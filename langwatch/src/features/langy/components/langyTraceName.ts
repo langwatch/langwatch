@@ -53,7 +53,9 @@ export function useResolvedTraceName(
   const projectId = project?.id;
 
   const query = api.tracesV2.header.useQuery(
-    { projectId: projectId ?? "", traceId: traceId ?? "" },
+    // Only traceName/name are read below — never worth the extra spans
+    // read full resolution costs.
+    { projectId: projectId ?? "", traceId: traceId ?? "", full: false },
     {
       enabled: enabled && !!projectId && !!traceId,
       // A trace's name barely changes; keep it cached across hovers.

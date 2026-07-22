@@ -42,11 +42,15 @@ export function useConversationPrefetch(
         if (!turn) continue;
         // Fire and forget. tRPC's prefetch is a no-op when the entry is
         // already fresh in cache, so subsequent passes don't re-hit the
-        // server.
+        // server. full: false — most siblings are never opened, so this
+        // stays a cheap read, same philosophy as not prefetching spans:
+        // the full IO resolution one spans read costs is only worth
+        // paying once the user actually navigates there.
         void utils.tracesV2.header.prefetch({
           projectId,
           traceId: turn.traceId,
           occurredAtMs: turn.timestamp,
+          full: false,
         });
       }
     }, PREFETCH_DELAY_MS);

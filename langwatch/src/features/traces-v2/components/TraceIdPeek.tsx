@@ -172,6 +172,9 @@ function PeekPopoverContent({
       projectId: project?.id ?? "",
       traceId,
       ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
+      // The popover only ever shows a 2-line clamp of input/output — never
+      // worth the extra spans read full resolution costs.
+      full: false,
     },
     { enabled: !!project?.id, staleTime: 300_000 },
   );

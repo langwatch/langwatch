@@ -95,10 +95,13 @@ const DEFAULT_SEARCH_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
  * One trace header per id, in id order, via the same `tracesV2.header` read the
- * trace drawer uses. Fetched individually (the v2 surface has no bulk-by-id
- * read), which is also what makes chunked fill natural: each settled header is
- * one more row. A trace the viewer cannot see — deleted, out of retention,
- * hidden by privacy rules — just doesn't come back, and the card says so.
+ * trace drawer uses (minus full IO resolution — this fetches N traces and
+ * immediately truncates each to `ROW_TEXT_MAX`, so it's never worth the extra
+ * spans read `full: true` costs). Fetched individually (the v2 surface has no
+ * bulk-by-id read), which is also what makes chunked fill natural: each settled
+ * header is one more row. A trace the viewer cannot see — deleted, out of
+ * retention, hidden by privacy rules — just doesn't come back, and the card
+ * says so.
  */
 async function traceByIds({
   utils,
@@ -110,7 +113,9 @@ async function traceByIds({
   ids: string[];
 }): Promise<CapabilityHydration> {
   const settled = await Promise.allSettled(
-    ids.map((traceId) => utils.tracesV2.header.fetch({ projectId, traceId })),
+    ids.map((traceId) =>
+      utils.tracesV2.header.fetch({ projectId, traceId, full: false }),
+    ),
   );
   const rows: CapabilityHydratedRow[] = [];
   settled.forEach((result, index) => {

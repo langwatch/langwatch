@@ -1,5 +1,29 @@
-import { describe, expect, it } from "vitest";
-import { traceDisplayName } from "../components/langyTraceName";
+// @vitest-environment jsdom
+import { renderHook } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import {
+  traceDisplayName,
+  useResolvedTraceName,
+} from "../components/langyTraceName";
+
+const capturedHeaderInputs: Array<{ full?: boolean }> = [];
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    tracesV2: {
+      header: {
+        useQuery: (input: { full?: boolean }) => {
+          capturedHeaderInputs.push(input);
+          return { data: undefined };
+        },
+      },
+    },
+  },
+}));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
+}));
 
 /**
  * The one trace display-name derivation for Langy's context surfaces (task #11).
@@ -62,6 +86,16 @@ describe("traceDisplayName", () => {
       });
       expect(name).not.toBe("abcdef1234567890");
       expect(name).toContain("…");
+    });
+  });
+});
+
+describe("useResolvedTraceName", () => {
+  describe("given a trace id with no cached label", () => {
+    it("reads only the name — never the extra spans read full IO resolution costs", () => {
+      renderHook(() => useResolvedTraceName("trace-1"));
+
+      expect(capturedHeaderInputs.at(-1)).toMatchObject({ full: false });
     });
   });
 });

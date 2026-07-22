@@ -29,24 +29,32 @@ export function useTraceHeader() {
   // newly arrived spans show up without a manual refresh. Once the
   // trace is older than the window, the interval falls away and the
   // query goes back to its normal staleTime caching behaviour.
-  const query = api.tracesV2.header.useQuery(queryArgs, {
-    enabled: isReady,
-    staleTime: 300_000,
-    cacheTime: 1_800_000,
-    keepPreviousData: true,
-    refetchOnWindowFocus: true,
-    refetchInterval: (data) => {
-      if (isLive && !sseConnected) return LIVE_REFETCH_MS;
-      // The trace knows it used a prompt but the rollup hasn't
-      // populated the IDs yet — keep polling on a slower cadence so
-      // the chips fill in without the user clicking around. Once an
-      // ID is present we go quiet again.
-      if (data?.containsPrompt && !data.lastUsedPromptId) {
-        return PROMPTS_PENDING_REFETCH_MS;
-      }
-      return false;
+  // full: true — this is the drawer's own detail read; it's the one caller
+  // of tracesV2.header that actually shows/exports untruncated input/output
+  // (see buildTraceMarkdown), so it's worth the extra spans read full
+  // resolution costs. Every other header caller (peek, name lookups, bulk
+  // hydrators, sibling prefetch) passes false.
+  const query = api.tracesV2.header.useQuery(
+    { ...queryArgs, full: true },
+    {
+      enabled: isReady,
+      staleTime: 300_000,
+      cacheTime: 1_800_000,
+      keepPreviousData: true,
+      refetchOnWindowFocus: true,
+      refetchInterval: (data) => {
+        if (isLive && !sseConnected) return LIVE_REFETCH_MS;
+        // The trace knows it used a prompt but the rollup hasn't
+        // populated the IDs yet — keep polling on a slower cadence so
+        // the chips fill in without the user clicking around. Once an
+        // ID is present we go quiet again.
+        if (data?.containsPrompt && !data.lastUsedPromptId) {
+          return PROMPTS_PENDING_REFETCH_MS;
+        }
+        return false;
+      },
     },
-  });
+  );
 
   // When the drawer opened without a partition hint (deep link / refresh
   // whose URL carried no `t`), the header itself runs an unconstrained
