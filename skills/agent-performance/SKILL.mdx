@@ -84,12 +84,7 @@ Open the report path for the user and also summarize the top findings directly i
 
 ## Step 5: Hand Off to Improvement
 
-Diagnosis without treatment is just bad news. Close by proposing the next step:
-
-- If the `agent-improve` skill is installed, offer to run `/agent-improve` on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes.
-- If it is not installed, tell the user to install it: `npx skills add langwatch/skills/agent-improve`
-
-Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
+Diagnosis without treatment is just bad news. If the `agent-improve` skill is installed, run it on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. Pass along the report — agent-improve uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 
@@ -98,4 +93,4 @@ Pass along the report: agent-improve uses these findings and trace examples as i
 - Do NOT rely on aggregates alone; always read at least a handful of full traces per finding, the surprise is always in the details
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
-- If the CLI returns an error, surface the exact message in your reply rather than paraphrasing; the user often needs the raw error to debug API key, project, or date-range issues
+- If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text — an activity card already shows the underlying failure
