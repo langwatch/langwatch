@@ -75,11 +75,16 @@ export interface ExecutionState {
   trace_id?: string;
   span_id?: string;
   /**
-   * The raw engineer-facing failure message. Kept for the studio's debug
-   * panel and logs, but it can name a URL or a Go net error, so it is NOT
-   * rendered to a customer — both the control plane and the studio present
-   * from `error_type` (see ADR-045, `src/features/errors`, and the studio's
-   * `utils/executionStateError`).
+   * The raw engineer-facing failure message — it can name a URL or a Go net
+   * error, so it is never a headline.
+   *
+   * Where the state carries an `error_type`, the studio presents from that
+   * code via the registry and this string stays in the debug panel and the
+   * logs (see ADR-045 and `utils/executionStateError`). Where it does NOT —
+   * a client-side timeout, the stream's top-level error frame, the
+   * optimization runner — this is the only thing anyone has, and showing it
+   * beats telling the user "we've been notified" about something nobody was
+   * notified of.
    */
   error?: string;
   /**

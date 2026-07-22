@@ -17,9 +17,16 @@ import {
  *
  * Built through `handledErrorFromHerr` so the same adapter that decodes real
  * Go `herr` envelopes produces this one: the raw message rides as the handled
- * error's server-side `message` (which `SerializedHandledError` deliberately
- * omits — see #5984), so it stays in logs and never crosses to the browser,
- * while the client presents from the code via the registry.
+ * error's server-side `message`, which `SerializedHandledError` deliberately
+ * omits (#5984), so the CODE is what the client presents from.
+ *
+ * The raw string does still reach one surface, deliberately: the evaluator
+ * grid ships it as `details` and `ComparisonCell` puts it behind a "show
+ * details" popover. That is not a contradiction of the rule, it is the rule —
+ * registry copy is what a customer READS, and the engine's own words are
+ * available on request to the person debugging the workflow they wrote. What
+ * is forbidden is the raw string appearing as a headline, a toast body, or
+ * anything a customer sees without asking for it.
  */
 export function nodeErrorToDomainError({
   errorType,
