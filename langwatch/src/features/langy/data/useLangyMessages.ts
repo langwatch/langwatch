@@ -1,7 +1,9 @@
 import type { LangyEventCursor } from "@langwatch/langy";
+import { useEffect } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useLangyStore } from "../stores/langyStore";
 import type { LangyMessageDto } from "./langy.dtos";
 
 export interface LangyMessagesResult {
@@ -106,6 +108,15 @@ export function useLangyMessages(
       refetchInterval: (data) => langyMessagesPollInterval(data),
     },
   );
+
+  // A successful read is durable proof the conversation's projection exists —
+  // confirms a freshly-minted conversation (see `unconfirmedConversations`).
+  const conversationRead = !!conversationId && query.isSuccess;
+  useEffect(() => {
+    if (conversationRead && conversationId) {
+      useLangyStore.getState().confirmConversation(conversationId);
+    }
+  }, [conversationRead, conversationId]);
 
   return {
     messages: (query.data?.messages ?? []) as LangyMessageDto[],

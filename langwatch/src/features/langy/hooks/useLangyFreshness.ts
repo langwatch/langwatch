@@ -54,6 +54,11 @@ export function useLangyFreshness(activeConversationId: string | null): void {
       signalCursor: LangyConversationUpdateSignal["cursor"],
     ) => {
       const store = useLangyStore.getState();
+      // A signal naming the conversation is durable proof it exists — the
+      // projection updated. Confirms a freshly-minted conversation so the
+      // history read's not-found stops presenting as pending (see
+      // `unconfirmedConversations`).
+      store.confirmConversation(conversationId);
       const local = store.turnProjection.cursor;
       if (!signalCursor || !local) {
         // Pre-cursor server build, or the snapshot has not seeded the local

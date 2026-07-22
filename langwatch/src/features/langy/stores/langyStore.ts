@@ -268,6 +268,17 @@ interface LangyState extends TurnPhaseState {
    * it WITHOUT reloading history (the stream already holds the messages).
    */
   adoptConversation: (id: string) => void;
+  /**
+   * Conversations THIS tab created whose read-side projection has not yet
+   * been seen. The create command is accepted before the projection lands, so
+   * a not-found from the history read is "not yet", never an error, until a
+   * durable confirmation arrives — a successful read, or a freshness signal
+   * naming the conversation. Session-scoped on purpose: never persisted (a
+   * refreshed tab reads before it writes, so the window doesn't exist there).
+   */
+  unconfirmedConversations: Record<string, true>;
+  /** A durable read or signal proved the conversation's projection exists. */
+  confirmConversation: (id: string) => void;
   /** Start a fresh, empty conversation. */
   startNewConversation: () => void;
   /** Mark the pending history load as applied. */
@@ -786,12 +797,27 @@ export const useLangyStore = create<LangyState>()(
           // adopting the conversation and clearing the previous turn's live
           // signals (status / progress / reasoning / plan).
           activeConversationId: conversationId,
+          // A conversation this dispatch just MINTED (the tab pointed at
+          // nothing, or at another conversation) starts unconfirmed: its
+          // projection may lag the accepted command, and a not-found read in
+          // that window must present as pending, not as an error.
+          unconfirmedConversations:
+            s.activeConversationId === conversationId
+              ? s.unconfirmedConversations
+              : { ...s.unconfirmedConversations, [conversationId]: true },
           turnStatus: null,
           turnProgress: null,
           turnProgressSample: null,
           turnReasoning: null,
           turnPlan: null,
         })),
+      unconfirmedConversations: {},
+      confirmConversation: (id) =>
+        set((s) => {
+          if (!s.unconfirmedConversations[id]) return s;
+          const { [id]: _confirmed, ...rest } = s.unconfirmedConversations;
+          return { unconfirmedConversations: rest };
+        }),
       requestStop: () => set((s) => reduceRequestStop(s)),
       abandonStop: () => set((s) => reduceAbandonStop(s)),
       observeBackendTurn: (inFlight) =>
