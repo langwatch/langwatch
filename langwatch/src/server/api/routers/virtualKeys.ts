@@ -14,6 +14,7 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
+import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -136,7 +137,7 @@ async function assertScopesBelongToOrg(
  *     VK trace-project's guardrails) — else BAD_REQUEST
  *     `guardrail_project_mismatch`.
  *   - the actor must hold `gatewayGuardrails:attach` on that project —
- *     else FORBIDDEN `missing_perm:gatewayGuardrails:attach`.
+ *     else a handled `guardrail_attach_forbidden` (403).
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  *       — @cross-project + @rbac scenarios.
@@ -184,10 +185,16 @@ async function assertGuardrailAttachmentsAllowed(
     "gatewayGuardrails:attach",
   );
   if (!allowed) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "missing_perm:gatewayGuardrails:attach",
-    });
+    // A named permission denial, not a string the client has to parse. The
+    // guardrails surface used to branch on `err.message.includes("missing_perm")`
+    // to write its own copy — which is exactly the message-prose coupling the
+    // handled-error boundary exists to remove, and it would have broken
+    // silently the moment this throw was tidied up.
+    throw new HandledError(
+      "guardrail_attach_forbidden",
+      "Caller lacks gatewayGuardrails:attach on the virtual key's project",
+      { httpStatus: 403, fault: "customer" },
+    );
   }
 }
 

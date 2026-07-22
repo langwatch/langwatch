@@ -14,7 +14,7 @@
  *      AuditLog row targeted at the VK.
  *   3. Perm gate — a caller holding `virtualKeys:manage` but NOT
  *      `gatewayGuardrails:attach` on the VK's project is rejected
- *      FORBIDDEN `missing_perm:gatewayGuardrails:attach`. The denial must
+ *      a handled `guardrail_attach_forbidden` (403). The denial must
  *      fire on the guardrail-attach gate, not the upstream
  *      `virtualKeys:manage` org gate — otherwise the test would pass for
  *      the wrong reason.
@@ -336,7 +336,7 @@ describe("virtualKeys.update — guardrail attach", () => {
 
   describe("when the caller lacks gatewayGuardrails:attach on the project", () => {
     /** @scenario gatewayGuardrails:attach is required on the VK side to wire a guardrail to a VK */
-    it("rejects with missing_perm:gatewayGuardrails:attach", async () => {
+    it("rejects with a handled guardrail_attach_forbidden", async () => {
       await expect(
         noAttachCaller.virtualKeys.update({
           organizationId: ORG_ID,
@@ -347,7 +347,7 @@ describe("virtualKeys.update — guardrail attach", () => {
             ],
           },
         }),
-      ).rejects.toThrow(/missing_perm:gatewayGuardrails:attach/);
+      ).rejects.toThrow(/guardrail_attach_forbidden/);
     });
 
     // Guards against a false-green: the denial must come from the
