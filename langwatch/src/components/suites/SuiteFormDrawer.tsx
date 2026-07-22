@@ -28,7 +28,9 @@ import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import {
   applyHandledErrorToForm,
+  describeError,
   FormServerError,
+  readHandledError,
   showErrorToast,
 } from "~/features/errors";
 import {
@@ -141,6 +143,24 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const { form } = suiteForm;
   const errors = form.formState.errors;
 
+  /**
+   * Puts a taken-name rejection under the field the server is complaining
+   * about — the same input the user is looking at — and reports whether it
+   * did, so the caller can skip the toast.
+   *
+   * `applyHandledErrorToForm` claims only `validation_error`; a name clash
+   * arrives as its own 409 code, so it is placed by hand.
+   */
+  const applyNameTakenToForm = (error: unknown): boolean => {
+    if (readHandledError(error)?.code !== "suite_name_taken") return false;
+    form.setError(
+      "name",
+      { type: "server", message: describeError({ error }) },
+      { shouldFocus: true },
+    );
+    return true;
+  };
+
   // -- Mutations --
 
   const createMutation = api.suites.create.useMutation({
@@ -162,6 +182,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
     onError: (err) => {
       saveAndRunRef.current = false;
+      if (applyNameTakenToForm(err)) return;
       if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true }))
         return;
       showErrorToast({ error: err, fallbackTitle: "Couldn't create run plan" });
@@ -191,6 +212,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
     onError: (err) => {
       saveAndRunRef.current = false;
+      if (applyNameTakenToForm(err)) return;
       if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true }))
         return;
       showErrorToast({ error: err, fallbackTitle: "Couldn't update run plan" });

@@ -16,7 +16,6 @@ import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import MyLayout from "~/components/me/MyLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -92,13 +91,9 @@ function RequestBudgetIncreasePage() {
         });
         return;
       }
-      showErrorToast({
-        error: err,
-        fallbackTitle: "Couldn't send your request",
-      });
-      // The toast reports the failure and then leaves; the way out of a
-      // request that won't send is the admin's address, so it stays on the
-      // page until the next attempt.
+      // No toast: the alert below reports this same failure and stays until
+      // the next attempt, and it carries the way out — the admin's address.
+      // A toast on top of it says the same thing twice, then leaves.
       setSendFailed(true);
     },
   });

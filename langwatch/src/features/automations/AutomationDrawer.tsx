@@ -46,7 +46,11 @@ import {
   type ConfigFormCtx,
   isNotifyEntry,
 } from "~/features/automations/providers/types";
-import { explainAnyError, showErrorToast } from "~/features/errors";
+import {
+  explainAnyError,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -85,6 +89,34 @@ import {
   useDraft,
   useSection,
 } from "./state/selectors";
+
+/**
+ * Headlines naming the template the server rejected.
+ *
+ * An automation carries up to four Liquid templates, so "This template isn't
+ * valid" — the registry's copy for `template_validation_error`, which has no
+ * way to know which drawer this is — leaves the author opening each editor in
+ * turn to find the syntax error the description is describing. The failing
+ * field rides on the handled payload's `meta.field`; these are the words for
+ * each one.
+ */
+const TEMPLATE_FIELD_TITLES: Record<string, string> = {
+  emailSubjectTemplate: "Your email subject template isn't valid",
+  emailBodyTemplate: "Your email body template isn't valid",
+  slackTemplate: "Your Slack message template isn't valid",
+  slackTemplateType: "Your Slack message format isn't valid",
+};
+
+/**
+ * The headline for a rejected template, or nothing for any other failure —
+ * in which case the caller's normal title selection applies.
+ */
+function templateValidationTitle(error: unknown): string | undefined {
+  const handled = readHandledError(error);
+  if (handled?.code !== "template_validation_error") return undefined;
+
+  return TEMPLATE_FIELD_TITLES[String(handled.meta.field ?? "")];
+}
 
 /** Facet-ordered "why can't I save yet" copy: Name → Type → Subject →
  *  Cadence → Severity → Delivery. Type is always chosen (the source defaults
@@ -778,17 +810,26 @@ export function AutomationDrawer({
           // said, so it has to say the same thing — same title selection as
           // `showErrorToast`: registered copy names the actual failure and
           // wins, anything else takes the generic headline for the action.
+          // A rejected template beats both, because it names which of the
+          // four editors to open.
           const explanation = explainAnyError(err);
+          const templateTitle = templateValidationTitle(err);
           pushAttempt({
             at: Date.now(),
             channel,
             status: "failure",
-            errorTitle: explanation.isRegistered
-              ? explanation.title
-              : "Test fire failed",
+            errorTitle:
+              templateTitle ??
+              (explanation.isRegistered
+                ? explanation.title
+                : "Test fire failed"),
             errorDetail: explanation.description,
           });
-          showErrorToast({ error: err, fallbackTitle: "Test fire failed" });
+          showErrorToast({
+            error: err,
+            title: templateTitle,
+            fallbackTitle: "Test fire failed",
+          });
         },
       },
     );
@@ -855,9 +896,12 @@ export function AutomationDrawer({
           void queryClient.graphs.getById.invalidate();
           closeDrawer();
         },
+        // Save validates the same four templates, so it names the offending
+        // one too — see `templateValidationTitle`.
         onError: (err) =>
           showErrorToast({
             error: err,
+            title: templateValidationTitle(err),
             fallbackTitle: "Couldn't save automation",
           }),
       },

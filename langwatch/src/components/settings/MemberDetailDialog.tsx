@@ -18,6 +18,7 @@ import { Link } from "~/components/ui/link";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import {
   BindingInputRow,
@@ -132,8 +133,10 @@ export function MemberDetailDialog({
       toaster.create({ title: "Member updated", type: "success" });
       onClose();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to save";
-      toaster.create({ title: message, type: "error" });
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update this member",
+      });
     } finally {
       setIsSaving(false);
     }

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import type { ExportMode, ExportFormat, ExportProgress } from "~/server/export/types";
 import type { ExportProgressEvent } from "~/server/api/routers/export";
 import { api } from "~/utils/api";
@@ -273,12 +274,9 @@ export function useExportTraces({
           if (error instanceof Error && error.name === "AbortError") {
             return false; // User cancelled, not an error
           }
-          const message =
-            error instanceof Error ? error.message : "Unknown error";
-          toaster.create({
-            title: "Export failed",
-            description: message,
-            type: "error",
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't export your traces",
           });
           return false;
         });

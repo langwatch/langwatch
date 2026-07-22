@@ -18,6 +18,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import type { RouterOutputs } from "~/utils/api";
 import { TeamUserRole } from "@prisma/client";
@@ -132,8 +133,7 @@ export function GroupDetailDialog({
       toaster.create({ title: "Group updated", type: "success" });
       onClose();
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to save";
-      toaster.create({ title: message, type: "error" });
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update this group" });
     } finally {
       setIsSaving(false);
     }

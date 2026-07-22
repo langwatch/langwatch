@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { Crown } from "lucide-react";
 import { useState } from "react";
-import { showErrorToast } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
@@ -21,7 +21,9 @@ type ProrationQueryResult =
       };
       isLoading: boolean;
       isError: boolean;
-      error?: { message: string };
+      /** The query's error, passed straight to the alert — handled or not.
+       *  Never read `.message`: since #5984 that is the error's code slug. */
+      error?: unknown;
     }
   | undefined;
 
@@ -38,8 +40,6 @@ function SeatsProrationPreview({
 }) {
   const isLoading = prorationQuery?.isLoading ?? false;
   const isError = prorationQuery?.isError ?? false;
-  const errorMessage =
-    prorationQuery?.error?.message ?? "Failed to load proration preview";
   const data = prorationQuery?.data;
 
   if (!hasSubscriptionApi) {
@@ -55,7 +55,12 @@ function SeatsProrationPreview({
   }
 
   if (isError) {
-    return <Text color="red.500">{errorMessage}</Text>;
+    return (
+      <HandledErrorAlert
+        error={prorationQuery?.error}
+        fallbackTitle="Couldn't load the price preview"
+      />
+    );
   }
 
   return (

@@ -30,6 +30,7 @@ import {
   LiquidEditor,
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
+import { describeError } from "~/features/errors";
 import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { api } from "~/utils/api";
@@ -260,6 +261,17 @@ function channelOption(channel: {
 }
 
 /**
+ * Terminates a sentence so another can follow it.
+ *
+ * `describeError` only ends in a full stop when the code has body copy to add
+ * — a bare title ("Couldn't load channels") comes back unpunctuated — and the
+ * hint below always glues the "you can still type it" affordance on the end.
+ */
+function endWithStop(sentence: string): string {
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
+/**
  * Channel field: a typeable combobox. Manual entry always works (type a name or
  * paste an ID); once a token is present the channel list is fetched
  * AUTOMATICALLY and drops in as filterable suggestions. Picking a suggestion
@@ -414,7 +426,12 @@ function SlackChannelField({
     ? `${gapHints.join(" ")} Type the channel name or paste its ID above to use one that isn't shown.`
     : null;
   const hint = list.isError
-    ? `Couldn't load channels: ${list.error?.message ?? "request failed"}. You can still type the channel above.`
+    ? `${endWithStop(
+        describeError({
+          error: list.error,
+          fallbackTitle: "Couldn't load channels",
+        }),
+      )} You can still type the channel above.`
     : returnedError === "missing_scope"
       ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
       : returnedError
