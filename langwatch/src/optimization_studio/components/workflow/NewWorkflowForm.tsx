@@ -9,7 +9,11 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { Dialog } from "../../../components/ui/dialog";
 import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
@@ -216,7 +220,10 @@ export const NewWorkflowForm = ({
             );
           },
           onError: (error) => {
-            if (applyHandledErrorToForm({ error, form })) return;
+            if (
+              applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })
+            )
+              return;
             showErrorToast({
               error,
               fallbackTitle: "Couldn't create workflow",
@@ -246,7 +253,9 @@ export const NewWorkflowForm = ({
       <form onSubmit={handleSubmit(onSubmit)}>
         <Dialog.Body>
           <VStack gap={4} align="stretch">
-            <Field.Root invalid={!!errors.name}>
+            <FormServerError form={form} />
+
+            <Field.Root invalid={!!errors.name || !!errors.icon}>
               <EmojiPickerModal
                 open={emojiPicker.open}
                 onClose={emojiPicker.onClose}
@@ -272,7 +281,9 @@ export const NewWorkflowForm = ({
                   }}
                 />
               </HStack>
-              <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+              <Field.ErrorText>
+                {errors.name?.message ?? errors.icon?.message}
+              </Field.ErrorText>
             </Field.Root>
             <Field.Root invalid={!!errors.description}>
               <Field.Label>Description</Field.Label>

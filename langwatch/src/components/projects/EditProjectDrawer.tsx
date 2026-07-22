@@ -11,7 +11,11 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -98,7 +102,10 @@ export function EditProjectDrawer({
             closeDrawer();
           },
           onError: (error) => {
-            if (applyHandledErrorToForm({ error, form })) return;
+            if (
+              applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })
+            )
+              return;
             showErrorToast({
               error,
               fallbackTitle: "Couldn't update the project",
@@ -135,6 +142,8 @@ export function EditProjectDrawer({
         <Drawer.Body>
           <form onSubmit={handleSubmit(onSubmit)}>
             <VStack align="stretch" gap={6}>
+              <FormServerError form={form} />
+
               <Text fontSize="sm" color="fg.muted">
                 Update the project name or move it to a different team. Moving a
                 project changes which team members inherit access.

@@ -35,7 +35,11 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import {
   getComplexProps,
   getDrawerStack,
@@ -487,7 +491,8 @@ export function useEvaluatorEditorController(
       }
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form })) return;
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+        return;
       showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" });
     },
   });
@@ -521,7 +526,8 @@ export function useEvaluatorEditorController(
       }
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form })) return;
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+        return;
       showErrorToast({ error, fallbackTitle: "Couldn't save evaluator" });
     },
   });
@@ -800,19 +806,24 @@ export function EvaluatorEditorBody({
         paddingY={4}
         overflowY="auto"
       >
+        <FormServerError form={form} />
+
         {evaluatorDef?.description && (
           <Text fontSize="sm" color="fg.muted">
             {evaluatorDef.description}
           </Text>
         )}
 
-        <Field.Root required>
+        <Field.Root required invalid={!!form.formState.errors.name}>
           <Field.Label>Evaluator Name</Field.Label>
           <Input
             {...form.register("name")}
             placeholder="Enter evaluator name"
             data-testid="evaluator-name-input"
           />
+          <Field.ErrorText>
+            {form.formState.errors.name?.message}
+          </Field.ErrorText>
         </Field.Root>
 
         {hasSettings && evaluatorType && settingsSchema && (

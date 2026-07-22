@@ -14,7 +14,11 @@ import {
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -181,7 +185,8 @@ export const AddAnnotationQueueDrawer = ({
           reset();
         },
         onError: (error) => {
-          if (applyHandledErrorToForm({ error, form })) return;
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+            return;
           showErrorToast({
             error,
             fallbackTitle: queueId
@@ -246,6 +251,8 @@ export const AddAnnotationQueueDrawer = ({
             {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack align="start">
+                <FormServerError form={form} />
+
                 <FullWidthFormControl
                   label="Participants"
                   helper="Select the participants for this annotation queue"
@@ -329,6 +336,7 @@ export const AddAnnotationQueueDrawer = ({
                 >
                   <Input {...register("name")} required />
                   {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
+                  <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
                 </FullWidthFormControl>
 
                 <FullWidthFormControl
@@ -337,6 +345,9 @@ export const AddAnnotationQueueDrawer = ({
                   invalid={!!errors.description}
                 >
                   <Textarea {...register("description")} required />
+                  <Field.ErrorText>
+                    {errors.description?.message}
+                  </Field.ErrorText>
                 </FullWidthFormControl>
 
                 <FullWidthFormControl
