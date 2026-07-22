@@ -188,7 +188,10 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
       {isTerminalOrigin({
         serviceName: turn.serviceName,
         origin: turn.origin,
-      }) && (
+      }) &&
+        // TurnSteps parses Claude Code's span names only — for any other
+        // agent the strip would announce steps and then find none.
+        (turn.serviceName ?? "").toLowerCase().includes("claude") && (
         <TurnSteps
           traceId={turn.traceId}
           occurredAtMs={turn.timestamp}

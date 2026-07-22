@@ -28,7 +28,7 @@ import { deriveTokenTimeline, findCacheRebuilds } from "./tokenTimeline";
  * answer "was this session healthy, and what did it cost me". This is the other
  * half — the same session, folded.
  *
- * Everything here comes from one pre-folded row (ADR-041), so the screen costs a
+ * Everything here comes from one pre-folded row (ADR-056), so the screen costs a
  * single point read rather than re-walking 800 spans in the browser.
  */
 
@@ -36,7 +36,7 @@ interface SessionViewProps {
   session: CodingAgentSessionRow;
   /**
    * The session's transcript entries, for the per-call token timeline. The
-   * fold above is a bounded aggregate (ADR-041) — it has the SUM of cache
+   * fold above is a bounded aggregate (ADR-056) — it has the SUM of cache
    * reused/rebuilt but not the "where". Optional: without it the timeline
    * section is simply omitted rather than the whole tab failing.
    */

@@ -182,14 +182,7 @@ export async function codeToHtml({
   code: string;
   lang: string;
 }): Promise<string> {
-  const canonical = normalizeShikiLang(lang);
-  await ensureShikiLangLoaded(canonical);
-  const highlighter = await getSharedHighlighter();
-  ensureDisposeNeutered(highlighter);
-  return highlighter.codeToHtml(code, {
-    lang: canonical,
-    theme: "github-light",
-  });
+  return codeToHtmlThemed({ code, lang, theme: "github-light" });
 }
 
 /**
@@ -204,12 +197,21 @@ export async function codeToHtmlDark({
   code: string;
   lang: string;
 }): Promise<string> {
+  return codeToHtmlThemed({ code, lang, theme: "github-dark" });
+}
+
+async function codeToHtmlThemed({
+  code,
+  lang,
+  theme,
+}: {
+  code: string;
+  lang: string;
+  theme: "github-light" | "github-dark";
+}): Promise<string> {
   const canonical = normalizeShikiLang(lang);
   await ensureShikiLangLoaded(canonical);
   const highlighter = await getSharedHighlighter();
   ensureDisposeNeutered(highlighter);
-  return highlighter.codeToHtml(code, {
-    lang: canonical,
-    theme: "github-dark",
-  });
+  return highlighter.codeToHtml(code, { lang: canonical, theme });
 }

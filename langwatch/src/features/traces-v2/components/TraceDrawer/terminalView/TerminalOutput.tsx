@@ -48,7 +48,7 @@ export const TerminalOutput = memo(function TerminalOutput({
   const [expanded, setExpanded] = useState(false);
   const { copy } = useCopyToClipboard();
 
-  const { visibleText, isCollapsible, foldLabel, displayCapped } =
+  const { visibleText, isCollapsible, foldLabel, isDisplayCapped } =
     useMemo(() => {
       const lines = text.split("\n");
       const hiddenLineCount = lines.length - COLLAPSE_AT_LINES;
@@ -69,7 +69,7 @@ export const TerminalOutput = memo(function TerminalOutput({
           hiddenLineCount > 0
             ? `+${hiddenLineCount} lines`
             : `+${formatCharCount(hiddenCharCount)}`,
-        displayCapped: expanded && text.length > RENDER_CEILING_CHARS,
+        isDisplayCapped: expanded && text.length > RENDER_CEILING_CHARS,
       };
     }, [text, expanded]);
 
@@ -89,7 +89,7 @@ export const TerminalOutput = memo(function TerminalOutput({
       onClick={handleClick}
     >
       <AnsiText text={visibleText} />
-      {displayCapped && (
+      {isDisplayCapped && (
         <Text
           fontFamily={TERMINAL_FONT_STACK}
           fontSize="13px"
