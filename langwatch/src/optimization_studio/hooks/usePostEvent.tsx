@@ -202,22 +202,27 @@ export const useHandleServerMessage = ({
   /**
    * Toasts a failed run.
    *
-   * The state's raw `error` is read only to tell a deliberate stop from a real
-   * failure — it is never rendered, because it is the engine's engineer-facing
-   * message. The words come from the state's `error_type` via the code-keyed
-   * registry (ADR-045); a state with no code degrades to the calm generic copy.
+   * The words come from the state's `error_type` via the code-keyed registry
+   * (ADR-045). A state with no code falls back to its raw message — see
+   * `explainExecutionStateError`, which explains why saying "we've been
+   * notified" there would be untrue.
    */
   const alertOnError = useCallback(
-    (failure: (CodedExecutionFailure & { error?: string }) | undefined) => {
+    (failure: CodedExecutionFailure | undefined) => {
       const explanation = explainExecutionStateError(failure);
       const rawMessage = failure?.error?.toLowerCase() ?? "";
       const wasStopped =
         rawMessage.includes("stopped") || rawMessage.includes("interrupted");
 
-      // Keyed by the failure code so a repeating failure (the engine being
-      // down while the studio retries) updates one toast instead of stacking
-      // a wall of them.
-      const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${failure?.error_type ?? "unknown"}`;
+      // Keyed by what the toast actually SAYS, so a repeating failure (the
+      // engine down while the studio retries) updates one toast instead of
+      // stacking a wall of them — while two different failures stay two
+      // toasts. Keying on `error_type` alone collapsed every uncoded failure
+      // onto one id, so a second, different one would silently replace the
+      // first.
+      const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${
+        failure?.error_type ?? explanation.title + explanation.description
+      }`;
 
       if (wasStopped) {
         toaster.create({

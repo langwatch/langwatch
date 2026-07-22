@@ -40,6 +40,7 @@ import {
   requestAbort,
   runOrchestrator,
 } from "~/server/experiments-v3/execution/orchestrator";
+import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import {
   type EvaluationV3Event,
@@ -269,11 +270,14 @@ secured
         logger.error({ error, projectId }, "Orchestrator error");
         captureException(toError(error), { extra: { projectId } });
 
+        // Through the same mapper the orchestrator uses: a handled error
+        // travels as its code plus `domainError` (so the client renders
+        // registry copy), and anything else becomes a fixed generic string.
+        // Writing `(error as Error).message` here put a Prisma string or a Go
+        // net error straight into the customer's cell — these two frames were
+        // the only producers the coded-error work didn't cover.
         await stream.writeSSE({
-          data: JSON.stringify({
-            type: "error",
-            message: (error as Error).message,
-          }),
+          data: JSON.stringify(mapThrownErrorEvent({ error })),
         });
       }
     });
@@ -487,11 +491,14 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
           extra: { projectId: project.id, slug },
         });
 
+        // Through the same mapper the orchestrator uses: a handled error
+        // travels as its code plus `domainError` (so the client renders
+        // registry copy), and anything else becomes a fixed generic string.
+        // Writing `(error as Error).message` here put a Prisma string or a Go
+        // net error straight into the customer's cell — these two frames were
+        // the only producers the coded-error work didn't cover.
         await stream.writeSSE({
-          data: JSON.stringify({
-            type: "error",
-            message: (error as Error).message,
-          }),
+          data: JSON.stringify(mapThrownErrorEvent({ error })),
         });
       }
     });
