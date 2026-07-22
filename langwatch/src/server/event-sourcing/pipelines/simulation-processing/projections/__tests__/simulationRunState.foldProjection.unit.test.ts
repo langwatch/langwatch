@@ -224,6 +224,38 @@ function foldEvents(events: SimulationProcessingEvent[]): SimulationRunStateData
 
 const FAKE_NOW = 99999;
 
+describe("batch denominator", () => {
+  describe("given a run queued as part of a batch", () => {
+    it("records the size the batch set out to queue", () => {
+      const state = foldEvents([createRunQueuedEvent({ batchTotal: 6 })]);
+
+      expect(state.BatchTotal).toBe(6);
+    });
+  });
+
+  describe("given a run queued before the denominator was carried", () => {
+    it("records an unknown size rather than guessing one", () => {
+      const state = foldEvents([createRunQueuedEvent()]);
+
+      expect(state.BatchTotal).toBe(0);
+    });
+  });
+
+  describe("when a queued event is redelivered without the denominator", () => {
+    // Delivery is at-least-once, and an older producer can redeliver the same
+    // run. Overwriting from the redelivery would erase a denominator an
+    // earlier one established and drop the batch back to counting rows.
+    it("keeps the size already established", () => {
+      const state = foldEvents([
+        createRunQueuedEvent({ batchTotal: 6 }),
+        createRunQueuedEvent(),
+      ]);
+
+      expect(state.BatchTotal).toBe(6);
+    });
+  });
+});
+
 describe("simulationRunStateFoldProjection", () => {
   beforeEach(() => {
     vi.useFakeTimers();
