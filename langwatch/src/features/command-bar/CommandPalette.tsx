@@ -577,7 +577,8 @@ export function CommandPalette({
             left={0}
             right={0}
             zIndex={20}
-            background="bg.panel"
+            background={{ base: "bg.panel/70", _dark: "bg.panel/70" }}
+            backdropFilter="blur(20px)"
             borderWidth="1px"
             borderColor="border.muted"
             borderRadius="16px"

@@ -133,9 +133,9 @@ export function LangyHomeHero() {
           ref={fieldRef}
           width="full"
           position="relative"
-          background="bg.panel/92"
+          background="bg.panel/60"
           borderWidth="1px"
-          borderColor={focused ? "border.emphasized" : "border.muted"}
+          borderColor={focused ? "border" : "border.muted"}
           borderRadius="16px"
           boxShadow={
             focused
