@@ -59,6 +59,17 @@ import { LangyChoicesCard } from "../components/blocks/LangyChoicesCard";
 
 afterEach(cleanup);
 
+/**
+ * The derived frame's provenance hooks (ADR-060 §4).
+ *
+ * Asserted through the frame's data attributes rather than its overline copy:
+ * the mark that a card is derived is the frame itself, and pinning these to a
+ * particular wording is what made every copy edit a test edit.
+ */
+const derivedFrames = () =>
+  document.querySelectorAll("[data-derived-by-langy]");
+const formingFrames = () => document.querySelectorAll("[data-derived-forming]");
+
 const statsCardPart = {
   type: "langy-card",
   blockId: "b1",
@@ -130,7 +141,7 @@ describe("given a reply whose parts carry a stamped block between prose", () => 
     expect(screen.getByText("Here is the picture:")).toBeDefined();
     expect(screen.getByText("That is the shape of it.")).toBeDefined();
     // The provenance chrome — visibly marked derived (ADR-060 §4).
-    expect(screen.getByText("Derived by Langy")).toBeDefined();
+    expect(derivedFrames()).toHaveLength(1);
     expect(screen.getByText("Yesterday at a glance")).toBeDefined();
     expect(screen.getByText("failures")).toBeDefined();
   });
@@ -147,7 +158,7 @@ describe("given recorded text that happens to contain a fence", () => {
       ]),
     );
     // No stamped part → no derived chrome, whatever the prose contains.
-    expect(screen.queryByText("Derived by Langy")).toBeNull();
+    expect(derivedFrames()).toHaveLength(0);
   });
 });
 
@@ -169,7 +180,7 @@ describe("given a failed block part", () => {
     expect(line).toBeDefined();
     // Raw hidden while collapsed; no card of any kind drawn from it.
     expect(screen.queryByText(/tr_fake/)).toBeNull();
-    expect(screen.queryByText("Derived by Langy")).toBeNull();
+    expect(derivedFrames()).toHaveLength(0);
 
     fireEvent.click(screen.getByText("View raw"));
     expect(screen.getByText(/tr_fake/)).toBeDefined();
@@ -286,7 +297,7 @@ describe("given a derived timeseries with hints", () => {
         },
       ]),
     );
-    expect(screen.getByText("Derived by Langy")).toBeDefined();
+    expect(derivedFrames()).toHaveLength(1);
     expect(screen.getByText("Open in Traces")).toBeDefined();
   });
 
@@ -402,7 +413,7 @@ describe("given a question that allows Other", () => {
 
 describe("given a turn streaming a block (ADR-060 §7)", () => {
   const statsFenceOpen =
-    'Plotting this now:\n```langy-card\n{"kind": "stats", "blockId": "live1", "title": "Forming", "items": [';
+    'Plotting this now:\n```langy-card\n{"kind": "stats", "blockId": "live1", "title": "Live counts", "items": [';
 
   it("shows no card preview until a validating prefix exists", () => {
     renderMessage(
@@ -410,7 +421,7 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
       { isStreaming: true },
     );
     expect(screen.getByText(/Plotting/)).toBeDefined();
-    expect(screen.queryByText(/Derived by Langy/)).toBeNull();
+    expect(derivedFrames()).toHaveLength(0);
   });
 
   it("renders the forming card once the prefix validates, marked forming", () => {
@@ -423,8 +434,8 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
       ]),
       { isStreaming: true },
     );
-    expect(screen.getByText("Derived by Langy · forming")).toBeDefined();
-    expect(screen.getByText("Forming")).toBeDefined();
+    expect(formingFrames()).toHaveLength(1);
+    expect(screen.getByText("Live counts")).toBeDefined();
     expect(screen.getByText("traces")).toBeDefined();
   });
 
@@ -438,7 +449,7 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
       ]),
       { isStreaming: true },
     );
-    expect(screen.getByText("Derived by Langy · forming")).toBeDefined();
+    expect(formingFrames()).toHaveLength(1);
 
     // The turn settles: the durable parts replace the streamed text — the
     // stamped part is the truth, the preview is gone with the stream.
@@ -455,7 +466,7 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
               card: {
                 kind: "stats",
                 blockId: "live1",
-                title: "Forming",
+                title: "Live counts",
                 items: [{ label: "traces", value: 12 }],
               },
             },
@@ -469,9 +480,9 @@ describe("given a turn streaming a block (ADR-060 §7)", () => {
       </ChakraProvider>,
     );
 
-    expect(screen.queryByText("Derived by Langy · forming")).toBeNull();
-    expect(screen.getAllByText("Derived by Langy")).toHaveLength(1);
-    expect(screen.getByText("Forming")).toBeDefined();
+    expect(formingFrames()).toHaveLength(0);
+    expect(derivedFrames()).toHaveLength(1);
+    expect(screen.getByText("Live counts")).toBeDefined();
   });
 });
 
