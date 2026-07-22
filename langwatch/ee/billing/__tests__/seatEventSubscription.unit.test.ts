@@ -759,6 +759,32 @@ describe("seatEventSubscription", () => {
       });
     });
 
+    describe("when the Stripe customer currency lookup fails", () => {
+      it("falls back to the requested currency instead of aborting checkout", async () => {
+        db.subscription.findMany.mockResolvedValue([]);
+        stripe.customers.retrieve.mockRejectedValue(
+          new Error("rate limit exceeded"),
+        );
+        stripe.checkout.sessions.create.mockResolvedValue({
+          url: "https://checkout.stripe.com/session",
+        });
+
+        const result = await service.createSeatEventCheckout({
+          organizationId: "org_1",
+          customerId: "cus_1",
+          baseUrl: "https://app.test",
+          currency: "USD" as any,
+          billingInterval: "monthly",
+          membersToAdd: 2,
+        });
+
+        expect(result).toEqual({ url: "https://checkout.stripe.com/session" });
+        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
+          expect.objectContaining({ currency: "usd" }),
+        );
+      });
+    });
+
     describe("when the Stripe customer is deleted", () => {
       it("falls back to the requested currency", async () => {
         db.subscription.findMany.mockResolvedValue([]);

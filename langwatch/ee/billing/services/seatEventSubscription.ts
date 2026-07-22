@@ -54,9 +54,17 @@ export const createSeatEventSubscriptionFns = ({
     isUpgradeFromTiered?: boolean;
     invites?: InviteInput[];
   }) {
+    // A failed lookup must not abort checkout — falling back to the requested
+    // currency just restores the pre-reconciliation behavior.
     const fixedCurrency = await getStripeCustomerFixedCurrency({
       stripe,
       customerId,
+    }).catch((error: unknown) => {
+      logger.warn(
+        { organizationId, error: (error as Error).message },
+        "[billing] Failed to look up Stripe customer currency, using requested currency",
+      );
+      return null;
     });
     const checkoutCurrency = fixedCurrency ?? currency;
     if (fixedCurrency && fixedCurrency !== currency) {
