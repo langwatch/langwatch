@@ -8,9 +8,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ScenarioRunStatus } from "../../scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { mergeRunData } from "../scenario-run.utils";
-import type { ScenarioRunData } from "../scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 
 function makeRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {

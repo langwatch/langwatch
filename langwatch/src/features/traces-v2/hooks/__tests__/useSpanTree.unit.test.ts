@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/contracts/traces-v2";
 
 import { LIVE_REFETCH_MS } from "../../constants/freshness";
 import { useSpanTree } from "../useSpanTree";

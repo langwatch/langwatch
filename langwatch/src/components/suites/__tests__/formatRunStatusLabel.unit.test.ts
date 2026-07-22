@@ -4,7 +4,7 @@
  * @see specs/features/suites/suite-list-view-status.feature
  */
 import { describe, expect, it } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { formatRunStatusLabel } from "../format-run-status-label";
 
 describe("formatRunStatusLabel()", () => {

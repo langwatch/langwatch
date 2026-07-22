@@ -25,7 +25,7 @@
 
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,

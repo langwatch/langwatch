@@ -6,7 +6,7 @@ import type {
   DatasetColumnType,
   DatasetRecordEntry,
   DatasetRecordInput,
-} from "../../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import type { Field, NodeDataset } from "../types/dsl";
 
 export function transposeColumnsFirstToRowsFirstWithId(

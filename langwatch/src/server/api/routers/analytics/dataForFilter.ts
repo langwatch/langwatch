@@ -1,10 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { FilterService } from "../../../filters/filter.service";
 import { availableFilters } from "../../../filters/registry";
-import { type FilterField, filterFieldsEnum } from "../../../filters/types";
+import { type FilterField, filterFieldsEnum } from "@langwatch/contracts/filters";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 

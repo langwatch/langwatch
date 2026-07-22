@@ -7,7 +7,7 @@ import {
   Role,
   TextMessage,
 } from "@copilotkit/runtime-client-gql";
-import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioMessageSnapshotEvent } from "@langwatch/contracts/scenarios/types";
 import { safeJsonParseOrStringFallback } from "./safe-json-parse-or-string-fallback";
 
 /**

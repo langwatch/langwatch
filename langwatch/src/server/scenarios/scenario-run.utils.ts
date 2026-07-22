@@ -10,7 +10,7 @@
  * Stored entries (ES/ClickHouse) win when both sources share an ID.
  */
 
-import type { ScenarioRunData } from "./scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 
 /**
  * Merges stored rows with BullMQ job rows, deduplicating by scenarioRunId.

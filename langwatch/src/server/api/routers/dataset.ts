@@ -8,7 +8,7 @@ import {
   datasetColumnsSchema,
   datasetRecordFormSchema,
   datasetRecordInputSchema,
-} from "../../datasets/types";
+} from "@langwatch/contracts/datasets";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

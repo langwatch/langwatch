@@ -19,7 +19,7 @@ import { Database, Search } from "react-feather";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { datasetDisplayRecordCount } from "~/server/datasets/record-count";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 import { api } from "~/utils/api";
 
 export type DatasetPickerSelection = {

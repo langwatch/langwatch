@@ -1,5 +1,5 @@
 import type { TRACE_EXPANSIONS } from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 
 /**
  * The subset of a `Trigger.actionParams` the graph-alert evaluation and

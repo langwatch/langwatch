@@ -7,7 +7,7 @@ import { prisma as defaultPrisma } from "~/server/db";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { Evaluation, Trace } from "~/server/tracer/types";
+import type { Evaluation, Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";

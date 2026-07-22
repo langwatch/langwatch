@@ -13,7 +13,7 @@ import {
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 import type { ViewMode } from "./useRunHistoryStore";
 
 type BatchSectionProps = {

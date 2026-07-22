@@ -10,7 +10,7 @@ import {
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { RestrictedAttribute } from "~/server/api/routers/tracesV2.schemas";
+import type { RestrictedAttribute } from "@langwatch/contracts/traces-v2";
 import { compileAttributePattern } from "~/server/data-privacy/attributePatternMatcher";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { usePinnedAttributes } from "../../hooks/usePinnedAttributes";

@@ -10,13 +10,15 @@ import {
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
 
-const toaster_ = createToaster({
+// Explicitly typed: createToaster's inferred return references @zag-js
+// internals that cannot be named in an emitted .d.ts.
+const toaster_: ReturnType<typeof createToaster> = createToaster({
   placement: "top-end",
   pauseOnPageIdle: true,
 });
 
 // Workaround for https://github.com/chakra-ui/chakra-ui/issues/9490#issuecomment-2601014577
-export const toaster = {
+export const toaster: ReturnType<typeof createToaster> = {
   ...toaster_,
   create: (args: Parameters<typeof toaster_.create>[0]) => {
     return toaster_.create({

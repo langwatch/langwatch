@@ -4,7 +4,7 @@ import type {
   Span,
   SpanInputOutput,
   Trace,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**

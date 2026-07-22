@@ -1,4 +1,4 @@
-import type { LLMSpan, Span } from "../server/tracer/types";
+import type { LLMSpan, Span } from "@langwatch/contracts/tracer";
 
 export const getSpanNameOrModel = (span: Span) => {
   return (

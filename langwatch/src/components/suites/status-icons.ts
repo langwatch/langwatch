@@ -14,7 +14,7 @@ import {
   Loader,
   XCircle,
 } from "lucide-react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 
 export interface StatusIconConfig {
   icon: LucideIcon;

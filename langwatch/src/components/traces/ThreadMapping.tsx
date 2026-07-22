@@ -11,10 +11,10 @@ import {
 import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { DatasetRecordEntry } from "../../server/datasets/types";
+import type { DatasetRecordEntry } from "@langwatch/contracts/datasets";
 import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPING_LABELS,

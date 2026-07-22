@@ -30,7 +30,7 @@ import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
-import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
+import type { ElasticSearchEvaluation, Trace } from "@langwatch/contracts/tracer";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
@@ -61,7 +61,7 @@ import { Tooltip } from "../ui/tooltip";
 import { ExportConfigDialog } from "./ExportConfigDialog";
 import { ExportProgress } from "./ExportProgress";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
-import type { TraceWithGuardrail } from "./MessageCard";
+import type { TraceWithGuardrail } from "@langwatch/contracts/tracer";
 import { useExportTraces } from "./useExportTraces";
 
 export interface MessagesTableProps {

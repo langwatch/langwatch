@@ -32,7 +32,7 @@ import { TracePresenceAvatars } from "~/features/presence/components/TracePresen
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/contracts/traces-v2";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useSpanTree } from "../../../hooks/useSpanTree";

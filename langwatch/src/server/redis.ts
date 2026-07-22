@@ -102,14 +102,17 @@ if (!isBuildOrNoRedis) {
     });
   }
 
-  // Common events for both single-node and cluster
-  connection?.on("error", (error: Error) => {
+  // Common events for both single-node and cluster. Narrowed to the
+  // EventEmitter surface: the Redis | Cluster union's overloaded `.on`
+  // signatures don't unify under declaration emit.
+  const connectionEvents = connection as NodeJS.EventEmitter | undefined;
+  connectionEvents?.on("error", (error: Error) => {
     logger.error({ error }, "error");
   });
-  connection?.on("close", () => {
+  connectionEvents?.on("close", () => {
     logger.info("connection closed");
   });
-  connection?.on("reconnecting", () => {
+  connectionEvents?.on("reconnecting", () => {
     logger.info("reconnecting...");
   });
 } else {

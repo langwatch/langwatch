@@ -37,8 +37,8 @@ import {
 } from "~/components/shared/PassRateIndicator";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
-import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
+import type { SuiteRunSummary } from "@langwatch/contracts/scenarios/types";
+import type { ExternalSetSummary } from "@langwatch/contracts/scenarios/types";
 import {
   ALL_RUNS_ID,
   toExternalSetSelection,

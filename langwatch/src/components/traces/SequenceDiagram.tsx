@@ -9,7 +9,7 @@ import { intervalToDuration } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import type { Span, SpanTypes } from "../../server/tracer/types";
+import type { Span, SpanTypes } from "@langwatch/contracts/tracer";
 
 import { useColorMode } from "../ui/color-mode";
 import { Select } from "../ui/select";

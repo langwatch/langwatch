@@ -14,7 +14,7 @@ import {
   DatasetTooLargeToExportError,
 } from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
-import type { DatasetRecordInput } from "../../datasets/types";
+import type { DatasetRecordInput } from "@langwatch/contracts/datasets";
 import { prisma } from "../../db";
 import { StorageService } from "../../storage";
 

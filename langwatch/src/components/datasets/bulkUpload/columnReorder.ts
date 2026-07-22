@@ -9,7 +9,7 @@
  * be driven there).
  */
 import { arrayMove } from "@dnd-kit/sortable";
-import type { DatasetConfirmColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "@langwatch/contracts/datasets";
 
 /** Move the dragged column (`active` sourceHeader) to the slot of the column it
  *  was dropped on (`over` sourceHeader). Identity-stable: returns the SAME array

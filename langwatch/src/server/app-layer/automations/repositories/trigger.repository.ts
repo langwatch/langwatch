@@ -6,7 +6,7 @@ import type {
   TriggerKind,
 } from "@prisma/client";
 import type { NotificationCadence } from "@langwatch/automations/cadences";
-import type { TriggerFilters } from "~/server/filters/types";
+import type { TriggerFilters } from "@langwatch/contracts/filters";
 
 export interface TriggerSummary {
   id: string;

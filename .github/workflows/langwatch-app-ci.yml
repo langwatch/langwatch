@@ -33,6 +33,10 @@ jobs:
           filters: |
             relevant:
               - 'langwatch/**'
+              # Root workspace packages compile into the app as source (see
+              # langwatch/pnpm-workspace.yaml), so their changes must gate the
+              # app CI too.
+              - 'packages/**'
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
@@ -47,6 +51,7 @@ jobs:
             feature-parity:
               - 'specs/**'
               - 'langwatch/**'
+              - 'packages/**'
               - 'tools/**'
               - 'mcp-server/**'
               - 'typescript-sdk/**'
@@ -85,10 +90,16 @@ jobs:
       - name: Cache TypeScript incremental build info
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: langwatch/node_modules/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          # Also caches the composite packages' declaration outputs (dist) and
+          # their per-package buildinfo — `tsgo --build` skips up-to-date
+          # referenced projects based on these.
+          path: |
+            langwatch/node_modules/.cache/tsbuildinfo
+            packages/*/dist
+            packages/*/node_modules/.cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig*.json', 'packages/*/tsconfig.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig*.json', 'packages/*/tsconfig.json') }}-
             ${{ runner.os }}-tsbuildinfo-
 
       - name: Run typecheck

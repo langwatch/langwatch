@@ -3,7 +3,7 @@ import {
   sanitizeTriggerFilters,
   triggerFiltersPermissiveSchema,
   triggerFiltersSchema,
-} from "../types";
+} from "@langwatch/contracts/filters";
 
 describe("triggerFiltersSchema", () => {
   describe("when filter field is known", () => {

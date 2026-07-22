@@ -29,7 +29,7 @@ import {
 } from "~/components/suites/SuiteDetailPanel";
 import { ExternalSetDetailPanel } from "~/components/suites/ExternalSetDetailPanel";
 import { SuiteSidebar } from "~/components/suites/SuiteSidebar";
-import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
+import type { SuiteRunSummary } from "@langwatch/contracts/scenarios/types";
 import { useRunSuite } from "~/components/suites/useRunSuite";
 import { SuiteRunConfirmationDialog } from "~/components/suites/SuiteRunConfirmationDialog";
 import {

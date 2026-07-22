@@ -4,7 +4,7 @@ import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/t
 import type {
   CustomMetadata,
   ReservedTraceMetadata,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
 
 /**

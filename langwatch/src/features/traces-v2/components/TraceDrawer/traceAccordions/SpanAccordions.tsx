@@ -14,7 +14,7 @@ import {
   PiiIncompleteNotice,
 } from "~/components/ui/ContentPrivacyMarkers";
 import { RedactedField } from "~/components/ui/RedactedField";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/contracts/traces-v2";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { AttributeTable } from "../AttributeTable";

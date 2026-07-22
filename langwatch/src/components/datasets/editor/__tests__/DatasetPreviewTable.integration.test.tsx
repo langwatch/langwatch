@@ -17,7 +17,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 import { DatasetPreviewTable } from "../DatasetPreviewTable";
 
 const SENTINEL = "SENTINEL_PAST_THE_CAP";

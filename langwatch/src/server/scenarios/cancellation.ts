@@ -14,8 +14,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { isCancellableStatus, ScenarioRunStatus } from "./scenario-event.enums";
-import type { ScenarioRunData } from "./scenario-event.types";
+import { isCancellableStatus, ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 
 const logger = createLogger("langwatch:scenarios:cancellation");
 

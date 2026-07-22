@@ -1,7 +1,20 @@
 packages:
   - .
-  - "packages/*"
   - "../mcp-server"
+  # All shared packages live in the repo-root /packages directory. They stay
+  # members of THIS workspace (not just the root one) so the app's pnpm install
+  # links them and installs their own deps against the app's lockfile.
+  # The app's API envelope/builder contract (Hono + zod peers).
+  - "../packages/api"
+  # Shared client/server type + zod-schema contracts (trace/span shapes,
+  # traces API schemas, dataset/filter types, scenario events).
+  - "../packages/contracts"
+  # Automation cadence/templating engine (liquidjs et al).
+  - "../packages/automations"
+  # Logger + tracing/context helpers (pino, OTel peer).
+  - "../packages/observability"
+  # Shared SSRF address classification (ADR-053), mirrored by pkg/ssrf in Go.
+  - "../packages/ssrf"
   # The CLI's card/domain-error contract, shared with typescript-sdk. Source-only
   # and zod-peer-dep'd, so it compiles against the app's own zod (3.25) via the
   # `zod/v4` subpath both majors ship.

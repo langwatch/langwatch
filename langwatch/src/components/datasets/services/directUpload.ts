@@ -20,7 +20,7 @@
 import type {
   DatasetColumns,
   DatasetConfirmColumns,
-} from "~/server/datasets/types";
+} from "@langwatch/contracts/datasets";
 
 /**
  * Sentinel error for "no browser-reachable object storage" (the backend's

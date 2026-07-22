@@ -28,7 +28,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
-} from "../../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import {
   MAX_FILE_SIZE_BYTES,
   MAX_ROWS_LIMIT,

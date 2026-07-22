@@ -5,7 +5,7 @@ import {
   XCircle,
   type LucideIcon,
 } from "lucide-react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 
 export interface ScenarioRunStatusConfig {
   /** Chakra colorPalette token */

@@ -6,7 +6,7 @@
 import { ChakraProvider, defaultSystem, Text } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { SimulationCard } from "../SimulationCard";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

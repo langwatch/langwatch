@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import {
   clickHouseFilterConditions,
   generateClickHouseFilterConditions,
 } from "../clickhouse/filter-conditions";
-import type { FilterField } from "../types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 describe("clickHouseFilterConditions", () => {
   describe("topics.topics", () => {

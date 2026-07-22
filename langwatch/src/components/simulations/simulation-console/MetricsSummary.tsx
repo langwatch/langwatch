@@ -1,5 +1,5 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
-import type { ScenarioResults } from "~/server/scenarios/schemas";
+import type { ScenarioResults } from "@langwatch/contracts/scenarios/schemas";
 import { CONSOLE_COLORS } from "./constants";
 
 interface MetricsSummaryProps {

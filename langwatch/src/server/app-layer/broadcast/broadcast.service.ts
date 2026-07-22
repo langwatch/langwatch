@@ -79,7 +79,10 @@ export class BroadcastService {
       this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
     });
 
-    this.subscriber.on("message", (channel, message) => {
+    // Narrowed to the EventEmitter surface: the Redis | Cluster union's
+    // overloaded `.on` signatures don't unify under declaration emit.
+    const subscriberEvents = this.subscriber as NodeJS.EventEmitter;
+    subscriberEvents.on("message", (channel: string, message: string) => {
       const eventType = ALL_EVENT_TYPES.find(
         (et) => redisChannel(et) === channel,
       );
@@ -104,7 +107,7 @@ export class BroadcastService {
       }
     });
 
-    this.subscriber.on("error", (error) => {
+    subscriberEvents.on("error", (error: Error) => {
       this.logger.error({ error }, "Redis subscriber error");
     });
   }

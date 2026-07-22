@@ -9,7 +9,7 @@ import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import type { DatasetRecordEntry } from "~/server/datasets/types";
+import type { DatasetRecordEntry } from "@langwatch/contracts/datasets";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
@@ -17,7 +17,7 @@ import {
   TRACE_EXPANSIONS,
   type TraceMapping,
 } from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 
 const logger = createLogger("langwatch:trigger-action-dispatch");
 

@@ -16,7 +16,7 @@
  * are semantically equivalent to EXISTS.
  */
 
-import type { FilterField } from "../../filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { type CHTable, tableAliases } from "./field-mappings";
 
 /**

@@ -5,6 +5,9 @@
 		// its own incremental cache instead of clobbering the app's.
 		"tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-tests.tsbuildinfo"
 	},
+	// No `references` — checked with `-p`, resolving @langwatch/* to source
+	// via the workspace symlink (see tsconfig.tsgo.json for why --build was
+	// dropped). Packages are validated by `pnpm typecheck:packages`.
 	"include": [
 		"./src/**/*.test.ts",
 		"./src/**/*.test.tsx",

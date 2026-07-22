@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { ScenarioSetLimitExceededError } from "~/server/app-layer/usage/errors";
-import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventType } from "@langwatch/contracts/scenarios/enums";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),

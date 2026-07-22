@@ -8,7 +8,7 @@ import {
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import type { LLMConfig } from "../../../types/dsl";
-import { normalizeToSnakeCase } from "./normalizeToSnakeCase";
+import { normalizeToSnakeCase } from "~/utils/normalizeToSnakeCase";
 
 type OptimizationStudioLLMConfigFieldProps = {
   llmConfig: LLMConfig;

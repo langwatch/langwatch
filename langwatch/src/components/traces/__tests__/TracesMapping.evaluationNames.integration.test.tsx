@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { MappingState } from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { TracesMapping } from "../TracesMapping";
 
 // Project-wide evaluator names returned for the last 30 days — note that the

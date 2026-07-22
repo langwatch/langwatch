@@ -18,10 +18,10 @@ const mockStudioBackendPostEvent = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/app/api/workflows/post_event/post-event", () => ({
   studioBackendPostEvent: (args: unknown) => mockStudioBackendPostEvent(args),
 }));
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
+vi.mock("~/server/optimization-studio/addEnvs", () => ({
   addEnvs: (event: unknown) => Promise.resolve(event),
 }));
-vi.mock("~/optimization_studio/server/loadDatasets", () => ({
+vi.mock("~/server/optimization-studio/loadDatasets", () => ({
   loadDatasets: (event: unknown) => Promise.resolve(event),
 }));
 

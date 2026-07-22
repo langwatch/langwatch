@@ -30,12 +30,12 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: vi.fn((v: string) => v.replace("encrypted:", "")),
 }));
 
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
+vi.mock("~/server/optimization-studio/addEnvs", () => ({
   addEnvs: vi.fn(),
   getS3CacheKey: vi.fn(),
 }));
 
-vi.mock("~/optimization_studio/server/loadDatasets", () => ({
+vi.mock("~/server/optimization-studio/loadDatasets", () => ({
   loadDatasets: vi.fn(),
 }));
 
@@ -44,7 +44,7 @@ vi.mock("../../workflows/post_event/post-event", () => ({
   studioBackendPostEvent: vi.fn(),
 }));
 
-vi.mock("~/optimization_studio/server/lambda", () => ({
+vi.mock("~/server/optimization-studio/lambda", () => ({
   invokeLambda: vi.fn(),
 }));
 
@@ -75,8 +75,8 @@ import type {
 } from "@copilotkit/runtime";
 import { beforeEach, describe, expect, it } from "vitest";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { addEnvs } from "~/server/optimization-studio/addEnvs";
+import { loadDatasets } from "~/server/optimization-studio/loadDatasets";
 import { PromptStudioAdapter } from "./service-adapter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

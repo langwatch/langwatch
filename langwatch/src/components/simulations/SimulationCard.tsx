@@ -1,5 +1,5 @@
 import { Box, Card, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
 import {
   SCENARIO_RUN_STATUS_CONFIG,

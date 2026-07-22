@@ -7,8 +7,8 @@ import type {
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { addEnvs } from "~/server/optimization-studio/addEnvs";
+import { loadDatasets } from "~/server/optimization-studio/loadDatasets";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { getTestProject } from "~/utils/testUtils";
 import type { ExecutionCell } from "../types";

@@ -47,7 +47,7 @@ import { datasetDisplayRecordCount } from "../../server/datasets/record-count";
 import {
   datasetColumnsSchema,
   type DatasetColumns,
-} from "../../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 

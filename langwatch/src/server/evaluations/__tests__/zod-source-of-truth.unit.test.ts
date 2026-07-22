@@ -11,7 +11,7 @@ import {
   collectorRESTParamsSchema,
   spanInputOutputSchema,
   spanSchema,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 
 // vitest runs from the langwatch package root, so cwd is the langwatch dir.
 const LANGWATCH_ROOT = process.cwd();

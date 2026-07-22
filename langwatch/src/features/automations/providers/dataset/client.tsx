@@ -6,7 +6,7 @@ import { DatasetSelector } from "~/components/datasets/DatasetSelector";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
-} from "~/server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import { api } from "~/utils/api";
 import type {
   ClientDef,

@@ -4,7 +4,7 @@ import { Settings } from "react-feather";
 import { getDisplayRoleVisuals } from "~/features/traces-v2/components/TraceDrawer/scenarioRoles";
 import { Bubble } from "~/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
-import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioMessageSnapshotEvent } from "@langwatch/contracts/scenarios/types";
 import { coerceContentToArray } from "~/server/stored-objects/coerce-content-to-array";
 import { visitContentPart } from "~/shared/content-parts/visit-content-part";
 import type { MediaPartData } from "~/shared/traces/mediaParts";

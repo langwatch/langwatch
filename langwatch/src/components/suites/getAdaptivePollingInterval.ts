@@ -1,5 +1,5 @@
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 
 const FAST_INTERVAL_MS = 3000;
 const SLOW_INTERVAL_MS = 15000;

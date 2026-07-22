@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 

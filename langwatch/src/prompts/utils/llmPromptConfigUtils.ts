@@ -22,7 +22,7 @@ import {
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
 } from "~/prompts/schemas/version-metadata-schema";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import type { DatasetColumnType } from "@langwatch/contracts/datasets";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import {
   type LlmConfigInputType,

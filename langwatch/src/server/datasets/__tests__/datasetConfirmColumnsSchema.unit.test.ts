@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { datasetConfirmColumnsSchema } from "../types";
+import { datasetConfirmColumnsSchema } from "@langwatch/contracts/datasets";
 
 /**
  * The confirm-columns schema is the upload route's boundary guard: its `name`s

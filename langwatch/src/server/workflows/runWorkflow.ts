@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { addEnvs } from "../../optimization_studio/server/addEnvs";
+import { addEnvs } from "~/server/optimization-studio/addEnvs";
 import type {
   ExecutionStatus,
   Workflow,

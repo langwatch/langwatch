@@ -6,7 +6,7 @@ import { cleanup, render } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ContentPrivacy } from "~/server/api/routers/tracesV2.schemas";
+import type { ContentPrivacy } from "@langwatch/contracts/traces-v2";
 import {
   ContentPrivacyMarkers,
   PiiIncompleteNotice,

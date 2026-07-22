@@ -1,8 +1,8 @@
 import { Button, Heading, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { FilterParam } from "~/hooks/useFilterParams";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterParam } from "@langwatch/contracts/filters";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { FieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { Drawer } from "./ui/drawer";

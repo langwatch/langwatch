@@ -1,4 +1,4 @@
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/contracts/traces-v2";
 import {
   type FlatRow,
   SIBLING_GROUP_THRESHOLD,

@@ -1,4 +1,4 @@
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 
 const TERMINAL_STATUSES = new Set<ScenarioRunStatus>([
   ScenarioRunStatus.SUCCESS,

@@ -126,7 +126,7 @@ export function resolvePathname(path: string): string {
   return path;
 }
 
-interface NextRouterOptions {
+export interface NextRouterOptions {
   shallow?: boolean;
   scroll?: boolean;
   locale?: string;

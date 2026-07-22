@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 
 /**

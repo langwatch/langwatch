@@ -4,7 +4,7 @@ import { getQueryKey } from "@trpc/react-query";
 import type {
   SpanTreeCursor,
   SpanTreeNode,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import { api, type RouterOutputs } from "~/utils/api";
 
 /*

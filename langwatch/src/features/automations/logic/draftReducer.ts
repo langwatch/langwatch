@@ -10,14 +10,14 @@ import {
   type SliceFor,
 } from "~/features/automations/providers/registry";
 import { isNotifyEntry } from "~/features/automations/providers/types";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import {
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
   extractGraphAlertFromTriggerRow as parseGraphAlertRow,
 } from "~/server/app-layer/automations/graph-alert.builder";
 import { reportSourceSchema } from "~/server/app-layer/automations/report.builder";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { describeCron, isValidCron } from "./reportSchedule";
 
 /**

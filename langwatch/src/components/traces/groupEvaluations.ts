@@ -1,4 +1,4 @@
-import type { ElasticSearchEvaluation } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "@langwatch/contracts/tracer";
 
 export interface EvaluationGroup {
   /** Stable unique key for this group, suitable for use as a React key. */

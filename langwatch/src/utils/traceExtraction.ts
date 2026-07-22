@@ -1,4 +1,4 @@
-import type { Trace } from "../server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { stringifyIfObject } from "./stringifyIfObject";
 
 /**

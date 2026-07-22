@@ -83,7 +83,7 @@ import {
 } from "~/server/modelProviders/modelDefaults.read";
 import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
-import { rAGChunkSchema } from "~/server/tracer/types";
+import { rAGChunkSchema } from "@langwatch/contracts/tracer";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException, toError } from "~/utils/posthogErrorCapture";

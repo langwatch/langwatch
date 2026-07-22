@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/contracts/traces-v2";
 import { useTraceSpanTree } from "../../../../../hooks/useTraceSpanTree";
 import type {
   TraceEvalResult,

@@ -13,8 +13,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/contracts/scenarios/enums";
+import type { ScenarioMessageSnapshotEvent } from "@langwatch/contracts/scenarios/types";
 import { Drawer } from "../../ui/drawer";
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 import { ScenarioRunHeader } from "../ScenarioRunHeader";

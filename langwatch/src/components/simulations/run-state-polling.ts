@@ -9,7 +9,7 @@
  * @see specs/suites/simulations-performance.feature
  */
 
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 
 const FAST_POLL_MS = 3000;
 const SSE_FALLBACK_POLL_MS = 15_000;

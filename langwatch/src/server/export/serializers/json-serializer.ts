@@ -5,7 +5,7 @@
  * Full mode: one JSON line per trace with complete spans and evaluations arrays.
  */
 
-import type { Trace, Span, LLMSpan, RAGSpan } from "~/server/tracer/types";
+import type { Trace, Span, LLMSpan, RAGSpan } from "@langwatch/contracts/tracer";
 import { RESERVED_METADATA_KEYS } from "./constants";
 
 // ---------------------------------------------------------------------------

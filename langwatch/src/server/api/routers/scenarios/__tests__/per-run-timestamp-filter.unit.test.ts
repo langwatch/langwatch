@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { filterRunsByTimestamp } from "../scenario-events.router";
-import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { BatchRunDataResult } from "@langwatch/contracts/scenarios/types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 
 function createRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {

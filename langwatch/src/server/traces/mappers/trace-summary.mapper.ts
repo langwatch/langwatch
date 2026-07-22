@@ -11,7 +11,7 @@ import type {
   TraceInput,
   TraceMetadata,
   TraceOutput,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 
 /**
  * Known attribute keys that map to reserved TraceMetadata fields.

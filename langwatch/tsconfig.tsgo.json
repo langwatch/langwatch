@@ -36,8 +36,19 @@
 			}
 		]
 	},
+	// This project's include/exclude intentionally mirrors the historically
+	// green config (no tooling exclusions). Excluding the vite/vitest config
+	// files broke how `vite/client`'s ambient declarations (import.meta.env,
+	// *.css, *?raw) apply to a handful of files at full-program scale — a
+	// subtle interaction not worth chasing here. The @langwatch/* workspace
+	// packages moved OUT of langwatch/ (to repo-root /packages), so the
+	// `**/*.ts` glob no longer sweeps them; they are validated separately by
+	// `pnpm typecheck:packages`. Checked with `-p` (not `tsgo --build`):
+	// @langwatch/* resolves to source via the pnpm workspace symlink, exactly
+	// as the app already resolved cli-cards / handled-error.
 	"include": [
 		"./src/**/*",
+		"./ee/**/*",
 		".eslintrc.cjs",
 		"next-env.d.ts",
 		"**/*.ts",
@@ -54,7 +65,6 @@
 		".next-saas",
 		"**/*.snippet.*",
 		"src/**/codegen/snippets/**/*",
-		"packages/insanity-check/**/*",
 		"**/*.test.ts",
 		"**/*.test.tsx",
 		"**/*.spec.ts",

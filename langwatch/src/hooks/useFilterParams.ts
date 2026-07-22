@@ -4,13 +4,8 @@ import { URL_QS_PARSE_OPTIONS } from "~/utils/qsParseOptions";
 import { usePeriodSelector } from "../components/PeriodSelector";
 import { filterOutEmptyFilters } from "../server/analytics/utils";
 import { availableFilters } from "../server/filters/registry";
-import type { FilterField } from "../server/filters/types";
+import type { FilterField, FilterParam } from "@langwatch/contracts/filters";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-
-export type FilterParam =
-  | string[]
-  | Record<string, string[]>
-  | Record<string, Record<string, string[]>>;
 
 export const useFilterParams = () => {
   const { project } = useOrganizationTeamProject();

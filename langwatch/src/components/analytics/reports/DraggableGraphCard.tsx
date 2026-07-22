@@ -5,7 +5,7 @@ import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { GraphCardHeader } from "./GraphCardHeader";
 import type { SizeOption } from "./GraphCardMenu";
 

@@ -3,7 +3,7 @@ import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-executi
 import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
 import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { TraceService } from "~/server/traces/trace.service";

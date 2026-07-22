@@ -1,5 +1,5 @@
 import { CheckCircle, Clock, MinusCircle, XCircle } from "react-feather";
-import type { ElasticSearchEvaluation } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "@langwatch/contracts/tracer";
 
 export function CheckStatusIcon({
   check,

@@ -1,5 +1,5 @@
 import { useDrawer } from "~/hooks/useDrawer";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/contracts/traces-v2";
 import {
   type ScenarioChipData,
   useScenarioChipData,

@@ -26,7 +26,7 @@ import {
   type DatasetRecordForm,
   type DatasetRecordInput,
   datasetRecordFormSchema,
-} from "../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import { api } from "../utils/api";
 import { isHandledByGlobalHandler } from "../utils/trpcError";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";

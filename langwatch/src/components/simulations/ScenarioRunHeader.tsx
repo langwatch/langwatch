@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
-import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { CopyButton } from "../CopyButton";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 

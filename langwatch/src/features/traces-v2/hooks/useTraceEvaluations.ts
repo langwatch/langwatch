@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Evaluation } from "~/server/tracer/types";
+import type { Evaluation } from "@langwatch/contracts/tracer";
 import { api } from "~/utils/api";
 import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";

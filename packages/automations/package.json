@@ -1,0 +1,43 @@
+{
+  "name": "@langwatch/automations",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Automation provider definitions, cadences, and notification templating shared by the LangWatch app, CLI, MCP server, and web surfaces",
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cadences": "./src/cadences.ts",
+    "./enums": "./src/enums.ts",
+    "./providers/*": "./src/providers/*.ts",
+    "./templating/*": "./src/templating/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "test": "vitest",
+    "test:unit": "vitest run"
+  },
+  "keywords": [
+    "langwatch",
+    "automations",
+    "webhooks",
+    "templating"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "liquidjs": "^10.27.1",
+    "marked": "^18.0.5",
+    "sanitize-html": "^2.17.5"
+  },
+  "peerDependencies": {
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/sanitize-html": "^2.16.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9",
+    "zod": "^3.25.76"
+  }
+}

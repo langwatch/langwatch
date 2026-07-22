@@ -1,4 +1,4 @@
-import type { Evaluation, Trace } from "~/server/tracer/types";
+import type { Evaluation, Trace } from "@langwatch/contracts/tracer";
 
 /**
  * Merge evaluations from traceChecks into trace objects.

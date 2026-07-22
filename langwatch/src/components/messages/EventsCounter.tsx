@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { ThumbsDown, ThumbsUp } from "react-feather";
-import type { Trace } from "../../server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 
 export function EventsCounter({
   trace,

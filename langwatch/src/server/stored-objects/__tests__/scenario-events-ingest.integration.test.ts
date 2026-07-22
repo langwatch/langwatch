@@ -169,7 +169,7 @@ vi.mock("~/env.mjs", () => ({
 // ---------------------------------------------------------------------------
 
 import { app } from "~/app/api/scenario-events/[[...route]]/app";
-import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioEventType } from "@langwatch/contracts/scenarios/enums";
 
 // ---------------------------------------------------------------------------
 // Test fixtures

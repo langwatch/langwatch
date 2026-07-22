@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DatasetConfirmColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "@langwatch/contracts/datasets";
 import { reorderColumnsBySourceHeader } from "../columnReorder";
 
 const cols: DatasetConfirmColumns = [

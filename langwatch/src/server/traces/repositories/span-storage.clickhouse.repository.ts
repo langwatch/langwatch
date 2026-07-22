@@ -4,7 +4,7 @@ import type {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 
 export interface SpanStorageRepository {

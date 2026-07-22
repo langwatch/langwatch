@@ -10,7 +10,7 @@ import type {
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
-} from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/contracts/scenarios/types";
 import { resolveRunStatus } from "~/server/scenarios/stall-detection";
 import {
   type ClickHouseSimulationRunRow,

@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { Span } from "../../../tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 import { collectRemoteSpans } from "../remote-span-collector";
 
 // Use real JudgeSpanCollector from SDK - no mocking needed for integration tests

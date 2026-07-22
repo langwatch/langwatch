@@ -63,7 +63,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 import { FieldsFilters } from "../FieldsFilters";
-import type { FilterField } from "../../../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 const mockFilterOptions = [
   { field: "label-1", label: "Production", count: 100 },

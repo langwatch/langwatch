@@ -3,7 +3,7 @@ import { memo } from "react";
 import type {
   SpanTreeNode,
   TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import { SpanAccordions } from "./SpanAccordions";
 import { useSyncSectionPresence } from "./sectionPresence";
 import { TraceSummaryAccordions } from "./TraceSummaryAccordions";

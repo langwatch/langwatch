@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import { getSafeColumnName } from "~/components/datasets/utils/reservedColumns";
-import type { DatasetColumns } from "./types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 
 /**
  * Maximum number of rows allowed per file upload.

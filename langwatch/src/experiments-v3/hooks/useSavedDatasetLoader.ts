@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import type { DatasetColumnType } from "@langwatch/contracts/datasets";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { DatasetColumn, DatasetReference, SavedRecord } from "../types";

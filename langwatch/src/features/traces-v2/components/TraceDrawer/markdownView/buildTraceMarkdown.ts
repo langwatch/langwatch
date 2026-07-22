@@ -2,7 +2,7 @@ import type {
   SpanDetail as FullSpan,
   SpanTreeNode,
   TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   abbreviateModel,

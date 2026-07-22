@@ -14,7 +14,7 @@ import {
 import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 

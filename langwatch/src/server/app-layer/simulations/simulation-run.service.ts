@@ -5,7 +5,7 @@ import type {
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
-} from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/contracts/scenarios/types";
 import { traced } from "../tracing";
 import { SimulationClickHouseRepository } from "./repositories/simulation.clickhouse.repository";
 import {
