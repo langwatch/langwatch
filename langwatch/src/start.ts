@@ -1,5 +1,5 @@
 import promBundle from "express-prom-bundle";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from "fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
@@ -340,6 +340,15 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   const wsHandle = setupTRPCWebSocket(server as ReturnType<typeof createServer>);
 
   server.once("error", (err) => {
+    // Write synchronously to stderr BEFORE the structured log: pino's
+    // transports are async worker threads that never flush past the
+    // process.exit(1) below, so without this a bind failure (e.g.
+    // EADDRINUSE when two dev processes race for the same port) is an
+    // exit(1) with zero output anywhere — stdout, Loki, or otherwise.
+    writeSync(
+      2,
+      `[langwatch:start] server error, exiting: ${err.stack ?? String(err)}\n`,
+    );
     logger.error({ error: err }, "error occurred on server");
     process.exit(1);
   });
