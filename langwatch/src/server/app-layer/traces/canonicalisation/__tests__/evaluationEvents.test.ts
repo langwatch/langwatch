@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedEvent } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
-import { ATTR_KEYS } from "../extractors/_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { makeStubSpan } from "./_helpers";
 
 const service = new CanonicalizeSpanAttributesService();

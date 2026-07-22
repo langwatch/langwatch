@@ -3,7 +3,7 @@ import type {
   EvaluationRunRepository,
   GetByEvaluationIdParams,
 } from "./repositories/evaluation-run.repository";
-import type { EvalSummary, EvaluationRunData } from "./types";
+import type { EvalSummary, EvaluationRunData } from "~/server/domain/evaluations/types";
 
 export class EvaluationRunService {
   constructor(readonly repository: EvaluationRunRepository) {}

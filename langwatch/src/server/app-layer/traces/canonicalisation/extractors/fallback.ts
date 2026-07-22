@@ -17,7 +17,7 @@
  * 3. LLM/GenAI indicators → llm
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { extractErrorInfo, inferSpanTypeIfAbsent } from "./_extraction";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 

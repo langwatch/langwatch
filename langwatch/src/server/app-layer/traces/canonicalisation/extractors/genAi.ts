@@ -33,7 +33,7 @@
  * - gen_ai.usage.completion_tokens → gen_ai.usage.output_tokens
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   coerceStringNumberAttrs,
   extractInputMessages,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
 import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 import type { TraceSummaryData } from "~/server/domain/traces/types";

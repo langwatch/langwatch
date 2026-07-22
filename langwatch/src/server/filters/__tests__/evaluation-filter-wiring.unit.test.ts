@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluationRunDataSchema } from "~/server/app-layer/evaluations/types";
+import { evaluationRunDataSchema } from "~/server/domain/evaluations/types";
 import { clickHouseFilters } from "../clickhouse";
 import { availableFilters } from "../registry";
 

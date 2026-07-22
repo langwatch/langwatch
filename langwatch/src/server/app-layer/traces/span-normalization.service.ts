@@ -16,7 +16,7 @@ import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/i
 import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
 import { EventUtils } from "../../event-sourcing/utils/event.utils";
 import type { CanonicalizeSpanAttributesService } from "./canonicalisation";
-import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 
 export class SpanNormalizationPipelineService {
   private readonly logger = createLogger(

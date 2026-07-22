@@ -31,7 +31,7 @@
  * - orphan/eval model_step → evaluation
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { recordValueType } from "./_extraction";
 import { asNumber } from "./_guards";
 import {

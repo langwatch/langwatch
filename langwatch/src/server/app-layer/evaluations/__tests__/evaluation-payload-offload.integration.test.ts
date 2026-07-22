@@ -54,7 +54,7 @@ import {
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload";
 import { EvaluationRunClickHouseRepository } from "../repositories/evaluation-run.clickhouse.repository";
-import type { EvaluationRunData } from "../types";
+import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 
 // Route the stored-objects repository (which resolves its client internally)
 // to the shared test client. Everything else uses injected clients.

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import { createTenantId } from "../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { EventSourcedQueueProcessor } from "../../../queues";

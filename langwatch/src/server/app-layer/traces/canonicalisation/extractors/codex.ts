@@ -51,7 +51,7 @@
  * - langwatch.input (from codex.user_prompt prompt)
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import type {
   CanonicalAttributesExtractor,
   ExtractorContext,

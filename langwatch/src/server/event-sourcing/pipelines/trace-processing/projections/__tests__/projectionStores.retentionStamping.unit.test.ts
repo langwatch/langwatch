@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import type { LogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";

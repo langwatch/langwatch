@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { NormalizedAttributes } from "../../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SpanDataBag } from "../../spanDataBag";
-import { ATTR_KEYS } from "../_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import type { ExtractorContext } from "../_types";
 import { LogfireExtractor } from "../logfire";
 import { createExtractorContext, parseJsonStringAttrs } from "./_testHelpers";

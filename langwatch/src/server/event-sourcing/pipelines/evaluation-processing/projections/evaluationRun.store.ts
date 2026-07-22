@@ -1,5 +1,5 @@
 import type { EvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";

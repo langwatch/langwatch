@@ -26,7 +26,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { ALLOWED_SPAN_TYPES } from "./_extraction";
 import { isRecord } from "./_guards";
 import {

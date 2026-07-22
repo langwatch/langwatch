@@ -1,4 +1,4 @@
-export * from "./_constants";
+export * from "~/server/domain/traces/canonicalisation-constants";
 export { ClaudeCodeExtractor } from "./claudeCode";
 export { CodexExtractor } from "./codex";
 export { FallbackExtractor } from "./fallback";

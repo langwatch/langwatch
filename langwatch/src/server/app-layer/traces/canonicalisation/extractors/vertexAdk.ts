@@ -30,7 +30,7 @@
  *   tool_call_args / tool_response on execute_tool spans)
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   convertGeminiContent,
   stringifyToolPayload,

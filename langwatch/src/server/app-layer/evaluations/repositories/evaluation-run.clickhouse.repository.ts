@@ -7,7 +7,7 @@ import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import { capSerializedInputs, capText } from "../evaluation-column-caps";
-import type { EvalSummary, EvaluationRunData } from "../types";
+import type { EvalSummary, EvaluationRunData } from "~/server/domain/evaluations/types";
 import type {
   EvaluationRunRepository,
   GetByEvaluationIdParams,

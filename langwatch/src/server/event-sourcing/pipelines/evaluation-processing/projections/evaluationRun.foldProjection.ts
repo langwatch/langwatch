@@ -1,4 +1,4 @@
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import type { Projection } from "../../../";
 import {
   AbstractFoldProjection,

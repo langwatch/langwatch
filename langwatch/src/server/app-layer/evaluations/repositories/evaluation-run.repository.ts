@@ -1,4 +1,4 @@
-import type { EvalSummary, EvaluationRunData } from "../types";
+import type { EvalSummary, EvaluationRunData } from "~/server/domain/evaluations/types";
 
 /**
  * Optional hints used to enable ClickHouse partition pruning. The

@@ -17,7 +17,7 @@
  * - langwatch.labels (from tag.tags)
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { ALLOWED_SPAN_TYPES } from "./_extraction";
 import { asNumber } from "./_guards";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";

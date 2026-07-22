@@ -23,7 +23,7 @@
  * - error.type (from exception.*, status.message, span.error.*)
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   ALLOWED_SPAN_TYPES,
   extractErrorInfo,

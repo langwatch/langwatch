@@ -1,4 +1,4 @@
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   extractAssistantTextFromResponseBody,
   isConversationalQuerySource,

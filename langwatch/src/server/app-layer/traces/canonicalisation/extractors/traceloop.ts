@@ -15,7 +15,7 @@
  * - gen_ai.output.messages (from traceloop.entity.output)
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   ALLOWED_SPAN_TYPES,
   extractInputMessages,

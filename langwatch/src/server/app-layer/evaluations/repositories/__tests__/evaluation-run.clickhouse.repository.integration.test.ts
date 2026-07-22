@@ -15,7 +15,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestClickHouseClient } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import type { EvaluationRunData } from "../../types";
+import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";
 
 const tenantId = `test-eval-resolve-${nanoid()}`;

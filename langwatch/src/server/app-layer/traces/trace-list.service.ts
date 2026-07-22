@@ -10,7 +10,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { EvalSummary } from "~/server/app-layer/evaluations/types";
+import type { EvalSummary } from "~/server/domain/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {

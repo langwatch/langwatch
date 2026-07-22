@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { createTenantId } from "../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";

@@ -14,7 +14,7 @@
  * - langwatch.rag.contexts (from retrieval.documents)
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { inferSpanTypeIfAbsent } from "./_extraction";
 import { isRecord } from "./_guards";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";

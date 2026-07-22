@@ -27,7 +27,7 @@
  * - span.name is mapped to langwatch.span.type
  */
 
-import { ATTR_KEYS } from "./_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   extractModelToBoth,
   extractUsageTokens,

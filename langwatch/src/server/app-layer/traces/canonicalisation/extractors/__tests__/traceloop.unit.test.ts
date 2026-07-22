@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ATTR_KEYS } from "../_constants";
+import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import { TraceloopExtractor } from "../traceloop";
 import { createExtractorContext } from "./_testHelpers";
 

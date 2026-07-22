@@ -3,7 +3,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "@langwatch/contracts/traces-v2";
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { EvaluationRunData } from "~/server/domain/evaluations/types";
 import type { RouterOutputs } from "~/utils/api";
 import type {
   TraceEvalResult,
