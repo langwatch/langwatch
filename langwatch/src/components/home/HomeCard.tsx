@@ -11,7 +11,8 @@ import type { ComponentProps } from "react";
 export function HomeCard(props: ComponentProps<typeof Card.Root>) {
   return (
     <Card.Root
-      bg="bg.surface"
+      bg="bg.surface/20"
+      backdropBlur={"md"}
       borderWidth="1px"
       borderColor="border.muted"
       borderRadius="14px"

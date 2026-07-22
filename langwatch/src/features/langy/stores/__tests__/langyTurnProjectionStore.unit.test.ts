@@ -42,6 +42,10 @@ const responded = (o: {
 
 describe("the turn projection in the store", () => {
   beforeEach(() => {
+    // Each test starts as a fresh page load: `scopeAnnounced` is never
+    // persisted, and without clearing it a repeated same-scope reset is a
+    // deliberate heartbeat no-op, leaking projection state between tests.
+    useLangyStore.setState({ scopeAnnounced: false });
     useLangyStore.getState().resetForProject();
   });
 
@@ -96,6 +100,29 @@ describe("the turn projection in the store", () => {
         .getState()
         .applyTurnEvents([
           accepted({ id: "e1", createdAt: 100, turnId: "turn-foreign" }),
+        ]);
+      const state = useLangyStore.getState();
+      expect(state.turnPhase).toBe("active");
+      expect(state.activeTurnId).toBe("turn-foreign");
+    });
+  });
+
+  describe("when a NEW foreign turn starts after this tab settled its own", () => {
+    it("adopts it — the old settle marker gags only its own turn's re-assertion", () => {
+      useLangyStore
+        .getState()
+        .beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
+      useLangyStore
+        .getState()
+        .applyTurnEvents([
+          accepted({ id: "e1", createdAt: 100 }),
+          responded({ id: "e2", createdAt: 200, outcome: "completed" }),
+        ]);
+      // Another tab (or a re-drive) starts a different turn afterwards.
+      useLangyStore
+        .getState()
+        .applyTurnEvents([
+          accepted({ id: "e3", createdAt: 300, turnId: "turn-foreign" }),
         ]);
       const state = useLangyStore.getState();
       expect(state.turnPhase).toBe("active");

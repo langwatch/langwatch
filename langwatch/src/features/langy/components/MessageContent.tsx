@@ -35,6 +35,7 @@ import { LangyFeedback } from "./LangyFeedback";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
 import { LangyPlanCard } from "./LangyPlanCard";
 import { langyPlan } from "../logic/langyPlan";
+import { questionToolCardParts } from "../logic/langyQuestionTool";
 import { stripToolNarration } from "../logic/langyToolNarration";
 import { useLangyStore } from "../stores/langyStore";
 import { StreamingText } from "./StreamingText";
@@ -139,6 +140,20 @@ function MessageContentImpl({
     [isUser, isStreaming, message.parts],
   );
 
+  // The agent's `question` TOOL call, mapped onto the choices contract
+  // (langyQuestionTool.ts) and rendered through the same card path a stamped
+  // choices block takes. Derived from the tool parts like the PR/progress
+  // cards — and on the STREAMING path too, deliberately: the tool waits on
+  // the user mid-turn, so a card that only appeared once the turn settled
+  // would hide the very thing the turn is waiting for.
+  const questionCards = useMemo(
+    () =>
+      isUser
+        ? []
+        : message.parts.flatMap((part) => questionToolCardParts(part)),
+    [isUser, message.parts],
+  );
+
   // The connect card is NOT sniffed out of the assistant's prose any more. A
   // missing GitHub connection is a structured `langy_github_not_connected` domain
   // error raised from the tool stream (the control plane sees the agent reach for
@@ -221,6 +236,7 @@ function MessageContentImpl({
     proposals.length > 0 ||
     prs.length > 0 ||
     progressEvents.length > 0 ||
+    questionCards.length > 0 ||
     showsActivity ||
     Boolean(plan);
   if (
@@ -229,6 +245,7 @@ function MessageContentImpl({
     proposals.length === 0 &&
     prs.length === 0 &&
     progressEvents.length === 0 &&
+    questionCards.length === 0 &&
     !showsActivity &&
     !plan &&
     !isStreaming
@@ -351,6 +368,24 @@ function MessageContentImpl({
             </Box>
           ))
         )}
+        {/* The question the agent is waiting on — the interactive choices
+            card, after the prose so the ask reads as the turn's closing line.
+            Lock state derives from the same recorded timeline as a stamped
+            choices block, so an answered question stays marked forever and a
+            moved-on conversation closes it. */}
+        {questionCards.map((part) => (
+          <LangyCardBoundary key={part.blockId} scope="this question">
+            <LangyDerivedCardView
+              card={part.card}
+              projectSlug={project?.slug ?? null}
+              choicesLockState={deriveLangyChoicesLockState({
+                blockId: part.blockId,
+                timeline: choicesTimeline ?? [],
+              })}
+              onChoiceSelect={onChoiceSelect}
+            />
+          </LangyCardBoundary>
+        ))}
         {/* WHEN to ask is the backend's call (langy.messages `shouldAskFeedback` —
             conversation depth + a per-user quiet period), or the agent's own
             [langy:feedback] directive at a high-signal moment, or the user

@@ -2,10 +2,18 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import type { UIMessage } from "ai";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MessageContent } from "../components/MessageContent";
 import { LANGY_OPEN_PR_TOOL } from "~/shared/langy/githubPrCard";
+
+// MessageContent reads the project for card deep-links; rendering it bare
+// (no tRPC provider) needs the same pinned project the sibling suites use.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "p_demo", slug: "demo" },
+  }),
+}));
 
 /**
  * GitHub interactions render THE GitHub card set — the progress card for the

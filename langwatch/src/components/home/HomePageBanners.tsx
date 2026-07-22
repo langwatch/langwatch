@@ -592,7 +592,6 @@ export function HomePageBanners({
       <Box
         position="relative"
         width="full"
-        isolation="isolate"
         onMouseEnter={() => (hoveredRef.current = true)}
         onMouseLeave={() => (hoveredRef.current = false)}
       >

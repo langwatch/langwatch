@@ -561,13 +561,6 @@ vi.mock("~/utils/api", async () => {
           isPending: false,
         }),
       },
-      stopTurn: {
-        useMutation: () => ({
-          mutate: () => undefined,
-          mutateAsync: () => Promise.resolve(),
-          isPending: false,
-        }),
-      },
       onConversationUpdate: {
         useSubscription: () => undefined,
       },

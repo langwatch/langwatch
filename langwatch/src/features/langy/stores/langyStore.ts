@@ -921,11 +921,29 @@ export const useLangyStore = create<LangyState>()(
             };
           }
           if (turnProjection.turn?.Status === "running") {
+            // The settle marker exists to gag the fold RE-ASSERTING the turn
+            // whose end frame already landed (its projection lags). A running
+            // turn with a DIFFERENT id is not that — it is a genuinely new
+            // turn (another tab's send, a re-driven turn), and the stale
+            // marker must not demote it to idle. Clear it, and drop the
+            // settled turn's id with it so the new turn is adopted.
+            const base =
+              s.settledTurnId !== null &&
+              turnProjection.turnId !== s.settledTurnId
+                ? {
+                    ...s,
+                    settledTurnId: null,
+                    activeTurnId:
+                      s.activeTurnId === s.settledTurnId
+                        ? null
+                        : s.activeTurnId,
+                  }
+                : s;
             return {
-              ...reduceObserveBackendTurn(s, true),
+              ...reduceObserveBackendTurn(base, true),
               // Adopt a running turn this tab doesn't track (another tab's
               // send, a re-driven turn) so Stop and live signals target it.
-              activeTurnId: s.activeTurnId ?? turnProjection.turnId,
+              activeTurnId: base.activeTurnId ?? turnProjection.turnId,
               turnProjection,
             };
           }

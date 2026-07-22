@@ -73,7 +73,7 @@ export function OnboardAgentPill({
   };
 
   return (
-    <Menu.Root positioning={{ placement: "bottom-end", gutter: 6 }}>
+    <Menu.Root positioning={{ placement: "bottom-middle", gutter: 6 }}>
       <Menu.Trigger asChild>
         <chakra.button
           type="button"

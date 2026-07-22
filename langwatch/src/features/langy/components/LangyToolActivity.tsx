@@ -43,6 +43,10 @@ import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { useLangyStore } from "../stores/langyStore";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 import { isPlanToolPart } from "../logic/langyPlan";
+import {
+  isQuestionToolPart,
+  questionToolCardParts,
+} from "../logic/langyQuestionTool";
 import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
 import {
   commandOfToolCall,
@@ -416,6 +420,14 @@ export function toActivityGroups(message: PartsView): ActivityGroup[] {
     // the checklist itself (LangyPlanCard), so it must not also collapse into a
     // shimmering "Planning…" row.
     if (isPlanToolPart(part)) return;
+    // The `question` tool is the interactive choices card (ADR-060 §6, rendered
+    // by MessageContent), never a raw activity card. It waits on the USER, so as
+    // an activity it read as a dead "Question…" stuck in-flight forever. Only a
+    // payload the choices contract can actually render is excluded — a broken
+    // one stays here, where raw honesty belongs.
+    if (isQuestionToolPart(part) && questionToolCardParts(part).length > 0) {
+      return;
+    }
     const name = partToolName(part);
     if (!name) return;
 

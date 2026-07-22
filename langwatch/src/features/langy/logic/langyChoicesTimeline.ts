@@ -19,6 +19,11 @@ import {
   type LangyChoicesTimelineEntry,
 } from "@langwatch/langy";
 
+import {
+  isQuestionToolPart,
+  questionToolCardParts,
+} from "./langyQuestionTool";
+
 interface MessageLike {
   role: string;
   parts?: readonly unknown[];
@@ -39,6 +44,17 @@ export function langyChoicesTimeline(
         if (card && card.card.kind === "choices") {
           timeline.push({ kind: "question", blockId: card.blockId });
           sawQuestion = true;
+          continue;
+        }
+        // The agent's `question` TOOL asks the same way a choices block does
+        // (see langyQuestionTool.ts) — its cards must appear on the timeline
+        // or the lock derivation would call them "never recorded" and render
+        // every one permanently closed.
+        if (isQuestionToolPart(part)) {
+          for (const questionCard of questionToolCardParts(part)) {
+            timeline.push({ kind: "question", blockId: questionCard.blockId });
+            sawQuestion = true;
+          }
         }
       }
       if (!sawQuestion) timeline.push({ kind: "message" });

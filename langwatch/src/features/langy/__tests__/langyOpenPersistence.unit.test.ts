@@ -70,6 +70,10 @@ describe("Langy conversation restoration", () => {
         useLangyStore.getState().consumeHistoryLoad();
 
         // A refresh: same project, store rehydrated from localStorage.
+        // `scopeAnnounced` is never persisted, so a real page load re-enters
+        // with it false — that is what makes this announcement the
+        // refresh-restore rather than a same-scope heartbeat.
+        useLangyStore.setState({ scopeAnnounced: false });
         useLangyStore.getState().resetForProject("project-a");
 
         const state = useLangyStore.getState();
