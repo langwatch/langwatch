@@ -1,8 +1,8 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {
-  LangyChoicesBlock,
+  LangyDerivedChoicesCard,
   LangyChoiceSelection,
-  LangyCardBlock,
+  LangyDerivedCard,
   LangyChoicesTimelineEntry,
 } from "@langwatch/langy";
 import { deriveLangyChoicesLockState } from "@langwatch/langy";
@@ -27,9 +27,9 @@ import {
   langyAnswerSegments,
   type LangyAnswerSegment,
 } from "../logic/langyAnswerSegments";
-import { LangyDerivedBlockCard } from "./blocks/LangyDerivedBlockCard";
-import { StreamingAnswerWithBlocks } from "./blocks/StreamingAnswerWithBlocks";
-import { LangyFailedBlockCard } from "./blocks/LangyFailedBlockCard";
+import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
+import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
+import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
 import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyFeedback } from "./LangyFeedback";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
@@ -109,10 +109,10 @@ function MessageContentImpl({
   /** Answer a choices card. Absent = read-only (time travel, shared views). */
   onChoiceSelect?: (a: {
     selection: LangyChoiceSelection;
-    card: LangyChoicesBlock;
+    card: LangyDerivedChoicesCard;
   }) => void;
   /** Bind a derived card's verify hint. Absent = chip hidden. */
-  onVerifyDerivedCard?: (a: { card: LangyCardBlock }) => void;
+  onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
 }) {
   const isUser = message.role === "user";
   const { project } = useOrganizationTeamProject();
@@ -314,7 +314,7 @@ function MessageContentImpl({
             step smaller than the user's `sm` bubble and a step dimmer than
             `fg`, so a glance separates "what I said" from "what it said". */}
         {blockSegments ? (
-          <AnswerWithBlocks
+          <AnswerWithCards
             segments={blockSegments}
             hasActivity={showsActivity || Boolean(plan)}
             projectSlug={project?.slug ?? null}
@@ -329,7 +329,7 @@ function MessageContentImpl({
             // ```langy-card fence previews through the SAME validation the
             // relay stamps with at settle (ADR-060 §7). Fence-less streams
             // take the plain path inside, unchanged.
-            <StreamingAnswerWithBlocks
+            <StreamingAnswerWithCards
               text={displayText}
               projectSlug={project?.slug ?? null}
             />
@@ -394,9 +394,9 @@ interface AnswerBlockContext {
   choicesTimeline?: LangyChoicesTimelineEntry[];
   onChoiceSelect?: (a: {
     selection: LangyChoiceSelection;
-    card: LangyChoicesBlock;
+    card: LangyDerivedChoicesCard;
   }) => void;
-  onVerifyDerivedCard?: (a: { card: LangyCardBlock }) => void;
+  onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
 }
 
 /**
@@ -406,7 +406,7 @@ interface AnswerBlockContext {
  * its own error boundary so one bad payload costs one card, never the
  * answer.
  */
-function AnswerWithBlocks({
+function AnswerWithCards({
   segments,
   ...context
 }: { segments: LangyAnswerSegment[] } & Omit<
@@ -459,7 +459,7 @@ function AnswerSegment({
     case "card":
       return (
         <LangyCardBoundary scope="this derived card">
-          <LangyDerivedBlockCard
+          <LangyDerivedCardView
             card={segment.part.card}
             hints={segment.part.hints}
             projectSlug={context.projectSlug}
@@ -479,7 +479,7 @@ function AnswerSegment({
     case "failed":
       return (
         <LangyCardBoundary scope="this card">
-          <LangyFailedBlockCard part={segment.part} />
+          <LangyFailedCard part={segment.part} />
         </LangyCardBoundary>
       );
   }

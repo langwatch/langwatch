@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { salvageJsonText, salvageLangyCardBlock } from "./salvage";
+import { salvageJsonText, salvageLangyDerivedCard } from "./salvage";
 
 describe("salvageJsonText", () => {
   describe("given an undamaged document", () => {
@@ -71,17 +71,17 @@ describe("salvageJsonText", () => {
   });
 });
 
-describe("salvageLangyCardBlock", () => {
+describe("salvageLangyDerivedCard", () => {
   const statsBlock = (extra = ""): string =>
     `{"kind": "stats", "blockId": "b1", "items": [{"label": "p95", "value": 812, "unit": "ms"}]${extra}`;
 
   describe("given a well-formed block", () => {
     it("salvages and validates it", () => {
-      const result = salvageLangyCardBlock(`${statsBlock()}}`);
+      const result = salvageLangyDerivedCard(`${statsBlock()}}`);
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.block.kind).toBe("stats");
-        expect(result.block.blockId).toBe("b1");
+        expect(result.card.kind).toBe("stats");
+        expect(result.card.blockId).toBe("b1");
       }
     });
   });
@@ -89,23 +89,23 @@ describe("salvageLangyCardBlock", () => {
   describe("when the block was cut off with unclosed brackets", () => {
     it("repairs it into a document that validates and still draws", () => {
       // The whole closing tail is missing — salvage closes it.
-      const result = salvageLangyCardBlock(statsBlock());
+      const result = salvageLangyDerivedCard(statsBlock());
       expect(result.ok).toBe(true);
-      if (result.ok) expect(result.block.kind).toBe("stats");
+      if (result.ok) expect(result.card.kind).toBe("stats");
     });
   });
 
   describe("when the salvaged JSON fails its kind's schema", () => {
     it("reports invalid, never a guessed card", () => {
       // Parses fine; `items` is missing, so stats does not validate.
-      const result = salvageLangyCardBlock(
+      const result = salvageLangyDerivedCard(
         '{"kind": "stats", "blockId": "b1"}',
       );
       expect(result).toEqual({ ok: false, reason: "invalid" });
     });
 
     it("reports invalid for a block without a blockId", () => {
-      const result = salvageLangyCardBlock(
+      const result = salvageLangyDerivedCard(
         '{"kind": "stats", "items": [{"label": "a", "value": 1}]}',
       );
       expect(result).toEqual({ ok: false, reason: "invalid" });
@@ -116,7 +116,7 @@ describe("salvageLangyCardBlock", () => {
     it.each([["traces"], ["evalRun"], ["resourceCreated"], ["metrics"]])(
       "refuses a %s block as invalid",
       (kind) => {
-        const result = salvageLangyCardBlock(
+        const result = salvageLangyDerivedCard(
           `{"kind": "${kind}", "blockId": "b1", "items": []}`,
         );
         expect(result).toEqual({ ok: false, reason: "invalid" });
@@ -126,7 +126,7 @@ describe("salvageLangyCardBlock", () => {
 
   describe("when the content cannot be salvaged at all", () => {
     it("reports unsalvageable", () => {
-      expect(salvageLangyCardBlock("not json, sorry")).toEqual({
+      expect(salvageLangyDerivedCard("not json, sorry")).toEqual({
         ok: false,
         reason: "unsalvageable",
       });

@@ -55,7 +55,7 @@ vi.mock("recharts", async (importOriginal) => {
 });
 
 import { MessageContent } from "../components/MessageContent";
-import { LangyChoicesCard } from "../components/blocks/LangyChoicesCard";
+import { LangyChoicesCard } from "../components/derived-cards/LangyChoicesCard";
 
 afterEach(cleanup);
 

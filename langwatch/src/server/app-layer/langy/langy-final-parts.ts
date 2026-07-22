@@ -1,9 +1,9 @@
-import type { CliResultDigest, CliToolResult } from "@langwatch/cli-cards";
+import type { CliResultDigest, CliToolResult } from "@langwatch/langy";
 import {
   LANGY_CARD_FAILED_PART_TYPE,
   LANGY_CARD_PART_TYPE,
   langyMessagePartSchema,
-  salvageLangyCardBlock,
+  salvageLangyDerivedCard,
   splitLangyCardFences,
   type LangyMessagePart,
 } from "@langwatch/langy";
@@ -120,18 +120,18 @@ function assistantTextParts(text: string): LangyMessagePart[] {
       continue;
     }
     ordinal += 1;
-    const parsed = salvageLangyCardBlock(segment.raw);
+    const parsed = salvageLangyDerivedCard(segment.raw);
     if (parsed.ok) {
       getLangyBlocksCounter("stamped").inc();
       parts.push(
         langyMessagePartSchema.parse({
           type: LANGY_CARD_PART_TYPE,
-          blockId: parsed.block.blockId,
-          kind: parsed.block.kind,
+          blockId: parsed.card.blockId,
+          kind: parsed.card.kind,
           provenance: "derived",
-          card: parsed.block,
-          ...(parsed.block.hints !== undefined
-            ? { hints: parsed.block.hints }
+          card: parsed.card,
+          ...(parsed.card.hints !== undefined
+            ? { hints: parsed.card.hints }
             : {}),
         }),
       );

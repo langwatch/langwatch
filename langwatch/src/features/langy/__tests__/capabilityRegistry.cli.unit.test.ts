@@ -1,4 +1,4 @@
-import { CLI_SUBRESOURCE_VERBS } from "@langwatch/cli-cards";
+import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
 import { FEATURES } from "~/shared/langy/featureMap";
 import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";

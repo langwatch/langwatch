@@ -47,22 +47,22 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
       error's accepted values and retried once, never turned into a question
 
   # ---------------------------------------------------------------------------
-  # The block channel rests on prompt rules, so it gets an eval (ADR-060)
+  # The inline card channel rests on prompt rules, so it gets an eval (ADR-060)
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: A scenario checks that Langy draws an uncommandable view as a derived block
+  Scenario: A scenario checks that Langy draws an uncommandable view as a derived card
     Given a Langy dogfood scenario asking to plot two columns of a dataset against each other
     When the scenario runs against Langy
-    Then Langy's reply carries a langy-card block that validates as a derived kind
+    Then Langy's reply carries a langy-card fence that validates as a derived-safe kind
     And the judge confirms Langy did not draw an ASCII chart or markdown table in prose
     And the judge confirms Langy did not hand-sum a figure a command computes
 
   @integration
-  Scenario: A scenario checks that Langy asks a user-owned choice as a choices block
+  Scenario: A scenario checks that Langy asks a user-owned choice as a choices card
     Given a Langy dogfood scenario where a scenario run needs an agent picked from several
     When the scenario runs against Langy
-    Then Langy's reply ends with a choices block naming the real agents by id
+    Then Langy's reply ends with a choices card naming the real agents by id
     And the turn settles with no in-flight work awaiting the answer
     And the judge confirms Langy offered no prose options and invented no id
 

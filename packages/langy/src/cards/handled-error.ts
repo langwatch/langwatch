@@ -20,7 +20,7 @@
  *   - anything else (a dead socket, a 500, a proxy's HTML error page) is OUR
  *     problem, and the panel must say so rather than blame the user.
  *
- * DELIBERATELY ZOD-FREE, and importable on its own (`@langwatch/cli-cards/handled-error`).
+ * DELIBERATELY ZOD-FREE, and importable on its own (`@langwatch/langy/cards/handled-error`).
  * This module sits on the CLI's hot path: every instrumented command imports it,
  * including the overwhelming majority of runs where telemetry is switched off.
  * Importing zod here costs ~28ms on EVERY `langwatch` invocation — measured — and

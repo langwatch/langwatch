@@ -20,6 +20,7 @@ import {
   LuArrowLeft,
   LuArrowRight,
   LuMic,
+  LuX,
   LuZap,
 } from "react-icons/lu";
 import { SERIF } from "~/features/asaplangy";
@@ -130,6 +131,8 @@ const LANGY_SLIDE: Slide = {
     ),
 };
 
+const SNOOZE_DAYS = 7;
+const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 /** Dwell per slide before it advances. */
 const DWELL_MS = 9000;
 /** One duration governs the whole slide change: the gradient morphs its palette
@@ -285,6 +288,35 @@ function useSlides(
   );
 }
 
+// ---- Snooze (per-slide, per-project) ------------------------------------
+
+const storageKey = (slide: Slide, projectId: string) =>
+  `${slide.storagePrefix}${projectId}`;
+
+function isSlideSnoozed(slide: Slide, projectId: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(storageKey(slide, projectId));
+    if (!raw) return false;
+    const expiresAt = Number(raw);
+    return Number.isFinite(expiresAt) && expiresAt > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function snoozeSlide(slide: Slide, projectId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      storageKey(slide, projectId),
+      String(Date.now() + SNOOZE_MS),
+    );
+  } catch {
+    // Best-effort dismissal.
+  }
+}
+
 // ---- Colour / shape interpolation ---------------------------------------
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
@@ -391,16 +423,25 @@ export function HomePageBanners({
   const askLangy = useLangyStore((s) => s.askLangy);
 
   const [hasMounted, setHasMounted] = useState(false);
+  const [snoozed, setSnoozed] = useState<Record<string, boolean>>({});
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  // Every slide, always. An announcement stands until it is taken out of the
-  // rotation in code — there is no per-reader dismissal to filter by, so
-  // there is nothing to work out here.
-  const eligible = slides;
+  useEffect(() => {
+    if (!projectId) return;
+    const next: Record<string, boolean> = {};
+    for (const slide of slides)
+      next[slide.id] = isSlideSnoozed(slide, projectId);
+    setSnoozed(next);
+  }, [projectId, slides]);
+
+  const eligible = useMemo(
+    () => slides.filter((slide) => !snoozed[slide.id]),
+    [snoozed, slides],
+  );
   const active = eligible.length > 0 ? index % eligible.length : 0;
   const slide = eligible[active];
 
@@ -555,6 +596,12 @@ export function HomePageBanners({
   if (!hasMounted || !projectId) return null;
   if (variant !== "lantern" && (eligible.length === 0 || !slide)) return null;
 
+  const dismiss = (slideToHide: Slide) => {
+    if (projectId) snoozeSlide(slideToHide, projectId);
+    setSnoozed((s) => ({ ...s, [slideToHide.id]: true }));
+    setIndex(0);
+  };
+
   const handleCta = (slideToOpen: Slide) => {
     posthog.capture(slideToOpen.posthogEvent, {
       surface: "home_banner",
@@ -592,52 +639,34 @@ export function HomePageBanners({
       <Box
         position="relative"
         width="full"
+        borderRadius="14px"
+        borderWidth="1px"
+        borderColor="border.muted"
+        background="bg.surface"
+        overflow="hidden"
         isolation="isolate"
         onMouseEnter={() => (hoveredRef.current = true)}
         onMouseLeave={() => (hoveredRef.current = false)}
       >
-        {/* The ground: light, not a panel.
-
-            This used to be a bordered card with the shader held at 13% behind a
-            flat gradient of the same colours. Two gradients multiplied down to
-            a whisper do not read as a moving mesh, they read as a tint — the
-            animation was there the whole time and could not be seen. So the
-            card is gone, the flat gradient is now only the fallback for a
-            machine that cannot run the shader, and what is left runs bright
-            enough to actually be light: a bloom behind the field that dissolves
-            into the page long before it reaches any text.
-
-            It bleeds past its own box on purpose. The hero is not an object on
-            the home, it is where the home is lit from. */}
+        {/* The ground. The SAME shared canvas the announcement card uses, at
+            the same whisper, tuned toward the Langy palette when no
+            announcement is lighting it. Everything else in this block layers
+            over it: the shader is the floor, never a decoration on top. */}
         <Box
           aria-hidden
           position="absolute"
-          insetInline={{ base: "-8%", md: "-14%" }}
-          insetBlock={{ base: "-30%", md: "-45%" }}
+          inset={0}
           pointerEvents="none"
-          opacity={{ base: 0.3, _dark: 0.55 }}
-          // Softer on light. On a pale ground the mesh's bands keep their
-          // edges and read as banding rather than as light; blurring takes the
-          // edges off without touching the colours. Dark needs none of it —
-          // the same blur there only muddies a field that already reads as
-          // depth.
-          filter={{ base: "blur(15px)", _dark: "none" }}
-          css={{
-            maskImage:
-              "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
-            WebkitMaskImage:
-              "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
-          }}
+          opacity={{ base: 0.13, _dark: 0.2 }}
         >
-          {lowPerf ? (
-            <Box
-              position="absolute"
-              inset={0}
-              style={{
-                background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
-              }}
-            />
-          ) : (
+          <Box
+            position="absolute"
+            inset={0}
+            style={{
+              background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
+            }}
+          />
+          {!lowPerf ? (
             <Box position="absolute" inset={0}>
               <MeshGradient
                 colors={lanternColors}
@@ -653,26 +682,28 @@ export function HomePageBanners({
                 style={{ width: "100%", height: "100%" }}
               />
             </Box>
-          )}
+          ) : null}
         </Box>
+        {/* The signal grid, the same one the panel wears, faded out toward the
+            bottom so it never competes with the composer sitting on it. */}
+        <Box
+          aria-hidden
+          position="absolute"
+          inset={0}
+          pointerEvents="none"
+          className="langy-signal-grid langy-signal-grid--banner"
+        />
 
         <VStack
           position="relative"
           zIndex={1}
-          align="center"
-          gap={5}
+          align="stretch"
+          gap={3}
           paddingX={{ base: 4, md: 5 }}
-          paddingY={{ base: 8, md: 12 }}
+          paddingY={4}
         >
-          {children}
-
-          {/* What is new, as a ticker rather than a bar.
-              It sits BELOW the field now. An announcement is the least
-              important thing on a page whose job is to take a question, and it
-              was previously the first line in the block with the only coloured
-              link in it — so the eye landed on this and not on the field. */}
           {slide ? (
-            <HStack gap={2.5} align="center" minHeight="20px" maxWidth="full">
+            <HStack gap={2.5} align="center" minHeight="20px">
               <Box flexShrink={0} color="orange.fg" display="grid">
                 {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
               </Box>
@@ -699,6 +730,7 @@ export function HomePageBanners({
               >
                 {slide.ctaLabel}
               </chakra.button>
+              <Spacer />
               {multi ? (
                 <HStack gap={1} flexShrink={0}>
                   {eligible.map((_, i) => (
@@ -719,8 +751,21 @@ export function HomePageBanners({
                   ))}
                 </HStack>
               ) : null}
+              <Tooltip content={`Hide for ${SNOOZE_DAYS} days`} openDelay={400}>
+                <IconButton
+                  aria-label="Hide this announcement"
+                  size="2xs"
+                  variant="ghost"
+                  color="fg.subtle"
+                  flexShrink={0}
+                  onClick={() => dismiss(slide)}
+                >
+                  <LuX size={13} />
+                </IconButton>
+              </Tooltip>
             </HStack>
           ) : null}
+          {children}
         </VStack>
       </Box>
     );
@@ -947,6 +992,27 @@ export function HomePageBanners({
             ))}
           </HStack>
         ) : null}
+
+        <Tooltip
+          content={`Hide for ${SNOOZE_DAYS} days`}
+          positioning={{ placement: "top" }}
+        >
+          <IconButton
+            size="sm"
+            variant="ghost"
+            color="white/80"
+            position="absolute"
+            top={2}
+            right={2}
+            zIndex={2}
+            _hover={{ bg: "white/20", color: "white" }}
+            _active={{ bg: "white/30" }}
+            onClick={() => dismiss(slide)}
+            aria-label="Dismiss"
+          >
+            <LuX />
+          </IconButton>
+        </Tooltip>
       </Box>
     );
   }
@@ -1192,6 +1258,28 @@ export function HomePageBanners({
               );
             })}
           </Box>
+
+          {/* Dismiss — quiet inline chrome, like every other card control.
+              Pinned to the TOP of the row (the row centres its items, which
+              otherwise floats the X to the vertical middle) so it reads as a
+              normal top-right card close. */}
+          <Tooltip
+            content={`Hide for ${SNOOZE_DAYS} days`}
+            positioning={{ placement: "top" }}
+          >
+            <IconButton
+              size="xs"
+              variant="ghost"
+              color="fg.subtle"
+              flexShrink={0}
+              alignSelf="flex-start"
+              _hover={{ bg: "bg.muted", color: "fg" }}
+              onClick={() => dismiss(slide)}
+              aria-label="Dismiss"
+            >
+              <LuX />
+            </IconButton>
+          </Tooltip>
         </HStack>
 
         {/* Countdown ring — sweeps to full over the dwell, and eases to a stop

@@ -10,27 +10,11 @@ export function useCommandBarKeyboard(
   setSelectedIndex: (index: number | ((prev: number) => number)) => void,
   handleSelect: (item: ListItem, newTab?: boolean) => void,
   handleCopyLink: () => void,
-  isMac: boolean,
-  /**
-   * Hand what is typed to Langy, on Tab.
-   *
-   * Omitted for a reader who cannot start a Langy turn, and the key then falls
-   * through to its normal job of moving focus: a shortcut that silently does
-   * nothing is worse than one that was never offered.
-   */
-  onAskLangy?: () => void
+  isMac: boolean
 ) {
   return useCallback(
     (e: React.KeyboardEvent) => {
       const modKey = isMac ? e.metaKey : e.ctrlKey;
-
-      // Ahead of the switch: Tab carries no modifier of its own, and Shift+Tab
-      // has to stay the way back out of the field.
-      if (e.key === "Tab" && !e.shiftKey && onAskLangy) {
-        e.preventDefault();
-        onAskLangy();
-        return;
-      }
 
       switch (e.key) {
         case "ArrowDown":
@@ -58,14 +42,6 @@ export function useCommandBarKeyboard(
           break;
       }
     },
-    [
-      allItems,
-      selectedIndex,
-      setSelectedIndex,
-      handleSelect,
-      handleCopyLink,
-      isMac,
-      onAskLangy,
-    ]
+    [allItems, selectedIndex, setSelectedIndex, handleSelect, handleCopyLink, isMac]
   );
 }

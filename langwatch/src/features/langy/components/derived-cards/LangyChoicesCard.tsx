@@ -18,7 +18,7 @@
  */
 import { Box, Button, HStack, Text, VStack, chakra } from "@chakra-ui/react";
 import type {
-  LangyChoicesBlock,
+  LangyDerivedChoicesCard,
   LangyChoiceSelection,
   LangyChoicesLockState,
 } from "@langwatch/langy";
@@ -35,14 +35,14 @@ export function LangyChoicesCard({
   onSelect,
   refRowsOverride,
 }: {
-  card: LangyChoicesBlock;
+  card: LangyDerivedChoicesCard;
   lockState: LangyChoicesLockState;
   /** Still streaming — never answerable while forming. */
   forming?: boolean;
   /** Absent = read-only (time travel, shared views). */
   onSelect?: (a: {
     selection: LangyChoiceSelection;
-    card: LangyChoicesBlock;
+    card: LangyDerivedChoicesCard;
   }) => void;
   /** Fixture seam (gallery/tests): pre-resolved rows instead of fetching. */
   refRowsOverride?: ReadonlyMap<string, ChoicesRefRow>;

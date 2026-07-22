@@ -23,8 +23,8 @@ import {
   SCHEMA_BY_CARD_KIND,
   spendProbeSchema,
   timeseriesProbeSchema,
-  type CardKind,
-} from "./cards.js";
+  type MeasuredCardKind,
+} from "./schemas.js";
 
 /**
  * ── SHAPE-DRIVEN PROMOTION ─────────────────────────────────────────────────
@@ -72,14 +72,14 @@ import {
  * A write card states what just happened and a bespoke `byVerb` read card was
  * chosen deliberately; neither is an invitation to guess again.
  */
-const PROMOTABLE_FROM: ReadonlySet<CardKind> = new Set<CardKind>([
+const PROMOTABLE_FROM: ReadonlySet<MeasuredCardKind> = new Set<MeasuredCardKind>([
   "resourceRead",
   "metrics",
 ]);
 
 export interface CardProbe {
   /** The card a payload matching `schema` is promoted to. */
-  card: CardKind;
+  card: MeasuredCardKind;
   /**
    * Accepts ONLY payloads that genuinely are this shape. See rule 4 — a probe
    * that tolerates everything promotes everything.
@@ -103,7 +103,7 @@ export interface CardProbe {
  * mystery.
  */
 export function assertTotalOrder(probes: readonly CardProbe[]): void {
-  const seen = new Map<number, CardKind>();
+  const seen = new Map<number, MeasuredCardKind>();
   for (const probe of probes) {
     const clash = seen.get(probe.specificity);
     if (clash !== undefined) {
@@ -129,10 +129,10 @@ export function promoteCard({
   probes,
 }: {
   /** The card the command's name resolved to. */
-  nominal: CardKind;
+  nominal: MeasuredCardKind;
   payload: unknown;
   probes: readonly CardProbe[];
-}): CardKind | null {
+}): MeasuredCardKind | null {
   if (!PROMOTABLE_FROM.has(nominal)) return null;
 
   let best: CardProbe | null = null;
@@ -183,7 +183,7 @@ export const CARD_PROBES: readonly CardProbe[] = [
 // the one it was guarding.
 
 /** Verbs that write, and the card each writes into. */
-const CARD_BY_WRITE_VERB: Record<string, CardKind> = {
+const CARD_BY_WRITE_VERB: Record<string, MeasuredCardKind> = {
   create: "resourceCreated",
   add: "resourceCreated",
   upload: "resourceCreated",
@@ -290,8 +290,8 @@ export interface ResourceRefHints {
 
 /** A resource's default card, and the verbs that deviate from it. */
 interface ResourceCards {
-  read: CardKind;
-  byVerb?: Record<string, CardKind>;
+  read: MeasuredCardKind;
+  byVerb?: Record<string, MeasuredCardKind>;
   /** Reference-extraction hints for the digest (see `extractDigest`). */
   ref?: ResourceRefHints;
 }
@@ -352,7 +352,7 @@ export const cardKindFor = ({
 }: {
   resource: string;
   verb: string;
-}): CardKind => {
+}): MeasuredCardKind => {
   const cards = CARDS_BY_RESOURCE[resource];
 
   const override = cards?.byVerb?.[verb];
@@ -374,8 +374,8 @@ export const cardSchemaFor = (command: {
 
 /** A CLI result, read into the card that draws it. */
 export type ParsedCliResult =
-  | { ok: true; kind: CardKind; card: unknown }
-  | { ok: false; kind: CardKind; reason: string };
+  | { ok: true; kind: MeasuredCardKind; card: unknown }
+  | { ok: false; kind: MeasuredCardKind; reason: string };
 
 /**
  * Read a CLI command's `--format json` output into its card.
@@ -413,7 +413,7 @@ export const parseCardResult = ({
   kind,
   output,
 }: {
-  kind: CardKind;
+  kind: MeasuredCardKind;
   output: unknown;
 }): ParsedCliResult => {
   const document = asJsonDocument(output);

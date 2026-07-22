@@ -27,7 +27,7 @@ import { chartVariantFor, useHomeDevState } from "./dev/homeDevState";
 import { DocsGuides } from "./DocsGuides";
 import { HomeFortune } from "./HomeFortune";
 import { HomePageBanners } from "./HomePageBanners";
-import { LangyHomeHero } from "./LangyHomeHero";
+import { LangyHomeLantern } from "./LangyHomeLantern";
 import { LearningResources } from "./LearningResources";
 import { OnboardingProgress } from "./OnboardingProgress";
 import { RecentItemsSection } from "./RecentItemsSection";
@@ -78,10 +78,7 @@ export function HomePage() {
         <Container maxW="7xl" padding={5} position="relative" zIndex={1}>
           <VStack gap={4} width="full" align="start">
             <HStack width="full" align="center" gap={2}>
-              {/* The Langy home greets from the centre of its own hero, where
-                  the question is being asked. Rendering the greeting here as
-                  well would put it on the page twice. */}
-              {composition === "langy" ? null : <WelcomeHeader />}
+              <WelcomeHeader />
               <Spacer />
               {/* The one sales-y ask: the friendly line, small and quiet, with
                   the demo link as a compact pill beside it. Shown to people who
@@ -283,7 +280,7 @@ function LangyHome() {
   return (
     <>
       <HomePageBanners variant="lantern">
-        <LangyHomeHero />
+        <LangyHomeLantern />
       </HomePageBanners>
       {empty ? (
         <OnboardingProgress />

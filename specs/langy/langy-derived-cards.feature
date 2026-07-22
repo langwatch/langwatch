@@ -6,13 +6,13 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
 
   # The model emits a fenced ```langy-card block inside its ordinary reply.
   # The RELAY extracts it, salvages the JSON (transport-tolerant), validates it
-  # against the block kind's schema (boundary-strict), and stamps it as a typed
+  # against the card kind's schema (boundary-strict), and stamps it as a typed
   # part in the durable event stream — the same one decision point every card
   # already inherits (ADR-059 card determinism, ADR-060). The browser never
   # parses fences out of text; time travel replays the same stamped part.
   #
   # Companion specs:
-  #   - specs/langy/langy-choice-questions.feature (the choices block)
+  #   - specs/langy/langy-choice-questions.feature (the choices card)
   #   - specs/langy/langy-capability-cards.feature (panel rendering of cards)
   #   - specs/langy/langy-event-sourced-frontend.feature (the fold these parts ride)
   #
@@ -26,11 +26,11 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
   # One decision point — the relay stamps, everything downstream inherits
   # ===========================================================================
 
-  Scenario: A block in the reply renders as a derived card
-    Given Langy's reply contains a well-formed timeseries block between prose
+  Scenario: A fenced card in the reply renders as a derived card
+    Given Langy's reply contains a well-formed timeseries fence between prose
     When the turn streams into the panel
-    Then the prose renders as prose and the block renders as a chart card
-    And the card sits where the block sat in the reply's flow
+    Then the prose renders as prose and the fence renders as a chart card
+    And the card sits where the fence sat in the reply's flow
 
   Scenario: The browser renders the stamped part, never its own parse of the text
     Given a turn whose reply carried a derived card
@@ -54,27 +54,27 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
   # ===========================================================================
 
   Scenario: Mechanically damaged JSON is salvaged and still draws
-    Given a block whose JSON was cut off with unclosed brackets
+    Given a fenced card whose JSON was cut off with unclosed brackets
     When the relay can repair it into a document that validates
     Then the card renders from the repaired document
 
-  Scenario: A block that validates nowhere renders as a disclosure, not a guess
-    Given a block whose salvaged JSON fails its kind's schema
+  Scenario: A card that validates nowhere renders as a disclosure, not a guess
+    Given a fenced card whose salvaged JSON fails its kind's schema
     When the turn renders
-    Then a collapsed one-line disclosure appears in the block's place
+    Then a collapsed one-line disclosure appears in the card's place
     And expanding it shows the raw fenced text
     And no card of any kind is drawn from it
 
-  Scenario: A failed block is never silently dropped
-    Given a block that could not be salvaged at all
+  Scenario: A failed card is never silently dropped
+    Given a fenced card that could not be salvaged at all
     When the turn renders
-    Then the reply still accounts for the block with the disclosure line
+    Then the reply still accounts for it with the disclosure line
     And the failure is counted for drift monitoring
 
-  Scenario: A resource-shaped block is refused
-    Given a block claiming a kind outside the derived-safe allowlist
+  Scenario: A resource-shaped kind is refused
+    Given a fenced card claiming a kind outside the derived-safe allowlist
     When the relay validates it
-    Then it is treated as a failed block and renders as the disclosure
+    Then it is treated as a failed card and renders as the disclosure
     And no traces, run, or created-resource card is drawn from it
 
   # ===========================================================================
@@ -82,7 +82,7 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
   # ===========================================================================
 
   Scenario: Every derived card wears its provenance
-    Given any card produced from a model-emitted block
+    Given any card Langy wrote itself
     When it renders
     Then its chrome visibly marks it as derived by Langy
     And it is distinguishable at a glance from a platform-measured card
@@ -103,18 +103,18 @@ Feature: Langy draws model-shaped data as derived cards, stamped by the relay
   # Progressive rendering — preview by the same rules as settle
   # ===========================================================================
 
-  Scenario: The card draws itself while the block streams
-    Given a turn streaming a timeseries block
-    When enough of the block has arrived to validate
+  Scenario: The card draws itself while the fence streams
+    Given a turn streaming a timeseries fence
+    When enough of the fence has arrived to validate
     Then a forming card renders and grows as points arrive
 
   Scenario: A preview only shows what already validates
-    Given a partially streamed block whose repaired prefix does not validate
+    Given a partially streamed fence whose repaired prefix does not validate
     When the stream continues
     Then no card preview is shown until a validating prefix exists
 
   Scenario: The settled card replaces its own preview, never duplicates it
     Given a card previewed during the live stream
     When the turn settles and the stamped part arrives
-    Then exactly one card renders, reconciled by the block's identity
+    Then exactly one card renders, reconciled by the card's identity
     And on any disagreement the settled part's content wins

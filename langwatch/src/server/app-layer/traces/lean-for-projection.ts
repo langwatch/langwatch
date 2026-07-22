@@ -23,8 +23,6 @@ import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   hasOversizedAttribute,
-  IO_ATTRIBUTE_KEYS,
-  utf8Preview,
 } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
 
 /**
@@ -37,10 +35,20 @@ export const COMMAND_INLINE_THRESHOLD = 256 * 1024;
 /**
  * Preview budget for IO attributes. Covers a complete chat-style Claude completion at
  * the common max_tokens=8192 setting (~16K tokens × 4 chars/token ≈ 64 KB).
- * Configurable via `LANGWATCH_IO_PREVIEW_BYTES`. Matches `IO_ATTRIBUTE_PREVIEW_BYTES` in
- * `capOversizedAttributes.ts`, which uses the same budget for the pre-persistence cap.
+ * Configurable via `LANGWATCH_IO_PREVIEW_BYTES`.
  */
 export const IO_PREVIEW_BYTES = 64 * 1024;
+
+/**
+ * Set of span attribute keys that are considered "IO" and receive the wide IO_PREVIEW_BYTES
+ * budget. Non-IO attributes stay at the existing 2 KB cap.
+ */
+export const IO_ATTR_KEYS = new Set([
+  "langwatch.input",
+  "langwatch.output",
+  "gen_ai.input.messages",
+  "gen_ai.output.messages",
+]);
 
 /**
  * Server-internal namespace prefix used by `leanForProjection` to attach eventref pointers
@@ -49,11 +57,21 @@ export const IO_PREVIEW_BYTES = 64 * 1024;
  */
 export const EVENTREF_ATTR_PREFIX = "langwatch.reserved.eventref.";
 
+/** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
+export function utf8Preview(value: string, maxBytes: number): string {
+  const buf = Buffer.from(value, "utf8");
+  if (buf.byteLength <= maxBytes) return value;
+  let end = maxBytes;
+  // 0b10xxxxxx are UTF-8 continuation bytes — don't cut mid-codepoint.
+  while (end > 0 && (buf[end]! & 0xc0) === 0x80) end--;
+  return buf.subarray(0, end).toString("utf8") + "…";
+}
+
 /**
  * Rewrites over-threshold IO attribute values to a preview (≤ IO_PREVIEW_BYTES) and attaches
  * a `langwatch.reserved.eventref.<attrKey>` pointer carrying `{ field: <attrKey> }`.
  *
- * - SpanReceived: for each IO attr in IO_ATTRIBUTE_KEYS that exceeds IO_PREVIEW_BYTES bytes,
+ * - SpanReceived: for each IO attr in IO_ATTR_KEYS that exceeds IO_PREVIEW_BYTES bytes,
  *   replaces the value with a UTF-8-safe preview and attaches an eventref.
  * - LogRecordReceived: if body exceeds IO_PREVIEW_BYTES bytes, replaces body with preview
  *   and attaches eventref.body.
@@ -110,7 +128,7 @@ function leanSpanReceivedEvent(event: Event): Event {
   let hasLargeIoAttr = false;
   for (const attr of originalAttributes) {
     if (
-      IO_ATTRIBUTE_KEYS.has(attr.key) &&
+      IO_ATTR_KEYS.has(attr.key) &&
       typeof attr.value.stringValue === "string" &&
       Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
     ) {
@@ -149,14 +167,11 @@ function leanSpanReceivedEvent(event: Event): Event {
 
     for (const attr of clonedSpan.attributes) {
       if (
-        IO_ATTRIBUTE_KEYS.has(attr.key) &&
+        IO_ATTR_KEYS.has(attr.key) &&
         typeof attr.value.stringValue === "string" &&
         Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
       ) {
-        const preview = utf8Preview({
-          value: attr.value.stringValue,
-          maxBytes: IO_PREVIEW_BYTES,
-        });
+        const preview = utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
         ioLeanedAttrs.push({ key: attr.key, value: { stringValue: preview } });
         // ADR-022: embed event.id so the read path can JOIN event_log by
         // EventId without guessing. The eventref carries `{field, eventId}`;
@@ -206,7 +221,7 @@ function leanLogRecordReceivedEvent(event: Event): Event {
     return event;
   }
 
-  const preview = utf8Preview({ value: data.body, maxBytes: IO_PREVIEW_BYTES });
+  const preview = utf8Preview(data.body, IO_PREVIEW_BYTES);
   const eventrefKey = `${EVENTREF_ATTR_PREFIX}body`;
 
   return {

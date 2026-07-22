@@ -716,6 +716,55 @@
 .langy-root[data-langy-peek="near"]::before {
   opacity: 1;
 }
+
+/* ── The peeking panel's lift ───────────────────────────────────────────────
+   A hairline against a white page is not a findable edge. Resting, the sliver
+   had only the panel's ordinary shadow to separate it from the page, and that
+   shadow is tuned for a card floating in the middle of the screen — against
+   the viewport edge it read as nothing at all, so the one affordance for
+   getting Langy back was invisible unless you already knew it was there.
+
+   Depth alone would only have made it a grey edge, so the lift carries the
+   brand's warmth too: what is sitting at the bottom of the page reads as
+   Langy. Directional — the glow throws away from the edge the panel is
+   tucked against, since the other side is off-screen.
+
+   Higher specificity than Chakra's generated class, deliberately: this is the
+   peeking state overriding the panel's resting material, and it must win. */
+.langy-root[data-langy-peek] {
+  transition: box-shadow 240ms ease;
+}
+.langy-root[data-langy-peek][data-langy-peek-mode="floating"] {
+  box-shadow:
+    0 -1px 3px rgba(20, 20, 23, 0.1),
+    0 -12px 32px rgba(20, 20, 23, 0.2),
+    0 -3px 18px rgba(237, 137, 38, 0.3);
+}
+.langy-root[data-langy-peek][data-langy-peek-mode="sidebar"] {
+  box-shadow:
+    -1px 0 3px rgba(20, 20, 23, 0.1),
+    -12px 0 32px rgba(20, 20, 23, 0.2),
+    -3px 0 18px rgba(237, 137, 38, 0.3);
+}
+.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"],
+:root.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"] {
+  box-shadow:
+    0 -1px 2px rgba(0, 0, 0, 0.45),
+    0 -14px 34px rgba(0, 0, 0, 0.55),
+    0 -3px 20px rgba(237, 137, 38, 0.28);
+}
+.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"],
+:root.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"] {
+  box-shadow:
+    -1px 0 2px rgba(0, 0, 0, 0.45),
+    -14px 0 34px rgba(0, 0, 0, 0.55),
+    -3px 0 20px rgba(237, 137, 38, 0.28);
+}
+@media (prefers-reduced-motion: reduce) {
+  .langy-root[data-langy-peek] {
+    transition: none;
+  }
+}
 /* A turn is in flight under the minimised panel: the seam breathes on the
    fold's own pulse period (WAVE_PULSE_PERIOD_S), the same clock the open
    panel's tool pulse keeps. */

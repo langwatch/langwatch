@@ -7,16 +7,16 @@
  * plain-text rendering rides beside it for the model to read.
  *
  * Whether a question is still answerable is EVENT ORDER and nothing else: a
- * choices block is open iff nothing follows it in the conversation. No
+ * choices card is open iff nothing follows it in the conversation. No
  * timers, no wall-clock state — the same derivation replays identically in
  * time travel, which is what makes the card's state honest forever.
  */
-import { z } from "zod";
+import * as z from "zod/v4";
 
 /**
  * The structured half of an answer. `optionIds` carries the picked option(s)
  * (plural under `multiSelect`); `otherText` carries a free-text answer when
- * the block allowed one (`allowOther`). At least one of the two must say
+ * the card allowed one (`allowOther`). At least one of the two must say
  * something — an empty selection answers nothing.
  */
 export const langyChoiceSelectionSchema = z
@@ -38,7 +38,7 @@ export type LangyChoiceSelection = z.infer<typeof langyChoiceSelectionSchema>;
  * One entry in the conversation's ordered timeline, as the caller flattens
  * it from the fold / message list:
  *
- *   - `question`  — a choices block appearing in an assistant message.
+ *   - `question`  — a choices card appearing in an assistant message.
  *   - `selection` — a recorded answer part (a user message carrying the
  *                   typed selection).
  *   - `message`   — any other conversational exchange (an ordinary user
@@ -66,9 +66,9 @@ export type LangyChoicesLockState =
   | { status: "superseded" };
 
 /**
- * Derive a choices block's lock state from the ordered timeline.
+ * Derive a choices card's lock state from the ordered timeline.
  *
- *   - A recorded selection for the block, anywhere after it, marks it
+ *   - A recorded selection for the card, anywhere after it, marks it
  *     answered — an answered question shows its outcome forever, including
  *     through time travel.
  *   - Otherwise anything at all after the question supersedes it: a question
@@ -94,7 +94,7 @@ export function deriveLangyChoicesLockState({
     }
   }
   // A question that is not on the timeline is not answerable — the caller is
-  // asking about a block the conversation never recorded.
+  // asking about a card the conversation never recorded.
   if (questionIndex === -1) return { status: "superseded" };
 
   let sawLaterEntry = false;

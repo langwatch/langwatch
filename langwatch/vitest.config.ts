@@ -8,7 +8,7 @@ export default defineConfig({
   test: {
     // The workspace packages export TypeScript SOURCE (`exports` → `src/*.ts`),
     // so they must be transformed by vite rather than handed to node's
-    // resolver — externalised, `import "@langwatch/cli-cards"` resolves to a
+    // resolver — externalised, `import "@langwatch/langy"` resolves to a
     // .ts file node cannot load, and vitest reports it as unresolvable.
     //
     // This lived under `resolve.server`, which is not a real option — `resolve`
@@ -20,7 +20,7 @@ export default defineConfig({
     server: {
       deps: {
         inline: [
-          /@langwatch\/(cli-cards|handled-error|automations|observability)/,
+          /@langwatch\/(langy|handled-error|automations|observability)/,
         ],
       },
     },
@@ -83,11 +83,11 @@ export default defineConfig({
       // its `safeModulePaths` set. `fs.allow` defaults to
       // `searchForWorkspaceRoot(root)`, and because `langwatch/` carries its
       // OWN `pnpm-workspace.yaml`, that search stops HERE — so the
-      // source-only workspace packages one level up (`../packages/cli-cards`,
+      // source-only workspace packages one level up (`../packages/langy`,
       // `../packages/handled-error`, `../mcp-server`) are outside the
       // allowlist. They still loaded, but only by accident: vite's
       // import-analysis adds every specifier it resolves to `safeModulePaths`,
-      // so each cli-cards file was "allowed" solely because vite had just
+      // so each langy file was "allowed" solely because vite had just
       // transformed the file importing it.
       //
       // `experimental.fsModuleCache` breaks that accident. A cached importer

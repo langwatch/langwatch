@@ -1,6 +1,7 @@
 /**
- * The card schemas: what each kind of LangWatch CLI result looks like once it has
- * been read as structure rather than as text.
+ * The card schemas: what each kind of card looks like once it has been read as
+ * structure rather than as text. ONE vocabulary, for every card the panel can
+ * draw — whoever wrote it.
  *
  * There is one schema per CARD, not one per command — because the panel has one
  * card per shape, and ~90 CLI commands collapse into a handful of shapes. A
@@ -9,10 +10,32 @@
  * tail therefore lands on the generic resource cards, which is the reuse that
  * makes this contract maintainable rather than a second copy of the API.
  *
- * Every schema is deliberately permissive about fields it does not name: a card
- * needs a handful of fields to draw a row, and the agent reading the same JSON
- * needs everything else. Parsing must never be lossy, and a CLI that grows a
- * field must never break a card.
+ * ── TWO CHANNELS, ONE VOCABULARY ───────────────────────────────────────────
+ *
+ * A card arrives by one of two channels, and the difference is PROVENANCE, not
+ * type:
+ *
+ *   - MEASURED — the CLI actually ran. The kind is stamped once, server-side,
+ *     from the command and the payload's shape (ADR-059). The acceptance
+ *     schemas below read those payloads.
+ *   - DERIVED — Langy wrote the JSON itself, inline in a ```langy-card fence
+ *     (ADR-060). `derived-safe.ts` builds those schemas, from the shapes
+ *     declared here, over a CLOSED subset of {@link CARD_KINDS}.
+ *
+ * The two channels used to keep separate copies of the same shapes, and the
+ * copies said so in their own headers. They are one declaration now: the unit
+ * vocabulary, the point and comparison fields, the table cell type are stated
+ * HERE and nowhere else. What each channel still states for itself is its
+ * TOLERANCE, because that is the one thing they legitimately disagree about —
+ * a measured payload must survive the round trip with its unknown fields
+ * intact (`looseObject`: the card shows a summary, the agent reading the same
+ * JSON wants the rest), a model-emitted one must not smuggle anything past
+ * validation (`object`, plus non-empty bars).
+ *
+ * Every measured schema is deliberately permissive about fields it does not
+ * name: a card needs a handful of fields to draw a row, and the agent reading
+ * the same JSON needs everything else. Parsing must never be lossy, and a CLI
+ * that grows a field must never break a card.
  */
 import * as z from "zod/v4";
 import {
@@ -80,6 +103,102 @@ export const metricsCardSchema = z.looseObject({
   previousPeriod: z.array(z.looseObject({})).optional(),
 });
 
+/*
+ * ── THE SHARED SHAPE VOCABULARY ────────────────────────────────────────────
+ *
+ * The pieces both channels are built from. A field map (`…Fields`) is spread
+ * into whichever object mode the channel needs; a leaf schema is used as-is.
+ * Nothing below is declared twice anywhere in the codebase — that duplication,
+ * and the header comment admitting to it, is what this module exists to end.
+ */
+
+/** How to format values. Drives the axis, the tooltip and the comparison. */
+export const timeseriesUnitSchema = z.enum([
+  "usd",
+  "count",
+  "ms",
+  "percent",
+  "tokens",
+]);
+
+/** One plotted point: x (ISO date, bucket label, or epoch) and value. */
+export const timeseriesPointFields = {
+  /** ISO date or bucket label — whatever the x axis should read. */
+  t: z.union([z.string(), z.number()]),
+  v: z.number(),
+} as const;
+
+/** The headline a plot supports: a value, its baseline, and their names. */
+export const timeseriesComparisonFields = {
+  label: z.string(),
+  value: z.number(),
+  baselineLabel: z.string(),
+  baseline: z.number(),
+} as const;
+
+/** A table cell is a JSON primitive — never a nested structure to render. */
+export const tableCellSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
+/**
+ * `table` — named columns, rows of primitive cells.
+ *
+ * Row length is deliberately not pinned to the column count: a ragged row
+ * renders short rather than failing the whole card.
+ */
+export const tableCardFields = {
+  title: z.string().optional(),
+  columns: z.array(z.string().min(1)).min(1),
+  rows: z.array(z.array(tableCellSchema)),
+} as const;
+
+/** `stats` — labelled key-value figures ("p95 latency: 812ms"). */
+export const statsCardFields = {
+  title: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        value: z.union([z.string(), z.number()]),
+        unit: z.string().optional(),
+      }),
+    )
+    .min(1),
+} as const;
+
+/**
+ * `choices` — a question with grounded options (ADR-060 §6).
+ *
+ * An option may ground itself in a real entity via `ref`; the platform
+ * hydrates the ref as the VIEWER through the existing id-reference seam, so a
+ * dead ref renders disabled and a live one renders with current,
+ * permission-true detail.
+ */
+export const choicesCardFields = {
+  question: z.string().min(1),
+  options: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        label: z.string().min(1),
+        description: z.string().optional(),
+        ref: z
+          .object({
+            type: z.string().min(1),
+            id: z.string().min(1),
+          })
+          .optional(),
+      }),
+    )
+    .min(1),
+  multiSelect: z.boolean().optional(),
+  allowOther: z.boolean().optional(),
+} as const;
+
 /**
  * A plotted answer: one or more named series over time, optionally with a
  * period-over-period comparison.
@@ -111,28 +230,13 @@ export const timeseriesCardSchema = z.looseObject({
     .array(
       z.looseObject({
         name: z.string(),
-        points: z.array(
-          z.looseObject({
-            /** ISO date or bucket label — whatever the x axis should read. */
-            t: z.union([z.string(), z.number()]),
-            v: z.number(),
-          }),
-        ),
+        points: z.array(z.looseObject(timeseriesPointFields)),
       }),
     )
     .min(1),
   title: z.string().optional(),
-  /** How to format values. Drives the axis, the tooltip and the comparison. */
-  unit: z.enum(["usd", "count", "ms", "percent", "tokens"]).optional(),
-  /** The headline the plot supports: a value, its baseline, and their names. */
-  comparison: z
-    .looseObject({
-      label: z.string(),
-      value: z.number(),
-      baselineLabel: z.string(),
-      baseline: z.number(),
-    })
-    .optional(),
+  unit: timeseriesUnitSchema.optional(),
+  comparison: z.looseObject(timeseriesComparisonFields).optional(),
   /** A `CustomGraphInput`, when the agent has one worth saving. */
   graph: z.unknown().optional(),
 });
@@ -152,9 +256,7 @@ export const timeseriesProbeSchema = z.looseObject({
     .array(
       z.looseObject({
         name: z.string(),
-        points: z
-          .array(z.looseObject({ t: z.union([z.string(), z.number()]), v: z.number() }))
-          .min(2),
+        points: z.array(z.looseObject(timeseriesPointFields)).min(2),
       }),
     )
     .min(1),
@@ -334,7 +436,14 @@ export const dashboardProbeSchema = z.union([
   z.looseObject({ graphType: z.string() }),
 ]);
 
-/** Every card the panel can draw. Mirrors the app's `CapabilityRenderKind`. */
+/**
+ * Every card the panel can draw, whichever channel wrote it. ONE list, so the
+ * measured and derived channels cannot grow separate vocabularies.
+ *
+ * Both channels are SUBSETS of this list: {@link MEASURED_CARD_KINDS} below,
+ * and the derived allowlist in `derived-safe.ts`. Neither subset is the whole,
+ * and neither is allowed to be — see {@link CARD_SHAPE}.
+ */
 export const CARD_KINDS = [
   "traces",
   "trace",
@@ -351,12 +460,86 @@ export const CARD_KINDS = [
   "resourceCreated",
   "resourceUpdated",
   "resourceRemoved",
+  "table",
+  "stats",
+  "choices",
 ] as const;
 
 export type CardKind = (typeof CARD_KINDS)[number];
 
-/** The schema that reads each card's payload. */
-export const SCHEMA_BY_CARD_KIND: Record<CardKind, z.ZodType> = {
+/**
+ * What a card KIND fundamentally claims. The security-relevant property of
+ * this whole module, and the reason it is a declaration rather than a guess.
+ *
+ *   - `resource` — the card asserts that RECORDS EXIST: these traces were
+ *     matched, this run produced these results, this dataset was created. The
+ *     claim is only true because something went and looked. Only a measured
+ *     result may make it.
+ *   - `presentation` — the card presents VALUES IT WAS HANDED, and claims
+ *     nothing about where they came from: a chart of supplied points, a table
+ *     of supplied cells, a question with supplied options. Either channel may
+ *     produce one honestly.
+ *
+ * `satisfies Record<CardKind, CardShape>` makes this EXHAUSTIVE: adding a kind
+ * to {@link CARD_KINDS} without classifying it here is a type error at this
+ * declaration. You cannot add a card kind without saying, in as many words,
+ * whether it asserts records — which is precisely the question `derived-safe.ts`
+ * then answers with a compile-time gate.
+ */
+export type CardShape = "resource" | "presentation";
+
+export const CARD_SHAPE = {
+  traces: "resource",
+  trace: "resource",
+  metrics: "resource",
+  evalRun: "resource",
+  dataset: "resource",
+  scenario: "resource",
+  promptDiff: "resource",
+  spend: "resource",
+  evaluatorConfig: "resource",
+  dashboard: "resource",
+  resourceRead: "resource",
+  resourceCreated: "resource",
+  resourceUpdated: "resource",
+  resourceRemoved: "resource",
+  // `timeseries` is presentation-shaped even though a command produces it:
+  // the card draws the points it is given and asserts nothing about what was
+  // searched. That is exactly why a model may draw one (ADR-060 §4) while the
+  // chrome, not the shape, says who computed it.
+  timeseries: "presentation",
+  table: "presentation",
+  stats: "presentation",
+  choices: "presentation",
+} as const satisfies Record<CardKind, CardShape>;
+
+/**
+ * The kinds a MEASURED result can be stamped with — the cards a CLI command
+ * produces. `table`, `stats` and `choices` are absent because no command emits
+ * one; they reach the panel through the derived channel only.
+ */
+export const MEASURED_CARD_KINDS = [
+  "traces",
+  "trace",
+  "metrics",
+  "timeseries",
+  "evalRun",
+  "dataset",
+  "scenario",
+  "promptDiff",
+  "spend",
+  "evaluatorConfig",
+  "dashboard",
+  "resourceRead",
+  "resourceCreated",
+  "resourceUpdated",
+  "resourceRemoved",
+] as const satisfies readonly CardKind[];
+
+export type MeasuredCardKind = (typeof MEASURED_CARD_KINDS)[number];
+
+/** The schema that reads each measured card's payload. */
+export const SCHEMA_BY_CARD_KIND: Record<MeasuredCardKind, z.ZodType> = {
   traces: tracesCardSchema,
   trace: traceCardSchema,
   metrics: metricsCardSchema,

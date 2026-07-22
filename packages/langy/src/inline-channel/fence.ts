@@ -3,20 +3,20 @@
  * relay (which extracts fences from the settled assistant text to stamp
  * typed parts) and the client preview (which spots a forming fence in the
  * live token stream). Both sides split text through this module, so they
- * cannot disagree about where a block starts and ends.
+ * cannot disagree about where a card starts and ends.
  *
  * Grammar: a line that is only a code fence (three or more backticks) tagged
- * exactly `langy-card` opens a block; the next line that is only a closing
+ * exactly `langy-card` opens a card; the next line that is only a closing
  * fence (three or more backticks, no tag) closes it. Scanning is
  * CommonMark-shaped about nesting: any OTHER fenced code block (```json,
  * ```markdown …) is opaque text, so a langy-card fence the model merely
- * quotes inside a code example never becomes a block. A fence still open at
+ * quotes inside a code example never becomes a card. A fence still open at
  * the end of the text is reported unclosed — the preview treats that as a
- * forming block; the relay treats it as a truncated one and lets salvage
+ * forming card; the relay treats it as a truncated one and lets salvage
  * decide.
  */
 
-/** The fence info tag that marks a model-emitted block. */
+/** The fence info tag that marks a card Langy wrote. */
 export const LANGY_CARD_FENCE_TAG = "langy-card";
 
 export type LangyCardFenceSegment =

@@ -10,9 +10,9 @@ import {
 import {
   LANGY_CHOICE_SELECTION_PART_TYPE,
   renderLangyChoiceSelectionText,
-  type LangyCardBlock,
+  type LangyDerivedCard,
   type LangyChoiceSelection,
-  type LangyChoicesBlock,
+  type LangyDerivedChoicesCard,
 } from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import {
@@ -112,7 +112,6 @@ import {
 } from "../logic/langyPanelLayout";
 import {
   FLOATING_PEEK_NEAR_PX,
-  SIDEBAR_PEEK_NEAR_PX,
   type LangyPeekPhase,
   resolvePeekTranslate,
 } from "../logic/langyPeekDock";
@@ -557,17 +556,6 @@ function LangyPanel({
   // (below) so nothing behind the edge is tabbable. When it is off, closed
   // means what it always meant: invisible, and the launcher orb opens it.
   const peeking = peekEnabled && !isOpen;
-  // ...and it gets out of the way while the home's ask field is in use. The
-  // field and this panel are two ways to say the same thing, so a peek sitting
-  // under the field's results is the page talking over itself.
-  //
-  // It FADES, and does not move. Standing the peek down by dropping it back to
-  // the ordinary closed state made it hop and scale away toward its corner —
-  // a departure, animated, for something the reader never asked to dismiss and
-  // is about to get back. Holding its position and taking it to zero opacity
-  // reads as the page quietly making room.
-  const homeAskOpen = useLangyStore((s) => s.homeAskOpen);
-  const peekDismissed = peeking && homeAskOpen;
   // The pointer approaching the sliver raises it a little further. One passive
   // rAF-throttled listener with hysteresis; off entirely under reduced motion,
   // where hover/focus alone does the raising.
@@ -623,9 +611,6 @@ function LangyPanel({
       // panel, and its position is the `translate` above. Only the flag-off
       // closed state still fades and hops out of the way.
       peek: { opacity: 1, scale: 1, x: 0, y: 0 },
-      // Same position as `peek`, just invisible: the peek standing aside for
-      // the home's ask field must not read as the panel leaving.
-      peekDismissed: { opacity: 0, scale: 1, x: 0, y: 0 },
       closed: floating ? FLOATING_CLOSED : SIDEBAR_CLOSED,
     }),
     [floating],
@@ -1662,7 +1647,7 @@ function LangyPanel({
       card,
     }: {
       selection: LangyChoiceSelection;
-      card: LangyChoicesBlock;
+      card: LangyDerivedChoicesCard;
     }) => {
       if (!projectId || isBusy) return;
       const text = renderLangyChoiceSelectionText({
@@ -1694,7 +1679,7 @@ function LangyPanel({
   // the ordinary send path — to run the real platform query. The measured
   // result then arrives as an ordinary measured card via the envelope path.
   const verifyDerivedCard = useCallback(
-    ({ card }: { card: LangyCardBlock }) => {
+    ({ card }: { card: LangyDerivedCard }) => {
       const subject =
         "title" in card && card.title ? `"${card.title}"` : "this derived card";
       void send(
@@ -1909,19 +1894,7 @@ function LangyPanel({
         // edge its peek sliver rests on.
         transformOrigin={floating ? "bottom right" : "right center"}
         initial={false}
-        // Invisible must also mean untouchable: a peek faded to zero still
-        // covers its corner, and a click landing on nothing visible is worse
-        // than a peek that stayed.
-        pointerEvents={peekDismissed ? "none" : undefined}
-        animate={
-          isOpen
-            ? "open"
-            : peekDismissed
-              ? "peekDismissed"
-              : peeking
-                ? "peek"
-                : "closed"
-        }
+        animate={isOpen ? "open" : peeking ? "peek" : "closed"}
         variants={variants}
         // The peek's whole motion, on the one element: rest → near → open is
         // a single property easing on the panel's own curve. Never set while
@@ -2095,24 +2068,12 @@ function LangyPanel({
             aria-label="Open Langy assistant"
             aria-keyshortcuts="Meta+I Control+I"
             position="absolute"
-            // The target covers the WHOLE visible sliver, which is a different
-            // shape in each mode: floating leaves a strip of header along the
-            // top, the dock leaves a strip of its edge running the entire
-            // height of the viewport. Sized to the RISEN sliver in both, so the
-            // pointer never falls off the target as the panel rises to meet it.
-            {...(floating
-              ? {
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: `${FLOATING_PEEK_NEAR_PX}px`,
-                }
-              : {
-                  top: 0,
-                  bottom: 0,
-                  left: 0,
-                  width: `${SIDEBAR_PEEK_NEAR_PX}px`,
-                })}
+            top={0}
+            left={0}
+            right={0}
+            // Tall enough to cover the risen sliver too, so the pointer never
+            // falls off the target as the panel rises to meet it.
+            height={`${FLOATING_PEEK_NEAR_PX}px`}
             zIndex={3}
             cursor="pointer"
             background="transparent"

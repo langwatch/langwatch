@@ -7,7 +7,7 @@
  *      "A write card never claims success on a result that names nothing"
  */
 import { describe, expect, it } from "vitest";
-import { SCHEMA_BY_CARD_KIND, namesCreatedResource } from "./cards.js";
+import { SCHEMA_BY_CARD_KIND, namesCreatedResource } from "./schemas.js";
 import { parseCliResult } from "./registry.js";
 import { parseCliToolResult, toCliToolResult } from "./tool-result.js";
 

@@ -115,21 +115,6 @@ export const summaryGraphTypes: CustomGraphInput["graphType"][] = [
   "donnut",
 ];
 
-/**
- * The floor a row of figures holds, in pixels.
- *
- * A figure is a label, a number, and — only once the comparison has arrived —
- * a change and the previous value under it. Those last two lines appear late
- * and are not there at all when there is nothing to compare against, so
- * without a floor the row grows by a line the moment the data lands and
- * shrinks again when the window changes. The floor is the tallest form of a
- * figure, so the row is that height from the first paint and never moves.
- *
- * `input.height` deliberately does NOT reach here. It sizes a plotting area,
- * and a row of figures has none: it is as tall as the type in it.
- */
-const SUMMARY_ROW_MIN_HEIGHT = "101px";
-
 const GraphComponentMap: Partial<{
   [K in CustomGraphInput["graphType"]]: [
     typeof LineChart | typeof PieChart,
@@ -655,17 +640,9 @@ const CustomGraph_ = React.memo(
           currentAndPreviousData?.length === 0 ||
           (!isSummaryType && allValues.every((v) => v === 0)));
 
-      // The bar-chart placeholder stands in for a CURVE that is not there yet.
-      // A summary has no curve: it draws its own per-figure placeholders (a
-      // label and a skeletoned number for each series), so painting bars behind
-      // them stacks two different loading states on the same pixels. Every
-      // other graph type keeps it.
-      const showChartSkeleton =
-        timeseries.isLoading && input.graphType !== "summary";
-
       return (
         <Box width="full" height="full" position="relative">
-          {showChartSkeleton && (
+          {timeseries.isLoading && (
             <Box
               position="absolute"
               inset={0}
@@ -784,7 +761,7 @@ const CustomGraph_ = React.memo(
         <HStack
           gap={0}
           align="start"
-          minHeight={SUMMARY_ROW_MIN_HEIGHT}
+          minHeight="101px"
           overflowX={"auto"}
           width="full"
         >

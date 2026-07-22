@@ -12,7 +12,7 @@
  * @see specs/langy/langy-capability-cards.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { CliResultDigest } from "@langwatch/cli-cards";
+import type { CliResultDigest } from "@langwatch/langy";
 import { render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

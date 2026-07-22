@@ -10,7 +10,7 @@
  * and the CLI's own command tree drift in either direction.
  *
  * WHICH card kind a verb produces and its tone are NOT here: those are CLI
- * grammar, owned by `@langwatch/cli-cards` (`cardKindFor`, `cliVerbTone`).
+ * grammar, owned by `@langwatch/langy` (`cardKindFor`, `cliVerbTone`).
  * This catalog only binds the view on top — the same split the registry has
  * always kept.
  *
@@ -21,7 +21,7 @@
  *
  * @see specs/langy/langy-capability-cards.feature
  */
-import type { DigestStrategy } from "@langwatch/cli-cards";
+import type { DigestStrategy } from "@langwatch/langy";
 
 /**
  * Every platform surface a card can point at. The label, path, icon and

@@ -258,19 +258,6 @@ interface LangyState extends TurnPhaseState {
   dockShifted: boolean;
   setDockShifted: (shifted: boolean) => void;
 
-  /**
-   * The home page's ask field is in use right now.
-   *
-   * The field and Langy's panel are two ways to say the same thing, so a
-   * minimised Langy stands down while someone is typing into the field rather
-   * than peeking out from under its results. Never persisted: it mirrors what
-   * the reader is doing this second, and a page that reloaded into "the field
-   * is focused" when it is not would leave Langy hidden with nothing to
-   * un-hide it.
-   */
-  homeAskOpen: boolean;
-  setHomeAskOpen: (open: boolean) => void;
-
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
   /**
@@ -650,9 +637,6 @@ export const useLangyStore = create<LangyState>()(
 
       dockShifted: false,
       setDockShifted: (dockShifted) => set({ dockShifted }),
-
-      homeAskOpen: false,
-      setHomeAskOpen: (homeAskOpen) => set({ homeAskOpen }),
 
       activeConversationId: null,
       activeConversationScope: null,

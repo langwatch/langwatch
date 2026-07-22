@@ -32,7 +32,7 @@ import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../logic/langyErrorExplainer";
-import { LangyBlocksTestingGround } from "./blocks/LangyBlocksTestingGround";
+import { LangyDerivedCardsTestingGround } from "./derived-cards/LangyDerivedCardsTestingGround";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { LangyCapabilityRenderer } from "./capabilities/LangyCapabilityRenderer";
 import { LangyError } from "./LangyError";
@@ -282,7 +282,7 @@ export function LangyCardGallery() {
           failed disclosure, and every choices state, all interactive. The
           streaming playground feeds the REAL preview reducer chunk by chunk. */}
       <Section title="Model-emitted blocks — derived cards and choices (ADR-060)">
-        <LangyBlocksTestingGround />
+        <LangyDerivedCardsTestingGround />
       </Section>
 
       <Section title="Capabilities — reads">

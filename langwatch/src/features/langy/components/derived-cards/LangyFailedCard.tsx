@@ -10,7 +10,7 @@ import type { LangyCardFailedPart } from "@langwatch/langy";
 import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 
-export function LangyFailedBlockCard({ part }: { part: LangyCardFailedPart }) {
+export function LangyFailedCard({ part }: { part: LangyCardFailedPart }) {
   const [expanded, setExpanded] = useState(false);
 
   return (

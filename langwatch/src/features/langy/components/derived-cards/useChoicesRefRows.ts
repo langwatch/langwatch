@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { LangyChoicesBlock } from "@langwatch/langy";
+import type { LangyDerivedChoicesCard } from "@langwatch/langy";
 import { CAPABILITY_HYDRATORS } from "../capabilities/capabilityHydrators";
 
 export type ChoicesRefRow =
@@ -28,7 +28,7 @@ export type ChoicesRefRow =
   | { state: "live"; primary?: string; secondary?: string };
 
 export function useChoicesRefRows(
-  options: LangyChoicesBlock["options"],
+  options: LangyDerivedChoicesCard["options"],
 ): ReadonlyMap<string, ChoicesRefRow> {
   const { project } = useOrganizationTeamProject();
   const utils = api.useContext();

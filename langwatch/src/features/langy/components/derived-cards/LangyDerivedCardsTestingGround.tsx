@@ -20,10 +20,10 @@
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import {
-  feedLangyCardBlockPreview,
-  initialLangyCardBlockPreview,
-  type LangyCardBlock,
-  type LangyChoicesBlock,
+  feedLangyDerivedCardPreview,
+  initialLangyDerivedCardPreview,
+  type LangyDerivedCard,
+  type LangyDerivedChoicesCard,
   type LangyChoiceSelection,
   type LangyChoicesLockState,
 } from "@langwatch/langy";
@@ -31,13 +31,13 @@ import { Pause, Play, RotateCcw, StepForward } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { LangyChoicesCard } from "./LangyChoicesCard";
-import { LangyDerivedBlockCard } from "./LangyDerivedBlockCard";
-import { LangyFailedBlockCard } from "./LangyFailedBlockCard";
+import { LangyDerivedCardView } from "./LangyDerivedCardView";
+import { LangyFailedCard } from "./LangyFailedCard";
 import type { ChoicesRefRow } from "./useChoicesRefRows";
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
-const TIMESERIES: LangyCardBlock = {
+const TIMESERIES: LangyDerivedCard = {
   kind: "timeseries",
   blockId: "gallery-ts",
   title: "Cost per day — derived from the dataset",
@@ -65,7 +65,7 @@ const TIMESERIES: LangyCardBlock = {
   hints: [{ type: "explore", query: { query: "checkout" } }, { type: "verify" }],
 };
 
-const TABLE: LangyCardBlock = {
+const TABLE: LangyDerivedCard = {
   kind: "table",
   blockId: "gallery-table",
   title: "Failures by model — derived grouping",
@@ -79,7 +79,7 @@ const TABLE: LangyCardBlock = {
   ],
 };
 
-const STATS_NUMERIC: LangyCardBlock = {
+const STATS_NUMERIC: LangyDerivedCard = {
   kind: "stats",
   blockId: "gallery-stats",
   title: "Yesterday, at a glance",
@@ -90,7 +90,7 @@ const STATS_NUMERIC: LangyCardBlock = {
   ],
 };
 
-const STATS_MIXED: LangyCardBlock = {
+const STATS_MIXED: LangyDerivedCard = {
   kind: "stats",
   blockId: "gallery-stats-mixed",
   title: "Mixed figures fall back to the grid",
@@ -100,7 +100,7 @@ const STATS_MIXED: LangyCardBlock = {
   ],
 };
 
-const CHOICES: LangyChoicesBlock = {
+const CHOICES: LangyDerivedChoicesCard = {
   kind: "choices",
   blockId: "gallery-choices",
   question: "Which agent should this scenario run against?",
@@ -111,7 +111,7 @@ const CHOICES: LangyChoicesBlock = {
   ],
 };
 
-const CHOICES_REFS: LangyChoicesBlock = {
+const CHOICES_REFS: LangyDerivedChoicesCard = {
   kind: "choices",
   blockId: "gallery-choices-refs",
   question: "Options grounded in real entities — hydrated as the viewer",
@@ -174,8 +174,8 @@ function StreamingPlayground() {
   const preview = useMemo(
     () =>
       STREAM_CHUNKS.slice(0, step + 1).reduce(
-        feedLangyCardBlockPreview,
-        initialLangyCardBlockPreview,
+        feedLangyDerivedCardPreview,
+        initialLangyDerivedCardPreview,
       ),
     [step],
   );
@@ -209,8 +209,8 @@ function StreamingPlayground() {
           chunk {step + 1}/{STREAM_CHUNKS.length}
         </Text>
       </HStack>
-      {preview.block ? (
-        <LangyDerivedBlockCard card={preview.block} forming={!done} />
+      {preview.card ? (
+        <LangyDerivedCardView card={preview.card} forming={!done} />
       ) : (
         <Text textStyle="2xs" color="fg.subtle">
           No preview yet — nothing shown until a prefix validates.
@@ -244,7 +244,7 @@ function ChoicesPlayground({
   card,
   refRowsOverride,
 }: {
-  card: LangyChoicesBlock;
+  card: LangyDerivedChoicesCard;
   refRowsOverride?: ReadonlyMap<string, ChoicesRefRow>;
 }) {
   const [selection, setSelection] = useState<LangyChoiceSelection | null>(null);
@@ -299,7 +299,7 @@ function ChoicesPlayground({
 
 // ─── the ground itself ───────────────────────────────────────────────────────
 
-export function LangyBlocksTestingGround() {
+export function LangyDerivedCardsTestingGround() {
   return (
     <VStack align="stretch" gap={4}>
       <Labeled label="Progressive preview — the real reducer, chunk by chunk">
@@ -311,23 +311,23 @@ export function LangyBlocksTestingGround() {
       </Labeled>
 
       <Labeled label="Derived table — ragged rows render short, never fail">
-        <LangyDerivedBlockCard card={TABLE} />
+        <LangyDerivedCardView card={TABLE} />
       </Labeled>
 
       <Labeled label="Derived stats — numeric figures roll up">
-        <LangyDerivedBlockCard card={STATS_NUMERIC} />
+        <LangyDerivedCardView card={STATS_NUMERIC} />
       </Labeled>
 
       <Labeled label="Derived stats — mixed values fall back to the grid">
-        <LangyDerivedBlockCard card={STATS_MIXED} />
+        <LangyDerivedCardView card={STATS_MIXED} />
       </Labeled>
 
       <Labeled label="Forming chrome — what a mid-stream card wears">
-        <LangyDerivedBlockCard card={STATS_NUMERIC} forming />
+        <LangyDerivedCardView card={STATS_NUMERIC} forming />
       </Labeled>
 
       <Labeled label="Failed block — the disclosure, never silence (expand it)">
-        <LangyFailedBlockCard
+        <LangyFailedCard
           part={{
             type: "langy-card-failed",
             blockId: "gallery-failed",
@@ -381,7 +381,7 @@ function VerifyDemo() {
   const [sent, setSent] = useState(false);
   return (
     <VStack align="stretch" gap={1.5}>
-      <LangyDerivedBlockCard
+      <LangyDerivedCardView
         card={TIMESERIES}
         projectSlug="demo"
         onVerify={() => setSent(true)}

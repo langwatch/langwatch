@@ -6,7 +6,7 @@
  * on the same question the agent asked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { CliResultDigest } from "@langwatch/cli-cards";
+import type { CliResultDigest } from "@langwatch/langy";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CapabilityData } from "../hooks/useCapabilityData";

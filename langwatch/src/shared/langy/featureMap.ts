@@ -19,7 +19,7 @@
  * view of these features among several (sidebar, docs, CLI itself), and each
  * binds its own rendering on top of the same facts. Langy's binding lives in
  * `capabilityRegistry.ts` (which surface, keyed by feature id — the card itself
- * comes from the shared `@langwatch/cli-cards` contract) and `cliFollowUps.ts`
+ * comes from the shared `@langwatch/langy` contract) and `cliFollowUps.ts`
  * (which offer, in which words) — so presentation can drift without structure.
  *
  * @see specs/langy/langy-cli-tool-envelope.feature

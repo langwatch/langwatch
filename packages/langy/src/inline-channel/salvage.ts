@@ -10,15 +10,15 @@
  *
  * What salvage never does is guess CONTENT: unquoted garbage, a value that is
  * not JSON, or trailing junk after the document is unsalvageable, full stop.
- * And the repaired document must then pass the block schema STRICTLY
- * (`salvageLangyCardBlock`) — a payload that parses but does not validate is
- * a failed block, never a guessed card.
+ * And the repaired document must then pass the derived-card schema STRICTLY
+ * (`salvageLangyDerivedCard`) — a payload that parses but does not validate is
+ * a failed card, never a guessed one.
  *
  * Pure: no dependencies beyond zod (via schemas.ts) for the post-validation.
  * The relay stamps and the client previews through this same module, so the
  * two runtimes repair identically.
  */
-import { langyCardBlockSchema, type LangyCardBlock } from "./schemas";
+import { langyDerivedCardSchema, type LangyDerivedCard } from "../cards/derived-safe.js";
 
 export type LangySalvageResult =
   | { ok: true; value: unknown }
@@ -241,20 +241,20 @@ export function salvageJsonText(raw: string): LangySalvageResult {
   return { ok: true, value: top.value };
 }
 
-export type LangyCardBlockParseResult =
-  | { ok: true; block: LangyCardBlock }
+export type LangyDerivedCardParseResult =
+  | { ok: true; card: LangyDerivedCard }
   | { ok: false; reason: "unsalvageable" | "invalid" };
 
 /**
  * The ONE decision the channel makes about a fence's content (ADR-060 §2):
  * salvage the JSON as leniently as engineering allows, then validate the
- * repaired document STRICTLY against the closed block allowlist. The relay
+ * repaired document STRICTLY against the closed derived-safe allowlist. The relay
  * stamps with this; the client previews with this; nothing else re-decides.
  */
-export function salvageLangyCardBlock(raw: string): LangyCardBlockParseResult {
+export function salvageLangyDerivedCard(raw: string): LangyDerivedCardParseResult {
   const salvaged = salvageJsonText(raw);
   if (!salvaged.ok) return { ok: false, reason: "unsalvageable" };
-  const parsed = langyCardBlockSchema.safeParse(salvaged.value);
+  const parsed = langyDerivedCardSchema.safeParse(salvaged.value);
   if (!parsed.success) return { ok: false, reason: "invalid" };
-  return { ok: true, block: parsed.data };
+  return { ok: true, card: parsed.data };
 }

@@ -2,7 +2,7 @@
   "name": "@langwatch/langy",
   "version": "0.1.0",
   "private": true,
-  "description": "Langy's shared conversation-projection contract: the event payload schemas, the pure turn fold, the turn-phase machine, and the event cursor — imported by both the LangWatch server pipeline and the browser panel so a turn renders identically on both sides (ADR-059).",
+  "description": "Langy's shared contract: the CARD vocabulary (every kind of card the panel can draw, the closed derived-safe allowlist a model may write, the CLI verb registry, digest and handled-error), the inline ```langy-card channel, and the conversation-projection contract (event payload schemas, the pure turn fold, the turn-phase machine, the event cursor) — imported by the LangWatch server pipeline, the browser panel and the CLI so a turn renders identically everywhere (ADR-059, ADR-060).",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -10,6 +10,14 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./cards": {
+      "types": "./src/cards/index.ts",
+      "default": "./src/cards/index.ts"
+    },
+    "./cards/handled-error": {
+      "types": "./src/cards/handled-error.ts",
+      "default": "./src/cards/handled-error.ts"
     }
   },
   "main": "./src/index.ts",

@@ -83,7 +83,11 @@ Extract the **pure** projection logic — event schemas (Zod, already portable),
 state types, the cursor type + its comparator, and the fold reducers — into a
 new source-only workspace package `@langwatch/langy` (`packages/langy`, exports
 `./src/index.ts`, no build step), consumed by `langwatch/` via `workspace:*`
-exactly like `@langwatch/cli-cards`.
+exactly like `@langwatch/handled-error`.
+
+> **2026-07-22.** This package has since absorbed the CLI card contract that was
+> `@langwatch/cli-cards`; it now lives at `packages/langy/src/cards` behind the
+> `@langwatch/langy/cards` subpath, which is what the CLI imports.
 
 - **Server** keeps its thin fold-projection wrappers, but the handler bodies
   become calls into the shared reducer (`foldTurn(state, event)`), the way
@@ -290,7 +294,8 @@ Sharpen the seams the later phases build on; no behaviour change.
   read per burst.
 - **Ship the reducers from `langwatch/src/shared` instead of a package.**
   Workable, but a package is the existing convention for code both the server
-  and client import (`cli-cards`, `handled-error`), enforces the
+  and client import (`handled-error`, and the card contract now inside this
+  same package), enforces the
   no-server-deps boundary at the module graph, and fits the `/packages`
   consolidation direction.
 - **Replay full event history on the client.** Rejected: unbounded; the

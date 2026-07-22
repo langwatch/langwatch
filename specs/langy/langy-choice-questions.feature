@@ -4,9 +4,9 @@ Feature: Langy asks a real question with selectable options
   So that choosing an agent, a prompt, or one of several ways forward
   is one tap with full context — not a prose question and a typed reply.
 
-  # The choices block is the sanctioned UI for the one exception to "never
+  # The choices card is the sanctioned UI for the one exception to "never
   # offer options": a decision that spends the customer's money or picks what
-  # gets tested belongs to the user. The block rides the same relay-stamped
+  # gets tested belongs to the user. It rides the same relay-stamped
   # channel as derived cards (ADR-060); the SELECTION is both a durable event
   # (the card renders its outcome from the fold, forever) and the next user
   # message (structured part + readable text).
@@ -15,7 +15,7 @@ Feature: Langy asks a real question with selectable options
   # parked worker. Answering starts an ordinary next turn.
   #
   # Companion specs:
-  #   - specs/langy/langy-derived-cards.feature (the shared block channel)
+  #   - specs/langy/langy-derived-cards.feature (the shared inline card channel)
   #   - specs/langy/langy-stop-and-resume.feature (the turn lifecycle, unchanged)
   #
   # ADR: dev/docs/adr/060-langy-model-emitted-blocks.md
@@ -29,7 +29,7 @@ Feature: Langy asks a real question with selectable options
   # ===========================================================================
 
   Scenario: A question card ends the turn and waits
-    Given Langy's reply ends with a choices block
+    Given Langy's reply ends with a choices card
     When the turn settles
     Then the options render as a selectable card
     And the panel is idle — no spinner, no in-flight turn

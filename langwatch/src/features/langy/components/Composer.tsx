@@ -253,16 +253,12 @@ function ComposerImpl({
   const onTextareaKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
-    // The sigils follow their buttons: while a turn is in flight there is
-    // nothing for a palette to attach to, so `#` and `/` type as the ordinary
-    // characters they are rather than opening a picker that cannot take.
-    const palettesOpen = !disabled && !turnActive;
-    if (palettesOpen && event.key === "#" && atWordBoundary()) {
+    if (event.key === "#" && atWordBoundary()) {
       event.preventDefault();
       openPalette("context");
       return;
     }
-    if (palettesOpen && event.key === "/" && atWordBoundary()) {
+    if (event.key === "/" && atWordBoundary()) {
       event.preventDefault();
       openPalette("skills");
       return;
@@ -506,16 +502,19 @@ function ComposerImpl({
                     color={canSend ? "white" : "fg.muted"}
                     cursor={canSend ? "pointer" : "default"}
                   >
-                    {/* Centred, with nothing to interfere. Lucide's paper plane
-                        is very nearly centred in its own box (ink centre within
-                        0.15 of the 24-grid centre), so `place-items: center` is
-                        the whole job — once the wrapper stops inheriting a line
-                        box it has no use for, whose stray half-leading was what
-                        pushed the glyph off centre in the first place. */}
+                    {/* OPTICAL centring, not geometric. Lucide's paper plane is
+                        very nearly centred in its own box (ink centre is within
+                        0.15 of the 24-grid centre), so `place-items: center`
+                        already puts it dead centre — and it still reads low and
+                        left, because the glyph's visual mass is the wide tail
+                        while the tip runs off to the top right. Nudging it a
+                        pixel along its own axis is what makes it LOOK centred in
+                        a circle. Sub-pixel values don't survive rasterisation,
+                        hence a whole pixel each way. */}
                     <Box
                       display="grid"
                       placeItems="center"
-                      lineHeight={0}
+                      transform="translate(1px, -1px)"
                     >
                       <Send size={14} />
                     </Box>
@@ -539,14 +538,6 @@ function ComposerImpl({
             // control height (see SigilButton) and the row centers explicitly
             // rather than by luck.
             align="center"
-            // ...and it STAYS one row. In a narrow panel the rail was breaking
-            // onto a second line, which put the model control on its own row
-            // above two left-stranded sigils and made the footer look like a
-            // stack of unrelated chrome. Nothing here may wrap; if the rail
-            // runs out of room the model pill gives up its width first (it
-            // collapses to a glyph by design), never the row's shape.
-            flexWrap="nowrap"
-            minWidth={0}
             paddingLeft={2.5}
             paddingRight={2}
             paddingBottom={2}
@@ -554,53 +545,35 @@ function ComposerImpl({
             // See the note on the context summary above: the hero stays bare.
             display={hero ? "none" : undefined}
           >
-            {/* The pill goes in a shrinkable wrapper rather than straight into
-                the row. Ark's combobox root is a layout box of its own, and
-                left as the flex item it can claim the rail's whole width —
-                which squeezed the spacer to nothing and pushed the sigils onto
-                a line of their own. The wrapper is the flex item now: it may
-                shrink to nothing and it may not grow, so the row's shape can
-                never depend on how wide the selected model's name happens to
-                be. */}
-            <Box minWidth={0} flexShrink={1} flexGrow={0} overflow="hidden">
-              
-            </Box>
-            <Box flex={1} minWidth={0} />
+            <LangyModelPill
+              model={model}
+              options={modelOptions}
+              langyDefaultModel={langyDefaultModel}
+              onChange={onModelChange}
+              // The model is locked in the moment a turn starts — it rode with
+              // the send and can't change mid-flight — so the picker greys out
+              // until the turn settles rather than offering a choice that
+              // wouldn't take.
+              disabled={disabled || turnActive}
+            />
+            <Box flex={1} />
             {/* The two keys, said out loud. A palette you can only reach by
                 guessing a keystroke is a palette most people never see, so the
                 sigils sit on the rail as real buttons: they name what each key
                 opens AND open it, which means the shortcut teaches itself the
-                first time someone clicks one.
-
-                They keep a gap between them: at the rail's 4px they read as one
-                four-word control rather than as two things you can press. */}
-            <HStack gap={2} flexShrink={0} align="center">
-              <LangyModelPill
-                model={model}
-                options={modelOptions}
-                langyDefaultModel={langyDefaultModel}
-                onChange={onModelChange}
-                // The model is locked in the moment a turn starts — it rode
-                // with the send and can't change mid-flight — so the picker
-                // greys out until the turn settles rather than offering a
-                // choice that wouldn't take.
-                disabled={disabled || turnActive}
-              />
-              <SigilButton
-                sigil="#"
-                label="Context"
-                hint="Add something from this page. Press #"
-                onClick={() => openPalette("context")}
-                disabled={disabled || turnActive}
-              />
-              <SigilButton
-                sigil="/"
-                label="Skills"
-                hint="Pick what Langy should do. Press /"
-                onClick={() => openPalette("skills")}
-                disabled={disabled || turnActive}
-              />
-            </HStack>
+                first time someone clicks one. */}
+            <SigilButton
+              sigil="#"
+              label="Context"
+              hint="Add something from this page. Press #"
+              onClick={() => openPalette("context")}
+            />
+            <SigilButton
+              sigil="/"
+              label="Skills"
+              hint="Pick what Langy should do. Press /"
+              onClick={() => openPalette("skills")}
+            />
           </HStack>
         </Box>
       </Box>
@@ -638,19 +611,11 @@ function SigilButton({
   label,
   hint,
   onClick,
-  disabled = false,
 }: {
   sigil: string;
   label: string;
   hint: string;
   onClick: () => void;
-  /**
-   * Greyed while a turn is in flight, alongside the model picker. Both change
-   * what the NEXT send carries, and the send has already gone — a palette that
-   * opened here would let someone attach context to a turn that cannot take
-   * it, and then look like it had done nothing.
-   */
-  disabled?: boolean;
 }) {
   return (
     <Tooltip content={hint} openDelay={300} showArrow>
@@ -658,9 +623,6 @@ function SigilButton({
         type="button"
         aria-label={hint}
         onClick={onClick}
-        disabled={disabled}
-        aria-disabled={disabled}
-        _disabled={{ opacity: 0.45, cursor: "not-allowed", background: "transparent" }}
         display="inline-flex"
         alignItems="center"
         gap={1}

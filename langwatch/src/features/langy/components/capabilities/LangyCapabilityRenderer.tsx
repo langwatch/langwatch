@@ -26,7 +26,7 @@ import {
   parseCliToolResult,
   toCliToolResult,
   type CliToolResult,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy";
 import { VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { digestOfToolCall } from "../../logic/langyCapabilityDigest";

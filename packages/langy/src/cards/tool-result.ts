@@ -21,7 +21,7 @@ import {
   traceCardSchema,
   tracesCardSchema,
   SCHEMA_BY_CARD_KIND,
-} from "./cards.js";
+} from "./schemas.js";
 import { CARD_PROBES, cardKindFor, promoteCard } from "./registry.js";
 
 /**

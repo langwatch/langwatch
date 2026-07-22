@@ -21,13 +21,13 @@
  */
 import { Box, Button, Grid, Table, Text } from "@chakra-ui/react";
 import type {
-  LangyCardBlock,
+  LangyDerivedCard,
   LangyCardHint,
-  LangyChoicesBlock,
+  LangyDerivedChoicesCard,
   LangyChoiceSelection,
   LangyChoicesLockState,
-  LangyStatsBlock,
-  LangyTableBlock,
+  LangyDerivedStatsCard,
+  LangyDerivedTableCard,
 } from "@langwatch/langy";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
@@ -42,8 +42,8 @@ import {
 import { LangyChoicesCard } from "./LangyChoicesCard";
 import { LangyDerivedCardFrame } from "./LangyDerivedCardFrame";
 
-export interface LangyDerivedBlockCardProps {
-  card: LangyCardBlock;
+export interface LangyDerivedCardViewProps {
+  card: LangyDerivedCard;
   /** Hints stamped on the part (already schema-validated by the kernel). */
   hints?: LangyCardHint[];
   /** Still streaming — renders the forming chrome (ADR-060 §7). */
@@ -54,13 +54,13 @@ export interface LangyDerivedBlockCardProps {
   /** Choices only: answer the question. Absent = read-only (time travel). */
   onChoiceSelect?: (a: {
     selection: LangyChoiceSelection;
-    card: LangyChoicesBlock;
+    card: LangyDerivedChoicesCard;
   }) => void;
   /** Verify hint: ask Langy to run the real query. Absent = chip hidden. */
-  onVerify?: (a: { card: LangyCardBlock }) => void;
+  onVerify?: (a: { card: LangyDerivedCard }) => void;
 }
 
-export function LangyDerivedBlockCard({
+export function LangyDerivedCardView({
   card,
   hints,
   forming = false,
@@ -68,7 +68,7 @@ export function LangyDerivedBlockCard({
   choicesLockState,
   onChoiceSelect,
   onVerify,
-}: LangyDerivedBlockCardProps) {
+}: LangyDerivedCardViewProps) {
   if (card.kind === "choices") {
     return (
       <LangyChoicesCard
@@ -107,7 +107,7 @@ export function LangyDerivedBlockCard({
 function DerivedBlockBody({
   card,
 }: {
-  card: Exclude<LangyCardBlock, { kind: "choices" }>;
+  card: Exclude<LangyDerivedCard, { kind: "choices" }>;
 }) {
   switch (card.kind) {
     case "timeseries":
@@ -132,7 +132,7 @@ function formatCell(cell: string | number | boolean | null | undefined): string 
   return cell;
 }
 
-function DerivedTableBody({ card }: { card: LangyTableBlock }) {
+function DerivedTableBody({ card }: { card: LangyDerivedTableCard }) {
   const shown = card.rows.slice(0, MAX_TABLE_ROWS);
   const remaining = card.rows.length - shown.length;
   return (
@@ -180,7 +180,7 @@ function DerivedTableBody({ card }: { card: LangyTableBlock }) {
   );
 }
 
-function DerivedStatsBody({ card }: { card: LangyStatsBlock }) {
+function DerivedStatsBody({ card }: { card: LangyDerivedStatsCard }) {
   const numeric = card.items.every((item) => typeof item.value === "number");
   if (numeric) {
     // The measured stat figures, reused — value roll-up and all.
@@ -224,10 +224,10 @@ function bindHints({
   projectSlug,
   onVerify,
 }: {
-  card: LangyCardBlock;
+  card: LangyDerivedCard;
   hints: LangyCardHint[];
   projectSlug: string | null;
-  onVerify?: (a: { card: LangyCardBlock }) => void;
+  onVerify?: (a: { card: LangyDerivedCard }) => void;
 }): ReactNode[] {
   const chips: ReactNode[] = [];
   for (const hint of hints) {

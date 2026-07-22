@@ -5,9 +5,19 @@
 **Status:** Accepted (implemented — schemas, relay stamp, and the choices card
 render on the event-sourced frontend)
 
+> **Terminology, 2026-07-22.** This ADR was written when the model's channel had
+> its own noun, "blocks", and its own type vocabulary in `packages/langy/src/blocks`.
+> The code no longer does. There are **cards**, some of which Langy wrote: ONE kind
+> list in `packages/langy/src/cards/schemas.ts`, of which the model-emittable ones
+> are a closed subset selected by `cards/derived-safe.ts`, and provenance is a
+> FIELD on the stamped part (`provenance: "derived"`) rather than a parallel type
+> system. The transport is unchanged — still a ```langy-card fence carrying a
+> `blockId` — and the scanner/salvage/preview code now sits under
+> `packages/langy/src/inline-channel`. Read "block" below as "a card Langy wrote".
+
 **Builds on:** ADR-059 (card selection is deterministic — §5 sketched the
 model's typed-data channel this ADR now specifies), ADR-059 (event-sourced
-Langy frontend — the durable event stream these blocks must live in), ADR-058
+Langy frontend — the durable event stream these cards must live in), ADR-058
 (turn lifecycle — which this ADR deliberately does not extend).
 
 **Specs:** `specs/langy/langy-derived-cards.feature`,
@@ -78,21 +88,26 @@ as a defense setting, but as a property of where the parser sits.
 
 Syntactic repair (unclosed brackets and strings, trailing commas, a
 truncated stream) is as tolerant as we can make it. The repaired document
-must then pass the block kind's Zod schema **strictly** — a payload that
-parses but does not validate is a failed block, never a guessed card.
+must then pass the card kind's Zod schema **strictly** — a payload that
+parses but does not validate is a failed card, never a guessed one.
 
-The block schemas and the salvage function live in the **shared package**
+The derived-safe schemas (`cards/derived-safe.ts`) and the salvage function
+(`inline-channel/salvage.ts`) live in the **shared package**
 (`packages/langy`), for the same reason the fold reducers do: the client
 previews with the SAME code the relay stamps with, so the two runtimes
-cannot disagree about what a block means.
+cannot disagree about what a fence means.
 
 ### 3. The kinds are a derived-safe allowlist
 
 The model may emit: a **timeseries**, a **generic table**, **key-value
 stats** — kinds that are pure presentation of supplied data — and a
-**choices** block (§6). It may never emit resource-shaped kinds (`traces`,
+**choices** card (§6). It may never emit resource-shaped kinds (`traces`,
 `evalRun`, `resourceCreated`, …): a model that can emit a traces card can
-assert records that were never searched for. This answers ADR-059's open
+assert records that were never searched for. Now that measured and derived
+cards share one kind list, that exclusion is enforced by construction:
+every kind is classified `resource` or `presentation` at declaration, and the
+allowlist is typed as presentation-only, so widening it is a type error rather
+than an omission (see `cards/derived-safe.ts`). This answers ADR-059's open
 question conservatively.
 
 ### 4. Provenance chrome is always on, and computation still belongs to the platform
@@ -205,10 +220,10 @@ validator is what keeps it from adding a second truth.
 
 ## Consequences
 
-- `packages/langy` grows the block schemas, the salvage function, and the
-  preview reducer — shared, like the folds, so relay and browser cannot
+- `packages/langy` grows the derived-safe schemas, the salvage function, and
+  the preview reducer — shared, like the folds, so relay and browser cannot
   drift.
-- The durable event stream grows part kinds for stamped blocks and choice
+- The durable event stream grows part kinds for stamped cards and choice
   selections; the capability catalog/registry grows renderers for the
   derived kinds and the choices card. Rendering stays registry-driven —
   these are new entries, not new conditional paths.

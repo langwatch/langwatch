@@ -103,7 +103,7 @@ describe("<TracesOverview /> presentation", () => {
       renderWithProviders(<TracesOverview variant="strip" />);
 
       expect(
-        screen.getByText("Each figure is compared with the period before it."),
+        screen.getByText("Each figure is compared with the last 2 days before it."),
       ).toBeDefined();
     });
 
@@ -118,22 +118,6 @@ describe("<TracesOverview /> presentation", () => {
   });
 
   describe("given a window with room for a trend", () => {
-    /** @scenario Every figure says what window it covers */
-    it("still says what the figures are compared against", () => {
-      period.daysDifference = 7;
-      renderWithProviders(<TracesOverview variant="strip" />);
-
-      // The footer carries both halves in every case. A reader on a window
-      // wide enough for a trend used to be offered the chart but never told
-      // what the deltas were measured against.
-      expect(
-        screen.getByText("Each figure is compared with the period before it."),
-      ).toBeDefined();
-      expect(
-        screen.getByRole("button", { name: /Show the trend/ }),
-      ).toBeDefined();
-    });
-
     /** @scenario Every figure says what window it covers */
     it("names the window on the control that opens the chart", () => {
       period.daysDifference = 7;

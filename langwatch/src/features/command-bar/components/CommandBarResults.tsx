@@ -175,6 +175,20 @@ export const CommandBarResults = forwardRef<
       });
     }
 
+    if (searchInTracesItem) {
+      groups.push({
+        label: "Search Traces",
+        items: [searchInTracesItem],
+      });
+    }
+
+    if (searchInDocsItem) {
+      groups.push({
+        label: "Search Docs",
+        items: [searchInDocsItem],
+      });
+    }
+
     return groups;
   }, [
     easterEggItem,
@@ -186,40 +200,19 @@ export const CommandBarResults = forwardRef<
     filteredPage,
     searchResults,
     filteredProjects,
+    searchInTracesItem,
+    searchInDocsItem,
   ]);
 
-  /**
-   * The two things we can always offer, for any string at all. They are not
-   * matches, and must never outrank one — see the ordering note in
-   * `useCommandBarItems`, which this has to mirror exactly or the running
-   * keyboard index stops agreeing with what is on screen.
-   */
-  const fallbackGroups = useMemo<GroupConfig[]>(() => {
-    const groups: GroupConfig[] = [];
-    if (searchInTracesItem) {
-      groups.push({ label: "Search Traces", items: [searchInTracesItem] });
-    }
-    if (searchInDocsItem) {
-      groups.push({ label: "Search Docs", items: [searchInDocsItem] });
-    }
-    return groups;
-  }, [searchInTracesItem, searchInDocsItem]);
-
-  // Ask Langy leads on an empty bar; while typing it sits under the real
-  // matches and above the fallbacks.
+  // Ask Langy leads on an empty bar and trails while typing — matching
+  // useCommandBarItems exactly so the running keyboard index lines up (on a
+  // typed query index 0 must stay the best match, not the assistant).
   const groups = useMemo<GroupConfig[]>(() => {
-    const askGroup: GroupConfig | null = askLangyItem
-      ? { label: "Ask Langy", items: [askLangyItem] }
-      : null;
-    if (query === "") {
-      return askGroup ? [askGroup, ...emptyQueryGroups] : emptyQueryGroups;
-    }
-    return [
-      ...queryGroups,
-      ...(askGroup ? [askGroup] : []),
-      ...fallbackGroups,
-    ];
-  }, [query, emptyQueryGroups, queryGroups, askLangyItem, fallbackGroups]);
+    const base = query === "" ? emptyQueryGroups : queryGroups;
+    if (!askLangyItem) return base;
+    const askGroup: GroupConfig = { label: "Ask Langy", items: [askLangyItem] };
+    return query === "" ? [askGroup, ...base] : [...base, askGroup];
+  }, [query, emptyQueryGroups, queryGroups, askLangyItem]);
 
   // Render groups with running index calculation
   const renderGroups = () => {

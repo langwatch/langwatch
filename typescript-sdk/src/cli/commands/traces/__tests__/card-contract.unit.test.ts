@@ -1,7 +1,7 @@
 /**
  * The CLI's `--format json` output IS the Langy panel's input. This pins the two
  * together: the document the command actually prints is parsed with the very
- * schema the app parses it with (`@langwatch/cli-cards`), so a change to either
+ * schema the app parses it with (`@langwatch/langy/cards`), so a change to either
  * side that breaks the other fails here rather than in the panel.
  *
  * This is the only place the CLI imports the card schemas — they cost ~28ms of
@@ -15,7 +15,7 @@ import {
   tracesCardSchema,
   traceIdOf,
   type TraceSummary,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy/cards";
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
