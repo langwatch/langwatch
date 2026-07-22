@@ -5,6 +5,7 @@ import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { TraceService } from "~/server/traces/trace.service";
 import { env } from "../../env.mjs";
 import {
@@ -83,11 +84,17 @@ const buildThreadData = async (
     );
   }
 
-  const traceService = TraceService.create();
+  // Thread content feeds the evaluator, so resolve full offloaded IO (#4991)
+  // instead of the 64 KB preview.
+  const traceService = TraceService.create(
+    undefined,
+    buildTraceBlobResolutionDeps(),
+  );
   const threadTraces = await traceService.getTracesByThreadId(
     projectId,
     threadId,
     protections,
+    { full: true },
   );
 
   const result: Record<string, any> = {};
@@ -218,13 +225,20 @@ const buildDataForEvaluation = async (
     data = mappedData;
 
     if (mappings && hasThreadMappings(mappings)) {
-      const traceService = TraceService.create();
+      // Thread content feeds the evaluator, so resolve full offloaded IO
+      // (#4991) instead of the 64 KB preview.
+      const traceService = TraceService.create(
+        undefined,
+        buildTraceBlobResolutionDeps(),
+      );
       await resolveThreadMappingsIntoData({
         data: data as Record<string, unknown>,
         trace,
         mappings,
         getThreadTraces: (threadId) =>
-          traceService.getTracesByThreadId(projectId, threadId, protections),
+          traceService.getTracesByThreadId(projectId, threadId, protections, {
+            full: true,
+          }),
       });
     }
   }
@@ -261,8 +275,15 @@ export const runEvaluationForTrace = async ({
   protections: Protections;
   workflowId?: string | null;
 }): Promise<EvaluationResultWithThreadId> => {
-  const traceService = TraceService.create();
-  const trace = await traceService.getById(projectId, traceId, protections);
+  // The trace's IO is the evaluator's primary input, so resolve full offloaded
+  // IO (#4991) instead of the 64 KB preview.
+  const traceService = TraceService.create(
+    undefined,
+    buildTraceBlobResolutionDeps(),
+  );
+  const trace = await traceService.getById(projectId, traceId, protections, {
+    full: true,
+  });
   if (!trace) {
     throw new Error("trace not found");
   }
