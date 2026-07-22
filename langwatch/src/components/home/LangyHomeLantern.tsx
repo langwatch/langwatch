@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { LuArrowRight } from "react-icons/lu";
 import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGhost";
 import { Composer } from "~/features/langy/components/Composer";
+import { LangyMark } from "~/features/langy/components/LangyMark";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useComposerMorph } from "~/features/langy/hooks/useComposerMorph";
 import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
@@ -240,6 +241,13 @@ export function LangyHomeLantern() {
  *
  * It offers a way back rather than a second place to talk: clicking it focuses
  * the conversation that already exists, and never starts a new one.
+ *
+ * It takes the composer's HEIGHT but not its width. The composer is full-bleed
+ * because it is an input and an input wants the room; a resume control that
+ * inherited that stretched one short sentence across the whole block and read
+ * as an empty container with some text stranded at one end. It hugs its own
+ * content instead, and what sits beside it is the block's moving canvas —
+ * which is the thing the lantern is for.
  */
 function ContinueLine({
   stalled,
@@ -252,17 +260,20 @@ function ContinueLine({
     <chakra.button
       type="button"
       onClick={onContinue}
-      // Fills the composer's reserved box (its parent is position:relative),
-      // so the resume affordance occupies the space the composer left rather
-      // than floating a thin line in it — same height, no emptiness.
+      // Pinned to the reserved box's full height (its parent is
+      // position:relative) but only its left edge — no `right`, so the width
+      // comes from the content.
       position="absolute"
-      inset={0}
+      left={0}
+      top={0}
+      bottom={0}
+      maxWidth="full"
       display="flex"
       alignItems="center"
-      justifyContent="space-between"
-      gap={3}
+      gap={2.5}
       textAlign="left"
-      paddingX={5}
+      paddingLeft={3.5}
+      paddingRight={4}
       borderRadius="18px"
       borderWidth="1px"
       borderStyle="solid"
@@ -274,32 +285,28 @@ function ContinueLine({
       transition="color 130ms ease, border-color 130ms ease, background 130ms ease"
       _hover={{
         color: "fg",
-        borderColor: "border.emphasized",
-        background: "bg.panel/80",
+        borderColor: "orange.emphasized",
+        background: "bg.panel/85",
       }}
     >
-      <VStack align="start" gap={1} minWidth={0}>
-        <Text fontFamily="mono" fontSize="13px" color="fg">
+      <LangyMark size={16} />
+      <VStack align="start" gap={0.5} minWidth={0}>
+        <Text fontFamily="mono" fontSize="13px" color="fg" lineHeight="1.3">
           {stalled ? "Langy is still working" : "Continue your conversation"}
         </Text>
-        <Text fontSize="xs" color="fg.subtle">
-          {stalled
-            ? "Its answer is on the way — open the panel to watch it land."
-            : "Your chat is open in the panel. Pick up where you left off."}
+        <Text
+          fontSize="xs"
+          color="fg.subtle"
+          lineHeight="1.3"
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          maxWidth="full"
+        >
+          {stalled ? "Its answer is on the way" : "Pick up where you left off"}
         </Text>
       </VStack>
-      <Box
-        flexShrink={0}
-        display="grid"
-        placeItems="center"
-        boxSize="30px"
-        borderRadius="full"
-        borderWidth="1px"
-        borderColor="border.muted"
-        color="fg.muted"
-      >
-        <LuArrowRight size={15} aria-hidden />
-      </Box>
+      <LuArrowRight size={14} aria-hidden />
     </chakra.button>
   );
 }
