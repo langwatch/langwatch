@@ -1,18 +1,18 @@
 /**
- * TokenCreatedDialog — shown immediately after a secret key is minted.
+ * TokenCreatedDialog — the one moment a secret key is readable.
  *
- * The key leads. This is the only moment it is ever readable, so it gets its
- * own row at the top with reveal and copy, rather than being reachable only by
- * reading it back out of a `.env` line further down. Everything under it is
- * about where to *put* the key:
+ * The key is shown exactly once, so the dialog is built around it: a credential
+ * card leads, carrying the key in mono, the copy affordance that is the whole
+ * point of the screen, and the "you won't see this again" warning woven into
+ * its base — not floated below as a separate slab.
  *
- *  1. "Use in code" tabs (.env / Bearer / Basic Auth) — ShikiCommandBox
- *  2. Amber "Copy this token now" warning
- *  3. "Use with code assistants" tabs (Claude Code / Codex) — ShikiCommandBox
- *  4. "Or paste into your config file" — existing JsonHighlight (no change)
+ * Under it, a single row of concrete destinations replaces what used to be two
+ * stacked tab groups ("Use in code" / "Use with code assistants"). A developer
+ * does not think in those buckets; they think ".env", "the API", "my
+ * assistant". Each destination shows exactly its snippet.
  *
- * The project selector sits above all of them because it rewrites every
- * snippet in the dialog, not just the tab group it used to live inside.
+ * The project selector sits with the destinations because it rewrites every
+ * snippet, not one tab group.
  *
  * ShikiCommandBox is lazy-loaded via dynamic() (ssr:false) so the settings
  * page never statically imports the ~hundreds-of-KB Shiki bundle at page load.
@@ -31,9 +31,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Clipboard, Eye, EyeOff } from "lucide-react";
+import { Check, Clipboard, Eye, EyeOff } from "lucide-react";
 import { useMemo, useState } from "react";
-import { RAINBOW_SURFACE_CSS } from "../../../components/brand/rainbow";
+import {
+  LW_RAINBOW_GRADIENT,
+  RAINBOW_SURFACE_CSS,
+} from "../../../components/brand/rainbow";
 import { Dialog } from "../../../components/ui/dialog";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { Select } from "../../../components/ui/select";
@@ -45,7 +48,6 @@ import {
 } from "../../../features/onboarding/components/sections/shared/build-mcp-config";
 import { InlineCopyButton } from "../../../features/onboarding/components/sections/shared/InlineCopyButton";
 import { JsonHighlight } from "../../../features/onboarding/components/sections/shared/JsonHighlight";
-import { TabButton } from "../../../features/onboarding/components/sections/shared/TabButton";
 import { copyToClipboard } from "../../../features/onboarding/components/sections/shared/copy-to-clipboard";
 import dynamic from "~/utils/compat/next-dynamic";
 import type { ShikiCommandBoxProps } from "~/components/code/ShikiCommandBox";
@@ -60,8 +62,15 @@ const ShikiCommandBox = dynamic(
   { ssr: false },
 ) as React.ComponentType<ShikiCommandBoxProps>;
 
-type AssistantTab = "claude-code" | "codex";
-type CodeTab = "env" | "bearer" | "basic";
+type Destination = "env" | "http" | "claude-code" | "codex" | "mcp";
+
+const DESTINATIONS: { id: Destination; label: string }[] = [
+  { id: "env", label: ".env" },
+  { id: "http", label: "HTTP" },
+  { id: "claude-code", label: "Claude Code" },
+  { id: "codex", label: "Codex" },
+  { id: "mcp", label: "MCP config" },
+];
 
 const EDITOR_PATHS = [
   { editor: "Claude Code", path: ".claude/settings.json" },
@@ -75,35 +84,27 @@ const EDITOR_PATHS = [
 ];
 
 /**
- * One tab strip, used by both groups so they read as the same control rather
- * than two similar-but-not-identical pills stacked down the dialog.
- */
-function TabStrip({ children }: { children: React.ReactNode }) {
-  return (
-    <HStack
-      gap={1}
-      padding={1}
-      borderRadius="lg"
-      border="1px solid"
-      borderColor="border.subtle"
-      bg="bg.muted/50"
-      width="fit-content"
-    >
-      {children}
-    </HStack>
-  );
-}
-
-/**
- * The key, on its own, once.
+ * The hero: the key on its own, before anything that consumes it.
  *
- * Masked until asked for — the dialog is frequently open on a shared screen —
- * and the rainbow rides its top edge, the same gradient at the same tempo as
- * the install commands below, so the one un-repeatable thing in the dialog is
- * also the one that moves.
+ * Masked by default — this dialog is often open on a shared screen — with the
+ * rainbow riding the top edge, the same gradient at the same tempo as the
+ * install commands, so the one un-repeatable thing in the dialog is also the
+ * one that moves. Copy is the primary action of the whole screen and looks it.
  */
-function SecretKeyRow({ token }: { token: string }) {
+function CredentialCard({ token }: { token: string }) {
   const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    const ok = await copyToClipboard({
+      text: token,
+      successMessage: "Secret key copied to clipboard",
+    });
+    if (ok) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    }
+  };
 
   return (
     <Box
@@ -111,40 +112,151 @@ function SecretKeyRow({ token }: { token: string }) {
       overflow="hidden"
       border="1px solid"
       borderColor="border.subtle"
-      bg="bg.panel/70"
+      bg="bg.panel/60"
       boxShadow="xs"
     >
-      <Box height="2px" css={RAINBOW_SURFACE_CSS} aria-hidden="true" />
-      <HStack gap={1} paddingX={3} paddingY={2}>
+      <Box height="3px" css={RAINBOW_SURFACE_CSS} aria-hidden="true" />
+      <VStack align="stretch" gap={0} paddingX={4} paddingTop={3.5}>
         <Text
-          flex={1}
-          minWidth={0}
-          truncate
-          fontFamily="'Geist Mono', 'IBM Plex Mono', Menlo, monospace"
-          fontSize="13px"
-          letterSpacing="-0.01em"
-          color="fg"
+          fontSize="2xs"
+          fontWeight="700"
+          letterSpacing="0.08em"
+          textTransform="uppercase"
+          color="fg.muted"
         >
-          {revealed ? token : maskApiKey(token)}
+          Secret key
         </Text>
-        <Tooltip
-          content={revealed ? "Hide secret key" : "Show secret key"}
-          openDelay={0}
-          showArrow
-        >
-          <IconButton
-            size="xs"
-            variant="ghost"
-            borderRadius="lg"
-            aria-label={revealed ? "Hide secret key" : "Show secret key"}
-            onClick={() => setRevealed((current) => !current)}
+        <HStack gap={2} align="center" paddingBottom={3.5}>
+          <Text
+            flex={1}
+            minWidth={0}
+            truncate
+            fontFamily="'Geist Mono', 'IBM Plex Mono', Menlo, monospace"
+            fontSize="15px"
+            letterSpacing="-0.01em"
+            color="fg"
+            userSelect="all"
           >
-            {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
-          </IconButton>
-        </Tooltip>
-        <InlineCopyButton text={token} label="Secret key" />
-      </HStack>
+            {revealed ? token : maskApiKey(token)}
+          </Text>
+          <Tooltip
+            content={revealed ? "Hide secret key" : "Show secret key"}
+            openDelay={0}
+            showArrow
+          >
+            <IconButton
+              size="sm"
+              variant="ghost"
+              borderRadius="lg"
+              color="fg.muted"
+              aria-label={revealed ? "Hide secret key" : "Show secret key"}
+              onClick={() => setRevealed((current) => !current)}
+            >
+              {revealed ? <EyeOff size={15} /> : <Eye size={15} />}
+            </IconButton>
+          </Tooltip>
+          <Button
+            size="sm"
+            borderRadius="lg"
+            gap={1.5}
+            colorPalette={copied ? "green" : "orange"}
+            variant={copied ? "subtle" : "solid"}
+            onClick={() => void copy()}
+            minWidth="88px"
+          >
+            {copied ? <Check size={15} /> : <Clipboard size={15} />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </HStack>
+      </VStack>
+
+      {/* The one-time warning belongs to the key, so it lives in the card's
+          base rather than floating below as its own block. */}
+      <Alert.Root
+        status="warning"
+        variant="subtle"
+        borderRadius={0}
+        paddingY={2}
+        paddingX={4}
+      >
+        <Alert.Indicator />
+        <Alert.Title fontSize="xs" fontWeight="medium">
+          Copy this token now. You won&apos;t be able to see it again.
+        </Alert.Title>
+      </Alert.Root>
     </Box>
+  );
+}
+
+/**
+ * One row of destinations. The active pill carries the rainbow on its own
+ * underline — the same brand motif as the key card, tying the "where is it
+ * going" choice back to the thing being placed.
+ */
+function DestinationTabs({
+  value,
+  onChange,
+}: {
+  value: Destination;
+  onChange: (next: Destination) => void;
+}) {
+  return (
+    <HStack
+      gap={0.5}
+      overflowX="auto"
+      paddingBottom={1}
+      css={{ scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}
+    >
+      {DESTINATIONS.map((destination) => {
+        const active = destination.id === value;
+        return (
+          <Box key={destination.id} position="relative" flexShrink={0}>
+            <Button
+              size="sm"
+              variant="ghost"
+              borderRadius="md"
+              paddingX={3}
+              fontWeight={active ? "semibold" : "medium"}
+              color={active ? "fg" : "fg.muted"}
+              _hover={{ color: "fg", bg: "bg.muted/60" }}
+              onClick={() => onChange(destination.id)}
+            >
+              {destination.label}
+            </Button>
+            {active && (
+              <Box
+                position="absolute"
+                left={2}
+                right={2}
+                bottom="-1px"
+                height="2px"
+                borderRadius="full"
+                css={{ backgroundImage: LW_RAINBOW_GRADIENT }}
+                aria-hidden="true"
+              />
+            )}
+          </Box>
+        );
+      })}
+    </HStack>
+  );
+}
+
+/** A snippet with its own one-line caption, so the pane reads without a legend. */
+function CaptionedSnippet({
+  caption,
+  children,
+}: {
+  caption: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <VStack align="stretch" gap={1.5}>
+      <Text fontSize="xs" color="fg.muted">
+        {caption}
+      </Text>
+      {children}
+    </VStack>
   );
 }
 
@@ -161,9 +273,10 @@ export function TokenCreatedDialog({
   orgProjects: Array<{ id: string; name: string }>;
   onClose: () => void;
 }) {
-  const [assistantTab, setAssistantTab] = useState<AssistantTab>("claude-code");
-  const [codeTab, setCodeTab] = useState<CodeTab>("env");
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId ?? "");
+  const [destination, setDestination] = useState<Destination>("env");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(
+    projectId ?? "",
+  );
 
   const activeProjectId = selectedProjectId || projectId;
   const maskedKey = maskApiKey(newToken ?? "");
@@ -210,7 +323,10 @@ export function TokenCreatedDialog({
     () =>
       formatEnvLines([
         { key: "LANGWATCH_API_KEY", value: newToken ?? "", mask: true },
-        { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+        {
+          key: "LANGWATCH_PROJECT_ID",
+          value: activeProjectId ?? "<your-project-id>",
+        },
         { key: "LANGWATCH_ENDPOINT", value: endpoint },
       ]),
     [newToken, activeProjectId, endpoint],
@@ -219,7 +335,10 @@ export function TokenCreatedDialog({
     () =>
       formatEnvLines([
         { key: "LANGWATCH_API_KEY", value: newToken ?? "" },
-        { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+        {
+          key: "LANGWATCH_PROJECT_ID",
+          value: activeProjectId ?? "<your-project-id>",
+        },
         { key: "LANGWATCH_ENDPOINT", value: endpoint },
       ]),
     [newToken, activeProjectId, endpoint],
@@ -261,138 +380,100 @@ export function TokenCreatedDialog({
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>
           <VStack gap={6} align="stretch">
-            {/* ── The key itself, before anything that consumes it ── */}
-            {newToken && <SecretKeyRow token={newToken} />}
+            {newToken && <CredentialCard token={newToken} />}
 
-            {/* The project rewrites every snippet below, so it is chosen once
-                here rather than from inside the first tab group. */}
-            {orgProjects.length > 1 && (
-              <HStack gap={2.5} justify="flex-end" width="full">
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Project
+            {/* ── Where the key goes ── */}
+            <VStack gap={3} align="stretch">
+              <HStack justify="space-between" align="center" gap={3}>
+                <Text fontWeight="600" fontSize="sm">
+                  Add it to your setup
                 </Text>
-                <Select.Root
-                  collection={projectCollection}
-                  value={activeProjectId ? [activeProjectId] : []}
-                  onValueChange={(details) => {
-                    setSelectedProjectId(details.value[0] ?? "");
-                  }}
-                  size="sm"
-                  width="240px"
-                >
-                  <Select.Trigger background="bg" borderRadius="lg">
-                    <Select.ValueText placeholder="Select project" />
-                  </Select.Trigger>
-                  <Select.Content>
-                    {projectCollection.items.map((item) => (
-                      <Select.Item key={item.value} item={item}>
-                        {item.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
+                {orgProjects.length > 1 && (
+                  <HStack gap={2} align="center" flexShrink={0}>
+                    <Text
+                      fontSize="xs"
+                      fontWeight="semibold"
+                      color="fg.muted"
+                    >
+                      Project
+                    </Text>
+                    <Select.Root
+                      collection={projectCollection}
+                      value={activeProjectId ? [activeProjectId] : []}
+                      onValueChange={(details) => {
+                        setSelectedProjectId(details.value[0] ?? "");
+                      }}
+                      size="sm"
+                      width="220px"
+                    >
+                      <Select.Trigger background="bg" borderRadius="lg">
+                        <Select.ValueText placeholder="Select project" />
+                      </Select.Trigger>
+                      <Select.Content>
+                        {projectCollection.items.map((item) => (
+                          <Select.Item key={item.value} item={item}>
+                            {item.label}
+                          </Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select.Root>
+                  </HStack>
+                )}
               </HStack>
-            )}
 
-            {/* ── Section 1: Use in code ── */}
-            <VStack gap={3} align="stretch">
-              <Text fontWeight="700" fontSize="sm">
-                Use in code
-              </Text>
-              <TabStrip>
-                <TabButton
-                  label=".env"
-                  active={codeTab === "env"}
-                  onClick={() => setCodeTab("env")}
-                />
-                <TabButton
-                  label="Bearer"
-                  active={codeTab === "bearer"}
-                  onClick={() => setCodeTab("bearer")}
-                />
-                <TabButton
-                  label="Basic Auth"
-                  active={codeTab === "basic"}
-                  onClick={() => setCodeTab("basic")}
-                />
-              </TabStrip>
+              <DestinationTabs value={destination} onChange={setDestination} />
 
-              {/* .env — ini-highlighted */}
-              {codeTab === "env" && newToken && (
-                <ShikiCommandBox
-                  command={envUnmasked}
-                  maskedCommand={envMasked}
-                  lang="ini"
-                  copyLabel=".env"
-                />
+              {/* ── .env ── */}
+              {destination === "env" && newToken && (
+                <CaptionedSnippet caption="Load these into your app's environment.">
+                  <ShikiCommandBox
+                    command={envUnmasked}
+                    maskedCommand={envMasked}
+                    lang="ini"
+                    copyLabel=".env"
+                  />
+                </CaptionedSnippet>
               )}
 
-              {/* Bearer — shellscript-highlighted */}
-              {codeTab === "bearer" && (
-                <VStack gap={1} align="stretch">
-                  <Text fontSize="xs" color="fg.muted">
-                    Use the <code>Authorization</code> header plus{" "}
-                    <code>X-Project-Id</code>:
-                  </Text>
-                  <ShikiCommandBox
-                    command={bearerUnmasked}
-                    maskedCommand={bearerMasked}
-                    lang="shellscript"
-                    copyLabel="Bearer headers"
-                  />
+              {/* ── HTTP: Bearer + Basic ── */}
+              {destination === "http" && (
+                <VStack align="stretch" gap={4}>
+                  <CaptionedSnippet
+                    caption={
+                      <>
+                        Send the <code>Authorization</code> header with{" "}
+                        <code>X-Project-Id</code>.
+                      </>
+                    }
+                  >
+                    <ShikiCommandBox
+                      command={bearerUnmasked}
+                      maskedCommand={bearerMasked}
+                      lang="shellscript"
+                      copyLabel="Bearer headers"
+                    />
+                  </CaptionedSnippet>
+                  <CaptionedSnippet
+                    caption={
+                      <>
+                        Or encode it as{" "}
+                        <code>base64(projectId:token)</code> for Basic auth.
+                      </>
+                    }
+                  >
+                    <ShikiCommandBox
+                      command={basicUnmasked}
+                      maskedCommand={basicMasked}
+                      lang="shellscript"
+                      copyLabel="Basic Auth header"
+                    />
+                  </CaptionedSnippet>
                 </VStack>
               )}
 
-              {/* Basic Auth — shellscript-highlighted */}
-              {codeTab === "basic" && (
-                <VStack gap={1} align="stretch">
-                  <Text fontSize="xs" color="fg.muted">
-                    Encode the project ID and token as{" "}
-                    <code>base64(projectId:token)</code>:
-                  </Text>
-                  <ShikiCommandBox
-                    command={basicUnmasked}
-                    maskedCommand={basicMasked}
-                    lang="shellscript"
-                    copyLabel="Basic Auth header"
-                  />
-                </VStack>
-              )}
-            </VStack>
-
-            {/* ── Amber warning ── */}
-            <Alert.Root status="warning" variant="subtle" opacity={0.8}>
-              <Alert.Indicator />
-              <Alert.Title fontSize="xs">
-                Copy this token now. You won&apos;t be able to see it again.
-              </Alert.Title>
-            </Alert.Root>
-
-            {/* ── Section 2: Use with code assistants ── */}
-            <VStack gap={3} align="stretch">
-              <Text fontWeight="700" fontSize="sm">
-                Use with code assistants
-              </Text>
-
-              <TabStrip>
-                <TabButton
-                  label="Claude Code"
-                  active={assistantTab === "claude-code"}
-                  onClick={() => setAssistantTab("claude-code")}
-                />
-                <TabButton
-                  label="Codex"
-                  active={assistantTab === "codex"}
-                  onClick={() => setAssistantTab("codex")}
-                />
-              </TabStrip>
-
-              {/* Claude Code terminal command — bash-highlighted with >_ prompt */}
-              {assistantTab === "claude-code" && newToken && (
-                <VStack align="stretch" gap={3}>
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                    Run in your terminal
-                  </Text>
+              {/* ── Claude Code ── */}
+              {destination === "claude-code" && newToken && (
+                <CaptionedSnippet caption="Run this in your terminal to register the MCP server.">
                   <ShikiCommandBox
                     command={claudeCommand}
                     maskedCommand={claudeMasked}
@@ -400,15 +481,12 @@ export function TokenCreatedDialog({
                     showPrompt
                     copyLabel="Claude Code command"
                   />
-                </VStack>
+                </CaptionedSnippet>
               )}
 
-              {/* Codex terminal command — bash-highlighted with >_ prompt */}
-              {assistantTab === "codex" && newToken && (
-                <VStack align="stretch" gap={3}>
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                    Run in your terminal
-                  </Text>
+              {/* ── Codex ── */}
+              {destination === "codex" && newToken && (
+                <CaptionedSnippet caption="Run this in your terminal to register the MCP server.">
                   <ShikiCommandBox
                     command={codexCommand}
                     maskedCommand={codexMasked}
@@ -416,42 +494,40 @@ export function TokenCreatedDialog({
                     showPrompt
                     copyLabel="Codex command"
                   />
-                </VStack>
+                </CaptionedSnippet>
               )}
 
-              {/* JSON config — existing JsonHighlight wiring unchanged */}
-              {newToken && (
-                <VStack align="stretch" gap={2}>
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                    Or paste into your config file
-                  </Text>
-                  <Box
-                    position="relative"
-                    borderRadius="xl"
-                    overflow="hidden"
-                    border="1px solid"
-                    borderColor="border.subtle"
-                    bg="bg.panel/70"
-                    boxShadow="xs"
-                    transition="all 0.17s ease"
-                    _hover={{
-                      borderColor: "orange.emphasized",
-                      boxShadow: "md",
-                    }}
-                  >
-                    <JsonHighlight
-                      code={displayConfigJson}
-                      highlightLines={findLangwatchEnvLines(displayConfigJson)}
-                    />
-                    <Box position="absolute" top={2.5} right={2.5}>
-                      <InlineCopyButton text={mcpJson} label="Config" />
+              {/* ── MCP config: JSON + per-editor paths ── */}
+              {destination === "mcp" && newToken && (
+                <VStack align="stretch" gap={2.5}>
+                  <CaptionedSnippet caption="Paste this into your editor's MCP config file.">
+                    <Box
+                      position="relative"
+                      borderRadius="xl"
+                      overflow="hidden"
+                      border="1px solid"
+                      borderColor="border.subtle"
+                      bg="bg.panel/70"
+                      boxShadow="xs"
+                      transition="all 0.17s ease"
+                      _hover={{
+                        borderColor: "orange.emphasized",
+                        boxShadow: "md",
+                      }}
+                    >
+                      <JsonHighlight
+                        code={displayConfigJson}
+                        highlightLines={findLangwatchEnvLines(displayConfigJson)}
+                      />
+                      <Box position="absolute" top={2.5} right={2.5}>
+                        <InlineCopyButton text={mcpJson} label="Config" />
+                      </Box>
                     </Box>
-                  </Box>
+                  </CaptionedSnippet>
 
                   {/* Each editor keeps this config somewhere different, so
-                      these copy the path rather than naming it: five paths
-                      spelled out inline would outweigh the block above. The
-                      row scrolls instead of wrapping into ragged rows. */}
+                      these copy the path rather than spelling five of them out
+                      inline. The row scrolls rather than wrapping ragged. */}
                   <VStack align="stretch" gap={1.5}>
                     <Text fontSize="xs" color="fg.muted">
                       Copy the config path for your editor
