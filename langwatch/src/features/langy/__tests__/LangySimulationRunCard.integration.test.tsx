@@ -15,10 +15,19 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 
-const { mockUseQuery, mockOpenDrawer } = vi.hoisted(() => ({
+const { mockUseQuery, mockOpenDrawer, mockUpdateListener } = vi.hoisted(() => ({
   mockUseQuery: vi.fn(),
   mockOpenDrawer: vi.fn(),
+  mockUpdateListener: vi.fn(() => ({ isConnected: false })),
 }));
+
+/** The `enabled` flag of the listener's LAST render — the SSE lifecycle gate. */
+function lastListenerEnabled(): boolean {
+  const call = mockUpdateListener.mock.calls.at(-1) as
+    | [{ enabled?: boolean }]
+    | undefined;
+  return call?.[0]?.enabled ?? false;
+}
 
 vi.mock("~/utils/api", () => ({
   api: { scenarios: { getRunState: { useQuery: mockUseQuery } } },
@@ -32,7 +41,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: mockOpenDrawer }),
 }));
 vi.mock("~/hooks/useSimulationUpdateListener", () => ({
-  useSimulationUpdateListener: () => ({ isConnected: false }),
+  useSimulationUpdateListener: mockUpdateListener,
 }));
 vi.mock("~/hooks/useSimulationStreamingState", () => ({
   useSimulationStreamingState: () => ({
@@ -198,6 +207,54 @@ describe("Feature: the run card renders the platform's live state for the run it
       // The snapshot card renders (its deep-link chip is its signature);
       // no live SimulationCard skeleton is left hanging.
       expect(screen.getByText(/Open in Simulations/i)).toBeDefined();
+      // ...and the dead card must not hold its SSE subscription open —
+      // `isTerminal` never flips on an error (only a terminal STATUS does),
+      // so the gate has to read the error itself.
+      expect(lastListenerEnabled()).toBe(false);
+    });
+  });
+
+  describe("given the SSE subscription lifecycle (one per LIVE card, none per settled one)", () => {
+    it("never subscribes for a run the envelope already reports as terminal", () => {
+      // The typed payload carries `status` — a card mounting over a finished
+      // run must not open a subscription even for its first render.
+      mockUseQuery.mockReturnValue({ data: runData(), error: null });
+      renderCard({ scenarioRunId: RUN_ID, status: "SUCCESS" });
+
+      for (const call of mockUpdateListener.mock.calls as Array<
+        [{ enabled?: boolean }]
+      >) {
+        expect(call[0]?.enabled).toBe(false);
+      }
+    });
+
+    it("subscribes while the run is live, and drops the subscription once it turns terminal", () => {
+      mockUseQuery.mockReturnValue({
+        data: runData({ status: ScenarioRunStatus.IN_PROGRESS }),
+        error: null,
+      });
+      const { rerender } = renderCard({
+        scenarioRunId: RUN_ID,
+        status: "IN_PROGRESS",
+      });
+      expect(lastListenerEnabled()).toBe(true);
+
+      // The platform reports the run finished: the flag flips and the very
+      // next render releases the subscription.
+      mockUseQuery.mockReturnValue({ data: runData(), error: null });
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <LangySimulationRunCard
+            descriptor={descriptor}
+            input={{
+              command: `langwatch simulation-run get ${RUN_ID} --format json`,
+            }}
+            output={{ scenarioRunId: RUN_ID, status: "IN_PROGRESS" }}
+            projectSlug="acme"
+          />
+        </ChakraProvider>,
+      );
+      expect(lastListenerEnabled()).toBe(false);
     });
   });
 });

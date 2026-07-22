@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isInternalHref } from "../spaLink";
+import { isInternalHref } from "~/components/Markdown";
 
 describe("isInternalHref", () => {
   describe("given a same-app relative path", () => {

@@ -106,7 +106,7 @@ import {
   selectLangySuggestions,
 } from "../logic/langyHomeSuggestions";
 import { navigateDedupKey, reserveNavigate } from "../logic/langyNavigateDedup";
-import { isInternalHref } from "../logic/spaLink";
+import { isInternalHref } from "~/components/Markdown";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,

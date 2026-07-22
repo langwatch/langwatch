@@ -481,6 +481,19 @@ export function LangyCardGallery() {
           ]}
           onOpen={() => undefined}
         />
+        {/* A LAUNCH receipt (`scenario run` → simulationSetRun): the shape is
+            `{ batchRunId, jobCount }` — no collection — so it must read as
+            facts, never as an empty rows table. Real renderer, real shape. */}
+        <LangyCapabilityRenderer
+          call={call(
+            "langwatch.scenario.run",
+            { batchRunId: "scenariobatch_gallery9", jobCount: 3 },
+            {
+              command:
+                "langwatch scenario run scenario_gallery --target agent:agent_1 --format json",
+            },
+          )}
+        />
         {/* A listed SET of runs (`simulation-run list` → simulationSetRun)
             through the real renderer, exercising the registry resolution. */}
         <LangyCapabilityRenderer
