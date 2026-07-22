@@ -69,3 +69,10 @@ Feature: The app backs off decorative blur effects on a struggling device
     And the tab becomes visible again
     Then that sample window is discarded instead of counted
     And the app does not mark itself as running in reduced-graphics mode
+
+  @integration
+  Scenario: The background probe stays idle between checks
+    Given a sample window has just closed
+    When the app waits for the next scheduled check
+    Then the probe does no work in the meantime
+    And it resumes checking once the wait is over

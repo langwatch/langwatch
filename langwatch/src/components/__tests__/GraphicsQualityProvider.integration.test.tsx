@@ -135,6 +135,7 @@ describe("<GraphicsQualityProvider/>", () => {
       expect(screen.getByTestId("consumer").textContent).toBe("false");
     });
 
+    /** @scenario "A single stray struggling window is not enough to degrade" */
     it("does not mark reduced-graphics mode after a single stray struggling window", () => {
       render(
         <GraphicsQualityProvider
@@ -157,6 +158,7 @@ describe("<GraphicsQualityProvider/>", () => {
       expect(screen.getByTestId("consumer").textContent).toBe("false");
     });
 
+    /** @scenario "The background probe stays idle between checks" */
     it("does not run the frame-rate probe during the idle gap between windows", () => {
       render(
         <GraphicsQualityProvider
