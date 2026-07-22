@@ -1,31 +1,45 @@
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
+interface CleanupVariables {
+  dryRun: boolean;
+}
+
+interface DeleteVariables {
+  queueName: string;
+  projectId: string;
+  hash: string;
+}
+
 /**
  * The two destructive calls the payload store offers, with their operator
  * feedback and cache invalidation attached.
  *
- * Kept out of the rendering components so a change to what an operator is told
- * after a sweep is not a change to the table.
+ * Success callbacks receive the variables the completed call ran with. That is
+ * what lets the caller close only the dialog that owns the resolved request:
+ * both the delete target and the reclaim prompt are single pieces of shared
+ * state, so a stale completion (a delete the operator cancelled, a preview that
+ * resolves after the Run dialog opened) must not be allowed to close whatever
+ * dialog is open now.
  */
 export function useBlobStoreActions({
   onCleanupSuccess,
   onDeleteSuccess,
 }: {
-  onCleanupSuccess: () => void;
-  onDeleteSuccess: () => void;
+  onCleanupSuccess: (variables: CleanupVariables) => void;
+  onDeleteSuccess: (variables: DeleteVariables) => void;
 }) {
   const utils = api.useContext();
 
   const cleanup = api.ops.runBlobCleanup.useMutation({
-    onSuccess: (report) => {
+    onSuccess: (report, variables) => {
       toaster.create({
         title: report.dryRun
           ? `Preview: ${report.totals.reclaimed} would be deleted`
           : `Reclaimed ${report.totals.reclaimed}, shortened ${report.totals.repaired}`,
         type: "success",
       });
-      onCleanupSuccess();
+      onCleanupSuccess(variables);
       void utils.ops.invalidate();
     },
     onError: (error) => {
@@ -38,14 +52,14 @@ export function useBlobStoreActions({
   });
 
   const deleteBlob = api.ops.deleteBlob.useMutation({
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       toaster.create({
         title: result.deleted
           ? "Payload deleted"
           : "Not deleted, something still references it",
         type: result.deleted ? "success" : "warning",
       });
-      onDeleteSuccess();
+      onDeleteSuccess(variables);
       void utils.ops.invalidate();
     },
     onError: (error) => {

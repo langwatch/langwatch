@@ -98,7 +98,7 @@ describe("BlobSweeper", () => {
 
   describe("given a blob written by a producer that has not staged yet", () => {
     describe("when the runner sweeps", () => {
-      /** @scenario "A blob written but not yet staged is never destroyed" */
+      /** @scenario "A blob still within its put-before-stage window is not reclaimed" */
       it("shortens the deadline but never destroys the bytes", async () => {
         // Exactly what TieredBlobStore.put leaves behind: bytes on the full
         // backstop, no lease and no holder set at all.

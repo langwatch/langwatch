@@ -1,11 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Renders the real BlobRow via React Testing Library against an actual
- * ChakraProvider — no shallow rendering, no module mocks. Covers the row
- * behaviour the payload-store scenarios in
- * specs/event-sourcing/payload-store-content-addressed.feature describe:
- * what an operator is told about references, and who may act on a blob.
+ * Covers what an operator is told about a payload's references and who may act
+ * on it — the row half of the payload-store scenarios in
+ * specs/event-sourcing/payload-store-content-addressed.feature.
  */
 import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

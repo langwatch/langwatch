@@ -119,9 +119,17 @@ export default function OpsSchedulerPage() {
                     <Table.Cell>{formatWhen(job.lastSlot)}</Table.Cell>
                     <Table.Cell>
                       {job.currentSlot ? (
-                        <Badge colorPalette="blue" variant="subtle">
-                          Running
-                        </Badge>
+                        // A claimed slot with prior attempts is a retry in
+                        // backoff, not a long-running execution — say which.
+                        job.attempts > 0 ? (
+                          <Badge colorPalette="orange" variant="subtle">
+                            Retrying
+                          </Badge>
+                        ) : (
+                          <Badge colorPalette="blue" variant="subtle">
+                            Running
+                          </Badge>
+                        )
                       ) : (
                         <Text textStyle="xs" color="fg.muted">
                           —

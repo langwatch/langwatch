@@ -1,46 +1,38 @@
-import { Center, EmptyState, Spinner, Text } from "@chakra-ui/react";
-import { Database } from "lucide-react";
+import { Text } from "@chakra-ui/react";
 import { useState } from "react";
 
 import { useOpsPermission } from "~/hooks/useOpsPermission";
-import type {
-  OpsBlobSort,
-  OpsBlobSummary,
-} from "~/server/app-layer/ops/types";
-import { api } from "~/utils/api";
+import type { OpsBlobSummary } from "~/server/app-layer/ops/types";
 
-import { BlobTable } from "./BlobTable";
+import { BlobStoreBody } from "./BlobStoreBody";
 import { BlobToolbar } from "./BlobToolbar";
 import { DeletePayloadDialog } from "./DeletePayloadDialog";
 import { RunCleanupDialog } from "./RunCleanupDialog";
+import { useBlobListing } from "./useBlobListing";
 import { useBlobStoreActions } from "./useBlobStoreActions";
-
-const PAGE_SIZE = 100;
 
 export function BlobStoreContent() {
   const { hasAccess } = useOpsPermission();
-  const [queueName, setQueueName] = useState<string | null>(null);
-  const [sort, setSort] = useState<OpsBlobSort>("largest");
+  const listing = useBlobListing();
   const [deleteTarget, setDeleteTarget] = useState<OpsBlobSummary | null>(null);
   const [reclaimConfirm, setReclaimConfirm] = useState<string | null>(null);
 
-  const queues = api.ops.listBlobQueues.useQuery(undefined, {
-    refetchInterval: 60_000,
-  });
-  const selectedQueue = queueName ?? queues.data?.[0] ?? null;
-
-  const blobs = api.ops.listBlobs.useQuery(
-    { queueName: selectedQueue ?? "", sort, limit: PAGE_SIZE },
-    { enabled: !!selectedQueue, refetchInterval: 30_000 },
-  );
-
   const { cleanup, deleteBlob } = useBlobStoreActions({
-    onCleanupSuccess: () => setReclaimConfirm(null),
-    onDeleteSuccess: () => setDeleteTarget(null),
+    // Only the destructive run owns the prompt; a resolving preview must not
+    // close a Run dialog the operator opened in the meantime.
+    onCleanupSuccess: (variables) => {
+      if (!variables.dryRun) setReclaimConfirm(null);
+    },
+    // Close only if the resolved delete is the one still on screen.
+    onDeleteSuccess: (variables) => {
+      setDeleteTarget((current) =>
+        current?.projectId === variables.projectId &&
+        current?.hash === variables.hash
+          ? null
+          : current,
+      );
+    },
   });
-
-  const isLoading = blobs.isLoading || queues.isLoading;
-  const rows = blobs.data?.blobs ?? [];
 
   return (
     <>
@@ -50,56 +42,33 @@ export function BlobStoreContent() {
       </Text>
 
       <BlobToolbar
-        queueNames={queues.data ?? []}
-        selectedQueue={selectedQueue}
-        onQueueChange={setQueueName}
-        sort={sort}
-        onSortChange={setSort}
+        queueNames={listing.queueNames}
+        selectedQueue={listing.selectedQueue}
+        onQueueChange={listing.setQueueName}
+        sort={listing.sort}
+        onSortChange={listing.setSort}
         canManage={hasAccess}
         onPreviewCleanup={() => cleanup.mutate({ dryRun: true })}
         onRunCleanup={() => setReclaimConfirm("")}
         previewLoading={cleanup.isPending && cleanup.variables?.dryRun === true}
       />
 
-      {blobs.data?.rankedFromSample && (
+      {listing.rankedFromSample && (
         <Text textStyle="xs" color="fg.muted" marginBottom={3}>
-          Ordered from a sample of {blobs.data.sampled} payloads, not the whole
+          Ordered from a sample of {listing.sampled} payloads, not the whole
           store. Use storage order to walk everything.
         </Text>
       )}
 
-      {isLoading ? (
-        <Center paddingY={20}>
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <Spinner size="lg" />
-              </EmptyState.Indicator>
-              <EmptyState.Title>Loading payloads</EmptyState.Title>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </Center>
-      ) : rows.length === 0 ? (
-        <Center paddingY={20}>
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <Database />
-              </EmptyState.Indicator>
-              <EmptyState.Title>No stored payloads</EmptyState.Title>
-              <EmptyState.Description>
-                Nothing is being held for this queue.
-              </EmptyState.Description>
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </Center>
-      ) : (
-        <BlobTable
-          blobs={rows}
-          canManage={hasAccess}
-          onDelete={setDeleteTarget}
-        />
-      )}
+      <BlobStoreBody
+        isLoading={listing.isLoading}
+        blobs={listing.blobs}
+        canManage={hasAccess}
+        onDelete={setDeleteTarget}
+        hasMore={listing.hasMore}
+        onLoadMore={listing.loadMore}
+        isLoadingMore={listing.isLoadingMore}
+      />
 
       <DeletePayloadDialog
         target={deleteTarget}

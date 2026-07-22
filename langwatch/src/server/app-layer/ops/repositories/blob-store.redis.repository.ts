@@ -8,6 +8,10 @@ import {
   redisBlobKeyPrefix,
 } from "~/server/event-sourcing/queues/groupQueue/blobKeys";
 import {
+  BLOB_OPERATOR_DELETE_LUA,
+  type BlobDeleteOutcome,
+} from "~/server/event-sourcing/queues/groupQueue/blobDeleteLua";
+import {
   BLOB_SWEEP_LUA,
   type BlobSweepOutcome,
 } from "~/server/event-sourcing/queues/groupQueue/blobSweepLua";
@@ -15,7 +19,10 @@ import {
   type BlobSweepReport,
   BlobSweeper,
 } from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
-import { CachedLuaScript } from "~/server/event-sourcing/queues/groupQueue/cachedLuaScript";
+import {
+  CachedLuaScript,
+  isNoScriptResult,
+} from "~/server/event-sourcing/queues/groupQueue/cachedLuaScript";
 import { GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing/queues/groupQueue/scripts";
 
 import type {
@@ -24,10 +31,26 @@ import type {
   OpsBlobStoreStats,
   OpsBlobSummary,
 } from "../types";
-import type { BlobStoreRepository } from "./blob-store.repository";
+import type {
+  BlobDeleteResult,
+  BlobStoreRepository,
+} from "./blob-store.repository";
 
 /** Dry-run eval, so the browser reports the same verdict the runner would act on. */
 const previewScript = new CachedLuaScript(BLOB_SWEEP_LUA);
+
+/** Lease-guarded hand delete. The guard is inside the script, not around it. */
+const deleteScript = new CachedLuaScript(BLOB_OPERATOR_DELETE_LUA);
+
+/**
+ * Everything about a blob that comes from plain key reads.
+ *
+ * Separated from the sweep verdict because the verdict costs an eval per blob:
+ * ranking and stats need these facts for thousands of blobs and the verdict for
+ * none of them, so the two are gathered separately and only joined for the rows
+ * actually returned.
+ */
+type BlobFacts = Omit<OpsBlobSummary, "sweepOutcome">;
 
 /** Hard ceiling on a page regardless of what the caller asks for. */
 const MAX_PAGE = 200;
@@ -92,6 +115,32 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     if (sort !== "scan") {
       return this.findRanked({ queueName, limit, projectId, sort });
     }
+    const { facts, nextCursor } = await this.scanFacts({
+      queueName,
+      cursor,
+      limit,
+      projectId,
+    });
+    return {
+      blobs: await this.withOutcomes(queueName, facts),
+      nextCursor,
+      sampled: facts.length,
+      rankedFromSample: false,
+    };
+  }
+
+  /** One SCAN page, described but not yet judged. */
+  private async scanFacts({
+    queueName,
+    cursor,
+    limit,
+    projectId,
+  }: {
+    queueName: string;
+    cursor?: string | null;
+    limit: number;
+    projectId?: string | null;
+  }): Promise<{ facts: BlobFacts[]; nextCursor: string | null }> {
     const pageSize = Math.min(Math.max(limit, 1), MAX_PAGE);
     const prefix = redisBlobKeyPrefix(queueName);
     // Filtering by project narrows in Redis rather than in Node, so a tenant
@@ -135,14 +184,10 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
       if (nodeCursor !== "0") nextCursors[node.id] = nodeCursor;
     }
 
-    const page = keys.slice(0, pageSize);
-    const blobs = await this.describe(queueName, page);
     return {
-      blobs,
+      facts: await this.describe(queueName, keys.slice(0, pageSize)),
       nextCursor:
         Object.keys(nextCursors).length > 0 ? JSON.stringify(nextCursors) : null,
-      sampled: blobs.length,
-      rankedFromSample: false,
     };
   }
 
@@ -169,19 +214,21 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     sort: OpsBlobSort;
   }): Promise<OpsBlobPage> {
     const pageSize = Math.min(Math.max(limit, 1), MAX_PAGE);
-    const sample: OpsBlobSummary[] = [];
+    const sample: BlobFacts[] = [];
     let cursor: string | null = null;
     let exhausted = false;
 
     while (sample.length < RANK_SAMPLE_CAP) {
-      const page: OpsBlobPage = await this.findAll({
+      // Facts only: none of the orderings below read the sweep verdict, and
+      // judging a 5,000-blob sample to return 100 rows would be 5,000 evals
+      // spent on rows nobody sees.
+      const page = await this.scanFacts({
         queueName,
         cursor,
         limit: MAX_PAGE,
         projectId,
-        sort: "scan",
       });
-      sample.push(...page.blobs);
+      sample.push(...page.facts);
       cursor = page.nextCursor;
       if (!cursor) {
         exhausted = true;
@@ -190,7 +237,7 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     }
 
     const now = Date.now();
-    const byLapsedLease = (blob: OpsBlobSummary): number =>
+    const byLapsedLease = (blob: BlobFacts): number =>
       // Future deadlines are live leases, not lapses; sort them last.
       blob.earliestLeaseDeadlineMs === null ||
       blob.earliestLeaseDeadlineMs > now
@@ -223,7 +270,9 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     }
 
     return {
-      blobs: ranked.slice(0, pageSize),
+      // Only the head is judged, which is the whole reason the sample carries
+      // facts alone.
+      blobs: await this.withOutcomes(queueName, ranked.slice(0, pageSize)),
       // Ranking consumes its own sample, so there is no resumable cursor: a
       // "next page" of a best-of-sample would not mean anything.
       nextCursor: null,
@@ -246,7 +295,8 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
       projectId: createTenantId(projectId),
       hash,
     });
-    const [summary] = await this.describe(queueName, [key]);
+    const facts = await this.describe(queueName, [key]);
+    const [summary] = await this.withOutcomes(queueName, facts);
     return summary ?? null;
   }
 
@@ -254,7 +304,7 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
   private async describe(
     queueName: string,
     keys: string[],
-  ): Promise<OpsBlobSummary[]> {
+  ): Promise<BlobFacts[]> {
     if (keys.length === 0) return [];
     const prefix = redisBlobKeyPrefix(queueName);
     const parsed = keys
@@ -287,7 +337,7 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     }
     const results = (await pipeline.exec()) ?? [];
 
-    const summaries: OpsBlobSummary[] = [];
+    const summaries: BlobFacts[] = [];
     for (const [index, entry] of parsed.entries()) {
       const base = index * 5;
       const num = (offset: number): number => {
@@ -313,33 +363,66 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
         earliestLeaseDeadlineMs: Number.isFinite(earliestScore)
           ? earliestScore
           : null,
-        sweepOutcome: await this.previewOutcome(queueName, entry),
       });
     }
     return summaries;
   }
 
-  /** Runs the sweep decision in dry-run so the UI never disagrees with the runner. */
-  private async previewOutcome(
+  /**
+   * Joins each row to the verdict a sweep would reach for it, in one round trip.
+   *
+   * The verdict is an eval per blob, so these are pipelined together rather than
+   * awaited one at a time — a 200-row page was 200 sequential round trips, which
+   * is what made a listing slow enough to feel broken. A node with no cached
+   * copy of the script answers NOSCRIPT for every row at once; those re-run
+   * through the script's own EVAL fallback, which warms the cache for later
+   * calls.
+   */
+  private async withOutcomes(
     queueName: string,
-    entry: { key: string; projectId: string; hash: string },
-  ): Promise<BlobSweepOutcome | "unknown"> {
-    const keyArgs = {
-      queueName,
-      projectId: createTenantId(entry.projectId),
-      hash: entry.hash,
+    facts: BlobFacts[],
+  ): Promise<OpsBlobSummary[]> {
+    if (facts.length === 0) return [];
+
+    const keysFor = (fact: BlobFacts) => {
+      const keyArgs = {
+        queueName,
+        projectId: createTenantId(fact.projectId),
+        hash: fact.hash,
+      };
+      return [
+        blobLeaseSetKey(keyArgs),
+        blobHolderSetKey(keyArgs),
+        redisBlobKey(keyArgs),
+      ] as const;
     };
-    try {
-      return String(
-        await previewScript.run(
-          this.redis,
-          3,
-          blobLeaseSetKey(keyArgs),
-          blobHolderSetKey(keyArgs),
-          entry.key,
-          "1",
+
+    const pipeline = this.redis.pipeline();
+    for (const fact of facts) {
+      previewScript.queue(pipeline, 3, ...keysFor(fact), "1");
+    }
+    const results = (await pipeline.exec()) ?? [];
+
+    return Promise.all(
+      facts.map(async (fact, index) => ({
+        ...fact,
+        sweepOutcome: await this.readOutcome(results[index], () =>
+          previewScript.run(this.redis, 3, ...keysFor(fact), "1"),
         ),
-      ) as BlobSweepOutcome;
+      })),
+    );
+  }
+
+  private async readOutcome(
+    result: [Error | null, unknown] | undefined,
+    rerun: () => Promise<unknown>,
+  ): Promise<BlobSweepOutcome | "unknown"> {
+    try {
+      if (isNoScriptResult(result)) {
+        return String(await rerun()) as BlobSweepOutcome;
+      }
+      if (result?.[0]) return "unknown";
+      return String(result?.[1]) as BlobSweepOutcome;
     } catch {
       return "unknown";
     }
@@ -352,14 +435,19 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
   }): Promise<OpsBlobStoreStats> {
     const queues: OpsBlobStoreStats["queues"] = [];
     for (const queueName of await this.findAllQueueNames()) {
-      const page = await this.findAll({ queueName, limit: sampleLimit });
+      // Stats read counts and bytes, never the sweep verdict, so this stays on
+      // facts and skips the per-blob eval entirely.
+      const { facts, nextCursor } = await this.scanFacts({
+        queueName,
+        limit: sampleLimit,
+      });
       queues.push({
         queueName,
-        sampledBlobs: page.blobs.length,
-        sampledBytes: page.blobs.reduce((sum, b) => sum + b.sizeBytes, 0),
-        unreferenced: page.blobs.filter((b) => b.liveLeases === 0).length,
+        sampledBlobs: facts.length,
+        sampledBytes: facts.reduce((sum, b) => sum + b.sizeBytes, 0),
+        unreferenced: facts.filter((b) => b.liveLeases === 0).length,
         // Says out loud that the numbers are a sample, so nobody reads them as a total.
-        truncated: page.nextCursor !== null,
+        truncated: nextCursor !== null,
       });
     }
     return { queues };
@@ -373,15 +461,26 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     queueName: string;
     projectId: string;
     hash: string;
-  }): Promise<boolean> {
+  }): Promise<BlobDeleteResult> {
     const keyArgs = {
       queueName,
       projectId: createTenantId(projectId),
       hash,
     };
-    const removed = await this.redis.unlink(redisBlobKey(keyArgs));
-    await this.redis.del(blobLeaseSetKey(keyArgs), blobHolderSetKey(keyArgs));
-    return removed > 0;
+    // The lease check lives inside the script, so a job that stages this exact
+    // content between "is it referenced?" and "delete it" is seen, not raced.
+    const raw = (await deleteScript.run(
+      this.redis,
+      3,
+      blobLeaseSetKey(keyArgs),
+      blobHolderSetKey(keyArgs),
+      redisBlobKey(keyArgs),
+    )) as [string, string];
+    const outcome = raw[0] as BlobDeleteOutcome;
+    return {
+      deleted: outcome === "deleted",
+      refusedLiveLeases: outcome === "leased" ? Number(raw[1]) : 0,
+    };
   }
 
   async runCleanup({ dryRun }: { dryRun: boolean }): Promise<BlobSweepReport> {

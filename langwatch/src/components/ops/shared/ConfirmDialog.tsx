@@ -23,7 +23,11 @@ export function ConfirmDialog({
    * of what is about to be destroyed.
    */
   children?: React.ReactNode;
-  /** Holds the confirm button closed until {@link children} is satisfied. */
+  /**
+   * Disables the confirm button while true. The parent owns the condition —
+   * e.g. a typed-confirmation input that only enables Confirm once the required
+   * word is present — this component just reflects it.
+   */
   confirmDisabled?: boolean;
 }) {
   return (

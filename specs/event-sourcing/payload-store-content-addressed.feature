@@ -363,14 +363,14 @@ Feature: GroupQueue content-addressed tiered payload store
   Scenario: An unreferenced blob is put on the grace window even though a stale holder token withheld it
     Given a Redis-tier blob with no live lease
     And a holder token left behind by a worker that died before releasing
-    When the reclaim runner sweeps the blob keyspace
+    When the reclaim runner runs
     Then the blob is still readable
     And its expiry is shortened to the release grace window
 
   @integration @track6
   Scenario: A blob a live lease still references is left alone
     Given a Redis-tier blob a staged job still leases
-    When the reclaim runner sweeps the blob keyspace
+    When the reclaim runner runs
     Then the blob keeps its four-day backstop
     And the runner reports it as still referenced
 
@@ -378,9 +378,9 @@ Feature: GroupQueue content-addressed tiered payload store
   # The put-before-stage window is why reclaim demands a margin. A producer writes
   # content-addressed bytes and stages them a round trip later; for that moment the
   # blob has no lease and no holder, and it must not be mistaken for abandoned.
-  Scenario: A blob written but not yet staged is never destroyed
+  Scenario: A blob still within its put-before-stage window is not reclaimed
     Given a Redis-tier blob just written by a producer that has not staged yet
-    When the reclaim runner sweeps the blob keyspace
+    When the reclaim runner runs
     Then the blob is still readable
     And no delete is issued for it
 
@@ -388,7 +388,7 @@ Feature: GroupQueue content-addressed tiered payload store
   Scenario: A blob whose grace window has been running past the safety margin is destroyed
     Given a Redis-tier blob with no live lease
     And its grace window has been running longer than the reclaim safety margin
-    When the reclaim runner sweeps the blob keyspace
+    When the reclaim runner runs
     Then the blob is deleted
     And its lease and holder bookkeeping are deleted with it
 
@@ -401,10 +401,10 @@ Feature: GroupQueue content-addressed tiered payload store
 
   @scheduled @track6
   Scenario: The runner is driven by the schedule, not by a request
-    Given the reclaim runner is registered as a scheduled process
-    When its interval elapses on a worker
-    Then exactly one worker performs the sweep
-    And a second worker waking for the same tick stands down
+    Given the reclaim runner is on its cleanup schedule
+    When a cleanup interval comes due
+    Then the sweep runs once for that interval
+    And it does not run again for the same interval
 
   # ===========================================================================
   # --- AC Coverage Map (ADR-029) ---

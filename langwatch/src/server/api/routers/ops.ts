@@ -964,7 +964,9 @@ export const opsRouter = createTRPCRouter({
       }
       return requireOps().blobStore.runCleanup({
         dryRun: input.dryRun,
-        requestedBy: ctx.session.user.email ?? ctx.session.user.id,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
       });
     }),
 
@@ -984,7 +986,9 @@ export const opsRouter = createTRPCRouter({
         queueName: input.queueName,
         projectId: input.projectId,
         hash: input.hash,
-        requestedBy: ctx.session.user.email ?? ctx.session.user.id,
+        // Opaque id, not email: the audit trail must trace the actor without
+        // carrying PII into the log stream.
+        requestedBy: ctx.session.user.id,
       });
     }),
 });

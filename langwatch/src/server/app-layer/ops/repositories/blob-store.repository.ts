@@ -7,6 +7,18 @@ import type {
   OpsBlobSummary,
 } from "../types";
 
+/**
+ * Outcome of an atomic hand delete.
+ *
+ * `refusedLiveLeases` is non-zero only when the delete was refused because that
+ * many live leases still referenced the blob at the instant it ran — the count
+ * the lease-guarded script measured, not one read separately and now stale.
+ */
+export interface BlobDeleteResult {
+  deleted: boolean;
+  refusedLiveLeases: number;
+}
+
 export interface BlobStoreRepository {
   findAllQueueNames(): Promise<string[]>;
   findAll(params: {
@@ -26,7 +38,7 @@ export interface BlobStoreRepository {
     queueName: string;
     projectId: string;
     hash: string;
-  }): Promise<boolean>;
+  }): Promise<BlobDeleteResult>;
   runCleanup(params: { dryRun: boolean }): Promise<BlobSweepReport>;
 }
 
@@ -49,8 +61,8 @@ export class NullBlobStoreRepository implements BlobStoreRepository {
   async findStats(): Promise<OpsBlobStoreStats> {
     return { queues: [] };
   }
-  async deleteOne(): Promise<boolean> {
-    return false;
+  async deleteOne(): Promise<BlobDeleteResult> {
+    return { deleted: false, refusedLiveLeases: 0 };
   }
   async runCleanup(): Promise<BlobSweepReport> {
     return {

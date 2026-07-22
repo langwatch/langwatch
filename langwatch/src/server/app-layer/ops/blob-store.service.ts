@@ -18,10 +18,11 @@ const STATS_SAMPLE_LIMIT = 200;
 /**
  * Read and reclaim surface for the group queue's content-addressed blob store.
  *
- * Every destructive method logs what it removed. Deleting a payload out from
- * under a staged job is unrecoverable and invisible at the queue level (the job
- * completes without its handler), so an operator-initiated delete has to leave
- * a trail that names who asked for it.
+ * Every destructive method logs what it removed and who asked. Deleting a
+ * payload out from under a staged job is unrecoverable and invisible at the
+ * queue level (the job completes without its handler), so the trail has to name
+ * the actor — as an opaque user id, never an email; the id is enough to trace
+ * an action back through the account without putting PII in the log stream.
  */
 export class BlobStoreService {
   constructor(private readonly repo: BlobStoreRepository) {}
@@ -64,18 +65,21 @@ export class BlobStoreService {
     queueName: string;
     projectId: string;
     hash: string;
+    /** Opaque actor id (never an email) — see the class docstring. */
     requestedBy: string;
   }): Promise<{ deleted: boolean }> {
-    const blob = await this.repo.findById(params);
-    // Refusing a leased blob is the guard that matters: the sweeper would never
-    // touch one, and a hand delete must not be the one path that can.
-    if (blob && blob.liveLeases > 0) {
+    // The lease guard is inside the delete script, so there is no read-then-act
+    // window here: a blob that gains a reference between inspection and delete
+    // is refused by the same eval that would have removed it.
+    const result = await this.repo.deleteOne(params);
+
+    if (result.refusedLiveLeases > 0) {
       logger.warn(
         {
           queueName: params.queueName,
           projectId: params.projectId,
           blobHash: params.hash,
-          liveLeases: blob.liveLeases,
+          liveLeases: result.refusedLiveLeases,
           requestedBy: params.requestedBy,
         },
         "Refused an operator blob delete: a live lease still references it",
@@ -83,18 +87,17 @@ export class BlobStoreService {
       return { deleted: false };
     }
 
-    const deleted = await this.repo.deleteOne(params);
     logger.info(
       {
         queueName: params.queueName,
         projectId: params.projectId,
         blobHash: params.hash,
         requestedBy: params.requestedBy,
-        deleted,
+        deleted: result.deleted,
       },
       "Operator deleted a queue blob",
     );
-    return { deleted };
+    return { deleted: result.deleted };
   }
 
   async runCleanup(params: {

@@ -1,15 +1,15 @@
 import { formatTimeAgo } from "~/components/ops/shared/formatters";
 
 /** Verdict a sweep would reach, phrased for a reader rather than for the script. */
-const OUTCOME_LABELS: Record<string, { label: string; palette: string }> = {
+const OUTCOME_LABELS = {
   leased: { label: "In use", palette: "green" },
   repaired: { label: "Will shorten", palette: "orange" },
   reclaimed: { label: "Will delete", palette: "red" },
   bookkeeping: { label: "Leftover keys", palette: "gray" },
   pending: { label: "Expiring", palette: "yellow" },
-};
+} as const;
 
-const UNKNOWN_OUTCOME = { label: "Unknown", palette: "gray" };
+const UNKNOWN_OUTCOME = { label: "Unknown", palette: "gray" } as const;
 
 /**
  * The sweeper's vocabulary grows server-side, so an outcome this build has
@@ -19,7 +19,9 @@ export function sweepOutcomeLabel(outcome: string): {
   label: string;
   palette: string;
 } {
-  return OUTCOME_LABELS[outcome] ?? UNKNOWN_OUTCOME;
+  return (
+    OUTCOME_LABELS[outcome as keyof typeof OUTCOME_LABELS] ?? UNKNOWN_OUTCOME
+  );
 }
 
 /** Remaining lifetime. Null means the key carries no expiry at all. */
