@@ -2,7 +2,11 @@ import { Button, Field, Heading, HStack, Input, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useDebounce } from "use-debounce";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
@@ -210,7 +214,8 @@ function LLMModelCostForm({
           void llmModelCostsQuery.refetch();
         },
         onError: (error) => {
-          if (applyHandledErrorToForm({ error, form })) return;
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+            return;
           showErrorToast({
             error,
             fallbackTitle: id
@@ -226,6 +231,7 @@ function LLMModelCostForm({
     <>
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
+        <FormServerError form={form} />
         <HorizontalFormControl
           label="Applies to"
           helper="Pick the scope this cost rule applies to. Project-level rules override team-level, which override organization-level."

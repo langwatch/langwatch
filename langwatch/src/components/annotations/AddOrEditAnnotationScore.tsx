@@ -16,7 +16,11 @@ import { AnnotationScoreDataType } from "@prisma/client";
 import { useEffect, useState } from "react";
 import { Plus, X } from "react-feather";
 import { useForm } from "react-hook-form";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { FullWidthFormControl } from "../FullWidthFormControl";
@@ -199,7 +203,8 @@ export const AddOrEditAnnotationScore = ({
           void queryClient.annotationScore.getById.invalidate();
         },
         onError: (error) => {
-          if (applyHandledErrorToForm({ error, form })) return;
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+            return;
           showErrorToast({
             error,
             fallbackTitle: annotationScoreId
@@ -218,12 +223,14 @@ export const AddOrEditAnnotationScore = ({
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
         <VStack gap={2} align="start">
+          <FormServerError form={form} />
           <FullWidthFormControl
             label="Name"
             helper="Give it a name that makes it easy to identify this score metric"
             invalid={!!errors.name}
           >
             <Input {...register("name")} required />
+            <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
           </FullWidthFormControl>
           <FullWidthFormControl
             label="Description"
@@ -236,6 +243,7 @@ export const AddOrEditAnnotationScore = ({
               autoresize
               maxHeight="6lh"
             />
+            <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
           </FullWidthFormControl>
           <FullWidthFormControl
             label="Score Type"
@@ -263,6 +271,7 @@ export const AddOrEditAnnotationScore = ({
                 </NativeSelect.Root>
               </VStack>
             </HStack>
+            <Field.ErrorText>{errors.dataType?.message}</Field.ErrorText>
 
             {watchDataType === "OPTION" && (
               <Field.Root mt={4}>

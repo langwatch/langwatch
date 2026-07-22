@@ -2,7 +2,7 @@ import { cloneDeep } from "lodash-es";
 import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import { showErrorToast } from "~/features/errors";
 import type { PromptConfigFormValues } from "~/prompts";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
@@ -103,7 +103,14 @@ export function useHandleSavePrompt() {
      * @param error - The error that occurred during save
      */
     const onError = (error: Error) => {
-      if (applyHandledErrorToForm({ error, form: methods })) return;
+      // No form bridge here on purpose. The only top-level (claimable) values
+      // on the prompt form are `handle`, `scope` and `configId`, and the
+      // playground renders none of them as an input — the handle is read-only
+      // in the header and changed through its own dialog.
+      // `applyHandledErrorToForm` would claim a `handle` field error, set it on
+      // a field nobody paints, and suppress this toast — the user would hit
+      // Save and see nothing at all. Toast until there is a field to put the
+      // message on.
       showErrorToast({ error, fallbackTitle: "Couldn't save the prompt" });
     };
 

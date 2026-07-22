@@ -14,7 +14,11 @@ import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import {
   getComplexProps,
@@ -102,7 +106,8 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
       onSave?.(agent);
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form })) return;
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+        return;
       showErrorToast({ error, fallbackTitle: "Couldn't create agent" });
     },
   });
@@ -156,7 +161,8 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         );
       } catch (error) {
         console.error("Error creating workflow agent:", error);
-        if (applyHandledErrorToForm({ error, form })) return;
+        if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+          return;
         showErrorToast({
           error,
           fallbackTitle: "Couldn't create workflow agent",
@@ -217,7 +223,9 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
 
               <Box paddingX={6}>
                 <VStack gap={4} align="stretch">
-                  <Field.Root invalid={!!errors.name}>
+                  <FormServerError form={form} />
+
+                  <Field.Root invalid={!!errors.name || !!errors.icon}>
                     <EmojiPickerModal
                       open={emojiPicker.open}
                       onClose={emojiPicker.onClose}
@@ -241,7 +249,9 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
                         data-testid="agent-name-input"
                       />
                     </HStack>
-                    <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+                    <Field.ErrorText>
+                      {errors.name?.message ?? errors.icon?.message}
+                    </Field.ErrorText>
                   </Field.Root>
 
                   <Field.Root invalid={!!errors.description}>

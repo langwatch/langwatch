@@ -23,7 +23,7 @@ import {
 } from "~/components/variables";
 import { useEvaluationMappings } from "~/experiments-v3/hooks/useEvaluationMappings";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -710,7 +710,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form: methods })) return;
+      // No form bridge here on purpose. The only top-level (claimable) values on
+      // this form are `handle`, `scope` and `configId`, and none of them is
+      // rendered as an input by this drawer — the handle/scope are collected by
+      // the separate Save/Change-handle dialog. `applyHandledErrorToForm` would
+      // therefore claim a `handle` field error, set it on a field nobody paints,
+      // and suppress this toast — the user would click Save and see nothing at
+      // all. Toast until there is a field to put the message on.
       showErrorToast({ error, fallbackTitle: "Couldn't create prompt" });
     },
   });
@@ -757,7 +763,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // Don't close - let user continue editing or close manually
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form: methods })) return;
+      // No form bridge here on purpose. The only top-level (claimable) values on
+      // this form are `handle`, `scope` and `configId`, and none of them is
+      // rendered as an input by this drawer — the handle/scope are collected by
+      // the separate Save/Change-handle dialog. `applyHandledErrorToForm` would
+      // therefore claim a `handle` field error, set it on a field nobody paints,
+      // and suppress this toast — the user would click Save and see nothing at
+      // all. Toast until there is a field to put the message on.
       showErrorToast({ error, fallbackTitle: "Couldn't save prompt" });
     },
   });

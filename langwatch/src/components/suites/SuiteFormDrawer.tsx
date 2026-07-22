@@ -26,7 +26,11 @@ import {
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import {
   getFlowCallbacks,
   useDrawer,
@@ -158,7 +162,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
     onError: (err) => {
       saveAndRunRef.current = false;
-      if (applyHandledErrorToForm({ error: err, form })) return;
+      if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true }))
+        return;
       showErrorToast({ error: err, fallbackTitle: "Couldn't create run plan" });
     },
   });
@@ -186,7 +191,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
     onError: (err) => {
       saveAndRunRef.current = false;
-      if (applyHandledErrorToForm({ error: err, form })) return;
+      if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true }))
+        return;
       showErrorToast({ error: err, fallbackTitle: "Couldn't update run plan" });
     },
   });
@@ -303,6 +309,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
               </VStack>
             ) : (
               <VStack gap={4} align="stretch">
+                <FormServerError form={form} />
+
                 {/* Name */}
                 <VStack align="start" gap={1}>
                   <Text fontSize="sm" fontWeight="medium">
@@ -330,6 +338,11 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                     {...form.register("description")}
                     rows={2}
                   />
+                  {errors.description && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.description.message}
+                    </Text>
+                  )}
                 </VStack>
 
                 {/* Scenarios */}
@@ -403,12 +416,22 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                     value={suiteForm.simulatorModel}
                     onChange={suiteForm.setSimulatorModel}
                   />
+                  {errors.simulatorModel && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.simulatorModel.message}
+                    </Text>
+                  )}
                   <SimulationModelSelect
                     label="Judge"
                     featureKey="scenarios.judge"
                     value={suiteForm.judgeModel}
                     onChange={suiteForm.setJudgeModel}
                   />
+                  {errors.judgeModel && (
+                    <Text fontSize="xs" color="red.fg">
+                      {errors.judgeModel.message}
+                    </Text>
+                  )}
                 </VStack>
 
                 {/* Execution Options */}

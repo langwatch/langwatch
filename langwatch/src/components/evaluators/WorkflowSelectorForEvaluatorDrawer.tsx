@@ -14,7 +14,11 @@ import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
 import {
   getComplexProps,
@@ -111,7 +115,8 @@ export function WorkflowSelectorForEvaluatorDrawer(
       });
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form })) return;
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+        return;
       showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" });
     },
   });
@@ -160,7 +165,8 @@ export function WorkflowSelectorForEvaluatorDrawer(
         );
       } catch (error) {
         console.error("Error creating workflow evaluator:", error);
-        if (applyHandledErrorToForm({ error, form })) return;
+        if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+          return;
         showErrorToast({
           error,
           fallbackTitle: "Couldn't create workflow evaluator",
@@ -222,7 +228,9 @@ export function WorkflowSelectorForEvaluatorDrawer(
 
               <Box paddingX={6}>
                 <VStack gap={4} align="stretch">
-                  <Field.Root invalid={!!errors.name}>
+                  <FormServerError form={form} />
+
+                  <Field.Root invalid={!!errors.name || !!errors.icon}>
                     <EmojiPickerModal
                       open={emojiPicker.open}
                       onClose={emojiPicker.onClose}
@@ -246,7 +254,9 @@ export function WorkflowSelectorForEvaluatorDrawer(
                         data-testid="evaluator-name-input"
                       />
                     </HStack>
-                    <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+                    <Field.ErrorText>
+                      {errors.name?.message ?? errors.icon?.message}
+                    </Field.ErrorText>
                   </Field.Root>
 
                   <Field.Root invalid={!!errors.description}>

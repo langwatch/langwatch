@@ -10,7 +10,11 @@ import { generate } from "@langwatch/ksuid";
 import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { type UseFormReturn, useWatch } from "react-hook-form";
-import { applyHandledErrorToForm, showErrorToast } from "~/features/errors";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useRouter } from "~/utils/compat/next-router";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
 import {
@@ -164,7 +168,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     onError: (error) => {
       if (
         formInstance &&
-        applyHandledErrorToForm({ error, form: formInstance })
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
       )
         return;
       showErrorToast({ error, fallbackTitle: "Couldn't create scenario" });
@@ -182,7 +190,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     onError: (error) => {
       if (
         formInstance &&
-        applyHandledErrorToForm({ error, form: formInstance })
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
       )
         return;
       showErrorToast({ error, fallbackTitle: "Couldn't save scenario" });
@@ -462,6 +474,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               borderRightWidth="1px"
               borderColor="border"
             >
+              {formInstance && <FormServerError form={formInstance} />}
               <ScenarioForm
                 key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
