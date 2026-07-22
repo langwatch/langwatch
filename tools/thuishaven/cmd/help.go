@@ -118,6 +118,9 @@ ENVIRONMENT
                                  full host access.
                                  The fast-iteration tier, and the one that lets a
                                  stack come up with no container runtime at all.
+    HAVEN_LANGY_IMAGE_REGISTRY   Registry ref (e.g. ghcr.io/langwatch/langyagent)
+                                 to pull a CI-published langy image for the
+                                 current content hash instead of building.
     HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on
                                  (default: default). A profile haven creates is
                                  capped; one that already exists is never resized.

@@ -48,6 +48,12 @@ type PlanOptions struct {
 	// sticky; defaults to true.
 	ShouldStartWorkers bool
 	ShouldSeed         bool
+	// ShouldRebuildImages (--rebuild) forces container images to be rebuilt even
+	// when their content hash says nothing changed.
+	ShouldRebuildImages bool
+	// langyImageTag is the content-addressed image tag Up resolves before
+	// provisioning (internal — derived, never set by the composition root).
+	langyImageTag string
 	// LangyTier is the local isolation posture for the langyagent worker, resolved
 	// from LANGY_UNSAFE_CONTAINER / LANGY_UNSAFE_HOST_ACCESS. The zero value is the
 	// sandboxed (production-like) default: the worker runs in colima with the

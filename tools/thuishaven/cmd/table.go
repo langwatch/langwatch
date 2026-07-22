@@ -190,6 +190,7 @@ var table = []commandSpec{
 		flags: []flagSpec{
 			{long: "--watch", short: "-w", summary: "air hot-reload for the Go services"},
 			{long: "--detach", short: "-d", summary: "run in the background; follow with haven logs -f"},
+			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			sel, err := d.orch.ResolveSelection(d.worktree, inv.args)
@@ -200,6 +201,7 @@ var table = []commandSpec{
 			if inv.has("--watch") {
 				d.opts.ShouldGoWatch = true
 			}
+			d.opts.ShouldRebuildImages = inv.has("--rebuild")
 			if d.opts.IsStub {
 				return d.orch.UpStub(ctx, d.params, dashboard.StartEcho)
 			}
@@ -227,12 +229,15 @@ var table = []commandSpec{
 		summary: "bounce one supervised service (or all) without tearing the stack down",
 		args:    "[service]",
 		maxArgs: 1,
+		flags: []flagSpec{
+			{long: "--rebuild", summary: "rebuild the image first (haven restart langy --rebuild)"},
+		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			name := ""
 			if len(inv.args) > 0 {
 				name = inv.args[0]
 			}
-			return d.orch.Restart(ctx, d.params, name)
+			return d.orch.Restart(ctx, d.params, name, inv.has("--rebuild"))
 		},
 	},
 	{

@@ -21,12 +21,36 @@ type restartTarget struct {
 // the crash-restart loop, triggered on purpose. Perfect for services without
 // hot reloading. The shared databases (ClickHouse/Postgres/Redis) are not
 // restartable this way; they are machine-wide servers, not stack children.
-func (o *Orchestrator) Restart(ctx context.Context, p UpParams, name string) error {
+func (o *Orchestrator) Restart(ctx context.Context, p UpParams, name string, rebuild bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
 	}
+	if rebuild {
+		if name != "langy" {
+			return fmt.Errorf("--rebuild applies to container services — `haven restart langy --rebuild`")
+		}
+		if err := o.rebuildLangyImage(ctx, p, slug); err != nil {
+			return err
+		}
+	}
 	return o.RestartStack(ctx, slug, name)
+}
+
+// rebuildLangyImage force-builds the current source into the RUNNING stack's
+// image tag, so the bounce that follows picks the fresh bytes up without a
+// re-plan. (The tag then names newer content than its hash until the next up
+// re-derives it — fine for a dev escape hatch.)
+func (o *Orchestrator) rebuildLangyImage(ctx context.Context, p UpParams, slug string) error {
+	st, ok := o.stackBySlug(slug)
+	if !ok {
+		return fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
+	}
+	if !st.LangyTier.RunsInContainer() {
+		return fmt.Errorf("langy runs on the host here (no image) — a plain `haven restart langy` picks up source changes")
+	}
+	_, err := o.prepareLangyContainer(ctx, p.WorktreeDir, st.LangyImage, true)
+	return err
 }
 
 // RestartStack is Restart addressed by slug — what the hub (which acts on any

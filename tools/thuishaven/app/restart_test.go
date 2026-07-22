@@ -62,7 +62,7 @@ func TestRestart(t *testing.T) {
 	t.Run("given a live stack", func(t *testing.T) {
 		t.Run("when restarting one service, it kills only that service's group", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "gateway"); err != nil {
+			if err := o.Restart(ctx, params, "gateway", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 101 {
@@ -72,7 +72,7 @@ func TestRestart(t *testing.T) {
 
 		t.Run("when restarting the api, it resolves the API backend port", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "api"); err != nil {
+			if err := o.Restart(ctx, params, "api", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 102 {
@@ -82,7 +82,7 @@ func TestRestart(t *testing.T) {
 
 		t.Run("when restarting with no service named, it bounces every supervised child", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, ""); err != nil {
+			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			// app, gateway, api, workers — NOT the fallback nlp, NOT clickhouse.
@@ -100,7 +100,7 @@ func TestRestart(t *testing.T) {
 		t.Run("when naming an unknown or shared service, it refuses with the restartable list", func(t *testing.T) {
 			for _, name := range []string{"clickhouse", "nlp", "bogus"} {
 				_, sys, o := newFixture()
-				if err := o.Restart(ctx, params, name); err == nil {
+				if err := o.Restart(ctx, params, name, false); err == nil {
 					t.Errorf("Restart(%q) should refuse", name)
 				}
 				if len(sys.groupTerminated) != 0 {
@@ -113,7 +113,7 @@ func TestRestart(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.pidsByPort[9000] = []int{42}
 			o := restartOrch(store, sys)
-			if err := o.Restart(ctx, params, "app"); err != nil {
+			if err := o.Restart(ctx, params, "app", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 0 {
@@ -135,14 +135,14 @@ func TestRestart(t *testing.T) {
 			}
 			o := restartOrch(store, sys)
 
-			if err := o.Restart(ctx, params, "workers"); err == nil {
+			if err := o.Restart(ctx, params, "workers", false); err == nil {
 				t.Error("restart workers should refuse in in-process mode")
 			}
 			if len(sys.groupTerminated) != 0 {
 				t.Errorf("restart workers must terminate nothing in in-process mode, got %v", sys.groupTerminated)
 			}
 
-			if err := o.Restart(ctx, params, ""); err != nil {
+			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart(all): %v", err)
 			}
 			// app, gateway, api — NOT workers (its port belongs to the API child).
@@ -163,7 +163,7 @@ func TestRestart(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.alive = map[int]bool{}
 			o := restartOrch(store, sys)
-			if err := o.Restart(ctx, params, "app"); err == nil {
+			if err := o.Restart(ctx, params, "app", false); err == nil {
 				t.Error("Restart should refuse when the launcher is dead")
 			}
 		})
