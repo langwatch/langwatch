@@ -235,12 +235,29 @@ See [ADR 018](../adr/018-form-validation-and-save.md) for the full decision cont
 For validation:
 
 - **Field-level (sync schema rules):** Use `react-hook-form` + `zodResolver`, render inline via `<Field.ErrorText>`.
-- **Cross-field or backend-only:** Validate inside the submit handler. On failure, call `toaster.create({ type: "error", title, description })` and `return` before any mutation fires.
-- **Mutation errors:** Catch in `onError`, surface via `toaster.create({ type: "error", … })`.
+- **Cross-field, checked client-side:** Validate inside the submit handler. On failure, call `toaster.create({ type: "error", title, description })` and `return` before any mutation fires. This is your own copy, so `toaster` is fine here.
+- **Server errors (any mutation `onError`):** Never `toaster.create` an error yourself, and never render `error.message` — since #5984 a handled error's tRPC wire message is its `code`, so that shows the customer `validation_error`. Use `showErrorToast`, which takes its copy from the code-keyed presentation registry.
+- **A server rejection that names fields:** Put it back on those fields with `applyHandledErrorToForm`, paired with `<FormServerError form={form} />` for complaints about the submission as a whole.
 
 ```tsx
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
+
+const mutation = api.team.update.useMutation({
+  onError: (error) => {
+    // Marks the fields it owns. Returns false when it can't show the whole
+    // rejection — including a partial match, where the fields ARE marked and
+    // the toast still fires for the rest.
+    if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+    showErrorToast({ error, fallbackTitle: "Couldn't save the team" });
+  },
+});
+
 const handleSubmit = async () => {
-  // Cross-field check
+  // Cross-field check — our own copy, so toaster is right
   if (useAsDefault && !defaultModel.startsWith(`${provider}/`)) {
     toaster.create({
       title: "Cannot save: pick a model from this provider",
@@ -251,13 +268,22 @@ const handleSubmit = async () => {
   }
   await mutation.mutateAsync(payload);
 };
+
+// …and, at the top of the form, the slot the `true` above promised:
+<FormServerError form={form} />
 ```
+
+`hasFormErrorSlot: true` is a promise that this form renders `<FormServerError>`.
+Get it wrong and a form-level rejection is claimed, the toast is suppressed, and
+Save appears to do nothing.
 
 ### Anti-patterns
 
 - ❌ `disabled={!isValid}` — forces the user to find what's wrong without help.
 - ❌ Silent no-op on submit — appears to succeed; persists nothing or persists garbage.
 - ❌ Validation that only renders if a field is touched — invisible until the user randomly stumbles on it.
+- ❌ `toaster.create({ type: "error", description: error.message })` — renders a code slug at the customer, and a build guard fails on it. Use `showErrorToast`.
+- ❌ A server field rejection surfaced as a toast — the user has to translate it back onto the form themselves.
 
 ## Summary Checklist
 

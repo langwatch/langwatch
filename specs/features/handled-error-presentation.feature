@@ -1,11 +1,12 @@
 Feature: Handled errors — what the customer actually reads
 
   ADR-045 settled what crosses the boundary; #5984 settled that a handled
-  error's free-text message is NOT part of it. A HandledError's message is
-  server copy — it names env vars, hostnames and internal services — so the
-  wire message is the stable `code` on every transport, and the structured
-  payload (`code`, `meta`, `tips`, `docsUrl`, `fault`, `traceId`) is the whole
-  client contract.
+  error's free-text message is not what the app renders. Over tRPC the wire
+  message is the stable `code`, and the structured payload (`code`, `meta`,
+  `tips`, `docsUrl`, `fault`, `traceId`) is the whole client contract. The
+  message itself is written customer-safe — nothing on a handled error is
+  sensitive, which is what "handled" means — but it is copy for a consumer with
+  no registry to read, not the words this app puts on screen.
 
   That left the client half undone: ~105 call sites rendered `error.message`
   straight into a toast, which after #5984 shows the customer a code slug —
@@ -48,7 +49,10 @@ Feature: Handled errors — what the customer actually reads
       # a Go service or a rolling deploy running ahead of this client
     When the client surfaces it
     Then a "customer" fault reads as a problem with the input
-    And a "platform" or "provider" fault reads as a problem on our end
+    And a "platform" fault reads as a problem on our end
+    And a "provider" fault reads as a connected service that didn't answer
+      # deliberately a third party — telling the customer it was us is both
+      # wrong and less actionable
     And the code slug is never shown
 
   @bdd @handled-errors @presentation
@@ -64,13 +68,27 @@ Feature: Handled errors — what the customer actually reads
   # ==========================================================================
 
   @bdd @handled-errors @presentation
-  Scenario: Remediation reaches the customer
+  Scenario: Remediation reaches the customer when we have nothing better
     Given a handled error carries tips and a docs URL
+    And the client has no copy of its own for that code
     When it is surfaced inline
     Then every tip is listed and the docs link is offered
     And when it is surfaced as a toast
     Then the most actionable tip is folded into the description
       # a toast has room for a sentence, not a bulleted list
+
+  @bdd @handled-errors @presentation
+  Scenario: Our own copy replaces the tips rather than joining them
+    Given a handled error carries tips and a docs URL
+    And the client has copy of its own for that code
+    When it is surfaced, inline or as a toast
+    Then the customer reads that copy and no tips at all
+      # the two are competing authorings of the same remediation — the
+      # description and the first tip both say "narrow the time range" — so
+      # showing both makes the surface repeat itself
+    And the docs link is still offered
+      # docs are an extra destination, not a second phrasing, so they never
+      # compete with the description
 
   @bdd @handled-errors @presentation
   Scenario: Technical detail stops at the trace id
@@ -129,9 +147,12 @@ Feature: Handled errors — what the customer actually reads
     Then the customer reads the calm generic message instead
 
     Examples:
-      | shape                                              |
-      | a client error carrying no message of its own      |
-      | a client error wrapping a caught failure           |
+      | shape                                                           |
+      | a client error carrying no message of its own                   |
+      | a client error whose message was inherited from what it wrapped |
+      # wrapping a caught failure is fine on its own — what disqualifies the
+      # message is being the same sentence as something in the cause chain,
+      # which is the tell that nobody wrote it for a person
 
   @bdd @handled-errors @presentation
   Scenario Outline: A machine's diagnostic is not mistaken for authored copy
@@ -142,12 +163,14 @@ Feature: Handled errors — what the customer actually reads
     Then the customer reads the calm generic message instead
 
     Examples:
-      | shape                          |
-      | a database driver's diagnostic |
-      | a socket error code            |
-      | a stack frame                  |
-      | a host name or address         |
-      | longer than a sentence or two  |
+      | shape                           |
+      | a database driver's diagnostic  |
+      | a socket error code             |
+      | a stack frame                   |
+      | a socket address with a port    |
+      | longer than a sentence or two   |
+      # deliberately narrow: a bare address a person typed ("The IP 10.0.0.1 is
+      # not allowed as a webhook destination") is real copy and must survive
 
   # ==========================================================================
   # Workflow node failures cross the language boundary as codes
@@ -218,15 +241,29 @@ Feature: Handled errors — what the customer actually reads
   # ==========================================================================
 
   @bdd @handled-errors @presentation
-  Scenario: An error code without customer copy fails the build
-    Given the presentation registry is exhaustive over every known error code
-    When a new code is added to the TypeScript app
-    Or a new code is added to a Go service and regenerated
+  Scenario: A Go service's new code fails the build until its copy is written
+    Given the presentation registry is exhaustive over every enumerated code
+    When a new code is added to a Go service and the code list is regenerated
     Then the project fails to type-check until its copy is written
+
+  @bdd @handled-errors @presentation
+  Scenario: A new app code is caught by the suite first, then by the compiler
+    Given the presentation registry is exhaustive over every enumerated code
+    When a new code is added to the TypeScript app
+    Then the suite fails first, because the code is raised but not enumerated
+      # the compiler cannot see a code that is nowhere in the list — nothing
+      # in the type system reflects over "every HandledError subclass"
+    And once it is enumerated, the project fails to type-check until its copy
+      is written
 
   @bdd @handled-errors @presentation
   Scenario: The list of app codes cannot drift from the code that raises them
     Given the app error codes are enumerated for the registry to be keyed on
+    And every tree that can raise one is searched — the app, the enterprise
+      tree, and the workspace packages
+      # a guard that only looks where the codes already are is a guard that
+      # passes forever: the enterprise impersonation errors sat outside it,
+      # so none of them was ever required to have copy
     When a HandledError subclass raises a code that is not enumerated
     Then the suite fails, because that error would reach a customer with no copy
     And when a code is enumerated that nothing raises
