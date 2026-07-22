@@ -867,16 +867,35 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }
       if (drainedSiblings.length > 0) {
         try {
-          // Parse each drained sibling; failures short-circuit via Promise.all
-          // (rejecting the whole batch) so the catch below can restage the
-          // siblings that haven't been dropped yet. Siblings that failed with
-          // a non-transient error are tagged dropped=true inside
-          // parseDrainedPayload's recordDrop, so restageDrainedSiblings
-          // skips them and they don't get re-dispatched → re-dropped (#5857).
-          const parsedSiblings = await Promise.all(
+          // Use Promise.allSettled (not Promise.all) so every sibling's
+          // parseDrainedPayload runs to terminal state — including its
+          // recordDrop call that marks the sibling as dropped — before
+          // we decide whether to restage. Promise.all short-circuits on
+          // the first rejection, so a TransientBlobStoreError or
+          // PayloadTooLargeError thrown by one sibling can fire the
+          // catch block — and trigger restageDrainedSiblings — before
+          // another sibling's parseDrainedPayload has run recordDrop.
+          // The dropped flag would then be unset when
+          // restageDrainedSiblings checks it, and the dropped sibling
+          // would be resurrected on the next drain: the exact loop
+          // #5857 set out to fix (#5883 P1 regression).
+          //
+          // Propagate the first rejection (in array order) so the
+          // existing Transient/PayloadTooLarge error routing in the
+          // catch block still fires.
+          const settled = await Promise.allSettled(
             drainedSiblings.map((sibling) =>
               this.parseDrainedPayload({ sibling, groupId }),
             ),
+          );
+          const firstRejection = settled.find(
+            (r): r is PromiseRejectedResult => r.status === "rejected",
+          );
+          if (firstRejection) {
+            throw firstRejection.reason;
+          }
+          const parsedSiblings = settled.map((r) =>
+            r.status === "fulfilled" ? r.value : null,
           );
           const liveSiblings = drainedSiblings.filter(
             (_, index) => parsedSiblings[index] !== null,
@@ -1442,9 +1461,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // A transient blob-store error on a sibling MUST NOT drop it to replay —
       // the dispatched job's decode routes transient errors through
       // `handleTransientDecode` so the whole batch can retry (ADR-030 §2).
-      // Rethrow so the caller (Promise.all in the batch drain) can bubble it up
-      // and re-stage every sibling together, rather than silently dropping
-      // hundreds of siblings on a brief S3 blip (2026-06-24 review).
+      // Rethrow so the caller (the Promise.allSettled batch drain above)
+      // can bubble it up and re-stage every sibling together, rather than
+      // silently dropping hundreds of siblings on a brief S3 blip
+      // (2026-06-24 review). Promise.allSettled ensures recordDrop has run
+      // on every sibling before the catch re-stages, so already-dropped
+      // siblings are skipped (#5857, #5883).
       if (err instanceof TransientBlobStoreError) {
         throw err;
       }
