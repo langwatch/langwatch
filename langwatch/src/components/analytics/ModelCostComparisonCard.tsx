@@ -134,6 +134,7 @@ export function ModelCostComparisonCard() {
             current={timeseries.isLoading ? undefined : actualCost}
             format={money}
             increaseIs="neutral"
+            zeroMeansNoData={false}
           />
           <SummaryMetric
             label="Estimated Cost on Selected Model"
@@ -145,6 +146,7 @@ export function ModelCostComparisonCard() {
             format={money}
             increaseIs="neutral"
             tooltip="The period's input and output tokens priced at the selected model's rates."
+            zeroMeansNoData={false}
           />
           <SummaryMetric
             label="Estimated Savings"
@@ -158,6 +160,7 @@ export function ModelCostComparisonCard() {
             }
             increaseIs="good"
             tooltip="Estimated cost on the selected model minus the actual cost. Negative means the current setup costs more."
+            zeroMeansNoData={false}
           />
         </HStack>
       )}

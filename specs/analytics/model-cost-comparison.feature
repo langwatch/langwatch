@@ -41,3 +41,8 @@ Feature: Model cost comparison — estimated savings against a reference model
   Scenario: No traffic in the period
     Given the filtered period has zero tokens
     Then the card shows an empty state instead of a $0.00 comparison
+
+  Scenario: Actual cost for the period is genuinely zero
+    Given the period has traffic and the actual recorded cost is $0
+    Then the card shows $0.00 as the current cost
+    And it does not show "No data yet"
