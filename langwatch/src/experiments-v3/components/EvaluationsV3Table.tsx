@@ -829,13 +829,16 @@ export function EvaluationsV3Table({
       const projectId = project?.id;
       if (!projectId) return;
 
-      await executeForkAgentDuplicate(target, {
-        copyAgent,
-        publishWorkflow,
-        deleteAgent,
-        addTarget,
-        openTargetEditor,
-        projectId,
+      await executeForkAgentDuplicate({
+        target,
+        deps: {
+          copyAgent,
+          publishWorkflow,
+          deleteAgent,
+          addTarget,
+          openTargetEditor,
+          projectId,
+        },
       });
     },
     [

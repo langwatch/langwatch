@@ -9,10 +9,19 @@ const logger = createLogger("executeForkAgentDuplicate");
 
 /**
  * Minimal mutation shape this handler depends on. Decoupling from the tRPC
- * router types lets the handler be exercised in an integration test with
- * plain `vi.fn()` mutation stubs (see `__tests__/executeForkAgentDuplicate.integration.test.ts`),
+ * router types lets the handler be exercised in a boundary test with plain
+ * `vi.fn()` mutation stubs (see `__tests__/executeForkAgentDuplicate.boundary.test.tsx`),
  * while the live path still passes the real `api.agents.copy.useMutation()`
  * instance from `EvaluationsV3Table`.
+ *
+ * Note: `toaster` and `createLogger` are intentionally kept as module-level
+ * singletons (matching the rest of the langwatch codebase — see
+ * `useHandleSavePrompt.ts`, `useExecuteEvaluation.ts`, etc.). The DI surface
+ * here is scoped to the *mutation* stubs, because those are the side-effects
+ * under ordered-sequence assertions. Toaster/logger are leaf side-effects
+ * downstream of the decisions under test; pulling them into deps would make
+ * this module inconsistent with the rest of the codebase without improving
+ * what the boundary test can verify.
  */
 export interface ForkAgentMutationDeps {
   copyAgent: {
@@ -77,10 +86,13 @@ export interface DuplicateTargetDeps extends ForkAgentMutationDeps {
  * Prompt/evaluator targets take the shallow path: they carry their own
  * per-column draft, so a spread-only duplicate is already correct.
  */
-export async function executeForkAgentDuplicate(
-  target: TargetConfig,
-  deps: DuplicateTargetDeps,
-): Promise<void> {
+export async function executeForkAgentDuplicate({
+  target,
+  deps,
+}: {
+  target: TargetConfig;
+  deps: DuplicateTargetDeps;
+}): Promise<void> {
   const plan = planDuplicateTarget(target);
   const newTargetId = `target-${nanoid(8)}`;
 
