@@ -46,6 +46,8 @@ export interface LangyMessagesResult {
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
+  /** Re-run the history fetch — what the failure card's "Try again" does. */
+  refetch: () => void;
   /** The failure itself, so the panel can classify and explain it. */
   error: unknown;
 }
@@ -105,7 +107,6 @@ export function useLangyMessages(
     isFetching: query.isFetching,
     isError: query.isError,
     error: query.error,
-    /** Re-run the history fetch — what the failure card's "Try again" does. */
-    refetch: query.refetch,
+    refetch: () => void query.refetch(),
   };
 }

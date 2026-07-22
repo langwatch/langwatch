@@ -19,6 +19,24 @@ import {
   langyMessagePartSchema,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/shared";
 
+/**
+ * The status values this column accepts, derived from the ONE definition rather
+ * than restated here.
+ *
+ * `status` is TEXT in the database — see the schema comment — so this parse is
+ * what the Postgres enum used to do. It is deliberately at the write boundary
+ * and not in the fold: the fold is already typed, and a guard that only repeats
+ * a type it trusts catches nothing. What this catches is the case the type
+ * cannot see — a projection replayed from an event written by a newer version
+ * of the fold, carrying a status this deployment has never heard of. Failing
+ * the write is right there: a silently stored unknown status would be read back
+ * as one, and every consumer would have to guess.
+ */
+const turnStatusSchema = z.enum(
+  Object.values(LANGY_CONVERSATION_TURN_STATUS) as [string, ...string[]],
+);
+
+
 const messagePartsSchema = z.array(langyMessagePartSchema);
 const planSchema = z.array(langyPlanItemSchema);
 const toolCallsSchema = z.array(
@@ -69,6 +87,12 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
   return {
     state: {
       ...state,
+      // The column is TEXT now, so the row hands back a plain string and the
+      // domain type wants the union. Parsing on the way OUT as well as in is
+      // the point of choosing text: this is the boundary that decides what a
+      // stored status means, and it refuses one this build cannot interpret
+      // rather than passing it on as if it understood it.
+      Status: turnStatusSchema.parse(state.Status),
       QuestionParts: messagePartsSchema.parse(QuestionParts),
       AnswerParts: messagePartsSchema.parse(AnswerParts),
       ToolCalls: toolCallsSchema.parse(ToolCalls),
@@ -84,23 +108,6 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
 }
 
 /** Postgres row I/O for the type-aware turn projection. */
-/**
- * The status values this column accepts, derived from the ONE definition rather
- * than restated here.
- *
- * `status` is TEXT in the database — see the schema comment — so this parse is
- * what the Postgres enum used to do. It is deliberately at the write boundary
- * and not in the fold: the fold is already typed, and a guard that only repeats
- * a type it trusts catches nothing. What this catches is the case the type
- * cannot see — a projection replayed from an event written by a newer version
- * of the fold, carrying a status this deployment has never heard of. Failing
- * the write is right there: a silently stored unknown status would be read back
- * as one, and every consumer would have to guess.
- */
-const turnStatusSchema = z.enum(
-  Object.values(LANGY_CONVERSATION_TURN_STATUS) as [string, ...string[]],
-);
-
 export class PrismaLangyConversationTurnProjectionRepository implements StateProjectionStore<LangyConversationTurnData> {
   constructor(
     private readonly prisma: ConversationTurnProjectionPrismaClient,
