@@ -22,10 +22,10 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useLocalStorage } from "usehooks-ts";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import {
-  APP_HEADER_HEIGHT,
   LANGY_DOCK_GAP,
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
+  SHELL_CARD_INSET,
 } from "~/features/langy/logic/langyPanelLayout";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import Head from "~/utils/compat/next-head";
@@ -68,6 +68,9 @@ import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+
+/** The sidebar column's logo/collapse row, above the nav. */
+const SIDEBAR_LOGO_ROW_HEIGHT = 52;
 
 const CrumbSeparator = () => (
   <Text color="fg.subtle" userSelect="none" aria-hidden fontWeight="300">
@@ -625,42 +628,108 @@ export const DashboardLayout = ({
         </title>
       </Head>
 
-      {/* Header bar - spans full width with gray background. Pinned to the
-          shared APP_HEADER_HEIGHT: the viewport math below and the docked
-          Langy card's top edge both derive from it, so the cards start exactly
-          where the header ends. */}
-      <HStack
-        position="relative"
-        width="full"
-        height={`${APP_HEADER_HEIGHT}px`}
-        paddingX={4}
-        paddingY={3}
-        background="bg.page"
-        justifyContent="space-between"
-        gap={4}
-        overflow="hidden"
-      >
-        {(user?.impersonator || publicEnv.data?.NODE_ENV === "development") && (
+      {/* The shell is one frame: a full-height sidebar column on the page
+          ground, and the application floating next to it as a raised card
+          that carries its own header row. Cards begin SHELL_CARD_INSET from
+          the ground on every side — the docked Langy card derives its edges
+          from the same constant, so the two cannot drift apart.
+          Spec: specs/navigation/shell-visual-language.feature */}
+      <HStack width="full" alignItems="stretch" gap={0} height="100vh">
+        {/* Sidebar column: logo/collapse control up top, nav below, on the
+            page ground for the full viewport height. */}
+        <Box
+          width={menuWidth}
+          minWidth={menuWidth}
+          height="100vh"
+          display="flex"
+          flexDirection="column"
+        >
           <Box
-            position="absolute"
-            top={-5}
-            right="-100px"
-            bottom={0}
-            w="400px"
-            background={user?.impersonator ? "blue.300" : "orange.300"}
-            filter="blur(40px)"
-            pointerEvents="none"
-          ></Box>
-        )}
+            height={`${SIDEBAR_LOGO_ROW_HEIGHT}px`}
+            flexShrink={0}
+            display="flex"
+            alignItems="center"
+            justifyContent={compactMenu ? "center" : "flex-start"}
+            paddingX={compactMenu ? 0 : 2}
+          >
+            <SidebarHeaderToggle
+              isCollapsed={compactMenu}
+              canToggle={canToggle}
+              onToggle={setCollapsed}
+            />
+          </Box>
+          <Box flex={1} minHeight={0}>
+            {isPersonalScopeRoute ? (
+              <PersonalSidebar isCompact={compactMenu} />
+            ) : (
+              <MainMenu isCompact={compactMenu} />
+            )}
+          </Box>
+        </Box>
 
-        {/* Left side: Logo/collapse toggle + Project + Breadcrumbs */}
-        <HStack gap={compactMenu ? 3 : 0} flex={1} alignItems="center">
-          <SidebarHeaderToggle
-            isCollapsed={compactMenu}
-            canToggle={canToggle}
-            onToggle={setCollapsed}
-          />
-          {router.pathname.startsWith("/ops") ? (
+        {/* Content column: the card floats on the ground with a symmetric
+            inset; while Langy is docked its reserved strip replaces the
+            right gutter (the docked panel wears the same inset). */}
+        <Box
+          flex={1}
+          minWidth={0}
+          height="100vh"
+          background="bg.page"
+          maxWidth={`calc(100vw - ${menuWidth})`}
+          paddingTop={`${SHELL_CARD_INSET}px`}
+          paddingBottom={`${SHELL_CARD_INSET}px`}
+          paddingRight={`${langyDockInset + SHELL_CARD_INSET}px`}
+          transition={`padding-right ${LANGY_TRANSITION}`}
+        >
+          <Box
+            width="full"
+            height="full"
+            background="bg.surface"
+            borderRadius="xl"
+            border="1px solid"
+            borderColor="border.muted"
+            _light={{
+              boxShadow:
+                "0 1px 2px rgba(16,24,40,0.04), 0 8px 24px -12px rgba(16,24,40,0.10)",
+            }}
+            _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
+            overflow="hidden"
+            display="flex"
+            flexDirection="column"
+            position="relative"
+          >
+            {/* Card header: context on the left, session controls on the
+                right. Lives inside the card so the frame outside stays pure
+                ground. */}
+            <HStack
+              position="relative"
+              width="full"
+              height="52px"
+              flexShrink={0}
+              paddingX={4}
+              borderBottom="1px solid"
+              borderColor="border.subtle"
+              justifyContent="space-between"
+              gap={4}
+              overflow="hidden"
+            >
+              {(user?.impersonator ||
+                publicEnv.data?.NODE_ENV === "development") && (
+                <Box
+                  position="absolute"
+                  top={-5}
+                  right="-100px"
+                  bottom={0}
+                  w="400px"
+                  background={user?.impersonator ? "blue.300" : "orange.300"}
+                  filter="blur(40px)"
+                  pointerEvents="none"
+                ></Box>
+              )}
+
+              {/* Left side: context chip + breadcrumbs */}
+              <HStack gap={0} flex={1} alignItems="center" minWidth={0}>
+                {router.pathname.startsWith("/ops") ? (
             <HStack gap={3} alignItems="center" paddingLeft={2}>
               <HStack
                 gap={1.5}
@@ -718,10 +787,15 @@ export const DashboardLayout = ({
               to LangWatch to monitor your projects
             </Text>
           )}
-        </HStack>
+              </HStack>
 
-        {/* Right side: Search, integrations, user */}
-        <HStack gap={2} justifyContent="flex-end" overflow="hidden">
+              {/* Right side: search, environment, account */}
+              <HStack
+                gap={2}
+                justifyContent="flex-end"
+                overflow="hidden"
+                flexShrink={0}
+              >
           {publicEnv.data?.NODE_ENV === "development" && (
             <Text
               fontSize="10px"
@@ -745,72 +819,16 @@ export const DashboardLayout = ({
           {/* Command bar trigger */}
           {project && <CommandBarTrigger />}
 
-          <AccountMenu
-            publicPage={publicPage}
-            showPresenceMenuItem={showPresenceMenuItem}
-          />
-        </HStack>
-      </HStack>
+                <AccountMenu
+                  publicPage={publicPage}
+                  showPresenceMenuItem={showPresenceMenuItem}
+                />
+              </HStack>
+            </HStack>
 
-      {/* Main content area with sidebar */}
-      <HStack
-        width="full"
-        alignItems="stretch"
-        gap={0}
-        minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-      >
-        {isPersonalScopeRoute ? (
-          <PersonalSidebar isCompact={compactMenu} />
-        ) : (
-          <MainMenu isCompact={compactMenu} />
-        )}
-
-        <Box
-          width="full"
-          height="full"
-          background="bg.page"
-          minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-          maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-          maxWidth={`calc(100vw - ${menuWidth})`}
-          // While Langy is docked, this gray ground keeps the viewport edge and
-          // the content card pulls in: the reserved strip is where the docked
-          // panel sits as a second card, with a gap of page ground between the
-          // two. Without Langy, the card keeps a slim gutter of ground on its
-          // right so it reads as a floating card rather than a filled pane.
-          // Spec: specs/langy/langy-panel-layout.feature,
-          //       specs/navigation/shell-visual-language.feature
-          paddingRight={`${langyDockInset > 0 ? langyDockInset : 10}px`}
-          transition={`padding-right ${LANGY_TRANSITION}`}
-        >
-          <Box
-            width="full"
-            height="full"
-            background="bg.surface"
-            borderTopLeftRadius="xl"
-            borderTopRightRadius="xl"
-            // The card that holds the whole app, one notch quieter than the
-            // Langy panel's own edge language: a muted hairline where it
-            // meets the page chrome, a soft ambient shadow in light, and
-            // (dark) a fainter cut of the panel's inset lit top rim, so the
-            // surface reads as a raised card catching light rather than a
-            // flat cut-out.
-            borderTopWidth="1px"
-            borderLeftWidth="1px"
-            borderRightWidth="1px"
-            borderStyle="solid"
-            borderColor="border.muted"
-            _light={{
-              boxShadow:
-                "0 1px 2px rgba(16,24,40,0.04), 0 8px 24px -12px rgba(16,24,40,0.10)",
-            }}
-            _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
-            overflow="auto"
-            display="flex"
-            minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-            maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
-            position="relative"
-          >
-            <VStack width="full" gap={0} {...props}>
+            {/* Scrollable page region below the card header */}
+            <Box flex={1} minHeight={0} overflow="auto" display="flex">
+              <VStack width="full" gap={0} {...props}>
               {/* Alert banners */}
               {publicEnv.data &&
                 (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
@@ -1051,7 +1069,8 @@ export const DashboardLayout = ({
                   </Alert.Content>
                 </Alert.Root>
               )}
-            </VStack>
+              </VStack>
+            </Box>
           </Box>
         </Box>
       </HStack>

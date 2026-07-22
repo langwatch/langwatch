@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  APP_HEADER_HEIGHT,
+  SHELL_CARD_INSET,
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   FLOATING_PANEL_MAX_WIDTH,
@@ -69,17 +69,19 @@ describe("resolveInspectorFrame", () => {
   });
 
   describe("given the docked sidebar", () => {
-    it("spans exactly the dock's header-to-floor claim under an app shell", () => {
+    it("wears the shell's shared card inset under an app shell", () => {
       const frame = resolveInspectorFrame({
         floating: false,
         dockShellClaimed: true,
         panelHeightPx: null,
       });
 
-      expect(frame.top).toBe(`${APP_HEADER_HEIGHT}px`);
-      expect(frame.bottom).toBe("0px");
+      expect(frame.top).toBe(`${SHELL_CARD_INSET}px`);
+      expect(frame.bottom).toBe(`${SHELL_CARD_INSET}px`);
       expect(frame.height).toBeNull();
-      expect(frame.right).toBe(`${SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK}px`);
+      expect(frame.right).toBe(
+        `${SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK + SHELL_CARD_INSET}px`,
+      );
     });
 
     it("runs the full viewport edge on a no-shell page, square like the pane", () => {

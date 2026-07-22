@@ -22,12 +22,14 @@ export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
 export const LANGY_DOCK_GAP = 12;
 
 /**
- * The app shell's header-bar height. The shell's content cards, and the
- * docked panel, which joins them as a second card, start below this line.
- * DashboardLayout derives its own viewport math from the same constant, so
- * the two cannot drift apart.
+ * The app shell's card inset: the strip of page ground between the viewport
+ * edge and every shell card — the content card and the docked panel, which
+ * joins it as a second card wearing the same inset. DashboardLayout derives
+ * its viewport math from this same constant, so the two cannot drift apart.
+ * (The shell has no full-width header bar anymore; context lives inside the
+ * content card's own header row.)
  */
-export const APP_HEADER_HEIGHT = 56;
+export const SHELL_CARD_INSET = 10;
 
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
@@ -157,17 +159,19 @@ export function resolveInspectorFrame({
     };
   }
   return {
-    right: `${SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK}px`,
-    // Exactly the dock's own span: below the shell header when one claims the
-    // dock, the full viewport edge on a no-shell page.
-    top: `${dockShellClaimed ? APP_HEADER_HEIGHT : 0}px`,
-    bottom: "0px",
+    // Exactly the dock's own span: the floating-card inset when a shell
+    // claims the dock, the full viewport edge on a no-shell page.
+    right: `${
+      SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK + (dockShellClaimed ? SHELL_CARD_INSET : 0)
+    }px`,
+    top: `${dockShellClaimed ? SHELL_CARD_INSET : 0}px`,
+    bottom: `${dockShellClaimed ? SHELL_CARD_INSET : 0}px`,
     height: null,
     maxHeight: null,
-    // The dock card's own top-left rounding (Chakra `xl`), so the pair reads
-    // as one widening card; the flush no-shell pane stays square.
+    // The dock card's own rounding (Chakra `xl`), so the pair reads as one
+    // widening card; the flush no-shell pane stays square.
     borderTopLeftRadius: dockShellClaimed ? "12px" : "0px",
-    borderBottomLeftRadius: "0px",
+    borderBottomLeftRadius: dockShellClaimed ? "12px" : "0px",
   };
 }
 

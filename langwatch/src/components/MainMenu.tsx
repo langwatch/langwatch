@@ -59,7 +59,7 @@ export const MainMenu = React.memo(function MainMenu({
       background="bg.page"
       width={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
       minWidth={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
-      height="calc(100vh - 60px)"
+      height="100%"
       position="relative"
       onMouseEnter={() => isCompact && setIsHovered(true)}
       onMouseLeave={() => isCompact && setIsHovered(false)}
@@ -70,7 +70,7 @@ export const MainMenu = React.memo(function MainMenu({
         top={0}
         left={0}
         width={currentWidth}
-        height="calc(100vh - 60px)"
+        height="100%"
         background="bg.page"
         transition="width 0.15s ease-in-out"
         overflow="hidden"

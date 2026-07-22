@@ -102,7 +102,7 @@ import {
 } from "../logic/langyErrorExplainer";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import {
-  APP_HEADER_HEIGHT,
+  SHELL_CARD_INSET,
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   LANGY_TRANSITION,
@@ -2082,21 +2082,19 @@ function LangyPanel({
             : dockShellClaimed
               ? {
                   // An app shell is mounted: the dock joins it as a SECOND
-                  // content card. It starts below the full-width header,
-                  // aligned with the content card's top edge, and wears the
-                  // card's own language: the same top-left radius, the same
-                  // muted hairline on the two edges that meet the page ground,
-                  // and (dark) the same faint lit top rim. The strip of page
-                  // ground between the two cards is reserved by the shell, see
-                  // DashboardLayout. Spec: specs/langy/langy-panel-layout.feature
-                  top: `${APP_HEADER_HEIGHT}px`,
-                  right: 0,
-                  bottom: 0,
-                  borderTopWidth: "1px",
-                  borderLeftWidth: "1px",
+                  // floating card, wearing the shell's shared card inset on
+                  // its top, right, and bottom edges so the pair sit level on
+                  // the page ground. Same card language as the content card:
+                  // full rounding, muted hairline, and (dark) the same faint
+                  // lit top rim. The strip of page ground between the two
+                  // cards is reserved by the shell, see DashboardLayout.
+                  // Spec: specs/langy/langy-panel-layout.feature
+                  top: `${SHELL_CARD_INSET}px`,
+                  right: `${SHELL_CARD_INSET}px`,
+                  bottom: `${SHELL_CARD_INSET}px`,
+                  borderWidth: "1px",
                   borderColor: "border.muted",
-                  borderTopLeftRadius: "xl",
-                  borderBottomLeftRadius: 0,
+                  borderRadius: "xl",
                   boxShadow: "none",
                   _dark: { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" },
                 }
