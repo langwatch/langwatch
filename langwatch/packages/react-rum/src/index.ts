@@ -23,9 +23,6 @@ export {
   RUM_SESSION_HEADER,
   RUM_TRACES_PATH,
 } from "./constants";
-// `resetBrowserTracingForTesting` is deliberately not re-exported here: it
-// disables the global OTel API, and nothing in an application bundle should be
-// able to reach it. Tests import it from "./browserTracing" directly.
 export { startBrowserTracing } from "./browserTracing";
 export type { NavigationSpanHandle, NavigationType } from "./navigation";
 export { startNavigationSpan } from "./navigation";

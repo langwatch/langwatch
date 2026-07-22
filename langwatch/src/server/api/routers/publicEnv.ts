@@ -46,7 +46,13 @@ export const publicEnvRouter = publicProcedure
       // Whether the browser should trace itself (ADR-058). A flag rather than a
       // URL: the browser always exports to this app's own origin, so there is
       // no endpoint for the client to know.
-      RUM_ENABLED: !!env.RUM_ENABLED,
+      //
+      // Gated on the collector as well as the flag, because the ingest route
+      // 404s without one. Told yes on its own, every open tab would export on a
+      // batch timer into a permanent 404 — work and noise for telemetry that
+      // has nowhere to land. Both are required, so the browser stays quiet
+      // until there is something to be quiet about.
+      RUM_ENABLED: !!env.RUM_ENABLED && !!env.OTEL_EXPORTER_OTLP_ENDPOINT,
       // Share of browser sessions the client should record. Server-side
       // because it is a cost lever operators pull without shipping a bundle,
       // and because the browser has no other way to learn it.

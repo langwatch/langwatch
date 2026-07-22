@@ -256,19 +256,25 @@ export const RUM_PER_CALLER_PER_MINUTE = 120;
 export const RUM_GLOBAL_PER_MINUTE = 6_000;
 
 export async function enforceRateLimits(callerKey: string): Promise<void> {
-  const perCaller = await rateLimit({
-    key: `rum:caller:${callerKey}`,
-    windowSeconds: 60,
-    max: RUM_PER_CALLER_PER_MINUTE,
-  });
-  if (!perCaller.allowed) throw new RumRateLimitedError();
-
+  // The global bucket is checked first because the per-caller key is built from
+  // a value the caller chooses. Checking that one first means every request
+  // writes a fresh 60s key whenever the caller rotates its session header — so
+  // a flood that the global cap is already refusing would still mint a Redis
+  // key per request, turning a refusal into unbounded key churn. Refusing on
+  // the global bucket first writes nothing the caller controls the name of.
   const global = await rateLimit({
     key: "rum:global",
     windowSeconds: 60,
     max: RUM_GLOBAL_PER_MINUTE,
   });
   if (!global.allowed) throw new RumRateLimitedError();
+
+  const perCaller = await rateLimit({
+    key: `rum:caller:${callerKey}`,
+    windowSeconds: 60,
+    max: RUM_PER_CALLER_PER_MINUTE,
+  });
+  if (!perCaller.allowed) throw new RumRateLimitedError();
 }
 
 /**

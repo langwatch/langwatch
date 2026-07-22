@@ -13,6 +13,30 @@ export const gatewaySecretsSchema = {
   LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
 };
 
+/**
+ * Share of browser *sessions* recorded, 0..1. Sessions rather than traces so a
+ * recorded visit is complete; the decision also reaches the server, which drops
+ * the backend half of an unsampled browser trace. Defaults to all of them.
+ * See ADR-058.
+ *
+ * Blank in .env means "unset" — without the preprocess, `z.coerce` turns `""`
+ * into 0 and silently records nothing.
+ *
+ * A meaningless value falls back to recording everything rather than failing
+ * validation. Without the `catch`, `RUM_SAMPLE_RATIO=banana` (or `2`) refuses to
+ * parse and takes the whole app down at boot — an optional telemetry dial is not
+ * worth a deployment for, and the safe reading of nonsense is "record
+ * everything", per the spec scenario "A nonsensical share records rather than
+ * silently collecting nothing". An explicit `0` still means zero; only
+ * unparseable and out-of-range values land on the fallback.
+ *
+ * Exported so tests exercise the real schema rather than an inline copy.
+ */
+export const rumSampleRatioSchema = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.coerce.number().min(0).max(1).default(1).catch(1),
+);
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -160,16 +184,8 @@ export function createEnvConfig() {
       // frontend telemetry volume, and the ingest route it exports to is
       // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
       RUM_ENABLED: z.boolean().optional(),
-      // Share of browser *sessions* recorded, 0..1. Sessions rather than
-      // traces so a recorded visit is complete; the decision also reaches the
-      // server, which drops the backend half of an unsampled browser trace.
-      // Defaults to all of them. See ADR-058.
-      // Blank in .env means "unset" — without the preprocess, z.coerce turns
-      // "" into 0 and silently records nothing.
-      RUM_SAMPLE_RATIO: z.preprocess(
-        (value) => (value === "" ? undefined : value),
-        z.coerce.number().min(0).max(1).default(1),
-      ),
+      // See `rumSampleRatioSchema` above.
+      RUM_SAMPLE_RATIO: rumSampleRatioSchema,
       // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
       // runner; mirrored on the Python NLP side via the same env name). When
       // true: private IPs, localhost, and hostnames resolving to private IPs

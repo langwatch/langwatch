@@ -13,11 +13,17 @@ import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  _getMemoryStoreSize,
+  _resetMemoryRateLimitStore,
+} from "~/server/rateLimit";
+
+import {
   collectorHeaders,
   countSpans,
   ingestBrowserTraces,
   type OtlpResourceSpans,
   readCappedBody,
+  RUM_GLOBAL_PER_MINUTE,
   RUM_PER_CALLER_PER_MINUTE,
   RumPayloadInvalidError,
   RumPayloadTooLargeError,
@@ -57,6 +63,9 @@ describe("given a browser posting telemetry", () => {
   beforeEach(() => {
     process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "http://collector.test:4318";
     delete process.env.OTEL_EXPORTER_OTLP_HEADERS;
+    // The limiter's buckets outlive a single test, so without this a test that
+    // deliberately spends one leaves every test after it throttled.
+    _resetMemoryRateLimitStore();
     vi.restoreAllMocks();
     vi.stubGlobal(
       "fetch",
@@ -154,21 +163,70 @@ describe("given a browser posting telemetry", () => {
     });
   });
 
-  describe("when a caller floods the route", () => {
-    it("throttles them even as they rotate their claimed identity", async () => {
-      // Rotating the session header lands every request in a fresh per-caller
-      // bucket, which is why a global bucket exists. Drive one caller past its
-      // own limit first to prove the per-caller bucket bites at all.
+  describe("when a caller floods the route under one identity", () => {
+    it("throttles them once their own bucket is spent", async () => {
       const attempts = RUM_PER_CALLER_PER_MINUTE + 5;
+      let accepted = 0;
       let refusals = 0;
       for (let i = 0; i < attempts; i++) {
         try {
           await ingestBrowserTraces({ body: exportWith(1), callerKey: "flood" });
+          accepted++;
         } catch (error) {
           if (error instanceof RumRateLimitedError) refusals++;
         }
       }
-      expect(refusals).toBeGreaterThan(0);
+
+      // Pinning both halves: a limit an order of magnitude off would still
+      // produce *some* refusals, so "more than zero" would not notice it.
+      expect(accepted).toBe(RUM_PER_CALLER_PER_MINUTE);
+      expect(refusals).toBe(attempts - RUM_PER_CALLER_PER_MINUTE);
+    });
+  });
+
+  describe("when a flood rotates the identity it claims", () => {
+    // The per-caller bucket is keyed on a value the caller picks, so rotating
+    // it lands every request in a fresh bucket — this is the case the global
+    // bucket exists for, and nothing exercised it.
+    it("refuses on the shared bucket regardless of the identity claimed", async () => {
+      // Every one of these lands in its own per-caller bucket and is accepted
+      // there, so the shared bucket is the only thing that can refuse them.
+      for (let i = 0; i < RUM_GLOBAL_PER_MINUTE; i++) {
+        await ingestBrowserTraces({
+          body: exportWith(1),
+          callerKey: `rotating-${i}`,
+        });
+      }
+
+      await expect(
+        ingestBrowserTraces({
+          body: exportWith(1),
+          callerKey: "rotating-one-more",
+        }),
+      ).rejects.toBeInstanceOf(RumRateLimitedError);
+    });
+
+    it("refuses before minting a bucket the caller names", async () => {
+      // Order matters, not just the outcome. The caller's bucket is keyed on a
+      // value they choose, so checking it first would write a fresh 60s key per
+      // request even while the shared bucket is already refusing everything —
+      // a refused flood would still churn one key per request.
+      for (let i = 0; i < RUM_GLOBAL_PER_MINUTE; i++) {
+        await ingestBrowserTraces({
+          body: exportWith(1),
+          callerKey: `rotating-${i}`,
+        });
+      }
+      const keysBefore = _getMemoryStoreSize();
+
+      await expect(
+        ingestBrowserTraces({
+          body: exportWith(1),
+          callerKey: "an-identity-never-seen-before",
+        }),
+      ).rejects.toBeInstanceOf(RumRateLimitedError);
+
+      expect(_getMemoryStoreSize()).toBe(keysBefore);
     });
   });
 
