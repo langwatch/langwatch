@@ -46,7 +46,10 @@ const otherAggregate = {
 const metadataMock = vi.mocked(getProcessManagerMetadata);
 
 function fakeStore(
-  overrides: Partial<Pick<ProcessStore, "findByRef" | "findMessagesByRef">> = {},
+  overrides: {
+    findByRef?: () => Promise<unknown>;
+    findMessagesByRef?: () => Promise<unknown[]>;
+  } = {},
 ): ProcessStore {
   return {
     findByRef: vi.fn(async () => null),
