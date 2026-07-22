@@ -1360,6 +1360,14 @@ export interface ReactorMetadata {
   afterProjection: string;
 }
 
+export interface EventSubscriberMetadata {
+  subscriberName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** The event types this subscriber reacts to — its transition triggers. */
+  eventTypes: readonly string[];
+}
+
 export interface DejaViewProjection {
   projectionName: string;
   eventTypes: readonly string[];
@@ -1413,6 +1421,25 @@ export function getReactorMetadata(): ReactorMetadata[] {
         afterProjection: projectionName,
       }),
     );
+  });
+}
+
+/**
+ * Event subscribers registered on each pipeline — live consumers of committed
+ * events that carry no projection state. This is the DejaView-facing view of
+ * the `.withEventSubscriber` / `.withSubscriber({ events })` seam; the
+ * process-manager runtime's generated `pm:<name>` subscribers are internal
+ * plumbing and are not part of the static definition, so they are not listed.
+ */
+export function getEventSubscriberMetadata(): EventSubscriberMetadata[] {
+  return getDefinitions().flatMap((def) => {
+    const { name: pipelineName, aggregateType } = def.metadata;
+    return Array.from(def.eventSubscribers.values()).map((definition) => ({
+      subscriberName: definition.name,
+      pipelineName,
+      aggregateType,
+      eventTypes: definition.eventTypes,
+    }));
   });
 }
 

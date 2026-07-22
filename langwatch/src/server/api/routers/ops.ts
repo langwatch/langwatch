@@ -11,9 +11,9 @@ import {
   TABLE_TTL_CONFIG,
 } from "~/server/clickhouse/ttlReconciler";
 import {
+  getEventSubscriberMetadata,
   getKillSwitchDescriptors,
   getProjectionMetadata,
-  getReactorMetadata,
 } from "~/server/event-sourcing/pipelineRegistry";
 import {
   getFeatureFlagStore,
@@ -314,7 +314,7 @@ export const opsRouter = createTRPCRouter({
   listProjections: protectedProcedure.use(opsViewPermission).query(() => {
     return {
       projections: getProjectionMetadata(),
-      reactors: getReactorMetadata(),
+      eventSubscribers: getEventSubscriberMetadata(),
     };
   }),
 
