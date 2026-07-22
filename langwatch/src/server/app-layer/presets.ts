@@ -61,7 +61,7 @@ import { translateFilterToClickHouse } from "./traces/filter-to-clickhouse";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 import { EventSourcing } from "../event-sourcing";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {

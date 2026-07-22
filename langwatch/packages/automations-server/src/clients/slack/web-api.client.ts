@@ -1,8 +1,7 @@
 import { DispatchError } from "@langwatch/dispatch-error";
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { createLogger } from "@langwatch/observability";
-import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
-import { appHttpEgress } from "./appHttpEgress";
+import { sendHttpDestination, type HttpEgress } from "../http/destination";
 
 const logger = createLogger("langwatch:triggers:slackWebApi");
 
@@ -73,20 +72,43 @@ function explainSlackPostError(code: string): string {
  * (plus any `response_metadata.messages`, e.g. the exact invalid block) is
  * surfaced and re-classified for the outbox drainer.
  */
-export async function postSlackChatMessage({
-  token,
-  channel,
-  payload,
-  triggerName,
+export interface SlackChannel {
+  id: string;
+  name: string;
+  isPrivate: boolean;
+}
+
+export interface SlackWebApiClient {
+  postSlackChatMessage(params: {
+    token: string;
+    channel: string;
+    payload: SlackPayload;
+    triggerName: string;
+  }): Promise<void>;
+  listSlackChannels(
+    token: string,
+  ): Promise<{ channels: SlackChannel[]; error: string | null }>;
+}
+
+export function createSlackWebApiClient<V>({
+  egress,
 }: {
-  token: string;
-  channel: string;
-  payload: SlackPayload;
-  triggerName: string;
-}): Promise<void> {
+  egress: HttpEgress<V>;
+}): SlackWebApiClient {
+  async function postSlackChatMessage({
+    token,
+    channel,
+    payload,
+    triggerName,
+  }: {
+    token: string;
+    channel: string;
+    payload: SlackPayload;
+    triggerName: string;
+  }): Promise<void> {
   const label = `Slack Web API dispatch for trigger "${triggerName}"`;
   const response = await sendHttpDestination({
-    egress: appHttpEgress,
+    egress,
     url: CHAT_POST_MESSAGE_URL,
     method: "POST",
     headers: {
@@ -125,12 +147,6 @@ export async function postSlackChatMessage({
     message: `${label}: ${explainSlackPostError(code)}${detail}`,
     retryable: RETRYABLE_SLACK_ERRORS.has(code),
   });
-}
-
-export interface SlackChannel {
-  id: string;
-  name: string;
-  isPrivate: boolean;
 }
 
 interface SlackConversationsResponse {
@@ -185,7 +201,7 @@ async function listChannelsForTypes(
     let response: { status: number; body: string };
     try {
       response = await sendHttpDestination({
-    egress: appHttpEgress,
+        egress,
         url: CONVERSATIONS_LIST_URL,
         method: "POST",
         headers: {
@@ -239,14 +255,17 @@ async function listChannelsForTypes(
  * retry public-only. An app with just `channels:read` then still gets its public
  * channels; only an app missing `channels:read` too ends up with `missing_scope`.
  */
-export async function listSlackChannels(
-  token: string,
-): Promise<{ channels: SlackChannel[]; error: string | null }> {
-  const withPrivate = await listChannelsForTypes(
-    token,
-    "public_channel,private_channel",
-  );
-  if (withPrivate.error !== "missing_scope") return withPrivate;
-  // Missing `groups:read` (private) — fall back to public channels only.
-  return listChannelsForTypes(token, "public_channel");
+  async function listSlackChannels(
+    token: string,
+  ): Promise<{ channels: SlackChannel[]; error: string | null }> {
+    const withPrivate = await listChannelsForTypes(
+      token,
+      "public_channel,private_channel",
+    );
+    if (withPrivate.error !== "missing_scope") return withPrivate;
+    // Missing `groups:read` (private) — fall back to public channels only.
+    return listChannelsForTypes(token, "public_channel");
+  }
+
+  return { postSlackChatMessage, listSlackChannels };
 }

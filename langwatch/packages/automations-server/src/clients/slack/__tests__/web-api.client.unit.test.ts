@@ -1,9 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DispatchError } from "@langwatch/dispatch-error";
-import { sendHttpDestination } from "@langwatch/automations-server/clients/http/destination";
-import { listSlackChannels, postSlackChatMessage } from "../slackWebApi";
+import { sendHttpDestination, type HttpEgress } from "../../http/destination";
+import { createSlackWebApiClient } from "../web-api.client";
 
-vi.mock("@langwatch/automations-server/clients/http/destination", () => ({
+const dummyEgress: HttpEgress = {
+  safeFetch: vi.fn(),
+  fetchWithResolvedIp: vi.fn(),
+};
+const { postSlackChatMessage, listSlackChannels } = createSlackWebApiClient({
+  egress: dummyEgress,
+});
+
+vi.mock("../../http/destination", () => ({
   sendHttpDestination: vi.fn(),
 }));
 

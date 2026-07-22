@@ -19,7 +19,7 @@ import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 
 import { WebhookDeliveryService } from "@langwatch/automations-server/services/webhook-delivery.service";
 import { PrismaAutomationCustomGraphRepository } from "~/server/app-layer/automations/repositories/custom-graph.prisma.repository";

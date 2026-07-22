@@ -30,7 +30,7 @@ import {
   sendRenderedSlackMessage,
   sendSlackWebhook,
 } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";

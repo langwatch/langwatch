@@ -12,7 +12,7 @@ import {
   deliverWebhook,
   type WebhookDeliveryRecorder,
 } from "~/server/app-layer/automations/delivery/deliverWebhook";
-import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 import { ALERT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
