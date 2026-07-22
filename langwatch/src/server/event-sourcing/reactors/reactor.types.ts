@@ -1,4 +1,4 @@
-import type { ProcessRole } from "../../app-layer/config";
+import type { ProcessRole } from "~/server/domain/process-role";
 import type { Event } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
 import type { DeduplicationConfig } from "../queues/queue.types";

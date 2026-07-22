@@ -1,7 +1,10 @@
 import { createEnvConfig } from "../../env-create.mjs";
 import { parseRedisDbIndex } from "../redis-db-index";
 
-export type ProcessRole = "web" | "worker" | "migration" | "all";
+// Defined in the domain layer so the event-sourcing runtime can name it
+// without importing app-layer (ADR-063). One definition, re-exported here.
+export type { ProcessRole } from "~/server/domain/process-role";
+import type { ProcessRole } from "~/server/domain/process-role";
 
 /**
  * Roles that run the background worker stack: event-sourcing consumers,

@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ProcessRole } from "../../app-layer/config";
+import type { ProcessRole } from "~/server/domain/process-role";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
 import type { EventSourcedQueueProcessor } from "../queues";

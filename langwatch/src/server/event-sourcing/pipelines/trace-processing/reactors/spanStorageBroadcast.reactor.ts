@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
+import type { BroadcastPort } from "~/server/domain/broadcast/broadcast.port";
 import type { ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../schemas/events";
 
@@ -8,7 +8,7 @@ const logger = createLogger(
 );
 
 export interface SpanStorageBroadcastReactorDeps {
-  broadcast: BroadcastService;
+  broadcast: BroadcastPort;
   hasRedis?: boolean;
 }
 

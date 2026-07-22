@@ -1,4 +1,4 @@
-import type { ProcessRole } from "../../app-layer/config";
+import type { ProcessRole } from "~/server/domain/process-role";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";

@@ -39,7 +39,7 @@ import { TraceService } from "~/server/traces/trace.service";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
-import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
+import type { BroadcastPort } from "~/server/domain/broadcast/broadcast.port";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
@@ -321,7 +321,7 @@ export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
   repositories: PipelineRepositories;
   redis: Redis | Cluster;
-  broadcast: BroadcastService;
+  broadcast: BroadcastPort;
   langy: {
     buffer: Pick<LangyTokenBuffer, "liveness" | "appendStatus" | "markError">;
     handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;

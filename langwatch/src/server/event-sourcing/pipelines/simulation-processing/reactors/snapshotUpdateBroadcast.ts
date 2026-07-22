@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { BroadcastService } from "../../../../app-layer/broadcast/broadcast.service";
+import type { BroadcastPort } from "~/server/domain/broadcast/broadcast.port";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -13,7 +13,7 @@ const logger = createLogger(
 );
 
 export interface SnapshotUpdateBroadcastReactorDeps {
-  broadcast: BroadcastService;
+  broadcast: BroadcastPort;
   hasRedis?: boolean;
 }
 
