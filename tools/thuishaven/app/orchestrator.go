@@ -188,33 +188,18 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 	}
 }
 
-// Setup is the one-time machine bootstrap `haven setup` runs: it verifies
-// portless is installed (pointing the user at how to install it if not), then
-// starts the proxy and trusts its CA. Idempotent — safe to re-run.
-func (o *Orchestrator) Setup(ctx context.Context) error {
-	if !o.proxy.Installed() {
-		fmt.Println("portless is not installed — haven routes worktree hostnames through it.")
-		fmt.Println()
-		fmt.Println("Install it, then re-run `haven setup`:")
-		fmt.Println("  npm install -g portless                 # recommended")
-		fmt.Println("  brew install portless                   # if you have a portless tap")
-		return fmt.Errorf("portless not found — install it and re-run `haven setup`")
-	}
-	if err := o.proxy.EnsureReady(); err != nil {
-		return fmt.Errorf("portless proxy setup failed: %w", err)
-	}
-	scheme, port := o.proxy.Endpoint()
-	fmt.Println("thuishaven ready.")
-	fmt.Printf("  proxy:     %s://…langwatch.localhost (port %d)\n", scheme, port)
-	fmt.Println("  next:      `haven up` in any worktree")
-	fmt.Println("  dashboard: https://langwatch.localhost")
-	return nil
-}
-
 // Up is the launcher hook `pnpm dev:haven` runs in portless mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
+	// Bootstrap is part of up, not a command: a fresh machine installs portless,
+	// trusts the CA, and starts the proxy right here (each step idempotent).
+	if !o.proxy.Installed() {
+		fmt.Println("portless is not installed — installing it (one time)…")
+		if err := o.proxy.Install(); err != nil {
+			return fmt.Errorf("could not install portless automatically (%w) — install it by hand (npm install -g portless) and re-run `haven up`", err)
+		}
+	}
 	if err := o.proxy.EnsureReady(); err != nil {
-		return fmt.Errorf("could not start the portless proxy automatically (%w) — run `haven setup` once to bootstrap it by hand", err)
+		return fmt.Errorf("could not start the portless proxy: %w", err)
 	}
 	slug, err := o.resolveSlug(p)
 	if err != nil {
@@ -265,6 +250,10 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	endRegistration()
 	fmt.Printf("  %s\n\n", opts.Selection.Describe())
 
+	// Stale dependencies install themselves before anything needs them.
+	if err := o.ensureDeps(ctx, p.LwDir); err != nil {
+		return err
+	}
 	// DOTENV_CONFIG_QUIET drops dotenv v17's promo line for any one-shot script
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
 	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
@@ -274,8 +263,11 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
+	// Migrations failing on an existing database is the one prep step that must
+	// STOP the up: continuing would boot the app onto a half-migrated schema,
+	// and silently dropping the data to get past it is never haven's call.
 	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
-		o.log.Warn("db prepare failed (continuing)", zap.Error(err))
+		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
 	// Always seed. The seed is idempotent (a no-op once the stable local project +
 	// API key exist), so every `up` guarantees the same migrations AND the same

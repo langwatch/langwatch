@@ -177,6 +177,7 @@ var removed = map[string]string{
 	"tc":            "haven typecheck",
 	"oc":            "haven cleanup",
 	"moron":         "haven git",
+	"setup":         "nothing — `haven up` bootstraps the machine itself (portless install, CA trust, proxy)",
 }
 
 // table is the whole CLI surface, in help order.
@@ -327,11 +328,6 @@ var table = []commandSpec{
 			fmt.Print(shellInitScript)
 			return nil
 		},
-	},
-	{
-		name:    "setup",
-		summary: "one-time machine bootstrap: portless proxy + trusted CA",
-		run:     func(ctx context.Context, d deps, _ invocation) error { return d.orch.Setup(ctx) },
 	},
 	{
 		name:    "hmr",
