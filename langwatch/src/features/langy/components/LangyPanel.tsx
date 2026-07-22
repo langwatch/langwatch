@@ -7,6 +7,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  LANGY_CHOICE_SELECTION_PART_TYPE,
+  renderLangyChoiceSelectionText,
+  type LangyCardBlock,
+  type LangyChoiceSelection,
+  type LangyChoicesBlock,
+} from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import {
   AppWindow,
@@ -120,6 +127,7 @@ import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyCardGallery } from "./LangyCardGallery";
 import { LangyDevDrawer } from "./LangyDevDrawer";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
+import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
@@ -1522,6 +1530,66 @@ function LangyPanel({
   const displayMessages = timeTravel
     ? (timeTravel.messages as unknown as typeof messages)
     : messages;
+
+  // The ordered timeline the choices lock state derives from (ADR-060 §6) —
+  // built from whatever is being DISPLAYED, so time travel shows a question
+  // open before its answer and locked after it, for free.
+  const choicesTimeline = useMemo(
+    () => langyChoicesTimeline(displayMessages),
+    [displayMessages],
+  );
+
+  // Answer a choices card: the selection is the NEXT USER MESSAGE — a typed
+  // part the record binds by blockId, plus the readable "Chose: X" the model
+  // acts on (ADR-060 §6). Rides the ordinary send path; the turn lifecycle
+  // is untouched.
+  const selectChoice = useCallback(
+    ({
+      selection,
+      card,
+    }: {
+      selection: LangyChoiceSelection;
+      card: LangyChoicesBlock;
+    }) => {
+      if (!projectId || isBusy) return;
+      const text = renderLangyChoiceSelectionText({
+        selection,
+        optionLabelById: new Map(
+          card.options.map((option) => [option.id, option.label]),
+        ),
+      });
+      recovery.reset();
+      useLangyDevLog.getState().recordOutbound("send", `choice: ${text}`, {
+        text,
+        conversationId: useLangyStore.getState().activeConversationId,
+      });
+      void sendMessage({
+        role: "user",
+        // The selection part rides beside its text rendering. The engine's
+        // part union has no custom members — same honest cast the history
+        // rehydration path documents.
+        parts: [
+          { type: LANGY_CHOICE_SELECTION_PART_TYPE, ...selection },
+          { type: "text", text },
+        ] as unknown as UIMessage["parts"],
+      });
+    },
+    [projectId, isBusy, recovery, sendMessage],
+  );
+
+  // The verify hint's binding (ADR-060 §5): ask Langy — in words, through
+  // the ordinary send path — to run the real platform query. The measured
+  // result then arrives as an ordinary measured card via the envelope path.
+  const verifyDerivedCard = useCallback(
+    ({ card }: { card: LangyCardBlock }) => {
+      const subject =
+        "title" in card && card.title ? `"${card.title}"` : "this derived card";
+      void send(
+        `Verify ${subject} with a real analytics query and show the measured result.`,
+      );
+    },
+    [send],
+  );
   const turnInFlight = timeTravel
     ? timeTravel.isTurnInFlight
     : liveTurnInFlight;
@@ -2150,6 +2218,16 @@ function LangyPanel({
                             shouldAskFeedback={shouldAskFeedback}
                             isFeedbackPinned={
                               pinnedFeedbackMessageId === message.id
+                            }
+                            // The block channel (ADR-060). Interaction is
+                            // live-only: while time-travelling the cards
+                            // render read-only from the replayed record.
+                            choicesTimeline={choicesTimeline}
+                            onChoiceSelect={
+                              timeTravel ? undefined : selectChoice
+                            }
+                            onVerifyDerivedCard={
+                              timeTravel ? undefined : verifyDerivedCard
                             }
                             // (No connect-card prop: MessageContent no longer sniffs
                             // the prose for `[langy:connect-github]`. The connect card
