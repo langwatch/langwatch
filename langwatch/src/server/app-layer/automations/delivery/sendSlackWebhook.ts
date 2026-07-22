@@ -7,7 +7,7 @@ import { toDispatchError } from "@langwatch/dispatch-error";
 import type { Trace } from "~/server/tracer/types";
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { env } from "~/env.mjs";
-import { assertSlackWebhookUrl } from "./slackWebhookGuard";
+import { assertSlackWebhookUrl } from "@langwatch/automations-server/clients/slack/webhook-guard";
 
 /**
  * Minimal Slack mrkdwn escaping. Slack only requires the three HTML-ish
