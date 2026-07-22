@@ -193,6 +193,8 @@ import { createRateLimitedBootstrap } from "../app-layer/topic-clustering/topicC
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
+import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
+import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
 import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
@@ -432,6 +434,20 @@ export class PipelineRegistry {
         },
       }),
     );
+    // Queue-infrastructure maintenance. Registered unconditionally: the runtime
+    // only arms the schedule where `roleRunsWorkers` holds, so on web this is
+    // inert shape rather than a second fleet sweeping the same keyspace.
+    const blobSweeper = new BlobSweeper({ redis: this.deps.redis });
+    this.deps.eventSourcing.register(
+      createBlobMaintenancePipeline({
+        cleanup: {
+          sweep: () => blobSweeper.sweep(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
     const automationCommands = mapCommands(automationPipeline.commands);
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
