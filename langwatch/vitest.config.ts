@@ -6,6 +6,24 @@ config();
 
 export default defineConfig({
   test: {
+    // The workspace packages export TypeScript SOURCE (`exports` → `src/*.ts`),
+    // so they must be transformed by vite rather than handed to node's
+    // resolver — externalised, `import "@langwatch/cli-cards"` resolves to a
+    // .ts file node cannot load, and vitest reports it as unresolvable.
+    //
+    // This lived under `resolve.server`, which is not a real option — `resolve`
+    // takes no `server` key. It typechecked only until something made the
+    // overload resolve strictly, and it had never been read there. Vitest reads
+    // it here. It is the same concern as `server.fs.allow` below: inlining is
+    // what makes vite READ these files, and therefore what makes the allowlist
+    // matter at all.
+    server: {
+      deps: {
+        inline: [
+          /@langwatch\/(cli-cards|handled-error|automations|observability)/,
+        ],
+      },
+    },
     watch: false,
     // vmForks over vmThreads: the VM context leaks memory by design, but a
     // forked child reclaims ALL of it on exit, whereas a worker THREAD's leak
@@ -58,6 +76,34 @@ export default defineConfig({
   esbuild: {
     jsx: "automatic",
     jsxImportSource: "react",
+  },
+  server: {
+    fs: {
+      // Vite refuses to READ a file that is neither inside `fs.allow` nor in
+      // its `safeModulePaths` set. `fs.allow` defaults to
+      // `searchForWorkspaceRoot(root)`, and because `langwatch/` carries its
+      // OWN `pnpm-workspace.yaml`, that search stops HERE — so the
+      // source-only workspace packages one level up (`../packages/cli-cards`,
+      // `../packages/handled-error`, `../mcp-server`) are outside the
+      // allowlist. They still loaded, but only by accident: vite's
+      // import-analysis adds every specifier it resolves to `safeModulePaths`,
+      // so each cli-cards file was "allowed" solely because vite had just
+      // transformed the file importing it.
+      //
+      // `experimental.fsModuleCache` breaks that accident. A cached importer
+      // is replayed straight from disk and never goes through import
+      // analysis, so it never vouches for its imports. The moment ONE file in
+      // those packages is edited (new content hash -> cache miss) while its
+      // importer is still cached, vite is asked to load a file nothing
+      // vouched for, skips the read, and reports the very confusing
+      // `Cannot find module '/@fs/.../cards.ts'` — for a file that plainly
+      // exists.
+      //
+      // Allowing the repo root states the intent directly instead of relying
+      // on transform order. Derived from `__dirname` so it holds in a plain
+      // clone, in a git worktree, and in CI.
+      allow: [join(__dirname, "..")],
+    },
   },
   resolve: {
     alias: {
