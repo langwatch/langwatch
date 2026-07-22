@@ -37,6 +37,16 @@ function renderSwitcher(props: WorkspaceSwitcherProps) {
   );
 }
 
+// The dropdown opens on the view matching the current context (Personal for
+// personal, Work for team/project/org). Tests asserting the other view's
+// content flip to it first, like a user would.
+async function switchToTab(
+  user: ReturnType<typeof userEvent.setup>,
+  name: RegExp,
+) {
+  await user.click(await screen.findByRole("tab", { name }));
+}
+
 const personal = {
   kind: "personal" as const,
   orgId: null,
@@ -164,6 +174,7 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      await switchToTab(user, /work/i);
       const addButton = await screen.findByRole("button", {
         name: /create project in acme engineering/i,
       });
@@ -189,6 +200,7 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      await switchToTab(user, /work/i);
       expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: /create project in/i }),
@@ -209,6 +221,7 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      await switchToTab(user, /work/i);
       // The IconButton itself must still be reachable (aria-label).
       expect(
         await screen.findByRole("button", {
@@ -235,6 +248,7 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      await switchToTab(user, /work/i);
       const addButton = await screen.findByRole("button", {
         name: /create project in acme engineering/i,
       });
@@ -260,6 +274,7 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      await switchToTab(user, /work/i);
       const addButton = await screen.findByRole("button", {
         name: /create project in acme engineering/i,
       });
@@ -309,6 +324,9 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      // Current context is a team, so the dropdown opens on Work — the
+      // personal entry lives one tab over.
+      await switchToTab(user, /personal/i);
       expect(
         (await screen.findAllByText("My Workspace")).length,
       ).toBeGreaterThan(0);
@@ -610,6 +628,7 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      await switchToTab(user, /work/i);
 
       // Both org names render as section headers, disambiguating the
       // identical "Default Team" rows that would otherwise look duplicated.
@@ -629,6 +648,7 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      await switchToTab(user, /work/i);
 
       // The generic header is only used in single-org mode; with multiple
       // orgs each org name is its own header. Wait for an org header to
@@ -666,6 +686,7 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
+      await switchToTab(user, /work/i);
 
       // Two orgs both named "Acme" should be distinguishable in the dropdown.
       expect(await screen.findByText("Acme · acme")).toBeInTheDocument();
@@ -876,11 +897,14 @@ describe("WorkspaceSwitcher", () => {
       await user.click(
         screen.getByRole("button", { name: /switch workspace/i }),
       );
-      // Two governance orgs → two My Workspace rows; Gamma (no governance)
-      // shows its team but contributes no personal entry.
+      // Two governance orgs → two My Workspace rows on the Personal view;
+      // Gamma (no governance) contributes no personal entry there.
       await screen.findAllByText("My Workspace");
       expect(hrefsFor("My Workspace").length).toBe(2);
-      expect(screen.getByText("Gamma")).toBeInTheDocument();
+      expect(screen.queryByText("Gamma")).not.toBeInTheDocument();
+      // Gamma's team still lives on the Work view.
+      await switchToTab(user, /work/i);
+      expect(await screen.findByText("Gamma")).toBeInTheDocument();
       expect(screen.getByText("Gamma Engineering")).toBeInTheDocument();
     });
 
@@ -899,6 +923,97 @@ describe("WorkspaceSwitcher", () => {
       );
       await screen.findAllByText("My Workspace");
       expect(hrefsFor("My Workspace")).toEqual(["/me"]);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Personal <-> Work tabs
+  // Spec: specs/ai-gateway/governance/workspace-switcher.feature
+  //       (scenarios under "Personal <-> Work tabs")
+  // -------------------------------------------------------------------
+
+  describe("Personal/Work tabs", () => {
+    /** @scenario The dropdown opens on the view matching the current context */
+    it("opens on the Personal view when the current context is personal", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [personal],
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "personal" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+
+      const personalTab = await screen.findByRole("tab", {
+        name: /personal/i,
+      });
+      expect(personalTab).toHaveAttribute("aria-selected", "true");
+      // Personal view shows the personal entry, not the work list.
+      expect(
+        (await screen.findAllByText("My Workspace")).length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText("Foo Project")).not.toBeInTheDocument();
+    });
+
+    /** @scenario The dropdown opens on the view matching the current context */
+    it("opens on the Work view when the current context is a project", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [personal],
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "project", projectId: "project_foo" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+
+      const workTab = await screen.findByRole("tab", { name: /work/i });
+      expect(workTab).toHaveAttribute("aria-selected", "true");
+      expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
+    });
+
+    /** @scenario Switching views slides between the two lists */
+    it("swaps the list when picking the other view", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [personal],
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "project", projectId: "project_foo" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      await screen.findByText("Acme Engineering");
+
+      await switchToTab(user, /personal/i);
+      expect(
+        (await screen.findAllByText("My Workspace")).length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText("Acme Engineering")).not.toBeInTheDocument();
+    });
+
+    /** @scenario Users without personal workspaces see no tabs */
+    it("renders no tabs when the user has no personal workspaces", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        teams: [teamA],
+        projects: [projectFoo],
+        current: { kind: "project", projectId: "project_foo" },
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+
+      expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     });
   });
 });

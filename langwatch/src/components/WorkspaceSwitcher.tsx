@@ -23,6 +23,7 @@ import { Menu } from "./ui/menu";
 import { Link } from "./ui/link";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { Tooltip } from "./ui/tooltip";
+import { useColorModeValue } from "./ui/color-mode";
 
 import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
 
@@ -151,6 +152,13 @@ const ICON_BY_KIND = {
   organization: Building2,
 } as const;
 
+type SwitcherView = "personal" | "work";
+
+const SWITCHER_VIEWS: { value: SwitcherView; label: string }[] = [
+  { value: "personal", label: "Personal" },
+  { value: "work", label: "Work" },
+];
+
 function entryIsCurrent(
   entry: WorkspaceSwitcherEntry,
   current: WorkspaceSwitcherCurrent,
@@ -227,6 +235,16 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   const [open, setOpen] = useState(false);
   const derivedCurrent = useWorkspaceCurrent({ teams, projects });
   const current = currentProp ?? derivedCurrent;
+
+  // Personal <-> Work views. The dropdown opens on the view matching the
+  // current context so the checkmarked row is immediately visible.
+  const defaultView: SwitcherView =
+    current.kind === "personal" ? "personal" : "work";
+  const [view, setView] = useState<SwitcherView>(defaultView);
+  const viewPillShadow = useColorModeValue(
+    "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06)",
+    "0 1px 3px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06)",
+  );
 
   const { label: triggerLabel, kind: triggerKind } = currentLabel(
     current,
@@ -352,17 +370,181 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
       ? `${org.orgName} · ${org.orgSlug}`
       : org.orgName;
 
+  // The dropdown splits into a Personal view (the user's personal
+  // workspaces, one per governance org) and a Work view (orgs → teams →
+  // projects). Users with only one side see that list directly, no tabs.
+  const hasPersonalContent = personals.length > 0;
+  const hasWorkContent =
+    teamsWithProjects.length > 0 || orphanProjects.length > 0 || showOrgSwitch;
+  const showTabs = hasPersonalContent && hasWorkContent;
+  const workOrgs = [...teamOrgs].sort((a, b) =>
+    a.orgName.localeCompare(b.orgName),
+  );
+  const sortedOrgPersonals = [...orgPersonals].sort((a, b) =>
+    (a.orgName ?? "").localeCompare(b.orgName ?? ""),
+  );
+
+  const selectEntry = (entry: WorkspaceSwitcherEntry) => {
+    setOpen(false);
+    void router.push(entry.href);
+  };
+
+  const personalPanel = (
+    <VStack gap={0} align="stretch">
+      {topLevelPersonal && (
+        <Group>
+          <SwitcherItem
+            entry={topLevelPersonal}
+            // The sole top-level personal entry is the personal context,
+            // so it is active on any /me route regardless of which org
+            // is selected (per-org matching only matters when nested).
+            active={current.kind === "personal"}
+            onSelect={() => selectEntry(topLevelPersonal)}
+          />
+        </Group>
+      )}
+      {sortedOrgPersonals.map((p) => (
+        <Group
+          key={p.orgId}
+          // The org name always renders above its personal workspace (the
+          // user's mental model: "my personal usage *within* this org").
+          title={orgHeader({
+            orgName: p.orgName ?? "Organization",
+            orgSlug: p.orgSlug ?? "",
+          })}
+        >
+          <SwitcherItem
+            entry={p}
+            active={entryIsCurrent(p, current)}
+            onSelect={() => selectEntry(p)}
+          />
+        </Group>
+      ))}
+    </VStack>
+  );
+
+  const workPanel = (
+    <VStack gap={0} align="stretch">
+      {showOrgSwitch && (
+        <Group title="Organizations">
+          {orgSwitchList.map((org) => {
+            const active =
+              current.kind === "organization" && current.orgId === org.orgId;
+            return (
+              <Menu.Item
+                key={org.orgId}
+                value={`org:${org.orgId}`}
+                fontSize="14px"
+                paddingY="5px"
+                onClick={() => {
+                  setOpen(false);
+                  onSwitchOrganization?.(org.orgId);
+                }}
+              >
+                <HStack gap={3} width="full" alignItems="center">
+                  <Box
+                    width="20px"
+                    display="flex"
+                    justifyContent="center"
+                    flexShrink={0}
+                  >
+                    <Building2 size={14} />
+                  </Box>
+                  <Text
+                    fontWeight={active ? "semibold" : "normal"}
+                    truncate
+                    flex={1}
+                    minWidth={0}
+                  >
+                    {org.orgName}
+                  </Text>
+                  {active && (
+                    <Box color="fg.muted" flexShrink={0}>
+                      <Check size={14} />
+                    </Box>
+                  )}
+                </HStack>
+              </Menu.Item>
+            );
+          })}
+        </Group>
+      )}
+
+      {workOrgs.map((org) => (
+        <Group
+          key={org.orgId}
+          // Org headers only matter when the user spans several orgs —
+          // a lone org's context is implicit.
+          title={multipleOrgs ? orgHeader(org) : undefined}
+        >
+          {org.teams.map((team) => {
+            const teamProjects = projectsByTeam.get(team.teamId) ?? [];
+            return (
+              <Box key={team.teamId}>
+                <Box position="relative">
+                  <SwitcherItem
+                    entry={team}
+                    active={entryIsCurrent(team, current)}
+                    onSelect={() => selectEntry(team)}
+                  />
+                  {team.canCreateProject && onCreateProjectForTeam && (
+                    <TeamCreateProjectButton
+                      team={team}
+                      onCreateProjectForTeam={onCreateProjectForTeam}
+                      setOpen={setOpen}
+                    />
+                  )}
+                </Box>
+                {teamProjects.length > 0 && (
+                  <VStack gap={0} align="stretch" paddingLeft={5}>
+                    {teamProjects.map((project) => (
+                      <SwitcherItem
+                        key={project.projectId}
+                        entry={project}
+                        active={entryIsCurrent(project, current)}
+                        onSelect={() => selectEntry(project)}
+                      />
+                    ))}
+                  </VStack>
+                )}
+              </Box>
+            );
+          })}
+        </Group>
+      ))}
+
+      {orphanProjects.length > 0 && (
+        <Group title="Projects">
+          {orphanProjects.map((project) => (
+            <SwitcherItem
+              key={project.projectId}
+              entry={project}
+              active={entryIsCurrent(project, current)}
+              onSelect={() => selectEntry(project)}
+            />
+          ))}
+        </Group>
+      )}
+    </VStack>
+  );
+
   return (
-    <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+    <Menu.Root
+      open={open}
+      onOpenChange={({ open }) => {
+        setOpen(open);
+        if (open) setView(defaultView);
+      }}
+    >
       <Menu.Trigger asChild>
         <Button
           variant="ghost"
           fontSize="13px"
           paddingX={2}
-          paddingY={1}
-          height="auto"
-          fontWeight="normal"
+          height="28px"
+          fontWeight="500"
           minWidth="fit-content"
+          borderRadius="md"
           color="fg"
           aria-haspopup="menu"
           aria-expanded={open}
@@ -378,7 +560,11 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
               <TriggerIcon size={14} />
             )}
             <Text>{triggerLabel}</Text>
-            {hasMore && <ChevronDown size={14} />}
+            {hasMore && (
+              <Box color="fg.subtle" display="flex" alignItems="center">
+                <ChevronDown size={12} />
+              </Box>
+            )}
           </HStack>
         </Button>
       </Menu.Trigger>
@@ -386,151 +572,90 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
         <Box zIndex="popover" padding={0}>
           {open && (
             <Menu.Content minWidth="280px" maxHeight="70vh" overflowY="auto">
-              {showOrgSwitch && (
-                <Group title="Organizations">
-                  {orgSwitchList.map((org) => {
-                    const active =
-                      current.kind === "organization" &&
-                      current.orgId === org.orgId;
-                    return (
-                      <Menu.Item
-                        key={org.orgId}
-                        value={`org:${org.orgId}`}
-                        fontSize="14px"
-                        paddingY="5px"
-                        onClick={() => {
-                          setOpen(false);
-                          onSwitchOrganization?.(org.orgId);
-                        }}
+              {showTabs && (
+                <Box paddingX={1.5} paddingTop={1.5} paddingBottom={1}>
+                  <HStack
+                    role="tablist"
+                    aria-label="Workspace type"
+                    position="relative"
+                    gap={0}
+                    height="30px"
+                    borderRadius="lg"
+                    bg="bg.muted"
+                    padding="2px"
+                  >
+                    <Box
+                      aria-hidden
+                      position="absolute"
+                      top="2px"
+                      bottom="2px"
+                      left="2px"
+                      width="calc(50% - 2px)"
+                      borderRadius="md"
+                      bg="bg.panel"
+                      boxShadow={viewPillShadow}
+                      transition="transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)"
+                      transform={
+                        view === "personal"
+                          ? "translateX(0)"
+                          : "translateX(100%)"
+                      }
+                      pointerEvents="none"
+                    />
+                    {SWITCHER_VIEWS.map((option) => (
+                      <Box
+                        key={option.value}
+                        as="button"
+                        type="button"
+                        role="tab"
+                        aria-selected={view === option.value}
+                        flex={1}
+                        height="full"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        position="relative"
+                        zIndex={1}
+                        fontSize="13px"
+                        fontWeight="500"
+                        color={view === option.value ? "fg" : "fg.muted"}
+                        cursor="pointer"
+                        transition="color 0.15s ease"
+                        onClick={() => setView(option.value)}
                       >
-                        <HStack gap={3} width="full" alignItems="center">
-                          <Box
-                            width="20px"
-                            display="flex"
-                            justifyContent="center"
-                            flexShrink={0}
-                          >
-                            <Building2 size={14} />
-                          </Box>
-                          <Text
-                            fontWeight={active ? "semibold" : "normal"}
-                            truncate
-                            flex={1}
-                            minWidth={0}
-                          >
-                            {org.orgName}
-                          </Text>
-                          {active && (
-                            <Box color="fg.muted" flexShrink={0}>
-                              <Check size={14} />
-                            </Box>
-                          )}
-                        </HStack>
-                      </Menu.Item>
-                    );
-                  })}
-                </Group>
+                        {option.label}
+                      </Box>
+                    ))}
+                  </HStack>
+                </Box>
               )}
 
-              {topLevelPersonal && (
-                <Group title="My Workspace">
-                  <SwitcherItem
-                    entry={topLevelPersonal}
-                    // The sole top-level personal entry is the personal context,
-                    // so it is active on any /me route regardless of which org
-                    // is selected (per-org matching only matters when nested).
-                    active={current.kind === "personal"}
-                    onSelect={() => {
-                      setOpen(false);
-                      void router.push(topLevelPersonal.href);
-                    }}
-                  />
-                </Group>
-              )}
-
-              {orgs.map((org) => {
-                const orgPersonal = personalByOrgId.get(org.orgId);
-                return (
-                <Group
-                  key={org.orgId}
-                  // Show the org name as a header when the user spans multiple
-                  // orgs, or whenever this org has a personal nested under it
-                  // (governance orgs), so the org name is always visible above
-                  // its "My Workspace". A lone non-governance org stays
-                  // header-free — its org context is implicit.
-                  title={
-                    multipleOrgs || personalByOrgId.has(org.orgId)
-                      ? orgHeader(org)
-                      : undefined
+              {showTabs ? (
+                <Box
+                  key={view}
+                  role="tabpanel"
+                  css={{
+                    "@keyframes switcherSlideFromLeft": {
+                      from: { opacity: 0.2, transform: "translateX(-10px)" },
+                      to: { opacity: 1, transform: "translateX(0)" },
+                    },
+                    "@keyframes switcherSlideFromRight": {
+                      from: { opacity: 0.2, transform: "translateX(10px)" },
+                      to: { opacity: 1, transform: "translateX(0)" },
+                    },
+                  }}
+                  animation={
+                    view === "personal"
+                      ? "switcherSlideFromLeft 0.16s ease-out"
+                      : "switcherSlideFromRight 0.16s ease-out"
                   }
                 >
-                  {orgPersonal && (
-                    <SwitcherItem
-                      entry={orgPersonal}
-                      active={entryIsCurrent(orgPersonal, current)}
-                      onSelect={() => {
-                        setOpen(false);
-                        void router.push(orgPersonal.href);
-                      }}
-                    />
-                  )}
-                  {org.teams.map((team) => {
-                    const teamProjects = projectsByTeam.get(team.teamId) ?? [];
-                    return (
-                      <Box key={team.teamId}>
-                        <Box position="relative">
-                          <SwitcherItem
-                            entry={team}
-                            active={entryIsCurrent(team, current)}
-                            onSelect={() => {
-                              setOpen(false);
-                              void router.push(team.href);
-                            }}
-                          />
-                          {team.canCreateProject && onCreateProjectForTeam && (
-                            <TeamCreateProjectButton
-                              team={team}
-                              onCreateProjectForTeam={onCreateProjectForTeam}
-                              setOpen={setOpen}
-                            />
-                          )}
-                        </Box>
-                        {teamProjects.length > 0 && (
-                          <VStack gap={0} align="stretch" paddingLeft={5}>
-                            {teamProjects.map((project) => (
-                              <SwitcherItem
-                                key={project.projectId}
-                                entry={project}
-                                active={entryIsCurrent(project, current)}
-                                onSelect={() => {
-                                  setOpen(false);
-                                  void router.push(project.href);
-                                }}
-                              />
-                            ))}
-                          </VStack>
-                        )}
-                      </Box>
-                    );
-                  })}
-                </Group>
-                );
-              })}
-
-              {orphanProjects.length > 0 && (
-                <Group title="Projects">
-                  {orphanProjects.map((project) => (
-                    <SwitcherItem
-                      key={project.projectId}
-                      entry={project}
-                      active={entryIsCurrent(project, current)}
-                      onSelect={() => {
-                        setOpen(false);
-                        void router.push(project.href);
-                      }}
-                    />
-                  ))}
-                </Group>
+                  {view === "personal" ? personalPanel : workPanel}
+                </Box>
+              ) : hasPersonalContent ? (
+                personalPanel
+              ) : (
+                workPanel
               )}
 
               {!hasMore && (

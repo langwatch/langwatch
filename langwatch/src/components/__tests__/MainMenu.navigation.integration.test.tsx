@@ -72,14 +72,6 @@ vi.mock("~/components/sidebar/UsageIndicator", () => ({
   UsageIndicator: () => null,
 }));
 
-vi.mock("~/components/sidebar/SupportMenu", () => ({
-  SupportMenu: () => null,
-}));
-
-vi.mock("~/components/sidebar/ThemeToggle", () => ({
-  ThemeToggle: () => null,
-}));
-
 import { MainMenu } from "../MainMenu";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -110,6 +102,9 @@ describe("<MainMenu /> navigation", () => {
       "Expand Govern",
     ]);
 
+    // Settings, support, and the theme switch live in the top-right account
+    // menu (specs/navigation/account-menu-hub.feature), so the sidebar lists
+    // product destinations only.
     expect(visibleLinkLabels()).toEqual([
       "Home",
       "Analytics",
@@ -119,7 +114,6 @@ describe("<MainMenu /> navigation", () => {
       "Simulations",
       "Experiments",
       "Annotations",
-      "Settings",
     ]);
   });
 

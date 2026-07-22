@@ -28,8 +28,6 @@ import {
 } from "./sidebar/navigationActiveState";
 import { SidebarSection } from "./sidebar/SidebarSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
-import { SupportMenu } from "./sidebar/SupportMenu";
-import { ThemeToggle } from "./sidebar/ThemeToggle";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
 
 export const MENU_WIDTH_EXPANDED = "200px";
@@ -44,8 +42,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute } =
-    useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
@@ -289,20 +286,11 @@ export const MainMenu = React.memo(function MainMenu({
             <OpsSection showExpanded={showExpanded} />
           </VStack>
 
+          {/* Settings, support, chat, and the theme switch live in the
+              top-right account menu — the sidebar bottom keeps only the
+              plan/usage indicator. Spec: specs/navigation/account-menu-hub.feature */}
           <VStack width="full" gap={0.5} align="start">
             <UsageIndicator showLabel={showExpanded} />
-            {(!!hasPermission("organization:view") || isPublicRoute) && (
-              <PageMenuLink
-                path={projectRoutes.settings.path}
-                icon={featureIcons.settings.icon}
-                label={projectRoutes.settings.title}
-                project={project}
-                isActive={router.pathname.includes("/settings")}
-                showLabel={showExpanded}
-              />
-            )}
-            <SupportMenu showLabel={showExpanded} />
-            <ThemeToggle showLabel={showExpanded} />
           </VStack>
         </VStack>
       </Box>

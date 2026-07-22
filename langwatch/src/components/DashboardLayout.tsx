@@ -1,6 +1,5 @@
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   HStack,
@@ -8,7 +7,6 @@ import {
   Spacer,
   type StackProps,
   Text,
-  useBreakpointValue,
   VStack,
 } from "@chakra-ui/react";
 import {
@@ -17,14 +15,7 @@ import {
   type Project,
   type Team,
 } from "@prisma/client";
-import {
-  Activity,
-  ChevronDown,
-  ChevronRight,
-  Info,
-  KeyRound,
-  Plus,
-} from "lucide-react";
+import { Activity, ChevronDown, Info, KeyRound, Plus } from "lucide-react";
 import numeral from "numeral";
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -40,12 +31,9 @@ import { useLangyStore } from "~/features/langy/stores/langyStore";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
-import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import { CommandBarTrigger } from "../features/command-bar";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { useDrawer } from "../hooks/useDrawer";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
-import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useOrgQueryParamSelection } from "../hooks/useOrgQueryParamSelection";
 import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
@@ -62,17 +50,17 @@ import {
   type Route,
 } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
+import { AccountMenu } from "./AccountMenu";
 import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
-import { FullLogo } from "./icons/FullLogo";
-import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
+import { SidebarHeaderToggle } from "./sidebar/SidebarHeaderToggle";
+import { useSidebarCollapsed } from "./sidebar/useSidebarCollapsed";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
@@ -80,41 +68,52 @@ import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
+const CrumbSeparator = () => (
+  <Text color="fg.subtle" userSelect="none" aria-hidden fontWeight="300">
+    /
+  </Text>
+);
+
+/**
+ * Page path continuing from the workspace chip: `chip / Parent / Title`.
+ * The chip already names the context, so there is no extra "Dashboard"
+ * crumb — the project home simply shows the chip alone. Parents link;
+ * the current page reads emphasized as plain text.
+ *
+ * Spec: specs/navigation/header-breadcrumb.feature
+ */
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   // No redirects from the breadcrumb path - it only reads `project` for the
-  // dashboard link. The owning DashboardLayout call handles bouncing.
+  // parent link. The owning DashboardLayout call handles bouncing.
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
 
-  if (!currentRoute) return null;
+  if (!currentRoute || currentRoute.title === "Home") return null;
 
   return (
     <HStack gap={2} fontSize="13px" color="fg.muted" alignItems="center">
-      <ChevronRight width="12" style={{ minWidth: "12px" }} />
-      <Link href={`/${project?.slug ?? ""}`}>Dashboard</Link>
+      <CrumbSeparator />
       {currentRoute.parent && (
         <>
-          <ChevronRight width="12" style={{ minWidth: "12px" }} />
           <Link
             href={projectRoutes[currentRoute.parent].path.replace(
               "[project]",
               project?.slug ?? "",
             )}
+            color="fg.muted"
+            whiteSpace="nowrap"
+            _hover={{ color: "fg", textDecoration: "none" }}
           >
             {projectRoutes[currentRoute.parent].title}
           </Link>
+          <CrumbSeparator />
         </>
       )}
-      {currentRoute.title !== "Home" && (
-        <>
-          <ChevronRight width="12" style={{ minWidth: "12px" }} />
-          <Text color="fg.muted" whiteSpace="nowrap">
-            {currentRoute.title}
-          </Text>
-        </>
-      )}
+      <Text color="fg" fontWeight="500" whiteSpace="nowrap">
+        {currentRoute.title}
+      </Text>
     </HStack>
   );
 };
@@ -411,14 +410,14 @@ export const DashboardLayout = ({
   pageTitle,
   ...props
 }: DashboardLayoutProps) => {
-  // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
-  // so the menu starts expanded and only compacts after hydration on small screens.
-  // This avoids the compact→expanded flicker on desktop page navigations.
-  const isSmallScreen = useBreakpointValue(
-    { base: true, lg: false },
-    { fallback: "lg" },
-  );
-  const compactMenu = isSmallScreen ? true : compactMenuProp;
+  // One global collapse preference: the user's explicit choice (made via the
+  // logo toggle) wins on every page; until they choose, pages keep their own
+  // default density and small screens stay compact.
+  const {
+    isCollapsed: compactMenu,
+    canToggle,
+    setCollapsed,
+  } = useSidebarCollapsed({ pageDefaultsToCompact: compactMenuProp });
   const router = useRouter();
 
   // Apply a one-shot `?org=<slug>` selection on any org-scoped page, then strip
@@ -442,7 +441,6 @@ export const DashboardLayout = ({
     redirectToOnboarding: !bypassProjectGating,
     redirectToProjectOnboarding: !bypassProjectGating,
   });
-  const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
     {
@@ -458,17 +456,6 @@ export const DashboardLayout = ({
     {},
     { enabled: !!session },
   );
-  // The "My Workspace" entry in the user-avatar dropdown is part of the
-  // governance preview surface, distinct from the existing AI Gateway
-  // menu (which keeps shipping unblocked under release_ui_ai_gateway_menu_enabled).
-  // The flag is org-targeted, so it must resolve on the org id - gating on
-  // project would diverge from the /me pages (which key off the org) and
-  // show the menu entry while the page it links to 404s.
-  const { enabled: governancePreviewEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-    { organizationId: organization?.id, enabled: !!organization?.id },
-  );
-
   usePostHogIdentify({
     session: session ?? null,
     organization,
@@ -660,26 +647,13 @@ export const DashboardLayout = ({
           ></Box>
         )}
 
-        {/* Left side: Logo + Project + Breadcrumbs */}
+        {/* Left side: Logo/collapse toggle + Project + Breadcrumbs */}
         <HStack gap={compactMenu ? 3 : 0} flex={1} alignItems="center">
-          {/* Logo container - fixed width for expanded menu, natural for compact */}
-          {compactMenu ? (
-            <Link href="/" display="flex" alignItems="center">
-              <LogoIcon width={25 * 0.7} height={32 * 0.7} />
-            </Link>
-          ) : (
-            <Box
-              width={MENU_WIDTH_EXPANDED}
-              minWidth={MENU_WIDTH_EXPANDED}
-              paddingLeft={2}
-              display="flex"
-              alignItems="center"
-            >
-              <Link href="/">
-                <FullLogo width={155 * 0.7} height={38 * 0.7} />
-              </Link>
-            </Box>
-          )}
+          <SidebarHeaderToggle
+            isCollapsed={compactMenu}
+            canToggle={canToggle}
+            onToggle={setCollapsed}
+          />
           {router.pathname.startsWith("/ops") ? (
             <HStack gap={3} alignItems="center" paddingLeft={2}>
               <HStack
@@ -718,7 +692,7 @@ export const DashboardLayout = ({
               <PersonalScopeHeaderSwitcher />
             </HStack>
           ) : organizations && project ? (
-            <HStack gap={0} alignItems="center">
+            <HStack gap={2} alignItems="center">
               <ProjectScopeHeaderSwitcher />
               <Box display={["none", "none", "flex"]}>
                 <Breadcrumbs currentRoute={currentRoute} />
@@ -765,77 +739,10 @@ export const DashboardLayout = ({
           {/* Command bar trigger */}
           {project && <CommandBarTrigger />}
 
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button
-                variant="ghost"
-                size="xs"
-                padding={0}
-                minWidth="auto"
-                height="auto"
-                borderRadius="full"
-                {...(publicPage
-                  ? {
-                      // On a public share page, clicking the avatar offers
-                      // sign-in. Route to the signin page with the current
-                      // URL as callbackUrl so the UI picks the right provider
-                      // from `publicEnv.NEXTAUTH_PROVIDER`. The old version
-                      // hardcoded `signIn("auth0")` which broke for on-prem
-                      // (email mode), google, gitlab, etc.
-                      onClick: () => {
-                        if (typeof window !== "undefined") {
-                          const callbackUrl = encodeURIComponent(
-                            window.location.pathname + window.location.search,
-                          );
-                          window.location.href = `/auth/signin?callbackUrl=${callbackUrl}`;
-                        }
-                      },
-                    }
-                  : {})}
-              >
-                <Avatar.Root
-                  size="xs"
-                  backgroundColor="orange.400"
-                  color="white"
-                  width="28px"
-                  height="28px"
-                >
-                  <Avatar.Fallback
-                    name={user?.name ?? undefined}
-                    fontSize="11px"
-                  />
-                </Avatar.Root>
-              </Button>
-            </Menu.Trigger>
-            {session && (
-              <Portal>
-                <Menu.Content>
-                  <ImpersonationSwitchBackMenuItem />
-                  <Menu.ItemGroup
-                    title={`${session.user.name} (${session.user.email})`}
-                  >
-                    {governancePreviewEnabled && (
-                      <Menu.Item value="my-workspace" asChild>
-                        <Link href="/me">My Workspace</Link>
-                      </Menu.Item>
-                    )}
-                    {!isLiteMember && (
-                      <Menu.Item value="api-keys" asChild>
-                        <Link href="/settings/api-keys">API Keys</Link>
-                      </Menu.Item>
-                    )}
-                    <Menu.Item value="settings" asChild>
-                      <Link href="/settings">Settings</Link>
-                    </Menu.Item>
-                    {showPresenceMenuItem && <PresenceMenuItem />}
-                    <Menu.Item value="logout" asChild>
-                      <a href="/api/auth/logout">Logout</a>
-                    </Menu.Item>
-                  </Menu.ItemGroup>
-                </Menu.Content>
-              </Portal>
-            )}
-          </Menu.Root>
+          <AccountMenu
+            publicPage={publicPage}
+            showPresenceMenuItem={showPresenceMenuItem}
+          />
         </HStack>
       </HStack>
 

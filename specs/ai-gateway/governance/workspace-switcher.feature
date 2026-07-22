@@ -375,3 +375,39 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     Then no per-team "+" button receives focus when the dropdown opens
     And the dropdown's initial focus lands on the first team entry instead
     But the "+" button remains clickable with the pointer
+
+  # ---------------------------------------------------------------------------
+  # Personal <-> Work tabs (sidebar/header redesign)
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @workspace-switcher @tabs
+  Scenario: The dropdown splits into Personal and Work views
+    Given the user has at least one personal workspace and at least one team or project
+    When the user opens the switcher
+    Then a two-option control at the top offers "Personal" and "Work"
+    And the "Personal" view lists only the user's personal workspaces,
+        grouped under their organization when the user spans several
+    And the "Work" view lists organizations, teams, and projects
+        (same grouping, checkmarks, and create-project affordances as before)
+
+  @bdd @ui @workspace-switcher @tabs
+  Scenario: The dropdown opens on the view matching the current context
+    Given the user is in their personal workspace
+    When the user opens the switcher
+    Then the "Personal" view is selected
+    But when the current context is a team, project, or organization
+    Then the "Work" view is selected
+
+  @bdd @ui @workspace-switcher @tabs
+  Scenario: Switching views slides between the two lists
+    Given the switcher is open on the "Work" view
+    When the user picks "Personal"
+    Then the selected-state indicator slides to "Personal"
+    And the list is replaced by the personal workspaces
+
+  @bdd @ui @workspace-switcher @tabs
+  Scenario: Users without personal workspaces see no tabs
+    Given no organization gives the user a personal workspace
+    When the user opens the switcher
+    Then no Personal/Work control renders
+    And the dropdown lists organizations, teams, and projects directly

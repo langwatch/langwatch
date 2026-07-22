@@ -79,11 +79,19 @@ export const SideMenuItem = ({
     size?: string | number;
     color?: string;
   }>;
-  // Use CSS variable for icon color to support dark mode
+  // Use CSS variables for icon color to support dark mode; the active row's
+  // icon brightens with its label (nav.fgActive).
   const iconNode =
     typeof IconElem === "function" ||
     (IconElem as unknown as { render?: unknown }).render ? (
-      <IconElem size={ICON_SIZE} color="var(--chakra-colors-nav-fg-muted)" />
+      <IconElem
+        size={ICON_SIZE}
+        color={
+          isActive
+            ? "var(--chakra-colors-nav-fg-active)"
+            : "var(--chakra-colors-nav-fg-muted)"
+        }
+      />
     ) : (
       (icon as React.ReactNode)
     );
@@ -96,8 +104,15 @@ export const SideMenuItem = ({
       paddingX={3}
       borderRadius="lg"
       backgroundColor={isActive ? "nav.bgActive" : "transparent"}
+      // In light mode the active row is a white card on the gray rail — a
+      // whisper of shadow sells the lift; hover keeps the flat gray fill.
+      _light={{
+        boxShadow: isActive
+          ? "0 1px 2px rgba(16,24,40,0.06), 0 0 0 1px rgba(16,24,40,0.04)"
+          : "none",
+      }}
       _hover={{
-        backgroundColor: "nav.bgHover",
+        backgroundColor: isActive ? "nav.bgActive" : "nav.bgHover",
       }}
       transition="background-color 0.15s ease-in-out"
     >
@@ -121,8 +136,8 @@ export const SideMenuItem = ({
         <>
           <Text
             fontSize="14px"
-            fontWeight="normal"
-            color="nav.fg"
+            fontWeight={isActive ? "500" : "normal"}
+            color={isActive ? "nav.fgActive" : "nav.fg"}
             whiteSpace="nowrap"
             flex={1}
             overflow="hidden"

@@ -69,14 +69,6 @@ vi.mock("~/components/sidebar/UsageIndicator", () => ({
   UsageIndicator: () => null,
 }));
 
-vi.mock("~/components/sidebar/SupportMenu", () => ({
-  SupportMenu: () => null,
-}));
-
-vi.mock("~/components/sidebar/ThemeToggle", () => ({
-  ThemeToggle: () => null,
-}));
-
 import { MainMenu } from "../MainMenu";
 
 const menu = (

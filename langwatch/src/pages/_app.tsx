@@ -394,11 +394,18 @@ const appConfig = defineConfig({
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.300}" },
           },
+          // Active rows brighten to full foreground so the current page pops
+          // from its neighbours instead of relying on background alone.
+          fgActive: {
+            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.100}" },
+          },
           fgMuted: {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
+          // Light: the active row lifts as a white card on the gray.100 rail
+          // (hover stays gray.200, so hover and active read differently).
           bgActive: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.700}" },
+            value: { _light: "white", _dark: "{colors.zinc.700}" },
           },
           bgHover: {
             value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.800}" },

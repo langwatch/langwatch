@@ -14,7 +14,6 @@ import {
   IconButton,
   Input,
   Portal,
-  useBreakpointValue,
   Text,
 } from "@chakra-ui/react";
 import {
@@ -42,6 +41,7 @@ import { getOriginColor } from "../../utils/originColors";
 import { getColorForString } from "../../utils/rotatingColors";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../MainMenu";
+import { useSidebarCollapsed } from "../sidebar/useSidebarCollapsed";
 import { Menu } from "../ui/menu";
 
 /**
@@ -100,8 +100,10 @@ export function SavedViewsBar() {
   );
 
   const allTracesView = defaultViews[0];
-  const isSmallScreen = useBreakpointValue({ base: true, lg: false });
-  const menuWidth = isSmallScreen ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
+  // Mirror the sidebar's actual width so the bar's left edge tracks the
+  // user's global collapse preference, not just the breakpoint.
+  const { isCollapsed } = useSidebarCollapsed();
+  const menuWidth = isCollapsed ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
 
   return (
     <Portal>

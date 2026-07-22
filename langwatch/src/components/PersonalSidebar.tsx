@@ -5,7 +5,6 @@ import {
   Database,
   Gauge,
   ListTree,
-  Settings as SettingsIcon,
   Sliders,
   Smartphone,
   Sparkles,
@@ -21,8 +20,6 @@ import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { GovernSection } from "./sidebar/GovernSection";
 import { isOnlineEvaluationsActivePath } from "./sidebar/navigationActiveState";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
-import { SupportMenu } from "./sidebar/SupportMenu";
-import { ThemeToggle } from "./sidebar/ThemeToggle";
 
 /**
  * Personal-scope sidebar rendered by DashboardLayout when
@@ -47,13 +44,9 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
   const isUsageActive = router.pathname === "/me";
   const isConfigureActive = router.pathname.startsWith("/me/configure");
   const isSessionsActive = router.pathname.startsWith("/me/sessions");
-  const isOrgSettingsActive =
-    router.pathname === "/settings" ||
-    (router.pathname.startsWith("/settings") &&
-      !router.pathname.startsWith("/settings/gateway"));
 
   const session = useRequiredSession();
-  const { organizations, hasPermission } = useOrganizationTeamProject({
+  const { organizations } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
@@ -197,20 +190,8 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
             />
             <GovernSection showExpanded={showExpanded} />
           </VStack>
-
-          <VStack width="full" gap={0.5} align="start">
-            {hasPermission("organization:view") && (
-              <SideMenuLink
-                icon={SettingsIcon}
-                label="Settings"
-                href="/settings"
-                isActive={isOrgSettingsActive}
-                showLabel={showExpanded}
-              />
-            )}
-            <SupportMenu showLabel={showExpanded} />
-            <ThemeToggle showLabel={showExpanded} />
-          </VStack>
+          {/* Settings, support, chat, and the theme switch live in the
+              top-right account menu. Spec: specs/navigation/account-menu-hub.feature */}
         </VStack>
       </Box>
     </Box>
