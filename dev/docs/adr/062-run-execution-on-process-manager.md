@@ -144,6 +144,37 @@ generator. What changes is that abort no longer has to be observed for the run
 to finish: if the process holding the generator disappears, the deadline wake
 finalises the run regardless.
 
+### Sequencing: liveness before dispatch
+
+The `scenarioExecution` process manager lands in two steps, because the two
+guarantees it carries have very different risk profiles.
+
+**Step 1 — liveness.** The process observes the run's events, arms a durable
+deadline, and writes the terminal state when one fires. Dispatch is untouched:
+`scenarioExecution.reactor.ts` and the in-process pool keep doing what they do.
+This step only *adds* a safety net, and it is what lets both boot sweeps be
+deleted in the same change — the replacement is strictly stronger than what it
+removes, because it runs continuously rather than at boot.
+
+The read-time `STALLED` derivation in `stall-detection.ts` survives step 1 and
+goes dormant on its own: `resolveRunStatus` returns the stored status whenever
+one exists, so once the process writes a terminal state the derivation stops
+firing for that run. It has three production consumers including a UI hook, so
+removing it is a change to the read path, not to execution, and it belongs with
+step 2 rather than being rushed alongside a sweep deletion.
+
+For the same reason step 1 writes `ERROR` (or `CANCELLED`) rather than a stored
+`STALLED`: that is exactly what the boot sweeps it replaces wrote, so the
+terminal status a user sees does not change. `STALLED` becomes a stored status
+in step 2, where `FailureEventParams` grows a single modelled outcome instead of
+a second mutually-exclusive boolean beside `cancelled`.
+
+**Step 2 — dispatch.** The reactor is replaced by the leased outbox, the pool
+loses its pending queue and drain path, and the read-time `STALLED` derivation
+is deleted. This is the invasive half: it moves the execution path for a feature
+that costs money per run, and it is worth landing only once step 1 has proven
+the deadline arithmetic in production.
+
 ### What is deleted
 
 `scenario-orphan-reconciler.ts`, `orphaned-run-reconciliation.ts` and

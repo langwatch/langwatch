@@ -1,6 +1,31 @@
 import { definePipeline } from "../../";
+import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import {
+  buildProcessEventView,
+  handleCancelRequested,
+  handleMessageSnapshot,
+  handleQueued,
+  handleSettled,
+  handleStarted,
+  handleTextMessageEnd,
+  handleTextMessageStart,
+  INITIAL_SCENARIO_EXECUTION_STATE,
+  scenarioExecutionWake,
+} from "./process-manager/scenarioExecution.process";
+import {
+  createScenarioExecutionFailRunHandler,
+  type ScenarioExecutionDispatchDeps,
+} from "./process-manager/scenarioExecutionIntentHandlers";
+import {
+  SCENARIO_EXECUTION_INTENT_TYPES,
+  SCENARIO_EXECUTION_LEASE_DURATION_MS,
+  SCENARIO_EXECUTION_MAX_ATTEMPTS,
+  SCENARIO_EXECUTION_PROCESS_NAME,
+  scenarioExecutionFailRunIntentSchema,
+} from "./process-manager/scenarioExecutionProcess.types";
+import { SIMULATION_RUN_EVENT_TYPES } from "./schemas/constants";
 import {
   CancelRunCommand,
   DeleteRunCommand,
@@ -41,6 +66,43 @@ export interface SimulationProcessingPipelineDeps {
     SimulationProcessingEvent,
     SimulationRunStateData
   >;
+  /** Terminal-write dependencies for the `scenarioExecution` process (ADR-062). */
+  scenarioExecutionDispatch: ScenarioExecutionDispatchDeps;
+}
+
+/**
+ * The `scenarioExecution` process-manager topology, exported standalone so
+ * tests can build the exact definition the runtime mounts.
+ *
+ * Every progress event re-arms the deadline; the terminal events clear it; a
+ * fired wake writes the terminal state itself. See ADR-062 and
+ * `scenarioExecution.process.ts`.
+ */
+export function scenarioExecutionPM(
+  dispatch: ScenarioExecutionDispatchDeps,
+): ProcessManagerApplier<SimulationProcessingEvent> {
+  return (pm) =>
+    pm
+      .state(INITIAL_SCENARIO_EXECUTION_STATE)
+      .intent(
+        SCENARIO_EXECUTION_INTENT_TYPES.FAIL_RUN,
+        scenarioExecutionFailRunIntentSchema,
+        createScenarioExecutionFailRunHandler(dispatch),
+      )
+      .on(SIMULATION_RUN_EVENT_TYPES.QUEUED, handleQueued)
+      .on(SIMULATION_RUN_EVENT_TYPES.STARTED, handleStarted)
+      .on(SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT, handleMessageSnapshot)
+      .on(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START, handleTextMessageStart)
+      .on(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END, handleTextMessageEnd)
+      .on(SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED, handleCancelRequested)
+      .on(SIMULATION_RUN_EVENT_TYPES.FINISHED, handleSettled)
+      .on(SIMULATION_RUN_EVENT_TYPES.DELETED, handleSettled)
+      .onWake(scenarioExecutionWake)
+      .toPayload(buildProcessEventView)
+      .outbox({
+        maxAttempts: SCENARIO_EXECUTION_MAX_ATTEMPTS,
+        leaseDurationMs: SCENARIO_EXECUTION_LEASE_DURATION_MS,
+      });
 }
 
 /**
@@ -121,6 +183,10 @@ export function createSimulationProcessingPipeline(
           ttlMs: 60_000,
         },
       },
+    )
+    .withProcessManager(
+      SCENARIO_EXECUTION_PROCESS_NAME,
+      scenarioExecutionPM(deps.scenarioExecutionDispatch),
     )
     .build();
 }
