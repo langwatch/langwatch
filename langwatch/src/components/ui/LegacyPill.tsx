@@ -68,7 +68,10 @@ export function LegacyPill({
     >
       <PopoverAnchor asChild>
         <Badge
-          variant="subtle"
+          // Outline keeps the flag legible without competing with the
+          // sidebar's active-row emphasis (a filled red pill outshouted
+          // the current page). Spec: specs/navigation/sidebar-hierarchy.feature
+          variant="outline"
           colorPalette={"red"}
           fontSize="2xs"
           paddingX={1.5}

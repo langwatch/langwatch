@@ -6,6 +6,7 @@ import { LogoIcon } from "../icons/LogoIcon";
 import { MENU_WIDTH_EXPANDED } from "../MainMenu";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
+import { getSidebarToggleShortcut } from "./useSidebarCollapseHotkey";
 
 export type SidebarHeaderToggleProps = {
   isCollapsed: boolean;
@@ -56,7 +57,10 @@ export const SidebarHeaderToggle = ({
           </Link>
         </Box>
         {canToggle && (
-          <Tooltip content="Expand sidebar" positioning={{ placement: "right" }}>
+          <Tooltip
+            content={`Expand sidebar · ${getSidebarToggleShortcut()}`}
+            positioning={{ placement: "right" }}
+          >
             <IconButton
               aria-label="Expand sidebar"
               size="xs"
@@ -94,7 +98,10 @@ export const SidebarHeaderToggle = ({
         <FullLogo width={155 * 0.7} height={38 * 0.7} />
       </Link>
       {canToggle && (
-        <Tooltip content="Collapse sidebar" positioning={{ placement: "right" }}>
+        <Tooltip
+          content={`Collapse sidebar · ${getSidebarToggleShortcut()}`}
+          positioning={{ placement: "right" }}
+        >
           <IconButton
             aria-label="Collapse sidebar"
             size="xs"

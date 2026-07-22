@@ -63,3 +63,16 @@ Feature: Sidebar collapse preference (global, remembered)
     When the user hovers over the icon rail
     Then the expanded sidebar overlays the content temporarily
     And moving the pointer away collapses it back
+
+  @bdd @ui @sidebar @collapse @keyboard
+  Scenario: The sidebar toggles from the keyboard
+    When the user presses Cmd+B (Ctrl+B outside macOS)
+    Then the sidebar toggles between collapsed and expanded
+    And the choice is saved as the user's global sidebar preference
+    And the toggle's tooltip shows the shortcut
+
+  @bdd @ui @sidebar @collapse @keyboard
+  Scenario: The shortcut stands down while typing
+    Given focus is in a text input, textarea, or rich-text editor
+    When the user presses Cmd+B
+    Then the sidebar does not toggle

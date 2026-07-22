@@ -77,7 +77,9 @@ export function BetaPill({
     >
       <PopoverAnchor asChild>
         <Badge
-          variant="subtle"
+          // Outline keeps the flag legible without competing with the
+          // sidebar's active-row emphasis. Spec: specs/navigation/sidebar-hierarchy.feature
+          variant="outline"
           colorPalette={colorPalette}
           fontSize="2xs"
           paddingX={1.5}

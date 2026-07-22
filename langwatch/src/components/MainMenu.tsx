@@ -115,20 +115,24 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
+            {/* Analytics spans the whole product, so it sits ungrouped next
+                to Home rather than inside Observe.
+                Spec: specs/navigation/sidebar-hierarchy.feature */}
+            <PageMenuLink
+              path={projectRoutes.analytics.path}
+              icon={featureIcons.analytics.icon}
+              label={projectRoutes.analytics.title}
+              project={project}
+              isActive={router.pathname.includes("/analytics")}
+              showLabel={showExpanded}
+            />
+
             <SidebarSection
               id="observe"
               label="Observe"
               showExpanded={showExpanded}
               projectId={project?.id}
             >
-              <PageMenuLink
-                path={projectRoutes.analytics.path}
-                icon={featureIcons.analytics.icon}
-                label={projectRoutes.analytics.title}
-                project={project}
-                isActive={router.pathname.includes("/analytics")}
-                showLabel={showExpanded}
-              />
               <PageMenuLink
                 path={projectRoutes.traces_v2.path}
                 icon={featureIcons.traces_v2.icon}

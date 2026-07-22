@@ -60,6 +60,7 @@ import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { SidebarHeaderToggle } from "./sidebar/SidebarHeaderToggle";
+import { useSidebarCollapseHotkey } from "./sidebar/useSidebarCollapseHotkey";
 import { useSidebarCollapsed } from "./sidebar/useSidebarCollapsed";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -418,6 +419,11 @@ export const DashboardLayout = ({
     canToggle,
     setCollapsed,
   } = useSidebarCollapsed({ pageDefaultsToCompact: compactMenuProp });
+  useSidebarCollapseHotkey({
+    enabled: canToggle,
+    isCollapsed: compactMenu,
+    setCollapsed,
+  });
   const router = useRouter();
 
   // Apply a one-shot `?org=<slug>` selection on any org-scoped page, then strip
