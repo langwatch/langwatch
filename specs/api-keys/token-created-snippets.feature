@@ -9,6 +9,29 @@ Feature: Token Created modal command snippets
     And the Token Created dialog is open with the newly minted token
 
   # ============================================================================
+  # Layout — the key leads, one row of destinations follows
+  # ============================================================================
+  # The dialog is built around the key: a credential card carries it (masked,
+  # with reveal + copy) and the one-time warning in its base. Under it, a single
+  # row of destinations — .env / HTTP / Claude Code / Codex / MCP config —
+  # replaces what were two separate tab groups ("Use in Code" / "Use with Code
+  # Assistants"); Bearer and Basic live together under one HTTP destination.
+  # The older scenario titles below say "tab" for continuity; the control is a
+  # destination in the single row.
+
+  @integration
+  Scenario: The key leads the dialog, masked until asked for
+    Then the credential card shows the key masked by default
+    And a reveal control shows the real key in the card, not only inside a snippet
+    And a copy control copies the real key
+
+  @integration
+  Scenario: One destination's snippet shows at a time
+    When I select a destination other than the one shown
+    Then that destination's snippet replaces the previous one
+    And the previous destination's snippet is no longer in the dialog
+
+  # ============================================================================
   # Highlighting engine — Shiki, github-light, singleton highlighter
   # ============================================================================
   # No new syntax-highlighting library is introduced. Shiki v3.x is already a
@@ -33,37 +56,38 @@ Feature: Token Created modal command snippets
     And no second syntax-highlighting library is added to package.json
 
   # ============================================================================
-  # "Use in Code" section — three tabs (.env / Bearer / Basic Auth)
+  # Code destinations — .env and HTTP
   # ============================================================================
-  # Today these render via the plain CodeBlock.tsx (monospace, no highlighting).
-  # After this change they share the new PostHog-style command-box look.
+  # Before the redesign these rendered via plain CodeBlock.tsx (monospace, no
+  # highlighting) under a "Use in Code" tab group. They now share the
+  # PostHog-style command-box look and live in the single destination row.
 
   @integration
   Scenario: .env tab renders as a highlighted ini command box
-    When I select the ".env" tab inside "Use in Code"
+    When I select the ".env" destination
     Then the snippet renders inside the new highlighted command-box style
     And LANGWATCH_API_KEY, LANGWATCH_PROJECT_ID, and LANGWATCH_ENDPOINT keys are visually distinct from their string values
     # (Highlighting language is `ini` — locked in by the `@unit` "Highlight engine wiring" scenario.)
 
   @integration
   Scenario: Bearer tab renders as a highlighted shell command box
-    When I select the "Bearer" tab inside "Use in Code"
-    Then the snippet renders inside the new highlighted command-box style
-    And the snippet shows an `Authorization: Bearer <token>` line plus an `X-Project-Id` line
+    When I select the "HTTP" destination
+    Then the Bearer snippet renders inside the new highlighted command-box style
+    And it shows an `Authorization: Bearer <token>` line plus an `X-Project-Id` line
 
   @integration
   Scenario: Basic Auth tab renders as a highlighted shell command box
-    When I select the "Basic Auth" tab inside "Use in Code"
-    Then the snippet renders inside the new highlighted command-box style
-    And the snippet shows an `Authorization: Basic base64(projectId:token)` line
+    When I select the "HTTP" destination
+    Then the Basic auth snippet renders alongside the Bearer one — both forms, not one behind a sub-toggle
+    And it shows an `Authorization: Basic base64(projectId:token)` line
 
   # ============================================================================
-  # "Use with Code Assistants" section — terminal command + JSON config
+  # Assistant destinations — Claude Code / Codex terminal commands, MCP config
   # ============================================================================
 
   @integration
   Scenario: Claude Code tab shows a PostHog-style terminal command snippet
-    When I select the "Claude Code" tab inside "Use with Code Assistants"
+    When I select the "Claude Code" destination
     Then the "Run in your terminal" snippet renders inside the new command-box style
     And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (this glyph is decorative and must not enter the copy buffer — see the "prompt glyph is not in the copied value" scenario)
     And the executable name "claude" is visually distinct from its flags and arguments
@@ -71,7 +95,7 @@ Feature: Token Created modal command snippets
 
   @integration
   Scenario: Codex tab shows a PostHog-style terminal command snippet
-    When I select the "Codex" tab inside "Use with Code Assistants"
+    When I select the "Codex" destination
     Then the "Run in your terminal" snippet renders inside the new command-box style
     And the snippet displays a leading terminal prompt glyph ">_" on the left of the command (decorative — must not enter the copy buffer)
     And the executable name "codex" is visually distinct from its `--env` / `--` / `npx` flags and arguments
@@ -137,8 +161,11 @@ Feature: Token Created modal command snippets
 
   @integration
   Scenario: Amber warning between .env block and Code Assistants section stays
+    # The warning now belongs to the key: it sits in the base of the credential
+    # card rather than floating between two sections, so it travels with the
+    # thing it is warning about instead of being scrollable away from it.
     When the Token Created dialog renders
-    Then between the "Use in Code" block and the "Use with Code Assistants" section there is an amber/warning alert reading "Copy this token now. You won't be able to see it again."
+    Then an amber/warning alert reading "Copy this token now. You won't be able to see it again." is shown in the credential card
     And the warning is prominently visible (not collapsed, not dismissible by default)
 
   # ============================================================================
