@@ -178,6 +178,9 @@ import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
+import { ManagerExplorerService } from "./ops/manager-explorer.service";
+import { InMemoryProcessStore } from "~/server/event-sourcing/process-manager/stores/inMemoryProcessStore";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
@@ -1171,6 +1174,7 @@ export function initializeDefaultApp(options?: {
       new PrismaScheduledJobRepository(prisma),
     ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
+    managerExplorer: new ManagerExplorerService(new PrismaProcessStore(prisma)),
     replay: new ReplayService(replayRepo),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, queueRepo })
@@ -1470,6 +1474,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
+      managerExplorer: new ManagerExplorerService(new InMemoryProcessStore()),
       replay: new ReplayService(new NullReplayRepository()),
       metricsCollector: null,
     },

@@ -1443,6 +1443,53 @@ export function getEventSubscriberMetadata(): EventSubscriberMetadata[] {
   });
 }
 
+export interface ProcessManagerMetadata {
+  processName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** Event types that drive the machine's transitions. */
+  eventTypes: readonly string[];
+  /**
+   * Intent types the machine can emit — its cross-aggregate commands, dispatched
+   * through the transactional outbox.
+   */
+  intentTypes: string[];
+  /**
+   * True for a fixed-interval singleton (one instance, project `__global__`);
+   * false for a per-aggregate machine keyed by aggregate id.
+   */
+  scheduled: boolean;
+  /** Fixed wake interval in ms for a scheduled singleton, else null. */
+  everyMs: number | null;
+  /** True when the machine computes its own wake-ups from within `evolve`. */
+  hasWake: boolean;
+}
+
+/**
+ * The process-manager state machines mounted across the pipelines.
+ *
+ * The machine itself is implicit in each manager's `evolve` — there is no
+ * declared state set or transition table — so what is introspectable is the
+ * definition surface: which event types trigger it, which intents it can emit,
+ * and how it wakes. The per-aggregate *position* in the machine lives in the
+ * persisted instance, read separately by ref.
+ */
+export function getProcessManagerMetadata(): ProcessManagerMetadata[] {
+  return getDefinitions().flatMap((def) => {
+    const { name: pipelineName, aggregateType } = def.metadata;
+    return Array.from(def.processManagers.values()).map(({ config }) => ({
+      processName: config.name,
+      pipelineName,
+      aggregateType,
+      eventTypes: config.eventTypes,
+      intentTypes: Object.keys(config.intents ?? {}),
+      scheduled: Boolean(config.schedule),
+      everyMs: config.schedule?.everyMs ?? null,
+      hasWake: Boolean(config.onWake),
+    }));
+  });
+}
+
 /**
  * One descriptor per ES kill-switch key that the registered pipelines
  * will generate at runtime. Used by the Ops Feature Flags page to list

@@ -18,6 +18,7 @@ import { EventTimeline } from "./EventTimeline";
 import { buildFragment, parseFragment } from "./fragment";
 import { KeyboardHints } from "./KeyboardHints";
 import { LeftPanel } from "./LeftPanel";
+import { ManagerPanel } from "./ManagerPanel";
 import { ReplayHeader } from "./ReplayHeader";
 import { RightPanel } from "./RightPanel";
 import { SearchHeader } from "./SearchHeader";
@@ -392,6 +393,12 @@ export function DejaViewContent() {
               {selectedProjection && showEventDetail && currentEvent && (
                 <RightPanel event={currentEvent} />
               )}
+
+              <ManagerPanel
+                aggregateType={currentAggregateType ?? ""}
+                tenantId={selectedAggregate?.tenantId ?? ""}
+                aggregateId={selectedAggregate?.aggregateId ?? ""}
+              />
             </Box>
 
             <EventTimeline
