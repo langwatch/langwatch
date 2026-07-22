@@ -107,17 +107,9 @@ export function GuardrailAttachmentsSection({
       onSaved();
     },
     onError: (err) => {
-      // The router rejects an unpermitted attach with a bare FORBIDDEN whose
-      // message is `missing_perm:gatewayGuardrails:attach` — not a handled
-      // error the registry has copy for — so this surface writes its own.
-      if (err.message.includes("missing_perm")) {
-        toaster.create({
-          title:
-            "You don't have permission to attach guardrails in this project",
-          type: "error",
-        });
-        return;
-      }
+      // The permission denial is a handled `guardrail_attach_forbidden` now,
+      // so its copy lives in the registry with everything else — no branching
+      // on message prose, which the boundary is explicitly free to change.
       showErrorToast({
         error: err,
         fallbackTitle: "Couldn't update the guardrails",
