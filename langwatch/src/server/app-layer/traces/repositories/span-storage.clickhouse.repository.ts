@@ -13,6 +13,7 @@ import {
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { SpanInsertData } from "../types";
@@ -561,6 +562,16 @@ export function deserializeAttributes(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attrs)) {
+    // `langwatch.reserved.eventref.*` pointers (ADR-022) are pipeline-internal
+    // plumbing, never shown as a span attribute — parseSpanEventRefs decodes
+    // their JSON itself and requires the raw string. Richifying them here
+    // (the object-shaped ones round-trip through the JSON branch below) would
+    // silently break read-time offload resolution.
+    if (key.startsWith(EVENTREF_ATTR_PREFIX)) {
+      result[key] = value;
+      continue;
+    }
+
     // Boolean strings
     if (value === "true") {
       result[key] = true;

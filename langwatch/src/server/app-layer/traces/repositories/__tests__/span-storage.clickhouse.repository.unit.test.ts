@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import {
   deserializeAttributes,
   mapSpanSummaryRow,
@@ -119,6 +120,21 @@ describe("deserializeAttributes", () => {
     it("keeps invalid JSON-looking strings as strings", () => {
       const result = deserializeAttributes({ bad: "{not json" });
       expect(result).toEqual({ bad: "{not json" });
+    });
+  });
+
+  describe("when given a langwatch.reserved.eventref.* pointer", () => {
+    it("keeps the JSON-object-shaped value as a raw string instead of parsing it", () => {
+      const key = `${EVENTREF_ATTR_PREFIX}langwatch.input`;
+      const rawPointer = JSON.stringify({
+        field: "langwatch.input",
+        eventId: "evt-001",
+      });
+
+      const result = deserializeAttributes({ [key]: rawPointer });
+
+      expect(result).toEqual({ [key]: rawPointer });
+      expect(typeof result[key]).toBe("string");
     });
   });
 
