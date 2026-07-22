@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { NormalizedSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   extractLastUserMessageText,

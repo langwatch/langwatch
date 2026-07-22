@@ -16,7 +16,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { TraceIOAccumulationService } from "../trace-io-accumulation.service";
-import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 

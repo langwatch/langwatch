@@ -30,7 +30,7 @@ import {
 import type {
   ExtractedIO,
   TraceIOExtractionService,
-} from "~/server/app-layer/traces/trace-io-extraction.service";
+} from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 

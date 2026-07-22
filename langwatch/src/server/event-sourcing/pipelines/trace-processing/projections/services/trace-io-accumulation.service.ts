@@ -3,7 +3,7 @@ import {
   extractAssistantTextFromResponseBody,
   isConversationalQuerySource,
 } from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation/extractors/claudeCode";
-import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   RESERVED_INPUT_MEDIA_REFS,

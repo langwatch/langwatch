@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import { createTenantId } from "~/server/event-sourcing";
 import {
   TRACE_NAME_CHANGED_EVENT_TYPE,

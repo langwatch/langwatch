@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { NormalizedSpan } from "../../schemas/spans";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
 import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 

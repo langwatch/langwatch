@@ -19,7 +19,7 @@ vi.mock("langwatch", () => ({
 import type { BlobStore } from "../blob-store.service";
 import { BlobNotFoundError } from "../blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "../lean-for-projection";
-import { TraceIOExtractionService } from "../trace-io-extraction.service";
+import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import type { SpanStorageRepository } from "../repositories/span-storage.repository";
 import {
   NormalizedSpanKind,

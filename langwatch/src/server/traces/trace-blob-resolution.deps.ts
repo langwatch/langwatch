@@ -1,6 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import {
   type ClickHouseClientResolver,
   getClickHouseClientForProject,

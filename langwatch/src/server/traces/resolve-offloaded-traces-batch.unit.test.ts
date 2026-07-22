@@ -28,7 +28,7 @@ vi.mock("langwatch", () => ({
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,

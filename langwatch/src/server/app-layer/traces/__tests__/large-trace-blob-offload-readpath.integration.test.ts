@@ -62,7 +62,7 @@ import {
 } from "~/server/app-layer/traces/lean-for-projection";
 import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import type { Event } from "~/server/event-sourcing";
 import {
   getTestClickHouseClient,

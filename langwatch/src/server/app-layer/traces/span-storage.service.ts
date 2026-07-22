@@ -19,7 +19,7 @@ import type {
   SpanSummaryPageCursor,
   SpanSummaryRow,
 } from "./repositories/span-storage.repository";
-import type { TraceIOExtractionService } from "./trace-io-extraction.service";
+import type { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import type { SpanInsertData } from "~/server/domain/traces/types";
 import { redactSpanContent } from "./visibility-window.service";
 

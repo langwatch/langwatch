@@ -21,7 +21,7 @@ import {
   EVENTREF_ATTR_PREFIX,
   IO_PREVIEW_BYTES,
 } from "~/server/app-layer/traces/lean-for-projection";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
