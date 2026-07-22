@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
@@ -192,7 +193,11 @@ secured.access(requires("evaluations:view")).get(
 );
 
 // ── Create Monitor ──────────────────────────────────────────
-secured.access(requires("evaluations:manage")).post(
+// Creating asks for `evaluations:create`, not `evaluations:manage`. `:manage`
+// still implies `:create` through the RBAC hierarchy, so every role and key
+// that could create a monitor yesterday still can; a viewer holds only
+// `evaluations:view` and is declined exactly as before.
+secured.access(requires("evaluations:create")).post(
   "/",
   resourceLimitMiddleware("onlineEvaluations"),
   describeRoute({
@@ -265,7 +270,7 @@ secured.access(requires("evaluations:manage")).post(
 );
 
 // ── Update Monitor ──────────────────────────────────────────
-secured.access(requires("evaluations:manage")).patch(
+secured.access(requires("evaluations:update")).patch(
   "/:id",
   describeRoute({
     description: "Update a monitor (name, enabled state, settings, etc.)",
@@ -350,7 +355,8 @@ secured.access(requires("evaluations:manage")).patch(
 );
 
 // ── Toggle Monitor ──────────────────────────────────────────
-secured.access(requires("evaluations:manage")).post(
+// Enabling/disabling changes the monitor that already exists — an `:update`.
+secured.access(requires("evaluations:update")).post(
   "/:id/toggle",
   describeRoute({
     description: "Enable or disable a monitor",
@@ -402,6 +408,7 @@ secured.access(requires("evaluations:manage")).post(
 );
 
 // ── Delete Monitor ──────────────────────────────────────────
+// Destruction deliberately stays at `:manage`.
 secured.access(requires("evaluations:manage")).delete(
   "/:id",
   describeRoute({

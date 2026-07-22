@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
@@ -28,7 +29,13 @@ const logger = createLogger("langwatch:api:scenario-events");
 const secured = createProjectApp({ basePath: "/api/scenario-events" });
 
 // POST /api/scenario-events - Create a new scenario event
-secured.access(requires("scenarios:manage")).post(
+//
+// Reporting a scenario event creates run data; it never touches a scenario
+// definition, so it asks for `scenarios:create` rather than the administration
+// grain. `:manage` still implies `:create` through the RBAC hierarchy, so every
+// SDK key and role that could report events yesterday still can; a viewer holds
+// only `scenarios:view` and is declined exactly as before.
+secured.access(requires("scenarios:create")).post(
   "/",
   blockTraceUsageExceededMiddleware,
   bodyLimit({ maxSize: 50 * 1024 * 1024 }), // 50MB — accommodates inline media payloads
@@ -139,7 +146,8 @@ secured.access(requires("scenarios:manage")).post(
 
 // DELETE /api/scenario-events - Archive all simulation runs for a scenario
 // set. A scenarioSetId is MANDATORY: an unqualified request is rejected so a
-// single call can never archive every run in the project.
+// single call can never archive every run in the project. Stays at `:manage`:
+// it is bulk destruction, and only the administration grain should carry it.
 export const route = secured.access(requires("scenarios:manage")).delete(
   "/",
   blockTraceUsageExceededMiddleware,

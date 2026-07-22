@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   handledErrorFromThrown,
+  isTerminalFailure,
   parseHandledError,
   readCliErrorDocument,
   toCliErrorDocument,
@@ -702,6 +703,93 @@ describe("parseHandledError, given a bare `code` with nothing else", () => {
       code: "dataset_not_found",
       meta: { id: "sales-q3" },
       isHandled: true,
+    });
+  });
+});
+
+/**
+ * The one thing a machine caller needs beyond "what went wrong": whether there
+ * is anything left to try.
+ *
+ * The agent used to infer this from the code and got it wrong in the expensive
+ * direction — it re-ran a create that had been refused on a PLAN LIMIT with a
+ * different set of flags, which could never have worked, and put a second card
+ * in the user's transcript for a resource that was never made.
+ */
+describe("isTerminalFailure", () => {
+  const failure = ({ status, code }: { status: number; code: string }) =>
+    parseHandledError({
+      status,
+      body: { code, kind: code, message: code, meta: {} },
+    });
+
+  describe("given a failure no argument can change", () => {
+    it("calls a plan limit terminal", () => {
+      expect(
+        isTerminalFailure(
+          failure({ status: 403, code: "resource_limit_exceeded" }),
+        ),
+      ).toBe(true);
+    });
+
+    it("calls a refused permission terminal", () => {
+      expect(
+        isTerminalFailure(
+          failure({ status: 403, code: "api_key_permission_denied" }),
+        ),
+      ).toBe(true);
+    });
+
+    it("calls a missing resource terminal", () => {
+      expect(
+        isTerminalFailure(failure({ status: 404, code: "dataset_not_found" })),
+      ).toBe(true);
+    });
+  });
+
+  describe("given a failure a different request could fix", () => {
+    it("leaves a validation error open, since the fields can be corrected", () => {
+      expect(
+        isTerminalFailure(failure({ status: 422, code: "validation_error" })),
+      ).toBe(false);
+    });
+
+    it("leaves rate limiting open, since waiting is a fix", () => {
+      expect(
+        isTerminalFailure(failure({ status: 429, code: "rate_limited" })),
+      ).toBe(false);
+    });
+  });
+
+  describe("given a failure that is ours", () => {
+    it("never calls our own outage the caller's dead end", () => {
+      expect(
+        isTerminalFailure(failure({ status: 503, code: "internal_error" })),
+      ).toBe(false);
+    });
+
+    it("never trusts a status read off something we did not answer with", () => {
+      expect(
+        isTerminalFailure(
+          parseHandledError({ status: 403, body: "<html>Forbidden</html>" }),
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the failure document is written", () => {
+    it("states the verdict on the document, so nothing has to infer it", () => {
+      const document = toCliErrorDocument(
+        failure({ status: 403, code: "resource_limit_exceeded" }),
+      );
+      expect(document.error.terminal).toBe(true);
+    });
+
+    it("states it for the retryable failures too, rather than omitting it", () => {
+      const document = toCliErrorDocument(
+        failure({ status: 429, code: "rate_limited" }),
+      );
+      expect(document.error.terminal).toBe(false);
     });
   });
 });
