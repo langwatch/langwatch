@@ -34,7 +34,7 @@
 		"zod": "^3.25.0"
 	},
 	"devDependencies": {
-		"@types/node": "^26.0.1",
+		"@types/node": "^26.1.1",
 		"@types/sanitize-html": "^2.16.0",
 		"typescript": "^6.0.3",
 		"vitest": "^4.1.9",
