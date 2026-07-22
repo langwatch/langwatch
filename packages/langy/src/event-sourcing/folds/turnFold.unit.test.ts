@@ -4,7 +4,7 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_TURN_STATUS,
   LANGY_TURN_TOOL_CALL_STATUS,
-} from "../constants";
+} from "../../constants";
 import {
   foldLangyConversationTurn,
   initLangyConversationTurnState,
@@ -12,7 +12,7 @@ import {
   parseConversationTurnKey,
   type LangyConversationTurnEvent,
   type LangyConversationTurnFoldState,
-} from "../turnFold";
+} from "./turnFold";
 
 const IDS = { conversationId: "conv-1", turnId: "turn-1" };
 

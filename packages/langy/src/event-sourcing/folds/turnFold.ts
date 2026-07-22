@@ -20,17 +20,7 @@ import {
   LANGY_TURN_TOOL_CALL_STATUS,
   type LangyConversationTurnStatus,
   type LangyTurnToolCallStatus,
-} from "./constants";
-import {
-  langyAgentResponseFailedEventDataSchema,
-  langyAgentRespondedEventDataSchema,
-  langyAgentTurnAcceptedEventDataSchema,
-  langyPlanUpdatedEventDataSchema,
-  langyToolCallFailedEventDataSchema,
-  langyToolCallInitiatedEventDataSchema,
-  langyToolCallSucceededEventDataSchema,
-} from "./events";
-import { langyJsonValueSchema } from "./shared";
+} from "../../constants";
 import type {
   LangyAgentResponseFailedEventData,
   LangyAgentRespondedEventData,
@@ -40,12 +30,13 @@ import type {
   LangyToolCallFailedEventData,
   LangyToolCallInitiatedEventData,
   LangyToolCallSucceededEventData,
-} from "./events";
+} from "../contracts/events";
+import { langyJsonValueSchema } from "../../json";
 import type {
   LangyJsonObject,
   LangyJsonValue,
   LangyMessagePart,
-} from "./shared";
+} from "../../json";
 
 /**
  * Composite fold key: one turn document per `(conversationId, turnId)` within a
@@ -217,71 +208,6 @@ export type LangyConversationTurnEvent =
       typeof LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
       LangyAgentRespondedEventData
     >;
-
-/** The `type` strings the turn fold consumes (routing/subscription filters). */
-export const LANGY_CONVERSATION_TURN_EVENT_TYPES = [
-  LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
-  LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED,
-  LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED,
-  LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED,
-  LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED,
-  LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
-  LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
-] as const;
-
-/**
- * The WIRE envelope of one turn event, as the tail read serves it (ADR-059 §3):
- * the event's identity, its cursor coordinates (`createdAt` is the log-accept
- * time — the same clock as `LangyEventCursor.acceptedAt` — `id` the KSUID
- * tie-break), the fold clock (`occurredAt`), and the typed payload. No tenant,
- * aggregate, or server-only fields ever ride it.
- */
-const turnWireEnvelope = {
-  id: z.string(),
-  createdAt: z.number().int().nonnegative(),
-  occurredAt: z.number().int().nonnegative(),
-} as const;
-
-export const langyConversationTurnEventSchema = z.discriminatedUnion("type", [
-  z.object({
-    ...turnWireEnvelope,
-    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED),
-    data: langyAgentTurnAcceptedEventDataSchema,
-  }),
-  z.object({
-    ...turnWireEnvelope,
-    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED),
-    data: langyToolCallInitiatedEventDataSchema,
-  }),
-  z.object({
-    ...turnWireEnvelope,
-    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED),
-    data: langyToolCallSucceededEventDataSchema,
-  }),
-  z.object({
-    ...turnWireEnvelope,
-    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED),
-    data: langyToolCallFailedEventDataSchema,
-  }),
-  z.object({
-    ...turnWireEnvelope,
-    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED),
-    data: langyPlanUpdatedEventDataSchema,
-  }),
-  z.object({
-    ...turnWireEnvelope,
-    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED),
-    data: langyAgentResponseFailedEventDataSchema,
-  }),
-  z.object({
-    ...turnWireEnvelope,
-    type: z.literal(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED),
-    data: langyAgentRespondedEventDataSchema,
-  }),
-]);
-export type LangyConversationTurnWireEvent = z.infer<
-  typeof langyConversationTurnEventSchema
->;
 
 /** Set identity from any turn event (the fold may hydrate mid-stream). */
 function withIdentity<S extends LangyConversationTurnFoldState>(
