@@ -239,7 +239,7 @@ import { traced } from "./tracing";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
 import { ClickHouseAutomationAuditRepository } from "./automations/repositories/automation-audit.clickhouse.repository";
-import { NullAutomationAuditRepository } from "./automations/repositories/automation-audit.repository";
+import { NullAutomationAuditRepository } from "@langwatch/automations/repositories/automation-audit.repository";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
@@ -247,7 +247,7 @@ import {
 import {
   NullEmailSuppressionNameLookupRepository,
   NullEmailSuppressionRepository,
-} from "./automations/repositories/emailSuppression.repository";
+} from "@langwatch/automations/repositories/emailSuppression.repository";
 import { PrismaTriggerRepository } from "./automations/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./automations/repositories/trigger.repository";
 import { TriggerService } from "./automations/trigger.service";

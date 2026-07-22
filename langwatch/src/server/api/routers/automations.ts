@@ -24,7 +24,7 @@ import {
   MissingAnnotatorError,
   NotificationDeliveryError,
   ProjectNotFoundError,
-} from "~/server/app-layer/automations/errors";
+} from "@langwatch/automations-server/errors";
 import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import { type SlackActionParams } from "@langwatch/automations/providers/slack";

@@ -3,7 +3,7 @@ import type {
   TriggerFire,
   TriggerFireHistoryRepository,
   TriggerFireStats,
-} from "../repositories/trigger-fire-history.repository";
+} from "@langwatch/automations/repositories/trigger-fire-history.repository";
 import { TriggerFireHistoryService } from "../trigger-fire-history.service";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;

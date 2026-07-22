@@ -10,6 +10,9 @@
 		".": "./src/index.ts",
 		"./cadences": "./src/cadences.ts",
 		"./enums": "./src/enums.ts",
+		"./domain/*": "./src/domain/*.ts",
+		"./repositories/*": "./src/repositories/*.ts",
+		"./utils/*": "./src/utils/*.ts",
 		"./providers/*": "./src/providers/*.ts",
 		"./templating/*": "./src/templating/*.ts"
 	},

@@ -52,12 +52,12 @@ import { createLogger } from "@langwatch/observability";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,
-} from "./evaluate-custom-graph-threshold.service";
+} from "@langwatch/automations-server/services/evaluate-custom-graph-threshold.service";
 import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
 } from "./repositories/trigger.repository";
-import { parseSeriesIndex } from "./seriesName";
+import { parseSeriesIndex } from "@langwatch/automations-server/services/seriesName";
 
 const logger = createLogger("langwatch:graph-trigger-evaluation");
 

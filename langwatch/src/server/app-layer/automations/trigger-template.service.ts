@@ -26,7 +26,7 @@ import {
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
 import { validateLiquid } from "@langwatch/automations/templating/validate";
-import { TemplateValidationError, TestFireUnavailableError } from "./errors";
+import { TemplateValidationError, TestFireUnavailableError } from "@langwatch/automations-server/errors";
 
 export type TemplateChannel = "email" | "slack" | "webhook";
 

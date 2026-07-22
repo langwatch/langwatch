@@ -9,6 +9,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./api": "./src/api/service.ts",
+		"./errors": "./src/errors.ts",
 		"./services/*": "./src/services/*.ts",
 		"./clients/*": "./src/clients/*.ts",
 		"./dispatch/*": "./src/dispatch/*.ts",

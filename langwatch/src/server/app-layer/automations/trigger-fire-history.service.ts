@@ -4,7 +4,7 @@ import type {
   TriggerFire,
   TriggerFireHistoryRepository,
   TriggerFireStats,
-} from "./repositories/trigger-fire-history.repository";
+} from "@langwatch/automations/repositories/trigger-fire-history.repository";
 
 export type { TriggerFire, TriggerFireStats };
 

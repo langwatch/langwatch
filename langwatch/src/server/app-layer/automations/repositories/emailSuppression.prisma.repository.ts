@@ -4,7 +4,7 @@ import type {
   EmailSuppressionRepository,
   EmailSuppressionRow,
   UnsubscribeNames,
-} from "./emailSuppression.repository";
+} from "@langwatch/automations/repositories/emailSuppression.repository";
 
 export class PrismaEmailSuppressionRepository
   implements EmailSuppressionRepository

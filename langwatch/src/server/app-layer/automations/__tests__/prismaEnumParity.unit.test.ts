@@ -3,10 +3,12 @@ import {
   TriggerAction as PackageTriggerAction,
   TriggerKind as PackageTriggerKind,
 } from "@langwatch/automations";
+import type { TriggerRow } from "@langwatch/automations/domain/trigger";
 import {
   AlertType as PrismaAlertType,
   TriggerAction as PrismaTriggerAction,
   TriggerKind as PrismaTriggerKind,
+  type Trigger as PrismaTrigger,
 } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
@@ -34,6 +36,16 @@ const _alertTypeParity: AssertMutuallyAssignable<
 const _triggerKindParity: AssertMutuallyAssignable<
   PackageTriggerKind,
   PrismaTriggerKind
+> = true;
+
+// The domain TriggerRow (ADR-063) mirrors the Prisma Trigger scalars: every
+// generated row must satisfy the domain shape, and neither side may grow a
+// column the other lacks.
+const _triggerRowAssignable: PrismaTrigger extends TriggerRow ? true : never =
+  true;
+const _triggerRowKeysParity: AssertMutuallyAssignable<
+  keyof PrismaTrigger,
+  keyof TriggerRow
 > = true;
 
 describe("prisma enum parity", () => {

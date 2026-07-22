@@ -5,7 +5,7 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type {
   AutomationAuditRepository,
   AutomationAuditRow,
-} from "./automation-audit.repository";
+} from "@langwatch/automations/repositories/automation-audit.repository";
 
 const TABLE_NAME = "automation_audit" as const;
 const logger = createLogger("langwatch:triggers:automation-audit-repository");
