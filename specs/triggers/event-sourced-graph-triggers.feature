@@ -7,6 +7,11 @@ Feature: Event-sourced custom-graph threshold alerts
   # reactor fires on fold updates and the 30s heartbeat covers no-data and
   # resolve. The K8s cron that used to share this work was removed once every
   # project had cut over (ADR-034).
+  #
+  # Silence (ADR-063, specs/automations/silence.feature): a silenced trigger
+  # keeps evaluating and recording incidents, but its notifications are
+  # suppressed until the silence expires. These scenarios assume an
+  # unsilenced trigger.
 
   Background:
     Given a project owns active custom-graph triggers

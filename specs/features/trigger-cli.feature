@@ -3,6 +3,11 @@ Feature: Trigger (Automation) CLI Commands
   I want to manage triggers via CLI commands
   So that I can set up automated alerts and actions without using the UI
 
+  # Deprecation note (ADR-063): these commands drive the legacy /api/triggers
+  # surface, which is deprecated and will be removed after a migration
+  # window. The CLI migrates to the versioned automations API
+  # (specs/automations/customer-api.feature).
+
   Background:
     Given I have a valid LANGWATCH_API_KEY configured
 

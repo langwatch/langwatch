@@ -14,6 +14,14 @@ Feature: Staged automation authoring drawer
 
   See dev/docs/adr/037-automation-operator-surfaces.md.
 
+  Scope note (ADR-063): this drawer is no longer the primary creation path.
+  Creation starts in the composing flow (specs/automations/page-states.feature,
+  specs/automations/agent-composing.feature); this staged form is the
+  "Edit details" escape hatch and the editor for existing automations. The
+  scenarios below — including the type picker and the cadence-review save
+  gate — describe the form path; a plan approved in composing states its
+  cadence on the plan card instead.
+
   Background:
     Given a user authoring an automation in a project
 
