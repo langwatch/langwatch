@@ -189,7 +189,15 @@ export interface LangyProgressSample {
 }
 
 interface LangyState extends TurnPhaseState {
-  // Panel visibility
+  // Panel visibility. `false` is MINIMISED, not gone: the panel sinks to its
+  // edge peek (see LangyPeekDock — a sliver of the card at the bottom edge in
+  // floating mode, of the dock's spine on the right edge in sidebar mode)
+  // with the conversation, draft and layout choice untouched underneath.
+  // `openPanel` — the peek's click/Enter, the Cmd/Ctrl+I toggle, an askLangy
+  // handoff — brings the same surface back. Exactly ONE minimised affordance
+  // renders at a time: the peek behind release_ui_langy_peek_dock_enabled,
+  // the classic launcher orb while that flag is off (see LangySidecar).
+  // Spec: specs/langy/langy-peek-dock.feature
   isOpen: boolean;
   openPanel: () => void;
   closePanel: () => void;
