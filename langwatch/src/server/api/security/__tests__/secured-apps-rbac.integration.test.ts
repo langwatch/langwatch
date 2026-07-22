@@ -291,7 +291,9 @@ describe("Feature: migrated Hono apps enforce RBAC + tenant isolation", () => {
           body: JSON.stringify({ enabled: true }),
         });
 
-      expect((await writeRequest()).status).not.toBe(403);
+      // 200, not merely 'not 403': a 4xx/5xx here would satisfy the
+      // before/after contrast without the write ever having worked.
+      expect((await writeRequest()).status).toBe(200);
 
       await prisma.roleBinding.updateMany({
         where: { organizationId: orgA.id, userId: owner.id },
