@@ -1,5 +1,6 @@
 import { Box, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
+import { LuArrowRight } from "react-icons/lu";
 import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGhost";
 import { Composer } from "~/features/langy/components/Composer";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
@@ -145,14 +146,11 @@ export function LangyHomeLantern() {
                 />
               </Box>
               {conversationOpen ? (
-                <Box
-                  position="absolute"
-                  inset={0}
-                  display="flex"
-                  alignItems="center"
-                >
-                  <ContinueLine stalled={stalled} onContinue={continueInLangy} />
-                </Box>
+                // Absolute, filling the composer's reserved footprint: the
+                // slot keeps its height (nothing below jumps) AND the space
+                // reads as an intentional resume card rather than a short line
+                // stranded in emptiness.
+                <ContinueLine stalled={stalled} onContinue={continueInLangy} />
               ) : null}
             </>
           )}
@@ -254,13 +252,17 @@ function ContinueLine({
     <chakra.button
       type="button"
       onClick={onContinue}
-      flex={1}
+      // Fills the composer's reserved box (its parent is position:relative),
+      // so the resume affordance occupies the space the composer left rather
+      // than floating a thin line in it — same height, no emptiness.
+      position="absolute"
+      inset={0}
       display="flex"
       alignItems="center"
-      gap={2}
+      justifyContent="space-between"
+      gap={3}
       textAlign="left"
-      height="46px"
-      paddingX={4}
+      paddingX={5}
       borderRadius="18px"
       borderWidth="1px"
       borderStyle="solid"
@@ -269,12 +271,35 @@ function ContinueLine({
       backdropFilter="blur(8px)"
       cursor="pointer"
       color="fg.muted"
-      fontFamily="mono"
-      fontSize="11.5px"
-      transition="color 130ms ease, border-color 130ms ease"
-      _hover={{ color: "fg", borderColor: "border.emphasized" }}
+      transition="color 130ms ease, border-color 130ms ease, background 130ms ease"
+      _hover={{
+        color: "fg",
+        borderColor: "border.emphasized",
+        background: "bg.panel/80",
+      }}
     >
-      {stalled ? "Langy is still working" : "Continue in Langy"}
+      <VStack align="start" gap={1} minWidth={0}>
+        <Text fontFamily="mono" fontSize="13px" color="fg">
+          {stalled ? "Langy is still working" : "Continue your conversation"}
+        </Text>
+        <Text fontSize="xs" color="fg.subtle">
+          {stalled
+            ? "Its answer is on the way — open the panel to watch it land."
+            : "Your chat is open in the panel. Pick up where you left off."}
+        </Text>
+      </VStack>
+      <Box
+        flexShrink={0}
+        display="grid"
+        placeItems="center"
+        boxSize="30px"
+        borderRadius="full"
+        borderWidth="1px"
+        borderColor="border.muted"
+        color="fg.muted"
+      >
+        <LuArrowRight size={15} aria-hidden />
+      </Box>
     </chakra.button>
   );
 }
