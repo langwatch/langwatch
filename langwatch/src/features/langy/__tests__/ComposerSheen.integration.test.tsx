@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * The composer's rainbow sheen (`.langy-composer-sheen`) is an invitation on a
- * blank, idle composer. It must drop the moment the conversation has anything
- * in it — a turn in flight, or a conversation already adopted — so it never
- * competes with the answer. This pins that toggle.
+ * The composer's rainbow sheen (`.langy-composer-sheen`) is an ACTIVITY signal:
+ * lit for exactly as long as a turn is in flight, dark at rest. It used to be
+ * the inverse — an invitation that showed only on a blank, never-used composer
+ * and dropped the instant you sent — so this pins the direction, in both
+ * senses, to stop it flipping back by accident.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
@@ -20,7 +21,7 @@ vi.mock("../components/LangyModelPill", () => ({
 import { Composer } from "../components/Composer";
 import { useLangyStore } from "../stores/langyStore";
 
-function renderComposer(overrides: Partial<{ isBusy: boolean }> = {}) {
+function renderComposer() {
   return render(
     <ChakraProvider value={defaultSystem}>
       <Composer
@@ -29,7 +30,6 @@ function renderComposer(overrides: Partial<{ isBusy: boolean }> = {}) {
         onModelChange={() => {}}
         onSend={() => {}}
         onStop={() => {}}
-        isBusy={overrides.isBusy ?? false}
         disabled={false}
       />
     </ChakraProvider>,
@@ -39,34 +39,51 @@ function renderComposer(overrides: Partial<{ isBusy: boolean }> = {}) {
 const sheen = (container: HTMLElement) =>
   container.querySelector(".langy-composer-sheen");
 
-describe("given the Langy composer sheen", () => {
-  beforeEach(() => {
-    useLangyStore.setState({ activeConversationId: null, draft: "" });
+const resetStore = () =>
+  useLangyStore.setState({
+    activeConversationId: null,
+    draft: "",
+    turnPhase: "idle",
   });
+
+describe("given the Langy composer sheen", () => {
+  beforeEach(resetStore);
   afterEach(() => {
     cleanup();
-    useLangyStore.setState({ activeConversationId: null, draft: "" });
+    resetStore();
   });
 
   describe("when the conversation is empty and idle", () => {
-    it("shows the inviting rainbow sheen", () => {
+    it("stays dark, because nothing is happening", () => {
+      const { container } = renderComposer();
+      expect(sheen(container)).toBeNull();
+    });
+  });
+
+  describe("when an adopted conversation is sitting idle", () => {
+    it("stays dark", () => {
+      useLangyStore.setState({
+        activeConversationId: "conv-1",
+        turnPhase: "idle",
+      });
+      const { container } = renderComposer();
+      expect(sheen(container)).toBeNull();
+    });
+  });
+
+  describe("when a turn is in flight", () => {
+    it("lights the sheen", () => {
+      useLangyStore.setState({ turnPhase: "active" });
       const { container } = renderComposer();
       expect(sheen(container)).not.toBeNull();
     });
   });
 
-  describe("when a conversation has been adopted", () => {
-    it("drops the sheen", () => {
-      useLangyStore.setState({ activeConversationId: "conv-1" });
+  describe("when a stop has been requested but the backend has not confirmed", () => {
+    it("keeps the sheen lit through the stopping window", () => {
+      useLangyStore.setState({ turnPhase: "stopping" });
       const { container } = renderComposer();
-      expect(sheen(container)).toBeNull();
-    });
-  });
-
-  describe("when a turn is in flight before the conversation is adopted", () => {
-    it("drops the sheen", () => {
-      const { container } = renderComposer({ isBusy: true });
-      expect(sheen(container)).toBeNull();
+      expect(sheen(container)).not.toBeNull();
     });
   });
 });

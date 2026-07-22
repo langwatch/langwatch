@@ -8,6 +8,7 @@ import {
   BLOB_LEASE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
 } from "./blobConstants";
+import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -418,13 +419,17 @@ end
 // its lease in the same eval as the staged value becomes visible. A squash
 // transfers the displaced lease atomically with that replacement. Releases
 // never delete content-addressed blobs: Redis TTL and the durable-store
-// lifecycle sweep are the only reclaim paths.
+// lifecycle sweep are the only reclaim paths. Retiring the LAST lease does
+// shorten the Redis-tier blob's expiry to the release grace window, which any
+// later take re-arms — see `blobGraceLua.ts`.
 //
 // Envelope lease parse mirrors the TS readEnvelopeLease: "GQ2|<len>|<headerJson>"
 // with header.ref = {tier, projectId, hash} and header.h = the lease holder id.
 // GQ1 values ("GQ1|", header.r = blob id) are private — their blob is
 // UNLINKed directly. Legacy bare-JSON / inline values carry no blob at all.
-const BLOB_LEASE_HELPER_LUA = `
+const BLOB_LEASE_HELPER_LUA =
+  GQ_BLOB_GRACE_LUA +
+  `
 local function gqTenantOf(groupId)
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then return string.sub(groupId, 1, slashPos - 1) end
@@ -503,9 +508,16 @@ local function gqSquashTransferLeases(keyPrefix, tenant, newValue, oldValue)
   local oldLeaseKey = keyPrefix .. "blobleases:" .. oldLease.projectId .. "/" .. oldLease.hash
   redis.call("ZREM", oldLeaseKey, oldLease.holderId)
   redis.call("ZREMRANGEBYSCORE", oldLeaseKey, "-inf", nowMs)
-  if redis.call("ZCARD", oldLeaseKey) == 0 then redis.call("DEL", oldLeaseKey) end
   local oldLegacyKey = keyPrefix .. "blobholders:" .. oldLease.projectId .. "/" .. oldLease.hash
   redis.call("SREM", oldLegacyKey, oldLease.holderId)
+  -- Same grace window the standalone release eval applies: a displaced blob
+  -- nothing leases any more must not sit on the full backstop.
+  local oldBlobKey = ""
+  if oldLease.tier == "redis" then
+    oldBlobKey = keyPrefix .. "blob:" .. oldLease.projectId .. "/" .. oldLease.hash
+  end
+  gqGraceExpireIfUnleased(oldLeaseKey, oldLegacyKey, oldBlobKey)
+  if redis.call("ZCARD", oldLeaseKey) == 0 then redis.call("DEL", oldLeaseKey) end
   return 0
 end
 

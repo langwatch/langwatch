@@ -454,6 +454,21 @@ export const langyRouter = createTRPCRouter({
          */
         isTurnInFlight: boolean;
         /**
+         * WHICH turn is in flight — null when none is, and null in the brief
+         * window between a message being sent and its turn being accepted on
+         * the record (`CurrentTurnId` lands at `agent_turn_accepted`).
+         *
+         * The durable answer to "what would Stop stop?". A browser tab only
+         * learns a turn id from its OWN send, so a turn it merely adopted from
+         * this read — started in another tab, or rejoined after a refresh —
+         * used to offer a Stop button with no id behind it: the click moved the
+         * control to "Stopping" and dispatched nothing, while the agent kept
+         * running. A tab-to-tab message could not fix that, because the worst
+         * case is that no other tab exists; the record can, because it always
+         * knew.
+         */
+        inFlightTurnId: string | null;
+        /**
          * Whether the panel should ask "How did Langy do?" under the latest
          * answer — the backend-driven cadence (never a client heuristic; see
          * specs/langy/langy-feedback.feature). False while a turn is in
@@ -501,6 +516,9 @@ export const langyRouter = createTRPCRouter({
               ? conversation.lastError
               : null,
           isTurnInFlight,
+          // Only ever the id of a turn that IS in flight: a cleared/stale id
+          // must never become a Stop target.
+          inFlightTurnId: isTurnInFlight ? conversation.currentTurnId : null,
           shouldAskFeedback,
         };
       },
@@ -612,6 +630,35 @@ export const langyRouter = createTRPCRouter({
         });
       },
     ),
+
+  /**
+   * Stop an in-flight turn FOR REAL (ADR-058). The browser's `useChat` stop only
+   * aborts its own subscription and lets the worker keep burning tokens; this
+   * records the durable stopped terminal (the confirmation the client waits on),
+   * ends the live stream, and best-effort asks the worker to abandon the run.
+   *
+   * `langy:create` — the same permission as sending — but deliberately NOT the
+   * rate-limited `langyTurnProcedure`: a Stop must never be throttled. The
+   * per-turn control gate (actor-or-owner, never a shared viewer) and its handled
+   * `LangyConversationNotOwnedError` live in the service; idempotent — stopping an
+   * already-finished turn is a harmless no-op.
+   */
+  stopTurn: langyCreateProcedure
+    .input(
+      z.object({
+        conversationId: z.string().min(1),
+        turnId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ stopped: boolean }> => {
+      await getApp().langy.turns.stopTurn({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        userId: ctx.session.user.id,
+      });
+      return { stopped: true };
+    }),
 
   /**
    * The model allowlist the composer's picker narrows to, or null when the

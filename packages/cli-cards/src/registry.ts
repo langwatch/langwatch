@@ -17,7 +17,170 @@
  * The resource list is the CLI's own, per `feature-map.json`.
  */
 import type * as z from "zod/v4";
-import { SCHEMA_BY_CARD_KIND, type CardKind } from "./cards.js";
+import {
+  dashboardProbeSchema,
+  evaluatorConfigProbeSchema,
+  SCHEMA_BY_CARD_KIND,
+  spendProbeSchema,
+  timeseriesProbeSchema,
+  type CardKind,
+} from "./cards.js";
+
+/**
+ * ── SHAPE-DRIVEN PROMOTION ─────────────────────────────────────────────────
+ *
+ * `cardKindFor` picks a card from the command's NAME alone. That is right most
+ * of the time and wrong in a specific, recurring way: a result can arrive full
+ * of summable cost or a chartable series and still render as a generic table
+ * because of what the command happened to be called. So the name stays a PRIOR
+ * and the shape may PROMOTE.
+ *
+ * Rules that keep it honest, in order of how easily they are lost:
+ *
+ *  1. PROMOTE ONLY — never demote, never override a deliberate `byVerb`
+ *     binding. Eligibility is decided by HOW the card was chosen, not by how
+ *     generic it is: a resource's DEFAULT read card (`read:`) is a prior and
+ *     may be promoted; a `byVerb` binding is a decision and may not. See
+ *     `PROMOTABLE_FROM`.
+ *  2. ELIGIBILITY THEN RANK, never first-match. An if-chain encodes its
+ *     priority in source order, where nobody can see or test it. (Every
+ *     serious visualisation-recommendation system ranks: Mackinlay's *Show Me*,
+ *     UW's *Draco*.)
+ *  3. TIES BREAK EXPLICITLY — two probes may not share a specificity, asserted
+ *     by `promotion.test.ts`.
+ *  4. PROBES MUST DISCRIMINATE, and a probe schema is NOT a card's render
+ *     schema. Acceptance is a floor ("I can draw this"); evidence is a bar
+ *     ("this payload proves it is mine"). Conflating them breaks a deliberate
+ *     binding the moment a real payload omits a field.
+ *
+ * ADR: dev/docs/adr/059-card-selection-is-deterministic.md
+ */
+
+/**
+ * The cards a result may be promoted FROM.
+ *
+ * The test is rule 1, not "is it generic": a card is promotable when it was
+ * chosen by a resource DEFAULT rather than by a deliberate `byVerb` binding. So
+ * the generic read qualifies, and so does `metrics` — the default the whole
+ * `analytics` resource rides, which nothing ever chose for a specific verb.
+ *
+ * `metrics` matters because `analytics query` is the ONE command that answers
+ * with a chartable series, and while it was excluded the timeseries card could
+ * not be reached by any command in the product: "compare trace cost this week
+ * to last" resolved to `metrics` and rendered the trend as two large decimals.
+ *
+ * A write card states what just happened and a bespoke `byVerb` read card was
+ * chosen deliberately; neither is an invitation to guess again.
+ */
+const PROMOTABLE_FROM: ReadonlySet<CardKind> = new Set<CardKind>([
+  "resourceRead",
+  "metrics",
+]);
+
+export interface CardProbe {
+  /** The card a payload matching `schema` is promoted to. */
+  card: CardKind;
+  /**
+   * Accepts ONLY payloads that genuinely are this shape. See rule 4 — a probe
+   * that tolerates everything promotes everything.
+   */
+  schema: z.ZodType;
+  /**
+   * How specific this shape is. Higher wins. Unique across all probes, asserted
+   * below, so the winner never depends on declaration order.
+   */
+  specificity: number;
+  /** Why this shape earns this card — read by nobody, needed by everybody. */
+  why: string;
+}
+
+/**
+ * Assert that no two probes share a specificity, at module load.
+ *
+ * A duplicate would resolve by array order today and by a different array order
+ * after the next edit, which is exactly the class of bug this module exists to
+ * prevent. Failing at load makes it a five-second fix instead of a rendering
+ * mystery.
+ */
+export function assertTotalOrder(probes: readonly CardProbe[]): void {
+  const seen = new Map<number, CardKind>();
+  for (const probe of probes) {
+    const clash = seen.get(probe.specificity);
+    if (clash !== undefined) {
+      throw new Error(
+        `Card probes must be totally ordered: '${probe.card}' and '${clash}' ` +
+          `both claim specificity ${probe.specificity}.`,
+      );
+    }
+    seen.set(probe.specificity, probe.card);
+  }
+}
+
+/**
+ * The best card a payload's SHAPE earns, or null to keep the one its name did.
+ *
+ * Null is the overwhelmingly common answer and the safe one: an unrecognised
+ * shape keeps today's card, so growing this list can add richness but cannot
+ * take any away.
+ */
+export function promoteCard({
+  nominal,
+  payload,
+  probes,
+}: {
+  /** The card the command's name resolved to. */
+  nominal: CardKind;
+  payload: unknown;
+  probes: readonly CardProbe[];
+}): CardKind | null {
+  if (!PROMOTABLE_FROM.has(nominal)) return null;
+
+  let best: CardProbe | null = null;
+  for (const probe of probes) {
+    if (probe.card === nominal) continue;
+    if (best && probe.specificity <= best.specificity) continue;
+    if (!probe.schema.safeParse(payload).success) continue;
+    best = probe;
+  }
+  return best?.card ?? null;
+}
+
+/**
+ * The shape probes, most specific first by SCORE (not by position — see
+ * `promotion.ts`). A payload that lands on a generic card and matches one of
+ * these is promoted to the richer card it has evidently earned.
+ */
+export const CARD_PROBES: readonly CardProbe[] = [
+  {
+    card: "timeseries",
+    schema: timeseriesProbeSchema,
+    specificity: 40,
+    why: "carries named series of points over time — it IS a trend, and a trend outranks the total you could take of it",
+  },
+  {
+    card: "dashboard",
+    schema: dashboardProbeSchema,
+    specificity: 30,
+    why: "carries graph or panel definitions — it IS a visual",
+  },
+  {
+    card: "spend",
+    schema: spendProbeSchema,
+    specificity: 20,
+    why: "carries a named cost total, or rows that each carry one",
+  },
+  {
+    card: "evaluatorConfig",
+    schema: evaluatorConfigProbeSchema,
+    specificity: 10,
+    why: "carries an enabled flag or an evaluator type — a check's config",
+  },
+];
+
+// The total order is asserted by `promotion.test.ts`, not at module load: a
+// shared contract package that can throw on import turns one bad literal into
+// an unresolvable module for every consumer, which is a far worse failure than
+// the one it was guarding.
 
 /** Verbs that write, and the card each writes into. */
 const CARD_BY_WRITE_VERB: Record<string, CardKind> = {
@@ -143,24 +306,26 @@ export const CARDS_BY_RESOURCE: Record<string, ResourceCards> = {
     read: "resourceRead",
     byVerb: { run: "evalRun", results: "evalRun", status: "evalRun" },
   },
-  monitor: { read: "resourceRead" },
   scenario: { read: "scenario", byVerb: { run: "evalRun" } },
+  // `get` is the single-resource read these cards are for; `list` stays a
+  // collection, which the generic rows card already draws well.
+  evaluator: { read: "resourceRead", byVerb: { get: "evaluatorConfig" } },
+  monitor: { read: "resourceRead", byVerb: { get: "evaluatorConfig" } },
+  dashboard: { read: "resourceRead", byVerb: { get: "dashboard" } },
+  graph: { read: "resourceRead", byVerb: { get: "dashboard" } },
+  "virtual-keys": { read: "resourceRead", byVerb: { get: "spend" } },
   "simulation-run": { read: "evalRun" },
   suite: { read: "resourceRead", byVerb: { run: "evalRun" } },
   prompt: { read: "resourceRead" },
   agent: { read: "resourceRead", byVerb: { run: "evalRun" } },
   workflow: { read: "resourceRead", byVerb: { run: "evalRun" } },
-  evaluator: { read: "resourceRead" },
   dataset: { read: "dataset", byVerb: { records: "dataset" } },
-  dashboard: { read: "resourceRead" },
-  graph: { read: "resourceRead" },
   trigger: { read: "resourceRead" },
   projects: { read: "resourceRead" },
   "api-keys": { read: "resourceRead" },
   "model-provider": { read: "resourceRead" },
   "model-default": { read: "resourceRead" },
   secret: { read: "resourceRead" },
-  "virtual-keys": { read: "resourceRead" },
   "gateway-budgets": { read: "resourceRead" },
   governance: { read: "resourceRead" },
   ingest: { read: "resourceRead" },
@@ -223,8 +388,26 @@ export const parseCliResult = ({
   resource: string;
   verb: string;
   output: unknown;
+}): ParsedCliResult =>
+  parseCardResult({ kind: cardKindFor({ resource, verb }), output });
+
+/**
+ * Read a result into the schema of a card that has ALREADY been decided.
+ *
+ * The panel's entry point. By the time anything renders, the card was chosen
+ * once at the command boundary from the name and the payload together, and the
+ * choice travels on the envelope — so re-deriving a kind from the command's
+ * name at render time is a second decision that can disagree with the first.
+ * It did: a promoted result parsed against the card its name would have earned
+ * rather than the card it was stamped with. See ADR-059 §1.
+ */
+export const parseCardResult = ({
+  kind,
+  output,
+}: {
+  kind: CardKind;
+  output: unknown;
 }): ParsedCliResult => {
-  const kind = cardKindFor({ resource, verb });
   const document = asJsonDocument(output);
 
   if (document === null) {

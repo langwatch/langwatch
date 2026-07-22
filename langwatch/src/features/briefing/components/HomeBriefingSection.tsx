@@ -1,6 +1,7 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { LangyPanelSurface } from "~/features/asaplangy";
 import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
+import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { HomeOverviewCard } from "./HomeOverviewCard";
@@ -33,6 +34,13 @@ export function HomeBriefingSection() {
   // Without Langy, every hand-to-Langy handler stays undefined so the sheet
   // offers only its own evidence links, never a panel that won't mount.
   const showLangy = useShowLangy();
+  // Reading Langy and STARTING a turn are different grants. Everything below
+  // that auto-sends a question needs `langy:create`; only the two that hand the
+  // reader a composer they finish themselves are safe on `langy:view`. With
+  // built-in roles the two always travel together, but the Langy permission
+  // category's read level is exactly `langy:view`, so a custom role or key can
+  // hold one without the other — and would otherwise meet a button that 403s.
+  const canAsk = useCanAskLangy();
   const openPanel = useLangyStore((s) => s.openPanel);
   const askLangy = useLangyStore((s) => s.askLangy);
   const attachContext = useLangyStore((s) => s.attachContext);
@@ -99,9 +107,9 @@ export function HomeBriefingSection() {
     <LangyBriefing
       data={data}
       onAsk={showLangy ? openPanel : undefined}
-      onAskSubmit={showLangy ? handleAskSubmit : undefined}
+      onAskSubmit={canAsk ? handleAskSubmit : undefined}
       onFeedback={showLangy ? handleSignalFeedback : undefined}
-      onInvestigateReceipt={showLangy ? handleInvestigateReceipt : undefined}
+      onInvestigateReceipt={canAsk ? handleInvestigateReceipt : undefined}
       status={
         <HomeOverviewCard
           bare

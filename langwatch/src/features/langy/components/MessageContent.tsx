@@ -18,6 +18,7 @@ import { LangyFeedback } from "./LangyFeedback";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
 import { LangyPlanCard } from "./LangyPlanCard";
 import { langyPlan } from "../logic/langyPlan";
+import { stripToolNarration } from "../logic/langyToolNarration";
 import { useLangyStore } from "../stores/langyStore";
 import { StreamingText } from "./StreamingText";
 
@@ -123,7 +124,6 @@ function MessageContentImpl({
   // onTurnStream subscription, so useChat's `message.parts` already carry the
   // streamed text — no separate optimistic buffer to reconcile. StreamingText
   // still gives the blur-reveal while `isStreaming`.
-  const displayText = text;
 
   const proposals = extractProposals(message);
   // The PR cards, read off the message's TOOL PARTS — not scraped from the
@@ -154,6 +154,16 @@ function MessageContentImpl({
   const plan = isUser
     ? null
     : langyPlan(message, isStreaming ? { overrideItems: livePlan } : undefined);
+  // The cards above already say which skill ran and what it does, so an opening
+  // line that says it again is the same fact three times before the answer.
+  // Dropped here, at the point of display — see logic/langyToolNarration.ts for
+  // why this is presentation, not the prose-sniffing this file deleted.
+  const displayText = isUser
+    ? text
+    : stripToolNarration({
+        text,
+        hasActivity: showsActivity || Boolean(plan),
+      });
   const hasContent =
     displayText ||
     proposals.length > 0 ||
@@ -178,11 +188,14 @@ function MessageContentImpl({
         <Box
           paddingX={3}
           paddingY={2}
-          background="bg.muted"
+          // Dedicated tokens, not `bg.muted` / `border.muted` — on the light
+          // ground those two are the SAME colour, which left the bubble with no
+          // edge and almost no fill. See `langy.userBubble*` in langyTheme.ts.
+          background="langy.userBubbleBg"
           color="fg"
           borderWidth="1px"
           borderStyle="solid"
-          borderColor="border.muted"
+          borderColor="langy.userBubbleBorder"
           borderRadius="15px"
           borderBottomRightRadius="5px"
           textStyle="sm"
@@ -240,11 +253,7 @@ function MessageContentImpl({
             `fg`, so a glance separates "what I said" from "what it said". */}
         {displayText &&
           (isStreaming ? (
-            <Box
-              fontSize="langyAnswer"
-              color="langy.answerFg"
-              lineHeight="1.6"
-            >
+            <Box fontSize="langyAnswer" color="langy.answerFg" lineHeight="1.6">
               <StreamingText text={displayText} />
             </Box>
           ) : (
@@ -260,7 +269,7 @@ function MessageContentImpl({
                 linkVariant="langy"
                 color="langy.answerFg"
               >
-                {text}
+                {displayText}
               </Markdown>
             </Box>
           ))}
@@ -274,10 +283,10 @@ function MessageContentImpl({
             /feedback. Never renders mid-stream. */}
         {showFeedback &&
         !isStreaming &&
-        text &&
+        displayText &&
         (isFeedbackPinned ||
           feedbackDirective.requested ||
-          (shouldAskFeedback && isSubstantiveLangyAnswer(text))) ? (
+          (shouldAskFeedback && isSubstantiveLangyAnswer(displayText))) ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}
             messageId={message.id}

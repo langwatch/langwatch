@@ -3,6 +3,7 @@ import { Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "../langyContextTarget.css";
+import { useLangyContextArming } from "../hooks/useLangyContextArming";
 import {
   absorbContextTarget,
   releaseContextTarget,
@@ -30,8 +31,16 @@ import { useLangyStore } from "../stores/langyStore";
  *     where any generated box gets wrapped in an anonymous table row and wrecks
  *     the row's geometry. A fixed-position portal touches nothing.
  *
- * Nothing here runs while the panel is closed: it returns null before any
- * listener is attached, so a page without Langy open pays literally nothing.
+ * Both jobs are gated on the page OFFERING its targets, which is two states, not
+ * one: ARMED — `#` or a held Shift, see `useLangyContextArming` — or REVEALED,
+ * the brief `#trace` → "Show traces on this page" glow. Both light targets up
+ * and both make them clickable, so both need the pointer layer; a reveal that
+ * lit rows the button never appeared over made the palette's own promise
+ * ("anything that lights up can be added as context") untrue.
+ *
+ * With Langy merely open, this attaches one keydown listener and renders
+ * nothing; with Langy closed it does not even do that. The pointer tracking, the
+ * measurement and the button only exist inside a mode the user asked for.
  */
 
 /** How close the pointer has to get before a target admits it exists (px). */
@@ -42,10 +51,180 @@ interface TargetRect {
   rect: DOMRect;
 }
 
+/**
+ * Marks the layer's OWN floating chrome. The pointer resting on the "Absorb
+ * context" button must not read as "the pointer left the target" — the button
+ * is drawn in a portal on top of it, so a naive hit test finds the button, not
+ * the row, and the thing you are reaching for unmounts as you reach for it.
+ */
+const OVERLAY_ATTR = "data-langy-overlay";
+
+/**
+ * Subtrees the page has taken out of play. Ark/Chakra mark everything behind an
+ * open modal drawer or dialog `aria-hidden` / `inert`, which is exactly the
+ * "don't offer this" signal we want — a row sitting under a drawer must not
+ * glow, and must not be absorbable, through the thing covering it.
+ */
+const OCCLUDED_SELECTOR = '[aria-hidden="true"], [inert]';
+
+/** Is this target genuinely available to the pointer right now? */
+function isReachable(element: HTMLElement): boolean {
+  if (element.closest(OCCLUDED_SELECTOR)) return false;
+  const rect = element.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
 export function LangyContextTargetLayer() {
   const isOpen = useLangyStore((state) => state.isOpen);
   if (!isOpen) return null;
-  return <ActiveLayer />;
+  return (
+    <>
+      <ArmableLayer />
+      {/* Outside the armed gate on purpose: pointing at a chip in the panel is
+          not the picking MODE, it is reading the list you already have. */}
+      <SpotlightLayer />
+    </>
+  );
+}
+
+/**
+ * Panel → page. The user runs their eye down the context list; whichever chip
+ * is under the pointer, its card lights up where it actually sits.
+ *
+ * Drawn as an overlay rather than by handing the target another visual state,
+ * for two reasons that both matter. The ring the targets paint themselves is
+ * suppressed on table rows (a sticky first column paints over an ancestor's
+ * outline — see the stylesheet), so a row could not answer this at all. And the
+ * spotlight has to be legible at a glance from across the page, which is a
+ * different job from the deliberately-barely-there proximity field.
+ */
+function SpotlightLayer() {
+  const spotlightId = useLangyContextTargetStore((s) => s.spotlightId);
+  if (!spotlightId) return null;
+  return <TargetSpotlight targetId={spotlightId} />;
+}
+
+/** Follows the element: its box, and its own corners. */
+function TargetSpotlight({ targetId }: { targetId: string }) {
+  const [box, setBox] = useState<{ rect: DOMRect; radius: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const element = document.querySelector<HTMLElement>(
+      `[data-langy-target="${CSS.escape(targetId)}"]`,
+    );
+    if (!element) {
+      setBox(null);
+      return;
+    }
+    // The element's OWN radius, read rather than guessed: a squared-off glow
+    // around a rounded card is the tell that something is drawn on top of the
+    // page instead of belonging to it.
+    const radius = getComputedStyle(element).borderRadius || "0px";
+    const track = () =>
+      setBox({ rect: element.getBoundingClientRect(), radius });
+    track();
+
+    window.addEventListener("scroll", track, { passive: true, capture: true });
+    window.addEventListener("resize", track, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", track, { capture: true });
+      window.removeEventListener("resize", track);
+    };
+  }, [targetId]);
+
+  if (!box || typeof document === "undefined") return null;
+
+  return createPortal(
+    <chakra.div
+      className="langy-target-spotlight"
+      data-testid="langy-target-spotlight"
+      aria-hidden
+      position="fixed"
+      top={`${box.rect.top}px`}
+      left={`${box.rect.left}px`}
+      width={`${box.rect.width}px`}
+      height={`${box.rect.height}px`}
+      borderRadius={box.radius}
+      // Never in the way: this is a light shone on the page, not a surface.
+      pointerEvents="none"
+      zIndex={1249}
+    />,
+    document.body,
+  );
+}
+
+/**
+ * Open, but idle. All this does is listen for the arming gesture — one keydown
+ * handler, no pointer tracking, no measurement, nothing rendered. The page is
+ * untouched until the user asks for it.
+ *
+ * A REVEAL counts as asking for it. `#trace` → "Show traces on this page" lights
+ * targets up and makes them clickable for a couple of seconds; without the
+ * pointer layer running they would light up and answer to nothing — no hover
+ * state, and no button over the row the user is pointing at.
+ */
+function ArmableLayer() {
+  useLangyContextArming();
+  const armed = useLangyContextTargetStore((s) => s.armSource !== null);
+  const revealing = useLangyContextTargetStore((s) => s.revealedIds.size > 0);
+  if (!armed && !revealing) return null;
+  return (
+    <>
+      <ActiveLayer />
+      <OfferHint />
+    </>
+  );
+}
+
+/**
+ * The mode indicator. A mode you cannot see is a trap — the page suddenly
+ * intercepting clicks with no explanation is exactly how a feature earns a bug
+ * report — so while targets are being offered there is always one line saying
+ * what is happening and how it ends. A reveal ends by itself, which is the only
+ * thing that changes between the two.
+ */
+function OfferHint() {
+  const source = useLangyContextTargetStore((s) => s.armSource);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <chakra.div
+      className="langy-armed-hint"
+      data-testid="langy-armed-hint"
+      position="fixed"
+      bottom="20px"
+      left="50%"
+      transform="translateX(-50%)"
+      zIndex={1250}
+      display="inline-flex"
+      alignItems="center"
+      gap={2}
+      paddingX={3}
+      paddingY={1.5}
+      borderRadius="full"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="purple.emphasized"
+      background="bg.panel"
+      color="fg.muted"
+      boxShadow="md"
+      textStyle="xs"
+      pointerEvents="none"
+      whiteSpace="nowrap"
+    >
+      <Sparkles size={12} />
+      Click anything highlighted to give it to Langy
+      <chakra.span color="fg.subtle">
+        {source === null
+          ? "these fade in a moment"
+          : source === "hold"
+            ? "release Shift to stop"
+            : "# or Esc to stop"}
+      </chakra.span>
+    </chakra.div>,
+    document.body,
+  );
 }
 
 function ActiveLayer() {
@@ -68,6 +247,10 @@ function ActiveLayer() {
     for (const element of elements) {
       const id = element.dataset.langyTarget;
       if (!id) continue;
+      // A row behind an open drawer is still in the DOM, still registered, and
+      // still has a perfectly good rect. Dropping it here is what stops the
+      // page glowing THROUGH whatever is covering it.
+      if (!isReachable(element)) continue;
       rects.push({ id, rect: element.getBoundingClientRect() });
     }
     rectsRef.current = rects;
@@ -81,22 +264,35 @@ function ActiveLayer() {
       return;
     }
 
-    const nearIds: string[] = [];
-    let hovered: string | null = null;
-    let hoveredArea = Number.POSITIVE_INFINITY;
+    // Which target is under the pointer is a HIT TEST, not an arithmetic
+    // question. Rect maths alone cannot see a drawer, a dialog, the Langy panel
+    // itself, or a sticky header — it happily reports a row the user physically
+    // cannot touch, and the affordance then floats over the covering surface
+    // offering to absorb something behind it. `elementFromPoint` answers with
+    // whatever is actually on top, which is the only honest answer.
+    const hit = document.elementFromPoint(pointer.x, pointer.y);
+    // Our own floating button counts as "still on the target" — see OVERLAY_ATTR.
+    const onOwnOverlay = !!hit?.closest(`[${OVERLAY_ATTR}]`);
+    const hitTarget = hit?.closest<HTMLElement>("[data-langy-target]");
+    const hovered = onOwnOverlay
+      ? useLangyContextTargetStore.getState().hoveredId
+      : hitTarget && isReachable(hitTarget)
+        ? (hitTarget.dataset.langyTarget ?? null)
+        : null;
 
+    // Reaching for a revealed target holds its light. The reveal is a couple of
+    // seconds long by design ("a look, not a state"), which is plenty to SEE and
+    // nowhere near enough to read a row, decide, and click it — and an offer
+    // that expires under the pointer taking it up is worse than no offer.
+    if (hovered) {
+      const targets = useLangyContextTargetStore.getState();
+      if (targets.revealedIds.has(hovered)) targets.holdReveal();
+    }
+
+    const nearIds: string[] = [];
     for (const { id, rect } of rectsRef.current) {
-      const distance = distanceToRect(pointer, rect);
-      if (distance > PROXIMITY_PX) continue;
+      if (distanceToRect(pointer, rect) > PROXIMITY_PX) continue;
       nearIds.push(id);
-      if (distance > 0) continue;
-      // Targets can nest (a row inside a table that is itself a target one day).
-      // The SMALLEST box under the pointer is the one the user means.
-      const area = rect.width * rect.height;
-      if (area < hoveredArea) {
-        hoveredArea = area;
-        hovered = id;
-      }
     }
 
     setProximity({ nearIds, hoveredId: hovered });
@@ -132,6 +328,11 @@ function ActiveLayer() {
       capture: true,
     });
     window.addEventListener("resize", onGeometryChange, { passive: true });
+    // A drawer or dialog opening does not scroll, resize, or change the target
+    // registry — but it does take focus, and it does mark everything behind it
+    // `aria-hidden`. `focusin` is the cheap, reliable moment to re-measure and
+    // let the newly-covered targets drop out.
+    document.addEventListener("focusin", onGeometryChange);
 
     // Rows mount and unmount constantly as the virtualizer scrolls, which
     // invalidates the cache. Subscribe imperatively rather than with a selector:
@@ -147,6 +348,7 @@ function ActiveLayer() {
       document.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("scroll", onGeometryChange, { capture: true });
       window.removeEventListener("resize", onGeometryChange);
+      document.removeEventListener("focusin", onGeometryChange);
       unsubscribe();
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       useLangyContextTargetStore

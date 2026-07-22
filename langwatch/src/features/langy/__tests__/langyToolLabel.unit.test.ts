@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
+import {
+  describeToolCall,
+  effectiveToolName,
+  skillCardDetail,
+} from "../logic/langyToolLabel";
 
 /**
  * The frames in this file are the ones that were ON SCREEN in the screenshot
@@ -108,6 +112,40 @@ describe("given a tool frame from the live stream", () => {
 
       expect(label.title).toBe("Editing a file");
       expect(label.detail).toBe("router.ts");
+    });
+  });
+});
+
+describe("skillCardDetail", () => {
+  describe("given a multi-sentence skill description", () => {
+    it("keeps the first sentence only", () => {
+      expect(
+        skillCardDetail(
+          "Deep-dive diagnosis of how your AI agent behaves in production. Explores LangWatch analytics and traces end to end. Use when you want to truly understand what your agent is doing in production.",
+        ),
+      ).toBe("Deep-dive diagnosis of how your AI agent behaves in production.");
+    });
+  });
+
+  describe("given a description that is only routing guidance for the model", () => {
+    it("gives the card no detail at all, rather than instructing the user", () => {
+      expect(
+        skillCardDetail("Use when you want to understand your agent."),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("given a single-sentence description", () => {
+    it("keeps it whole", () => {
+      expect(skillCardDetail("Opens a real pull request.")).toBe(
+        "Opens a real pull request.",
+      );
+    });
+  });
+
+  describe("given an empty description", () => {
+    it("leaves the card with just its title", () => {
+      expect(skillCardDetail("   ")).toBeUndefined();
     });
   });
 });

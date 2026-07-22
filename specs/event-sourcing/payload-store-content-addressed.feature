@@ -42,6 +42,11 @@ Feature: GroupQueue content-addressed tiered payload store
   #     Redis expiry and the durable-store lifecycle sweep reclaim blobs lazily.
   #     A missing blob completes the slot without the handler
   #     (recoverable via replay) — a fail-safe, never a wedge.
+  #   - Retiring the LAST lease shortens the blob's expiry to a 1-hour grace
+  #     window rather than leaving the full 4-day backstop (2026-07-22, Track 5).
+  #     Shortening an expiry is not deletion: any later take re-arms the 4-day
+  #     backstop, so the release stays safe against a producer that wrote these
+  #     bytes before the release and stages after it.
   #
   # RESOLVED (ADR-029): the s3/file tier reuses the stored-objects StorageDriver/
   # StorageRegistry/URI minting (specs/features/scenarios/externalize-event-byte-content.feature)
@@ -61,6 +66,7 @@ Feature: GroupQueue content-addressed tiered payload store
     And the inline tier ceiling is configured at 4 KiB
     And the S3 tier threshold is configured at 256 KiB
     And the blob TTL backstop is configured at 4 days
+    And the released-blob grace window is configured at 1 hour
 
   # ===========================================================================
   # Track 1 — content-addressed tiers
@@ -262,6 +268,71 @@ Feature: GroupQueue content-addressed tiered payload store
     And the work remains recoverable via event replay
 
   # ===========================================================================
+  # Track 5 — bounded dead-blob retention (2026-07-22 amendment)
+  # ===========================================================================
+  # Track 3 removed eager reclaim to stop a completion racing a live sibling into
+  # deleting a shared blob. It left nothing shorter than the 4-day backstop in its
+  # place, so a blob nothing referenced any more still occupied Redis for four
+  # days. Nothing drains a retired blob before it ages out, so retention runs the
+  # full four days deep — a leak whatever its label. These scenarios
+  # bound that retention without restoring the race: the release does not delete
+  # the bytes, it only shortens their deadline, and any subsequent take restores
+  # the full backstop.
+  #
+  # Bound by blobLeases.integration.test.ts ("release grace window") and
+  # scripts.integration.test.ts ("dedup squash grace window").
+
+  @integration @track5
+  Scenario: Retiring the last lease puts a Redis-tier blob on the grace window
+    Given a Redis-tier blob whose only lease holder is retiring
+    When that holder releases its lease
+    Then the blob is still readable
+    And its expiry is shortened to the release grace window
+
+  @integration @track5
+  Scenario: A blob a sibling still leases keeps its full backstop
+    Given a Redis-tier blob leased by two staged jobs
+    When one of them releases its lease
+    Then the blob keeps its four-day backstop
+    And the grace window is withheld while any lease is live
+
+  @integration @track5
+  # This is what makes shortening the expiry safe where deleting the bytes was
+  # not. A producer PUTs content-addressed bytes and stages a round trip later;
+  # if the last lease is retired in that window, the stage re-arms the backstop
+  # rather than finding a hole.
+  Scenario: A job staged after the grace window began restores the full backstop
+    Given a Redis-tier blob placed on the release grace window
+    When a new job referencing the same content is staged
+    Then the blob's four-day backstop is restored
+    And the new job's lease is live
+
+  @integration @track5
+  # Belt and braces for a mixed-version fleet: a holder from a release that
+  # predates leases writes a token into the legacy holder set and no lease
+  # deadline, so an empty lease set alone must not be read as "unreferenced".
+  Scenario: A holder from a pre-lease release withholds the grace window
+    Given a Redis-tier blob whose only lease holder is retiring
+    And a holder token written by a release that predates leases
+    When that holder releases its lease
+    Then the blob keeps its four-day backstop
+
+  @integration @track5
+  Scenario: A dedup squash that retires the last lease puts the displaced blob on the grace window
+    Given a staged job holding the only lease on a Redis-tier blob
+    When a later job with the same dedup id replaces it with different content
+    Then the displaced blob is still readable
+    And its expiry is shortened to the release grace window
+    And the replacement's own blob carries the full four-day backstop
+
+  @integration @track5
+  Scenario: An S3-tier release leaves the object to the durable-store sweep
+    Given an S3-tier blob whose only lease holder is retiring
+    When that holder releases its lease
+    Then no object-store delete is issued
+    And the object remains for the durable-store lifecycle sweep
+
+  # ===========================================================================
   # --- AC Coverage Map (ADR-029) ---
   # Track 1 — content-addressed tiers
   #   AC1.1 "Size picks the tier; inline stays inline"
@@ -309,7 +380,20 @@ Feature: GroupQueue content-addressed tiered payload store
   #     -> Legacy GQ1 and bare-JSON jobs staged before the deploy still process
   #   AC4.3 "Old pod drops an unparseable v2 value safely"
   #     -> A pod on the previous release drops a v2 value it cannot parse
+  # Track 5 — bounded dead-blob retention (2026-07-22 amendment)
+  #   AC5.1 "Last release shortens the blob's expiry to the grace window"
+  #     -> Retiring the last lease puts a Redis-tier blob on the grace window
+  #   AC5.2 "A live sibling lease withholds the grace window"
+  #     -> A blob a sibling still leases keeps its full backstop
+  #   AC5.3 "A later take re-arms the backstop" (why shortening is not deleting)
+  #     -> A job staged after the grace window began restores the full backstop
+  #   AC5.4 "A pre-lease holder token withholds the grace window"
+  #     -> A holder from a pre-lease release withholds the grace window
+  #   AC5.5 "The Lua squash release grants the same grace window"
+  #     -> A dedup squash that retires the last lease puts the displaced blob on the grace window
+  #   AC5.6 "The S3 tier is untouched; the durable sweep still owns it"
+  #     -> An S3-tier release leaves the object to the durable-store sweep
   #
-  # Count: 21 behavioral ACs -> 21 scenarios. All @unimplemented pending the
-  # Outside-In TDD pass (integration tests first, then unit, then code).
+  # Count: 21 ADR-029 ACs -> 21 scenarios (@unimplemented pending the Outside-In
+  # TDD pass), plus 6 Track 5 amendment ACs -> 6 scenarios, all bound.
   # ===========================================================================

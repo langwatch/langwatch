@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,9 +24,18 @@ vi.mock("~/hooks/useReducedMotion", () => ({
   useReducedMotion: vi.fn(() => false),
 }));
 
-// The automations banner navigates via the compat router on CTA click.
+// The Langy announcement starts its conversation in place rather than routing.
+const askLangy = vi.fn();
+vi.mock("~/features/langy/stores/langyStore", () => ({
+  useLangyStore: (selector: (s: unknown) => unknown) =>
+    selector({ askLangy }),
+}));
+
+// The automations banner navigates via the compat router on CTA click. One
+// shared spy so a test can assert WHERE the click went, not just that it went.
+const routerPush = vi.fn();
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
 }));
 
 // Stub the in-app Link primitive: it expects a Next router we don't have.
@@ -59,6 +68,8 @@ describe("<HomePageBanners />", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    routerPush.mockClear();
+    askLangy.mockClear();
     useOrganizationTeamProjectMock.mockReturnValue({
       project: { id: "project-1", slug: "my-project" },
     } as ReturnType<typeof useOrganizationTeamProject>);
@@ -144,6 +155,69 @@ describe("<HomePageBanners />", () => {
         name: "Voice agent simulations are here",
       }),
     ).toBeNull();
+  });
+
+  describe("when a banner's link is followed", () => {
+    it("routes in-app announcements through SPA navigation", () => {
+      renderWithProviders(<HomePageBanners />);
+
+      fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
+
+      expect(routerPush).toHaveBeenCalledWith("/my-project/automations");
+    });
+
+    it("keeps the announcement on the page, so the way back is not lost", () => {
+      renderWithProviders(<HomePageBanners />);
+
+      fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
+
+      // Still on screen, and nothing was written to the per-project snooze:
+      // following a link is interest, not "seen it, thanks". Only the X
+      // dismisses.
+      expect(
+        screen.getByRole("heading", { name: "React the moment it matters" }),
+      ).toBeDefined();
+      expect(localStorage.getItem(AUTOMATIONS_KEY)).toBeNull();
+    });
+
+    it("still snoozes when the reader actually dismisses it", () => {
+      renderWithProviders(<HomePageBanners />);
+
+      fireEvent.click(
+        screen.getAllByRole("button", { name: /Hide|Dismiss/ })[0]!,
+      );
+
+      expect(localStorage.getItem(AUTOMATIONS_KEY)).not.toBeNull();
+    });
+  });
+
+  describe("when the Langy home carries the announcements", () => {
+    /** @scenario The Langy home carries an announcement about Langy */
+    /** @scenario That announcement is not shown to readers without Langy */
+    it("adds the Langy announcement only for the lantern", () => {
+      renderWithProviders(<HomePageBanners variant="lantern" />);
+      expect(
+        screen.getByText("Langy can ship the fix, not just find it"),
+      ).toBeDefined();
+
+      cleanup();
+      renderWithProviders(<HomePageBanners />);
+      expect(
+        screen.queryByText("Langy can ship the fix, not just find it"),
+      ).toBeNull();
+    });
+
+    /** @scenario The Langy home carries an announcement about Langy */
+    it("starts the conversation in place instead of navigating", () => {
+      renderWithProviders(<HomePageBanners variant="lantern" />);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /Ask Langy to investigate/ }),
+      );
+
+      expect(askLangy).toHaveBeenCalledTimes(1);
+      expect(routerPush).not.toHaveBeenCalled();
+    });
   });
 
   it("does not reintroduce a Langy promo into the announcement carousel", () => {

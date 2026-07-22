@@ -1,10 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { BlobLeases } from "../blobLeases";
 import { CachedLuaScript } from "../cachedLuaScript";
 
 const PROJECT = createTenantId("project-1");
+
+// Every test here spies on the shared CachedLuaScript prototype. Without this,
+// call history accumulates across tests and an exact-argument assertion can
+// silently match a previous test's invocation.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("BlobLeases", () => {
   describe("given a queue-scoped lease primitive", () => {
@@ -26,20 +33,22 @@ describe("BlobLeases", () => {
           projectId: PROJECT,
           hash: "hash-1",
           holderId: "holder-1",
+          tier: "redis",
         });
 
         expect(run).toHaveBeenCalledWith(
           redis,
-          2,
+          3,
           "{queue}:gq:blobleases:project-1/hash-1",
           "{queue}:gq:blobholders:project-1/hash-1",
+          "{queue}:gq:blob:project-1/hash-1",
           "holder-1",
           "30",
         );
       });
     });
 
-    describe("when a lease is released", () => {
+    describe("when an S3-tier lease is released", () => {
       it("does not pass a blob key to the release script", async () => {
         const run = vi
           .spyOn(CachedLuaScript.prototype, "run")
@@ -53,6 +62,7 @@ describe("BlobLeases", () => {
           projectId: PROJECT,
           hash: "hash-1",
           holderId: "holder-1",
+          tier: "s3",
         });
 
         expect(run).toHaveBeenCalledWith(
@@ -62,9 +72,57 @@ describe("BlobLeases", () => {
           "{queue}:gq:blobholders:project-1/hash-1",
           "holder-1",
         );
-        expect(run.mock.calls[0]).not.toContain(
+        expect(run.mock.lastCall).not.toContain(
           "{queue}:gq:blob:project-1/hash-1",
         );
+      });
+    });
+
+    describe("when a Redis-tier lease is released", () => {
+      it("passes the blob key so the grace window can reach it", async () => {
+        const run = vi
+          .spyOn(CachedLuaScript.prototype, "run")
+          .mockResolvedValue(1);
+        const redis = {} as ConstructorParameters<
+          typeof BlobLeases
+        >[0]["redis"];
+        const leases = new BlobLeases({ redis, queueName: "{queue}" });
+
+        const graced = await leases.release({
+          projectId: PROJECT,
+          hash: "hash-1",
+          holderId: "holder-1",
+          tier: "redis",
+        });
+
+        expect(run).toHaveBeenCalledWith(
+          redis,
+          3,
+          "{queue}:gq:blobleases:project-1/hash-1",
+          "{queue}:gq:blobholders:project-1/hash-1",
+          "{queue}:gq:blob:project-1/hash-1",
+          "holder-1",
+        );
+        expect(graced).toBe(true);
+      });
+    });
+
+    describe("when a release leaves other holders behind", () => {
+      it("reports that no grace window was applied", async () => {
+        vi.spyOn(CachedLuaScript.prototype, "run").mockResolvedValue(0);
+        const redis = {} as ConstructorParameters<
+          typeof BlobLeases
+        >[0]["redis"];
+        const leases = new BlobLeases({ redis, queueName: "{queue}" });
+
+        const graced = await leases.release({
+          projectId: PROJECT,
+          hash: "hash-1",
+          holderId: "holder-1",
+          tier: "redis",
+        });
+
+        expect(graced).toBe(false);
       });
     });
 

@@ -66,6 +66,58 @@ function liveId(id: string | undefined, zero: string): string | undefined {
   return id && id !== zero ? id : undefined;
 }
 
+/**
+ * The `reasons` chain, in the serialised shape the clients already read.
+ *
+ * This handler used to drop it. That was invisible while every handled error
+ * was a single fact ("dataset not found"), and became load-bearing the moment
+ * one carried a LIST of them: a schema failure's whole payload is its reasons —
+ * one per offending field — and without them the response is a sentence saying
+ * something was wrong with no way to learn what. `HandledError.serialize()` is
+ * the one implementation of that shape, so it is the one used here.
+ *
+ * A payload that merely LOOKS like a handled error (the tail of the guard
+ * above) has no `serialize`; its reasons, if any, are already serialised, so
+ * they pass through as they arrived.
+ */
+function serializedReasons(error: unknown): unknown[] {
+  if (HandledError.isHandled(error)) return error.serialize().reasons;
+  const reasons = (error as { reasons?: unknown }).reasons;
+  return Array.isArray(reasons) ? reasons : [];
+}
+
+/**
+ * The wire body for a handled error — the code as the discriminant, the
+ * sentence, the meta bag spread flat, and the remediation channel (tips /
+ * docsUrl / fault) alongside.
+ *
+ * Exported because `onError` is not the only place a handled error becomes a
+ * response: a middleware that answers a denial itself (the API-key ceiling)
+ * must produce the SAME body, or the caller gets a sentence with no code, no
+ * meta and no next step — which is a failure an agent or a CLI cannot act on.
+ */
+export function handledErrorResponseBody(error: unknown): {
+  statusCode: ContentfulStatusCode;
+  body: object;
+} {
+  const { code, message, httpStatus, meta } = error as HandledError;
+  const { tips, docsUrl, fault } = error as HandledError;
+  const reasons = serializedReasons(error);
+  return {
+    statusCode: (httpStatus ?? 500) as ContentfulStatusCode,
+    body: {
+      ...errorSchema.parse({ error: code, message }),
+      ...(meta ?? {}),
+      // Additive remediation channel (agents read these; older clients
+      // and the Python SDK ignore unknown keys).
+      ...(tips?.length ? { tips } : {}),
+      ...(docsUrl ? { docsUrl } : {}),
+      ...(fault ? { fault } : {}),
+      ...(reasons.length ? { reasons } : {}),
+    },
+  };
+}
+
 function determineErrorResponse(
   error: Error & {
     status?: ContentfulStatusCode;
@@ -85,20 +137,8 @@ function determineErrorResponse(
       "code" in error &&
       "httpStatus" in error)
   ) {
-    const { code, message, httpStatus, meta } = error as HandledError;
-    const { tips, docsUrl, fault } = error as HandledError;
-    return {
-      statusCode: (httpStatus ?? 500) as ContentfulStatusCode,
-      response: {
-        ...errorSchema.parse({ error: code, message }),
-        ...(meta ?? {}),
-        // Additive remediation channel (agents read these; older clients
-        // and the Python SDK ignore unknown keys).
-        ...(tips?.length ? { tips } : {}),
-        ...(docsUrl ? { docsUrl } : {}),
-        ...(fault ? { fault } : {}),
-      },
-    };
+    const { statusCode, body } = handledErrorResponseBody(error);
+    return { statusCode, response: body };
   }
 
   // Check if it's a "not found" error

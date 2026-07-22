@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -26,6 +27,38 @@ const (
 	localLangyContainerCPUs    = "2"
 	localLangyContainerPIDs    = 256
 )
+
+// langyWorkerIdleEnv lets a developer override the aggressive local idle timeout
+// for their own worktree.
+const langyWorkerIdleEnv = "LANGY_WORKER_IDLE_MS"
+
+// langyWorkerIdleMS resolves the worker idle timeout haven passes to the manager.
+//
+// The 15s default is a RAM decision, not a product one (see the block above),
+// and it has a real cost when you are working on Langy itself: production reaps
+// idle workers after ten minutes, so locally every message sent more than
+// fifteen seconds after the last one hits a freshly-spawned worker and shows the
+// cold "Waking Langy up…" copy. Warm-path behaviour is therefore untestable
+// locally by default, and the difference is invisible — nothing in the UI says
+// the worker was reaped.
+//
+// So the value is overridable: export LANGY_WORKER_IDLE_MS to hold workers
+// longer while you work on the warm path. It stays opt-in because the cost is
+// real — up to localLangyMaxWorkers × ~600 MiB held on a small Colima VM — so
+// nobody pays it who has not asked to. A missing, unparseable or non-positive
+// value falls back to the safe default rather than failing the launch: a typo in
+// a dev env var must never stop the stack coming up.
+func langyWorkerIdleMS() int {
+	raw := strings.TrimSpace(os.Getenv(langyWorkerIdleEnv))
+	if raw == "" {
+		return localLangyWorkerIdleMS
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed <= 0 {
+		return localLangyWorkerIdleMS
+	}
+	return parsed
+}
 
 // langyChild builds the supervised child that runs the langyagent worker, picking
 // the launch mechanism from the stack's tier (see domain.LangyTier):
@@ -83,7 +116,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 			"SESSIONS_ROOT="+filepath.Join(laRoot, "sessions"),
 			"LANGY_WORKSPACE_ROOT="+filepath.Join(laRoot, "workspace"),
 			fmt.Sprintf("LANGY_MAX_WORKERS=%d", localLangyMaxWorkers),
-			fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", localLangyWorkerIdleMS),
+			fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS()),
 			fmt.Sprintf("LANGY_REAPER_INTERVAL_MS=%d", localLangyReaperIntervalMS),
 			"LANGY_UNSAFE_DEV_DISABLE_ISOLATION=true",
 		),
@@ -158,7 +191,7 @@ func langyContainerShell(o langyContainerOpts) string {
 		"-e", "LOG_FORMAT=pretty",
 		"-e", "LANGY_INTERNAL_SECRET=" + o.Secret,
 		"-e", fmt.Sprintf("LANGY_MAX_WORKERS=%d", localLangyMaxWorkers),
-		"-e", fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", localLangyWorkerIdleMS),
+		"-e", fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS()),
 		"-e", fmt.Sprintf("LANGY_REAPER_INTERVAL_MS=%d", localLangyReaperIntervalMS),
 	}
 	if o.DisableUIDSandbox {

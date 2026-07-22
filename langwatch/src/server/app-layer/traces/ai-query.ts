@@ -1,18 +1,15 @@
 import { createLogger } from "@langwatch/observability";
 import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
-import { FIELD_VALUES, SEARCH_FIELDS } from "./query-language/metadata";
+import { buildFieldsBlock } from "./query-language/fieldCatalogue";
 import { isEmptyAST, parse } from "./query-language/parse";
 import { validateAst } from "./query-language/queries";
 
 const logger = createLogger("langwatch:ai-query");
 
 const MAX_ATTEMPTS = 3;
-const DYNAMIC_VALUES_LIMIT = 20;
-
 export interface AiQueryInput {
   projectId: string;
   prompt: string;
@@ -529,58 +526,3 @@ legitimate, polite "I couldn't translate that"; hallucinating a filter
 the operator didn't ask for is worse.`;
 }
 
-async function buildFieldsBlock(input: AiQueryInput): Promise<string> {
-  const dynamicValues = await fetchDynamicCategoricalValues(input);
-  const lines: string[] = [];
-  for (const [name, meta] of Object.entries(SEARCH_FIELDS)) {
-    const sample = pickSampleValues(name, meta.facetField, dynamicValues);
-    const sampleStr = sample.length > 0 ? ` — e.g. ${sample.join(", ")}` : "";
-    lines.push(`- ${name} (${meta.valueType}): ${meta.label}${sampleStr}`);
-  }
-  return lines.join("\n");
-}
-
-function pickSampleValues(
-  fieldName: string,
-  facetField: string | undefined,
-  dynamic: Map<string, string[]>,
-): string[] {
-  const fromDb = facetField ? (dynamic.get(facetField) ?? []) : [];
-  const fromStatic = FIELD_VALUES[fieldName] ?? [];
-  const merged = Array.from(new Set([...fromDb, ...fromStatic])).slice(0, 8);
-  return merged;
-}
-
-async function fetchDynamicCategoricalValues(
-  input: AiQueryInput,
-): Promise<Map<string, string[]>> {
-  const app = getApp();
-  const facetFields = Object.values(SEARCH_FIELDS)
-    .filter((meta) => meta.valueType === "categorical" && meta.facetField)
-    .map((meta) => meta.facetField as string);
-
-  const results = await Promise.allSettled(
-    facetFields.map((facetKey) =>
-      app.traces.list.getFacetValues({
-        tenantId: input.projectId,
-        timeRange: input.timeRange,
-        facetKey,
-        limit: DYNAMIC_VALUES_LIMIT,
-        offset: 0,
-      }),
-    ),
-  );
-
-  const map = new Map<string, string[]>();
-  results.forEach((result, idx) => {
-    const facetKey = facetFields[idx];
-    if (!facetKey) return;
-    if (result.status === "fulfilled") {
-      map.set(
-        facetKey,
-        result.value.values.map((v) => v.value),
-      );
-    }
-  });
-  return map;
-}

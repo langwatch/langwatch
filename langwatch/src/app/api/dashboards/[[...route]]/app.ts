@@ -1,5 +1,5 @@
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { createProjectApp, requires } from "~/server/api/security";
@@ -29,29 +29,6 @@ const reorderDashboardsSchema = z.object({
     .array(z.string().min(1))
     .min(1, "dashboardIds must not be empty"),
 });
-
-function validationHook(
-  result: {
-    success: boolean;
-    error?: {
-      issues: Array<{ message?: string; path?: (string | number)[] }>;
-    };
-  },
-  c: { json: (body: unknown, status: number) => Response },
-): Response | undefined {
-  if (!result.success) {
-    const issue = result.error?.issues?.[0];
-    return c.json(
-      {
-        error: "Unprocessable Entity",
-        message: issue?.message ?? "Validation failed",
-        path: issue?.path,
-      },
-      422,
-    );
-  }
-  return undefined;
-}
 
 function mapDashboardNotFoundError(error: unknown): never {
   if (error instanceof Error && error.name === "DashboardNotFoundError") {
@@ -104,14 +81,17 @@ secured.access(requires("analytics:view")).get(
 );
 
 // ── Create Dashboard ──────────────────────────────────────────
-secured.access(requires("analytics:manage")).post(
+// Creating asks for `analytics:create`; `:manage` still implies it, so nobody
+// who could create a dashboard yesterday loses that, and a viewer holding only
+// `analytics:view` is declined exactly as before.
+secured.access(requires("analytics:create")).post(
   "/",
   dashboardServiceMiddleware,
   describeRoute({
     description: "Create a new dashboard",
   }),
   resourceLimitMiddleware("dashboards"),
-  zValidator("json", createDashboardSchema, validationHook),
+  zValidator("json", createDashboardSchema),
   async (c) => {
       const project = c.get("project");
       const { name } = c.req.valid("json");
@@ -138,13 +118,14 @@ secured.access(requires("analytics:manage")).post(
 
 // ── Reorder Dashboards ────────────────────────────────────────
 // Placed before /:id to avoid route conflict with "reorder" being treated as an id
-secured.access(requires("analytics:manage")).put(
+// Reordering rewrites existing dashboards' positions — an `:update`.
+secured.access(requires("analytics:update")).put(
   "/reorder",
   dashboardServiceMiddleware,
   describeRoute({
     description: "Reorder dashboards by providing an ordered list of IDs",
   }),
-  zValidator("json", reorderDashboardsSchema, validationHook),
+  zValidator("json", reorderDashboardsSchema),
   async (c) => {
       const project = c.get("project");
       const { dashboardIds } = c.req.valid("json");
@@ -192,13 +173,13 @@ secured.access(requires("analytics:view")).get(
 );
 
 // ── Rename Dashboard ──────────────────────────────────────────
-secured.access(requires("analytics:manage")).patch(
+secured.access(requires("analytics:update")).patch(
   "/:id",
   dashboardServiceMiddleware,
   describeRoute({
     description: "Rename a dashboard",
   }),
-  zValidator("json", renameDashboardSchema, validationHook),
+  zValidator("json", renameDashboardSchema),
   async (c) => {
       const { id } = c.req.param();
       const project = c.get("project");
@@ -225,6 +206,7 @@ secured.access(requires("analytics:manage")).patch(
 );
 
 // ── Delete Dashboard ──────────────────────────────────────────
+// Hard delete with cascade — deliberately stays at `:manage`.
 secured.access(requires("analytics:manage")).delete(
   "/:id",
   dashboardServiceMiddleware,

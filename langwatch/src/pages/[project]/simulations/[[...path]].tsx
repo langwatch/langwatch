@@ -10,15 +10,16 @@
  *   /simulations/:externalSetSlug             → External set
  *   /simulations/:externalSetSlug/:batchId    → External set + batch highlight
  *
- * Also handles legacy redirects:
- *   /simulations/suites?suite=X       → /simulations/run-plans/X
- *   /simulations/suites?externalSet=Y → /simulations/Y
- *   /simulations/:setId/:batchId/:runId → redirect + open drawer
+ * Everything that is not one of those shapes is REDIRECTED rather than rendered
+ * as an external set that does not exist — see `resolveSimulationsRedirect` for
+ * the rules (the scenario library, the legacy /suites URLs, and the old
+ * per-run URL that now opens a drawer).
  */
 import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import SimulationsPage from "~/components/suites/SimulationsPage";
+import { resolveSimulationsRedirect } from "~/components/suites/useSuiteRouting";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
 function SimulationsRoutePage() {
@@ -26,35 +27,21 @@ function SimulationsRoutePage() {
   const pathSegments = Array.isArray(router.query.path) ? router.query.path : [];
   const projectSlug = router.query.project as string | undefined;
 
-  // Handle legacy /suites redirect
+  const redirect =
+    router.isReady && projectSlug
+      ? resolveSimulationsRedirect({
+          projectSlug,
+          segments: pathSegments,
+          query: router.query as Record<string, unknown>,
+        })
+      : null;
+
   useEffect(() => {
-    if (!router.isReady || !projectSlug) return;
+    if (redirect) void router.replace(redirect);
+  }, [redirect]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (pathSegments[0] === "suites") {
-      const suite = router.query.suite;
-      const externalSet = router.query.externalSet;
-      if (typeof suite === "string" && suite) {
-        void router.replace(`/${projectSlug}/simulations/run-plans/${suite}`);
-      } else if (typeof externalSet === "string" && externalSet) {
-        void router.replace(`/${projectSlug}/simulations/${externalSet}`);
-      } else {
-        void router.replace(`/${projectSlug}/simulations`);
-      }
-      return;
-    }
-
-    // Handle /setId/batchId/scenarioRunId redirect → open drawer
-    if (pathSegments.length === 3 && pathSegments[0] !== "run-plans") {
-      const [setId, batchId, runId] = pathSegments;
-      void router.replace(
-        `/${projectSlug}/simulations/${setId}/${batchId}?openRun=${runId}`,
-      );
-    }
-  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Don't render during redirects
-  if (pathSegments[0] === "suites") return null;
-  if (pathSegments.length === 3 && pathSegments[0] !== "run-plans") return null;
+  // Don't render the wrong page for a frame while the redirect is in flight.
+  if (redirect) return null;
 
   return <SimulationsPage />;
 }
