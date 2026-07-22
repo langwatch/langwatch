@@ -114,8 +114,8 @@ export function useFilteredCommands(
         id: "action-toggle-ops-pin",
         label: pinned ? "Unpin Ops from sidebar" : "Pin Ops in sidebar",
         description: pinned
-          ? "Remove the Ops sidebar pin"
-          : "Keep Ops visible in the sidebar",
+          ? "Remove the Ops sidebar pin (this browser)"
+          : "Keep Ops visible in the sidebar (this browser)",
         icon: pinned ? PinOff : Pin,
         category: "actions",
         keywords: [
