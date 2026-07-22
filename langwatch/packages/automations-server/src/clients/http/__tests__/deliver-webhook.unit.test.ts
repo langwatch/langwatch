@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { DispatchError } from "@langwatch/dispatch-error";
 import type { WebhookDeliveryInput } from "@langwatch/automations/repositories/webhook-delivery.repository";
-import { deliverWebhook } from "../deliverWebhook";
-import type { WebhookSendResult } from "@langwatch/automations-server/clients/http/webhook.client";
-import type { sendWebhook } from "../appWebhookSender";
+import { deliverWebhook } from "../deliver-webhook";
+import type { WebhookSender, WebhookSendResult } from "../webhook.client";
 
 const base = {
   projectId: "proj_1",
@@ -18,13 +17,13 @@ const base = {
 
 function sendResolvingWith(
   overrides: Partial<WebhookSendResult>,
-): typeof sendWebhook {
+): WebhookSender["sendWebhook"] {
   return (async () => ({
     status: 200,
     body: "ok",
     eventId: "evt_abc",
     ...overrides,
-  })) as unknown as typeof sendWebhook;
+  })) as unknown as WebhookSender["sendWebhook"];
 }
 
 describe("deliverWebhook", () => {
@@ -144,7 +143,7 @@ describe("deliverWebhook", () => {
           message: "blocked: private address",
           retryable: false,
         });
-      }) as unknown as typeof sendWebhook;
+      }) as unknown as WebhookSender["sendWebhook"];
       await expect(
         deliverWebhook({
           ...base,

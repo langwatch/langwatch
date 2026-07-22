@@ -21,7 +21,8 @@ import type { Trace } from "~/server/tracer/types";
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,
-} from "~/server/app-layer/automations/delivery/deliverWebhook";
+} from "@langwatch/automations-server/clients/http/deliver-webhook";
+import { sendWebhook } from "~/server/app-layer/automations/delivery/appWebhookSender";
 import {
   DispatchError,
   isDispatchError,
@@ -566,6 +567,7 @@ async function dispatchNotifyDigest({
         "evt_" +
         createHash("sha256").update(messageKey).digest("hex").slice(0, 32);
       await deliverWebhook({
+        send: sendWebhook,
         recorder: deps.recordWebhookDelivery,
         projectId,
         triggerId,

@@ -11,7 +11,7 @@ import type { sendWebhook } from "~/server/app-layer/automations/delivery/appWeb
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,
-} from "~/server/app-layer/automations/delivery/deliverWebhook";
+} from "@langwatch/automations-server/clients/http/deliver-webhook";
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/appSlackWebApi";
 import { ALERT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";

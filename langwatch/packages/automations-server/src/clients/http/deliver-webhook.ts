@@ -7,9 +7,9 @@ import type {
 } from "@langwatch/automations/repositories/webhook-delivery.repository";
 import {
   assertWebhookDelivered,
+  type WebhookSender,
   type WebhookSendResult,
-} from "@langwatch/automations-server/clients/http/webhook.client";
-import { sendWebhook } from "./appWebhookSender";
+} from "./webhook.client";
 
 const logger = createLogger("langwatch:webhook-delivery");
 
@@ -53,7 +53,7 @@ function captureFailureResponse({
  * breaks dispatch.
  */
 export async function deliverWebhook({
-  send = sendWebhook,
+  send,
   recorder,
   projectId,
   triggerId,
@@ -64,9 +64,9 @@ export async function deliverWebhook({
   body,
   triggerName,
 }: {
-  /** The sender — defaults to the real one; the graph-alert path injects its
-   *  own `deps.sendWebhook` so its unit tests keep the mock seam. */
-  send?: typeof sendWebhook;
+  /** The injected sender — the app's configured `appWebhookSender`, or a
+   *  path-specific one (the graph-alert path threads `deps.sendWebhook`). */
+  send: WebhookSender["sendWebhook"];
   recorder?: WebhookDeliveryRecorder;
   projectId: string;
   triggerId: string;
