@@ -114,13 +114,20 @@ export const NewWorkflowModal = ({
           }
 
           setStep({ step: "create", template: result.data as Workflow });
-        } catch (parseFailure) {
-          // Local `JSON.parse` of the file the user picked — nothing crossed the
-          // wire, and the syntax detail is what tells them what to fix.
+        } catch (readFailure) {
+          // Local handling of the file the user picked — nothing crossed the
+          // wire, so the detail is what tells them what to fix. The `catch`
+          // covers more than `JSON.parse` (the schema walk, `setStep`), and
+          // narrowing to `SyntaxError` left everything else with a headline and
+          // an empty body. `String()` of whatever happened beats a blank.
           toaster.create({
             title: "Invalid workflow file",
-            description:
-              parseFailure instanceof SyntaxError ? parseFailure.message : "",
+            // This failure never crossed the wire, so the message is a local
+            // parser's, not a code slug. See above.
+            description: // no-raw-error-toast-ok
+              readFailure instanceof Error
+                ? readFailure.message
+                : String(readFailure),
             type: "error",
             meta: { closable: true },
           });

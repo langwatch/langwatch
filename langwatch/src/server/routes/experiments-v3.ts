@@ -40,7 +40,10 @@ import {
   requestAbort,
   runOrchestrator,
 } from "~/server/experiments-v3/execution/orchestrator";
-import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
+import {
+  mapThrownErrorEvent,
+  toClientEvent,
+} from "~/server/experiments-v3/execution/resultMapper";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import {
   type EvaluationV3Event,
@@ -245,7 +248,10 @@ secured
 
         for await (const event of orchestrator) {
           await stream.writeSSE({
-            data: JSON.stringify(event),
+            // `toClientEvent`, never the raw event: an error frame carries the
+            // failure's own message for our ClickHouse row, and that field
+            // stops here.
+            data: JSON.stringify(toClientEvent(event)),
           });
 
           if (event.type === "done" || event.type === "stopped") {
@@ -276,8 +282,11 @@ secured
         // Writing `(error as Error).message` here put a Prisma string or a Go
         // net error straight into the customer's cell — these two frames were
         // the only producers the coded-error work didn't cover.
+        //
+        // No `rowIndex`: the orchestrator itself threw, so the whole run is
+        // gone and the mapper says so, rather than blaming one row.
         await stream.writeSSE({
-          data: JSON.stringify(mapThrownErrorEvent({ error })),
+          data: JSON.stringify(toClientEvent(mapThrownErrorEvent({ error }))),
         });
       }
     });
@@ -475,7 +484,10 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
         for await (const event of orchestrator) {
           await stream.writeSSE({
-            data: JSON.stringify(event),
+            // `toClientEvent`, never the raw event: an error frame carries the
+            // failure's own message for our ClickHouse row, and that field
+            // stops here.
+            data: JSON.stringify(toClientEvent(event)),
           });
 
           if (event.type === "done" || event.type === "stopped") {
@@ -497,8 +509,11 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
         // Writing `(error as Error).message` here put a Prisma string or a Go
         // net error straight into the customer's cell — these two frames were
         // the only producers the coded-error work didn't cover.
+        //
+        // No `rowIndex`: the orchestrator itself threw, so the whole run is
+        // gone and the mapper says so, rather than blaming one row.
         await stream.writeSSE({
-          data: JSON.stringify(mapThrownErrorEvent({ error })),
+          data: JSON.stringify(toClientEvent(mapThrownErrorEvent({ error }))),
         });
       }
     });

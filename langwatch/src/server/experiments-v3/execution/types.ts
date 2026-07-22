@@ -253,10 +253,30 @@ export type EvaluationV3Event =
        */
       message: string;
       /**
+       * The failure's own words, for OUR record — the run row in ClickHouse and
+       * the log line beside it. ADR-045 stops the CUSTOMER reading internals;
+       * it does not ask us to blank our own history, which is what persisting
+       * the generic wire line did (a Prisma failure, an OOM and a bad mapping
+       * all stored as the same eleven words).
+       *
+       * Server-only: `toClientEvent` strips it before the SSE writer, so it
+       * never reaches a browser. Everything that serialises an event for a
+       * client goes through that function.
+       */
+      serverMessage?: string;
+      /**
        * The coded failure, when we knew what went wrong. The client presents
        * from this via the registry, exactly as it does for `target_result`.
        */
       domainError?: SerializedHandledError;
+      /**
+       * The trace to hand support. An unhandled failure deliberately tells the
+       * client nothing about what went wrong, which leaves the id as the only
+       * thing that ties "it broke" to the log line — the same reasoning as
+       * `data.traceId` on the tRPC boundary. A handled failure also carries it
+       * inside `domainError`; this is the field a caller can read either way.
+       */
+      traceId?: string;
       rowIndex?: number;
       targetId?: string;
       evaluatorId?: string;

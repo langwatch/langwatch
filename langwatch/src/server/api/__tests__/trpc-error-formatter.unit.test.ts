@@ -131,4 +131,94 @@ describe("tRPC error response boundary", () => {
 
     expect(format(error).message).toBe("Choose a project first");
   });
+
+  it("strips the development stack from a plain 4xx too", () => {
+    const error = new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Choose a project first",
+    });
+
+    expect(format(error).data).not.toHaveProperty("stack");
+  });
+});
+
+/**
+ * `data.authored` is the server's verdict on whether `message` is prose
+ * somebody wrote for a person. The client renders it when true and degrades to
+ * "we've been notified" when false, so a wrong verdict either leaks a driver
+ * string or throws away the one sentence that told the user what to fix.
+ */
+describe("authored-message verdict", () => {
+  describe("given a procedure that wrote its own copy", () => {
+    it("marks a message with no cause as authored", () => {
+      const error = new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Changing column types is not yet supported for large datasets",
+      });
+
+      expect(format(error).data.authored).toBe(true);
+    });
+
+    /**
+     * The majority shape in this codebase: the sentence is ours, `cause` is
+     * passed so the log line keeps the driver's story. Rejecting it on the
+     * presence of `cause` told an admin who mistyped a field to wait for
+     * something that was never going to change.
+     */
+    it("marks a message passed alongside a cause as authored", () => {
+      const error = new TRPCError({
+        code: "BAD_REQUEST",
+        message: "That rule name is already in use",
+        cause: new Error("Unique constraint failed on the fields: (`name`)"),
+      });
+
+      expect(format(error).data.authored).toBe(true);
+      expect(format(error).message).toBe("That rule name is already in use");
+    });
+  });
+
+  describe("given a message inherited from the cause", () => {
+    it("does not present a driver string as our own copy", () => {
+      const cause = new Error("fetch failed");
+      const error = new TRPCError({ code: "BAD_REQUEST", cause });
+
+      const formatted = format(error);
+      expect(formatted.message).toBe("fetch failed");
+      expect(formatted.data.authored).toBe(false);
+    });
+
+    it("looks past a wrapper that re-donated the same string", () => {
+      const driver = new Error("connect ECONNREFUSED 10.0.0.5:5432");
+      const wrapper = new Error(driver.message, { cause: driver });
+      const error = new TRPCError({
+        code: "BAD_REQUEST",
+        message: driver.message,
+        cause: wrapper,
+      });
+
+      expect(format(error).data.authored).toBe(false);
+    });
+  });
+
+  describe("given no message at all", () => {
+    it("does not present the tRPC code name as copy", () => {
+      const error = new TRPCError({ code: "NOT_FOUND" });
+
+      const formatted = format(error);
+      expect(formatted.message).toBe("NOT_FOUND");
+      expect(formatted.data.authored).toBe(false);
+    });
+  });
+
+  describe("given a handled error", () => {
+    it("leaves presentation to the code registry", () => {
+      const error = new TRPCError({
+        code: "NOT_FOUND",
+        message: "Conversation not found: c-1",
+        cause: new NotFoundError("langy_conversation_not_found", "Conversation", "c-1"),
+      });
+
+      expect(format(error).data.authored).toBe(false);
+    });
+  });
 });

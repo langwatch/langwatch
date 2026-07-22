@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import {
@@ -8,9 +9,19 @@ import {
   mapEvaluatorResult,
   mapNlpEvent,
   mapTargetResult,
+  mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   parseNodeId,
+  toClientEvent,
 } from "../resultMapper";
+
+class DatasetColumnMissingError extends HandledError {
+  constructor() {
+    super("invalid_dataset", "Column \"expected_output\" is not mapped", {
+      httpStatus: 422,
+    });
+  }
+}
 
 describe("resultMapper", () => {
   describe("parseNodeId", () => {
@@ -921,6 +932,102 @@ describe("resultMapper", () => {
           score: 0.0, // Score should be preserved
         });
       }
+    });
+  });
+});
+
+/**
+ * The single choke point deciding whether a thrown error's message reaches a
+ * customer. Everything the orchestrator and the two route-level catches emit
+ * for a failure passes through here.
+ */
+describe("mapThrownErrorEvent", () => {
+  describe("given a handled error", () => {
+    it("carries the code as the wire message", () => {
+      const event = mapThrownErrorEvent({
+        error: new DatasetColumnMissingError(),
+        rowIndex: 3,
+        targetId: "target-1",
+      });
+
+      expect(event).toMatchObject({
+        type: "error",
+        message: "invalid_dataset",
+        rowIndex: 3,
+        targetId: "target-1",
+      });
+    });
+
+    it("carries the serialised handled payload the client renders from", () => {
+      const event = mapThrownErrorEvent({
+        error: new DatasetColumnMissingError(),
+        rowIndex: 3,
+      });
+
+      expect(event.type).toBe("error");
+      if (event.type !== "error") return;
+      expect(event.domainError).toMatchObject({
+        code: "invalid_dataset",
+        httpStatus: 422,
+      });
+    });
+  });
+
+  describe("given an unhandled infrastructure error", () => {
+    const connectionRefused = () =>
+      new Error("connect ECONNREFUSED 10.0.0.5:5432");
+
+    it("puts neither host nor port on the wire", () => {
+      const event = toClientEvent(
+        mapThrownErrorEvent({
+          error: connectionRefused(),
+          rowIndex: 0,
+          targetId: "target-1",
+        }),
+      );
+
+      const wire = JSON.stringify(event);
+      expect(wire).not.toContain("10.0.0.5");
+      expect(wire).not.toContain("5432");
+      expect(wire).not.toContain("ECONNREFUSED");
+    });
+
+    it("keeps the real message for the server's own record", () => {
+      const event = mapThrownErrorEvent({
+        error: connectionRefused(),
+        rowIndex: 0,
+        targetId: "target-1",
+      });
+
+      expect(event.type).toBe("error");
+      if (event.type !== "error") return;
+      expect(event.serverMessage).toBe("connect ECONNREFUSED 10.0.0.5:5432");
+    });
+  });
+
+  describe("given a failure that took the whole run", () => {
+    it("does not blame a single row", () => {
+      const runLevel = mapThrownErrorEvent({ error: new Error("boom") });
+      const cellLevel = mapThrownErrorEvent({
+        error: new Error("boom"),
+        rowIndex: 0,
+        targetId: "target-1",
+      });
+
+      expect(runLevel.type).toBe("error");
+      expect(cellLevel.type).toBe("error");
+      if (runLevel.type !== "error" || cellLevel.type !== "error") return;
+      expect(runLevel.message).not.toBe(cellLevel.message);
+      expect(runLevel.message.toLowerCase()).not.toContain("row");
+    });
+  });
+});
+
+describe("toClientEvent", () => {
+  describe("when the event carries no server-only field", () => {
+    it("returns it untouched", () => {
+      const event = mapThrownErrorEvent({ error: "not an Error at all" });
+      expect(toClientEvent(event)).toBe(event);
     });
   });
 });

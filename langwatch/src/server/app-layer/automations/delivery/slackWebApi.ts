@@ -119,9 +119,16 @@ export async function postSlackChatMessage({
   const detail = body.response_metadata?.messages?.length
     ? ` (${body.response_metadata.messages.join("; ")})`
     : "";
+  const explanation = explainSlackPostError(code);
   throw new DispatchError({
-    message: `${label}: ${explainSlackPostError(code)}${detail}`,
+    message: `${label}: ${explanation}${detail}`,
     retryable: RETRYABLE_SLACK_ERRORS.has(code),
+    // Slack told us what the admin has to do; that sentence is the whole value
+    // of this failure, so it travels to them. Capitalised because
+    // `explainSlackPostError` writes a clause to follow the label, and this is
+    // read on its own. `label` and `detail` stay behind: one names an internal
+    // dispatcher, the other is raw provider metadata.
+    customerMessage: `${explanation.charAt(0).toUpperCase()}${explanation.slice(1)}`,
   });
 }
 
