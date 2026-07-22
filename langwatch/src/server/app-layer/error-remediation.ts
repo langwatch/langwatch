@@ -21,6 +21,19 @@ interface RemediationEntry {
 }
 
 const registry = {
+  // ---- request boundary ----
+  validation_error: {
+    tips: [
+      "Read `reasons` — each entry names the offending field in meta.field and what was expected in meta.expected",
+      "Fix those fields and send the request again; retrying it unchanged will fail identically",
+    ],
+  },
+  malformed_request: {
+    tips: [
+      "The body could not be parsed at all — check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
+    ],
+  },
+
   // ---- traces ----
   trace_not_found: {
     tips: [
@@ -133,6 +146,13 @@ const registry = {
       "If it persists, check the LangWatch status page or contact support",
     ],
   },
+  evaluator_input_too_large: {
+    tips: [
+      "Shorten the input sent to this evaluator — the payload exceeded the evaluator's size limit",
+      "Map the evaluator to a specific field rather than the whole trace, so only what it scores is sent",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
   evaluator_missing_field: {
     tips: [
       "Provide the missing field in the request (see meta.field)",
@@ -174,6 +194,25 @@ const registry = {
   langy_turn_in_progress: {
     tips: [
       "Wait for the current response to finish before sending another message",
+    ],
+  },
+  langy_turn_not_stoppable: {
+    tips: [
+      "Read the conversation to find the turn it currently has in flight, and stop that one",
+      "A turn that already finished needs no stopping — its answer is on the conversation",
+    ],
+  },
+  langy_idempotency_mismatch: {
+    tips: [
+      "The same idempotency key was reused with different content — mint a fresh key for every new send",
+    ],
+  },
+  langy_empty_message: {
+    tips: ["Send a message with actual text content"],
+  },
+  langy_dispatch_rejected: {
+    tips: [
+      "The agent rejected this turn's request as invalid — it will not be retried; send a new message",
     ],
   },
   langy_agent_unavailable: {

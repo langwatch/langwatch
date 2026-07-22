@@ -4,7 +4,7 @@ import {
   type Organization,
 } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import {
   BindingNotFoundError,
@@ -58,29 +58,6 @@ const addBindingSchema = z.object({
   scopeType: z.nativeEnum(RoleBindingScopeType),
   scopeId: z.string().min(1, "scopeId is required"),
 });
-
-function validationHook(
-  result: {
-    success: boolean;
-    error?: {
-      issues: Array<{ message?: string; path?: (string | number)[] }>;
-    };
-  },
-  c: { json: (body: unknown, status: number) => Response },
-): Response | undefined {
-  if (!result.success) {
-    const issue = result.error?.issues?.[0];
-    return c.json(
-      {
-        error: "Unprocessable Entity",
-        message: issue?.message ?? "Validation failed",
-        path: issue?.path,
-      },
-      422,
-    );
-  }
-  return undefined;
-}
 
 const secured = createOrgApp<GroupServiceMiddlewareVariables>({
   basePath: "/api/groups",
@@ -139,7 +116,7 @@ secured
     "/",
     groupServiceMiddleware,
     describeRoute({ description: "Create a new group" }),
-    zValidator("json", createGroupSchema, validationHook),
+    zValidator("json", createGroupSchema),
     async (c) => {
       const organization = c.get("organization") as Organization;
       const body = c.req.valid("json");
@@ -215,7 +192,7 @@ secured
     "/:id",
     groupServiceMiddleware,
     describeRoute({ description: "Rename a group" }),
-    zValidator("json", updateGroupSchema, validationHook),
+    zValidator("json", updateGroupSchema),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -307,7 +284,7 @@ secured
     "/:id/members",
     groupServiceMiddleware,
     describeRoute({ description: "Add a member to a group" }),
-    zValidator("json", addMemberSchema, validationHook),
+    zValidator("json", addMemberSchema),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;
@@ -408,7 +385,7 @@ secured
     "/:id/bindings",
     groupServiceMiddleware,
     describeRoute({ description: "Add a role binding to a group" }),
-    zValidator("json", addBindingSchema, validationHook),
+    zValidator("json", addBindingSchema),
     async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization") as Organization;

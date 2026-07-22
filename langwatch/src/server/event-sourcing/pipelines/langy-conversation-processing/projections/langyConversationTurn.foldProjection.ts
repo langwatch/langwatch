@@ -331,14 +331,23 @@ export class LangyConversationTurnFoldProjection
     event: LangyAgentRespondedEvent,
     state: LangyConversationTurnData,
   ): LangyConversationTurnData {
-    const failed = event.data.outcome === "failed";
+    // Three terminal outcomes on the one answer-carrying event: a user stop keeps
+    // the partial answer (AnswerParts) but renders distinctly from a clean finish,
+    // and is never an error (ADR-058). A `failed` outcome here is the ran-but-
+    // failed answer; the no-answer stall is agent_response_failed, handled above.
+    const outcome = event.data.outcome;
+    const status =
+      outcome === "failed"
+        ? LANGY_CONVERSATION_TURN_STATUS.FAILED
+        : outcome === "stopped"
+          ? LANGY_CONVERSATION_TURN_STATUS.STOPPED
+          : LANGY_CONVERSATION_TURN_STATUS.COMPLETED;
     return {
       ...this.withIdentity(event, state),
       AnswerParts: event.data.parts ?? [],
-      Status: failed
-        ? LANGY_CONVERSATION_TURN_STATUS.FAILED
-        : LANGY_CONVERSATION_TURN_STATUS.COMPLETED,
-      Error: failed ? event.data.error ?? "unknown error" : state.Error,
+      Status: status,
+      Error:
+        outcome === "failed" ? event.data.error ?? "unknown error" : state.Error,
       EndedAt: event.occurredAt,
     };
   }

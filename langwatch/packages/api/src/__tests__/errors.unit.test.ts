@@ -56,7 +56,10 @@ describe("formatError", () => {
 
         expect(status).toBe(404);
         expect(body.code).toBe("not_found");
-        expect(body.message).toBe("Resource not found: abc");
+        // The code, never the handled error's own message: that is server copy
+        // and can name internals (ADR-045). Identifying context is in `meta`.
+        expect(body.message).toBe("not_found");
+        expect(JSON.stringify(body)).not.toContain("Resource not found: abc");
         expect(body.meta).toEqual({ id: "abc" });
         expect(body.error).toBeUndefined();
       });
@@ -150,7 +153,7 @@ describe("formatError", () => {
 
       expect(status).toBe(422);
       expect(body.code).toBe("validation_error");
-      expect(body.message).toBe("Validation error");
+      expect(body.message).toBe("validation_error");
       expect(body.reasons).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

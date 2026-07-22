@@ -113,14 +113,28 @@ async function runSeedPass(
   let cursor: string | null = null;
 
   for (;;) {
-    const page: Array<{ projectId: string }> =
-      await deps.prisma.topic.findMany({
-        distinct: ["projectId"],
-        select: { projectId: true },
-        orderBy: { projectId: "asc" },
+    // Fleet-wide walk over the projects that still hold pre-ownership Topic
+    // rows. A distinct-projectId scan straight off `Topic` trips the tenancy
+    // guard: `Topic` is project-scoped and the first page carries no projectId
+    // predicate. Instead we page the GLOBAL `Project` model — which the guard
+    // exempts (it IS the tenant, addressed by its own id), exactly as the
+    // sibling schedule seed's `findEligibleProjectsPage` does — and keep only
+    // the projects that own Topic rows via a `topics: { some }` EXISTS filter.
+    // Topic.projectId is a FK, so that is the same set as a distinct-projectId
+    // scan of `Topic`. Each project's rows are still READ back through the
+    // guarded model API in seedProjectTopicModel, which carries its projectId —
+    // only this fleet-wide enumeration is cross-tenant.
+    const page: Array<{ projectId: string }> = (
+      await deps.prisma.project.findMany({
+        where: {
+          topics: { some: {} },
+          ...(cursor ? { id: { gt: cursor } } : {}),
+        },
+        select: { id: true },
+        orderBy: { id: "asc" },
         take: PAGE_SIZE,
-        ...(cursor ? { where: { projectId: { gt: cursor } } } : {}),
-      });
+      })
+    ).map((project) => ({ projectId: project.id }));
     if (page.length === 0) break;
     cursor = page[page.length - 1]!.projectId;
 

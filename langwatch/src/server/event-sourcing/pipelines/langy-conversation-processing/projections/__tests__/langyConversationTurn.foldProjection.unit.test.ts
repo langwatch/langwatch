@@ -235,6 +235,34 @@ describe("LangyConversationTurnFoldProjection", () => {
       });
     });
 
+    describe("when the user stops the turn mid-answer", () => {
+      /** @scenario A stopped turn keeps the words Langy had already written */
+      it("marks the turn stopped, keeps the partial answer, and is not an error", () => {
+        const state = fold.apply(
+          running,
+          event(
+            "AGENT_RESPONDED",
+            LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            {
+              messageId: "a1",
+              role: "assistant",
+              parts: [{ type: "text", text: "here is what I had so f" }],
+              outcome: "stopped",
+            },
+            2000,
+          ),
+        );
+        // A stop is its own terminal: the partial stays, it renders distinctly
+        // from a clean completion, and it is never a red error (ADR-058).
+        expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.STOPPED);
+        expect(state.AnswerParts).toEqual([
+          { type: "text", text: "here is what I had so f" },
+        ]);
+        expect(state.EndedAt).toBe(2000);
+        expect(state.Error).toBeNull();
+      });
+    });
+
     describe("when the response fails with no answer to carry", () => {
       it("marks the turn failed with the error and no answer parts", () => {
         const state = fold.apply(

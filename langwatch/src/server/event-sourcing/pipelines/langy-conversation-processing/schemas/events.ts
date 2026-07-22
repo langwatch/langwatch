@@ -328,6 +328,14 @@ export type LangyAgentResponseFailedEvent = z.infer<
  * truth. Streamed tokens are NOT events; this single event carries the complete
  * assistant message. Feeds operational state (terminal status, count) and the
  * assistant message projection.
+ *
+ * `outcome` is the terminal discriminant on the ONE answer-carrying terminal:
+ * `completed` (the agent finished), `failed` (it ran but ended in failure, still
+ * with something to carry — distinct from `agent_response_failed`, which is the
+ * no-answer stall), and `stopped` (the USER stopped the turn mid-answer, ADR-058).
+ * A stop is not a failure and carries the partial answer streamed so far, so it
+ * rides this event and its `turn-terminal` idempotency slot rather than inventing
+ * a parallel terminal.
  */
 export const langyAgentRespondedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -335,7 +343,7 @@ export const langyAgentRespondedEventDataSchema = z.object({
   messageId: z.string(),
   role: langyMessageRoleSchema.default("assistant"),
   parts: z.array(langyMessagePartSchema).default([]),
-  outcome: z.enum(["completed", "failed"]).default("completed"),
+  outcome: z.enum(["completed", "failed", "stopped"]).default("completed"),
   error: z.string().nullable().optional(),
 });
 export type LangyAgentRespondedEventData = z.infer<

@@ -1,7 +1,6 @@
 import {
   Box,
   Link as ChakraLink,
-  Heading,
   HStack,
   Icon,
   Skeleton,
@@ -13,8 +12,11 @@ import type { ReactNode } from "react";
 import { LuCircleX } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RecentItem, RecentItemType } from "~/server/home/types";
+import {
+  HOME_SECTION_GAP,
+  HomeSectionHeader,
+} from "./HomeSectionHeader";
 import { api } from "~/utils/api";
-import { SERIF } from "~/features/asaplangy";
 import { featureIcons, recentItemTypeToFeature } from "~/utils/featureIcons";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { HomeCard } from "./HomeCard";
@@ -200,17 +202,8 @@ export function RecentItemsSection({
   }
 
   return (
-    <VStack align="stretch" gap={3} width="full">
-      {/* The page's serif display voice, matching the card titles. */}
-      <Heading
-        size="md"
-        fontFamily={SERIF}
-        fontWeight="500"
-        fontSize="18px"
-        letterSpacing="-0.01em"
-      >
-        Jump right back
-      </Heading>
+    <VStack align="stretch" gap={HOME_SECTION_GAP} width="full">
+      <HomeSectionHeader title="Jump right back" />
 
       {/* Only a real in-flight fetch earns a skeleton — a disabled query
           (project still resolving) reports isLoading without ever fetching. */}

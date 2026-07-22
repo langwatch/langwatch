@@ -20,19 +20,19 @@ function dirtyTheStore() {
   const store = useLangyStore.getState();
   store.selectConversation("conv-old");
   store.setDraft("half a question I never sent");
-  store.setActiveTurnId("turn-old");
+  store.beginTurn({ conversationId: "conv-old", turnId: "turn-old" });
   store.setTurnStatus("searching the abandoned turn");
   store.setTurnProgress(0.5);
   store.markProposalApplying("prop-1");
   store.markProposalApplied("prop-2", {});
   store.discardProposal("prop-3");
-  store.dismissChip("chip-1");
+  store.chooseChip("chip-1");
   store.dismissFeedback("msg-1");
 }
 
 describe("startNewConversation", () => {
   beforeEach(() => {
-    useLangyStore.getState().resetForProject();
+    useLangyStore.getState().resetForProject("project-test");
   });
 
   describe("given a conversation the user is walking away from", () => {
@@ -62,6 +62,8 @@ describe("startNewConversation", () => {
       useLangyStore.getState().startNewConversation();
       const state = useLangyStore.getState();
       expect(state.activeTurnId).toBeNull();
+      // The turn phase machine resets too — a new chat is idle, not mid-turn.
+      expect(state.turnPhase).toBe("idle");
       expect(state.turnStatus).toBeNull();
       expect(state.turnProgress).toBeNull();
     });
@@ -74,10 +76,12 @@ describe("startNewConversation", () => {
       expect(state.discardedProposalIds.size).toBe(0);
     });
 
-    it("restores the page-context chips and the feedback prompt", () => {
+    it("drops the page-context chips and restores the feedback prompt", () => {
       useLangyStore.getState().startNewConversation();
       const state = useLangyStore.getState();
-      expect(state.dismissedChipIds.size).toBe(0);
+      // Chips are opt-in, so a new chat starts with none — the context you
+      // assembled for the last question does not follow you into the next.
+      expect(state.chosenChipIds.size).toBe(0);
       expect(state.dismissedFeedbackMessageIds.size).toBe(0);
     });
 
@@ -87,7 +91,7 @@ describe("startNewConversation", () => {
       useLangyStore.getState().startNewConversation();
       const after = useLangyStore.getState();
       const fresh = { ...after };
-      useLangyStore.getState().resetForProject();
+      useLangyStore.getState().resetForProject("project-test");
       const baseline = useLangyStore.getState();
 
       for (const key of [
@@ -95,11 +99,13 @@ describe("startNewConversation", () => {
         "historyLoadConversationId",
         "draft",
         "activeTurnId",
+        "turnPhase",
+        "settledTurnId",
       ] as const) {
         expect(fresh[key], key).toEqual(baseline[key]);
       }
       for (const key of [
-        "dismissedChipIds",
+        "chosenChipIds",
         "dismissedFeedbackMessageIds",
         "applyingProposalIds",
         "discardedProposalIds",

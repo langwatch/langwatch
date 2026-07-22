@@ -78,7 +78,14 @@ export interface SerializedHandledError {
  * pre-collapsed to type "unknown".
  */
 export interface HerrEnvelope {
+  /**
+   * The discriminant, OpenAI-compatible name. Go emits this and `code` with
+   * the same value; `type` stays required here so an envelope from a writer
+   * that only sets it still parses.
+   */
   type: string;
+  /** Always equal to `type` when Go wrote the envelope. Preferred when present. */
+  code?: string;
   message: string;
   meta?: Record<string, unknown>;
   trace_id?: string;
@@ -308,9 +315,12 @@ export function handledErrorFromHerr(
   body: HerrEnvelope,
   options: { httpStatus?: number } = {},
 ): HandledError {
+  // Go emits `code` and `type` with the same value; prefer `code` and fall back
+  // to `type` so an envelope from an older writer resolves identically.
+  const code = body.code ?? body.type;
   return new (class extends HandledError {
     constructor() {
-      super(body.type, body.message, {
+      super(code, body.message, {
         meta: body.meta,
         httpStatus: options.httpStatus,
         fault: body.fault,
@@ -320,7 +330,7 @@ export function handledErrorFromHerr(
         spanId: body.span_id,
         reasons: (body.reasons ?? []).map((r) => handledErrorFromHerr(r)),
       });
-      this.name = body.type;
+      this.name = code;
     }
   })();
 }

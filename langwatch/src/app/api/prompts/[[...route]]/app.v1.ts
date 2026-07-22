@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
@@ -121,6 +122,11 @@ export function registerPromptRoutes(
     updatedAt: z.date(),
   });
 
+  // Assigning a tag changes an existing prompt; it creates nothing the caller
+  // `:manage`. Moving a tag is not editing a prompt — it repoints the release
+  // pointer, and so decides which version the customer's live traffic resolves
+  // to. That is a deployment, and it belongs with the grain that administers
+  // the prompt rather than with the one that edits its text.
   secured.access(requires("prompts:manage")).put(
     "/:id{.+?}/tags/:tag",
     organizationMiddleware,
@@ -480,8 +486,9 @@ export function registerPromptRoutes(
     },
   );
 
-  // Restore (rollback to) a specific version
-  secured.access(requires("prompts:manage")).post(
+  // Restore (rollback to) a specific version — a new version of a prompt that
+  // already exists, i.e. an update of that prompt.
+  secured.access(requires("prompts:update")).post(
     "/:id{.+?}/versions/:versionId/restore",
     organizationMiddleware,
     promptServiceMiddleware,
@@ -674,8 +681,10 @@ export function registerPromptRoutes(
     },
   );
 
-  // Create prompt with initial version
-  secured.access(requires("prompts:manage")).post(
+  // Create prompt with initial version. Asks for `prompts:create`; `:manage`
+  // still implies it, so no existing caller changes, and a viewer holding only
+  // `prompts:view` is declined exactly as before.
+  secured.access(requires("prompts:create")).post(
     "/",
     organizationMiddleware,
     promptServiceMiddleware,
@@ -908,7 +917,7 @@ export function registerPromptRoutes(
   );
 
   // Update prompt
-  secured.access(requires("prompts:manage")).put(
+  secured.access(requires("prompts:update")).put(
     "/:id{.+}",
     organizationMiddleware,
     promptServiceMiddleware,

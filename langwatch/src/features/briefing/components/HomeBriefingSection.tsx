@@ -1,5 +1,7 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { LangyPanelSurface } from "~/features/asaplangy";
+import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
+import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { HomeOverviewCard } from "./HomeOverviewCard";
@@ -27,6 +29,18 @@ export function HomeBriefingSection() {
   const { data, statusCells, isLoading, isAnalyticsLoading, isRefreshing } =
     useLangyBriefing();
   const { project } = useOrganizationTeamProject();
+  // The sheet renders wherever the signal-focused home is rolled out — with
+  // or without Langy (spec: specs/home/signal-focused-home-rollout.feature).
+  // Without Langy, every hand-to-Langy handler stays undefined so the sheet
+  // offers only its own evidence links, never a panel that won't mount.
+  const showLangy = useShowLangy();
+  // Reading Langy and STARTING a turn are different grants. Everything below
+  // that auto-sends a question needs `langy:create`; only the two that hand the
+  // reader a composer they finish themselves are safe on `langy:view`. With
+  // built-in roles the two always travel together, but the Langy permission
+  // category's read level is exactly `langy:view`, so a custom role or key can
+  // hold one without the other — and would otherwise meet a button that 403s.
+  const canAsk = useCanAskLangy();
   const openPanel = useLangyStore((s) => s.openPanel);
   const askLangy = useLangyStore((s) => s.askLangy);
   const attachContext = useLangyStore((s) => s.attachContext);
@@ -92,10 +106,10 @@ export function HomeBriefingSection() {
   return (
     <LangyBriefing
       data={data}
-      onAsk={openPanel}
-      onAskSubmit={handleAskSubmit}
-      onFeedback={handleSignalFeedback}
-      onInvestigateReceipt={handleInvestigateReceipt}
+      onAsk={showLangy ? openPanel : undefined}
+      onAskSubmit={canAsk ? handleAskSubmit : undefined}
+      onFeedback={showLangy ? handleSignalFeedback : undefined}
+      onInvestigateReceipt={canAsk ? handleInvestigateReceipt : undefined}
       status={
         <HomeOverviewCard
           bare

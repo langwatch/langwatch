@@ -10,6 +10,10 @@
  * invocation, before anything else is loaded.
  */
 
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
 /**
  * Commands that must never be served by a daemon.
  *
@@ -49,6 +53,7 @@ const DENIED_FLAGS = new Set(["--follow", "--watch"]);
 export type Ineligible =
   | "unsupported-platform"
   | "disabled-by-env"
+  | "disabled-by-config"
   | "interactive-tty"
   | "denied-command"
   | "long-running-flag"
@@ -62,6 +67,8 @@ export interface EligibilityInput {
   /** process.argv.slice(2) */
   args: string[];
   env: NodeJS.ProcessEnv;
+  /** `langwatch config set daemon off` was persisted (see isDaemonDisabledByConfig). */
+  daemonDisabledByConfig?: boolean;
   /** process.stdout.isTTY */
   stdoutIsTty: boolean;
   /** process.stderr.isTTY */
@@ -97,6 +104,10 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
     return { eligible: false, reason: "disabled-by-env" };
   }
 
+  if (input.daemonDisabledByConfig) {
+    return { eligible: false, reason: "disabled-by-config" };
+  }
+
   if (input.stdoutIsTty || input.stderrIsTty || input.stdinIsTty) {
     return { eligible: false, reason: "interactive-tty" };
   }
@@ -126,6 +137,32 @@ export function isAutoSpawnEnabled(env: NodeJS.ProcessEnv): boolean {
 }
 
 /**
+ * Read the persistent opt-out (`langwatch config set daemon off`) straight
+ * from config.json.
+ *
+ * Read directly rather than through utils/governance/config.ts: this module
+ * must stay dependency-free — it runs on EVERY invocation, before anything
+ * else is loaded, and `loadConfig` pulls in the governance module graph. The
+ * field is owned by `GovernanceConfig.daemon`; keep the two in sync.
+ */
+export function isDaemonDisabledByConfig(env: NodeJS.ProcessEnv): boolean {
+  try {
+    const configFile =
+      env.LANGWATCH_CLI_CONFIG ??
+      path.join(os.homedir(), ".langwatch", "config.json");
+    const parsed = JSON.parse(fs.readFileSync(configFile, "utf8")) as {
+      daemon?: string;
+    };
+    return parsed.daemon === "off";
+  } catch {
+    // A missing config means "no opt-out recorded", and an unreadable or
+    // corrupt one must not break a command HERE — `loadConfig` reports that
+    // properly on any command that actually reads config.
+    return false;
+  }
+}
+
+/**
  * Environment forwarded to the daemon with each request.
  *
  * An allowlist, not the caller's whole environment: shipping every variable
@@ -147,6 +184,15 @@ const ENV_ALLOWLIST = new Set([
   "http_proxy",
   "https_proxy",
   "no_proxy",
+  // Agent-mode detection (see cli/utils/output.ts AGENT_MODE_ENV_VARS): without
+  // forwarding these, a daemon-served command could not tell it is being run
+  // by an agent. `LANGWATCH_AGENT_MODE` rides the `LANGWATCH_` prefix rule.
+  "CLAUDECODE",
+  "CLAUDE_CODE",
+  "CURSOR_AGENT",
+  "GITHUB_COPILOT",
+  "AMAZON_Q",
+  "LW_AGENT_MODE",
 ]);
 
 export function collectForwardedEnv(

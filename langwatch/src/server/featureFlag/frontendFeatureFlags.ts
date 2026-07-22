@@ -60,6 +60,16 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_governance_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",
+  // The Langy home composition (the lit block leads, with a real composer in
+  // it). Rolls out on its own schedule ON TOP of `release_langy_enabled`:
+  // having Langy is necessary but not sufficient, so the panel can ship to a
+  // project long before its home page changes shape. Outranked by
+  // `release_ui_home_signal_focused_enabled`. See useHomeComposition.
+  "release_ui_home_langy_lantern_enabled",
+  // The signal-focused home composition (briefing sheet leads). Decides
+  // the homepage's layout ONLY — Langy access separately gates the
+  // sheet's hand-to-Langy affordances. See useShowSignalFocusedHome.
+  "release_ui_home_signal_focused_enabled",
   "release_webhook_automations",
 ] as const;
 

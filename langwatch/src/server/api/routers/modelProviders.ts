@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { SCOPE_TIERS, scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import {
+  SCOPE_TIERS,
+  scopeAssignmentSchema,
+} from "~/server/scopes/scope.types";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import {
   featureByKey,
@@ -49,6 +52,9 @@ export {
 } from "./modelProviders.utils";
 
 export const modelProviderRouter = createTRPCRouter({
+  // tRPC responses land in the browser, so every query here must go
+  // through the masking service method — decrypted customKeys are only
+  // for server-internal callers of `getProjectModelProviders`.
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
@@ -61,7 +67,11 @@ export const modelProviderRouter = createTRPCRouter({
         "project:update",
       );
 
-      return await getProjectModelProviders(projectId, hasSetupPermission);
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.getProjectModelProvidersForFrontend(
+        projectId,
+        hasSetupPermission,
+      );
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -121,7 +131,9 @@ export const modelProviderRouter = createTRPCRouter({
         enabled: z.boolean(),
         customKeys: z.object({}).passthrough().optional().nullable(),
         customModels: customModelUpdateInputSchema.optional().nullable(),
-        customEmbeddingsModels: customModelUpdateInputSchema.optional().nullable(),
+        customEmbeddingsModels: customModelUpdateInputSchema
+          .optional()
+          .nullable(),
         extraHeaders: z
           .array(z.object({ key: z.string(), value: z.string() }))
           .optional()
@@ -228,7 +240,9 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(({ input }) => {
-      return { managed: isManagedProvider(input.organizationId, input.provider) };
+      return {
+        managed: isManagedProvider(input.organizationId, input.provider),
+      };
     }),
 
   /**
@@ -563,4 +577,3 @@ async function deleteConfigPermissionMiddleware({
   ctx.permissionChecked = true;
   return next();
 }
-

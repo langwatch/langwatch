@@ -1,4 +1,4 @@
-import { Box, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -23,11 +23,10 @@ import {
   GripVertical,
   type LucideIcon,
   PanelLeftClose,
-  TextSearch,
-  X,
+  Settings2,
 } from "lucide-react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -86,7 +85,7 @@ export const FilterSidebar: React.FC = () => {
   // moved to the lens bar, the only optional header button left is Clear, so
   // the chip is hidden ONLY when Clear is present AND the rail is narrow enough
   // that it'd crowd — otherwise it always shows (the "don't hide it when it's
-  // not needed" rule). The header cluster is [clear?] [finder] [Configure
+  // not needed" rule). The header cluster is [clear?] [Configure
   // (+chip)] [expand-all].
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const headerExtraButtons = hasActiveFilters ? 1 : 0;
@@ -120,25 +119,6 @@ export const FilterSidebar: React.FC = () => {
     orderedKeysAll,
     isSectionVisibleForDensity,
   } = useFilterSidebarData();
-
-  // Facet finder: a header search that filters which facet SECTIONS render so
-  // the user can jump to a facet by name. Transient — it never touches the
-  // per-project visibility settings (that's Configure) or facet values (that's
-  // the per-facet search). See specs/traces-v2/search.feature "Facet finder".
-  const [finderOpen, setFinderOpen] = useState(false);
-  const [finderQuery, setFinderQuery] = useState("");
-  const closeFinder = useCallback(() => {
-    setFinderOpen(false);
-    setFinderQuery("");
-  }, []);
-  const visibleKeys = useMemo(() => {
-    const q = finderQuery.trim().toLowerCase();
-    if (!q) return orderedKeys;
-    return orderedKeys.filter((key) => {
-      const label = (sectionByKey.get(key)?.label ?? key).toLowerCase();
-      return label.includes(q) || key.toLowerCase().includes(q);
-    });
-  }, [orderedKeys, sectionByKey, finderQuery]);
 
   // Track which section is being dragged so we can render a lightweight
   // DragOverlay (and tell SortableSection a drag is in progress).
@@ -185,10 +165,10 @@ export const FilterSidebar: React.FC = () => {
     ({ active, over }: DragEndEvent) => {
       setActiveId(null);
       if (!over || active.id === over.id) return;
-      const oldIndex = visibleKeys.indexOf(String(active.id));
-      const newIndex = visibleKeys.indexOf(String(over.id));
+      const oldIndex = orderedKeys.indexOf(String(active.id));
+      const newIndex = orderedKeys.indexOf(String(over.id));
       if (oldIndex < 0 || newIndex < 0) return;
-      const reorderedVisible = arrayMove(visibleKeys, oldIndex, newIndex);
+      const reorderedVisible = arrayMove(orderedKeys, oldIndex, newIndex);
       // Preserve any hidden keys' relative positions: walk the full
       // saved order, replacing the visible-key slots with the new
       // sequence in turn. Keys that weren't in the saved order yet get
@@ -206,7 +186,7 @@ export const FilterSidebar: React.FC = () => {
       }
       setSectionOrder(next);
     },
-    [visibleKeys, orderedKeysAll, setSectionOrder],
+    [orderedKeys, orderedKeysAll, setSectionOrder],
   );
 
   const handleShiftToggle = useCallback(
@@ -234,19 +214,18 @@ export const FilterSidebar: React.FC = () => {
   // sidebar's lifetime (these listeners only exist while it's mounted /
   // expanded) and bound to the local handlers next to each action:
   //   c → Configure facets (open the manager popover)
-  //   f → Find a facet (open the finder)
   //   e → Expand / collapse all sections
   //   x → Clear all filters   (only while there ARE active filters)
   //   r → Reset to the active lens (only while a local draft deviates)
   // (Hide-the-sidebar's `[` is owned by the page-level `useSidebarShortcut`.)
   // Bare single keys, matching the page's existing `[` / `?` / `D` style.
   // Ignored while the user is typing in any input/contentEditable (incl.
-  // the search bar, the finder, and per-section value search) and when a
-  // modifier is held, so they never hijack ⌘C / Ctrl+F / etc.
+  // the search bar and per-section value search) and when a modifier is
+  // held, so they never hijack ⌘C / Ctrl+F / etc.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't fire sidebar shortcuts while the trace drawer is open — the
-      // sidebar stays mounted underneath it, so `x`/`r`/`c`/`f`/`e` would
+      // sidebar stays mounted underneath it, so `x`/`r`/`c`/`e` would
       // otherwise act behind the drawer (and `c`/`r` collide with the
       // drawer's own shortcuts). Mirrors the page-level shortcut guards.
       if (useDrawerStore.getState().isOpen) return;
@@ -265,9 +244,6 @@ export const FilterSidebar: React.FC = () => {
       if (key === "c") {
         e.preventDefault();
         setFacetManagerOpen(true);
-      } else if (key === "f") {
-        e.preventDefault();
-        setFinderOpen(true);
       } else if (key === "e") {
         e.preventDefault();
         handleToggleAll();
@@ -283,7 +259,6 @@ export const FilterSidebar: React.FC = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [
     setFacetManagerOpen,
-    setFinderOpen,
     handleToggleAll,
     hasActiveFilters,
     clearAllFilters,
@@ -463,27 +438,6 @@ export const FilterSidebar: React.FC = () => {
               (LensTabs), where it sits right next to the draft lens tab — a
               clearer home than buried among the sidebar's filter chrome. The
               `r` shortcut + `revertLens` stay wired here for keyboard users. */}
-          <Tooltip
-            positioning={{ placement: "bottom" }}
-            content={
-              <HStack gap={1.5}>
-                <Text>Find a facet</Text>
-                <Kbd>F</Kbd>
-              </HStack>
-            }
-          >
-            <IconButton
-              aria-label="Find a facet"
-              aria-pressed={finderOpen}
-              size="2xs"
-              variant="ghost"
-              color={finderOpen ? "fg" : "fg.subtle"}
-              bg={finderOpen ? "bg.muted" : undefined}
-              onClick={() => (finderOpen ? closeFinder() : setFinderOpen(true))}
-            >
-              <TextSearch size={14} />
-            </IconButton>
-          </Tooltip>
           <FacetManagerPopover
             orderedKeysAll={orderedKeysAll}
             sectionByKey={sectionByKey}
@@ -529,60 +483,6 @@ export const FilterSidebar: React.FC = () => {
           </Tooltip>
         </HStack>
       </HStack>
-      {/* Facet finder input — a slim row that appears under the header when
-          the search toggle is on. Filters which sections render (visibleKeys)
-          without changing any visibility setting. */}
-      {finderOpen && (
-        <HStack
-          flexShrink={0}
-          gap={1.5}
-          paddingX={2.5}
-          paddingY={1.5}
-          borderBottomWidth="1px"
-          borderColor="border"
-          bg={{ base: "bg.subtle", _dark: "bg.surface" }}
-        >
-          <Input
-            aria-label="Find a facet"
-            autoFocus
-            size="xs"
-            variant="flushed"
-            placeholder="Find a facet…"
-            value={finderQuery}
-            onChange={(e) => setFinderQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                closeFinder();
-              }
-            }}
-            border="none"
-            _focus={{ boxShadow: "none" }}
-            height="22px"
-            paddingY={0}
-            flex={1}
-          />
-          {finderQuery.trim().length > 0 && (
-            <Text
-              textStyle="2xs"
-              color="fg.subtle"
-              flexShrink={0}
-              fontVariantNumeric="tabular-nums"
-            >
-              {visibleKeys.length} of {orderedKeys.length}
-            </Text>
-          )}
-          <IconButton
-            aria-label="Clear facet finder"
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            onClick={closeFinder}
-          >
-            <X size={12} />
-          </IconButton>
-        </HStack>
-      )}
       <Box
         flex="1"
         display="flex"
@@ -635,20 +535,15 @@ export const FilterSidebar: React.FC = () => {
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={visibleKeys}
+              items={orderedKeys}
               strategy={verticalListSortingStrategy}
             >
-              {visibleKeys.map((key) => (
+              {orderedKeys.map((key) => (
                 <SortableSection key={key} id={key} isAnyDragging={!!activeId}>
                   {(dragHandleProps) => renderSection({ key, dragHandleProps })}
                 </SortableSection>
               ))}
             </SortableContext>
-            {finderQuery.trim().length > 0 && visibleKeys.length === 0 && (
-              <Text textStyle="xs" color="fg.subtle" paddingX={3} paddingY={3}>
-                No facets match “{finderQuery.trim()}”.
-              </Text>
-            )}
             {/* Lightweight drag ghost — renders only the header strip (icon +
                 title + grip) so the full section content doesn't move with the
                 cursor. Keeps the animation smooth by painting a tiny node rather
@@ -665,6 +560,28 @@ export const FilterSidebar: React.FC = () => {
               ) : null}
             </DragOverlay>
           </DndContext>
+        )}
+        {/* "More…" opens the Configure popover (facet visibility manager) —
+            the same one the header trigger drives, via the shared
+            `facetManagerOpen` state. Sits below the last facet so a user who
+            scanned the list and wants a facet that isn't shown has a way in
+            without hunting for the header control. */}
+        {!showSkeleton && (
+          <Button
+            variant="ghost"
+            size="xs"
+            width="full"
+            justifyContent="center"
+            gap={1.5}
+            color="fg.subtle"
+            fontWeight="500"
+            marginTop={1}
+            marginBottom={2}
+            onClick={() => setFacetManagerOpen(true)}
+          >
+            <Settings2 size={13} />
+            More…
+          </Button>
         )}
       </Box>
     </VStack>

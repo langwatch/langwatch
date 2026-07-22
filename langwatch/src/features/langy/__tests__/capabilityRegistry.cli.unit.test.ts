@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { FEATURES } from "~/shared/langy/featureMap";
+import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
 import {
   buildResourceHref,
   buildSurfaceHref,
   resolveCapability,
   SURFACE_BY_FEATURE,
+  withDecidedCard,
 } from "../components/capabilities/capabilityRegistry";
-import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
-import { FEATURES } from "~/shared/langy/featureMap";
 
 describe("resolveCapability, given a LangWatch CLI tool call", () => {
   describe("when the CLI searched traces", () => {
@@ -195,6 +196,54 @@ describe("buildResourceHref, given a row-level deep link", () => {
     });
   });
 
+  describe("when online evaluations and evaluators have distinct destinations", () => {
+    it("opens a monitor from Online Evaluations", () => {
+      expect(
+        buildResourceHref({
+          surface: "evaluations",
+          projectSlug: "acme",
+          resourceId: "monitor_1",
+        }),
+      ).toBe(
+        "/acme/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=monitor_1",
+      );
+    });
+
+    it("opens a reusable evaluator from the Evaluators library", () => {
+      expect(
+        buildResourceHref({
+          surface: "evaluators",
+          projectSlug: "acme",
+          resourceId: "evaluator_1",
+        }),
+      ).toBe(
+        "/acme/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=evaluator_1",
+      );
+    });
+  });
+
+  // A scenario is not a simulation RUN. The Simulations index is the run
+  // history, where a scenario that was just written does not appear at all.
+  describe("when the resource is a scenario", () => {
+    it("points the surface link at the scenario library", () => {
+      expect(
+        buildSurfaceHref({ surface: "scenarios", projectSlug: "acme" }),
+      ).toBe("/acme/simulations/scenarios");
+    });
+
+    it("opens the scenario in the library", () => {
+      expect(
+        buildResourceHref({
+          surface: "scenarios",
+          projectSlug: "acme",
+          resourceId: "scenario_1",
+        }),
+      ).toBe(
+        "/acme/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=scenario_1",
+      );
+    });
+  });
+
   describe("when the surface only has an index page", () => {
     it("returns null instead of five rows all linking to the same index", () => {
       expect(
@@ -259,6 +308,56 @@ describe("the card binding, given the catalog and feature map are the sources of
       }
 
       expect(disagreements).toEqual([]);
+    });
+  });
+});
+
+/**
+ * The command's name is the PRIOR; the card stamped on the result envelope at
+ * the command boundary is the DECISION (ADR-059 §1/§3). `withDecidedCard` is
+ * where the panel stops arguing with it.
+ */
+describe("withDecidedCard, given a result whose card was decided by its shape", () => {
+  const analyticsQuery = () => {
+    const descriptor = resolveCapability("langwatch.analytics.query");
+    if (!descriptor) throw new Error("analytics query resolves to no card");
+    return descriptor;
+  };
+
+  describe("when the decided card is richer than the name's", () => {
+    it("draws the decided card", () => {
+      expect(
+        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" })
+          .render,
+      ).toBe("timeseries");
+    });
+
+    it("re-derives the body widget for the card being drawn", () => {
+      // A trend's body is its plot. Carrying the metrics card's figures over
+      // would draw the promoted card with the widget of the card it replaced.
+      expect(
+        withDecidedCard({ descriptor: analyticsQuery(), card: "timeseries" })
+          .body,
+      ).toBe("chart");
+    });
+
+    it("keeps the wording and surface the command earned", () => {
+      const promoted = withDecidedCard({
+        descriptor: analyticsQuery(),
+        card: "timeseries",
+      });
+      expect(promoted).toMatchObject({
+        surface: analyticsQuery().surface,
+        overline: analyticsQuery().overline,
+        command: analyticsQuery().command,
+      });
+    });
+  });
+
+  describe("when the decided card is the one the name already gave", () => {
+    it("leaves the descriptor exactly as it was", () => {
+      const descriptor = analyticsQuery();
+      expect(withDecidedCard({ descriptor, card: "metrics" })).toBe(descriptor);
     });
   });
 });

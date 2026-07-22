@@ -18,6 +18,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Controllable gate state (flipped per-test to exercise the visibility gate).
+// The layout keys Langy by the AMBIENT project this hook resolves, so the
+// mock must be SUBSCRIBABLE: in production a project change re-renders the
+// layout through the hook's own router/query subscriptions, and a static mock
+// would silently skip exactly the re-render under test. `setGateProject`
+// notifies like the real resolver does.
 // ---------------------------------------------------------------------------
 const gate = {
   flagEnabled: true,
@@ -28,6 +33,11 @@ const gate = {
   } | null,
   demoSlug: "not-this-project",
 };
+const gateListeners = new Set<() => void>();
+const setGateProject = (project: typeof gate.project) => {
+  gate.project = project;
+  for (const notify of gateListeners) notify();
+};
 
 vi.mock("~/hooks/useRequiredSession", () => ({
   useRequiredSession: () => ({
@@ -35,19 +45,32 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: gate.project,
-    team: {
-      isPersonal: false,
-      ownerUserId: "someone-else",
-      members: [{ userId: "user-1" }],
+vi.mock("~/hooks/useOrganizationTeamProject", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    useOrganizationTeamProject: () => {
+      const project = useSyncExternalStore(
+        (onChange) => {
+          gateListeners.add(onChange);
+          return () => gateListeners.delete(onChange);
+        },
+        () => gate.project,
+      );
+      return {
+        project,
+        team: {
+          isPersonal: false,
+          ownerUserId: "someone-else",
+          members: [{ userId: "user-1" }],
+        },
+        organization: { id: "org-1" },
+        organizationRole: "MEMBER",
+        hasPermission: (permission: string) =>
+          gate.permissions.includes(permission),
+      };
     },
-    organization: { id: "org-1" },
-    organizationRole: "MEMBER",
-    hasPermission: (permission: string) => gate.permissions.includes(permission),
-  }),
-}));
+  };
+});
 
 vi.mock("~/hooks/usePublicEnv", () => ({
   // Defaults to a demo slug that does NOT match the active project, so the
@@ -60,6 +83,13 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: gate.flagEnabled }),
 }));
 
+// The wrapper releases the dock reservation while a drawer is open (the panel
+// rides beside the drawer instead). Controlled per-test; null = no drawer.
+const drawerState = { current: null as string | null };
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({ currentDrawer: drawerState.current }),
+}));
+
 // Stub the heavy chat surface. Open state genuinely lives in the zustand
 // store nowadays, so the stub reads the REAL store and exposes a button that
 // opens Langy through it. It also counts its own mounts: the layout's whole
@@ -68,8 +98,6 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 const sidecarMounts = { count: 0 };
 vi.mock("../components/LangyPanel", () => ({
   LangySidecar: () => <LangySidecarStub />,
-  LANGY_DOCKED_OFFSET: 400,
-  LANGY_TRANSITION: "200ms",
 }));
 
 import { useEffect } from "react";
@@ -99,6 +127,7 @@ const renderAt = (initialPath: string) => {
         children: [
           { path: "/:project/traces", element: <div>traces page</div> },
           { path: "/:project/prompts", element: <div>prompts page</div> },
+          { path: "/settings", element: <div>settings page</div> },
         ],
       },
     ],
@@ -121,8 +150,14 @@ beforeEach(() => {
   gate.permissions = ["langy:view"];
   gate.project = { id: "project-demo", slug: "demo" };
   gate.demoSlug = "not-this-project";
+  drawerState.current = null;
   // The store is a module singleton — start every test closed and uncounted.
-  useLangyStore.setState({ isOpen: false });
+  useLangyStore.setState({
+    isOpen: false,
+    panelMode: "floating",
+    dockShellClaims: 0,
+    dockShifted: false,
+  });
   sidecarMounts.count = 0;
 });
 
@@ -153,20 +188,40 @@ describe("ProjectLangyLayout", () => {
 
   describe("given Langy is open in one project", () => {
     /** @scenario "Switching projects resets Langy" */
-    it("remounts the Langy tree when switching to a different project", async () => {
+    it("remounts the Langy tree when the ambient project changes", async () => {
       const router = renderAt("/demo/traces");
       await openLangy();
       expect(drawer()?.getAttribute("data-open")).toBe("true");
       const mountsBefore = sidecarMounts.count;
 
+      // The reset boundary is the AMBIENT project (what
+      // useOrganizationTeamProject resolves), not the URL segment.
       await act(async () => {
+        setGateProject({ id: "project-acme", slug: "acme" });
         await router.navigate("/acme/traces");
       });
 
-      // key={:project} changed → the whole Langy tree (provider + panel)
+      // key={project.id} changed → the whole Langy tree (provider + panel)
       // remounted — the trigger for the panel's per-project reset, which
       // clears the conversation so nothing from "demo" carries into "acme".
       expect(sidecarMounts.count).toBeGreaterThan(mountsBefore);
+    });
+
+    /** @scenario "Langy travels into settings and back" */
+    it("stays mounted on settings while the ambient project holds", async () => {
+      const router = renderAt("/demo/traces");
+      await openLangy();
+      const mountsBefore = sidecarMounts.count;
+
+      await act(async () => {
+        await router.navigate("/settings");
+      });
+
+      // Settings has no :project segment, but the ambient project is
+      // unchanged, so the panel neither unmounts nor resets.
+      expect(screen.getByText("settings page")).toBeTruthy();
+      expect(drawer()?.getAttribute("data-open")).toBe("true");
+      expect(sidecarMounts.count).toBe(mountsBefore);
     });
   });
 
@@ -225,6 +280,86 @@ describe("ProjectLangyLayout", () => {
         expect(screen.getByText("traces page")).toBeTruthy();
         expect(drawer()).toBeNull();
       });
+    });
+  });
+
+  // The dock's room is reserved by exactly one party (spec:
+  // specs/langy/langy-panel-layout.feature). The wrapper exposes who holds it
+  // via data-langy-dock; the app shell claims through the real store.
+  describe("given the panel is open in sidebar mode", () => {
+    const dockWrapper = () =>
+      document.querySelector("[data-langy-dock]") as HTMLElement | null;
+
+    /** @scenario "Pages without the app shell keep the flush dock" */
+    it("reserves the width at the page wrapper when no shell is mounted", async () => {
+      renderAt("/demo/traces");
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("page");
+    });
+
+    /** @scenario "The app header spans the full width while Langy is docked" */
+    it("stands down while an app shell claims the dock", async () => {
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+        useLangyStore.getState().claimDockShell();
+      });
+      await openLangy();
+      // The shell reserves the room inside its own content row; padding the
+      // page wrapper too would reserve the width twice.
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("shell");
+      act(() => {
+        useLangyStore.getState().releaseDockShell();
+      });
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("page");
+    });
+
+    /** @scenario "The content card rounds its right corner while Langy is docked" */
+    it("publishes the reservation truth for the claiming shell", async () => {
+      renderAt("/demo/traces");
+      expect(useLangyStore.getState().dockShifted).toBe(false);
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(useLangyStore.getState().dockShifted).toBe(true);
+      // Floating mode reserves nothing, the card overlays the page.
+      act(() => {
+        useLangyStore.setState({ panelMode: "floating" });
+      });
+      expect(useLangyStore.getState().dockShifted).toBe(false);
+    });
+
+    /** @scenario "A drawer turns the DOCKED panel into its floating companion" */
+    it("releases the reservation while a drawer is open", async () => {
+      drawerState.current = "traceV2Details";
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      // The panel rides beside the drawer as an overlay; the page keeps its
+      // full width underneath the pair.
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
+    });
+
+    /** @scenario "Closing the dock returns the page to full width" */
+    it("releases the reservation when the panel closes", async () => {
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("page");
+      act(() => {
+        useLangyStore.getState().closePanel();
+      });
+      expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
+      expect(useLangyStore.getState().dockShifted).toBe(false);
     });
   });
 });

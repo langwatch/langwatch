@@ -64,6 +64,16 @@ export type ConversationListItem = {
 export type ConversationDetail = ConversationListItem & {
   status: string;
   /**
+   * The turn in flight right now, or null when none is (`CurrentTurnId` on the
+   * fold — set at `agent_turn_accepted`, cleared by the turn's terminal).
+   *
+   * The durable answer to "which turn would a Stop stop?" (ADR-058). A browser
+   * tab only learns a turn id from its own send, so a turn it merely adopted —
+   * another tab's, or one rejoined after a refresh — had no id to stop with.
+   * The record has always known; nobody read it back.
+   */
+  currentTurnId: string | null;
+  /**
    * Why the last turn failed, when it did (`agent_response_failed` sets it on the
    * fold). DURABLE, unlike the browser's `useChat` error — which is why a refresh
    * after a failed turn used to leave the user's question sitting there with no
@@ -200,6 +210,7 @@ export class LangyConversationService {
     return {
       ...toListItem(row, userId),
       status: row.status,
+      currentTurnId: row.currentTurnId,
       lastError: row.lastError,
     };
   }
@@ -456,6 +467,8 @@ export class LangyConversationService {
         lastActivityAt,
         messageCount: importedMessages.length,
         status: LANGY_CONVERSATION_STATUS.IDLE,
+        // An import runs no turn — there is nothing in flight to stop.
+        currentTurnId: null,
         lastError: null,
       },
       messages: importedMessages,
@@ -881,7 +894,10 @@ export class LangyConversationService {
     conversationId: string;
     turnId: string;
     parts: LangyMessagePart[];
-    outcome?: "completed" | "failed";
+    // `stopped` is a user-initiated stop carrying the partial answer (ADR-058);
+    // it shares agent_responded's turn-terminal slot with completed/failed, so a
+    // stop racing a natural finish collapses to exactly one terminal.
+    outcome?: "completed" | "failed" | "stopped";
     error?: string | null;
   }): Promise<{ messageId: string }> {
     const messageId = turnMessageId(turnId);

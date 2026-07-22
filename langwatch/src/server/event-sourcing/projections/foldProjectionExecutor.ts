@@ -1,10 +1,24 @@
 import { createLogger } from "@langwatch/observability";
-import { incrementEsFoldRefoldTotal } from "~/server/metrics";
+import {
+  incrementEsFoldDuplicateEventsSkipped,
+  incrementEsFoldRefoldTotal,
+  observeEsFoldBlindReapplyEvents,
+} from "~/server/metrics";
 import type { Event } from "../domain/types";
-import type { FoldProjectionDefinition } from "./foldProjection.types";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionStore,
+} from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
+
+/**
+ * Event ids carried in a blind-reapply log line. A coalesced batch can hold up
+ * to COALESCE_MAX_BATCH events; the ids are for identifying which aggregates to
+ * reconcile afterwards, and a handful is enough to find the trace.
+ */
+const MAX_LOGGED_EVENT_IDS = 10;
 
 function compareFoldEvents<State, E extends Event>(
   projection: FoldProjectionDefinition<State, E>,
@@ -60,6 +74,17 @@ function withOccurredAtHint(
 }
 
 /**
+ * Returns a context recording which events this fold step applied, so a caching
+ * store can recognise them if the queue redelivers the same batch.
+ */
+function withAppliedEventIds(
+  context: ProjectionStoreContext,
+  appliedEventIds: readonly string[],
+): ProjectionStoreContext {
+  return { ...context, appliedEventIds };
+}
+
+/**
  * Executes a fold projection incrementally by applying a single event to existing state.
  *
  * Flow:
@@ -98,6 +123,90 @@ export class FoldProjectionExecutor {
    */
   constructor(private readonly refoldPageSize = 1000) {}
 
+  /**
+   * Loads state along with the ids of the events already folded into it.
+   *
+   * Caching stores answer with the applied-set they recorded; the rest answer
+   * with an empty one, correctly — a store with no cache always reads the
+   * durable row, so it has no redelivery window to close.
+   */
+  private async loadWithApplied<State>(
+    store: FoldProjectionStore<State>,
+    key: string,
+    context: ProjectionStoreContext,
+  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
+    const withApplied = (
+      store as FoldProjectionStore<State> & {
+        getWithApplied?: (
+          aggregateId: string,
+          context: ProjectionStoreContext,
+        ) => Promise<{ state: State | null; appliedEventIds: string[] }>;
+      }
+    ).getWithApplied;
+
+    if (typeof withApplied === "function") {
+      return await withApplied.call(store, key, context);
+    }
+    return { state: await store.get(key, context), appliedEventIds: [] };
+  }
+
+  /**
+   * Drops events already folded into the loaded state.
+   *
+   * Queue delivery is at-least-once: a fold job that fails after its state was
+   * stored is re-dispatched with the same events. Most handlers accumulate
+   * (counters, sums, appends) rather than being idempotent, so re-applying
+   * would double-count silently.
+   */
+  private dropAlreadyApplied<E extends Event>({
+    projectionName,
+    events,
+    appliedEventIds,
+    context,
+  }: {
+    projectionName: string;
+    events: E[];
+    appliedEventIds: readonly string[];
+    context: ProjectionStoreContext;
+  }): E[] {
+    if (events.length === 0) return events;
+
+    if (appliedEventIds.length === 0) {
+      // A retry with no record of what an earlier attempt applied cannot tell a
+      // redelivery from a fresh event, so everything here is about to be folded
+      // on top of state that may already contain it. `dedup_unavailable` counts
+      // that this happened; this records how much it is about to re-apply.
+      if ((context.deliveryAttempt ?? 1) > 1) {
+        observeEsFoldBlindReapplyEvents(projectionName, events.length);
+        logger.warn(
+          {
+            projection: projectionName,
+            tenantId: context.tenantId,
+            aggregateId: context.aggregateId,
+            deliveryAttempt: context.deliveryAttempt,
+            reapplying: events.length,
+            eventIds: events.slice(0, MAX_LOGGED_EVENT_IDS).map((e) => e.id),
+          },
+          "Retry has no applied-event-id set — re-folding events that may already be in the stored state (accumulating folds will double-count)",
+        );
+      }
+      return events;
+    }
+
+    const applied = new Set(appliedEventIds);
+    const fresh = events.filter((event) => !applied.has(event.id));
+    const skipped = events.length - fresh.length;
+
+    if (skipped > 0) {
+      incrementEsFoldDuplicateEventsSkipped(projectionName, skipped);
+      logger.info(
+        { projection: projectionName, skipped, delivered: events.length },
+        "Skipped redelivered events already folded into the cached state",
+      );
+    }
+    return fresh;
+  }
+
   async execute<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
     event: E,
@@ -113,7 +222,11 @@ export class FoldProjectionExecutor {
     // time instead of scanning every partition. Best-effort: the store falls
     // back to an unbounded read when the hint misses.
     const loadContext = withOccurredAtHint(context, event);
-    const loaded = await projection.store.get(key, loadContext);
+    const { state: loaded, appliedEventIds } = await this.loadWithApplied(
+      projection.store,
+      key,
+      loadContext,
+    );
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
@@ -122,9 +235,25 @@ export class FoldProjectionExecutor {
         context,
       );
       if (refolded !== null) {
-        await projection.store.store(refolded, context);
+        await projection.store.store(
+          refolded,
+          withAppliedEventIds(context, [event.id]),
+        );
         return refolded;
       }
+    }
+
+    // A redelivery of an event already folded into the loaded state: the state
+    // is already correct, so there is nothing to apply and nothing to write.
+    if (
+      this.dropAlreadyApplied({
+        projectionName: projection.name,
+        events: [event],
+        appliedEventIds,
+        context,
+      }).length === 0
+    ) {
+      return loaded ?? projection.init();
     }
 
     const loadedState = loaded ?? projection.init();
@@ -177,7 +306,10 @@ export class FoldProjectionExecutor {
       }
     }
 
-    await projection.store.store(state, context);
+    await projection.store.store(
+      state,
+      withAppliedEventIds(context, [event.id]),
+    );
     return state;
   }
 
@@ -224,7 +356,11 @@ export class FoldProjectionExecutor {
     const loadContext = ordered[0]
       ? withOccurredAtHint(context, ordered[0])
       : context;
-    const loaded = await projection.store.get(key, loadContext);
+    const { state: loaded, appliedEventIds } = await this.loadWithApplied(
+      projection.store,
+      key,
+      loadContext,
+    );
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
@@ -233,9 +369,27 @@ export class FoldProjectionExecutor {
         context,
       );
       if (refolded !== null) {
-        await projection.store.store(refolded, context);
+        await projection.store.store(
+          refolded,
+          withAppliedEventIds(
+            context,
+            ordered.map((event) => event.id),
+          ),
+        );
         return refolded;
       }
+    }
+
+    const fresh = this.dropAlreadyApplied({
+      projectionName: projection.name,
+      events: ordered,
+      appliedEventIds,
+      context,
+    });
+    // Every event in the batch was a redelivery — the loaded state already
+    // reflects them all, so re-storing it would only churn the durable row.
+    if (fresh.length === 0) {
+      return loaded ?? projection.init();
     }
 
     const loadedState = loaded ?? projection.init();
@@ -244,7 +398,7 @@ export class FoldProjectionExecutor {
       (loadedState as Record<string, unknown>)[
         projection.LastEventOccurredAtKey
       ] ?? 0;
-    const earliestOccurredAt = (ordered[0] as Record<string, unknown>)
+    const earliestOccurredAt = (fresh[0] as Record<string, unknown>)
       .occurredAt;
 
     // Out-of-order vs the persisted checkpoint: the batch starts earlier than
@@ -284,12 +438,18 @@ export class FoldProjectionExecutor {
         state = projection.apply(state, e as E);
       }
     } else {
-      for (const event of ordered) {
+      for (const event of fresh) {
         state = projection.apply(state, event);
       }
     }
 
-    await projection.store.store(state, context);
+    await projection.store.store(
+      state,
+      withAppliedEventIds(
+        context,
+        fresh.map((event) => event.id),
+      ),
+    );
     return state;
   }
 

@@ -33,6 +33,37 @@ import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 const logger = createLogger("langwatch:user-router");
 
 export const userRouter = createTRPCRouter({
+  getTraceExplorerTourPreference: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx }) => {
+      const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
+      const user = await ctx.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { tracesExplorerTourDismissedAt: true },
+      });
+
+      return {
+        dismissed: user.tracesExplorerTourDismissedAt !== null,
+        dismissedAt: user.tracesExplorerTourDismissedAt,
+      };
+    }),
+  dismissTraceExplorerTour: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx }) => {
+      const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
+      const user = await ctx.prisma.user.update({
+        where: { id: userId },
+        data: { tracesExplorerTourDismissedAt: new Date() },
+        select: { tracesExplorerTourDismissedAt: true },
+      });
+
+      return {
+        dismissed: true as const,
+        dismissedAt: user.tracesExplorerTourDismissedAt,
+      };
+    }),
   /**
    * Whether the current user is a platform admin (email listed in ADMIN_EMAILS).
    * Exposed so the client can decide whether to render admin-only UI surfaces

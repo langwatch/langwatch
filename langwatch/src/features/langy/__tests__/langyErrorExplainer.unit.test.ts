@@ -195,14 +195,16 @@ describe("explainLangyError", () => {
   });
 
   describe("given a turn is already streaming for the conversation", () => {
-    it("tells the user to wait and offers no retry (a retry would 409 again)", () => {
+    it("tells the user to wait, offers no retry, and rides above the composer", () => {
       const presentation = explainLangyError(
         domain({ code: "langy_turn_in_progress", httpStatus: 409 }),
       );
 
       expect(presentation.title).toBe("Langy is still replying");
       expect(presentation.action).toBeUndefined();
-      expect(presentation.render).toBe("card");
+      // A wait, not a turn failure: a dismissable notice attached above the
+      // composer that keeps the user's draft — not a red history card (ADR-058).
+      expect(presentation.render).toBe("composer-notice");
     });
   });
 

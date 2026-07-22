@@ -1157,3 +1157,80 @@ func TestPlanItemsFromInput_AcceptsBareArray(t *testing.T) {
 		t.Fatalf("bare array must parse, got ok=%v items=%+v", ok, items)
 	}
 }
+
+// A failed LangWatch CLI command writes its failure DOCUMENT to stdout and a
+// one-line human summary to stderr. Overwriting stdout with the summary threw
+// away the code, the meta and the platform's own next steps at the first hop,
+// and the panel showed "This step couldn't be completed" for a failure the
+// platform had explained in full.
+func TestToolEndFrame_KeepsTheCLIFailureDocumentOverTheSummaryLine(t *testing.T) {
+	document := `{"ok":false,"error":{"code":"api_key_permission_denied","message":"denied","httpStatus":403,"meta":{"permission":"scenarios:create"},"isHandled":true}}`
+	part := &ssePart{
+		Tool: "bash",
+		State: sseToolState{
+			Output: json.RawMessage(strconv.Quote(document)),
+			Error:  json.RawMessage(strconv.Quote("Failed to create scenario: denied")),
+		},
+	}
+
+	frame, ok := toolEndFrame("call-1", part, true)
+	if !ok {
+		t.Fatal("expected a frame")
+	}
+	var decoded struct {
+		Output string `json:"output"`
+	}
+	if err := json.Unmarshal([]byte(frame.JSON()), &decoded); err != nil {
+		t.Fatalf("decode frame: %v", err)
+	}
+	if !strings.Contains(decoded.Output, "api_key_permission_denied") {
+		t.Fatalf("failure document was dropped, got %q", decoded.Output)
+	}
+}
+
+func TestToolEndFrame_UsesTheErrorMessageWhenStdoutHasNoDocument(t *testing.T) {
+	part := &ssePart{
+		Tool: "bash",
+		State: sseToolState{
+			Output: json.RawMessage(strconv.Quote("partial console output")),
+			Error:  json.RawMessage(strconv.Quote("command not found: langwatch")),
+		},
+	}
+
+	frame, ok := toolEndFrame("call-2", part, true)
+	if !ok {
+		t.Fatal("expected a frame")
+	}
+	var decoded struct {
+		Output string `json:"output"`
+	}
+	if err := json.Unmarshal([]byte(frame.JSON()), &decoded); err != nil {
+		t.Fatalf("decode frame: %v", err)
+	}
+	if decoded.Output != "command not found: langwatch" {
+		t.Fatalf("expected the error message, got %q", decoded.Output)
+	}
+}
+
+func TestCarriesFailureDocument(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		output string
+		want   bool
+	}{
+		{"a failure document", `{"ok":false,"error":{"code":"not_found"}}`, true},
+		{"a failure document after console noise", "- Creating...\n" + `{"ok":false,"error":{"code":"not_found"}}`, true},
+		{"a successful result", `{"id":"scenario_1"}`, false},
+		{"an ok-true document", `{"ok":true}`, false},
+		{"a document with no error", `{"ok":false}`, false},
+		{"a human table", "ID   NAME\n1    Support", false},
+		{"empty output", "", false},
+		{"truncated JSON", `{"ok":false,"error":{"code":"not_`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := carriesFailureDocument(tc.output); got != tc.want {
+				t.Fatalf("carriesFailureDocument(%q) = %v, want %v", tc.output, got, tc.want)
+			}
+		})
+	}
+}

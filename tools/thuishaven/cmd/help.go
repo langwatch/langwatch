@@ -138,12 +138,21 @@ COMMANDS
                   plain per-worktree overview (branch, dirty, up) instead of
                   the TUI; agents always get that (--json for JSON).
                   Alias: moron.
-    prune [--yes] Reclaim regenerable disk (node_modules, dist, .vite, caches)
-                  from worktrees that are neither up nor dirty, and drop those
-                  worktrees' ClickHouse + Postgres databases (lingering
-                  connections are terminated; the standing lw_main database is
-                  always kept). Dry-run without --yes. Also prunes orphaned git
-                  worktree admin entries.
+    prune         Interactive worktree cleanup: scans every worktree at once
+                  (disk size, its ClickHouse/Postgres databases, how long it has
+                  sat idle, whether its branch was merged + deleted upstream)
+                  behind a loading state, pre-ticks those idle 5+ days
+                  (--stale-days N / HAVEN_PRUNE_STALE_DAYS), sorts by most-idle /
+                  size / name / uncommitted / origin-gone ("s" cycles), and
+                  deletes exactly the ones you confirm — stopping their stacks,
+                  dropping their databases, removing their directories (lw_main
+                  and the primary / current worktree are always kept). Agents get
+                  a read-only report and delete nothing.
+    prune --artifacts [--yes]
+                  The conservative reclaim: only regenerable disk (node_modules,
+                  dist, .vite, caches) from worktrees that are neither up nor
+                  dirty, plus their databases; no worktree is deleted. Dry-run
+                  without --yes. Also prunes orphaned git worktree admin entries.
     cleanup --force  Reap orphaned local dev runtimes (tsgo, node, pnpm, uv,
                   Python, and OpenCode) belonging to this worktree. Refuses
                   without --force.
@@ -185,6 +194,8 @@ ENVIRONMENT
                                  been up for this long (default 14 days; 0 disables).
                                  Only databases haven itself created are considered,
                                  and lw_main is always kept.
+    HAVEN_PRUNE_STALE_DAYS=5     Idle age at which "haven prune" pre-ticks a
+                                 worktree for deletion (--stale-days N overrides).
     HAVEN_WORKTREE_DIR=<dir>     Where haven pr creates PR worktrees (default: the
                                  sibling worktrees/ dir next to the checkout).
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).

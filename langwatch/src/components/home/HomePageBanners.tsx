@@ -7,24 +7,81 @@ import {
   Icon,
   IconButton,
   Kbd,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { MeshGradient } from "@paper-design/shaders-react";
 import { motion, useAnimationFrame, useMotionValue } from "motion/react";
 import posthog from "posthog-js";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { IconType } from "react-icons";
-import { LuArrowLeft, LuArrowRight, LuMic, LuX, LuZap } from "react-icons/lu";
+import {
+  LuArrowLeft,
+  LuArrowRight,
+  LuMic,
+  LuSparkles,
+  LuX,
+  LuZap,
+} from "react-icons/lu";
+import { SERIF } from "~/features/asaplangy";
+import { getIsMac } from "~/features/command-bar/utils/platform";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useRouter } from "~/utils/compat/next-router";
 import { useColorModeValue } from "../ui/color-mode";
-import { getIsMac } from "~/features/command-bar/utils/platform";
 import { Tooltip } from "../ui/tooltip";
-import { SERIF } from "~/features/asaplangy";
 
 // ---- Timing knobs -------------------------------------------------------
+
+/**
+ * Langy's own palette, for the lantern's ground when there is no announcement
+ * lighting it. The shader cannot read CSS variables, so these are resolved hex
+ * exactly like every slide's.
+ */
+const LANTERN_COLORS = ["#f56b1a", "#ffb380", "#6e57d2"];
+const LANTERN_COLORS_DARK = ["#a8480d", "#f56b1a", "#5b41c2"];
+
+/**
+ * The Langy announcement, carried only by the Langy home.
+ *
+ * It names the loop the agent actually runs end to end (read the traces, find
+ * the cause, open the pull request), because that IS the loop: see the GitHub
+ * skill and the matching row in the panel's own suggestions. It stops at
+ * opening a PR, and so does this copy. Anything further would be a headline
+ * the product then fails to deliver.
+ */
+const LANGY_SLIDE: Slide = {
+  id: "langy-ships-the-fix",
+  storagePrefix: "langwatch:langy-home-banner-dismissed:v1:",
+  colorsLight: ["#f56b1a", "#ffb380", "#6e57d2", "#fff7ed"],
+  colorsDark: ["#a8480d", "#f56b1a", "#5b41c2", "#140b06"],
+  mesh: {
+    distortion: 0.9,
+    swirl: 0.7,
+    scale: 1.15,
+    offsetX: -0.12,
+    offsetY: 0.16,
+    rotation: 42,
+  },
+  Icon: LuSparkles,
+  heading: "Langy can ship the fix, not just find it",
+  badge: "New",
+  subtitle: (
+    <>
+      Ask about a failing trace and Langy digs through your data, explains what
+      broke, and opens a pull request with the change.
+    </>
+  ),
+  ctaLabel: "Ask Langy to investigate",
+  legacyCtaColor: "orange.700",
+  posthogEvent: "langy_banner_click",
+  navigate: ({ askLangy }) =>
+    askLangy?.(
+      "Investigate the most important problem in this project from the last 24 hours, explain what changed, and show me the affected traces.",
+    ),
+};
 
 const SNOOZE_DAYS = 7;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
@@ -53,6 +110,12 @@ const PERF_MIN_FPS = 28;
 interface NavCtx {
   router: ReturnType<typeof useRouter>;
   projectSlug?: string;
+  /**
+   * Start a Langy conversation in place. Present only where Langy is, which is
+   * why it is optional: a slide that needs it is only ever in the rotation for
+   * readers who have it.
+   */
+  askLangy?: (prompt: string) => void;
 }
 
 interface Slide {
@@ -157,12 +220,24 @@ const SLIDES: Slide[] = [
   },
 ];
 
-// Langy is no longer surfaced as a banner slide: the whole logged-in home is
-// now Langy's briefing, so a promo/activation banner for it is redundant (and
-// competes with the hero). The carousel carries only genuine feature
-// announcements. The `projectId` arg is kept for the callers' signature.
-function useSlides(_projectId: string | undefined): Slide[] {
-  return SLIDES;
+/**
+ * Which announcements this home is carrying.
+ *
+ * Langy is never PROMOTED here. A banner inviting someone to try Langy, sat
+ * directly above a composer that already is Langy, is the same offer made
+ * twice, and the banner is the worse of the two. What the Langy home does get
+ * is a genuine announcement about what Langy can do, on the same footing as
+ * every other feature announcement, and only for the readers who have it: an
+ * announcement about a capability you cannot reach is just noise.
+ */
+function useSlides(
+  _projectId: string | undefined,
+  { includeLangy }: { includeLangy: boolean },
+): Slide[] {
+  return useMemo(
+    () => (includeLangy ? [LANGY_SLIDE, ...SLIDES] : SLIDES),
+    [includeLangy],
+  );
 }
 
 // ---- Snooze (per-slide, per-project) ------------------------------------
@@ -271,8 +346,18 @@ function lerpMesh(a: Mesh, b: Mesh, t: number): Mesh {
  */
 export function HomePageBanners({
   variant = "briefing",
+  children,
 }: {
-  variant?: "briefing" | "legacy";
+  /**
+   * `lantern` is the Langy home's block: this component keeps owning the one
+   * shared canvas, the announcement compresses to a single line of chrome
+   * across the top, and `children` (the composer and its capability row) are
+   * laid over the same ground beneath it. It is a variant rather than a second
+   * component precisely so there is never a second canvas on the page.
+   */
+  variant?: "briefing" | "legacy" | "lantern";
+  /** Lantern only: what sits under the chrome line, over the same ground. */
+  children?: ReactNode;
 }) {
   const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -284,7 +369,10 @@ export function HomePageBanners({
   const reduceMotion = useReducedMotion();
   const isDark = useColorModeValue(false, true);
 
-  const slides = useSlides(projectId);
+  // The lantern variant only ever renders on the Langy home, so it is the
+  // honest signal for "this reader has Langy" without re-deriving the gate.
+  const slides = useSlides(projectId, { includeLangy: variant === "lantern" });
+  const askLangy = useLangyStore((s) => s.askLangy);
 
   const [hasMounted, setHasMounted] = useState(false);
   const [snoozed, setSnoozed] = useState<Record<string, boolean>>({});
@@ -453,7 +541,12 @@ export function HomePageBanners({
   // Nothing renders until the project resolves: the snooze map is keyed per
   // project, so before `projectId` exists every slide would look eligible —
   // snoozed users would see a flash, and the CTA would push /undefined/...
-  if (!hasMounted || !projectId || eligible.length === 0 || !slide) return null;
+  //
+  // The lantern is the exception to "no slide, no banner": it is the block the
+  // composer lives in, so it still has to render once every announcement has
+  // been dismissed. It just renders without a chrome line.
+  if (!hasMounted || !projectId) return null;
+  if (variant !== "lantern" && (eligible.length === 0 || !slide)) return null;
 
   const dismiss = (slideToHide: Slide) => {
     if (projectId) snoozeSlide(slideToHide, projectId);
@@ -466,13 +559,21 @@ export function HomePageBanners({
       surface: "home_banner",
       projectId,
     });
-    if (projectId) snoozeSlide(slideToOpen, projectId);
-    setSnoozed((s) => ({ ...s, [slideToOpen.id]: true }));
-    setIndex(0);
-    slideToOpen.navigate({ router, projectSlug });
+    // Following the link is NOT dismissing the announcement. It used to snooze
+    // the slide for a week, which meant the people most interested in a feature
+    // were the ones who lost the way back to it: one click to look, and the
+    // link was gone from their home page. Interest is not "seen it, thanks".
+    // Only the explicit dismiss (the X) snoozes, which is the control that
+    // actually says so.
+    slideToOpen.navigate({ router, projectSlug, askLangy });
   };
 
   const colors = displayColors.length ? displayColors : targetColors;
+  // The lantern is lit whether or not there is anything to announce, so when
+  // every slide has been dismissed it falls back to Langy's own palette rather
+  // than going dark. Same canvas, different bed.
+  const lanternColors =
+    colors.length >= 3 ? colors : isDark ? LANTERN_COLORS_DARK : LANTERN_COLORS;
   const multi = eligible.length > 1;
   const selectSlide = (nextIndex: number) => {
     setIndex((nextIndex + eligible.length) % eligible.length);
@@ -484,6 +585,145 @@ export function HomePageBanners({
   const slideTransition = instant
     ? { duration: 0 }
     : { duration: TRANSITION_S, ease: TRANSITION_EASE };
+
+  if (variant === "lantern") {
+    return (
+      <Box
+        position="relative"
+        width="full"
+        borderRadius="14px"
+        borderWidth="1px"
+        borderColor="border.muted"
+        background="bg.surface"
+        overflow="hidden"
+        isolation="isolate"
+        onMouseEnter={() => (hoveredRef.current = true)}
+        onMouseLeave={() => (hoveredRef.current = false)}
+      >
+        {/* The ground. The SAME shared canvas the announcement card uses, at
+            the same whisper, tuned toward the Langy palette when no
+            announcement is lighting it. Everything else in this block layers
+            over it: the shader is the floor, never a decoration on top. */}
+        <Box
+          aria-hidden
+          position="absolute"
+          inset={0}
+          pointerEvents="none"
+          opacity={{ base: 0.13, _dark: 0.2 }}
+        >
+          <Box
+            position="absolute"
+            inset={0}
+            style={{
+              background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
+            }}
+          />
+          {!lowPerf ? (
+            <Box position="absolute" inset={0}>
+              <MeshGradient
+                colors={lanternColors}
+                distortion={displayMesh.distortion}
+                swirl={displayMesh.swirl}
+                offsetX={displayMesh.offsetX}
+                offsetY={displayMesh.offsetY}
+                rotation={displayMesh.rotation}
+                grainMixer={0.12}
+                grainOverlay={0.12}
+                speed={reduceMotion ? 0 : (slide?.speed ?? 0.45)}
+                scale={displayMesh.scale}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </Box>
+          ) : null}
+        </Box>
+        {/* The signal grid, the same one the panel wears, faded out toward the
+            bottom so it never competes with the composer sitting on it. */}
+        <Box
+          aria-hidden
+          position="absolute"
+          inset={0}
+          pointerEvents="none"
+          className="langy-signal-grid langy-signal-grid--banner"
+        />
+
+        <VStack
+          position="relative"
+          zIndex={1}
+          align="stretch"
+          gap={3}
+          paddingX={{ base: 4, md: 5 }}
+          paddingY={4}
+        >
+          {slide ? (
+            <HStack gap={2.5} align="center" minHeight="20px">
+              <Box flexShrink={0} color="orange.fg" display="grid">
+                {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
+              </Box>
+              <Text
+                fontSize="12.5px"
+                color="fg.muted"
+                truncate
+                display={{ base: "none", sm: "block" }}
+              >
+                {slide.heading}
+              </Text>
+              <chakra.button
+                type="button"
+                onClick={() => handleCta(slide)}
+                fontFamily="mono"
+                fontSize="11px"
+                color="orange.fg"
+                background="transparent"
+                borderWidth={0}
+                cursor="pointer"
+                whiteSpace="nowrap"
+                flexShrink={0}
+                _hover={{ textDecoration: "underline" }}
+              >
+                {slide.ctaLabel}
+              </chakra.button>
+              <Spacer />
+              {multi ? (
+                <HStack gap={1} flexShrink={0}>
+                  {eligible.map((_, i) => (
+                    <Box
+                      key={i}
+                      as="button"
+                      aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
+                      aria-current={i === active ? "true" : undefined}
+                      onClick={() => selectSlide(i)}
+                      width={i === active ? "16px" : "6px"}
+                      height="6px"
+                      borderRadius="full"
+                      background={
+                        i === active ? "fg.muted" : "border.emphasized"
+                      }
+                      transition="width 200ms ease, background 200ms ease"
+                    />
+                  ))}
+                </HStack>
+              ) : null}
+              <Tooltip content={`Hide for ${SNOOZE_DAYS} days`} openDelay={400}>
+                <IconButton
+                  aria-label="Hide this announcement"
+                  size="2xs"
+                  variant="ghost"
+                  color="fg.subtle"
+                  flexShrink={0}
+                  onClick={() => dismiss(slide)}
+                >
+                  <LuX size={13} />
+                </IconButton>
+              </Tooltip>
+            </HStack>
+          ) : null}
+          {children}
+        </VStack>
+      </Box>
+    );
+  }
+
+  if (!slide) return null;
 
   if (variant === "legacy") {
     return (
@@ -939,17 +1179,21 @@ export function HomePageBanners({
                       fontSize="11.5px"
                       whiteSpace="nowrap"
                       cursor="pointer"
-                      color="fg"
+                      // Wears the same orange as the "New" pill beside the
+                      // heading so the call to action reads as the announcement's
+                      // own colour, not a muted default. A filled subtle pill (vs
+                      // the badge's outline) keeps it clearly a button.
+                      color="orange.fg"
                       borderWidth="1px"
-                      borderColor="border.emphasized"
+                      borderColor="orange.emphasized"
                       borderRadius="8px"
                       paddingX={2.5}
                       paddingY="4px"
-                      background="bg.emphasized"
-                      transition="border-color 130ms ease, color 130ms ease"
+                      background="orange.subtle"
+                      transition="background-color 130ms ease, border-color 130ms ease"
                       _hover={{
-                        borderColor: "orange.emphasized",
-                        color: "orange.fg",
+                        background: "orange.muted",
+                        borderColor: "orange.solid",
                       }}
                     >
                       {s.ctaLabel}
@@ -967,7 +1211,10 @@ export function HomePageBanners({
             })}
           </Box>
 
-          {/* Dismiss — quiet inline chrome, like every other card control. */}
+          {/* Dismiss — quiet inline chrome, like every other card control.
+              Pinned to the TOP of the row (the row centres its items, which
+              otherwise floats the X to the vertical middle) so it reads as a
+              normal top-right card close. */}
           <Tooltip
             content={`Hide for ${SNOOZE_DAYS} days`}
             positioning={{ placement: "top" }}
@@ -977,6 +1224,7 @@ export function HomePageBanners({
               variant="ghost"
               color="fg.subtle"
               flexShrink={0}
+              alignSelf="flex-start"
               _hover={{ bg: "bg.muted", color: "fg" }}
               onClick={() => dismiss(slide)}
               aria-label="Dismiss"

@@ -20,6 +20,8 @@
  * renders them. Infrastructure failures throw and surface generically.
  */
 import type { Session } from "~/server/auth";
+import { createHash } from "node:crypto";
+
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
 import { getLangyTurnsCounter } from "~/server/metrics";
@@ -29,17 +31,32 @@ import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
 import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import {
+  extractLangyConversationMemory,
+  renderLangyConversationMemory,
+  LANGY_REFERENT_POLICY,
+} from "~/server/app-layer/langy/langyConversationMemory";
+import type {
+  LangyMessageRepository,
+  LangyMessageRow,
+} from "~/server/app-layer/langy/repositories/langy-message.repository";
 import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
 import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import {
   LangyAgentUnavailableError,
+  LangyConversationNotOwnedError,
   LangyInsufficientScopeError,
   LangyModelNotAllowedError,
+  LangyEmptyMessageError,
+  LangyIdempotencyMismatchError,
   LangyTurnInProgressError,
+  LangyTurnNotStoppableError,
 } from "./errors";
 import type { LangyConversationService } from "./langy-conversation.service";
+import { buildFinalAssistantParts } from "./langy-final-parts";
 import { extractTextFromParts } from "./langy-message.service";
 import type { LangyMessagePart } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
@@ -56,12 +73,38 @@ const logger = createLogger("langwatch:langy:turn-service");
  */
 const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
 
-function turnIdForRequest(requestId: string): string {
-  return `langyturn_request-${requestId}`;
-}
-
-function messageIdForRequest(requestId: string): string {
-  return `langymsg_request-${requestId}`;
+/**
+ * Turn identity binds the client's idempotency key to WHO sent it and WHAT was
+ * sent. Three properties fall out structurally:
+ *
+ * - a transport retry (same user, same key, same content) derives the same id
+ *   and collapses onto the admitted turn;
+ * - the same key with DIFFERENT content derives a different id, which the
+ *   admission receipt exposes as a mismatch instead of silently replaying the
+ *   original send;
+ * - two users can never mint the same turn id, whatever keys they choose.
+ *
+ * The hash input uses the zod-parsed messages verbatim: a retry is the same
+ * client re-serializing the same payload, so byte-stable JSON is a fair
+ * equality. Semantic reordering counts as different content — by design.
+ */
+export function langyTurnIdentity(input: {
+  userId: string;
+  idempotencyKey: string;
+  messages: unknown;
+  modelOverride?: string;
+}): { turnId: string; messageId: string } {
+  const digest = createHash("sha256")
+    .update(input.userId)
+    .update("\u0000")
+    .update(input.idempotencyKey)
+    .update("\u0000")
+    .update(JSON.stringify(input.messages))
+    .update("\u0000")
+    .update(input.modelOverride ?? "")
+    .digest("hex")
+    .slice(0, 32);
+  return { turnId: `langyturn_${digest}`, messageId: `langymsg_${digest}` };
 }
 
 export interface LangyChatMessageInput {
@@ -72,7 +115,7 @@ export interface LangyChatMessageInput {
 export interface StartConversationTurnInput {
   projectId: string;
   /** Stable identity for one logical send, reused by every transport retry. */
-  requestId: string;
+  idempotencyKey: string;
   session: Session;
   /** The client-supplied conversation id, or null to mint a fresh one. */
   requestedConversationId: string | null;
@@ -89,8 +132,15 @@ export interface LangyTurnServiceDeps {
   credentials: LangyCredentialService;
   /** Resolve the project's default model; rejects when none is configured. */
   resolveModel: (args: { projectId: string }) => Promise<unknown>;
-  /** Direct fast-path dispatch plus durable process-effect recovery. */
-  worker: Pick<LangyWorkerPort, "probe" | "dispatch"> | null;
+  /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
+   * is the best-effort worker abort behind a user Stop (ADR-058). */
+  worker: Pick<LangyWorkerPort, "probe" | "dispatch" | "cancel"> | null;
+  /**
+   * The durable token buffer (ADR-044). A user Stop reads its `delta` tail to
+   * reconstruct the partial answer as the source of truth, then `markEnd`s it so
+   * every attached browser's live stream settles. Null where there is no Redis.
+   */
+  tokenBuffer: Pick<LangyTokenBuffer, "readTail" | "markEnd"> | null;
   reservePermit: (args: { userId: string }) => Promise<{
     reserved: boolean;
     allowed: boolean;
@@ -111,6 +161,34 @@ export interface LangyTurnServiceDeps {
   admission: LangyTurnAdmissionRepository;
   accessStore: LangyTurnAccessStore | null;
   handoffStore: LangyTurnHandoffStore | null;
+  /**
+   * The conversation's durable messages, read so a follow-up turn can be told
+   * what earlier turns of the SAME conversation created (see
+   * `langyConversationMemory` for why the agent cannot be relied on to remember
+   * it). Null where there is no projection, and a failed read is never fatal —
+   * a turn without its memory is degraded, not broken.
+   */
+  messages: Pick<LangyMessageRepository, "findAllByConversation"> | null;
+}
+
+/**
+ * Reconstruct the partial answer text from the durable buffer's `delta` entries
+ * (ADR-058). The buffer batches deltas and flushes its tail on `markEnd`, so this
+ * is the durable truth up to the last flush; a handful of un-flushed words still
+ * in the worker's memory are not the control plane's to see, and "the partial is
+ * preserved" does not require them. Non-`delta` entries (status, reasoning, tool,
+ * plan, terminals) are not answer text and are skipped.
+ */
+async function reconstructPartialAnswer(
+  tokenBuffer: Pick<LangyTokenBuffer, "readTail">,
+  { conversationId, turnId }: { conversationId: string; turnId: string },
+): Promise<string> {
+  const { reads } = await tokenBuffer.readTail({ conversationId, turnId });
+  let text = "";
+  for (const { entry } of reads) {
+    if (entry.type === "delta") text += entry.text;
+  }
+  return text;
 }
 
 export class LangyTurnService {
@@ -118,6 +196,101 @@ export class LangyTurnService {
 
   static create(deps: LangyTurnServiceDeps): LangyTurnService {
     return new LangyTurnService(deps);
+  }
+
+  /**
+   * Stop an in-flight turn FOR REAL (ADR-058). The browser's `useChat` stop only
+   * aborts its own subscription; this ends the turn on the durable record — the
+   * confirmation — and only then, best-effort, asks the worker to abandon the
+   * generation. The order matters: the truthful stop must not depend on a live,
+   * responsive worker.
+   *
+   *   1. reconstruct the partial answer from the durable buffer's `delta` tail
+   *      (the source of truth, refresh-safe — never whatever the browser painted);
+   *   2. record `agent_responded { outcome: "stopped" }` on the shared
+   *      turn-terminal slot, so a stop racing a natural finish collapses to
+   *      exactly one terminal and the partial is preserved as the assistant
+   *      message that anchors a later Continue;
+   *   3. `markEnd` the buffer so every attached browser's live stream settles out
+   *      of its spinner;
+   *   4. best-effort `worker.cancel` to stop the token burn.
+   *
+   * Idempotent by construction: if the turn already reached a terminal, the
+   * terminal command collapses at the store (first-writer-wins) and steps 3–4 are
+   * harmless no-ops — a Stop clicked a beat too late leaves the finished answer
+   * intact.
+   *
+   * The control gate is stricter than watching a turn: only the turn's actor or
+   * the conversation owner may stop it, never a shared viewer. A caller who may
+   * not control it gets a handled `LangyConversationNotOwnedError` (403). An
+   * owner who is not the actor must additionally name the turn the record has in
+   * flight — see the guard below for why an unproven id may not write a
+   * terminal (`LangyTurnNotStoppableError`, 409).
+   */
+  async stopTurn({
+    projectId,
+    conversationId,
+    turnId,
+    userId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    userId: string;
+  }): Promise<void> {
+    const { tokenBuffer, worker, conversations, accessStore } = this.deps;
+
+    const isActor = accessStore
+      ? await accessStore.isTurnActor({
+          projectId,
+          conversationId,
+          turnId,
+          userId,
+        })
+      : false;
+    if (!isActor) {
+      const conv = await conversations.findByIdVisible({
+        id: conversationId,
+        projectId,
+        userId,
+      });
+      if (!conv || !conv.isOwn) {
+        throw new LangyConversationNotOwnedError(conversationId);
+      }
+      // The turn id is client input, and a stop is the one place it buys a
+      // DURABLE terminal — an assistant message and a conversation returned to
+      // idle. The turn's own actor already proved the turn exists under this
+      // conversation (the live-access grant is written before the turn is
+      // accepted, so it cannot lag). An owner who is NOT the actor has proved
+      // nothing about the id, so it must be the turn the record has in flight;
+      // otherwise a bogus id would terminate — or fabricate an answer on — a
+      // turn that is not running. The sibling `agent_response_failed` fold has
+      // carried exactly this guard all along.
+      if (conv.currentTurnId !== turnId) {
+        throw new LangyTurnNotStoppableError(turnId);
+      }
+    }
+
+    const partialText = tokenBuffer
+      ? await reconstructPartialAnswer(tokenBuffer, { conversationId, turnId })
+      : "";
+
+    // The durable terminal — this write IS the "real backend confirmation".
+    await conversations.finalizeTurn({
+      projectId,
+      conversationId,
+      turnId,
+      parts: buildFinalAssistantParts({ text: partialText }),
+      outcome: "stopped",
+    });
+
+    // End the stream and chase the token burn. Both are best-effort and
+    // independent of the durable terminal above; neither may throw back into the
+    // mutation, and a wedged worker must not delay the stop the user already got.
+    await Promise.allSettled([
+      tokenBuffer?.markEnd({ conversationId, turnId }) ?? Promise.resolve(),
+      worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
+    ]);
   }
 
   /**
@@ -130,7 +303,7 @@ export class LangyTurnService {
   ): Promise<{ conversationId: string; turnId: string }> {
     const {
       projectId,
-      requestId,
+      idempotencyKey,
       session,
       requestedConversationId,
       messages,
@@ -148,6 +321,25 @@ export class LangyTurnService {
     if (!accessStore || !handoffStore) {
       throw new LangyAgentUnavailableError();
     }
+
+    // Reject content-free sends BEFORE anything durable happens: an admitted
+    // empty turn is one the agent can only 422, and a permanently rejected
+    // dispatch used to poison the process outbox with endless retries.
+    const lastUserMessage = messages[messages.length - 1];
+    const userText = extractTextFromParts(lastUserMessage?.parts);
+    if (!userText.trim()) {
+      // Self-report like every other rejection branch — without this the
+      // empty-send path is invisible in the turn-outcome metric.
+      getLangyTurnsCounter("rejected").inc();
+      throw new LangyEmptyMessageError();
+    }
+
+    const identity = langyTurnIdentity({
+      userId,
+      idempotencyKey,
+      messages,
+      ...(modelOverride ? { modelOverride } : {}),
+    });
 
     const conversationService = this.deps.conversations;
     const credentialService = this.deps.credentials;
@@ -168,10 +360,14 @@ export class LangyTurnService {
     const admission = await this.deps.admission.claim({
       projectId,
       userId,
-      requestId,
+      idempotencyKey,
       conversationId: speculativeConversation.id,
-      turnId: turnIdForRequest(requestId),
+      turnId: identity.turnId,
     });
+    if (admission.kind === "mismatch") {
+      getLangyTurnsCounter("mismatch").inc();
+      throw new LangyIdempotencyMismatchError();
+    }
     if (admission.kind === "replay") {
       getLangyTurnsCounter("replay").inc();
       return {
@@ -214,7 +410,7 @@ export class LangyTurnService {
       {
         projectId,
         userId,
-        requestId,
+        idempotencyKey,
         conversationId: conversation.id,
         turnId,
         claimToken: admission.claimToken,
@@ -223,8 +419,6 @@ export class LangyTurnService {
     );
 
     try {
-      const lastUserMessage = messages[messages.length - 1];
-      const userText = extractTextFromParts(lastUserMessage?.parts);
       const questionParts = lastUserMessage?.parts ?? [];
       const title =
         extractTextFromParts(messages[0]?.parts).slice(0, 80) || null;
@@ -257,6 +451,7 @@ export class LangyTurnService {
         handoffResult,
         runTokenResult,
         modelsAllowedResult,
+        memoryResult,
       ] = await Promise.allSettled([
         conversationService.findByIdVisible({
           id: conversation.id,
@@ -279,6 +474,17 @@ export class LangyTurnService {
               organizationId: credentials.organizationId,
             })
           : Promise.resolve(null),
+        // The conversation's own history. Overlapped with the reads above so
+        // remembering costs no extra latency window. A fresh conversation has
+        // nothing to read, so it does not pay for the round trip either. The
+        // OWNERSHIP gate is already behind us: `ensureConversation` accepted
+        // this id only because this user owns it.
+        conversation.isNew || !this.deps.messages
+          ? Promise.resolve<LangyMessageRow[]>([])
+          : this.deps.messages.findAllByConversation({
+              conversationId: conversation.id,
+              projectId,
+            }),
       ]);
 
       const runToken =
@@ -350,9 +556,29 @@ export class LangyTurnService {
         attempt.retainSessionKey(minted.apiKeyId);
       }
 
+      // A turn that cannot read its own history still runs — degraded, and said
+      // so once in the logs, rather than 500ing over a memory aid.
+      if (memoryResult.status === "rejected") {
+        logger.warn(
+          { error: memoryResult.reason, conversationId: conversation.id },
+          "failed to read langy conversation memory — the turn runs without it",
+        );
+      }
+      const conversationMemory = renderLangyConversationMemory(
+        extractLangyConversationMemory({
+          messages:
+            memoryResult.status === "fulfilled" ? memoryResult.value : [],
+        }),
+      );
+
+      // ORDER IS THE POINT. The two DATA blocks describe what "it" could mean —
+      // this conversation's own history, then the user's screen — and the
+      // referent policy comes last so "described above" names both of them.
       const system = [
         LANGY_OVERRIDE,
+        conversationMemory,
         renderLangyTurnContext(turnContext),
+        LANGY_REFERENT_POLICY,
         capReachedNote,
       ]
         .filter((block): block is string => !!block && block.trim().length > 0)
@@ -419,7 +645,7 @@ export class LangyTurnService {
             ? {
                 userMessage: {
                   userId,
-                  messageId: messageIdForRequest(requestId),
+                  messageId: identity.messageId,
                   role: lastUserMessage.role,
                   parts: lastUserMessage.parts,
                   title,

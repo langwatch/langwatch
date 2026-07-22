@@ -102,31 +102,45 @@ async function readRollupForTenant(tenant: string): Promise<{
   durationSum: number;
   errorCount: number;
 }> {
-  const result = await ch.query({
-    query: `
-      SELECT
-        sum(CostSum) AS costSum,
-        sum(SpanCount) AS spanCount,
-        sum(TraceCount) AS traceCount,
-        sum(DurationSum) AS durationSum,
-        sum(ErrorCount) AS errorCount
-      FROM trace_analytics_rollup
-      WHERE TenantId = {tenantId:String}
-      GROUP BY TenantId, BucketStart, Model, SpanType
-    `,
-    query_params: { tenantId: tenant },
-    format: "JSONEachRow",
-  });
-  const rows = (await result.json()) as Array<Record<string, number | string>>;
-  // The fixtures land in one (Model, SpanType) group so we get exactly one row.
-  const row = rows[0] ?? {};
-  return {
-    costSum: Number(row.costSum ?? 0),
-    spanCount: Number(row.spanCount ?? 0),
-    traceCount: Number(row.traceCount ?? 0),
-    durationSum: Number(row.durationSum ?? 0),
-    errorCount: Number(row.errorCount ?? 0),
-  };
+  // Async-inserted rows are intermittently not yet visible to the first
+  // read even with wait_for_async_insert=1 (observed both in CI and
+  // locally, independent of any code change). Every fixture row carries
+  // SpanCount 1, so an empty or zero-span read can only mean the parts
+  // are not queryable yet: retry briefly instead of asserting on a
+  // pre-visibility snapshot. The assertions still verify the SUMS, which
+  // is the contract under test.
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const result = await ch.query({
+      query: `
+        SELECT
+          sum(CostSum) AS costSum,
+          sum(SpanCount) AS spanCount,
+          sum(TraceCount) AS traceCount,
+          sum(DurationSum) AS durationSum,
+          sum(ErrorCount) AS errorCount
+        FROM trace_analytics_rollup
+        WHERE TenantId = {tenantId:String}
+        GROUP BY TenantId, BucketStart, Model, SpanType
+      `,
+      query_params: { tenantId: tenant },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<
+      Record<string, number | string>
+    >;
+    // The fixtures land in one (Model, SpanType) group so we get exactly one row.
+    const row = rows[0] ?? {};
+    const read = {
+      costSum: Number(row.costSum ?? 0),
+      spanCount: Number(row.spanCount ?? 0),
+      traceCount: Number(row.traceCount ?? 0),
+      durationSum: Number(row.durationSum ?? 0),
+      errorCount: Number(row.errorCount ?? 0),
+    };
+    if (read.spanCount > 0 || Date.now() >= deadline) return read;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
 }
 
 /**

@@ -28,10 +28,14 @@ const data: BriefingData = {
   headline: "1 signal needs attention.",
   receiptsLabel: "Attention inbox",
   receipts: [receipt],
+  suggestions: ["Why did errors spike?"],
 };
 
 function renderBriefing(props: {
   onInvestigateReceipt?: (item: BriefingReceipt) => void;
+  onAsk?: () => void;
+  onAskSubmit?: (question: string) => void;
+  onFeedback?: () => void;
 }) {
   return render(
     <ChakraProvider value={defaultSystem}>
@@ -70,5 +74,47 @@ describe("LangyBriefing attention inbox actions", () => {
     expect(
       screen.queryByRole("button", { name: /Ask Langy about/ }),
     ).toBeNull();
+  });
+});
+
+describe("LangyBriefing without Langy", () => {
+  describe("when no Langy handlers are provided", () => {
+    /** @scenario Without Langy the sheet keeps working, quietly */
+    it("keeps the row's Trace Explorer evidence link working", () => {
+      renderBriefing({});
+
+      expect(
+        screen
+          .getByRole("link", { name: "Open traces for New error shape" })
+          .getAttribute("href"),
+      ).toBe(receipt.link?.href);
+    });
+
+    it("offers no control that hands a signal to Langy", () => {
+      renderBriefing({});
+
+      expect(screen.queryByRole("button", { name: /in Langy/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Investigate/ })).toBeNull();
+      expect(screen.queryByText("⌘I")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "Why did errors spike?" }),
+      ).toBeNull();
+      expect(screen.queryByText("Missing a signal? Tell us")).toBeNull();
+    });
+  });
+
+  describe("when Langy handlers are provided", () => {
+    /** @scenario With Langy the sheet keeps its hand-offs */
+    it("renders the ask row and sends the clicked suggestion chip", () => {
+      const onAskSubmit = vi.fn();
+      renderBriefing({ onAsk: vi.fn(), onAskSubmit });
+
+      expect(screen.getByText("⌘I")).toBeDefined();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Why did errors spike?" }),
+      );
+
+      expect(onAskSubmit).toHaveBeenCalledWith("Why did errors spike?");
+    });
   });
 });

@@ -7,7 +7,7 @@ import {
  * Langy error explainer (ADR-045).
  *
  * The platform serializes handled `HandledError`s to `{ code, kind, meta,
- * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.domainError`, and (new in
+ * httpStatus, traceId, spanId, reasons }` — over tRPC as `error.data.error`, and (new in
  * this PR) over the chat stream as a JSON-encoded string in the error part.
  * This module turns either into a keyed presentation the UI renders:
  *
@@ -23,7 +23,14 @@ import {
  * gets one calm generic message plus a trace id.
  */
 
-export type LangyErrorRender = "card" | "inline" | "suppress";
+export type LangyErrorRender =
+  | "card"
+  | "inline"
+  | "suppress"
+  // A transient composer-level notice, not a message-history card: rendered as a
+  // dismissable box attached above the composer, leaving the user's draft in
+  // place (ADR-058). Used for "one turn at a time" — a wait, not a turn failure.
+  | "composer-notice";
 
 export interface LangyErrorAction {
   label: string;
@@ -45,6 +52,16 @@ export interface LangyErrorPresentation {
   action?: LangyErrorAction;
   /** Present for unknown/unhandled errors so support can correlate. */
   traceId?: string;
+  /**
+   * The raw domain code, shown under the message on the GENERIC cards only.
+   *
+   * A card that says "Something went wrong" and nothing else is unactionable
+   * for everyone: support cannot correlate it and a developer cannot tell
+   * `clickhouse_unavailable` (your local stack is down) from a genuine bug.
+   * The bespoke cases do not set this — their copy already names the problem,
+   * and a code under prose that already explains itself is just noise.
+   */
+  code?: string;
   /** Renderable domain metadata, surfaced under the message when present. */
   meta?: Record<string, unknown>;
   /** The reason chain, surfaced under the message for debugging when present. */
@@ -163,17 +180,17 @@ export function readLangyStreamError(
   };
 }
 
-/** Read a Langy domain error off a tRPC client error (`error.data.domainError`). */
+/** Read a Langy domain error off a tRPC client error (`error.data.error`). */
 export function readLangyTrpcError(err: unknown): LangyDomainError | null {
   const domain = readHandledError(err);
   if (!domain) return null;
   const serialized = (
     err as {
       data?: {
-        domainError?: { traceId?: unknown; reasons?: unknown };
+        error?: { traceId?: unknown; reasons?: unknown };
       };
     }
-  )?.data?.domainError;
+  )?.data?.error;
   const traceId = serialized?.traceId;
   return {
     ...domain,
@@ -404,12 +421,14 @@ export function explainLangyError(
     case "langy_turn_in_progress":
       // One turn at a time per conversation. A retry would just 409 again, so
       // there's no retry action — the answer is to wait for the reply to finish.
+      // It is a WAIT, not a turn failure, so it rides above the composer as a
+      // dismissable notice that keeps the user's draft — not a red history card.
       return {
         kind: domain.code,
         title: "Langy is still replying",
         description:
           "There's already a response in progress for this conversation. Wait for it to finish before sending another message.",
-        render: "card",
+        render: "composer-notice",
         ...debug,
       };
 
@@ -418,24 +437,34 @@ export function explainLangyError(
         kind: "unknown",
         title: "Something went wrong",
         description:
-          "Langy hit an unexpected error. Try again — if it keeps happening, share the id below with support.",
+          "Langy hit an unexpected error. Try again — if it keeps happening, share the details below with support.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
+        code: domain.code,
         ...debug,
       };
 
-    default:
+    default: {
       // A handled kind we don't have bespoke copy for yet: still useful, never
-      // a raw string, and its meta + reasons are surfaced for debugging.
+      // a raw string, and its meta + reasons are surfaced for debugging. A
+      // server-authored sentence in `meta.message` wins over the stock line —
+      // that is the only channel carrying prose (ADR-045), and it is how a
+      // proxied Go herr explains itself before we write copy for its code.
+      const authored = domain.meta?.message;
       return {
         kind: domain.code,
         title: "Langy couldn't finish that",
-        description: "The request was rejected. Try rephrasing or start again.",
+        description:
+          typeof authored === "string" && authored.length > 0
+            ? authored
+            : "The request was rejected. Try rephrasing or start again.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,
+        code: domain.code,
         ...debug,
       };
+    }
   }
 }

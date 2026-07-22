@@ -58,10 +58,17 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// The worker authenticated to US with a placeholder (its env holds no
 			// virtual key). Replace it with the real credential.
 			pr.Out.Header.Set("Authorization", "Bearer "+entry.info.LLMVirtualKey)
-			// opencode emits no traceparent of its own; stamp the turn's so the
-			// gateway's customer-facing gen_ai span joins the turn's trace. An
-			// invalid (not-yet-set) turn context stamps nothing — the gateway then
-			// roots its own trace, today's behaviour.
+			// Stamp the TURN's traceparent so the gateway's customer-facing
+			// gen_ai span joins the turn's trace. The worker's own traceparent
+			// is deliberately NOT continued, for two reasons: its trace id is
+			// worker-chosen (a prompt-injectable process must never pick which
+			// trace its calls land in), and — verified against opencode's real
+			// export set — the span id it stamps on outbound calls belongs to
+			// an internal fetch span it never exports, so continuing it parents
+			// the gateway span under a node that will never exist. The turn
+			// span is the one stable ancestor both the worker's re-parented
+			// roots and this span share. An invalid (not-yet-set) turn context
+			// stamps nothing — the gateway then roots its own trace.
 			if sc := entry.turnContext(); sc.IsValid() {
 				pr.Out.Header.Set("traceparent", traceparentHeader(sc))
 			} else {
@@ -97,7 +104,8 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 				return nil // capture is best-effort; the proxied response stands.
 			}
 			var envelope herr.ErrorResponse
-			if json.Unmarshal(peeked, &envelope) != nil || envelope.Error.Type == "" {
+			if json.Unmarshal(peeked, &envelope) != nil ||
+				(envelope.Error.Type == "" && envelope.Error.Code == "") {
 				return nil // not a herr envelope (e.g. a raw provider body) — skip.
 			}
 			e := herr.FromBody(envelope.Error)

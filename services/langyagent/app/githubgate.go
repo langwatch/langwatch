@@ -65,9 +65,9 @@ func newGithubGate(hasCredential bool, cancel func()) *githubGate {
 // The end frame is self-describing (input rides it too), so the settle event
 // alone answers "what ran, and how did it end?".
 type gateToolFrame struct {
-	Type    string `json:"type"`
-	Phase   string `json:"phase"`
-	Input   struct {
+	Type  string `json:"type"`
+	Phase string `json:"phase"`
+	Input struct {
 		Command string `json:"command"`
 	} `json:"input"`
 	Output  string `json:"output"`

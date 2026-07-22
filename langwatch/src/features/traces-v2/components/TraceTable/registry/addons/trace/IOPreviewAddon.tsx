@@ -170,7 +170,12 @@ export const IOPreviewAddon: AddonDef<TraceListItem> = {
             cursor="pointer"
           >
             {seg.role === "content" ? (
-              <IOPreview input={row.input} output={row.output} />
+              <IOPreview
+                input={row.input}
+                output={row.output}
+                inputMediaRefs={row.inputMediaRefs}
+                outputMediaRefs={row.outputMediaRefs}
+              />
             ) : null}
           </Td>
         ))}

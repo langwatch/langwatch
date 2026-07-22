@@ -209,7 +209,10 @@ export default defineConfig(async (): Promise<UserConfig> => {
         "**/dist/**",
         "**/.next/**",
         "**/coverage/**",
-        "**/server.log",
+        // Any dev-server tee target (server.log, server-qa.log, ...): the
+        // server appends on every request, so watching one turns each page
+        // load into a full-reload loop.
+        "**/server*.log",
       ],
       // Docker-on-macOS bind mounts don't surface inotify events reliably,
       // so Vite's default fs.watch sits silent on edits made from the host.

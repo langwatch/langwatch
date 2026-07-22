@@ -162,6 +162,79 @@ describe("redactV2Content", () => {
     });
   });
 
+  describe("given the trace carries extracted media references", () => {
+    const withRefs = () => ({
+      input: "voice call",
+      output: "transcript",
+      inputMediaRefs: [{ kind: "audio", url: "/api/files/p1/a1" }],
+      outputMediaRefs: [{ kind: "audio", url: "/api/files/p1/a2" }],
+      attributes: {
+        "langwatch.reserved.media_refs.input": `[{"kind":"audio","url":"/api/files/p1/a1"}]`,
+        "langwatch.reserved.media_refs.output": `[{"kind":"audio","url":"/api/files/p1/a2"}]`,
+        "service.name": "x",
+      },
+    });
+
+    describe("when the viewer cannot see captured input", () => {
+      /** @scenario Redacted trace content never leaks its media references */
+      it("drops the input refs and reserved input attribute, keeps the output ones", () => {
+        const out = redactV2Content(withRefs(), {
+          canSeeCapturedInput: false,
+          canSeeCapturedOutput: true,
+        });
+
+        // The whole point: the /api/files URLs are fetchable on their own, so
+        // they must not ride along in the payload for redacted content.
+        expect(out.inputMediaRefs).toBeUndefined();
+        expect(
+          out.attributes?.["langwatch.reserved.media_refs.input"],
+        ).toBeUndefined();
+        expect(out.outputMediaRefs).toEqual([
+          { kind: "audio", url: "/api/files/p1/a2" },
+        ]);
+        expect(out.attributes?.["langwatch.reserved.media_refs.output"]).toBe(
+          `[{"kind":"audio","url":"/api/files/p1/a2"}]`,
+        );
+        expect(out.attributes?.["service.name"]).toBe("x");
+      });
+    });
+
+    describe("when the viewer cannot see captured output", () => {
+      it("drops the output refs and reserved output attribute", () => {
+        const out = redactV2Content(withRefs(), {
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: false,
+        });
+
+        expect(out.outputMediaRefs).toBeUndefined();
+        expect(
+          out.attributes?.["langwatch.reserved.media_refs.output"],
+        ).toBeUndefined();
+        expect(out.inputMediaRefs).toEqual([
+          { kind: "audio", url: "/api/files/p1/a1" },
+        ]);
+      });
+    });
+
+    describe("when the viewer sees everything", () => {
+      it("keeps both ref fields and both reserved attributes", () => {
+        const out = redactV2Content(withRefs(), {
+          canSeeCapturedInput: true,
+          canSeeCapturedOutput: true,
+        });
+
+        expect(out.inputMediaRefs).toBeDefined();
+        expect(out.outputMediaRefs).toBeDefined();
+        expect(
+          out.attributes?.["langwatch.reserved.media_refs.input"],
+        ).toBeDefined();
+        expect(
+          out.attributes?.["langwatch.reserved.media_refs.output"],
+        ).toBeDefined();
+      });
+    });
+  });
+
   describe("given system instructions are restricted from the viewer", () => {
     const conversation = JSON.stringify({
       type: "chat_messages",

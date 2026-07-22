@@ -6,6 +6,7 @@ import {
   commandValidationError,
   reportCommandError,
 } from "../../utils/errorOutput";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -49,8 +50,8 @@ export const parseRecordsJson = (jsonStr: string): Record<string, unknown>[] => 
  */
 export const recordsAddCommand = async (
   slugOrId: string,
-  options: { json?: string; file?: string; stdin?: boolean; format?: string },
-): Promise<void> => {
+  options: { json?: string; file?: string; stdin?: boolean },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (!options.json && !options.file && !options.stdin) {
@@ -58,7 +59,6 @@ export const recordsAddCommand = async (
       error: commandValidationError(
         "One of --json, --file, or --stdin is required.",
       ),
-      format: options.format,
     });
     process.exit(1);
   }
@@ -70,7 +70,6 @@ export const recordsAddCommand = async (
       if (!fs.existsSync(options.file)) {
         reportCommandError({
           error: commandValidationError(`File not found: ${options.file}`),
-          format: options.format,
         });
         process.exit(1);
       }
@@ -86,7 +85,6 @@ export const recordsAddCommand = async (
       error: commandValidationError(
         error instanceof Error ? error.message : "Invalid JSON input",
       ),
-      format: options.format,
     });
     process.exit(1);
   }
@@ -96,7 +94,6 @@ export const recordsAddCommand = async (
       error: commandValidationError(
         "No records provided. The JSON array is empty.",
       ),
-      format: options.format,
     });
     process.exit(1);
   }
@@ -112,15 +109,15 @@ export const recordsAddCommand = async (
       `Added ${created.length} record${created.length !== 1 ? "s" : ""} to "${chalk.cyan(slugOrId)}"`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
-      return;
-    }
-
-    console.log();
-    created.forEach((record) => {
-      console.log(`  ${chalk.bold("ID:")} ${record.id}`);
-    });
+    return {
+      data: result,
+      table: () => {
+        console.log();
+        created.forEach((record) => {
+          console.log(`  ${chalk.bold("ID:")} ${record.id}`);
+        });
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "add records" });
   }

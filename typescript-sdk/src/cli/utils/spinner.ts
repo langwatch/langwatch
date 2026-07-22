@@ -30,6 +30,8 @@ export function createSpinner(textOrOptions?: string | Options): Ora {
 
   return ora({
     ...options,
-    isSilent: options.isSilent === true || getOutputFormat() === "json",
+    // Silent for EVERY machine format (json, agents compact JSON): anything
+    // the spinner prints would land in the document a parser is reading.
+    isSilent: options.isSilent === true || getOutputFormat() !== "text",
   });
 }

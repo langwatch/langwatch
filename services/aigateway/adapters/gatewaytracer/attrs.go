@@ -1,18 +1,15 @@
 package gatewaytracer
 
 const (
-	AttrOrigin                    = "langwatch.origin"
-	OriginGateway                 = "gateway"
-	AttrVirtualKeyID              = "langwatch.virtual_key_id"
-	// AttrLabels carries the VK's tags; the trace pipeline ingests this
-	// exact key into metadata.labels (otel.traces.ts), which the Trace
-	// Explorer filters as "Label".
-	AttrLabels = "langwatch.labels"
+	// OriginGateway is the langwatch.origin value for this service — stamped
+	// on its own operational spans and, via the customer-trace policy in
+	// deps.go, on the spans it retells into customer projects.
+	OriginGateway = "gateway"
+
 	AttrProjectID                 = "langwatch.project_id"
 	AttrTeamID                    = "langwatch.team_id"
 	AttrOrgID                     = "langwatch.organization_id"
 	AttrPrincipalID               = "langwatch.principal_id"
-	AttrGatewayReqID              = "langwatch.gateway_request_id"
 	AttrModel                     = "langwatch.model"
 	AttrProvider                  = "langwatch.provider"
 	AttrModelSource               = "langwatch.model_source"

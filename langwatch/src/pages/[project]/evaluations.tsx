@@ -1,10 +1,6 @@
 import {
   Badge,
   Box,
-  Card,
-  Container,
-  EmptyState,
-  Heading,
   HStack,
   Skeleton,
   Spacer,
@@ -14,10 +10,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ExperimentType } from "@prisma/client";
-import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, MoreVertical } from "react-feather";
-import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import {
   LuCircleCheckBig,
   LuCircleX,
@@ -26,16 +20,18 @@ import {
   LuSquareCheckBig,
   LuTrash,
 } from "react-icons/lu";
-import { NewEvaluationMenu } from "~/components/evaluations/NewEvaluationMenu";
-import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { CreateExperimentButton } from "~/components/experiments/CreateExperimentButton";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { ListTable } from "~/components/ui/ListTable";
+import { FullWidthListPageContent } from "~/components/ui/layouts/FullWidthListPageContent";
 import { Link } from "~/components/ui/link";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { experimentContextChip } from "~/features/langy/logic/langyContextChips";
 import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
-import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
 import { formatEvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
+import { CopyExperimentDialog } from "../../components/experiments/CopyExperimentDialog";
 import {
   NavigationFooter,
   useNavigationFooter,
@@ -50,28 +46,20 @@ import type { TASK_TYPES } from "../../server/experiments/workbenchState";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
-function EvaluationsV2() {
+export function ExperimentsPage() {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const [copyDialogState, setCopyDialogState] = useState<{
     open: boolean;
     experimentId: string;
-    evaluationName: string;
+    experimentName: string;
   } | null>(null);
-  const [newEvaluationMenuOpen, setNewEvaluationMenuOpen] = useState(false);
   const [experimentToDelete, setExperimentToDelete] = useState<{
     id: string;
     name: string;
   } | null>(null);
 
   const navigationFooter = useNavigationFooter();
-
-  const monitors = api.monitors.getAllForProject.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    { enabled: !!project },
-  );
 
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     {
@@ -93,7 +81,6 @@ function EvaluationsV2() {
     {
       onSuccess: () => {
         void experiments.refetch();
-        void monitors.refetch();
         toaster.create({
           title: "Experiment deleted",
           type: "success",
@@ -127,16 +114,16 @@ function EvaluationsV2() {
   if (!project) return null;
 
   const taskTypeToLabel: Record<keyof typeof TASK_TYPES, string> = {
-    real_time: "Real-Time Evaluation",
-    llm_app: "LLM App Evaluation",
-    prompt_creation: "Prompt Creation",
-    custom_evaluator: "Custom Evaluator",
-    scan: "Scan for Vulnerabilities",
+    real_time: "Legacy live workflow",
+    llm_app: "LLM App Experiment",
+    prompt_creation: "Prompt Experiment",
+    custom_evaluator: "Evaluator Experiment",
+    scan: "Vulnerability Scan",
   };
 
   const experimentTypeToLabel: Record<ExperimentType, string> = {
     BATCH_EVALUATION_V2: "Experiment (SDK)",
-    BATCH_EVALUATION: "Batch Evaluation",
+    BATCH_EVALUATION: "Batch Experiment",
     DSPY: "DSPy Optimization",
     EVALUATIONS_V3: "Experiment (UI)",
   };
@@ -144,317 +131,263 @@ function EvaluationsV2() {
   return (
     <DashboardLayout>
       <PageLayout.Header>
-        <PageLayout.Heading>Evaluations</PageLayout.Heading>
+        <PageLayout.Heading>Experiments</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
-          <NewEvaluationMenu
-            open={newEvaluationMenuOpen}
-            onOpenChange={setNewEvaluationMenuOpen}
-          />
+          <CreateExperimentButton />
         </HStack>
       </PageLayout.Header>
-      {monitors.isLoading || experiments.isLoading ? (
+      {experiments.isLoading ? (
         <Box display="flex" justifyContent="center" py={8}>
           <Spinner />
         </Box>
-      ) : monitors.isError ? (
+      ) : experiments.isError ? (
         <Box padding={6}>
-          <Text color="red.500">Error loading evaluations</Text>
+          <Text color="red.500">Error loading experiments</Text>
         </Box>
-      ) : monitors.data?.length === 0 &&
-        experiments.data?.experiments.length === 0 ? (
+      ) : experiments.data?.experiments.length === 0 ? (
         <PageLayout.Container>
           <PageLayout.Content>
             <NoDataInfoBlock
               title="No experiments yet"
-              description="Run experiments to evaluate your LLM outputs with automated checks and custom metrics."
+              description="Test prompts, models, and agents against a dataset before shipping changes."
               icon={<LuSquareCheckBig size={24} />}
               color="green.500"
               docsInfo={
                 <Text>
-                  To learn more about evaluations, please visit our{" "}
+                  To learn more about experiments, visit the{" "}
                   <Link
-                    color="green.500"
-                    href="https://langwatch.ai/docs/evaluations/overview"
+                    color="inherit"
+                    textDecoration="underline"
+                    href="https://langwatch.ai/docs/evaluations/experiments/overview"
                     isExternal
                   >
-                    documentation
+                    experiments documentation
                   </Link>
                   .
                 </Text>
               }
             >
-              {hasPermission("evaluations:manage") && (
-                <PageLayout.HeaderButton
-                  onClick={() => setNewEvaluationMenuOpen(true)}
-                  marginTop={4}
-                >
-                  <Plus size={16} /> Create your first evaluation
-                </PageLayout.HeaderButton>
-              )}
+              <Box marginTop={4}>
+                <CreateExperimentButton />
+              </Box>
             </NoDataInfoBlock>
           </PageLayout.Content>
         </PageLayout.Container>
       ) : (
-        <Container
-          maxW={"calc(min(1440px, 100vw - 200px))"}
-          paddingX={6}
-          paddingTop={4}
-        >
-          <VStack width="fill" gap={4} align="stretch">
-            {monitors.data && monitors.data.length > 0 && (
-              <MonitorsSection title="Online Evaluations" monitors={monitors} />
-            )}
-
-            <VStack align="start" gap={1}>
-              <Heading as="h1">Evaluations</Heading>
-              <Text color="fg.muted">
-                View and analyze your evaluation results
-              </Text>
-            </VStack>
-
-            {experiments.data && experiments.data.experiments.length == 0 ? (
-              <Card.Root overflow="hidden">
-                <Card.Body>
-                  <EmptyState.Root>
-                    <EmptyState.Content>
-                      <EmptyState.Indicator>
-                        <LuSquareCheckBig size={32} />
-                      </EmptyState.Indicator>
-                      <EmptyState.Title>No experiments yet</EmptyState.Title>
-                      <EmptyState.Description>
-                        {project && hasPermission("evaluations:manage") && (
-                          <>
-                            {" "}
-                            Click on{" "}
-                            <Text
-                              as="span"
-                              textDecoration="underline"
+        <FullWidthListPageContent>
+          <VStack width="full" gap={4} align="stretch">
+            <Text color="fg.muted">
+              Compare configurations and analyze batch test results
+            </Text>
+            <>
+              <ListTable width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader width="20%">
+                      Experiment
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="15%">Type</Table.ColumnHeader>
+                    <Table.ColumnHeader width="10%">Dataset</Table.ColumnHeader>
+                    <Table.ColumnHeader width="20%">
+                      Primary Metric
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="10%">Runs</Table.ColumnHeader>
+                    <Table.ColumnHeader width="10%">Status</Table.ColumnHeader>
+                    <Table.ColumnHeader width="10%">
+                      Last Updated
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="5%"></Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {experiments.isLoading || experiments.isFetching
+                    ? Array.from({ length: 3 }).map((_, i) => (
+                        <Table.Row key={i}>
+                          <Table.Cell>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Skeleton height="20px" />
+                          </Table.Cell>
+                        </Table.Row>
+                      ))
+                    : experiments.data
+                      ? experiments.data.experiments.map((experiment) => (
+                          // Point Langy at an experiment. Same chip id the
+                          // `/experiments/<slug>` route derives, so pointing
+                          // at a row and then opening it yields one chip, not
+                          // two. Closed, this is the plain clickable row.
+                          <LangyContextTarget
+                            key={experiment.id}
+                            target={experimentContextChip({
+                              slug: experiment.slug,
+                              name: experiment.name,
+                            })}
+                          >
+                            <Table.Row
                               cursor="pointer"
-                              onClick={() => setNewEvaluationMenuOpen(true)}
-                            >
-                              New Evaluation
-                            </Text>{" "}
-                            to get started.
-                          </>
-                        )}
-                      </EmptyState.Description>
-                    </EmptyState.Content>
-                  </EmptyState.Root>
-                </Card.Body>
-              </Card.Root>
-            ) : (
-              <>
-                <ListTable width="full">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader width="20%">
-                        Evaluation
-                      </Table.ColumnHeader>
-                      <Table.ColumnHeader width="15%">Type</Table.ColumnHeader>
-                      <Table.ColumnHeader width="10%">
-                        Dataset
-                      </Table.ColumnHeader>
-                      <Table.ColumnHeader width="20%">
-                        Primary Metric
-                      </Table.ColumnHeader>
-                      <Table.ColumnHeader width="10%">Runs</Table.ColumnHeader>
-                      <Table.ColumnHeader width="10%">
-                        Status
-                      </Table.ColumnHeader>
-                      <Table.ColumnHeader width="10%">
-                        Last Updated
-                      </Table.ColumnHeader>
-                      <Table.ColumnHeader width="5%"></Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {experiments.isLoading || experiments.isFetching
-                      ? Array.from({ length: 3 }).map((_, i) => (
-                          <Table.Row key={i}>
-                            <Table.Cell>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                          </Table.Row>
-                        ))
-                      : experiments.data
-                        ? experiments.data.experiments.map((experiment, i) => (
-                            // Point Langy at an evaluation. Same chip id the
-                            // `/experiments/<slug>` route derives, so pointing
-                            // at a row and then opening it yields one chip, not
-                            // two. Closed, this is the plain clickable row.
-                            <LangyContextTarget
-                              key={i}
-                              target={{
-                                id: `experiment:${experiment.slug}`,
-                                kind: "experiment",
-                                label: `experiment: ${
-                                  experiment.name ?? experiment.slug
-                                }`,
-                                ref: experiment.slug,
+                              onClick={() => {
+                                // Workbench-backed experiments (current and
+                                // legacy wizard) open in the workbench;
+                                // everything else in the experiment view.
+                                if (
+                                  experiment.type === "EVALUATIONS_V3" ||
+                                  experiment.workbenchState
+                                ) {
+                                  void router.push({
+                                    pathname: `/${project?.slug}/experiments/workbench/${experiment.slug}`,
+                                  });
+                                } else {
+                                  void router.push({
+                                    pathname: `/${project?.slug}/experiments/${experiment.slug}`,
+                                  });
+                                }
                               }}
                             >
-                              <Table.Row
-                                cursor="pointer"
-                                onClick={() => {
-                                  // Workbench-backed experiments (current and
-                                  // legacy wizard) open in the workbench;
-                                  // everything else in the experiment view.
-                                  if (
-                                    experiment.type === "EVALUATIONS_V3" ||
-                                    experiment.workbenchState
-                                  ) {
-                                    void router.push({
-                                      pathname: `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                    });
-                                  } else {
-                                    void router.push({
-                                      pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                                    });
-                                  }
-                                }}
-                              >
-                                <Table.Cell>
-                                  <OverflownTextWithTooltip
-                                    lineClamp={1}
-                                    wordBreak="break-word"
-                                  >
-                                    {experiment.name ?? experiment.slug}
-                                  </OverflownTextWithTooltip>
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <Badge colorPalette="gray" variant="outline">
-                                    {experiment.workbenchState?.task
-                                      ? taskTypeToLabel[
-                                          experiment.workbenchState.task
-                                        ]
-                                      : experimentTypeToLabel[experiment.type]}
-                                  </Badge>
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <OverflownTextWithTooltip
-                                    lineClamp={1}
-                                    wordBreak="break-word"
-                                  >
-                                    {experiment.dataset?.name ?? "-"}
-                                  </OverflownTextWithTooltip>
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {experiment.runsSummary.primaryMetric ? (
+                              <Table.Cell>
+                                <OverflownTextWithTooltip
+                                  lineClamp={1}
+                                  wordBreak="break-word"
+                                >
+                                  {experiment.name ?? experiment.slug}
+                                </OverflownTextWithTooltip>
+                              </Table.Cell>
+                              <Table.Cell whiteSpace="nowrap">
+                                <Badge colorPalette="gray" variant="outline">
+                                  {experiment.workbenchState?.task
+                                    ? taskTypeToLabel[
+                                        experiment.workbenchState.task
+                                      ]
+                                    : experimentTypeToLabel[experiment.type]}
+                                </Badge>
+                              </Table.Cell>
+                              <Table.Cell>
+                                <OverflownTextWithTooltip
+                                  lineClamp={1}
+                                  wordBreak="break-word"
+                                >
+                                  {experiment.dataset?.name ?? "-"}
+                                </OverflownTextWithTooltip>
+                              </Table.Cell>
+                              <Table.Cell>
+                                {experiment.runsSummary.primaryMetric ? (
+                                  <>
+                                    <Text
+                                      as="span"
+                                      fontSize="xs"
+                                      color="fg.muted"
+                                    >
+                                      {
+                                        experiment.runsSummary.primaryMetric
+                                          .name
+                                      }
+                                      : &nbsp;
+                                    </Text>
+                                    <Text as="span" fontWeight="semibold">
+                                      {formatEvaluationSummary(
+                                        experiment.runsSummary.primaryMetric,
+                                        true,
+                                      )}
+                                    </Text>
+                                  </>
+                                ) : (
+                                  "-"
+                                )}
+                              </Table.Cell>
+                              <Table.Cell>
+                                {experiment.runsSummary.count ?? "-"}
+                              </Table.Cell>
+                              <Table.Cell>
+                                <HStack gap={1}>
+                                  {experiment.runsSummary.latestRun?.timestamps
+                                    ?.finishedAt ? (
                                     <>
-                                      <Text
-                                        as="span"
-                                        fontSize="xs"
-                                        color="fg.muted"
-                                      >
-                                        {
-                                          experiment.runsSummary.primaryMetric
-                                            .name
-                                        }
-                                        : &nbsp;
-                                      </Text>
-                                      <Text as="span" fontWeight="semibold">
-                                        {formatEvaluationSummary(
-                                          experiment.runsSummary.primaryMetric,
-                                          true,
-                                        )}
-                                      </Text>
+                                      <LuCircleCheckBig
+                                        size={14}
+                                        color="var(--chakra-colors-green-500)"
+                                      />
+                                      <Text fontSize="sm">Completed</Text>
+                                    </>
+                                  ) : experiment.runsSummary.latestRun
+                                      ?.timestamps?.stoppedAt ? (
+                                    <>
+                                      <LuCircleX
+                                        size={14}
+                                        color="var(--chakra-colors-red-500)"
+                                      />
+                                      <Text fontSize="sm">Stopped</Text>
+                                    </>
+                                  ) : experiment.runsSummary.latestRun
+                                      ?.timestamps?.updatedAt &&
+                                    Date.now() -
+                                      experiment.runsSummary.latestRun
+                                        .timestamps.updatedAt <
+                                      5 * 60 * 1000 ? (
+                                    <>
+                                      <Spinner size="xs" />
+                                      <Text fontSize="sm">Running</Text>
+                                    </>
+                                  ) : experiment.runsSummary.count > 0 ? (
+                                    <>
+                                      <LuCircleCheckBig
+                                        size={14}
+                                        color="var(--chakra-colors-green-500)"
+                                      />
+                                      <Text fontSize="sm">Completed</Text>
                                     </>
                                   ) : (
-                                    "-"
+                                    <Text fontSize="sm" color="fg.muted">
+                                      -
+                                    </Text>
                                   )}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {experiment.runsSummary.count ?? "-"}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <HStack gap={1}>
-                                    {experiment.runsSummary.latestRun?.timestamps
-                                      ?.finishedAt ? (
-                                      <>
-                                        <LuCircleCheckBig
-                                          size={14}
-                                          color="var(--chakra-colors-green-500)"
-                                        />
-                                        <Text fontSize="sm">Completed</Text>
-                                      </>
-                                    ) : experiment.runsSummary.latestRun
-                                        ?.timestamps?.stoppedAt ? (
-                                      <>
-                                        <LuCircleX
-                                          size={14}
-                                          color="var(--chakra-colors-red-500)"
-                                        />
-                                        <Text fontSize="sm">Stopped</Text>
-                                      </>
-                                    ) : experiment.runsSummary.latestRun
-                                        ?.timestamps?.updatedAt &&
-                                      Date.now() -
-                                        experiment.runsSummary.latestRun
-                                          .timestamps.updatedAt <
-                                        5 * 60 * 1000 ? (
-                                      <>
-                                        <Spinner size="xs" />
-                                        <Text fontSize="sm">Running</Text>
-                                      </>
-                                    ) : experiment.runsSummary.count > 0 ? (
-                                      <>
-                                        <LuCircleCheckBig
-                                          size={14}
-                                          color="var(--chakra-colors-green-500)"
-                                        />
-                                        <Text fontSize="sm">Completed</Text>
-                                      </>
-                                    ) : (
-                                      <Text fontSize="sm" color="fg.muted">
-                                        -
-                                      </Text>
-                                    )}
-                                  </HStack>
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  {new Date(
-                                    experiment.updatedAt,
-                                  ).toLocaleString()}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <Box
-                                    width="full"
-                                    height="full"
-                                    display="flex"
-                                    justifyContent="end"
-                                  >
-                                    <Menu.Root>
-                                      <Menu.Trigger
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                        }}
-                                      >
-                                        <MoreVertical size={16} />
-                                      </Menu.Trigger>
-                                      <Menu.Content>
-                                        {experiment.type === "EVALUATIONS_V3" && (
+                                </HStack>
+                              </Table.Cell>
+                              <Table.Cell whiteSpace="nowrap">
+                                {new Date(
+                                  experiment.updatedAt,
+                                ).toLocaleString()}
+                              </Table.Cell>
+                              <Table.Cell>
+                                <Box
+                                  width="full"
+                                  height="full"
+                                  display="flex"
+                                  justifyContent="end"
+                                >
+                                  <Menu.Root>
+                                    <Menu.Trigger
+                                      aria-label={`Actions for ${
+                                        experiment.name ?? experiment.slug
+                                      }`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      <MoreVertical size={16} />
+                                    </Menu.Trigger>
+                                    <Menu.Content>
+                                      {hasPermission("workflows:create") &&
+                                        experiment.type ===
+                                          "EVALUATIONS_V3" && (
                                           <Menu.Item
                                             value="edit"
                                             onClick={(e) => {
@@ -468,95 +401,94 @@ function EvaluationsV2() {
                                             Edit
                                           </Menu.Item>
                                         )}
-                                        {experiment.type !== "EVALUATIONS_V3" &&
-                                          experiment.type !==
-                                            "BATCH_EVALUATION_V2" &&
-                                          experiment.workbenchState && (
-                                            <Menu.Item
-                                              value="edit"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                void router.push(
-                                                  `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                                );
-                                              }}
-                                            >
-                                              <LuPencil size={16} />
-                                              Edit
-                                            </Menu.Item>
-                                          )}
-                                        <Menu.Item
-                                          value="view-results"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            void router.push(
-                                              `/${project?.slug}/experiments/${experiment.slug}`,
-                                            );
-                                          }}
-                                        >
-                                          <LuEye size={16} />
-                                          View Results
-                                        </Menu.Item>
-                                        {hasPermission("evaluations:manage") && (
+                                      {hasPermission("workflows:create") &&
+                                        experiment.type !== "EVALUATIONS_V3" &&
+                                        experiment.type !==
+                                          "BATCH_EVALUATION_V2" &&
+                                        experiment.workbenchState && (
                                           <Menu.Item
-                                            value="replicate"
+                                            value="edit"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              setCopyDialogState({
-                                                open: true,
-                                                experimentId: experiment.id,
-                                                evaluationName:
-                                                  experiment.name ??
-                                                  experiment.slug,
-                                              });
-                                            }}
-                                          >
-                                            <Copy size={16} />
-                                            Replicate to another project
-                                          </Menu.Item>
-                                        )}
-                                        {hasPermission("evaluations:manage") && (
-                                          <Menu.Item
-                                            value="delete"
-                                            color="red.500"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDeleteExperiment(
-                                                experiment.id,
-                                                experiment.name ??
-                                                  experiment.slug,
+                                              void router.push(
+                                                `/${project?.slug}/experiments/workbench/${experiment.slug}`,
                                               );
                                             }}
                                           >
-                                            <LuTrash size={16} />
-                                            Delete
+                                            <LuPencil size={16} />
+                                            Edit
                                           </Menu.Item>
                                         )}
-                                      </Menu.Content>
-                                    </Menu.Root>
-                                  </Box>
-                                </Table.Cell>
-                              </Table.Row>
-                            </LangyContextTarget>
-                          ))
-                        : null}
-                  </Table.Body>
-                </ListTable>
-                {experiments.data &&
-                  experiments.data.experiments.length > 0 && (
-                    <NavigationFooter {...navigationFooter} />
-                  )}
-              </>
-            )}
+                                      <Menu.Item
+                                        value="view-results"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          void router.push(
+                                            `/${project?.slug}/experiments/${experiment.slug}`,
+                                          );
+                                        }}
+                                      >
+                                        <LuEye size={16} />
+                                        View Results
+                                      </Menu.Item>
+                                      {hasPermission("evaluations:manage") && (
+                                        <Menu.Item
+                                          value="replicate"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setCopyDialogState({
+                                              open: true,
+                                              experimentId: experiment.id,
+                                              experimentName:
+                                                experiment.name ??
+                                                experiment.slug,
+                                            });
+                                          }}
+                                        >
+                                          <Copy size={16} />
+                                          Replicate to another project
+                                        </Menu.Item>
+                                      )}
+                                      {hasPermission("workflows:delete") && (
+                                        <Menu.Item
+                                          value="delete"
+                                          color="red.500"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteExperiment(
+                                              experiment.id,
+                                              experiment.name ??
+                                                experiment.slug,
+                                            );
+                                          }}
+                                        >
+                                          <LuTrash size={16} />
+                                          Delete
+                                        </Menu.Item>
+                                      )}
+                                    </Menu.Content>
+                                  </Menu.Root>
+                                </Box>
+                              </Table.Cell>
+                            </Table.Row>
+                          </LangyContextTarget>
+                        ))
+                      : null}
+                </Table.Body>
+              </ListTable>
+              {experiments.data && experiments.data.experiments.length > 0 && (
+                <NavigationFooter {...navigationFooter} />
+              )}
+            </>
           </VStack>
-        </Container>
+        </FullWidthListPageContent>
       )}
       {copyDialogState && (
-        <CopyEvaluationDialog
+        <CopyExperimentDialog
           open={copyDialogState.open}
           onClose={() => setCopyDialogState(null)}
           experimentId={copyDialogState.experimentId}
-          evaluationName={copyDialogState.evaluationName}
+          experimentName={copyDialogState.experimentName}
         />
       )}
       <ConfirmDialog
@@ -564,8 +496,8 @@ function EvaluationsV2() {
         onOpenChange={(isOpen) => {
           if (!isOpen) setExperimentToDelete(null);
         }}
-        title="Delete evaluation"
-        message={`Are you sure you want to delete the evaluation "${
+        title="Delete experiment"
+        message={`Are you sure you want to delete the experiment "${
           experimentToDelete?.name ?? ""
         }"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`}
         confirmLabel="Delete"
@@ -586,6 +518,18 @@ function EvaluationsV2() {
   );
 }
 
-export default withPermissionGuard("evaluations:view", {
+export const GuardedExperimentsPage = withPermissionGuard("experiments:view", {
   layoutComponent: DashboardLayout,
-})(EvaluationsV2);
+})(ExperimentsPage);
+
+export default function LegacyEvaluationsRedirect() {
+  const router = useRouter();
+  const projectSlug = router.query.project;
+
+  useEffect(() => {
+    if (!router.isReady || typeof projectSlug !== "string") return;
+    void router.replace(`/${projectSlug}/experiments`);
+  }, [projectSlug, router, router.isReady]);
+
+  return null;
+}

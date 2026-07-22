@@ -155,6 +155,18 @@ Rule: Search bar keyboard shortcuts
     When the user presses Tab
     Then the highlighted suggestion is inserted into the search bar
 
+  # The search bar used to carry a lightbulb button whose popover listed
+  # these tips. That was one more button crowding the bar; the tips now live
+  # in the single keyboard-shortcuts dialog (opened with "?") alongside every
+  # other shortcut, so there is one place to look.
+  Scenario: Search tips live in the keyboard shortcuts dialog
+    Given the search bar is shown
+    Then there is no lightbulb "Search shortcuts" button next to it
+    When the user opens the keyboard shortcuts dialog with "?"
+    Then a "Search" section lists: Ask AI to build a query (⌘/Ctrl I),
+      combine a facet with OR (Shift or ⌘/Ctrl click), and flip an operator
+      by clicking AND / OR in the query
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QUERY SYNTAX
@@ -413,66 +425,6 @@ Rule: Filter column collapse and expand
     Given the user collapses or expands the sidebar
     When the user navigates away and returns to the Observe page
     Then the sidebar restores from `langwatch:traces-v2:ui` in localStorage
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FACET FINDER — FILTER THE SIDEBAR'S FACETS BY NAME
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Facet finder
-  A search control in the sidebar header filters which facet SECTIONS are
-  shown, so the user can jump to a facet by name without scrolling. It filters
-  the already-visible facets in place — it does not change which facets are
-  enabled (that is Configure) and does not search facet values (that is the
-  per-facet value search).
-
-  Background:
-    Given the user is authenticated with "traces:view" permission
-    And the sidebar shows the Model, Cost, Duration, and Status facets
-
-  Scenario: The finder is collapsed until invoked
-    Then a facet-finder search icon is shown in the sidebar header
-    And no finder input is shown
-
-  Scenario: Opening the finder focuses the input
-    When the user clicks the facet-finder icon
-    Then a "Find a facet…" input appears below the header
-    And it is focused for immediate typing
-
-  Scenario: Typing filters the facet sections by name
-    Given the facet finder is open
-    When the user types "cost"
-    Then only facet sections whose name matches "cost" remain
-    And the non-matching sections are hidden
-
-  Scenario: Matching is case-insensitive and also matches the field key
-    Given the facet finder is open
-    When the user types "PROMPT"
-    Then the "Prompt version" facet remains visible
-    # Matches the human label OR the raw field key, lower-cased.
-
-  Scenario: The finder shows how many facets match
-    Given the sidebar shows 12 facets
-    And the facet finder is open
-    When the user types a query that matches 3 of them
-    Then the finder shows a "3 of 12" count
-
-  Scenario: No match shows an inline hint, not a blank column
-    Given the facet finder is open
-    When the user types a query that matches no shown facet
-    Then an inline "No facets match" hint is shown
-
-  Scenario: Clearing the finder restores every facet
-    Given the user has filtered the facets with a query
-    When the user presses Escape or clicks the clear button
-    Then every previously visible facet is shown again
-    And the finder input closes
-
-  Scenario: The finder is a transient view filter, not a visibility change
-    Given the user filtered to a single facet with the finder
-    When the user clears the finder
-    Then the other facets reappear without opening Configure
-    And no facet's shown or hidden setting was changed
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -40,6 +40,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [046](./046-event-sourced-langy-conversations.md)                 | Event-sourced Langy conversations                                                           | Superseded in part by 049                         |
 | [049](./049-langy-projection-independent-reactions.md)            | Langy pilots projection-independent reactions                                               | Accepted                                          |
 | [050](./050-langy-versioned-prompts-and-dogfood-evals.md)         | Langy's prompts in the versioned prompt registry + dogfood scenarios/evals                  | Proposed                                          |
+| [059](./059-card-selection-is-deterministic.md)                    | Card selection is deterministic — the model supplies data, never presentation               | Proposed                                          |
 
 ## When to Write an ADR
 

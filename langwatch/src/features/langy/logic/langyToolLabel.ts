@@ -155,6 +155,43 @@ function humanize(name: string): string {
 }
 
 /**
+ * The one line of a skill's description that belongs on a card.
+ *
+ * A skill's `description` frontmatter is written for two readers at once: the
+ * public skill directory, and the model deciding whether to route to it. So it
+ * runs to several sentences and typically ends with an instruction aimed
+ * squarely at the agent —
+ *
+ *   "Deep-dive diagnosis of how your AI agent behaves in production. Explores
+ *    LangWatch analytics and traces end to end to map failure patterns,
+ *    dissatisfied users, token cost hotspots, edge cases, behavior changes, and
+ *    outliers, then delivers an HTML report where every finding links to real
+ *    example traces. Use when you want to truly understand what your agent is
+ *    doing in production."
+ *
+ * Dropped whole into a 400px panel that is three lines of paragraph above the
+ * answer the user actually asked for, and its last sentence is routing guidance
+ * for the model being shown to a human. Cards get the first sentence, and never
+ * a "Use when…" clause.
+ *
+ * The catalogue's `summary` is deliberately left intact — the `/` palette shows
+ * the full description, which is exactly where the long form belongs.
+ */
+export function skillCardDetail(summary: string): string | undefined {
+  const trimmed = summary.trim();
+  if (!trimmed) return undefined;
+  // First sentence: up to the first terminator followed by whitespace, so a
+  // decimal or an abbreviation mid-sentence cannot cut it short.
+  const match = /^(.+?[.!?])(\s|$)/.exec(trimmed);
+  const first = (match?.[1] ?? trimmed).trim();
+  // A description that is ONLY routing guidance leaves the card with a title
+  // and nothing else, which is correct — better silent than instructing the
+  // user to "use when…".
+  if (/^use\s+(this\s+)?(when|for|if)\b/i.test(first)) return undefined;
+  return first;
+}
+
+/**
  * Describe one tool call. The single mapping every activity card goes through —
  * there is no per-tool branch anywhere else in the UI.
  */
@@ -180,7 +217,8 @@ export function describeToolCall({
         // The summary comes from the derived catalogue — the skill's OWN
         // SKILL.md description, which is the copy on the public skill directory.
         // The card therefore cannot over-promise: it can only quote the skill.
-        detail: skill.summary,
+        // But it quotes only the FIRST LINE of it: see skillCardDetail.
+        detail: skillCardDetail(skill.summary),
         key: `skill:${skill.id}`,
       };
     }

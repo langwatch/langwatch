@@ -3,11 +3,15 @@ import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the duplicated suite rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const duplicateSuiteCommand = async (
   id: string,
-  options?: { format?: string },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new SuitesApiService();
@@ -18,18 +22,18 @@ export const duplicateSuiteCommand = async (
 
     spinner.succeed(`Suite duplicated as "${suite.name}" (${suite.id})`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(suite, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`  ${chalk.gray("New ID:")}   ${chalk.green(suite.id)}`);
-    console.log(`  ${chalk.gray("Name:")}     ${chalk.cyan(suite.name)}`);
-    console.log(`  ${chalk.gray("Slug:")}     ${chalk.yellow(suite.slug)}`);
-    console.log();
+    return {
+      data: suite,
+      table: () => {
+        console.log();
+        console.log(`  ${chalk.gray("New ID:")}   ${chalk.green(suite.id)}`);
+        console.log(`  ${chalk.gray("Name:")}     ${chalk.cyan(suite.name)}`);
+        console.log(`  ${chalk.gray("Slug:")}     ${chalk.yellow(suite.slug)}`);
+        console.log();
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "duplicate suite", format: options?.format });
+    failSpinner({ spinner, error, action: "duplicate suite" });
     process.exit(1);
   }
 };

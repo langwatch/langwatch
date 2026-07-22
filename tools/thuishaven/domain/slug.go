@@ -67,6 +67,15 @@ func SanitizeSlug(name string) string {
 // ValidSlug reports whether s is a well-formed slug.
 func ValidSlug(s string) bool { return SlugPattern.MatchString(s) }
 
+// SlugOrBase is a worktree's display name: its slug when known, else the basename
+// of its directory. Shared so the picker and the report name a worktree the same.
+func SlugOrBase(slug, dir string) string {
+	if slug != "" {
+		return slug
+	}
+	return filepath.Base(dir)
+}
+
 // RedisDBForSlug maps a slug to a stable Redis DB (0-15) so BullMQ queues,
 // GroupQueue streams, and fold caches stay isolated across concurrent worktrees —
 // the job the old PORT-slot derivation did, now keyed on the slug.

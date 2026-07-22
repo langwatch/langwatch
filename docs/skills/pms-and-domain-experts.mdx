@@ -32,12 +32,12 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
-# Analyze Agent Performance with LangWatch
+# Diagnose Your Agent's Production Behavior
 
-This skill queries and presents analytics. It does NOT write code.
+This skill is a production diagnostician. It reads the real traffic, not the code, and answers: what is my agent actually doing out there, where is it failing, who is it annoying, and where is the money going. It is read-only on the platform: the only thing it writes is a report file.
 
 ## Step 1: Set up the LangWatch CLI
 
@@ -53,7 +53,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -67,77 +67,83 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
-## Step 2: Get a Project Overview
+## Step 2: Baseline the Vital Signs
 
-```bash
-langwatch status
-```
-
-This shows resource counts (traces, evaluators, scenarios, datasets, etc.) and reminds you which subcommands are available.
-
-## Step 3: Query Trends and Aggregations
-
-Use `langwatch analytics query` for time-series data and aggregate metrics. Start with the presets:
+Establish the macro picture first, always comparing against the previous period (the analytics API returns both periods for every query):
 
 ```bash
-langwatch analytics query --metric trace-count        # Total traces over the last 7 days
-langwatch analytics query --metric total-cost         # Total LLM cost
-langwatch analytics query --metric avg-latency        # Average completion latency
-langwatch analytics query --metric p95-latency        # P95 completion latency
-langwatch analytics query --metric eval-pass-rate     # Evaluation pass rate
+langwatch status                                                  # Resource counts and project overview
+langwatch analytics query --metric trace-count --format json      # Volume trend, last 7 days
+langwatch analytics query --metric total-cost --format json       # Spend trend
+langwatch analytics query --metric avg-latency --format json      # Latency trend
+langwatch analytics query --metric p95-latency --format json      # Tail latency
+langwatch analytics query --metric total-tokens --format json     # Token consumption
+langwatch analytics query --metric eval-pass-rate --format json   # Quality trend, if evaluators exist
 ```
 
-Refine with `--start-date`, `--end-date`, `--group-by`, `--time-scale`, and `--aggregation`. Use `langwatch analytics query --help` to see every flag and `--format json` to feed the output to other tools.
-
-If you don't know which preset names exist or want a non-preset metric path:
+Then slice the same metrics to find WHERE the numbers come from:
 
 ```bash
-langwatch analytics query --help                       # Lists presets and flags
-langwatch docs analytics/custom-metrics                # Background on the metric model
+langwatch analytics query --metric total-cost --group-by metadata.model --format json
+langwatch analytics query --metric trace-count --group-by metadata.labels --format json
+langwatch analytics query --metric p95-latency --group-by metadata.model --format json
 ```
 
-## Step 4: Find Specific Traces
+Widen with `--start-date` (ISO) to 30 days when trends look suspicious: a gradual drift only shows on longer windows. Run `langwatch analytics query --help` for every preset and flag.
+
+## Step 3: Export the Evidence and Mine It
+
+Aggregates say WHAT changed; only the traces say WHY. Export a large sample and analyze it locally:
 
 ```bash
-langwatch trace search -q "error" --limit 10           # Find error traces by keyword
-langwatch trace search --start-date 2026-01-01         # Custom date range
-langwatch trace search --format json                   # Machine-readable output
+langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
+langwatch trace export --format jsonl --limit 1000 --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
 
-## Step 5: Inspect Individual Traces
+Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
+
+1. **Failure patterns**: cluster error traces by error message and by input shape. Which user intents fail most?
+2. **Dissatisfied users**: traces with negative feedback or angry language in inputs ("this is wrong", "that's not what I asked", repeated rephrasing of the same question in a thread). Check annotations on candidate traces too: thumbs down and reviewer comments are gold.
+3. **Token and cost hotspots**: distribution of tokens per trace; the p99 tail; which metadata slice (model, label, user) concentrates the spend; prompts that balloon context.
+4. **Edge cases**: inputs far from the common distribution (very long, empty, non-primary language, unusual formats) and how the agent handled them.
+5. **Behavior changes**: compare the recent window against the older export: output length, tool usage mix, model mix, refusal rate, latency. Anything that moved, find the first day it moved.
+6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace get <traceId>                          # Human-readable digest (default)
-langwatch trace get <traceId> -f json                  # Raw JSON for full detail
-langwatch trace export --format csv -o traces.csv      # Bulk export as CSV
-langwatch trace export --format jsonl --limit 500      # Bulk export as JSONL
+langwatch trace search -q "<keyword from a pattern>" --limit 10 --format json   # Chase a specific pattern
+langwatch trace get <traceId>                                                   # Read a representative trace in full
+langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
 
-For each interesting trace, look at:
+For every pattern you claim, keep 2-3 example trace IDs as evidence. Never report a pattern without example traces behind it.
 
-- The full request/response
-- Token counts and costs per span
-- Error messages and stack traces
-- Individual LLM calls within a multi-step agent
+## Step 4: Build the Report
 
-## Step 6: Present Findings
+Write a single self-contained `agent-performance-report.html` in the project root (inline CSS, no external assets) with:
 
-Summarize the data clearly for the user:
+- **Executive summary**: the 3-5 findings that matter, each one sentence with its magnitude ("34% of errors come from date parsing on non-English inputs")
+- One section per finding: the metric evidence (small tables, before/after numbers), what it means, and **links to example traces** so every claim is verifiable in one click
+- A cost breakdown section, a reliability section, and a user-satisfaction section, even when healthy: say what was checked and that it looks fine
+- A closing "recommended next steps" section ranked by impact
 
-- Lead with the key numbers they asked about
-- Highlight anomalies or concerning trends (cost spikes, latency increases, error rate changes)
-- Provide context by comparing to previous periods when relevant
-- Suggest next steps if issues are found (e.g., "The p95 latency spiked on Tuesday — here are the slowest traces from that day")
+Trace links: `langwatch trace get` returns the platform URL for each trace; use those URLs directly. Anyone on the project team can open them.
+
+Open the report path for the user and also summarize the top findings directly in the conversation, leading with the numbers.
+
+## Step 5: Hand Off to Improvement
+
+Diagnosis without treatment is just bad news. If the `agent-improve` skill is installed, run it on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. Pass along the report — agent-improve uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 
-- Do NOT try to write code — this skill queries existing data, no SDK installation or code changes
-- Use the preset names with `langwatch analytics query --metric ...` (trace-count, total-cost, avg-latency, etc.); do NOT hardcode raw metric paths unless the preset list doesn't cover what you need
-- Do NOT use `langwatch evaluator create` / `langwatch monitor create` here — this skill is read-only analytics
-- Do NOT present raw JSON to the user — summarize the data in a clear, human-readable format
-- If the CLI returns an error, surface the exact message in your reply rather than paraphrasing — the user often needs the raw error to debug API key, project, or date-range issues
+- Do NOT modify the agent's code, prompts, or any platform resource; this skill is read-only plus one report file
+- Do NOT report a pattern without linked example traces; unverifiable claims are worthless
+- Do NOT rely on aggregates alone; always read at least a handful of full traces per finding, the surprise is always in the details
+- Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
+- Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
+- If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text — an activity card already shows the underlying failure
 ````
 
         </div>
@@ -167,7 +173,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -203,7 +209,7 @@ If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **C
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** — they test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use evaluations instead for single input/output benchmarking with many examples.
+Scenarios sit at the **top of the testing pyramid** and test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use the `experiments` skill instead for single input/output benchmarking with many examples. If it is not installed, use `npx skills@1.5.19 add langwatch/skills/experiments`.
 
 Best practices:
 
@@ -217,12 +223,10 @@ LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments,
 
 How to handle:
 
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
+- Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
-
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it — point to the subscription settings on the platform (license settings instead, if `LANGWATCH_ENDPOINT` is set — self-hosted).
+- Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ---
 
@@ -242,7 +246,7 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -256,7 +260,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -332,7 +336,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent: AgentAdapter = {
   role: AgentRole.AGENT,
-  async call(input) { return await myExistingAgent(input.messages); },
+  async call(input) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("My Agent", () => {
@@ -343,7 +349,9 @@ describe("My Agent", () => {
       agents: [
         myAgent,
         scenario.userSimulatorAgent(),
-        scenario.judgeAgent({ criteria: ["Agent provides a helpful response"] }),
+        scenario.judgeAgent({
+          criteria: ["Agent provides a helpful response"],
+        }),
       ],
     });
     expect(result.success).toBe(true);
@@ -360,7 +368,8 @@ There are two distinct things to wire:
 **1. Scenario-run tracing** — call `setupScenarioTracing()` once at the top of the test file so the simulator, judge, and adapter spans are captured:
 
 ```typescript
-// TypeScript — add at the very top of the test file, before any imports or setup
+// TypeScript — the import and call go at the very top of the test file,
+// before any other imports or setup that might create spans of their own
 import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 ```
@@ -447,7 +456,9 @@ import { describe, it, expect } from "vitest";
 
 const myAgent = {
   role: scenario.AgentRole.AGENT,
-  async call(input: scenario.AgentInput) { return await myExistingAgent(input.messages); },
+  async call(input: scenario.AgentInput) {
+    return await myExistingAgent(input.messages);
+  },
 };
 
 describe("Agent Security", () => {
@@ -511,14 +522,14 @@ There are dozens of patterns there (angry customer with cafe noise, password-res
 
 Detect the user's transport from their codebase and pick the matching adapter. **Critically**, every adapter has a different idea of "what is the agent under test":
 
-| User's stack | Adapter | How it connects to the user's agent |
-| --- | --- | --- |
-| Pipecat / Twilio Media Streams WS bot deployed somewhere | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)` | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely). |
-| ElevenLabs hosted ConvAI agent (created in the EL dashboard) | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)` | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools. |
-| Twilio phone number (real PSTN, agent answers via Media Streams) | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`) | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up. |
-| Gemini Live model is the agent | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)` | The **adapter IS the agent**. It opens a Gemini Live session with these params — there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent. |
-| OpenAI Realtime model is the agent | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live — the **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent. |
-| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)` | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
+| User's stack                                                                                          | Adapter                                                                                  | How it connects to the user's agent                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pipecat / Twilio Media Streams WS bot deployed somewhere                                              | `scenario.PipecatAgentAdapter(url="ws://<your-bot>/stream", ...)`                        | Opens a WebSocket to the user's **already-running** bot. The bot has to be reachable (locally on `ws://localhost:<port>` or remotely).                                                                                                                                                                                         |
+| ElevenLabs hosted ConvAI agent (created in the EL dashboard)                                          | `scenario.ElevenLabsAgentAdapter(agent_id=..., api_key=...)`                             | Dials the user's hosted ConvAI agent by ID. The hosted agent owns model + voice + instructions + tools.                                                                                                                                                                                                                        |
+| Twilio phone number (real PSTN, agent answers via Media Streams)                                      | `scenario.TwilioAgentAdapter` (via `TwilioHarness(phone_number=...)`)                    | Accepts a real inbound call on the user's Twilio number. The deployed agent picks up.                                                                                                                                                                                                                                          |
+| Gemini Live model is the agent                                                                        | `scenario.GeminiLiveAgentAdapter(model=..., system_instruction=..., voice=...)`          | The **adapter IS the agent**. It opens a Gemini Live session with these params, so there is no separate "user's agent" being connected to. Copy the user's prod model, system instruction, voice, and tools into the constructor or the test is testing Gemini defaults, not the user's agent.                                   |
+| OpenAI Realtime model is the agent                                                                    | `scenario.OpenAIRealtimeAgentAdapter(model=..., instructions=..., voice=..., tools=...)` | Same shape as Gemini Live. The **adapter IS the agent**. Copy prod `model`, `instructions`, `voice`, and `tools` into the constructor. Without those, you're testing OpenAI defaults, not the user's agent.                                                                                                                   |
+| Text-only stack (chat completions, LangGraph, Mastra, plain SDK) with no deployed voice transport yet | `scenario.ComposableVoiceAgent(stt=..., llm=<wrap their agent>, tts=...)`                | Wraps the user's existing text agent in STT → agent → TTS. **Be explicit in your reply** that this tests a *voice wrapper* around their text logic, not a production voice transport. If they want to test a real deployed voice transport, they need to ship one first (Pipecat, Twilio, ElevenLabs hosted, OpenAI Realtime). |
 
 If you can't tell from the codebase which path the user is on, ASK before generating a test. Picking the wrong adapter means the test exercises something the user hasn't deployed — and they will (rightly) call it useless.
 
@@ -550,14 +561,14 @@ audio_effects=[
 
 The same adapters, simulator voice, and effects are available in TypeScript via thin factory functions on the `scenario` object. Pick the adapter the same way (Step 2) — the mapping is one-to-one:
 
-| User's stack | TypeScript adapter |
-| --- | --- |
-| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })` |
-| ElevenLabs hosted ConvAI agent | `scenario.elevenLabsAgent({ agentId, apiKey })` |
-| Twilio phone number (real PSTN) | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })` |
-| Gemini Live model is the agent | `scenario.geminiLiveAgent({ model, systemInstruction, voice })` |
-| OpenAI Realtime model is the agent | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
-| Text-only stack wrapped as voice | `scenario.composableAgent({ stt, llm, tts })` |
+| User's stack                          | TypeScript adapter                                                    |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| Pipecat / Twilio Media Streams WS bot | `scenario.pipecatAgent({ url: "ws://<your-bot>/stream" })`            |
+| ElevenLabs hosted ConvAI agent        | `scenario.elevenLabsAgent({ agentId, apiKey })`                       |
+| Twilio phone number (real PSTN)       | `scenario.twilioAgent({ accountSid, authToken, phoneNumber })`        |
+| Gemini Live model is the agent        | `scenario.geminiLiveAgent({ model, systemInstruction, voice })`       |
+| OpenAI Realtime model is the agent    | `scenario.openAIRealtimeAgent({ model, instructions, voice, tools })` |
+| Text-only stack wrapped as voice      | `scenario.composableAgent({ stt, llm, tts })`                         |
 
 Seed a voice on the simulator and layer effects the same way:
 
@@ -569,7 +580,7 @@ scenario.userSimulatorAgent({
   persona: "...",
   audioEffects: [
     voice.effects.backgroundNoise("cafe", 0.4), // presets: cafe / office / street / airport
-    voice.effects.phoneQuality(),               // mulaw + 8kHz + codec degradation
+    voice.effects.phoneQuality(), // mulaw + 8kHz + codec degradation
   ],
 });
 ```
@@ -717,7 +728,7 @@ describe("Voice agent — angry billing", () => {
         scenario.openAIRealtimeAgent({
           voice: "alloy",
           instructions: AGENT_INSTRUCTIONS,
-          // tools: AGENT_TOOLS,
+          tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
@@ -747,7 +758,7 @@ describe("Voice agent — angry billing", () => {
       ],
     });
     expect(result.success).toBe(true);
-  }, 240_000);  // voice scenarios are slow — TTS + transport + multi-turn
+  }, 240_000); // Voice scenarios are slow because they include TTS, transport, and multiple turns.
 });
 ```
 
@@ -800,7 +811,7 @@ describe("Voice agent — angry billing (Pipecat WS)", () => {
       ],
       script: [
         scenario.agent(), // the bot greets first (voice convention)
-        scenario.user(),  // heated opening
+        scenario.user(), // heated opening
         scenario.proceed(5),
         scenario.judge(),
       ],
@@ -854,9 +865,15 @@ async def test_noisy_handoff(): ...
 //
 // Then mark scenarios as concurrent inside the same file:
 describe.concurrent("voice agent", () => {
-  it("billing inquiry", async () => { /* scenario.run(...) */ }, 240_000);
-  it("account lockout", async () => { /* scenario.run(...) */ }, 240_000);
-  it("refund flow", async () => { /* scenario.run(...) */ }, 240_000);
+  it("billing inquiry", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("account lockout", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
+  it("refund flow", async () => {
+    /* scenario.run(...) */
+  }, 240_000);
 });
 ```
 
@@ -877,15 +894,129 @@ Use this when the user has no codebase. NOTE: If you have a codebase and want te
 
 (see "CliSetup" above)
 
-Then drive everything via `langwatch scenario --help` and `langwatch suite --help`. The basic flow:
+Then drive everything via `langwatch scenario --help` and `langwatch suite --help`. What follows is the surface as it actually is; `--help` is the live source when in doubt.
 
-1. Create scenarios with `langwatch scenario create`, providing a situation and natural-language criteria covering happy path, edge cases, error handling, and boundary conditions.
-2. Find your agent via `langwatch agent list`.
-3. Group scenarios into a suite (run plan): `langwatch suite create`.
-4. Execute and wait: `langwatch suite run <suiteId> --wait`.
-5. Iterate by reviewing results and refining criteria with `langwatch scenario update`.
+### Three nouns, and mixing them up is what makes this API feel confusing
 
-ALWAYS run the suite — an unrun scenario is useless. Run `langwatch <subcommand> --help` first if unsure of flags.
+| Noun | What it is | Commands |
+| --- | --- | --- |
+| **scenario** | One test case: a *situation* plus natural-language *criteria*. It needs a target to run against. | `langwatch scenario …` |
+| **suite** (a *run plan*) | A reusable plan pairing scenarios × targets × repeats. Use it when the same set should run again later. | `langwatch suite …` |
+| **simulation run** | One scenario executed once against one target. Runs triggered together share a `batchRunId`. | `langwatch simulation-run …` |
+
+"Simulations" is what the product calls the results surface — the same work seen from the other end. There is no `langwatch simulation` command; results live under `langwatch simulation-run`.
+
+### The flow
+
+Steps 2 and 4 are questions **for the user**. Ask, wait for the answer, and do not guess.
+
+#### 1. Create the scenario
+
+```bash
+langwatch scenario create "Angry refund request" \
+  --situation "A customer whose order arrived broken demands a full refund and is rude about it" \
+  --criteria "Agent stays polite,Agent offers a refund or a replacement,Agent never promises a delivery date it cannot keep" \
+  --labels "support,critical" \
+  --format json
+```
+
+- `<name>` (positional) and `--situation` are the only **required** inputs.
+- `--criteria` and `--labels` each take **one comma-separated string** — not repeated flags, not space-separated. A criterion therefore cannot contain a comma; rephrase instead.
+- Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
+- `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
+
+#### 2. ASK: run it once now, or put it in a run plan?
+
+Three real answers, so name all three: run it now (one command, results immediately), add it to an existing run plan, or start a new run plan.
+
+```bash
+langwatch suite list --format json    # so "existing" can name real plans
+```
+
+**What the API cannot do:** there is no "add scenario to suite" command. `langwatch suite update <id> --scenarios …` **replaces** the whole list, so appending is a read-modify-write:
+
+```bash
+langwatch suite get <suiteId> --format json          # read .scenarioIds
+langwatch suite update <suiteId> --scenarios "<existingId1>,<existingId2>,<newScenarioId>"
+```
+
+Leaving an existing id out silently drops that scenario from the plan — no warning, no undo. `--targets` and `--labels` on `suite update` replace the same way.
+
+#### 3. List what can be tested
+
+```bash
+langwatch agent list --format json     # -> { data: [{ id, name, type }], pagination }
+langwatch prompt list --format json    # -> [{ id, handle, name, version, model }]
+```
+
+#### 4. ASK: which agent(s) or prompt(s)?
+
+Show the names (with each agent's type) and let the user choose — **multiple choice**. One target runs as a single scenario run (step 5); several targets need a run plan (step 6), because every scenario runs against each target.
+
+Never invent a target and never quietly default to the first row.
+
+#### 5. Run it — the one-command path
+
+```bash
+langwatch scenario run <scenarioId> --target http:<agentId> --format json
+```
+
+That is the whole thing. No suite to create first. Under the hood it makes a throwaway run plan, runs it, and deletes it — so the results appear under Simulations, but no run plan survives to re-run later. That is the right trade for a one-off check; reach for step 6 when the user will want it again.
+
+Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `http`, `code`, `workflow`.
+
+- For `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL** — the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
+- For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json` — not its handle, not its name.
+- `--target` is **required** and takes exactly **one** value. (`suite create` spells the same idea `--targets`, plural and variadic — see below.)
+- Bad references are caught when the run is scheduled, not when the scenario was created: `Invalid target references: …` means you invented an id. Go back to step 3 and read a real one.
+- Add `--wait` only when the caller can afford to block: it polls every 3s for up to 10 minutes and exits non-zero if any run failed — which is the point in CI. In an interactive turn, skip it, hand over the link, and let the page stream results in.
+
+#### 6. Or create a run plan — reusable, and the only way to hit several targets
+
+```bash
+langwatch suite create "Refund regression" \
+  --scenarios "<scenarioId1>,<scenarioId2>" \
+  --targets http:<agentId> prompt:<promptId> \
+  --repeat-count 1 \
+  --format json
+
+langwatch suite run <suiteId> --format json
+```
+
+- `--scenarios` and `--targets` are both **required** and take **different shapes**: `--scenarios` is one comma-separated string; `--targets` is space-separated and variadic. `--targets http:a,prompt:b` does not error — it parses as the single target `http` → `a,prompt:b` and fails later. Keep them apart.
+- Suite names must be unique in the project (the slug comes from the name); a duplicate answers `A suite with this name already exists`.
+- The run count is `scenarios × targets × repeatCount`. Three scenarios × two targets × `--repeat-count 2` is twelve real LLM conversations. Say the number before launching anything large.
+- `suite run` returns `{ scheduled, batchRunId, setId, jobCount, skippedArchived, items }`. `jobCount: 0` with entries in `skippedArchived` means everything referenced is archived and nothing ran.
+
+Either way, follow progress without blocking via:
+
+```bash
+langwatch simulation-run list --scenario-set-id <setId> --batch-run-id <batchRunId> --format json
+langwatch simulation-run get <scenarioRunId> --format json      # messages, verdict, cost
+```
+
+`--batch-run-id` only works alongside `--scenario-set-id`. `--status` and `--name` filter **client-side, after** the server has applied `--limit` — raise `--limit` if a filtered list looks suspiciously short.
+
+#### 7. Send the user to the run
+
+Hand over the link instead of narrating what the run is doing.
+
+- A run plan's batch: `/<projectSlug>/simulations/run-plans/<suiteSlug>/<batchRunId>` — the run-plan half is the suite's own `platformUrl` (`langwatch suite get <suiteId> --format json`), with `/<batchRunId>` appended.
+- A one-command `scenario run`: its plan was ephemeral and is already deleted, so link to `/<projectSlug>/simulations`, where the batch shows up in All Runs.
+
+Neither `scenario run` nor `suite run` returns a `platformUrl` of its own. If you are an in-product assistant, do not paste URLs into prose — run the command whose result carries the link and let the product render it as a navigable action.
+
+### Iterating
+
+Review the results, sharpen the scenario with `langwatch scenario update <id> --criteria "…"`, and run it again. ALWAYS run the scenario — an unrun scenario is worth nothing.
+
+### When the choice is the user's, ask
+
+One short question beats a confident wrong run.
+
+- Never choose *which* agent or prompt to test when the user has not said. That is their call, and the wrong one burns real LLM spend.
+- Never invent a target: `http:demo-agent-support` is not an agent id.
+- Never widen a vague request into a bigger investigation, or a bigger plan, than was asked for. If the instruction is two words and ambiguous, ask one question and stop.
 
 ---
 
@@ -895,13 +1026,13 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
 
 After delivering initial results, transition to consultant mode to help the user get maximum value.
 
-**Phase 1 — read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits — the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
+**Phase 1: read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits because the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
 
-**Phase 2 — quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works — the a-ha moment.
+**Phase 2: quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works and create the a-ha moment.
 
-**Phase 3 — go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue — add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
+**Phase 3: go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue. Add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
 
-Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets — everything must reflect the actual domain.
+Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets. Everything must reflect the actual domain.
 
 ## Common Mistakes
 
@@ -939,6 +1070,12 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
 - This path uses the CLI — do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios — each should test one specific behavior
+- Do NOT build a suite for a one-off check — `langwatch scenario run <id> --target <type>:<refId>` runs a single scenario in one command. Suites are for sets you will run again, or for hitting several targets at once
+- Do NOT use `suite update --scenarios` to *add* a scenario — it REPLACES the list. Read `suite get --format json` first and send back the existing ids plus the new one
+- Do NOT invent a target reference. `http`/`code`/`workflow` take an **Agent id** from `agent list --format json` (matching that agent's `type`); `prompt` takes the prompt **id** from `prompt list --format json`. Bad ids surface only when the run is scheduled, as `Invalid target references`
+- Do NOT comma-separate `--targets` on `suite create` — it is space-separated and variadic, and a comma silently parses into one malformed target. `--scenarios` is the comma-separated one, and `scenario run` uses `--target`, singular, exactly one value
+- Do NOT choose the agent or prompt on the user's behalf, and do NOT decide for them between a one-off run and a run plan. Ask one short question and wait
+- Do NOT `--wait` inside an interactive turn — trigger, hand over the link, let results stream in. Save `--wait` for CI, where its non-zero exit on failure is the whole point
 ````
 
         </div>
@@ -964,259 +1101,43 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
         <div className="lw-prompt-source">
 
 ````text
-Set up evaluations for my agent
+Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
-# Set Up Evaluations for Your Agent
+# Route an Evaluation Request
 
-LangWatch Evaluations is a comprehensive QA system. Map the user's request to one branch:
+This is a compatibility skill. Do not build an experiment, monitor, or guardrail from this skill.
 
-| User says... | They need... | Go to... |
-|---|---|---|
-| "test my agent", "benchmark", "compare models" | **Experiments** | Step A |
-| "monitor production", "track quality", "block harmful content", "safety" | **Online Evaluation** (includes guardrails) | Step B |
-| "create an evaluator", "scoring function" | **Evaluators** | Step C |
-| "create a dataset", "test data" | **Datasets** | Step D |
-| "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
+Classify the user's intent:
 
-## Where Evaluations Fit
+| Intent                                                                               | Correct skill        |
+| ------------------------------------------------------------------------------------ | -------------------- |
+| Batch test a dataset, compare prompts or models, benchmark, create a CI quality gate | `experiments`        |
+| Score live traces or threads, monitor production quality, create a guardrail         | `online-evaluations` |
 
-Evaluations sit at the **component level** of the testing pyramid — they test specific aspects of an agent with many input/output examples. Different from scenarios (end-to-end multi-turn).
+If the request remains ambiguous after inspecting context, briefly explain the distinction and route to `experiments` as the safer pre-deployment default.
 
-Use evaluations when you have many examples with clear correct answers, or for CI quality gates. Use scenarios for multi-turn behavior and tool-calling sequences.
+Then hand off:
 
-## Determine Scope
+1. If the correct companion skill is available, load it and follow it instead of continuing here.
 
-If the user's request is **general** ("set up evaluations"):
+2. If `experiments` is missing, tell the user to install it with:
 
-- Read the codebase to understand the agent
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
-- Set up an experiment + evaluator + dataset
-- After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
-
-If the user's request is **specific** ("add a faithfulness evaluator"):
-
-- Focus on the specific need
-- Create the targeted evaluator, dataset, or experiment
-- Verify it works
-
-## Detect Context
-
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) — use the SDK for experiments and guardrails; use the CLI for evaluators, datasets, monitors. If there is no codebase, drive everything via the CLI. If ambiguous, ask the user.
-
-Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
-
-## Plan Limits
-
-LangWatch's free plan has limits on prompts, scenarios, evaluators, experiments, and datasets. When you hit a limit, the API returns `"Free plan limit of N reached..."` with an upgrade link.
-
-How to handle:
-
-- Work within the limits — if 3 scenarios are allowed, create 3 meaningful ones, not 10.
-- Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
-- Do NOT delete existing resources to make room, and do NOT reuse a scenario set to cram in more tests.
-
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted — direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead
-
-## Prerequisites
-
-Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
-
-```bash
-langwatch docs                                    # Docs index
-langwatch docs integration/python/guide           # Python integration
-langwatch docs integration/typescript/guide       # TypeScript integration
-langwatch docs prompt-management/cli              # Prompts CLI
-langwatch scenario-docs                           # Scenario docs index
-```
-
-Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
-
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
-
-**Projects and API keys: target a real project, not a personal one.**
-
-LangWatch has two kinds of project:
-
-- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
-- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
-
-And two ways to authenticate:
-
-- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
-- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
-
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
-
-Then read the evaluations overview:
-
-```bash
-langwatch docs evaluations/overview
-```
-
-## Step A: Experiments (Batch Testing) — Code Approach
-
-Create a script or notebook that runs the agent against a dataset and measures quality.
-
-1. Read the SDK docs:
    ```bash
-   langwatch docs evaluations/experiments/sdk
+   npx skills@1.5.19 add langwatch/skills/experiments
    ```
-2. Analyze the agent code to understand its inputs/outputs.
-3. Create a dataset with examples that look like real production data — domain-realistic, not generic.
-4. Create the experiment file:
 
-**Python (Jupyter):**
+3. If `online-evaluations` is missing, tell the user to install it with:
 
-```python
-import langwatch
-import pandas as pd
+   ```bash
+   npx skills@1.5.19 add langwatch/skills/online-evaluations
+   ```
 
-data = {
-    "input": ["domain-specific question 1", "domain-specific question 2"],
-    "expected_output": ["expected answer 1", "expected answer 2"],
-}
-df = pd.DataFrame(data)
-
-evaluation = langwatch.experiment.init("agent-evaluation")
-
-for index, row in evaluation.loop(df.iterrows()):
-    response = my_agent(row["input"])
-    evaluation.evaluate(
-        "ragas/answer_relevancy",
-        index=index,
-        data={"input": row["input"], "output": response},
-        settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
-    )
-```
-
-**TypeScript:**
-
-```typescript
-import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch();
-const dataset = [
-  { input: "domain-specific question", expectedOutput: "expected answer" },
-];
-
-const evaluation = await langwatch.experiments.init("agent-evaluation");
-
-await evaluation.run(dataset, async ({ item, index }) => {
-  const response = await myAgent(item.input);
-  await evaluation.evaluate("ragas/answer_relevancy", {
-    index,
-    data: { input: item.input, output: response },
-    settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
-  });
-});
-```
-
-5. Run it. ALWAYS execute the experiment after creating it — an unrun experiment is useless. For Python notebooks: run the cells, or `jupyter nbconvert --to notebook --execute`. For TypeScript: `npx tsx experiment.ts`.
-
-## Step B: Online Evaluation (Production Monitoring & Guardrails)
-
-### Platform mode: Monitors (continuous async scoring)
-
-```bash
-langwatch docs evaluations/online-evaluation/overview
-```
-
-Create monitors via the CLI (`langwatch monitor --help` for the flag set). Optionally configure further at https://app.langwatch.ai → Evaluations → Monitors.
-
-### Code mode: Guardrails (synchronous blocking)
-
-```bash
-langwatch docs evaluations/guardrails/code-integration
-```
-
-Add guardrail checks in agent code:
-
-```python
-import langwatch
-
-@langwatch.trace()
-def my_agent(user_input):
-    guardrail = langwatch.evaluation.evaluate(
-        "azure/jailbreak",
-        name="Jailbreak Detection",
-        as_guardrail=True,
-        data={"input": user_input},
-    )
-    if not guardrail.passed:
-        return "I can't help with that request."
-    ...
-```
-
-Key distinction: Monitors **measure** (async). Guardrails **act** (sync via `as_guardrail=True`).
-
-## Step C: Evaluators (Scoring Functions)
-
-Read the docs first:
-
-```bash
-langwatch docs evaluations/evaluators/overview
-langwatch docs evaluations/evaluators/list      # Browse available evaluators
-```
-
-In code, call evaluators via the SDK as shown in Step A. To create or manage evaluators on the platform, use `langwatch evaluator --help`. If unsure which `--type` values are valid, run `langwatch evaluator create --help` first.
-
-If you need an LLM-as-judge evaluator, verify a model provider is configured (`langwatch model-provider list`).
-
-## Step D: Datasets
-
-Read the docs first:
-
-```bash
-langwatch docs datasets/overview
-langwatch docs datasets/programmatic-access
-langwatch docs datasets/ai-dataset-generation
-```
-
-Use `langwatch dataset --help` for create/upload/download. Generate data tailored to the agent:
-
-| Agent type | Dataset examples |
-|---|---|
-| Chatbot | Realistic user questions matching the bot's persona |
-| RAG pipeline | Questions with expected answers testing retrieval quality |
-| Classifier | Inputs with expected category labels |
-| Code assistant | Coding tasks with expected outputs |
-| Customer support | Support tickets and customer questions |
-| Summarizer | Documents with expected summaries |
-
-CRITICAL: The dataset MUST be specific to what the agent ACTUALLY does. Before generating any data:
-
-1. Read the agent's system prompt word by word
-2. Read the agent's function signatures and tool definitions
-3. Understand the agent's domain, persona, and constraints
-
-Then generate data reflecting EXACTLY this agent's real-world usage. NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing" — every example must be something a real user of THIS specific agent would say.
-
-## Consultant Mode
-
-Once the experiment is working, summarize results and suggest 2-3 domain-specific improvements based on what you learned from the codebase.
-
-After delivering initial results, transition to consultant mode to help the user get maximum value.
-
-**Phase 1 — read first.** Before generating ANY content: read the codebase end-to-end (every system prompt, function, tool definition), study git history for agent-related changes (`git log --oneline -30`, then drill into prompt/agent/eval-related commits — the WHY in commit messages matters more than the WHAT), and read READMEs and comments for domain context.
-
-**Phase 2 — quick wins.** Generate best-effort content based on what you learned. Run everything, iterate until green. Show the user what works — the a-ha moment.
-
-**Phase 3 — go deeper.** Once Phase 2 lands, summarize what you delivered, then suggest 2-3 specific improvements grounded in the codebase: domain edge cases, areas that need expert terminology or real data, integration points (APIs, databases, file uploads), or regression patterns from git history that deserve test coverage. Ask light questions with options, not open-ended ("Want scenarios for X or Y?", "I noticed Z was a recurring issue — add a regression test?", "Do you have real customer queries I could use?"). Respect "that's enough" and wrap up cleanly.
-
-Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask generic questions or overwhelm with too many suggestions. Do NOT generate generic datasets — everything must reflect the actual domain.
-
-## Common Mistakes
-
-- Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
-- Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT skip running the experiment to verify it works
-- Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`)
+Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.
 ````
 
         </div>

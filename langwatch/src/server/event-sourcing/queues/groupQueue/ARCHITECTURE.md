@@ -26,7 +26,7 @@ Every job sent to a GroupQueue lands first in the **staging layer** — a set of
 | Key | Type | Role |
 |---|---|---|
 | `{queue}:groups:active` | sorted set | groups with pending work, scored by next-eligible timestamp |
-| `{queue}:group:{groupId}:jobs` | list | per-group FIFO of staged-job IDs (RPUSH on stage, LPOP on dispatch) |
+| `{queue}:group:{groupId}:jobs` | sorted set | per-group staged-job IDs scored by ready time — FIFO in practice, with retries scored into the future (ZADD on stage, ZRANGEBYSCORE + ZREM on dispatch) |
 | `{queue}:group:{groupId}:data` | hash | staged-job ID → envelope value (the body) |
 | `{queue}:group:{groupId}:blocked` | string | non-empty marker that this group is paused (set by retries, cleared on resume) |
 | `{queue}:signals` | list | wake-up signals consumed by `BRPOP` (one entry per stage) |
@@ -42,12 +42,13 @@ The `{queue}` prefix is a Redis Cluster hash tag (`{...}`), so every key for a g
 ```
 producer.send(payload)
   │
-  ▼  STAGE_LUA: RPUSH job id, HSET envelope, ZADD group → active, dedup write,
-  │             LPUSH a signal
+  ▼  STAGE_LUA: ZADD job id to `:jobs` (scored by ready time), HSET envelope,
+  │             ZADD group → active, dedup write, LPUSH a signal
   │
   ▼  signals list  ──BRPOP──▶  dispatcher loop  (idle workers wake up here)
   │
-  ▼  DISPATCH_LUA: pick next eligible group (weighted RR), LPOP its job,
+  ▼  DISPATCH_BATCH_LUA: pick next eligible groups (weighted RR), take its next
+  │                due job from `:jobs` (ZRANGEBYSCORE + ZREM),
   │                read envelope, mark group active with TTL
   │
   ▼  fastq processing slot (local node concurrency)
@@ -58,7 +59,7 @@ producer.send(payload)
   │
   ▼  COMPLETE_LUA: HDEL the envelope, drop the active marker, ZREM if group empty
   │
-  ▼  release the blob hold → atomic reclaim if last holder (Lua)
+  ▼  release this holder's blob lease (shared data is reclaimed lazily)
 ```
 
 A failure anywhere in this chain takes one of three paths:
@@ -71,7 +72,7 @@ A failure anywhere in this chain takes one of three paths:
 
 ## Cross-Aggregate Parallelism + Fair Scheduling
 
-The dispatcher pulls one signal at a time off `BRPOP` and then runs `DISPATCH_LUA`, which:
+The dispatcher pulls one signal at a time off `BRPOP` and then runs `DISPATCH_BATCH_LUA`, which:
 
 1. Picks the next eligible group from the `active` sorted set (`ZRANGEBYSCORE 0 now`).
 2. Weights groups by `sqrt(pendingCount)` so a backed-up group gets more turns without starving fresher work.
@@ -111,8 +112,8 @@ serialized payload size
 
 - **Inline raw (≤ 1 KiB)** — gzip+base64 of sub-kilobyte JSON is usually *larger* than the input. Skip compression entirely.
 - **Inline gzip (1–4 KiB)** — gzip wins for most real payloads in this range; the encoder verifies (`gzip+base64 < raw`) and falls back to raw if not. The inline ceiling (`INLINE_CEILING_BYTES = 4 KiB`) is set low so ordinary fan-out events cross into the dedup tier rather than inlining N× across reactors. Tighter than the GQ1 32 KiB threshold (`BLOB_OFFLOAD_THRESHOLD_BYTES`), which only offloaded for the very-large case.
-- **Redis blob (4–256 KiB)** — bigger than we want repeated in the staged value (every fan-out copy would replicate), but small enough that round-trip latency through a standalone Redis key is fine. Holds for ~3 days by default, refreshed on every read (GETEX); reclaimed atomically when the last referencing job completes.
-- **S3 / object-store (> 256 KiB)** — large bodies are the worst-case for Redis: memory pressure, replication lag, eviction risk. Push them to the durable object store the rest of the platform already runs on (`StorageRegistry`, projectId-scoped so each tenant's BYOC bucket is honored). No TTL on s3 objects — the lifecycle takes care of reclaim via the holder set; a bucket lifecycle policy is the operational backstop for missed reclaims.
+- **Redis blob (4–256 KiB)** — bigger than we want repeated in the staged value (every fan-out copy would replicate), but small enough that round-trip latency through a standalone Redis key is fine. It has a 4-day backstop refreshed on every read (`GETEX`) and is reclaimed lazily by Redis expiry.
+- **S3 / object-store (> 256 KiB)** — large bodies are the worst-case for Redis: memory pressure, replication lag, eviction risk. Push them to the durable object store the rest of the platform already runs on (`StorageRegistry`, projectId-scoped so each tenant's BYOC bucket is honored). Application releases never delete shared objects; the configured durable-store lifecycle sweep is the reclaim path.
 
 All thresholds live in [`jobEnvelope.ts`](./jobEnvelope.ts) and [`tieredBlobStore.ts`](./tieredBlobStore.ts). The 4 KiB inline ceiling and 256 KiB S3 threshold are conservative — tighten them under load if metrics show too much inline bloat or too many Redis-tier blobs.
 
@@ -120,7 +121,7 @@ All thresholds live in [`jobEnvelope.ts`](./jobEnvelope.ts) and [`tieredBlobStor
 
 A Redis-tier or S3-tier blob is keyed by `{projectId}/{sha256(payload-bytes)}` — content-addressed, tenant-namespaced. The two consequences:
 
-- **Identical bytes → one stored blob.** A 30-reactor fan-out of the same event stages 30 envelopes, each carrying a hold token, but the underlying blob is a single stored copy. PUTs are idempotent — racing or retrying just overwrites the same key with the same content.
+- **Identical bytes → one stored blob.** A 30-reactor fan-out of the same event stages 30 envelopes, each carrying a distinct lease-holder identity, but the underlying blob is a single stored copy. PUTs are idempotent — racing or retrying just overwrites the same key with the same content.
 - **Tenant isolation.** Two tenants with byte-identical user payloads still get distinct blobs (different `projectId` prefix). A project purge is a delete-by-prefix.
 
 The hash is taken over the **raw** payload bytes, not the gzipped output, so the dedup key doesn't depend on gzip determinism (zlib version / compression level).
@@ -138,37 +139,39 @@ See ADR-029 (content-addressed store) and ADR-030 (hardening) for the design.
 
 ---
 
-## The Holder Set: Reference-Counting Without a Counter
+## Per-Holder Renewable Leases
 
-A counter would race: two completions decrementing simultaneously could both see "1, decrement, drop to 0, reclaim" — the blob is reclaimed twice, the second reclaim noisy-fails (or worse, deletes a freshly-restored copy).
+Reference counting made correctness depend on every completion releasing its token. A worker crash between processing and release leaked the holder indefinitely, while eager last-release deletion could race a live sibling or a rolling-deploy peer.
 
-GroupQueue uses a **per-blob Redis SET** instead. Each staged occupancy gets a random hold token; the set's members are the live holders. The reclaim happens atomically inside one Lua eval:
+GroupQueue instead uses a **per-blob Redis sorted set**. Each staged occupancy gets a stable holder identity; its score is an absolute 3-day lease deadline calculated from Redis server time. Initial, batch, retry, and blocked-restage scripts publish the staged value and its lease in the same Redis transaction. Decode, the active-job heartbeat, and transfer renew the deadline; a coalesced batch heartbeats every participating envelope. Every lease operation first prunes expired members. A Redis-tier renewal also slides the blob's 4-day backstop in the same eval, leaving a full day for lazy reclaim and ensuring a live lease cannot outlast its data:
 
 ```lua
--- RELEASE_LUA (simplified)
-if redis.call("SREM", holderKey, token) == 0 then return "still-held" end  -- no-op release
-if redis.call("SCARD", holderKey) == 0 then
-  redis.call("DEL", holderKey)
-  if #KEYS >= 2 then redis.call("UNLINK", blobKey); return "reclaimed-redis" end
-  return "reclaim-s3"
-end
-return "still-held"
+local now = redis.call("TIME")
+local deadlineMs = nowMs(now) + leaseTtlMs
+redis.call("ZREMRANGEBYSCORE", leaseKey, "-inf", nowMs(now))
+redis.call("ZADD", leaseKey, deadlineMs, holderId)
 ```
 
 Key properties:
 
-- **Double-release is a no-op.** An already-released token can't reclaim a live blob.
-- **Last-release reclaims atomically.** SREM + SCARD + UNLINK in one eval — no acquire-then-release gap a partial failure could exploit.
-- **Cluster-safe.** The release/transfer evals pass only the keys that exist (`#KEYS` is dynamic), so an s3-tier release doesn't ship an empty placeholder key that would CROSSSLOT.
-- **TTL backstop.** Holder TTL ≥ blob TTL + 1 day (both refreshed on access) — the set always outlives the blob it guards, and both reclaim eagerly on the happy path. The TTL is a safety net for missed releases (crashes mid-completion), not the primary reclaim mechanism.
+- **Crash-bounded.** A crashed holder stops renewing and disappears after the lease window; no explicit release is required for convergence.
+- **Live siblings remain protected.** Every holder has its own deadline, so pruning a crashed sibling cannot remove a live job's renewed lease.
+- **Duplicate take/release is idempotent.** `ZADD` updates one member and `ZREM` of a missing member is harmless.
+- **No eager deletion.** Release and transfer mutate lease membership and expiry, never blob contents. Redis TTL reclaims Redis-tier bytes. The durable tier relies on the deployment's bucket lifecycle/project-purge policy; adding lease-aware, storage-specific durable GC is separate from this change's explicitly unchanged S3 tiering behaviour.
+- **Bounded retention after the last release.** Retiring the last lease shortens the Redis-tier blob's expiry from the 4-day backstop to `BLOB_RELEASE_GRACE_TTL_SECONDS` (1 hour). Without it the backstop is the only Redis-tier reclaim path, so nothing drains a retired blob before it ages out and retention runs the full four days deep — a ceiling that was never sized against the instance it has to fit in, and that production exceeded (2026-07-21). Shortening a deadline is not deletion — the bytes stay readable and any later take re-arms the full backstop — so a producer that wrote content-addressed bytes before the release and stages after it still finds them. Withheld while any lease is live, or while the rolling-deploy holder set carries a member beyond the migration sentinel. Counted by `gq_blob_release_grace_total`.
+- **Cluster-safe.** Blob, lease, migration-guard, and queue keys share the queue's Redis hash tag.
 
-A retry or dedup-squash uses `TRANSFER_LUA` to move the hold from the old envelope to the new one in one atomic eval — same-set swap (`SADD newToken + SREM oldToken`, blob stays) when the re-encode produces the same content hash, or cross-set reclaim (drop the old blob, hold the new one) when content actually changed.
+A retry or dedup-squash uses `TRANSFER_LUA` to take/renew the new lease and remove the old member atomically. The blob is never deleted on either the same-content or changed-content path; a changed-content transfer that retires the displaced blob's last lease puts it on the grace window.
+
+`gqGraceExpireIfUnleased` ([`blobGraceLua.ts`](./blobGraceLua.ts)) is the one definition of that decision, shared verbatim by the standalone release/transfer evals and by the dedup-squash release inlined into `STAGE_LUA`, so a release path cannot drift into leaving the full backstop where the others would not.
+
+During a rolling deploy, lease operations also write a TTL-bound sentinel into the previous release's holder set. Old release code therefore cannot observe an empty set and eagerly delete a blob written or renewed by new code. Existing ref-count-era blobs remain readable; the first new-code decode renews a lease, while finite Redis TTLs and the durable-store lifecycle policy eventually reclaim untouched legacy data.
 
 ---
 
 ## Tenant Isolation
 
-Every blob ref carries the tenant's `projectId` (branded `TenantId` end-to-end). On decode, the lifecycle asserts `hold.ref.projectId === projectIdFor(groupId)` BEFORE fetching — a mis-routed or tampered envelope can't read another tenant's blob. The same guard runs on `release` and `transfer`: a foreign-tenant hold is left to its TTL rather than dropped via the wrong tenant's cleanup path.
+Every blob ref carries the tenant's `projectId` (branded `TenantId` end-to-end). On decode, the lifecycle asserts `lease.ref.projectId === projectIdFor(groupId)` BEFORE fetching — a mis-routed or tampered envelope can't read another tenant's blob. The same guard runs on `release` and `transfer`: a foreign-tenant lease is left to expire rather than dropped via the wrong tenant's cleanup path.
 
 The s3 object URI is re-minted server-side from `(projectId, hash)` on every read, never trusted from the envelope. Even a tampered envelope can't redirect a fetch across tenants.
 
@@ -189,13 +192,13 @@ When a `process()` handler throws, the queue:
 1. **Classifies** the error via `categorizeError`:
    - `Retryable` → re-stage with exponential backoff
    - `NonRetryable` → drop to the fail-safe; the slot is completed and the work is expected to recover via event replay
-   - `Transient` (blob-store specific) → re-stage the SAME envelope (same hold token, no re-encode)
-2. **Computes backoff** via `getBackoffMs(attempt)` (exponential with jitter, capped).
-3. **Re-encodes** the payload with `__attempt: N+1` and atomically transfers the hold from the old envelope to the new one.
+   - `Transient` (blob-store specific) → re-stage the SAME envelope (same lease-holder identity, no re-encode)
+2. **Computes backoff** via `getBackoffMs(attempt)` (exponential, capped at 10 min — no jitter, so simultaneous failures retry in lockstep).
+3. **Re-encodes** the payload with `__attempt: N+1` and atomically transfers the lease from the old envelope to the new one.
 4. **Re-stages** at the head of the group with a future score (the group is briefly blocked so the retry is the next one dispatched).
 5. **Exhausts** after `JOB_RETRY_CONFIG.maxAttempts` and increments `gqJobsExhaustedTotal`; the slot is completed.
 
-Because routing-exclusion keeps the content hash stable across retries (the body is unchanged; `__attempt` is in the header), the atomic transfer is a same-set `SADD + SREM` — the blob stays held throughout the retry, no reclaim/re-fetch churn.
+Because routing-exclusion keeps the content hash stable across retries (the body is unchanged; `__attempt` is in the header), the atomic transfer is a same-set `ZADD + ZREM` — the replacement is leased before the retired identity is removed.
 
 ---
 
@@ -207,7 +210,7 @@ Three modes, configured per-job or per-queue:
 - **`"aggregate"`** — dedup ID is `${tenantId}:${aggregateType}:${aggregateId}`; only the latest event per aggregate is processed within the dedup window (default 200 ms).
 - **Custom `DeduplicationConfig`** — caller-supplied `makeId` + `ttlMs`, with `extend` (reset TTL on each new send) and `replace` (overwrite the staged value) flags.
 
-Dedup is implemented inside `STAGE_LUA`: a write to `{queue}:dedup:{dedupId}` with the staged-job ID; subsequent sends within the TTL either coalesce, replace, or extend. The orphaned staged value (when `replace: true`) has its hold transferred atomically to the new envelope — see "Holder Set" above for why this matters.
+Dedup is implemented inside `STAGE_LUA`: a write to `{queue}:dedup:{dedupId}` with the staged-job ID; subsequent sends within the TTL either coalesce, replace, or extend. The orphaned staged value (when `replace: true`) has its lease transferred atomically to the new envelope — see "Per-Holder Renewable Leases" above for why this matters.
 
 ---
 
@@ -215,7 +218,7 @@ Dedup is implemented inside `STAGE_LUA`: a write to `{queue}:dedup:{dedupId}` wi
 
 Pipelines that opt in (`processBatch` + `coalesceMaxBatch` in the queue definition) can drain multiple jobs from the same group in one dispatch, hand them to the user as an array, and complete them as a batch. The drain is bounded by `coalesceMaxBatch(payload)` — a per-payload knob since some payload shapes can usefully coalesce up to N, others only 1.
 
-Coalesced batches go through the same envelope decoder and the same lifecycle: every staged value's hold is acquired at stage, released on batch completion or retry-transferred to the re-encoded retry value.
+Coalesced batches go through the same envelope decoder and the same lifecycle: every staged value's lease is taken at stage, renewed together throughout a long-running handler, released on batch completion, or retry-transferred to the re-encoded retry value.
 
 ---
 
@@ -226,7 +229,7 @@ The `{queue}:group:{groupId}:blocked` marker is set by:
 - A retry (`RESTAGE_AND_BLOCK_LUA`) — briefly blocks the group so the retry is next out.
 - An explicit pause from the queue-pausing pipeline (see [`specs/queue-pausing/queue-pausing.feature`](../../../../../../specs/queue-pausing/queue-pausing.feature)).
 
-`DISPATCH_LUA` skips blocked groups when picking the next eligible group; the active sorted set is unchanged but the group is invisible to the dispatcher until unblocked. Unblock is just deleting the marker.
+`DISPATCH_BATCH_LUA` skips blocked groups when picking the next eligible group; the active sorted set is unchanged but the group is invisible to the dispatcher until unblocked. Unblock is just deleting the marker.
 
 The active key (`{queue}:active:{groupId}`) is a separate safety net: a TTL'd marker that says "this group is being processed by someone right now." On crash, the TTL expires (default 5 min) and the group becomes dispatchable again — a stuck job is recoverable without manual intervention.
 
@@ -237,10 +240,10 @@ The active key (`{queue}:active:{groupId}`) is a separate safety net: a TTL'd ma
 The queue is built so a transient infrastructure failure never drops a job, and a permanent failure never silently corrupts state:
 
 - **Missing blob** (offloaded body genuinely gone — TTL backstop kicked in, or a manual purge) → decode returns null, the dispatcher logs and completes the slot. The work is expected to recover via event replay.
-- **Transient blob-store error** (network blip, 5xx) → classified `TransientBlobStoreError`, the job is re-staged with the SAME envelope (no re-encode, no holder churn). Distinguished from `Missing` so a transient store outage can't mass-drop every in-flight offloaded job.
+- **Transient blob-store error** (network blip, 5xx) → classified `TransientBlobStoreError`, the job is re-staged with the SAME envelope (no re-encode, no lease identity churn). Distinguished from `Missing` so a transient store outage can't mass-drop every in-flight offloaded job.
 - **Decode tenant mismatch** → refuse to fetch, log tenant-attributed, drop to fail-safe.
 - **Oversized value** (staged value or decompressed blob exceeds `MAX_BLOB_BYTES` at decode) → parked unparsed via the poison guard below.
-- **Holder Lua failure** → log + rely on the TTL backstop.
+- **Lease Lua failure** → log + rely on the TTL backstop.
 
 The fail-safe always prefers "complete the slot and let replay handle it" over "stall the queue" — event sourcing's append-only event log is the durable source of truth.
 
@@ -279,7 +282,7 @@ GroupQueue dependencies are explicit constructor injections — no env-coupling.
 - `resolveStorageDestination(projectId)` → `ProjectStorageDestination` (BYOC or global).
 - `featureFlagService` (kill-switch support).
 
-This keeps the queue testable in isolation: integration tests pass an in-memory `ObjectStore` + a stub destination resolver and exercise the full Lua + holder lifecycle against a testcontainers Redis.
+This keeps the queue testable in isolation: integration tests pass an in-memory `ObjectStore` + a stub destination resolver and exercise the full Lua + lease lifecycle against a testcontainers Redis.
 
 ---
 
@@ -292,9 +295,10 @@ This keeps the queue testable in isolation: integration tests pass an in-memory 
 | Staging Lua scripts | [`scripts.ts`](./scripts.ts) |
 | Envelope encode / decode (GQ1 + GQ2) | [`jobEnvelope.ts`](./jobEnvelope.ts) |
 | Content-addressed tiered store | [`tieredBlobStore.ts`](./tieredBlobStore.ts) |
-| Per-blob holder set + reclaim Lua | [`blobHolders.ts`](./blobHolders.ts) |
-| Lifecycle collaborator (encode/decode + acquire/release/transfer) | [`envelopeBlobLifecycle.ts`](./envelopeBlobLifecycle.ts) |
-| Shared key layout (blob + holder) | [`blobKeys.ts`](./blobKeys.ts) |
+| Per-holder renewable lease Lua | [`blobLeases.ts`](./blobLeases.ts) |
+| Shared last-release grace-window Lua | [`blobGraceLua.ts`](./blobGraceLua.ts) |
+| Lifecycle collaborator (encode/decode + take/release/transfer) | [`envelopeBlobLifecycle.ts`](./envelopeBlobLifecycle.ts) |
+| Shared key layout (blob + lease) | [`blobKeys.ts`](./blobKeys.ts) |
 | Cluster hash-tag guard | [`redisHashTag.ts`](./redisHashTag.ts) |
 | Constants (TTLs, size cap) | [`blobConstants.ts`](./blobConstants.ts) |
 | GQ1 (legacy) randomUUID blob store | [`redisJobBlobStore.ts`](./redisJobBlobStore.ts) |

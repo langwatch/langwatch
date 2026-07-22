@@ -52,6 +52,7 @@ import {
 } from "./LangyCapabilityCard";
 import { LangyObservationState } from "../LangyObservationState";
 import { LangyContextTarget } from "../LangyContextTarget";
+import { LangySpaAnchor } from "../LangySpaAnchor";
 import { traceContextChip } from "../../logic/langyContextChips";
 
 /**
@@ -180,10 +181,10 @@ function ExplorerAction({ href }: { href: string | null }) {
       width="full"
       textDecoration="none"
     >
-      <a href={href}>
+      <LangySpaAnchor href={href}>
         View in Trace Explorer
         <ArrowUpRight size={12} />
-      </a>
+      </LangySpaAnchor>
     </Button>
   );
 }

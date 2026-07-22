@@ -7,7 +7,7 @@ const logger = createLogger("langwatch:langy:turn-attempt");
 export interface LangyTurnAttemptIdentity {
   projectId: string;
   userId: string;
-  requestId: string;
+  idempotencyKey: string;
   conversationId: string;
   turnId: string;
   claimToken: string;

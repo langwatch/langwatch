@@ -25,6 +25,7 @@ function conversationRow(
     title: null,
     isShared: false,
     status: "idle",
+    currentTurnId: null,
     lastError: null,
     messageCount: 0,
     lastActivityAtMs: 1,
@@ -43,8 +44,9 @@ function makeConversationRepo(
     findActiveOwnedIds: vi.fn().mockResolvedValue([]),
     findPendingHandoff: vi.fn().mockResolvedValue(null),
     findRunToken: vi.fn().mockResolvedValue(null),
+    turnExists: vi.fn().mockResolvedValue(false),
     ...overrides,
-  } as LangyConversationRepository;
+  };
 }
 
 describe("LangyMessageService", () => {

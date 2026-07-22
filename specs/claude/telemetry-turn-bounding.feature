@@ -72,6 +72,26 @@ Feature: Claude Code telemetry turn bounding
     And the produced trace is marked as truncated in an observable way
     And the workers remain responsive while the turn is live
 
+  # Incident 2026-07-20: a compact log contribution and its canonical log records
+  # travel through separate durable pipelines, so the span-sync reactor throws
+  # CanonicalLogNotVisibleError to retry until the records land in ClickHouse.
+  # When the records NEVER land (dropped upstream, or the ±2-day partition window
+  # misses them), that throw is a poison pill: every re-emitted contribution for
+  # the trace burns the full 25-attempt retry ladder, and one pathological turn
+  # re-emits thousands, wedging the per-trace group and taking ~a quarter of the
+  # shared queue. CLAUDE_LOG_VISIBILITY_DEADLINE_MS (default 10m, env
+  # LANGWATCH_CLAUDE_LOG_VISIBILITY_DEADLINE_MS) bounds the retry: age is measured
+  # from the log's ingest time (event.occurredAt), stable across retries.
+  # Covered by claudeCodeSpanSync.reactor.unit.test.ts.
+  @bounding @unit
+  Scenario: the retry-until-visible gate gives up once a contribution outlives the deadline
+    Given a log contribution whose canonical logs are not visible in ClickHouse
+    When the contribution is younger than the visibility deadline
+    Then the reactor throws to retry until the records land
+    But once the contribution has been unfoldable past the deadline
+    Then the reactor gives up and completes the job instead of retrying
+    And the per-trace group drains rather than churning the retry ladder forever
+
   # The structural guarantee is covered by logCommandSharding.test.ts (the fold
   # stays keyed per trace, not per shard; the event aggregate is the bare trace)
   # and recordLogCommand.sharding.integration (unsharded collapses to the single

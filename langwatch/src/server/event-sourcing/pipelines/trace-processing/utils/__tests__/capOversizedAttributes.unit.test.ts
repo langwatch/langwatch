@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { OtlpResource, OtlpSpan } from "../../schemas/otlp";
 import {
   capOversizedAttributes,
+  DEFAULT_ATTRIBUTE_PREVIEW_BYTES,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   hasOversizedAttribute,
+  IO_ATTRIBUTE_PREVIEW_BYTES,
   valueExceeds,
 } from "../capOversizedAttributes";
 
@@ -29,6 +31,12 @@ function makeSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
 function oversizedDataUrl(): string {
   const payload = "A".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1024);
   return `data:image/png;base64,${payload}`;
+}
+
+/** Byte length of just the kept-content part of a capped preview (before the "\n[truncated:" marker). */
+function previewByteLength(cappedValue: string): number {
+  const previewPart = cappedValue.split("\n[truncated:")[0]!;
+  return Buffer.byteLength(previewPart, "utf8");
 }
 
 describe("capOversizedAttributes", () => {
@@ -66,10 +74,11 @@ describe("capOversizedAttributes", () => {
     expect(span.attributes).toEqual(before);
   });
 
-  it("caps oversized strings nested inside arrayValue and kvlistValue", () => {
+  it("caps oversized strings nested inside arrayValue and kvlistValue, keeping a readable prefix", () => {
     const big = "x".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
     const span = makeSpan([
       {
+        // Non-IO key: nested values get the smaller DEFAULT_ATTRIBUTE_PREVIEW_BYTES budget.
         key: "langwatch.params",
         value: {
           kvlistValue: {
@@ -81,6 +90,7 @@ describe("capOversizedAttributes", () => {
         },
       },
       {
+        // IO key: nested values get the wider IO_ATTRIBUTE_PREVIEW_BYTES budget.
         key: "langwatch.input",
         value: {
           arrayValue: {
@@ -94,10 +104,27 @@ describe("capOversizedAttributes", () => {
 
     expect(cappedCount).toBe(2);
     const kv = span.attributes[0]!.value.kvlistValue!.values;
-    expect(kv[0]!.value.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
+    // "…" ends the UTF-8-safe preview (utf8Preview always appends it on truncation).
+    expect(kv[0]!.value.stringValue).toMatch(
+      /^x+…\n\[truncated: showing \d+ of \d+ bytes\]$/,
+    );
+    // +4 bytes tolerance for the ellipsis (3 UTF-8 bytes), matching the convention
+    // used for IO_PREVIEW_BYTES elsewhere (lean-for-projection.unit.test.ts).
+    expect(previewByteLength(kv[0]!.value.stringValue!)).toBeLessThanOrEqual(
+      DEFAULT_ATTRIBUTE_PREVIEW_BYTES + 4,
+    );
     expect(kv[1]!.value.stringValue).toBe("ok");
+
     const arr = span.attributes[1]!.value.arrayValue!.values;
-    expect(arr[0]!.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
+    expect(arr[0]!.stringValue).toMatch(
+      /^x+…\n\[truncated: showing \d+ of \d+ bytes\]$/,
+    );
+    expect(previewByteLength(arr[0]!.stringValue!)).toBeLessThanOrEqual(
+      IO_ATTRIBUTE_PREVIEW_BYTES + 4,
+    );
+    expect(previewByteLength(arr[0]!.stringValue!)).toBeGreaterThan(
+      DEFAULT_ATTRIBUTE_PREVIEW_BYTES,
+    );
     expect(arr[1]!.stringValue).toBe("fine");
   });
 
@@ -154,6 +181,111 @@ describe("capOversizedAttributes", () => {
     ]);
 
     expect(() => capOversizedAttributes(span, null)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Oversized text keeps a readable partial preview (customer report: Trace
+// Explorer showed only "[truncated: N bytes]" with no visible content).
+// ---------------------------------------------------------------------------
+
+describe("given an oversized langwatch.input value that is plain text, not a data URL", () => {
+  describe("when the span is capped", () => {
+    it("keeps the actual start of the user's text, not just a byte count", () => {
+      const original = "The quick brown fox jumps. ".repeat(15_000);
+      const span = makeSpan([
+        { key: "langwatch.input", value: { stringValue: original } },
+      ]);
+
+      capOversizedAttributes(span, null);
+
+      const capped = span.attributes[0]!.value.stringValue!;
+      expect(capped.startsWith("The quick brown fox jumps.")).toBe(true);
+      expect(capped).toContain(
+        `[truncated: showing ${previewByteLength(capped)} of ${Buffer.byteLength(original, "utf8")} bytes]`,
+      );
+    });
+
+    it("keeps up to the wide IO preview budget, not the smaller default budget", () => {
+      const original = "z".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1000);
+      const span = makeSpan([
+        { key: "langwatch.input", value: { stringValue: original } },
+      ]);
+
+      capOversizedAttributes(span, null);
+
+      const capped = span.attributes[0]!.value.stringValue!;
+      expect(previewByteLength(capped)).toBeLessThanOrEqual(
+        IO_ATTRIBUTE_PREVIEW_BYTES + 4,
+      );
+      expect(previewByteLength(capped)).toBeGreaterThan(
+        DEFAULT_ATTRIBUTE_PREVIEW_BYTES,
+      );
+    });
+  });
+});
+
+describe("given an oversized custom (non-IO) attribute that is plain text", () => {
+  describe("when the span is capped", () => {
+    it("keeps a smaller readable prefix than an IO attribute would get", () => {
+      const original = "z".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1000);
+      const span = makeSpan([
+        { key: "custom.big.field", value: { stringValue: original } },
+      ]);
+
+      capOversizedAttributes(span, null);
+
+      const capped = span.attributes[0]!.value.stringValue!;
+      expect(capped.startsWith("z")).toBe(true);
+      expect(previewByteLength(capped)).toBeLessThanOrEqual(
+        DEFAULT_ATTRIBUTE_PREVIEW_BYTES + 4,
+      );
+    });
+  });
+});
+
+describe("given an oversized base64 data URL on an IO attribute", () => {
+  describe("when the span is capped", () => {
+    it("still replaces the value entirely, with no partial image bytes", () => {
+      const url = oversizedDataUrl();
+      const span = makeSpan([
+        { key: "langwatch.input", value: { stringValue: url } },
+      ]);
+
+      capOversizedAttributes(span, null);
+
+      const capped = span.attributes[0]!.value.stringValue!;
+      expect(capped).not.toContain("AAAA");
+      expect(capped).toMatch(/^\[truncated: \d+ bytes, image\/png\]$/);
+    });
+  });
+});
+
+describe("given an oversized non-base64 data URL on an IO attribute", () => {
+  describe("when the span is capped", () => {
+    it("keeps a readable text preview, not the binary placeholder", () => {
+      // A `data:` URL without the `;base64` flag carries percent-encoded/raw
+      // readable text (e.g. an inline SVG or plain-text payload), not binary
+      // content — it must get the same text preview as any other oversized
+      // string, not the size-only placeholder reserved for base64 blobs.
+      const original = `data:text/plain,${"The quick brown fox jumps. ".repeat(15_000)}`;
+      const span = makeSpan([
+        { key: "langwatch.input", value: { stringValue: original } },
+      ]);
+
+      capOversizedAttributes(span, null);
+
+      const capped = span.attributes[0]!.value.stringValue!;
+      expect(capped.startsWith("data:text/plain,The quick brown fox jumps.")).toBe(
+        true,
+      );
+      expect(capped).toContain(
+        `[truncated: showing ${previewByteLength(capped)} of ${Buffer.byteLength(original, "utf8")} bytes]`,
+      );
+      expect(previewByteLength(capped)).toBeLessThanOrEqual(
+        IO_ATTRIBUTE_PREVIEW_BYTES + 4,
+      );
+    });
   });
 });
 
