@@ -506,23 +506,16 @@ function ComposerImpl({
                     color={canSend ? "white" : "fg.muted"}
                     cursor={canSend ? "pointer" : "default"}
                   >
-                    {/* OPTICAL centring, not geometric. Lucide's paper plane is
-                        very nearly centred in its own box (ink centre is within
-                        0.15 of the 24-grid centre), so `place-items: center`
-                        already puts it dead centre — and it still reads low and
-                        left, because the glyph's visual mass is the wide tail
-                        while the tip runs off to the top right. Nudging it a
-                        pixel along its own axis is what makes it LOOK centred in
-                        a circle. Sub-pixel values don't survive rasterisation,
-                        hence a whole pixel each way. */}
+                    {/* Centred, with nothing to interfere. Lucide's paper plane
+                        is very nearly centred in its own box (ink centre within
+                        0.15 of the 24-grid centre), so `place-items: center` is
+                        the whole job — once the wrapper stops inheriting a line
+                        box it has no use for, whose stray half-leading was what
+                        pushed the glyph off centre in the first place. */}
                     <Box
                       display="grid"
                       placeItems="center"
-                      // No line box to inherit: the icon is the only thing in
-                      // here, and a stray half-leading would shift it off the
-                      // centre the nudge above is measured against.
                       lineHeight={0}
-                      transform="translate(1px, -1px)"
                     >
                       <Send size={14} />
                     </Box>
