@@ -201,3 +201,124 @@ func TestRelayDropsNonTraceSignals(t *testing.T) {
 		t.Errorf("logs/metrics must be dropped, never forwarded; upstream saw %q", ingest.path)
 	}
 }
+
+// opencode's native exporter ships OTLP/HTTP JSON and ignores
+// OTEL_EXPORTER_OTLP_PROTOCOL — the relay must accept it, and everything it
+// forwards must still be protobuf.
+func TestRelayTraces_JSONEncodedExport(t *testing.T) {
+	relay := startRelay(t)
+	ingest := startIngest(t)
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-json",
+		LangwatchEndpoint: ingest.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	relay.SetTurnContext(token, turnContext())
+
+	td, _, _ := workerBatch()
+	payload, err := (&ptrace.JSONMarshaler{}).MarshalTraces(td)
+	if err != nil {
+		t.Fatalf("marshal JSON fixture: %v", err)
+	}
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/json",
+		bytes.NewReader(payload),
+	)
+	if err != nil {
+		t.Fatalf("POST JSON traces: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("relay answered %d for a JSON body, want 200", resp.StatusCode)
+	}
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.body)
+	if err != nil {
+		t.Fatalf("forwarded payload is not OTLP protobuf: %v", err)
+	}
+	span := forwarded.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+	if span.TraceID() != pcommon.TraceID(turnTraceID) {
+		t.Errorf("forwarded span trace id = %v, want the turn's %v", span.TraceID(), turnTraceID)
+	}
+	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
+	if origin, ok := attrs.Get("langwatch.origin"); !ok || origin.Str() != "langy" {
+		t.Errorf("forwarded origin = %v, want langy", origin.Str())
+	}
+}
+
+// The turn span is the platform-owned ROOT the customer's trace hangs off —
+// same span id as the internal langy.turn (the cross-store correlation key),
+// agent-scoped, origin-stamped at both span and resource level.
+func TestForwardTurnSpan(t *testing.T) {
+	relay := startRelay(t)
+	ingest := startSignallingIngest(t)
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-root",
+		ActorUserID:       "user-a",
+		LangwatchEndpoint: ingest.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+	turn := turnContext()
+	relay.SetTurnContext(token, turn)
+
+	start := time.Now().Add(-3 * time.Second)
+	relay.ForwardTurnSpan(token, turn, start, time.Now())
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(ingest.await(t))
+	if err != nil {
+		t.Fatalf("forwarded turn span is not OTLP protobuf: %v", err)
+	}
+
+	rs := forwarded.ResourceSpans().At(0)
+	ss := rs.ScopeSpans().At(0)
+	span := ss.Spans().At(0)
+
+	if got := span.Name(); got != "langy.turn" {
+		t.Fatalf("span name = %q", got)
+	}
+	if span.TraceID() != pcommon.TraceID(turn.TraceID()) || span.SpanID() != pcommon.SpanID(turn.SpanID()) {
+		t.Fatal("turn span must carry the internal langy.turn identity — that id is what every child already parents on")
+	}
+	if !span.ParentSpanID().IsEmpty() {
+		t.Fatalf("turn span must be a root, got parent %s", span.ParentSpanID())
+	}
+	if got := ss.Scope().Name(); got != "langy-agent" {
+		t.Fatalf("instrumentation scope = %q, want langy-agent", got)
+	}
+	if v, ok := span.Attributes().Get("langwatch.origin"); !ok || v.Str() != "langy" {
+		t.Fatalf("span-level origin = %v", v.Str())
+	}
+	attrs := rs.Resource().Attributes()
+	if v, ok := attrs.Get("langwatch.origin"); !ok || v.Str() != "langy" {
+		t.Fatalf("resource origin = %v", v.Str())
+	}
+	if v, ok := attrs.Get("langwatch.thread.id"); !ok || v.Str() != "conv-root" {
+		t.Fatalf("thread id = %v", v.Str())
+	}
+	if v, ok := attrs.Get("service.name"); !ok || v.Str() != "langy" {
+		t.Fatalf("service.name = %v", v.Str())
+	}
+}
+
+func TestPathSignal(t *testing.T) {
+	for path, want := range map[string]string{
+		"/w/tok/v1/traces":               "v1/traces",
+		"/w/tok/v1/logs":                 "v1/logs",
+		"/w/tok/llm/v1/chat/completions": "llm",
+		"/w/tok/llm/v1/responses":        "llm",
+		"/w/tok/llm/models":              "llm",
+		"/w/tok":                         "?",
+	} {
+		if got := pathSignal(path); got != want {
+			t.Errorf("pathSignal(%q) = %q, want %q", path, got, want)
+		}
+	}
+}

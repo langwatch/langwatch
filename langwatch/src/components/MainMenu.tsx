@@ -220,7 +220,7 @@ export const MainMenu = React.memo(function MainMenu({
 
             <SidebarSection
               id="library"
-              label="Library"
+              label="Build"
               showExpanded={showExpanded}
               defaultExpanded={false}
               projectId={project?.id}

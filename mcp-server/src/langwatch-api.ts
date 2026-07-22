@@ -1,5 +1,6 @@
 import type { HandledErrorFault } from "@langwatch/handled-error";
 import { getConfig, requireApiKey } from "./config.js";
+import type { EvaluationSummary } from "./utils/format-evaluations.js";
 
 // --- Response types ---
 
@@ -11,6 +12,7 @@ export interface TraceSearchResult {
   timestamps?: { started_at?: string | number };
   metadata?: Record<string, unknown>;
   error?: Record<string, unknown>;
+  evaluations?: EvaluationSummary[];
 }
 
 export interface SearchTracesResponse {
@@ -40,13 +42,7 @@ export interface TraceDetailResponse {
   };
   error?: Record<string, unknown>;
   ascii_tree?: string;
-  evaluations?: Array<{
-    evaluator_id?: string;
-    name?: string;
-    score?: number;
-    passed?: boolean;
-    label?: string;
-  }>;
+  evaluations?: EvaluationSummary[];
   spans?: Array<{
     span_id: string;
     name?: string;

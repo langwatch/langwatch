@@ -7,6 +7,7 @@ import {
 } from "~/server/app-layer/config";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
+  incrementEsFoldPostStoreFailure,
   incrementEsFoldProjectionTotal,
   incrementEsMapProjectionTotal,
   incrementEsProjectionTotal,
@@ -63,8 +64,16 @@ import type { ReplayMarkerChecker } from "./replayMarkerCheck";
  * events one at a time (see initializeFoldQueues below), so raising it changes
  * throughput only, never correctness.
  */
-const DEFAULT_FOLD_COALESCE_MAX_BATCH = 500;
+export const DEFAULT_FOLD_COALESCE_MAX_BATCH = 500;
 const SLOW_PROJECTION_OPERATION_MS = 5_000;
+
+/**
+ * Event ids carried in a post-store-failure log line. A coalesced batch holds
+ * up to DEFAULT_FOLD_COALESCE_MAX_BATCH events and the whole line would be
+ * unreadable; the ids exist to locate the affected aggregate for reconciliation,
+ * and the aggregate id already narrows it. eventCount reports the true size.
+ */
+const MAX_LOGGED_EVENT_IDS = 10;
 
 /**
  * The router only ever dispatches reactors on the live event path — the
@@ -454,7 +463,7 @@ export class ProjectionRouter<
 
     this.queueManager.initializeStateProjectionQueues(
       projectionDefs,
-      async (projectionName, event) => {
+      async (projectionName, event, context) => {
         const projection = this.stateProjections.get(projectionName);
         if (!projection) {
           throw new ConfigurationError(
@@ -463,11 +472,14 @@ export class ProjectionRouter<
             { projectionName },
           );
         }
-        await this.processStateProjectionEvents(projectionName, projection, [
-          event,
-        ]);
+        await this.processStateProjectionEvents(
+          projectionName,
+          projection,
+          [event],
+          context,
+        );
       },
-      async (projectionName, events) => {
+      async (projectionName, events, context) => {
         const projection = this.stateProjections.get(projectionName);
         if (!projection) {
           throw new ConfigurationError(
@@ -480,6 +492,7 @@ export class ProjectionRouter<
           projectionName,
           projection,
           events,
+          context,
         );
       },
     );
@@ -532,7 +545,7 @@ export class ProjectionRouter<
 
     this.queueManager.initializeProjectionQueues(
       projectionDefs,
-      async (projectionName, triggerEvent, _context) => {
+      async (projectionName, triggerEvent, context) => {
         const fold = this.foldProjections.get(projectionName);
         if (!fold) {
           throw new ConfigurationError(
@@ -546,10 +559,15 @@ export class ProjectionRouter<
           projectionName,
           fold,
           triggerEvent,
-          { tenantId: triggerEvent.tenantId },
+          {
+            tenantId: triggerEvent.tenantId,
+            ...(context.deliveryAttempt !== undefined
+              ? { deliveryAttempt: context.deliveryAttempt }
+              : {}),
+          },
         );
       },
-      async (projectionName, events, _context) => {
+      async (projectionName, events, context) => {
         const fold = this.foldProjections.get(projectionName);
         if (!fold) {
           throw new ConfigurationError(
@@ -561,6 +579,9 @@ export class ProjectionRouter<
 
         await this.processFoldProjectionBatch(projectionName, fold, events, {
           tenantId: events[0]!.tenantId,
+          ...(context.deliveryAttempt !== undefined
+            ? { deliveryAttempt: context.deliveryAttempt }
+            : {}),
         });
       },
     );
@@ -786,7 +807,7 @@ export class ProjectionRouter<
         // Default state projections are independent operational read models.
         if (this.stateProjections.size > 0) {
           try {
-            await this.dispatchToStateProjections(events);
+            await this.dispatchToStateProjections(events, context);
           } catch (e) {
             if (e instanceof AggregateError) {
               errors.push(...(e.errors as Error[]));
@@ -916,6 +937,7 @@ export class ProjectionRouter<
 
   private async dispatchToStateProjections(
     events: readonly EventType[],
+    context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     const queued = this.queueManager.hasStateProjectionQueues();
     const errors: Error[] = [];
@@ -939,7 +961,12 @@ export class ProjectionRouter<
         }
 
         for (const event of matching) {
-          await this.processStateProjectionEvents(name, projection, [event]);
+          await this.processStateProjectionEvents(
+            name,
+            projection,
+            [event],
+            context,
+          );
         }
       } catch (error) {
         this.logger.error(
@@ -1239,6 +1266,7 @@ export class ProjectionRouter<
     projectionName: string,
     projection: StateProjectionDefinition<any, EventType>,
     events: EventType[],
+    context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     if (events.length === 0) return;
     const first = events[0]!;
@@ -1294,7 +1322,11 @@ export class ProjectionRouter<
         if (toApply.length === 0) return;
 
         const key = projection.key ? projection.key(toApply[0]!) : undefined;
-        const storeContext = await this.buildStoreContext(toApply[0]!, key);
+        const storeContext = await this.buildStoreContext(
+          toApply[0]!,
+          key,
+          context.deliveryAttempt,
+        );
         await withMetrics({
           fn: () =>
             this.stateProjectionExecutor.execute({
@@ -1405,7 +1437,11 @@ export class ProjectionRouter<
         }
 
         const key = fold.key ? fold.key(event) : undefined;
-        const storeContext = await this.buildStoreContext(event, key);
+        const storeContext = await this.buildStoreContext(
+          event,
+          key,
+          context.deliveryAttempt,
+        );
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.execute(fold, event, storeContext),
@@ -1435,17 +1471,92 @@ export class ProjectionRouter<
           },
         });
 
-        // After fold succeeds, dispatch to reactors for this fold
-        const reactors = this.reactorsForFold.get(projectionName);
-        if (reactors && reactors.length > 0) {
-          await this.dispatchToReactors({
-            foldName: projectionName,
-            reactors,
-            events: [event],
-            foldState,
-          });
-        }
+        // After fold succeeds, dispatch to reactors for this fold. The fold
+        // state is durable by this point, so a throw from here redelivers
+        // events the store already contains.
+        await this.dispatchReactorsAfterStore({
+          projectionName,
+          events: [event],
+          foldState,
+        });
       },
+    );
+  }
+
+  /**
+   * Dispatches a fold's reactors once its state is already durable.
+   *
+   * Anything that throws from here fails the job without un-writing the state,
+   * so the queue redelivers events the store already holds — see
+   * {@link recordPostStoreFailure}. Shared by the single-event and batch paths
+   * so the two cannot drift on the exact path this counter measures.
+   */
+  private async dispatchReactorsAfterStore({
+    projectionName,
+    events,
+    foldState,
+  }: {
+    projectionName: string;
+    events: EventType[];
+    foldState: unknown;
+  }): Promise<void> {
+    const reactors = this.reactorsForFold.get(projectionName);
+    if (!reactors || reactors.length === 0) return;
+
+    try {
+      await this.dispatchToReactors({
+        foldName: projectionName,
+        reactors,
+        events,
+        foldState,
+      });
+    } catch (error) {
+      this.recordPostStoreFailure({
+        projectionName,
+        stage: "reactor_dispatch",
+        events,
+        error,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Records a failure that happened after the fold's state was durably stored.
+   *
+   * Distinct from a plain fold failure: the store already holds this batch, so
+   * the retry re-applies it. Accumulating folds (spanCount + 1, cost sums, id
+   * appends) double-count as a result — nothing on this path deduplicates by
+   * event id.
+   *
+   * Logged at warn with the aggregate and event ids so the affected traces can
+   * be identified and reconciled after an incident — the metric says how often,
+   * the log says which.
+   */
+  private recordPostStoreFailure({
+    projectionName,
+    stage,
+    events,
+    error,
+  }: {
+    projectionName: string;
+    stage: "reactor_dispatch";
+    events: EventType[];
+    error: unknown;
+  }): void {
+    incrementEsFoldPostStoreFailure({ projectionName, stage });
+    const first = events[0];
+    this.logger.warn(
+      {
+        projection: projectionName,
+        stage,
+        tenantId: first ? String(first.tenantId) : undefined,
+        aggregateId: first ? String(first.aggregateId) : undefined,
+        eventCount: events.length,
+        eventIds: events.slice(0, MAX_LOGGED_EVENT_IDS).map((e) => e.id),
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "Fold failed after its state was stored — the retry will re-apply events the store already holds",
     );
   }
 
@@ -1517,7 +1628,11 @@ export class ProjectionRouter<
 
         const first = toApply[0]!;
         const key = fold.key ? fold.key(first) : undefined;
-        const storeContext = await this.buildStoreContext(first, key);
+        const storeContext = await this.buildStoreContext(
+          first,
+          key,
+          context.deliveryAttempt,
+        );
 
         const foldState = await withMetrics({
           fn: () => this.foldExecutor.executeBatch(fold, toApply, storeContext),
@@ -1555,15 +1670,15 @@ export class ProjectionRouter<
         // to one job by the queue's dedup anyway, so dispatchToReactors collapses
         // them here instead of paying N serialize+gzip+blob round-trips to reach
         // the same state. See ProjectionRouter.collapseByJobId.
-        const reactors = this.reactorsForFold.get(projectionName);
-        if (reactors && reactors.length > 0) {
-          await this.dispatchToReactors({
-            foldName: projectionName,
-            reactors,
-            events: toApply,
-            foldState,
-          });
-        }
+        //
+        // A post-store failure is worse here than on the single-event path: the
+        // whole coalesced batch is re-applied, so one failure can double-count
+        // up to DEFAULT_FOLD_COALESCE_MAX_BATCH events against one aggregate.
+        await this.dispatchReactorsAfterStore({
+          projectionName,
+          events: toApply,
+          foldState,
+        });
       },
     );
   }
@@ -1981,12 +2096,14 @@ export class ProjectionRouter<
   private async buildStoreContext(
     event: EventType,
     key?: string,
+    deliveryAttempt?: number,
   ): Promise<ProjectionStoreContext> {
     const retentionPolicy = await this.resolveRetention(event.tenantId);
     return {
       aggregateId: String(event.aggregateId),
       tenantId: event.tenantId,
       ...(key !== undefined ? { key } : {}),
+      ...(deliveryAttempt !== undefined ? { deliveryAttempt } : {}),
       retentionPolicy,
     };
   }

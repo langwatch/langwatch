@@ -31,6 +31,7 @@ import type { LangyTurnService } from "./langy/langy-turn.service";
 import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyMessageService } from "./langy/langy-message.service";
+import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
@@ -116,6 +117,7 @@ export interface AppDependencies {
     messages: LangyMessageService;
     githubInstallations: LangyGithubInstallationsService;
     credentials: LangyCredentialService;
+    feedbackPrompt: LangyFeedbackPromptService;
   };
   experiments: ExperimentService;
   triggers: TriggerService;

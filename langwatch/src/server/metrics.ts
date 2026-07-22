@@ -847,8 +847,81 @@ const esFoldCacheRedisErrorTotal = new Counter({
 
 export const incrementEsFoldCacheRedisError = (
   projectionName: string,
-  operation: "get" | "set",
+  operation: "get" | "set" | "del",
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
+
+register.removeSingleMetric("es_fold_cache_entry_bytes");
+const esFoldCacheEntryBytes = new Histogram({
+  name: "es_fold_cache_entry_bytes",
+  help: "Serialized size of a cached fold state entry, in bytes",
+  labelNames: ["projection_name"] as const,
+  buckets: [1_024, 8_192, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216],
+});
+
+export const observeEsFoldCacheEntryBytes = (
+  projectionName: string,
+  bytes: number,
+) => esFoldCacheEntryBytes.labels(projectionName).observe(bytes);
+
+// ============================================================================
+// Fold redelivery
+// ============================================================================
+
+register.removeSingleMetric("es_fold_dedup_unavailable_total");
+const esFoldDedupUnavailable = new Counter({
+  name: "es_fold_dedup_unavailable_total",
+  help: "Retried fold deliveries that had no applied-event-id set to check against, by reason",
+  labelNames: ["projection_name", "reason"] as const,
+});
+
+/**
+ * A RETRY reached the fold with no record of what an earlier attempt applied.
+ *
+ * This is the moment the batch is about to be re-applied on top of durable
+ * state that already contains it. It has to be its own counter rather than a
+ * label on the cache result, because the dangerous case is invisible in the
+ * existing signals: a miss on a retry and a miss on a fresh delivery are the
+ * same observation, and `es_fold_duplicate_events_skipped_total` staying flat
+ * during an incident reads as good news whether dedup was idle or blind.
+ */
+export const incrementEsFoldDedupUnavailable = (
+  projectionName: string,
+  reason: "cache_miss" | "read_error" | "unreadable" | "legacy_entry",
+) => esFoldDedupUnavailable.labels(projectionName, reason).inc();
+
+register.removeSingleMetric("es_fold_duplicate_events_skipped_total");
+const esFoldDuplicateEventsSkipped = new Counter({
+  name: "es_fold_duplicate_events_skipped_total",
+  help: "Redelivered events recognised as already folded in and skipped",
+  labelNames: ["projection_name"] as const,
+});
+
+export const incrementEsFoldDuplicateEventsSkipped = (
+  projectionName: string,
+  count = 1,
+) => esFoldDuplicateEventsSkipped.labels(projectionName).inc(count);
+
+register.removeSingleMetric("es_fold_blind_reapply_events");
+const esFoldBlindReapplyEvents = new Histogram({
+  name: "es_fold_blind_reapply_events",
+  help: "Events re-applied on a retry that carried no applied-event-id set to check against",
+  labelNames: ["projection_name"] as const,
+  buckets: [1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
+
+/**
+ * Blast radius of a blind re-apply, in events.
+ *
+ * `es_fold_dedup_unavailable_total` counts the *occurrences* of a retry
+ * arriving with nothing to check against; this measures how much accumulation
+ * each one re-applies. One re-applied event on a coalesced batch of 500 and
+ * 500 of them are the same increment on the counter and very different
+ * incidents — a coalescing fold can double-count an entire batch at once.
+ */
+export const observeEsFoldBlindReapplyEvents = (
+  projectionName: string,
+  events: number,
+) => esFoldBlindReapplyEvents.labels(projectionName).observe(events);
 
 // ============================================================================
 // Langy Metrics
@@ -868,7 +941,7 @@ const langyTurnsTotal = new Counter({
   labelNames: ["outcome"] as const,
 });
 export const getLangyTurnsCounter = (
-  outcome: "accepted" | "replay" | "busy" | "rejected" | "error",
+  outcome: "accepted" | "replay" | "busy" | "rejected" | "mismatch" | "error",
 ) => langyTurnsTotal.labels(outcome);
 
 // One increment per dispatch attempt to the agent manager.
@@ -883,6 +956,7 @@ export const getLangyDispatchCounter = (
     | "accepted"
     | "busy"
     | "credentials_required"
+    | "rejected"
     | "unavailable"
     | "error",
 ) => langyDispatchTotal.labels(outcome);
@@ -930,6 +1004,42 @@ const langyRateLimitTotal = new Counter({
 });
 export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
   langyRateLimitTotal.labels(outcome);
+
+// ============================================================================
+// Fold redelivery
+// ============================================================================
+
+register.removeSingleMetric("es_fold_post_store_failure_total");
+const esFoldPostStoreFailure = new Counter({
+  name: "es_fold_post_store_failure_total",
+  help: "Fold deliveries that threw after their state was durably stored, by stage",
+  labelNames: ["projection_name", "stage"] as const,
+});
+
+/**
+ * A fold threw *after* its state was already written durably.
+ *
+ * Queue delivery is at-least-once and the fold's state is stored before
+ * reactors are dispatched, so anything that throws from that point fails the
+ * job without un-writing it: the queue re-delivers events the store already
+ * holds. Folds accumulate rather than being idempotent (trace summary does
+ * `spanCount + 1` and sums cost), so the re-apply double-counts.
+ *
+ * Every other fold signal reports this as a plain failure, which is
+ * indistinguishable from one that threw *before* the write and is therefore
+ * harmless to retry. The two need opposite responses, so they need separate
+ * counters.
+ *
+ * Rate against `es_fold_projection_total{status="failed"}` for the share of
+ * fold failures that land in the dangerous half.
+ */
+export const incrementEsFoldPostStoreFailure = ({
+  projectionName,
+  stage,
+}: {
+  projectionName: string;
+  stage: "reactor_dispatch";
+}) => esFoldPostStoreFailure.labels(projectionName, stage).inc();
 
 // ============================================================================
 // Stored Objects Metrics

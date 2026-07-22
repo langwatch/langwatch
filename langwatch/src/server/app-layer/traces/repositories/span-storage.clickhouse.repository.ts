@@ -24,11 +24,15 @@ import type {
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
+  SpanSummaryPage,
+  SpanSummaryPageCursor,
   SpanSummaryRow,
 } from "./span-storage.repository";
 import {
   clampSpanReadLimit,
   LANGWATCH_SIGNAL_BUCKETS,
+  MAX_DERIVATION_SPANS,
+  MAX_LIGHT_SPAN_READ_ROWS,
 } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
@@ -215,7 +219,8 @@ const SUMMARY_SPAN_SELECT = `
   SpanAttributes['langwatch.model.cacheReadCostPerToken'] AS CustomCacheReadRate,
   SpanAttributes['langwatch.model.cacheCreationCostPerToken'] AS CustomCacheCreationRate,
   SpanAttributes['langwatch.span.cost'] AS LwSpanCost,
-  toUnixTimestamp64Milli(StartTime) AS StartTimeMs
+  toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+  toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs
 `;
 
 /**
@@ -284,9 +289,16 @@ function mapModelSpanSampleRow(
  * picks the latest version (max UpdatedAt) per spanId. Caller assembles the
  * surrounding `AND (TenantId, TraceId, SpanId, UpdatedAt) IN (…)`.
  *
- * Kept as a function so optional extra predicates (partition window,
- * sinceStartTimeMs) are applied symmetrically in inner + outer scopes —
- * essential because the dedup must see the same row set as the outer scan.
+ * Kept as a function so an optional extra predicate (the partition-hint
+ * window, or the `since` readers' row-version bound) can be applied to the
+ * inner scope as well as the outer.
+ *
+ * Only pass a predicate that a span's versions cannot straddle. The subquery
+ * elects each span's latest version, so it has to see every version: bound it
+ * by something a re-projection can move — a span's StartTime, say — and it
+ * will elect a stale version whose row the outer filter then emits. This is
+ * why the span-tree cursor's `StartTime >=` bound is deliberately NOT passed
+ * in (see `findSpanSummariesPage`).
  */
 function dedupInTuple(extraInnerWhere: string): string {
   return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
@@ -341,6 +353,7 @@ export interface SpanSummaryQueryRow {
   CustomCacheCreationRate: string;
   LwSpanCost: string;
   StartTimeMs: number;
+  UpdatedAtMs: number;
 }
 
 /** "" → null, malformed → null, otherwise the parsed number. */
@@ -417,6 +430,7 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     cacheReadTokens,
     cacheCreationTokens,
     startTimeMs: Number(row.StartTimeMs),
+    updatedAtMs: Number(row.UpdatedAtMs),
   };
 }
 
@@ -1066,6 +1080,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ${partition.sqlAnd}
               AND ${dedupInTuple(partition.sqlAndInner)}
             ORDER BY StartTimeMs ASC
+            LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
           query_params: { tenantId, traceId, ...partition.params },
           format: "JSONEachRow",
@@ -1250,6 +1265,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 Events_Name AS event_name,
                 Events_Attributes AS event_attrs
               ORDER BY event_timestamp ASC
+              LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             `,
             query_params: { tenantId, traceId, ...partition.params },
             format: "JSONEachRow",
@@ -1460,6 +1476,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ${partition.sqlAnd}
               AND ${dedupInTuple(partition.sqlAndInner)}
             ORDER BY StartTimeMs ASC
+            LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
           query_params: { tenantId, traceId, ...partition.params },
           format: "JSONEachRow",
@@ -1514,6 +1531,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
+              -- Order before the cap so a runaway trace consistently yields the
+              -- same earliest-starting prefix; an unordered LIMIT would let
+              -- ClickHouse return an arbitrary subset that varies with merges
+              -- and part ordering, making which spans carry signals
+              -- nondeterministic across calls. Must be the raw StartTime
+              -- column — this subquery computes no StartTimeMs alias.
+              ORDER BY StartTime ASC
+              LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             )
           `,
           query_params: { tenantId, traceId, ...partition.params },
@@ -1650,6 +1675,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           ${sinceFilter}
           AND ${dedupInTuple(sinceFilter)}
         ORDER BY StartTime ASC
+        LIMIT ${MAX_DERIVATION_SPANS}
       `,
       query_params: { tenantId, traceId, sinceStartTimeMs },
       format: "JSONEachRow",
@@ -1659,103 +1685,163 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
   }
 
-  async findSpanSummariesPaginated({
+  async findSpanSummariesPage({
     tenantId,
     traceId,
     limit,
-    offset,
+    cursor,
     occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
     limit: number;
-    offset: number;
-  } & OccurredAtHint): Promise<{ rows: SpanSummaryRow[]; total: number }> {
+    cursor?: SpanSummaryPageCursor;
+  } & OccurredAtHint): Promise<SpanSummaryPage> {
     EventUtils.validateTenantId(
       { tenantId },
-      "SpanStorageClickHouseRepository.findSpanSummariesPaginated",
+      "SpanStorageClickHouseRepository.findSpanSummariesPage",
     );
 
-    return this.readTraceSpans<{ rows: SpanSummaryRow[]; total: number }>(
-      { tenantId, traceId, occurredAtMs },
-      (result) => result.rows.length === 0,
-      async (window) => {
-        const partition = partitionFragment(window);
-        const client = await this.resolveClient(tenantId);
-        // Same two-step rationale as findSpansPaginated, except the page
-        // query is already light (summary columns only). Splitting still
-        // helps because count() OVER () forces the deduped row set to be
-        // materialized in full before the LIMIT — a wasted scan when the
-        // user is on page N and we just want a number.
-        const [pageResult, countResult] = await Promise.all([
-          client.query({
-            query: `
-              SELECT ${SUMMARY_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-                AND ${dedupInTuple(partition.sqlAndInner)}
-              ORDER BY StartTime ASC
-              LIMIT {limit:UInt32}
-              OFFSET {offset:UInt32}
-            `,
-            query_params: {
-              tenantId,
-              traceId,
-              limit,
-              offset,
-              ...partition.params,
-            },
-            format: "JSONEachRow",
-          }),
-          client.query({
-            query: `
-              SELECT count(DISTINCT SpanId) AS Total
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                ${partition.sqlAnd}
-            `,
-            query_params: { tenantId, traceId, ...partition.params },
-            format: "JSONEachRow",
-          }),
-        ]);
+    const effectiveLimit = clampSpanReadLimit(limit, {
+      max: MAX_LIGHT_SPAN_READ_ROWS,
+    });
 
-        const pageRows = await pageResult.json<SpanSummaryQueryRow>();
-        const countRows = (await countResult.json()) as Array<{
-          Total: number | string;
-        }>;
-        const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
+    // This reader deliberately does NOT go through readTraceSpans /
+    // withPartitionHint — a paged read breaks both of that seam's
+    // assumptions:
+    //
+    //   - Its ±2-day window has an UPPER bound, and a page that runs into it
+    //     comes back short-but-non-empty, which the router would read as
+    //     end-of-trace: every span a long-running trace produced past
+    //     `occurredAt + 2d` would be silently dropped. Pages therefore bound
+    //     StartTime from below only; forward partitions cost one primary-key
+    //     probe each (TraceId is 2nd in the ORDER BY key), not a scan.
+    //   - Its empty-means-hint-missed fallback can't tell a missed hint from
+    //     an exhausted cursor, so a legitimately empty page would rerun as an
+    //     unhinted rescan. Cursor pages carry an exact lower bound (the
+    //     cursor itself), so their result is authoritative and never falls
+    //     back; only the first page keeps the empty→unbounded retry, because
+    //     its lower bound comes from a hint that can be plain wrong (stale
+    //     URL, clock skew).
+    const runPage = async (
+      lowerBoundMs: number | undefined,
+    ): Promise<SpanSummaryPage> => {
+      const client = await this.resolveClient(tenantId);
+      const pageLowerBound =
+        lowerBoundMs !== undefined
+          ? `AND StartTime >= fromUnixTimestamp64Milli({pageFromMs:Int64})`
+          : "";
+      // Keyed pagination over (StartTimeMs, SpanId): the tuple compare uses
+      // the same millisecond expression the rows are ordered (and returned)
+      // by, so page boundaries are exact. `StartTime` is `DateTime64(3)` —
+      // already exactly milliseconds — so `toUnixTimestamp64Milli` is a
+      // representation change, not a lossy truncation, and no two rows can
+      // differ by less than the tuple can express.
+      //
+      // The coarse `StartTime >=` bound restates the tuple predicate on the
+      // raw partition key: `toYearWeek(StartTime)` partition pruning can't
+      // see through `toUnixTimestamp64Milli(...)`, so without it every page
+      // re-scans the partitions pagination already moved past — exactly the
+      // long-running multi-week traces that need paging.
+      //
+      // NEITHER cursor predicate may enter the dedup subquery. The subquery's
+      // job is to elect each span's LATEST version, which it can only do if it
+      // sees every version. Restricting it to `StartTime >= cursor` breaks
+      // that whenever a span was re-emitted with a corrected EARLIER start:
+      // the latest version then sorts below the bound, the inner scan elects a
+      // stale older version instead, and the outer tuple filter emits it
+      // happily — and the client's dedup is last-write-wins per spanId, so the
+      // stale row wins the waterfall row. (`pageLowerBound` does stay in: it
+      // is the ±2-day hint window applied identically to both scopes, and a
+      // correction would have to move a span's start by more than two days to
+      // slip past it — whereas the cursor bound advances into the trace on
+      // every single page.)
+      const cursorCoarseBound = cursor
+        ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStartTimeMs:Int64})`
+        : "";
+      const cursorFilter = cursor
+        ? `${cursorCoarseBound}
+            AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})`
+        : "";
+      // Over-fetch one row past the page: `hasMore` comes from that row's
+      // existence, so an exact-multiple-of-page-size trace terminates without
+      // a follow-up empty fetch.
+      const result = await client.query({
+        query: `
+          SELECT ${SUMMARY_SPAN_SELECT}
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            ${pageLowerBound}
+            ${cursorFilter}
+            AND ${dedupInTuple(pageLowerBound)}
+          ORDER BY StartTimeMs ASC, SpanId ASC
+          LIMIT {limit:UInt32}
+        `,
+        query_params: {
+          tenantId,
+          traceId,
+          limit: effectiveLimit + 1,
+          ...(lowerBoundMs !== undefined ? { pageFromMs: lowerBoundMs } : {}),
+          ...(cursor
+            ? {
+                cursorStartTimeMs: Math.trunc(cursor.startTimeMs),
+                cursorSpanId: cursor.spanId,
+              }
+            : {}),
+        },
+        format: "JSONEachRow",
+      });
 
-        return {
-          rows: pageRows.map(mapSpanSummaryRow),
-          total,
-        };
-      },
-    );
+      const rows = (await result.json<SpanSummaryQueryRow>()).map(
+        mapSpanSummaryRow,
+      );
+      return {
+        rows: rows.slice(0, effectiveLimit),
+        hasMore: rows.length > effectiveLimit,
+      };
+    };
+
+    if (cursor) return runPage(undefined);
+
+    const hintMs =
+      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+    if (hintMs === undefined) return runPage(undefined);
+    const bounded = await runPage(hintMs - PARTITION_WINDOW_MS);
+    if (bounded.rows.length > 0) return bounded;
+    return runPage(undefined);
   }
 
   async findSpanSummariesSince({
     tenantId,
     traceId,
-    sinceStartTimeMs,
+    sinceUpdatedAtMs,
   }: {
     tenantId: string;
     traceId: string;
-    sinceStartTimeMs: number;
+    sinceUpdatedAtMs: number;
   } & OccurredAtHint): Promise<SpanSummaryRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanSummariesSince",
     );
 
-    // Poll reader: see findSpansSince — `StartTime > sinceStartTimeMs` already
-    // prunes partitions, so this does NOT resolve or clamp to the trace's
-    // OccurredAt window. An upper bound would silently stop the spanTreeDelta
-    // live view from showing new spans on a long-running trace.
+    // Keyed on the ROW VERSION, not the span start. A span updated in place —
+    // end time, duration, status, cost, all re-projected as the span closes —
+    // keeps its StartTime, so a `StartTime >` poll can only ever see brand-new
+    // spans. The root span is the worst case: it starts first and ends last,
+    // so a start-keyed poll left its duration (and with it the waterfall's
+    // whole time scale) frozen at first projection until SSE reconnected.
+    //
+    // UpdatedAt is not the partition key, so this gives up partition pruning.
+    // The read stays cheap because (TenantId, TraceId) is the table's sort-key
+    // prefix and carries a bloom-filter index: partitions that hold none of
+    // this trace's rows are skipped on the index, not scanned.
+    //
+    // Deliberately NOT clamped to the trace's OccurredAt window: an upper
+    // bound would silently stop the live view on a long-running trace.
     const sinceFilter =
-      "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
+      "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
@@ -1766,8 +1852,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           ${sinceFilter}
           AND ${dedupInTuple(sinceFilter)}
         ORDER BY StartTimeMs ASC
+        LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
-      query_params: { tenantId, traceId, sinceStartTimeMs },
+      query_params: { tenantId, traceId, sinceUpdatedAtMs },
       format: "JSONEachRow",
     });
 

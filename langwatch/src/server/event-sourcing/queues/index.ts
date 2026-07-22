@@ -6,6 +6,7 @@ export type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,
+  JobDelivery,
   QueueAuditAdapter,
   QueueSendOptions,
 } from "./queue.types";

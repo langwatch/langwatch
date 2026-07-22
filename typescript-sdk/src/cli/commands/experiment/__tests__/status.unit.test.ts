@@ -79,12 +79,13 @@ describe("experimentStatusCommand()", () => {
         progress: 3,
         total: 3,
       });
-      await experimentStatusCommand("doc-qa");
+      const result = await experimentStatusCommand("doc-qa");
       expect(mockListRuns).toHaveBeenCalledWith({
         experimentSlug: "doc-qa",
         pageSize: 1,
       });
       expect(mockGetRunStatus).toHaveBeenCalledWith("latest_run");
+      result?.table();
       const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
       expect(printed).toContain("3/3 cells");
     });
@@ -122,11 +123,12 @@ describe("experimentStatusCommand()", () => {
         dataset: [1, 2, 3, 4, 5],
         timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
       });
-      await experimentStatusCommand("doc-qa", { runId: "sdk_run" });
+      const result = await experimentStatusCommand("doc-qa", { runId: "sdk_run" });
       expect(mockGetRunResults).toHaveBeenCalledWith({
         runId: "sdk_run",
         experimentSlug: "doc-qa",
       });
+      result?.table();
       const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
       expect(printed).toContain("5/5 cells");
     });
@@ -139,13 +141,10 @@ describe("experimentStatusCommand()", () => {
         dataset: [1, 2, 3, 4, 5],
         timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
       });
-      await experimentStatusCommand("doc-qa", {
+      const result = await experimentStatusCommand("doc-qa", {
         runId: "sdk_run",
-        format: "json",
       });
-      const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-      const payload = JSON.parse(printed);
-      expect(payload.runId).toBe("sdk_run");
+      expect(result?.data).toMatchObject({ runId: "sdk_run" });
     });
 
     it("propagates a real fallback error instead of masking it as not-found", async () => {

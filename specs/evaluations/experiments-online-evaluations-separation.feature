@@ -13,8 +13,8 @@ Feature: Separate experiments from online evaluations
     Given I open a project's primary navigation
     Then the existing "Evaluate" section is named "Test"
     And "Test" contains "Simulations", "Experiments", and "Annotations" in that order
-    And the existing "Build" section is named "Library"
-    And "Library" contains "Prompts", "Agents", "Workflows", "Evaluators", "Datasets", and "Automations" in that order
+    And the existing section is named "Build"
+    And "Build" contains "Prompts", "Agents", "Workflows", "Evaluators", "Datasets", and "Automations" in that order
     And "Observe" contains its existing destinations followed by the menu label "Online Evals" after "Traces"
     And the destination page and product copy keep the full name "Online Evaluations"
     And "Automations" is not listed in "Observe"
@@ -22,15 +22,16 @@ Feature: Separate experiments from online evaluations
 
   Scenario: Collapse primary navigation sections
     Given the project navigation is expanded
-    Then every primary section has a visible caret and an accessible expand or collapse control
-    And each caret is positioned immediately beside its section label
+    Then every primary section has an accessible expand or collapse control
+    And expanded section headings stay decluttered with no caret
     When I collapse a section
     Then its destinations are hidden
+    And a dim caret appears beside the collapsed section's label
     And the preference is restored after I reload the application
 
   Scenario: Focus automation work by purpose
-    Given I open Automations from "Library"
-    Then I can use a local navigation to open "Automations", "Alerts", "Schedules", or "Recent activity"
+    Given I open Automations from "Build"
+    Then I can use a local navigation to open "Overview", "Automations", "Alerts", or "Schedules"
     And each destination has its own URL
     And each destination shows only the controls and records for that purpose
     And the automation content uses a readable maximum width instead of stretching across the page
@@ -39,7 +40,7 @@ Feature: Separate experiments from online evaluations
     Given I have no saved primary navigation preferences
     When I open a project
     Then "Observe" and "Test" are expanded
-    And "Library" and "Govern" are collapsed
+    And "Build" and "Govern" are collapsed
 
   Scenario: Discover experiments as a distinct testing workflow
     Given I want to test or compare an application before deployment

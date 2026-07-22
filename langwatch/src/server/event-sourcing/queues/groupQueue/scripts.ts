@@ -2,7 +2,13 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
 import { CachedLuaScript } from "./cachedLuaScript";
-import { BLOB_HOLDER_TTL_SECONDS } from "./blobConstants";
+import {
+  BLOB_BACKSTOP_TTL_SECONDS,
+  BLOB_LEASE_SET_TTL_SECONDS,
+  BLOB_LEASE_TTL_SECONDS,
+  LEGACY_HOLDER_LEASE_GUARD,
+} from "./blobConstants";
+import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -162,14 +168,17 @@ end
 -- Move an over-cap group out of ready into its tenant's parked set, preserving
 -- its ready score so it keeps priority when restored. Registers the tenant so
 -- the dispatch-tail reconcile can find it even if no COMPLETE ever fires.
+-- Returns 1 when the group was actually moved out of ready (0 otherwise) so
+-- the dispatch scan can keep its page offset aligned with the shrinking zset.
 local function parkGroup(readyKey, groupId)
   local score = redis.call("ZSCORE", readyKey, groupId)
-  if not score then return end
+  if not score then return 0 end
   local kp = parkKeyPrefixOf(readyKey)
   local tenantId = parkTenantOf(groupId)
   redis.call("ZREM", readyKey, groupId)
   redis.call("ZADD", kp .. "parked:" .. tenantId, score, groupId)
   redis.call("SADD", kp .. "parked-tenants", tenantId)
+  return 1
 end
 
 -- Restore up to "slots" of a tenant's parked groups (lowest score = earliest
@@ -376,12 +385,16 @@ end
 `;
 
 // Reads routing metadata (pipelineName, jobType, jobName) from a stored job
-// value. Envelope values (ADR-026, "GQ1|<headerLen>|<headerJson><body>") expose
-// it in the tiny header so the payload body is never decoded on Redis's
-// thread; legacy bare-JSON values fall back to a full decode.
+// value. Envelope values (ADR-026/029, "GQ<v>|<headerLen>|<headerJson><body>")
+// expose it in the tiny header so the payload body is never decoded on Redis's
+// thread; legacy bare-JSON values fall back to a full decode. GQ1 and GQ2 share
+// the header layout (p/t/n routing fields), so one parse covers both — a
+// GQ2-blind parse here silently disabled pipeline/jobType/jobName-level pause
+// and the per-job-name failed counter for every GQ2 envelope.
 const ROUTING_META_HELPER_LUA = `
 local function gqRoutingMeta(jobDataJson)
-  if string.sub(jobDataJson, 1, 4) == "GQ1|" then
+  local prefix = string.sub(jobDataJson, 1, 4)
+  if prefix == "GQ1|" or prefix == "GQ2|" then
     local barIdx = string.find(jobDataJson, "|", 5, true)
     if barIdx then
       local headerLen = tonumber(string.sub(jobDataJson, 5, barIdx - 1))
@@ -402,22 +415,28 @@ local function gqRoutingMeta(jobDataJson)
 end
 `;
 
-// Lua side of the GQ2 blob-hold lifecycle for the dedup squash. A squash
-// displaces one staged value with another; the displaced value's hold must be
-// released and the replacement's acquired ATOMICALLY WITH THE DISPLACEMENT.
-// The old design returned the displaced value and let send() fire a transfer
-// eval afterwards, fire-and-forget — concurrent squashes of the same dedup id
-// could reorder at Redis, and a late transfer re-added a token an earlier one
-// had displaced, pinning the blob under a phantom hold until its TTL (the
-// 2026-07-09 leak: ~279k orphaned blobs, ~1.9 GB). Doing the hold move inside
-// the stage eval serializes it with the squash it accounts for.
+// Lua side of the GQ2 blob-lease lifecycle for staging. A genuine stage takes
+// its lease in the same eval as the staged value becomes visible. A squash
+// transfers the displaced lease atomically with that replacement. Releases
+// never delete content-addressed blobs: Redis TTL and the durable-store
+// lifecycle sweep are the only reclaim paths. Retiring the LAST lease does
+// shorten the Redis-tier blob's expiry to the release grace window, which any
+// later take re-arms — see `blobGraceLua.ts`.
 //
-// Envelope hold parse mirrors the TS readEnvelopeHold: "GQ2|<len>|<headerJson>"
-// with header.ref = {tier, projectId, hash} and header.h = the stage token.
-// GQ1 values ("GQ1|", header.r = blob id) have no refcount — their blob is
+// Envelope lease parse mirrors the TS readEnvelopeLease: "GQ2|<len>|<headerJson>"
+// with header.ref = {tier, projectId, hash} and header.h = the lease holder id.
+// GQ1 values ("GQ1|", header.r = blob id) are private — their blob is
 // UNLINKed directly. Legacy bare-JSON / inline values carry no blob at all.
-const BLOB_HOLD_HELPER_LUA = `
-local function gqParseHold(value)
+const BLOB_LEASE_HELPER_LUA =
+  GQ_BLOB_GRACE_LUA +
+  `
+local function gqTenantOf(groupId)
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then return string.sub(groupId, 1, slashPos - 1) end
+  return groupId
+end
+
+local function gqParseLease(value)
   local prefix = string.sub(value, 1, 4)
   if prefix ~= "GQ2|" and prefix ~= "GQ1|" then return nil end
   local barIdx = string.find(value, "|", 5, true)
@@ -438,48 +457,67 @@ local function gqParseHold(value)
       projectId = ref["projectId"],
       hash = ref["hash"],
       tier = ref["tier"],
-      token = header["h"],
+      holderId = header["h"],
     }
   end
   return nil
 end
 
--- Acquire the replacement value's hold and release the displaced value's, in
--- the caller's (atomic) eval. Tenant-guarded like the TS release path: a hold
--- whose ref is not this group's tenant is skipped and left to its TTL.
--- Returns the displaced blob's reclaim outcome:
---   0  nothing to reclaim here (still held, inline value, or skipped)
---   1  redis-tier blob UNLINKed in this eval (GQ2 last-holder or GQ1)
---   2  s3-tier blob newly unreferenced — the CALLER must delete the object
-local function gqSquashTransferHolds(keyPrefix, tenant, newValue, oldValue)
-  local newHold = gqParseHold(newValue)
-  local oldHold = gqParseHold(oldValue)
-  if newHold and newHold.kind == "gq2" and newHold.projectId == tenant then
-    local holderKey = keyPrefix .. "blobholders:" .. newHold.projectId .. "/" .. newHold.hash
-    redis.call("SADD", holderKey, newHold.token)
-    redis.call("EXPIRE", holderKey, ${BLOB_HOLDER_TTL_SECONDS})
+local function gqRedisNowMs()
+  local now = redis.call("TIME")
+  return (tonumber(now[1]) * 1000) + math.floor(tonumber(now[2]) / 1000)
+end
+
+local function gqTakeLease(keyPrefix, lease, nowMs)
+  local leaseKey = keyPrefix .. "blobleases:" .. lease.projectId .. "/" .. lease.hash
+  redis.call("ZREMRANGEBYSCORE", leaseKey, "-inf", nowMs)
+  redis.call("ZADD", leaseKey, nowMs + (${BLOB_LEASE_TTL_SECONDS} * 1000), lease.holderId)
+  redis.call("EXPIRE", leaseKey, ${BLOB_LEASE_SET_TTL_SECONDS})
+
+  -- Rolling-deploy compatibility: previous-release code still SREMs this set
+  -- and UNLINKs on empty. The guard makes "last holder" unobservable while new
+  -- leases exist; the mirrored token lets an old pod process the value safely.
+  local legacyKey = keyPrefix .. "blobholders:" .. lease.projectId .. "/" .. lease.hash
+  redis.call("SADD", legacyKey, "${LEGACY_HOLDER_LEASE_GUARD}", lease.holderId)
+  redis.call("EXPIRE", legacyKey, ${BLOB_LEASE_SET_TTL_SECONDS})
+  if lease.tier == "redis" then
+    redis.call("EXPIRE", keyPrefix .. "blob:" .. lease.projectId .. "/" .. lease.hash, ${BLOB_BACKSTOP_TTL_SECONDS})
   end
-  if not oldHold then return 0 end
-  if oldHold.kind == "gq1" then
-    redis.call("UNLINK", keyPrefix .. "blob:" .. oldHold.blobId)
+end
+
+-- Take the replacement lease and release the displaced lease in the caller's
+-- atomic stage eval. Tenant-mismatched refs are left to their backstops.
+local function gqSquashTransferLeases(keyPrefix, tenant, newValue, oldValue)
+  local newLease = gqParseLease(newValue)
+  local oldLease = gqParseLease(oldValue)
+  local nowMs = gqRedisNowMs()
+  if newLease and newLease.kind == "gq2" and newLease.projectId == tenant then
+    gqTakeLease(keyPrefix, newLease, nowMs)
+  end
+  if not oldLease then return 0 end
+  if oldLease.kind == "gq1" then
+    redis.call("UNLINK", keyPrefix .. "blob:" .. oldLease.blobId)
     return 1
   end
-  if oldHold.projectId ~= tenant then return 0 end
-  -- A same-set same-token pair is a self-transfer: keep the hold (mirror of
-  -- the standalone TRANSFER eval's guard).
-  if newHold and newHold.kind == "gq2" and newHold.projectId == oldHold.projectId
-     and newHold.hash == oldHold.hash and newHold.token == oldHold.token then
+  if oldLease.projectId ~= tenant then return 0 end
+  -- A same-set same-token pair is a renewal: gqTakeLease already moved its deadline.
+  if newLease and newLease.kind == "gq2" and newLease.projectId == oldLease.projectId
+     and newLease.hash == oldLease.hash and newLease.holderId == oldLease.holderId then
     return 0
   end
-  local oldHolderKey = keyPrefix .. "blobholders:" .. oldHold.projectId .. "/" .. oldHold.hash
-  if redis.call("SREM", oldHolderKey, oldHold.token) == 1 and redis.call("SCARD", oldHolderKey) == 0 then
-    redis.call("DEL", oldHolderKey)
-    if oldHold.tier == "redis" then
-      redis.call("UNLINK", keyPrefix .. "blob:" .. oldHold.projectId .. "/" .. oldHold.hash)
-      return 1
-    end
-    return 2
+  local oldLeaseKey = keyPrefix .. "blobleases:" .. oldLease.projectId .. "/" .. oldLease.hash
+  redis.call("ZREM", oldLeaseKey, oldLease.holderId)
+  redis.call("ZREMRANGEBYSCORE", oldLeaseKey, "-inf", nowMs)
+  local oldLegacyKey = keyPrefix .. "blobholders:" .. oldLease.projectId .. "/" .. oldLease.hash
+  redis.call("SREM", oldLegacyKey, oldLease.holderId)
+  -- Same grace window the standalone release eval applies: a displaced blob
+  -- nothing leases any more must not sit on the full backstop.
+  local oldBlobKey = ""
+  if oldLease.tier == "redis" then
+    oldBlobKey = keyPrefix .. "blob:" .. oldLease.projectId .. "/" .. oldLease.hash
   end
+  gqGraceExpireIfUnleased(oldLeaseKey, oldLegacyKey, oldBlobKey)
+  if redis.call("ZCARD", oldLeaseKey) == 0 then redis.call("DEL", oldLeaseKey) end
   return 0
 end
 
@@ -487,18 +525,18 @@ end
 -- post-dispatch survive-dispatch squash). Only a GQ1 blob is safe to delete
 -- here: its randomUUID id belongs to this value alone. A GQ2 blob is
 -- content-addressed and possibly shared with concurrently-staging producers
--- whose holds are acquired after their stage returns, so it is left to the
--- holders of staged jobs sharing its content or to the TTL backstop.
+-- whose leases are acquired during staging via gqTakeLease, so it is left to
+-- those leases or the TTL backstop.
 local function gqReclaimDiscardedNew(keyPrefix, value)
-  local hold = gqParseHold(value)
-  if hold and hold.kind == "gq1" then
-    redis.call("UNLINK", keyPrefix .. "blob:" .. hold.blobId)
+  local lease = gqParseLease(value)
+  if lease and lease.kind == "gq1" then
+    redis.call("UNLINK", keyPrefix .. "blob:" .. lease.blobId)
   end
 end
 `;
 
 const STAGE_LUA =
-  BLOB_HOLD_HELPER_LUA +
+  BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   `
@@ -553,24 +591,23 @@ if dedupId ~= "" and dedupTtlMs > 0 then
     if rank then
       -- Still in staging: squash in place (net zero pending count change). The
       -- squash drops one payload on the floor. On replace the OLD stored value
-      -- is displaced and its blob hold is moved to the replacement HERE, in
+      -- is displaced and its blob lease is moved to the replacement HERE, in
       -- the same eval as the displacement — a fire-and-forget transfer after
       -- the eval can reorder against a concurrent squash of the same dedup id
-      -- and leave a phantom hold (the 2026-07-09 leak). Without replace the
+      -- and leave a phantom lifecycle entry (the 2026-07-09 leak). Without replace the
       -- NEW value we were just handed is the one discarded; it was never
-      -- staged, so no hold may be recorded for it: a discarded GQ1 blob
+      -- staged, so no lease may be recorded for it: a discarded GQ1 blob
       -- (uniquely owned by this value) is unlinked directly, while a GQ2 blob
-      -- is content-addressed and left to the holders of jobs sharing its
+      -- is content-addressed and left to the leases of jobs sharing its
       -- content, or to the TTL backstop.
       local orphanedValue = jobDataJson
-      local reclaimS3 = 0
       if shouldExtend == 1 then
         redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
       end
       if shouldReplace == 1 then
         orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
         redis.call("HSET", dataKey, existingJobId, jobDataJson)
-        reclaimS3 = gqSquashTransferHolds(parkKeyPrefixOf(readyKey), parkTenantOf(groupId), jobDataJson, orphanedValue)
+        gqSquashTransferLeases(parkKeyPrefixOf(readyKey), parkTenantOf(groupId), jobDataJson, orphanedValue)
       else
         gqReclaimDiscardedNew(parkKeyPrefixOf(readyKey), jobDataJson)
       end
@@ -582,26 +619,29 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
       redis.call("LPUSH", signalKey, "1")
       redis.call("LTRIM", signalKey, 0, 999)
-      return {0, orphanedValue, reclaimS3}
+      return {0, orphanedValue}
     end
     -- Already dispatched. Default: the dedup key is stale, clean it up and let a
     -- new job stage (the historical TOCTOU behavior). When shouldSurviveDispatch is
     -- set, HONOR the still-alive TTL instead — squash the new job and report its
-    -- payload as the orphaned value (same {code, orphanedValue, reclaimS3}
-    -- three-element shape the in-staging squash returns, reclaimS3 always 0
-    -- here) so a late re-trigger after dispatch cannot re-run it (#3912).
-    -- The discarded value was never staged: no hold is recorded for it, and a
+    -- payload as the orphaned value so a late re-trigger after dispatch cannot
+    -- re-run it (#3912).
+    -- The discarded value was never staged: no lease is recorded for it, and a
     -- GQ1 blob (uniquely owned by this value) is reclaimed here.
     if shouldSurviveDispatch == 1 then
       gqReclaimDiscardedNew(parkKeyPrefixOf(readyKey), jobDataJson)
-      return {0, jobDataJson, 0}
+      return {0, jobDataJson}
     end
     redis.call("DEL", dedupKey)
   end
 end
 
-redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
+local inserted = redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
 redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+local stagedLease = gqParseLease(jobDataJson)
+if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == parkTenantOf(groupId) then
+  gqTakeLease(parkKeyPrefixOf(readyKey), stagedLease, gqRedisNowMs())
+end
 refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
 if dedupId ~= "" and dedupTtlMs > 0 then
@@ -616,15 +656,21 @@ end
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 
--- New job staged: increment total pending counter
-redis.call("INCR", totalPendingKey)
+-- Counter conservation (specs/event-sourcing/pending-counter-conservation
+-- .feature): INCR only when the ZADD actually inserted a member. A re-send of
+-- the same stagedJobId (at-least-once event delivery) updates the member in
+-- place; an unconditional INCR here has no compensating DECR and drifts the
+-- counter upward permanently. Mirrors RETRY_RESTAGE_LUA's inserted guard.
+if inserted == 1 then
+  redis.call("INCR", totalPendingKey)
+end
 
--- A genuinely new stage displaces nothing, so there is no blob to reclaim.
-return {1, "", 0}
+-- A genuinely new stage displaces nothing; its lease was taken with the HSET.
+return {1, ""}
 `;
 
 const STAGE_BATCH_LUA =
-  BLOB_HOLD_HELPER_LUA +
+  BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   `
@@ -644,10 +690,8 @@ local nowMs        = tonumber(ARGV[#ARGV - 1])
 local newStagedCount = 0
 local affectedGroups = {}
 -- Per-job (index-aligned) displaced values; "" for a genuine new stage.
--- Mirrors STAGE_LUA's single-job report. Holds are transferred in this eval;
--- reclaimS3Flags marks (per job) an s3-tier blob the CALLER must delete.
+-- Mirrors STAGE_LUA's single-job report. Leases are transferred in this eval.
 local orphanedValues = {}
-local reclaimS3Flags = {}
 
 for i = 1, count do
   -- Per-job stride is 9: stagedJobId..shouldReplace (8) + shouldSurviveDispatch
@@ -672,7 +716,6 @@ for i = 1, count do
 
   local isDeduped = false
   local orphanedValue = ""
-  local reclaimS3 = 0
   -- True only for the post-dispatch squash (already-dispatched dedup honored):
   -- that item stages no job AND the deduped job is already gone, so it must NOT
   -- contribute this group to the post-loop ready bookkeeping (see below).
@@ -683,9 +726,9 @@ for i = 1, count do
       local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
       if rank then
         -- Still in staging: squash in place. On replace the OLD stored value is
-        -- displaced and its hold moved to the replacement here, atomic with the
+        -- displaced and its lease moved to the replacement here, atomic with the
         -- displacement (see STAGE_LUA); else the NEW value we were handed is
-        -- dropped, was never staged, and gets no hold.
+        -- dropped, was never staged, and gets no lease.
         orphanedValue = jobDataJson
         if shouldExtend == 1 then
           redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
@@ -693,7 +736,7 @@ for i = 1, count do
         if shouldReplace == 1 then
           orphanedValue = redis.call("HGET", dataKey, existingJobId) or ""
           redis.call("HSET", dataKey, existingJobId, jobDataJson)
-          reclaimS3 = gqSquashTransferHolds(keyPrefix, parkTenantOf(groupId), jobDataJson, orphanedValue)
+          gqSquashTransferLeases(keyPrefix, parkTenantOf(groupId), jobDataJson, orphanedValue)
         else
           gqReclaimDiscardedNew(keyPrefix, jobDataJson)
         end
@@ -718,15 +761,24 @@ for i = 1, count do
   end
 
   if not isDeduped then
-    redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
+    -- Counter conservation: count only members the ZADD actually inserted
+    -- (see STAGE_LUA). A duplicate stagedJobId — re-delivered event id, or
+    -- the same payload twice in one batch — updates in place and must not
+    -- inflate newStagedCount, which feeds the total-pending INCRBY below.
+    local inserted = redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
     redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+    local stagedLease = gqParseLease(jobDataJson)
+    if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
+      gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+    end
     if dedupId ~= "" and dedupTtlMs > 0 then
       redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
     end
-    newStagedCount = newStagedCount + 1
+    if inserted == 1 then
+      newStagedCount = newStagedCount + 1
+    end
   end
   orphanedValues[i] = orphanedValue
-  reclaimS3Flags[i] = reclaimS3
 
   refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
@@ -766,228 +818,7 @@ if newStagedCount > 0 then
   redis.call("INCRBY", totalPendingKey, newStagedCount)
 end
 
-return {newStagedCount, orphanedValues, reclaimS3Flags}
-`;
-
-const DISPATCH_LUA =
-  PARK_HELPER_LUA +
-  WATER_LEVEL_HELPER_LUA +
-  ROUTING_META_HELPER_LUA +
-  `
-local readyKey         = KEYS[1]
-local blockedKey       = KEYS[2]
-local pausedJobKey     = KEYS[3]
-local totalPendingKey  = KEYS[4]
-
-local keyPrefix    = ARGV[1]
-local nowMs        = tonumber(ARGV[2])
-local activeTtlSec = tonumber(ARGV[3])
--- Static operator soft-cap (post-2026-05-11 incident follow-up). 0 = explicit
--- kill switch (LANGWATCH_DISPATCH_TENANT_CAP=0): no cap, no parking. > 0 is the
--- per-tenant in-flight ceiling AND the fail-protective fallback for the dynamic
--- cap below. The tenantId is the groupId prefix (segment before first '/').
-local staticCap    = tonumber(ARGV[4]) or 0
--- Global in-flight budget for the DYNAMIC water-level cap (option C). It is the
--- hard ceiling = pods x concurrency; the water-fill divides the WHOLE capacity.
--- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
-local globalBudget = tonumber(ARGV[5]) or 0
-
-local hasPauses = redis.call("SCARD", pausedJobKey) > 0
-local activeUntil = nowMs + activeTtlSec * 1000
-
--- Restore parked over-cap groups + recompute the water-level on a cadence (TRAP 2
--- orphan recovery + cap=0 drain). COMPLETE-unpark handles the normal slot-freeing
--- as jobs finish; this only backstops what it can't: a crashed/timed-out tenant
--- that never fires COMPLETE (its in-flight slots lapse out of the live count as
--- their expiry scores pass = back under cap = unpark), and flipping the cap off
--- (drain everything parked). Time-gated and single-pod via reconcile-ts, so the
--- water-fill rides the same proven cadence at near-zero marginal cost.
-local reconcileTsKey = keyPrefix .. "reconcile-ts"
-local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
-if (nowMs - lastReconcile) >= ${RECONCILE_INTERVAL_MS} then
-  redis.call("SET", reconcileTsKey, nowMs)
-  -- Recompute W before reconciling so unpark uses the fresh cap. Only when the
-  -- cap is on (staticCap=0 is the kill switch) and a budget is configured.
-  if staticCap > 0 and globalBudget > 0 then
-    recomputeDynamicCap(keyPrefix, globalBudget, nowMs)
-  end
-  if redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
-    local reconcileCap = staticCap
-    if staticCap > 0 and globalBudget > 0 then
-      reconcileCap = effectiveCap(keyPrefix, staticCap)
-    end
-    reconcileParked(readyKey, keyPrefix, reconcileCap, nowMs)
-  end
-end
-
--- Effective per-tenant cap for this dispatch: the dynamic water-level when a
--- budget is configured, else the static cap. staticCap=0 (kill switch) always
--- wins and disables parking entirely.
-local tenantCap = staticCap
-if staticCap > 0 and globalBudget > 0 then
-  tenantCap = effectiveCap(keyPrefix, staticCap)
-end
-
--- Scan ready in priority order and dispatch ONE due job. effCap gates the
--- per-tenant in-flight cap (0 = cap off). bypassPark skips the over-cap PARKING
--- decision (used by the work-conserving override) while STILL recording the
--- in-flight slot, so an override dispatch is counted against its tenant.
--- Page through the ready zset so a head full of paused / blocked / legacy-drift
--- entries does not return nil while eligible work exists later.
-local function scanAndDispatch(effCap, bypassPark)
-  local pageSize = 200
-  -- Widen the scan budget when the cap is on so a head full of one tenant's
-  -- over-cap groups (correctly skipped but still counted) cannot starve tenants
-  -- deeper in the zset. The explicit cost of the cap: more work per poll.
-  local scanBudget = 1000
-  if effCap > 0 then scanBudget = 10000 end
-  local offset = 0
-  -- Cache tenant cap lookups within this scan to avoid redundant GETs.
-  local tenantCapCache = {}
-
-  while offset < scanBudget do
-    local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
-    if #groups == 0 then return nil end
-
-    for _, groupId in ipairs(groups) do
-      if redis.call("SISMEMBER", blockedKey, groupId) == 0 then
-        -- Tenant cap check (no-op when effCap == 0). capTenantId is resolved
-        -- regardless of bypassPark so the in-flight slot is still recorded; only
-        -- the PARK decision is skipped under bypassPark.
-        local tenantOverCap = false
-        local capTenantId = nil
-        if effCap > 0 then
-          local slashPos = string.find(groupId, "/", 1, true)
-          if slashPos and slashPos > 1 then
-            capTenantId = string.sub(groupId, 1, slashPos - 1)
-            if not bypassPark then
-              local cached = tenantCapCache[capTenantId]
-              if cached == nil then
-                cached = tenantActiveCount(keyPrefix .. "tenant_active_z:", capTenantId, nowMs) >= effCap
-                tenantCapCache[capTenantId] = cached
-              end
-              if cached then
-                tenantOverCap = true
-                -- Park the over-cap group OUT of ready (once) so subsequent polls
-                -- reach other tenants without re-scanning it. Restored when the
-                -- tenant's in-flight count drops below cap (COMPLETE / reconcile).
-                parkGroup(readyKey, groupId)
-              end
-            end
-          end
-        end
-
-        -- Tenant-level pause: park the group OUT of ready (like over-cap) rather
-        -- than skip it in place. A paused tenant can hold a huge due-now backlog;
-        -- left in ready it sits at the front and the bounded scan burns its whole
-        -- budget skipping it, starving every other tenant (the 2026-05-27 stall).
-        local tenantPaused = false
-        if hasPauses then
-          if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
-            tenantPaused = true
-            parkGroup(readyKey, groupId)
-          end
-        end
-
-        local activeKey = keyPrefix .. "group:" .. groupId .. ":active"
-        -- Defensive activeKey check — covers legacy state during migration
-        -- and the small race between ZADD ready and ZADD active.
-        local activeJob = redis.call("GET", activeKey)
-        if (not activeJob) and (not tenantOverCap) and (not tenantPaused) then
-          local jobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
-          local results = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, 1)
-
-          if #results >= 2 then
-            local stagedJobId = results[1]
-            local originalScore = results[2]
-
-            -- Check pause status before dequeuing
-            local paused = false
-            if hasPauses then
-              local slashIdx = string.find(groupId, "/", 1, true)
-              local tenantId = slashIdx and string.sub(groupId, 1, slashIdx - 1) or groupId
-              if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. tenantId) == 1 then
-                paused = true
-              end
-
-              if not paused then
-                local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-                local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-                if jobDataJson then
-                  local p, t, n = gqRoutingMeta(jobDataJson)
-                  local pIsStr = type(p) == "string"
-                  local tIsStr = type(t) == "string"
-                  local nIsStr = type(n) == "string"
-                  if pIsStr then
-                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
-                    end
-                  end
-                end
-              end
-            end
-
-            if not paused then
-              redis.call("ZREM", jobsKey, stagedJobId)
-              redis.call("DECR", totalPendingKey)
-              redis.call("SET", activeKey, stagedJobId, "EX", activeTtlSec)
-
-              -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
-              redis.call("ZADD", readyKey, activeUntil, groupId)
-
-              -- Tenant in-flight slot (self-healing ZSET; only when cap is set).
-              -- Recorded even under bypassPark so override dispatches are counted.
-              if effCap > 0 and capTenantId then
-                tenantActiveAdd(keyPrefix .. "tenant_active_z:", capTenantId, groupId, activeUntil)
-              end
-
-              local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-              local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-              redis.call("HDEL", dataKey, stagedJobId)
-
-              return {stagedJobId, groupId, jobDataJson or "", originalScore}
-            end
-          else
-            -- Group is in ready but has no due jobs — drift cleanup.
-            local pendingCount = redis.call("ZCARD", jobsKey)
-            if pendingCount == 0 then
-              redis.call("ZREM", readyKey, groupId)
-            else
-              -- All jobs are future-scheduled; re-score ready with earliest job's score
-              local nextScore = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
-              if #nextScore >= 2 then
-                redis.call("ZADD", readyKey, tonumber(nextScore[2]), groupId)
-              end
-            end
-          end
-        end
-      end
-    end
-
-    if #groups < pageSize then return nil end
-    offset = offset + pageSize
-  end
-
-  return nil
-end
-
-local r = scanAndDispatch(tenantCap, false)
-if r then return r end
-
--- Work-conserving override: nothing was admittable under the cap, but over-cap
--- work is parked while this slot would otherwise idle. Fairness binds ONLY under
--- contention; a slot free here means no contention, so exceed the per-tenant cap
--- W (never the global ceiling G — that is bounded by this pod's free slots)
--- rather than idle, which is the static-cap idle-behind-cap waste this feature
--- removes. Unpark the least-served over-cap tenant and dispatch it, parking
--- bypassed for the pass. Only when the cap is active (tenantCap>0).
-if globalBudget > 0 and tenantCap > 0 and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
-  unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs, 1)
-  return scanAndDispatch(tenantCap, true)
-end
-
-return nil
+return {newStagedCount, orphanedValues}
 `;
 
 const DISPATCH_BATCH_LUA =
@@ -1004,10 +835,14 @@ local keyPrefix      = ARGV[1]
 local nowMs          = tonumber(ARGV[2])
 local activeTtlSec   = tonumber(ARGV[3])
 local maxJobs        = tonumber(ARGV[4])
--- Static operator soft-cap (0 = kill switch). See DISPATCH_LUA comment.
+-- Static operator soft-cap (post-2026-05-11 incident follow-up). 0 = explicit
+-- kill switch (LANGWATCH_DISPATCH_TENANT_CAP=0): no cap, no parking. > 0 is the
+-- per-tenant in-flight ceiling AND the fail-protective fallback for the dynamic
+-- cap below. The tenantId is the groupId prefix (segment before first '/').
 local staticCap      = tonumber(ARGV[5]) or 0
--- Global in-flight budget = hard ceiling for the dynamic water-level cap.
--- 0 = dynamic disabled, static cap unchanged (back-compat). See DISPATCH_LUA.
+-- Global in-flight budget for the DYNAMIC water-level cap (option C). It is the
+-- hard ceiling = pods x concurrency; the water-fill divides the WHOLE capacity.
+-- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
 local globalBudget   = tonumber(ARGV[6]) or 0
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
@@ -1015,9 +850,13 @@ local activeUntil = nowMs + activeTtlSec * 1000
 local results = {}
 
 -- Restore parked over-cap groups + recompute the water-level on a cadence (TRAP 2
--- orphan recovery + cap=0 drain) — see DISPATCH_LUA for the rationale. Time- and
--- SCARD-gated so it is a no-op at the cap=0 steady state; the water-fill rides
--- the same single-pod reconcile-ts cadence at near-zero marginal cost.
+-- orphan recovery + cap=0 drain). COMPLETE-unpark handles the normal slot-freeing
+-- as jobs finish; this only backstops what it can't: a crashed/timed-out tenant
+-- that never fires COMPLETE (its in-flight slots lapse out of the live count as
+-- their expiry scores pass = back under cap = unpark), and flipping the cap off
+-- (drain everything parked). Time- and SCARD-gated so it is a no-op at the cap=0
+-- steady state and single-pod via reconcile-ts; the water-fill rides the same
+-- proven cadence at near-zero marginal cost.
 local reconcileTsKey = keyPrefix .. "reconcile-ts"
 local lastReconcile = tonumber(redis.call("GET", reconcileTsKey)) or 0
 if (nowMs - lastReconcile) >= ${RECONCILE_INTERVAL_MS} then
@@ -1055,11 +894,26 @@ local function scanBatch(effCap, bypassPark, dispatched)
   local scanBudget = pageSize * 5
   if effCap > 0 then scanBudget = pageSize * 50 end
   local offset = 0
+  -- Work bound: total entries EXAMINED this eval, independent of the offset.
+  -- The offset stalls when a whole page is parked out of ready (the zset
+  -- shifts left under it); bounding on the offset alone would then let one
+  -- eval park an unbounded backlog and block the single Redis thread.
+  local scanned = 0
   local tenantCapCache = {}
 
-  while offset < scanBudget and dispatched < maxJobs do
+  while scanned < scanBudget and dispatched < maxJobs do
     local groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
     if #groups == 0 then break end
+    scanned = scanned + #groups
+
+    -- Groups this page removed from the due window (parked, dispatched, or
+    -- drift-cleaned). Removals shift the zset left under the offset-based
+    -- pagination, so the offset must advance only past entries that STAYED
+    -- (blocked / job-paused / active). Advancing by the raw pageSize skipped
+    -- the shifted entries — with a small page and a head full of one over-cap
+    -- tenant, the scan could page past a quiet tenant's only group and return
+    -- empty while eligible work existed.
+    local removed = 0
 
     for _, groupId in ipairs(groups) do
       if dispatched >= maxJobs then break end
@@ -1081,7 +935,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
             end
             if cached then
               tenantOverCap = true
-              parkGroup(readyKey, groupId)
+              removed = removed + parkGroup(readyKey, groupId)
             end
           end
         end
@@ -1093,7 +947,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
       if hasPauses then
         if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
           tenantPaused = true
-          parkGroup(readyKey, groupId)
+          removed = removed + parkGroup(readyKey, groupId)
         end
       end
 
@@ -1164,9 +1018,15 @@ local function scanBatch(effCap, bypassPark, dispatched)
               results[#results + 1] = jobDataJson or ""
               results[#results + 1] = tostring(originalScore)
               dispatched = dispatched + 1
+              -- The activeUntil re-score above moved the group out of the due
+              -- window: it no longer occupies a slot in the next page read.
+              removed = removed + 1
             end
           else
-            -- Group is in ready but has no due jobs — drift cleanup.
+            -- Group is in ready but has no due jobs — drift cleanup. Both
+            -- branches take the group out of the due window (ZREM, or a
+            -- re-score to the earliest pending job which is necessarily in
+            -- the future — a due job would have dispatched above).
             local pendingCount = redis.call("ZCARD", jobsKey)
             if pendingCount == 0 then
               redis.call("ZREM", readyKey, groupId)
@@ -1177,6 +1037,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 redis.call("ZADD", readyKey, tonumber(nextScore[2]), groupId)
               end
             end
+            removed = removed + 1
           end
         end
       end
@@ -1184,7 +1045,9 @@ local function scanBatch(effCap, bypassPark, dispatched)
     end
 
     if #groups < pageSize then break end
-    offset = offset + pageSize
+    -- Advance only past the entries that stayed in the due window; the removed
+    -- ones shifted everything after them left by exactly that many positions.
+    offset = offset + #groups - removed
   end
 
   return dispatched
@@ -1268,12 +1131,12 @@ local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
 local jobName      = ARGV[3]
 -- Tenant in-flight ZSET key prefix. When the soft-cap is enabled in
--- DISPATCH_LUA, completing a job must remove this group's slot from the
+-- DISPATCH_BATCH_LUA, completing a job must remove this group's slot from the
 -- per-tenant ZSET so freed slots are picked up by other tenants. Passing the
 -- prefix in (not a derived tenantId) lets us keep the cap optional without
 -- breaking back-compat with older call sites.
 local tenantCountKeyPrefix = ARGV[4]
--- Static operator soft-cap (same value DISPATCH_LUA reads). When > 0, a
+-- Static operator soft-cap (same value DISPATCH_BATCH_LUA reads). When > 0, a
 -- completion frees a slot that may let one of the tenant's parked over-cap
 -- groups resume, so we unpark up to the freed headroom. 0 = cap disabled.
 local staticCap = tonumber(ARGV[5]) or 0
@@ -1400,6 +1263,7 @@ return 0
 `;
 
 const RESTAGE_AND_BLOCK_LUA =
+  BLOB_LEASE_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
   `
 local blockedKey      = KEYS[1]
@@ -1430,6 +1294,10 @@ redis.call("SADD", blockedKey, groupId)
 -- 2. Re-stage the failed job with a new ID
 local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+local stagedLease = gqParseLease(jobDataJson)
+if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
+  gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+end
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
@@ -1475,6 +1343,7 @@ return 1
 `;
 
 const RETRY_RESTAGE_LUA =
+  BLOB_LEASE_HELPER_LUA +
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   `
@@ -1505,6 +1374,10 @@ local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
 local inserted = redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+local stagedLease = gqParseLease(jobDataJson)
+if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
+  gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+end
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
@@ -1517,10 +1390,16 @@ refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 local readyKey = keyPrefix .. "ready"
 addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 
--- 4. Set active key TTL to match backoff period.
---    While the key exists the group is locked (preserves FIFO ordering).
---    When it expires the dispatcher picks up the retry job on its next poll.
-redis.call("EXPIRE", activeKey, retryTtlSec)
+-- 4. Rotate the active key to the NEW staged-job id with a TTL matching the
+--    backoff period. While the key exists the group is locked (preserves FIFO
+--    ordering); when it expires the dispatcher picks up the retry on its next
+--    poll. Rotating the VALUE (not just EXPIRE-ing the old one) invalidates
+--    the retired job id: the worker's activeKey heartbeat interval is still
+--    armed for a few awaits after this eval returns (blob transfer, audit
+--    write), and a late REFRESH matching the old id would reset this TTL to
+--    the full activeTtlSec and push the ready score out with it — delaying
+--    the retry by up to activeTtlSec instead of the backoff.
+redis.call("SET", activeKey, newStagedJobId, "EX", retryTtlSec)
 
 -- 5. Bump this slot's expiry score in lockstep with the activeKey TTL so the
 -- soft cap stays accurate during backoff windows. XX (below) only updates an
@@ -1562,19 +1441,19 @@ export interface DrainedJob {
 /**
  * Default tenant soft-cap when LANGWATCH_DISPATCH_TENANT_CAP is unset.
  *
- * Chosen as `GLOBAL_QUEUE_CONCURRENCY` (the per-worker-pod concurrency
- * default — see groupQueue.ts), which means "no tenant can hold more
- * than one pod's worth of in-flight slots". Sizing rationale:
+ * Chosen as half a worker pod's default concurrency (GLOBAL_QUEUE_CONCURRENCY,
+ * 100 — see groupQueue.ts), so no tenant can hold more than half of one pod's
+ * in-flight slots. Sizing rationale:
  *
  *   - On a multi-pod cluster (e.g. 4 pods × 100 concurrency = 400
- *     total slots), a single tenant is capped at 25% of cluster
+ *     total slots), a single tenant is capped at 12.5% of cluster
  *     capacity. Strong protection against noisy-neighbour starvation
  *     like the 2026-05-11 incident, while leaving ample headroom for
  *     legitimate single-tenant bursts at observed peak loads.
  *
- *   - On a 1-pod self-hosted install, the cap equals total cluster
- *     capacity → effectively unlimited for normal use, but still bounds
- *     a pathological runaway loop below catastrophic.
+ *   - On a 1-pod self-hosted install, the cap is half of total
+ *     capacity → generous for normal use, but still bounds a
+ *     pathological runaway loop below catastrophic.
  *
  *   - Operators can still set LANGWATCH_DISPATCH_TENANT_CAP=0 to
  *     disable entirely (incident kill-switch), or set a different
@@ -1612,7 +1491,7 @@ function readNonNegativeIntEnv({
 
 /**
  * Read the tenant soft-cap from the environment.
- * Post-2026-05-11 incident follow-up; see DISPATCH_LUA comment for design.
+ * Post-2026-05-11 incident follow-up; see the DISPATCH_BATCH_LUA comment for design.
  * Symbol is captured in env-create.mjs for schema discoverability; we
  * read process.env directly at call time so tests can mutate it without
  * re-importing the frozen env module.
@@ -1663,6 +1542,42 @@ export function readClaimStrikeThreshold(): number {
 }
 
 /**
+ * Default consecutive-failure count that quarantines (blocks) a group.
+ *
+ * Deliberately high: a single group failing this many times inside the TTL
+ * window with ZERO interleaved successes is unambiguously a runaway — a producer
+ * minting fresh jobs for one group faster than they drain — not a healthy group
+ * riding out a transient downstream blip. Prod incident 2026-07-20: one trace's
+ * span-sync group churned ~5 fresh jobs/min for 14h against an unmet
+ * precondition, taking ~a quarter of the shared queue, yet never tripped the
+ * per-JOB `maxAttempts` cap because every failure was a NEW attempt-1 job. This
+ * breaker counts failures ACROSS a group's jobs so the group itself terminates.
+ */
+export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
+
+/**
+ * The failure streak self-expires so a group that fails sparsely (well below its
+ * success rate) never accumulates to the threshold from blips hours apart.
+ * Refreshed on every failure, so an actively-churning group keeps its count; the
+ * group's next success clears it outright.
+ */
+export const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
+
+/**
+ * Read the group-quarantine failure-streak threshold from the environment.
+ * Mirrors {@link readClaimStrikeThreshold}:
+ *   - unset / empty / non-numeric / negative → DEFAULT_GROUP_QUARANTINE_THRESHOLD
+ *   - "0" → 0 (explicit kill switch — the breaker is disabled)
+ *   - positive integer → that integer
+ */
+export function readGroupQuarantineThreshold(): number {
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD",
+    fallback: DEFAULT_GROUP_QUARANTINE_THRESHOLD,
+  });
+}
+
+/**
  * Global in-flight budget for the dynamic water-level cap (option C, 2026-05-29).
  * 0 (the default) disables the dynamic cap: dispatch falls back to the fixed
  * per-tenant `readTenantCap()` and behaves exactly as before — the feature ships
@@ -1707,7 +1622,6 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
 // 11-23 KB script body (see CachedLuaScript).
 const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
-const dispatchScript = new CachedLuaScript(DISPATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const completeScript = new CachedLuaScript(COMPLETE_LUA);
@@ -1745,15 +1659,14 @@ export class GroupStagingScripts {
    * stale dedup key is cleaned up and the new job is staged as genuinely new.
    *
    * A squash drops one payload (the replaced old value, or the discarded new
-   * value when `replace` is off). Blob holds move INSIDE the eval, atomic with
+   * value when `replace` is off). Blob leases move INSIDE the eval, atomic with
    * the displacement (a post-eval transfer can reorder against a concurrent
-   * squash and leave a phantom hold — the 2026-07-09 leak). `orphanedValue`
-   * reports the displaced value ("" for a genuine new stage); when its blob is
-   * s3-tier and newly unreferenced, `reclaimS3` is true and the CALLER must
-   * delete the object (Lua cannot reach s3).
+   * squash and leave a phantom entry — the 2026-07-09 leak). `orphanedValue`
+   * reports the displaced value ("" for a genuine new stage). Lease
+   * transitions never delete blobs eagerly.
    *
-   * @returns `isNew` (true if staged fresh, false if deduped), the displaced
-   *   `orphanedValue`, and whether its s3 object needs out-of-band reclaim.
+   * @returns `isNew` (true if staged fresh, false if deduped) and the displaced
+   *   `orphanedValue`.
    */
   async stage({
     stagedJobId,
@@ -1775,7 +1688,7 @@ export class GroupStagingScripts {
     shouldExtend?: boolean;
     shouldReplace?: boolean;
     shouldSurviveDispatch?: boolean;
-  }): Promise<{ isNew: boolean; orphanedValue: string; reclaimS3: boolean }> {
+  }): Promise<{ isNew: boolean; orphanedValue: string }> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -1814,26 +1727,24 @@ export class GroupStagingScripts {
       String(shouldSurviveDispatch ? 1 : 0),
     );
 
-    // STAGE_LUA returns [code, orphanedValue, reclaimS3]. Tolerate a bare
+    // STAGE_LUA returns [code, orphanedValue]. Tolerate a bare
     // integer reply defensively (e.g. a stale cached script during a rolling
     // deploy).
-    const [code, orphanedValue, reclaimS3] = Array.isArray(result)
-      ? (result as [number, unknown, unknown])
-      : [result as number, "", 0];
+    const [code, orphanedValue] = Array.isArray(result)
+      ? (result as [number, unknown])
+      : [result as number, ""];
     return {
       isNew: Number(code) === 1,
       orphanedValue: orphanedValue == null ? "" : String(orphanedValue),
-      reclaimS3: Number(reclaimS3) === 2,
     };
   }
 
   /**
    * Stage a batch of jobs into their respective group queues.
    *
-   * @returns `newStagedCount` (new jobs, excluding deduped), the index-aligned
-   *   `orphanedValues` of squashed jobs (`""` where nothing was displaced), and
-   *   index-aligned `reclaimS3Flags` marking displaced s3-tier blobs the caller
-   *   must delete out of band. Holds move inside the eval — see {@link stage}.
+   * @returns `newStagedCount` (new jobs, excluding deduped) and the
+   *   index-aligned `orphanedValues` of squashed jobs (`""` where nothing was
+   *   displaced). Leases move inside the eval — see {@link stage}.
    */
   async stageBatch(
     jobs: Array<{
@@ -1850,10 +1761,8 @@ export class GroupStagingScripts {
   ): Promise<{
     newStagedCount: number;
     orphanedValues: string[];
-    reclaimS3Flags: boolean[];
   }> {
-    if (jobs.length === 0)
-      return { newStagedCount: 0, orphanedValues: [], reclaimS3Flags: [] };
+    if (jobs.length === 0) return { newStagedCount: 0, orphanedValues: [] };
 
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -1891,25 +1800,28 @@ export class GroupStagingScripts {
       ...args,
     );
 
-    // STAGE_BATCH_LUA returns [newStagedCount, orphanedValues[], reclaimS3Flags[]].
+    // STAGE_BATCH_LUA returns [newStagedCount, orphanedValues[]].
     // Tolerate a bare integer reply defensively (stale cached script mid-deploy).
     if (Array.isArray(result)) {
-      const [count, orphans, s3Flags] = result as [number, unknown, unknown];
+      const [count, orphans] = result as [number, unknown];
       return {
         newStagedCount: Number(count),
         orphanedValues: Array.isArray(orphans)
           ? orphans.map((v) => (v == null ? "" : String(v)))
           : [],
-        reclaimS3Flags: Array.isArray(s3Flags)
-          ? s3Flags.map((v) => Number(v) === 2)
-          : [],
       };
     }
-    return { newStagedCount: Number(result), orphanedValues: [], reclaimS3Flags: [] };
+    return { newStagedCount: Number(result), orphanedValues: [] };
   }
 
   /**
-   * Pick the highest-weight ready group and pop its oldest eligible job.
+   * Pick the next eligible group and pop its oldest due job.
+   *
+   * Thin wrapper over {@link dispatchBatch} with maxJobs=1. A dedicated
+   * single-dispatch Lua script used to live here as a near-duplicate of the
+   * batch body; no production caller used it (the dispatcher loop only
+   * batches) and the duplication invited drift between the two scan paths,
+   * so it was removed. One script, one behavior.
    *
    * @returns dispatch result or null if nothing to dispatch
    */
@@ -1920,39 +1832,8 @@ export class GroupStagingScripts {
     nowMs: number;
     activeTtlSec: number;
   }): Promise<DispatchResult | null> {
-    const readyKey = `${this.keyPrefix}ready`;
-    const blockedKey = `${this.keyPrefix}blocked`;
-    const pausedJobKey = `${this.keyPrefix}paused-jobs`;
-    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
-
-    // Tenant soft-cap (post-2026-05-11 follow-up). 0 = disabled.
-    // Env var lets operators flip on per-environment without redeploy.
-    const tenantCap = readTenantCap();
-
-    const result = await dispatchScript.run(
-      this.redis,
-      4,
-      readyKey,
-      blockedKey,
-      pausedJobKey,
-      totalPendingKey,
-      this.keyPrefix,
-      String(nowMs),
-      String(activeTtlSec),
-      String(tenantCap),
-      String(readGlobalBudget()),
-    );
-
-    if (!result || !Array.isArray(result) || result.length < 4) {
-      return null;
-    }
-
-    return {
-      stagedJobId: String(result[0]),
-      groupId: String(result[1]),
-      jobDataJson: String(result[2]),
-      originalScore: Number(result[3]),
-    };
+    const results = await this.dispatchBatch({ nowMs, activeTtlSec, maxJobs: 1 });
+    return results[0] ?? null;
   }
 
   /**
@@ -2280,6 +2161,35 @@ export class GroupStagingScripts {
     const raw = await this.redis.get(this.claimStrikesKey(groupId));
     const n = raw === null ? 0 : Number.parseInt(raw, 10);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  private failStreakKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:failstreak`;
+  }
+
+  /**
+   * Group-quarantine failure streak (specs/event-sourcing/poison-group-park-guard.feature).
+   * INCR'd on every RETRYABLE job failure in a group and cleared on the group's
+   * next success (see {@link clearGroupFailures}), so it counts consecutive
+   * failures ACROSS a group's jobs — the runaway signal the per-job `maxAttempts`
+   * cap misses when each failure is a fresh attempt-1 job. The TTL keeps a
+   * sparsely-failing group from accumulating a count from blips hours apart.
+   *
+   * @returns the streak count including this failure
+   */
+  async recordGroupFailure(groupId: string): Promise<number> {
+    const key = this.failStreakKey(groupId);
+    const results = await this.redis
+      .multi()
+      .incr(key)
+      .expire(key, GROUP_QUARANTINE_TTL_SECONDS)
+      .exec();
+    const count = results?.[0]?.[1];
+    return typeof count === "number" ? count : 0;
+  }
+
+  async clearGroupFailures(groupId: string): Promise<void> {
+    await this.redis.del(this.failStreakKey(groupId));
   }
 
   /**

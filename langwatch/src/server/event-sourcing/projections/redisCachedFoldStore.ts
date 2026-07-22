@@ -4,10 +4,17 @@ import type { Redis } from "ioredis";
 import {
   incrementEsFoldCacheRedisError,
   incrementEsFoldCacheTotal,
+  incrementEsFoldDedupUnavailable,
+  observeEsFoldCacheEntryBytes,
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
 } from "~/server/metrics";
 import type { FoldProjectionStore } from "./foldProjection.types";
+import {
+  decodeFoldCacheEntry,
+  encodeFoldCacheEntry,
+  mergeAppliedEventIds,
+} from "./foldCache/foldCacheEntry";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:redis-cached-fold-store");
@@ -16,32 +23,21 @@ export interface RedisCachedFoldStoreOptions<State = unknown> {
   keyPrefix: string;
   ttlSeconds?: number;
   /**
-   * Optional projection applied to the fold state before it is cached in Redis.
-   * The inner store still receives the FULL state (ClickHouse is the durable
-   * source of truth); only the Redis cache entry is leaned. Use this to keep
-   * carried-but-not-folded payload (e.g. computed input/output text) out of the
-   * hot cache — the Redis-clog + O(N²)-serialize root cause for large traces.
-   * The next fold step reads this shape back on a cache hit, so the projection
-   * MUST preserve every field the fold's `apply` reads (reductions + winner
-   * pointers + nullness markers).
+   * Reads the state's own version, recorded on the entry. Defaults to the
+   * `UpdatedAt` field, which `AbstractFoldProjection` maintains as strictly
+   * increasing per apply.
    */
-  toCacheable?: (state: State) => unknown;
+  updatedAtOf?: (state: State) => number;
 }
 
 /**
  * Default cache TTL, in seconds. Sized to outlast the processing of a single
- * aggregate's event stream so the fold state stays warm in Redis across
- * consecutive events instead of expiring mid-stream and forcing a ClickHouse
- * fallback read of the (potentially large) state on every event. Matches the
- * queue's activeTtlSec — the upper bound on how long one aggregate stays
- * in-flight.
+ * aggregate's event stream so the fold state stays warm across consecutive
+ * events instead of expiring mid-stream and forcing a durable read of the
+ * (potentially large) state on every event.
  *
- * Overridable via LANGWATCH_FOLD_CACHE_TTL_SECONDS (read at call time, like
- * LANGWATCH_DISPATCH_TENANT_CAP) so operators can dial residency down without a
- * redeploy: the fold-cache key set is one entry per aggregate touched within
- * the TTL window, so a longer TTL trades Redis memory for fewer ClickHouse
- * fallback reads. Group-coalescing already collapses an aggregate's in-flight
- * reads to one per batch, so this is a secondary lever, not the primary fix.
+ * Overridable via LANGWATCH_FOLD_CACHE_TTL_SECONDS, read at call time so
+ * operators can dial residency down without a redeploy.
  */
 function defaultFoldCacheTtlSeconds(): number {
   const raw = process.env.LANGWATCH_FOLD_CACHE_TTL_SECONDS;
@@ -51,22 +47,35 @@ function defaultFoldCacheTtlSeconds(): number {
   return parsed;
 }
 
+function readUpdatedAt<State>(state: State): number {
+  const value = (state as { UpdatedAt?: unknown })?.UpdatedAt;
+  return typeof value === "number" ? value : Date.now();
+}
+
 /**
- * Wraps any FoldProjectionStore with a Redis write-through cache.
+ * Wraps a fold store with a Redis write-through cache.
  *
- * - get(): Redis first, ClickHouse fallback on miss.
- * - store(): ClickHouse first (throws on failure), then Redis SET (cache).
+ * - `get()`: Redis first, durable store on miss.
+ * - `store()`: durable store first (throws on failure), then the cache.
  *
- * Ordering guarantees correctness without transactions:
- * - CH fails → throw → no Redis update → event retried by queue
- * - CH succeeds, Redis fails → next read falls back to CH
+ * The entry also carries the ids of the events folded into it. Queue delivery
+ * is at-least-once, so a fold job that fails after its state was stored is
+ * re-dispatched with the same events; most fold handlers accumulate (counters,
+ * sums, appends) rather than being idempotent, and would double-count. The
+ * executor uses that set to recognise and skip a redelivery.
+ *
+ * The set is deliberately NOT a durability mechanism. It lives in the cache
+ * entry, so eviction or Redis loss takes it with them — which degrades to the
+ * behaviour that existed before it, not to something worse. Closing the cold
+ * path properly means making the folds themselves idempotent; see
+ * dev/docs/plans/fold-idempotency-plan.md.
  */
 export class RedisCachedFoldStore<State>
   implements FoldProjectionStore<State>
 {
-  private readonly ttlSeconds: number;
   private readonly keyPrefix: string;
-  private readonly toCacheable?: (state: State) => unknown;
+  private readonly ttlSeconds: number;
+  private readonly updatedAtOf: (state: State) => number;
 
   constructor(
     private readonly inner: FoldProjectionStore<State>,
@@ -75,72 +84,197 @@ export class RedisCachedFoldStore<State>
   ) {
     this.keyPrefix = options.keyPrefix;
     this.ttlSeconds = options.ttlSeconds ?? defaultFoldCacheTtlSeconds();
-    this.toCacheable = options.toCacheable;
+    this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
   }
 
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<State | null> {
+    return (await this.getWithApplied(aggregateId, context)).state;
+  }
+
+  /**
+   * The state together with the ids already folded into it. On a miss the set
+   * is empty — there is no cached state to have applied anything to.
+   */
+  async getWithApplied(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
+    const cached = await this.readCached(aggregateId, context);
+    const isRetry = (context.deliveryAttempt ?? 1) > 1;
+
+    if (cached.hit) {
+      if (isRetry && cached.legacy) {
+        incrementEsFoldDedupUnavailable(this.keyPrefix, "legacy_entry");
+      }
+      return {
+        state: cached.state,
+        appliedEventIds: cached.appliedEventIds,
+      };
+    }
+
+    // A retry with no applied-set is the moment a batch gets re-applied on top
+    // of state that already holds it. Named by reason so an incident can tell a
+    // cold cache from a Redis fault from a corrupt entry.
+    if (isRetry) {
+      incrementEsFoldDedupUnavailable(this.keyPrefix, cached.reason);
+    }
+
+    return {
+      state: await this.readDurable(aggregateId, context),
+      appliedEventIds: [],
+    };
+  }
+
+  private async readCached(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<
+    | { hit: true; state: State; appliedEventIds: string[]; legacy: boolean }
+    | { hit: false; reason: "cache_miss" | "read_error" | "unreadable" }
+  > {
     const key = this.redisKey(aggregateId, context);
-    const getStartTime = performance.now();
-    let cached: string | null;
+    const startedAt = performance.now();
+
+    let raw: string | null;
     try {
-      cached = await this.redis.get(key);
-    } catch (_error) {
+      raw = await this.redis.get(key);
+    } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "get");
       incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
-      // Fall through to inner store
-      const innerStartTime = performance.now();
-      const result = await this.inner.get(aggregateId, context);
-      const innerDurationMs = performance.now() - innerStartTime;
-      observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", innerDurationMs);
-      return result;
+      logger.warn(
+        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        "Fold cache read failed — falling through to the durable store",
+      );
+      return { hit: false, reason: "read_error" };
     }
 
-    if (cached !== null) {
-      const getDurationMs = performance.now() - getStartTime;
-      incrementEsFoldCacheTotal(this.keyPrefix, "hit");
-      observeEsFoldCacheGetDuration(this.keyPrefix, "redis", getDurationMs);
-      return JSON.parse(cached) as State;
+    if (raw === null) {
+      incrementEsFoldCacheTotal(this.keyPrefix, "miss");
+      return { hit: false, reason: "cache_miss" };
     }
 
-    incrementEsFoldCacheTotal(this.keyPrefix, "miss");
-    const innerStartTime = performance.now();
+    incrementEsFoldCacheTotal(this.keyPrefix, "hit");
+    observeEsFoldCacheGetDuration(
+      this.keyPrefix,
+      "redis",
+      performance.now() - startedAt,
+    );
+
+    let decoded: ReturnType<typeof decodeFoldCacheEntry<State>>;
+    try {
+      decoded = decodeFoldCacheEntry<State>(raw);
+    } catch (error) {
+      // An unreadable entry is not a reason to fail the fold: the durable store
+      // still holds the state. Treated as a miss so the read falls through —
+      // but counted, because it also loses the applied-set, and a redelivery
+      // against a lost set double-counts.
+      incrementEsFoldCacheRedisError(this.keyPrefix, "get");
+      incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
+      logger.error(
+        { aggregateId, tenantId: String(context.tenantId), error: String(error) },
+        "Fold cache entry was unreadable — falling through to the durable store, dedup unavailable for this read",
+      );
+      return { hit: false, reason: "unreadable" };
+    }
+
+    return {
+      hit: true,
+      state: decoded.state,
+      appliedEventIds: decoded.appliedEventIds,
+      // Written before the applied-set existed: readable, but carries no record
+      // of what was applied.
+      legacy: decoded.updatedAt === null,
+    };
+  }
+
+  private async readDurable(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<State | null> {
+    const startedAt = performance.now();
     const result = await this.inner.get(aggregateId, context);
-    const innerDurationMs = performance.now() - innerStartTime;
-    observeEsFoldCacheGetDuration(this.keyPrefix, "clickhouse", innerDurationMs);
+    observeEsFoldCacheGetDuration(
+      this.keyPrefix,
+      "clickhouse",
+      performance.now() - startedAt,
+    );
     return result;
   }
 
-  async store(
+  async store(state: State, context: ProjectionStoreContext): Promise<void> {
+    const aggregateId = context.key ?? context.aggregateId;
+    const startedAt = performance.now();
+
+    await this.inner.store(state, context);
+    await this.cache(state, aggregateId, context);
+
+    observeEsFoldCacheStoreDuration(
+      this.keyPrefix,
+      performance.now() - startedAt,
+    );
+  }
+
+  /**
+   * A cache write failure is logged, not thrown: the durable write above
+   * already succeeded, so the next read falls through to state that is
+   * genuinely there. What is lost is the read-your-writes window and the
+   * applied-set, so it is counted rather than swallowed silently.
+   */
+  private async cache(
     state: State,
+    aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    const aggregateId = context.key ?? context.aggregateId;
-    const storeStartTime = performance.now();
+    const key = this.redisKey(aggregateId, context);
 
-    // 1. ClickHouse first — throws on failure, event retried by queue
-    await this.inner.store(state, context);
-
-    // 2. Redis second — cache for fast reads on next fold step
     try {
-      const key = this.redisKey(aggregateId, context);
-      const cacheable = this.toCacheable ? this.toCacheable(state) : state;
-      await this.redis.set(key, JSON.stringify(cacheable), "EX", this.ttlSeconds);
+      const applied = context.appliedEventIds ?? [];
+      // A fresh delivery means the previous batch for this group acked, so the
+      // ids it recorded can never come back — carrying them forward is what
+      // made the set grow to dwarf the state it sits next to. During a retry
+      // chain they are still live and must be kept, or a later attempt
+      // re-applies what an earlier one already folded.
+      const isRetry = (context.deliveryAttempt ?? 1) > 1;
+      const previous = isRetry ? await this.readCachedAppliedIds(key) : [];
+
+      const payload = encodeFoldCacheEntry({
+        state,
+        updatedAt: this.updatedAtOf(state),
+        appliedEventIds: isRetry
+          ? mergeAppliedEventIds({ previous, applied })
+          : applied,
+      });
+
+      observeEsFoldCacheEntryBytes(this.keyPrefix, Buffer.byteLength(payload));
+      await this.redis.set(key, payload, "EX", this.ttlSeconds);
     } catch (error) {
       incrementEsFoldCacheRedisError(this.keyPrefix, "set");
       logger.warn(
         { aggregateId, error: String(error) },
-        "Redis SET failed after CH write — next read will fall back to CH",
+        "Fold cache write failed after the durable write — reads fall through to the durable store",
       );
     }
-
-    const storeDurationMs = performance.now() - storeStartTime;
-    observeEsFoldCacheStoreDuration(this.keyPrefix, storeDurationMs);
   }
 
-  private redisKey(aggregateId: string, context: ProjectionStoreContext): string {
+  private async readCachedAppliedIds(key: string): Promise<string[]> {
+    const raw = await this.redis.get(key);
+    if (raw === null) return [];
+    try {
+      return decodeFoldCacheEntry<State>(raw).appliedEventIds;
+    } catch {
+      // Already redacted and logged by the read path; an unreadable entry here
+      // just means starting the set over.
+      return [];
+    }
+  }
+
+  private redisKey(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): string {
     return `fold:${this.keyPrefix}:${String(context.tenantId)}:${aggregateId}`;
   }
 }

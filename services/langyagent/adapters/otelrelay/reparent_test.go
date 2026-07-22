@@ -32,12 +32,12 @@ func workerBatch() (ptrace.Traces, pcommon.SpanID, pcommon.SpanID) {
 	childID := pcommon.SpanID{2, 2, 2, 2, 2, 2, 2, 2}
 
 	root := ss.Spans().AppendEmpty()
-	root.SetName("llm.call")
+	root.SetName("ai.streamText")
 	root.SetTraceID(workerTrace)
 	root.SetSpanID(rootID)
 
 	child := ss.Spans().AppendEmpty()
-	child.SetName("tool.call")
+	child.SetName("ai.toolCall")
 	child.SetTraceID(workerTrace)
 	child.SetSpanID(childID)
 	child.SetParentSpanID(rootID)

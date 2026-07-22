@@ -48,10 +48,41 @@ export class EvaluatorConfigError extends HandledError {
   ) {
     super("evaluator_config_error", message, {
       httpStatus: 422,
+      // Declared rather than inherited: `fault` decides whether the
+      // evaluation-processing command reports a skip or an error, so the
+      // classification belongs where the class is read.
+      fault: "customer",
       ...remediation("evaluator_config_error"),
       ...options,
     });
     this.name = "EvaluatorConfigError";
+  }
+}
+
+/**
+ * The payload sent to the evaluator exceeded its size limit (HTTP 413).
+ *
+ * Distinct from {@link EvaluatorExecutionError} because the fault is the
+ * customer's, not ours: nothing is broken on our side, and retrying sends the
+ * same oversized body again. Splitting it out means it reports as a skip with
+ * an actionable message rather than an opaque `413 {"message":"Request Too
+ * Long"}` error the customer cannot act on.
+ */
+export class EvaluatorInputTooLargeError extends HandledError {
+  declare readonly code: "evaluator_input_too_large";
+
+  constructor(options: HandledErrorOptions = {}) {
+    super(
+      "evaluator_input_too_large",
+      "Evaluator input is too large — shorten the text sent to this evaluator",
+      {
+        httpStatus: 413,
+        fault: "customer",
+        ...remediation("evaluator_input_too_large"),
+        ...options,
+      },
+    );
+    this.name = "EvaluatorInputTooLargeError";
   }
 }
 

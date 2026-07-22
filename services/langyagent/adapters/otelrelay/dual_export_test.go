@@ -69,7 +69,7 @@ func contentBatch(t *testing.T) []byte {
 	td := ptrace.NewTraces()
 	ss := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty()
 	span := ss.Spans().AppendEmpty()
-	span.SetName("llm.call")
+	span.SetName("ai.streamText")
 	span.SetTraceID(pcommon.TraceID{9})
 	span.SetSpanID(pcommon.SpanID{1})
 	span.Attributes().PutStr("gen_ai.request.model", "gpt-5-mini")
@@ -226,7 +226,7 @@ func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 	rs.Resource().Attributes().PutStr("langwatch.origin", "platform_internal")
 	rs.Resource().Attributes().PutStr("service.name", "opencode")
 	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
-	span.SetName("forged")
+	span.SetName("ai.streamText")
 	span.SetTraceID(pcommon.TraceID{7})
 	span.SetSpanID(pcommon.SpanID{2})
 	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
@@ -245,12 +245,63 @@ func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, forwarded.ResourceSpans().Len())
 	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
-	if _, found := attrs.Get("langwatch.origin"); found {
-		t.Fatal("a worker-forged langwatch.origin survived onto the customer forward")
-	}
+	origin, found := attrs.Get("langwatch.origin")
+	require.True(t, found, "the platform origin stamp must be present")
+	assert.Equal(t, "langy", origin.Str(),
+		"a worker-forged langwatch.origin must be replaced by the platform's stamp, never forwarded")
 	serviceName, ok := attrs.Get("service.name")
 	require.True(t, ok)
 	assert.Equal(t, "opencode", serviceName.Str(), "legitimate worker resource attributes must survive the strip")
+}
+
+// The customer-forward allowlist fails closed: a resource attribute outside
+// the policy — sdk metadata, pod identity, anything a future worker build
+// starts emitting — never reaches the customer's project.
+func TestCustomerForwardDropsUnlistedResourceAttributes(t *testing.T) {
+	customer := startSignallingIngest(t)
+	relay := relayWithInternal(t, "")
+
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-allow",
+		LangwatchEndpoint: customer.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+		Model:             "gpt-5-mini",
+	})
+	require.NoError(t, err)
+
+	td := ptrace.NewTraces()
+	rs := td.ResourceSpans().AppendEmpty()
+	rs.Resource().Attributes().PutStr("service.name", "opencode")
+	rs.Resource().Attributes().PutStr("k8s.pod.name", "worker-pod-7")
+	rs.Resource().Attributes().PutStr("telemetry.sdk.name", "opentelemetry")
+	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span.SetName("ai.toolCall")
+	span.SetTraceID(pcommon.TraceID{9})
+	span.SetSpanID(pcommon.SpanID{3})
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/x-protobuf",
+		bytes.NewReader(payload),
+	)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(customer.await(t))
+	require.NoError(t, err)
+	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
+	if _, found := attrs.Get("k8s.pod.name"); found {
+		t.Fatal("an unlisted resource attribute reached the customer forward")
+	}
+	if _, found := attrs.Get("telemetry.sdk.name"); found {
+		t.Fatal("sdk metadata reached the customer forward")
+	}
+	serviceName, ok := attrs.Get("service.name")
+	require.True(t, ok)
+	assert.Equal(t, "opencode", serviceName.Str())
 }
 
 func TestInternalExportIsBoundedDuringCollectorOutage(t *testing.T) {
@@ -310,4 +361,109 @@ func TestInternalExportIsBoundedDuringCollectorOutage(t *testing.T) {
 	assert.Equal(t, int64(total), customerRequests.Load(), "internal outage delayed customer forwarding")
 	assert.LessOrEqual(t, len(relay.internalJobs), internalExportQueueSize)
 	close(release)
+}
+
+// The reverse of the content-isolation guarantee: LangWatch's INTERNAL
+// identity must never ride the customer forward, even when the worker itself
+// claims it — a prompt-injectable process asserting platform identity on its
+// resource is exactly the forgery the allowlist exists for.
+func TestCustomerForwardCarriesNoInternalIdentity(t *testing.T) {
+	customer := startSignallingIngest(t)
+	relay := relayWithInternal(t, "")
+
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-ident",
+		LangwatchEndpoint: customer.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+		Model:             "gpt-5-mini",
+	})
+	require.NoError(t, err)
+
+	td := ptrace.NewTraces()
+	rs := td.ResourceSpans().AppendEmpty()
+	rs.Resource().Attributes().PutStr("langwatch.origin", "platform_internal")
+	rs.Resource().Attributes().PutStr("service.name", "langwatch-service-langyagent")
+	rs.Resource().Attributes().PutStr("deployment.environment.name", "lw-prod")
+	span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
+	span.SetName("ai.toolCall")
+	span.SetTraceID(pcommon.TraceID{5})
+	span.SetSpanID(pcommon.SpanID{6})
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/x-protobuf",
+		bytes.NewReader(payload),
+	)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body := customer.await(t)
+	if bytes.Contains(body, []byte("platform_internal")) {
+		t.Fatal("the internal-origin marker reached the customer forward")
+	}
+	if bytes.Contains(body, []byte("lw-prod")) {
+		t.Fatal("platform environment identity reached the customer forward")
+	}
+	if bytes.Contains(body, []byte("langwatch-service-langyagent")) {
+		t.Fatal("a worker-forged platform service identity reached the customer forward")
+	}
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(body)
+	require.NoError(t, err)
+	attrs := forwarded.ResourceSpans().At(0).Resource().Attributes()
+	origin, ok := attrs.Get("langwatch.origin")
+	require.True(t, ok)
+	assert.Equal(t, "langy", origin.Str(),
+		"the platform's own origin stamp must replace the forged one")
+}
+
+// Plumbing spans (storage, session bookkeeping) never reach the customer —
+// and because their dropped ancestors were what broke parentage, the
+// surviving ai.* spans attach cleanly to the turn.
+func TestCustomerForwardFiltersPlumbingSpans(t *testing.T) {
+	customer := startSignallingIngest(t)
+	relay := relayWithInternal(t, "")
+	token, err := relay.Register(WorkerInfo{
+		ConversationID:    "conv-filter",
+		LangwatchEndpoint: customer.srv.URL,
+		LangwatchAPIKey:   "sk-session",
+	})
+	require.NoError(t, err)
+	turn := turnContext()
+	relay.SetTurnContext(token, turn)
+
+	td := ptrace.NewTraces()
+	ss := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty()
+	session := ss.Spans().AppendEmpty()
+	session.SetName("SessionProcessor.flushV2Fragments")
+	session.SetSpanID(pcommon.SpanID{7})
+	sql := ss.Spans().AppendEmpty()
+	sql.SetName("sql.execute")
+	sql.SetSpanID(pcommon.SpanID{8})
+	llm := ss.Spans().AppendEmpty()
+	llm.SetName("ai.streamText")
+	llm.SetSpanID(pcommon.SpanID{9})
+	llm.SetParentSpanID(pcommon.SpanID{7}) // parent is plumbing → filtered → orphan
+	payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+	require.NoError(t, err)
+
+	resp, err := http.Post(
+		relay.OTLPEndpointFor(token)+"/v1/traces",
+		"application/x-protobuf",
+		bytes.NewReader(payload),
+	)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	forwarded, err := (&ptrace.ProtoUnmarshaler{}).UnmarshalTraces(customer.await(t))
+	require.NoError(t, err)
+	require.Equal(t, 1, forwarded.SpanCount(), "only the ai.* span may reach the customer")
+	span := forwarded.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+	assert.Equal(t, "ai.streamText", span.Name())
+	assert.Equal(t, pcommon.SpanID(turn.SpanID()), span.ParentSpanID(),
+		"with its plumbing ancestor filtered, the span must attach to the turn")
 }

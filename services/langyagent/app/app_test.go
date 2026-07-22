@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -57,6 +58,8 @@ type fakeWorker struct {
 	// LLM call failed with, riding the agent_error frame as a reason.
 	llmErr   herr.E
 	llmErrOK bool
+	// servedTurn stubs HasServedTurn — drives the ready-status wording.
+	servedTurn bool
 }
 
 func (w *fakeWorker) ClaimTurn(string) ClaimOutcome {
@@ -69,8 +72,11 @@ func (w *fakeWorker) ClaimTurn(string) ClaimOutcome {
 	}
 	return ClaimBusy
 }
-func (w *fakeWorker) Release() { w.released++ }
-func (w *fakeWorker) Touch()   { w.touched++ }
+func (w *fakeWorker) Release()                                                { w.released++ }
+func (w *fakeWorker) Touch()                                                  { w.touched++ }
+func (w *fakeWorker) HasServedTurn() bool                                     { return w.servedTurn }
+func (w *fakeWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time) {}
+
 func (w *fakeWorker) SetTurnTraceContext(sc trace.SpanContext) {
 	w.turnTraceContexts = append(w.turnTraceContexts, sc)
 }
@@ -415,14 +421,48 @@ func statusOf(fs []frames.Frame) string {
 	return ""
 }
 
-// The cold window's readiness status names a fresh workspace coming to life.
-func TestApp_Turn_ColdSpawnEmitsFreshWorkspaceStatus(t *testing.T) {
+// A worker that has never answered says Langy is waking up — one of the
+// wake-flavoured lines, never a warm reaching line.
+func TestApp_Turn_NeverServedWorkerEmitsWakingUpStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
-	if got := statusOf(relay.stream.emitted); got != "Setting up a fresh workspace…" {
-		t.Errorf("cold readiness status = %q, want the fresh-workspace line", got)
+	got := statusOf(relay.stream.emitted)
+	if !slices.Contains(wakingLangyStatuses, got) {
+		t.Errorf("cold readiness status = %q, want one of %v", got, wakingLangyStatuses)
+	}
+}
+
+// A warm worker gets a short reaching-Langy line, chosen from the rotation —
+// never the waking-up line, which would claim a boot that isn't happening.
+func TestApp_Turn_WarmWorkerEmitsReachingLangyStatus(t *testing.T) {
+	worker := &fakeWorker{claimOK: true, streamWrites: true, servedTurn: true}
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	got := statusOf(relay.stream.emitted)
+	if !slices.Contains(reachingLangyStatuses, got) {
+		t.Errorf("warm readiness status = %q, want one of %v", got, reachingLangyStatuses)
+	}
+}
+
+// The warm rotation is deterministic per turn (a re-drive repeats its line) and
+// actually varies across turn ids.
+func TestApp_ReadyStatus_WarmRotationVariesByTurn(t *testing.T) {
+	worker := &fakeWorker{servedTurn: true}
+	seen := map[string]struct{}{}
+	for _, turnID := range []string{"turn-a", "turn-b", "turn-c", "turn-d", "turn-e", "turn-f"} {
+		r := req()
+		r.TurnID = turnID
+		first := readyStatusFor(r, worker)
+		if again := readyStatusFor(r, worker); again != first {
+			t.Fatalf("ready status for %q not deterministic: %q then %q", turnID, first, again)
+		}
+		seen[first] = struct{}{}
+	}
+	if len(seen) < 2 {
+		t.Errorf("six turn ids produced %d distinct warm lines, want at least 2", len(seen))
 	}
 }
 

@@ -1,7 +1,7 @@
 import {
   parseCliJson,
   readCliErrorDocument,
-  type CliDomainError,
+  type CliHandledError,
 } from "@langwatch/cli-cards";
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { AlertCircle, ExternalLink, ScrollText } from "lucide-react";
@@ -35,7 +35,7 @@ function safeHttpUrl(value: unknown): string | undefined {
   }
 }
 
-function readStructuredError(errorText: unknown): CliDomainError | null {
+function readStructuredError(errorText: unknown): CliHandledError | null {
   if (typeof errorText === "string") {
     // Shell tools merge stderr with stdout. parseCliJson extracts the first
     // balanced JSON document, so a CLI error remains readable even when a
@@ -83,14 +83,16 @@ export function presentLangyToolError({
     };
   }
 
-  // The shared REST handler puts request diagnostics under `trace`; typed
-  // HandledErrors may carry traceId directly. Support both wire shapes.
+  // New-CLI documents carry the trace links top-level on the error; documents
+  // written by an older CLI keep them nested under `meta.trace` (the shared
+  // REST handler's wire shape). Prefer the top-level fields, fall back to the
+  // nested block so old documents keep their trace/logs actions.
   const trace = asRecord(domain.meta.trace);
   const traceId =
     domain.traceId ??
     (typeof trace?.traceId === "string" ? trace.traceId : undefined);
-  const traceUrl = safeHttpUrl(trace?.traceUrl);
-  const logsUrl = safeHttpUrl(trace?.logsUrl);
+  const traceUrl = safeHttpUrl(domain.traceUrl) ?? safeHttpUrl(trace?.traceUrl);
+  const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
 
   return {
     title: `${title} failed`,

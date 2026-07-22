@@ -178,8 +178,17 @@ export function useTraceFreshness() {
       // refetchInterval can stay off while SSE is connected. The key
       // is scoped to `projectId` + `traceId` so only the open trace
       // is invalidated, not the entire CSR cache.
+      //
+      // The span tree is refreshed through `spanTreeDelta`, NOT by
+      // invalidating `spanTree` itself: the tree is assembled by walking
+      // `spanTreePaginated`, so invalidating it re-runs `ceil(N/500)`
+      // sequential page requests — ~200 on a 100k-span trace, which cannot
+      // finish inside the 2s debounce window, and `invalidateQueries`
+      // defaults to `cancelRefetch: true` so the next batch would abort and
+      // restart it before it ever landed. `useSpanTree` merges the delta into
+      // the same cache entry in place.
       const key = { projectId, traceId: openTraceId };
-      void trpcUtils.tracesV2.spanTree.invalidate(key);
+      void trpcUtils.tracesV2.spanTreeDelta.invalidate(key);
       void trpcUtils.tracesV2.spanDetail.invalidate(key);
       void trpcUtils.tracesV2.spanLangwatchSignals.invalidate(key);
       void trpcUtils.tracesV2.traceEvents.invalidate(key);

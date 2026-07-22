@@ -42,6 +42,12 @@ export type LangyDispatchOutcome =
   | "accepted"
   | "busy"
   | "credentialsRequired"
+  /**
+   * A permanent 4xx: the agent understood the request and refused it as
+   * invalid. Retrying replays the same rejection — callers must terminalize
+   * the turn instead. (409 and 428 keep their own meanings above.)
+   */
+  | "rejected"
   | "unavailable";
 /**
  * The probe sits in front of EVERY message, so it gets a tight budget. It exists
@@ -282,7 +288,14 @@ export function createLangyWorkerPort(config: {
                   ? "busy"
                   : response.status === 428
                     ? "credentialsRequired"
-                    : "unavailable";
+                    : // Only the statuses that mean "the agent understood this
+                      // request and refused it as invalid" are permanent. A
+                      // 401 mid secret-rotation, a proxy 404, a 408 — all
+                      // transient, all must stay retryable, or a rolling
+                      // deploy terminalizes healthy turns.
+                      response.status === 400 || response.status === 422
+                      ? "rejected"
+                      : "unavailable";
             span.setAttribute("langy.dispatch.outcome", outcome);
             getLangyDispatchCounter(
               outcome === "credentialsRequired" ? "credentials_required" : outcome,

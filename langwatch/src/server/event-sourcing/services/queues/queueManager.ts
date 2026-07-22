@@ -15,6 +15,7 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import { resolveDeduplicationStrategy } from "../../queues";
+import type { JobDelivery } from "../../queues/queue.types";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
   type CommandHandlerOptions,
@@ -29,7 +30,7 @@ const logger = createLogger("langwatch:event-sourcing:queue-manager");
  * Used by the global queue's process/groupKey/score callbacks to dispatch to the right handler.
  */
 export interface JobRegistryEntry {
-  process: (payload: any) => Promise<void>;
+  process: (payload: any, delivery?: JobDelivery) => Promise<void>;
   groupKeyFn: (payload: any) => string;
   scoreFn: (payload: any) => number;
   delay?: number;
@@ -41,7 +42,7 @@ export interface JobRegistryEntry {
    * into one call (the dispatched job plus drained siblings, in occurredAt
    * order). The first payload is always the dispatched job.
    */
-  processBatch?: (payloads: any[]) => Promise<void>;
+  processBatch?: (payloads: any[], delivery?: JobDelivery) => Promise<void>;
   /**
    * Max number of same-group jobs to coalesce into one `processBatch` call
    * (including the dispatched job). Defaults to 1 (no coalescing).
@@ -415,9 +416,10 @@ export class QueueManager<EventType extends Event = Event> {
         scoreFn:
           projectionDef.scoreFn ??
           ((event: any) => event.occurredAt ?? event.createdAt),
-        process: async (event: any) => {
+        process: async (event: any, delivery?: JobDelivery) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
+            deliveryAttempt: delivery?.attempt,
           });
         },
         // Same-group fold events are coalesced into one load/apply/store cycle.
@@ -425,9 +427,10 @@ export class QueueManager<EventType extends Event = Event> {
         // so the tenant is taken from the first event.
         processBatch:
           onEventBatch && coalesceMaxBatch && coalesceMaxBatch > 1
-            ? async (events: any[]) => {
+            ? async (events: any[], delivery?: JobDelivery) => {
                 await onEventBatch(projectionName, events, {
                   tenantId: events[0]?.tenantId,
+                  deliveryAttempt: delivery?.attempt,
                 });
               }
             : undefined,
