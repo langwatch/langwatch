@@ -8,7 +8,7 @@
  */
 import { createListCollection, HStack, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import type { DatasetColumnType } from "@langwatch/contracts/datasets";
 import { Select } from "../ui/select";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
 

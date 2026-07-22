@@ -6,7 +6,7 @@
  */
 
 import { snakeCase } from "../../../utils/stringCasing";
-import type { FilterField } from "../../filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { isZeroWhenAbsentSeries, type SeriesInputType } from "../registry";
 import type { AggregationTypes } from "../types";
 import {

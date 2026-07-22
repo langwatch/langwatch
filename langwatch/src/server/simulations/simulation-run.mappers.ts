@@ -1,6 +1,6 @@
-import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "@langwatch/contracts/scenarios/enums";
 import { resolveRunStatus } from "../scenarios/stall-detection";
-import type { ScenarioRunData } from "../scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 
 type ScenarioMessages = ScenarioRunData["messages"];
 

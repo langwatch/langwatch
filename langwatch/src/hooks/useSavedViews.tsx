@@ -26,11 +26,11 @@ import React, {
   useState,
 } from "react";
 import { api } from "../utils/api";
-import type { FilterParam } from "./useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import { useFilterParams } from "./useFilterParams";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { availableFilters } from "../server/filters/registry";
-import type { FilterField } from "../server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import {
   DEFAULT_VIEWS,
   findMatchingView,

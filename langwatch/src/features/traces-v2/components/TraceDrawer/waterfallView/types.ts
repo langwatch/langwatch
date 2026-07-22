@@ -11,7 +11,7 @@ import {
   LuWorkflow,
   LuWrench,
 } from "react-icons/lu";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/contracts/traces-v2";
 
 export interface WaterfallViewProps {
   spans: SpanTreeNode[];

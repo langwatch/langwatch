@@ -7,8 +7,8 @@ export type FilterConditionResult = {
   params: Record<string, unknown>;
 };
 
-import type { FilterParam } from "~/hooks/useFilterParams";
-import type { FilterField } from "../types";
+import type { FilterParam } from "@langwatch/contracts/filters";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 export type ClickHouseFilterQueryParams = {
   tenantId: string;

@@ -19,7 +19,7 @@ export type DrawerTab = "span";
 
 type AccordionSection = "events" | "evals" | "conversation";
 
-interface TraceHistoryEntry {
+export interface TraceHistoryEntry {
   traceId: string;
   viewMode: DrawerViewMode;
   /**

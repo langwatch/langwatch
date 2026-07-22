@@ -14,7 +14,7 @@ import type {
   SpanMetrics,
   SpanTimestamps,
   SpanTypes,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 import { safeUnflatten } from "~/utils/safeUnflatten";
 

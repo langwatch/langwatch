@@ -2,8 +2,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
-import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
+import type { TraceWithGuardrail } from "@langwatch/contracts/tracer";
+import { LLM_PARAMETER_MAP } from "@langwatch/contracts/llm-parameters";
 import { HandledError } from "@langwatch/handled-error";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -21,7 +21,7 @@ import type {
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
-import type { Event, Span, Trace } from "~/server/tracer/types";
+import type { Event, Span, Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import { findPromptReferenceInAncestors } from "./findPromptReferenceInAncestors";
 import {

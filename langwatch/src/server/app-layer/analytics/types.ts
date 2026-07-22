@@ -9,7 +9,7 @@
  */
 
 import type { SeriesInputType } from "~/server/analytics/registry";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 /**
  * Built ClickHouse query — mirrors the legacy `BuiltQuery` shape so the shim

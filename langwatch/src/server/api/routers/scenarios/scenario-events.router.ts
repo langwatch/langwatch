@@ -7,7 +7,7 @@ import { getApp } from "~/server/app-layer/app";
 import type {
   BatchRunDataResult,
   ScenarioRunData,
-} from "~/server/scenarios/scenario-event.types";
+} from "@langwatch/contracts/scenarios/types";
 import { checkProjectPermission } from "../../rbac";
 
 const logger = createLogger("langwatch:api:scenarios:events");

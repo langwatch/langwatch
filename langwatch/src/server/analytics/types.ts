@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
-import { type FilterField, filterFieldsEnum } from "../filters/types";
+import { type FilterField, filterFieldsEnum } from "@langwatch/contracts/filters";
 
 export type AnalyticsMetric = {
   label: string;

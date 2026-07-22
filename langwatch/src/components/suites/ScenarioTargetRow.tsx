@@ -11,7 +11,7 @@
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Square, X } from "lucide-react";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
@@ -21,7 +21,7 @@ import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Tooltip } from "~/components/ui/tooltip";
 import { isCancellableStatus } from "./useCancelScenarioRun";
 import { usePrefetchRunState } from "./usePrefetchRunState";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 
 type ScenarioTargetRowProps = {
   scenarioRun: ScenarioRunData;

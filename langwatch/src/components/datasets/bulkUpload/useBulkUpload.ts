@@ -10,7 +10,7 @@
  */
 import { nanoid } from "nanoid";
 import { useCallback, useRef, useState } from "react";
-import type { DatasetConfirmColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "@langwatch/contracts/datasets";
 import { detectFileFormat } from "~/server/datasets/upload-utils";
 import { retryDatasetNormalize } from "../services/directUpload";
 import { parseHeaderColumns } from "../utils/parseHeaderColumns";

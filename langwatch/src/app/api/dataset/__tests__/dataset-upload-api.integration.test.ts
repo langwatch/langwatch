@@ -8,7 +8,7 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";

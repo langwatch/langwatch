@@ -36,7 +36,7 @@ import {
 } from "~/components/datasets/editor/DatasetEditorTable";
 import { UploadCSVDrawer } from "~/components/datasets/UploadCSVDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 import { Dialog } from "../../components/ui/dialog";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Component, Entry } from "../types/dsl";

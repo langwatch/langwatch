@@ -15,7 +15,7 @@ import {
   DuplicateRecordIdError,
 } from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
-import { newDatasetEntriesSchema } from "../../datasets/types";
+import { newDatasetEntriesSchema } from "@langwatch/contracts/datasets";
 import { prisma } from "../../db";
 import { StorageService } from "../../storage";
 import { checkProjectPermission } from "../rbac";

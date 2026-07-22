@@ -18,12 +18,12 @@ import { ConditionBuilder } from "./ConditionBuilder";
 import { queryIsStructurable } from "../logic/conditionQuery";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import {
   type FilterField,
   sanitizeTriggerFilters,
   type TriggerFilterValue,
-} from "~/server/filters/types";
+} from "@langwatch/contracts/filters";
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { NotificationCadence } from "@langwatch/automations/cadences";

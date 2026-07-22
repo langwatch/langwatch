@@ -5,7 +5,7 @@ import {
   TRPCUntypedClient,
 } from "@trpc/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { SpanTreeNode } from "@langwatch/contracts/traces-v2";
 
 import {
   fetchSpanTreePages,

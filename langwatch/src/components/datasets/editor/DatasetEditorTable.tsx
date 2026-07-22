@@ -53,7 +53,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
-} from "~/server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AddRowsFromCSVModal } from "../AddRowsFromCSVModal";

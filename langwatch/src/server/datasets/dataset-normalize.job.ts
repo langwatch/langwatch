@@ -33,7 +33,7 @@ import type { DatasetRepository } from "./dataset.repository";
 import { StreamingChunkWriter } from "./dataset-chunk-writer";
 import type { DatasetStorage } from "./dataset-storage";
 import { UPLOAD_MAX_BYTES } from "./presigned-upload";
-import type { DatasetColumns, DatasetConfirmColumns } from "./types";
+import type { DatasetColumns, DatasetConfirmColumns } from "@langwatch/contracts/datasets";
 import {
   convertValueToColumnType,
   dedupeHeaders,

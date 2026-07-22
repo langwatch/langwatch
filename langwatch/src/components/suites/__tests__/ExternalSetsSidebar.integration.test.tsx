@@ -10,7 +10,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
-import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
+import type { ExternalSetSummary } from "@langwatch/contracts/scenarios/types";
 
 // VoiceAgentsCallout inside SuiteSidebar pulls project context via
 // useOrganizationTeamProject, which fires tRPC queries the bare test rig

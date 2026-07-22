@@ -15,7 +15,7 @@ import {
   type OrphanFailureEmitter,
   reconcileOrphanedRuns,
 } from "./orphaned-run-reconciliation";
-import { ScenarioRunStatus } from "./scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 
 const logger = createLogger("langwatch:scenarios:orphan-reconciliation");
 

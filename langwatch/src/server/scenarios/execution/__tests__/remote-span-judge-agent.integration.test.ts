@@ -4,7 +4,7 @@
 
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Span } from "../../../tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 import { RemoteSpanJudgeAgent } from "../remote-span-judge-agent";
 
 function createTestSpan(overrides: Partial<Span> = {}): Span {

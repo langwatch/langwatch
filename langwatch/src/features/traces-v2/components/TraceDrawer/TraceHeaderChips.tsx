@@ -22,7 +22,7 @@ import {
 } from "react-icons/lu";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/contracts/traces-v2";
 import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
 import type { RichEval } from "../../hooks/useTraceEvaluations";

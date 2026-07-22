@@ -19,10 +19,10 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
     },
   ),
 }));
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
+vi.mock("~/server/optimization-studio/addEnvs", () => ({
   addEnvs: vi.fn(async (event: unknown) => event),
 }));
-vi.mock("~/optimization_studio/server/loadDatasets", () => ({
+vi.mock("~/server/optimization-studio/loadDatasets", () => ({
   loadDatasets: vi.fn(async (event: unknown) => event),
 }));
 

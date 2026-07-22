@@ -16,7 +16,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { ScenarioGridCard } from "../ScenarioGridCard";
 import { RunRow } from "../RunRow";
 import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";

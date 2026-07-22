@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { PreconditionTraceData } from "../precondition-matchers";
-import type { TriggerFilters } from "../types";
+import type { TriggerFilters } from "@langwatch/contracts/filters";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,

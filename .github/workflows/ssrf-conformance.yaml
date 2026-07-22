@@ -41,7 +41,7 @@ jobs:
           filters: |
             ssrf:
               - 'pkg/ssrf/**'
-              - 'langwatch/packages/ssrf/**'
+              - 'packages/ssrf/**'
               - '.github/workflows/ssrf-conformance.yaml'
 
   conformance:

@@ -4,7 +4,7 @@ import type {
   EvaluationResultError,
   EvaluationResultSkipped,
 } from "./evaluators.generated";
-import { filterFieldsEnum } from "../filters/types";
+import { filterFieldsEnum } from "@langwatch/contracts/filters";
 
 // ---------------------------------------------------------------------------
 // Precondition schemas (Zod-first, types inferred)

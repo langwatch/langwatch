@@ -12,7 +12,7 @@ import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { api } from "~/utils/api";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 

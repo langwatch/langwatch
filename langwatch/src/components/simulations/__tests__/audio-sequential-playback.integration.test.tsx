@@ -28,7 +28,7 @@ import {
   vi,
 } from "vitest";
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
-import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioMessageSnapshotEvent } from "@langwatch/contracts/scenarios/types";
 
 // ---------------------------------------------------------------------------
 // tRPC / TraceMessage mocks (keep renderer lightweight in jsdom)

@@ -3,7 +3,7 @@ import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create, type StateCreator } from "zustand";
 import type { CellPosition } from "~/components/datasets/editor/DatasetTableContext";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import type { DatasetColumnType } from "@langwatch/contracts/datasets";
 import {
   createInitialResults,
   createInitialState,

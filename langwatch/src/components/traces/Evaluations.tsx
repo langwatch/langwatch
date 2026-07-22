@@ -2,7 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import type { ElasticSearchEvaluation } from "~/server/tracer/types";
+import type { ElasticSearchEvaluation } from "@langwatch/contracts/tracer";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Link } from "../ui/link";
 import { EvaluationStatusItem } from "./EvaluationStatusItem";

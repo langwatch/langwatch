@@ -5,17 +5,22 @@
 # silently-swallowed failure here ships broken generated code.
 set -euo pipefail
 
-# Tracer types are Zod-first in the platform: the schemas in types.ts are the
-# source of truth and the TypeScript types are inferred with z.infer. Copy the
-# module verbatim — the SDK reuses both the schemas and the types directly, so
-# there is no schema-generation (ts-to-zod) step anymore.
-cp ../langwatch/src/server/tracer/types.ts src/internal/generated/types/tracer.ts
+# Tracer types are Zod-first in the platform: the schemas are the source of
+# truth and the TypeScript types are inferred with z.infer. Copy the module
+# verbatim — the SDK reuses both the schemas and the types directly, so there
+# is no schema-generation (ts-to-zod) step anymore.
+#
+# These live in @langwatch/contracts (ADR-063), not under langwatch/src/server.
+# Any build that runs this script must therefore have packages/contracts in its
+# context — see Dockerfile.langyagent. `set -e` makes a missing source fail the
+# build loudly rather than shipping a stale generated tree.
+cp ../packages/contracts/src/tracer.ts src/internal/generated/types/tracer.ts
 
 # Copy filter types (only filterFieldsEnum is needed by the SDK)
 mkdir -p src/internal/generated/filters
 node -e "
 const fs = require('fs');
-const src = fs.readFileSync('../langwatch/src/server/filters/types.ts', 'utf8');
+const src = fs.readFileSync('../packages/contracts/src/filters.ts', 'utf8');
 // Extract only the zod import and filterFieldsEnum definition
 const lines = src.split('\n');
 const out = [];

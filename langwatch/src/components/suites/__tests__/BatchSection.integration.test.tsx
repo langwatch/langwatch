@@ -12,7 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BatchSection } from "../BatchSection";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 
 vi.mock("../SummaryStatusIcon", () => ({
   SummaryStatusIcon: () => <span data-testid="summary-status-icon" />,

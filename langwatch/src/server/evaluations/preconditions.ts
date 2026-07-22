@@ -13,7 +13,7 @@ import type {
   LLMSpan,
   RAGSpan,
   Span,
-} from "../tracer/types";
+} from "@langwatch/contracts/tracer";
 import { getEvaluatorDefinitions } from "./getEvaluator";
 import type { CheckPreconditionRule, CheckPreconditions } from "./types";
 

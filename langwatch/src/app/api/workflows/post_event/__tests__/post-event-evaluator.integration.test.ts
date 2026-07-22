@@ -38,10 +38,10 @@ vi.mock("../../../../../server/featureFlag/featureFlag.service", () => ({
   },
 }));
 
-vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
+vi.mock("~/server/optimization-studio/addEnvs", async () => {
   const actual = await vi.importActual<
-    typeof import("../../../../../optimization_studio/server/addEnvs")
-  >("../../../../../optimization_studio/server/addEnvs");
+    typeof import("~/server/optimization-studio/addEnvs")
+  >("~/server/optimization-studio/addEnvs");
   return {
     ...actual,
     getS3CacheKey: () => undefined,

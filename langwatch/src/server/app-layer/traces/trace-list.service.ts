@@ -1,3 +1,12 @@
+import type {
+  CategoricalFacetDescriptor,
+  DynamicKeysFacetDescriptor,
+  EvaluatorValueAggregates,
+  FacetCounts,
+  FacetDescriptor,
+  FacetValuesResult,
+  RangeFacetDescriptor,
+} from "@langwatch/contracts/traces-v2";
 import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
@@ -105,18 +114,6 @@ export interface TraceListPage {
   totalHits: number;
   evaluations: Record<string, EvalSummary[]>;
   nextCursor: TraceListCursor | null;
-}
-
-interface FacetCounts {
-  origin: Record<string, number>;
-  status: Record<string, number>;
-  service: Record<string, number>;
-  model: Record<string, number>;
-  ranges: {
-    tokens: { min: number; max: number };
-    cost: { min: number; max: number };
-    latency: { min: number; max: number };
-  };
 }
 
 interface ListParams {
@@ -370,79 +367,6 @@ function discoverCacheKey(
   // serve the first-computed payload to both viewers; the second
   // viewer's facets would be for a window they aren't looking at.
   return [tenantId, snapped.label, snapped.from, snapped.to].join("|");
-}
-
-/**
- * Per-value result aggregates carried by the evaluator facet so the
- * sidebar inline-drilldown can render verdict pills, score-range
- * sliders, and hasLabel discriminators without firing a second query
- * per evaluator. Absent on other facets where it's not meaningful.
- */
-export interface EvaluatorValueAggregates {
-  passedCount: number;
-  failedCount: number;
-  erroredCount: number;
-  scoreMin: number | null;
-  scoreMax: number | null;
-  hasScore: boolean;
-  /** Count of distinct non-null score values. Lets the drilldown hide a
-   *  pointless score slider when the score is constant (1 distinct) or a
-   *  binary 0/1 that just mirrors the pass/fail verdict (2 distinct, ≤1). */
-  distinctScores: number;
-  hasLabel: boolean;
-  /** Top distinct emitted-label values + counts (capped to a small top-N).
-   *  The sidebar drilldown renders these as clickable `evaluatorLabel` filter
-   *  rows. Absent / empty when the evaluator emits no labels. */
-  labelValues?: { value: string; count: number }[];
-}
-
-interface CategoricalFacetDescriptor {
-  key: string;
-  kind: "categorical";
-  label: string;
-  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
-  topValues: {
-    value: string;
-    label?: string;
-    count: number;
-    aggregates?: EvaluatorValueAggregates;
-  }[];
-  totalDistinct: number;
-}
-
-interface RangeFacetDescriptor {
-  key: string;
-  kind: "range";
-  label: string;
-  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
-  min: number;
-  max: number;
-  /** Present only for `isDiscrete`-flagged integer facets: the distinct values
-   *  + counts for the tick-list presentation, plus the true distinct count
-   *  (the sidebar shows the slider instead above its threshold). */
-  discrete?: {
-    values: { value: number; count: number }[];
-    distinctCount: number;
-  };
-}
-
-interface DynamicKeysFacetDescriptor {
-  key: string;
-  kind: "dynamic_keys";
-  label: string;
-  group: "trace" | "evaluation" | "span" | "metadata" | "prompt";
-  topKeys: { value: string; count: number }[];
-  totalDistinct: number;
-}
-
-type FacetDescriptor =
-  | CategoricalFacetDescriptor
-  | RangeFacetDescriptor
-  | DynamicKeysFacetDescriptor;
-
-interface FacetValuesResult {
-  values: { value: string; label?: string; count: number }[];
-  totalDistinct: number;
 }
 
 const discoverLogger = createLogger(

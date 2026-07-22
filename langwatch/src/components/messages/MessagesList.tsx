@@ -24,7 +24,7 @@ import { useFilterParams } from "../../hooks/useFilterParams";
 import { useMinimumSpinDuration } from "../../hooks/useMinimumSpinDuration";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceUpdateListener } from "../../hooks/useTraceUpdateListener";
-import type { ElasticSearchEvaluation } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "@langwatch/contracts/tracer";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { FilterSidebar } from "../filters/FilterSidebar";
@@ -33,7 +33,8 @@ import { NavigationFooter, useNavigationFooter } from "../NavigationFooter";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
-import { MessageCard, type TraceWithGuardrail } from "./MessageCard";
+import type { TraceWithGuardrail } from "@langwatch/contracts/tracer";
+import { MessageCard } from "./MessageCard";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();

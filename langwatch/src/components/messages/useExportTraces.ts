@@ -21,7 +21,7 @@ interface UseExportTracesOptions {
   query?: string;
 }
 
-interface UseExportTracesReturn {
+export interface UseExportTracesReturn {
   /** Whether the config dialog is open */
   isDialogOpen: boolean;
   /** Open the export dialog, optionally scoped to selected trace IDs */

@@ -167,7 +167,14 @@ describe("requireApiKeyPermission()", () => {
         const res = await app.request("/");
 
         expect(res.status).toBe(403);
-        await expect(res.json()).resolves.toMatchObject({ error: "Forbidden" });
+        // The denial answers with the SAME body `onError -> handleError`
+        // produces, not a hand-built `{ error: "Forbidden" }` — that is the
+        // whole point of routing through `handledErrorResponseBody`. The code
+        // and the permission in `meta` are what a CLI or an agent acts on.
+        await expect(res.json()).resolves.toMatchObject({
+          error: "api_key_permission_denied",
+          permission: "project:update",
+        });
         expect(handler).not.toHaveBeenCalled();
       });
     });

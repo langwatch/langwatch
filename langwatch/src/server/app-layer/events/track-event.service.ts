@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
+import type { TrackEventRESTParamsValidator } from "@langwatch/contracts/tracer";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 const thumbsUpDownSchema = z.object({

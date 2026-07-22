@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import { addEnvs } from "~/server/optimization-studio/addEnvs";
 import type { ExecutionStatus } from "~/optimization_studio/types/dsl";
 import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";

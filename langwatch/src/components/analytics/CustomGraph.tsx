@@ -43,7 +43,7 @@ import type {
 } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
 import { availableFilters } from "~/server/filters/registry";
-import type { FilterField } from "~/server/filters/types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   useColorModeValue,

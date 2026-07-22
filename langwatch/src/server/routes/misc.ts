@@ -63,7 +63,7 @@ import {
   type DSPyStepRESTParams,
   dSPyStepRESTParamsSchema,
 } from "~/server/experiments/types";
-import { filterFieldsEnum } from "~/server/filters/types";
+import { filterFieldsEnum } from "@langwatch/contracts/filters";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import { getPayloadSizeHistogram } from "~/server/metrics";
@@ -80,7 +80,7 @@ import {
 import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
-} from "~/server/tracer/types";
+} from "@langwatch/contracts/tracer";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";

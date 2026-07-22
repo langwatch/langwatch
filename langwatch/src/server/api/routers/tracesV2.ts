@@ -39,7 +39,7 @@ import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { Span, SpanInputOutput } from "~/server/tracer/types";
+import type { Span, SpanInputOutput } from "@langwatch/contracts/tracer";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
@@ -71,8 +71,8 @@ import type {
   SpanTreeNode,
   TraceHeader,
   TraceResourceInfoDto,
-} from "./tracesV2.schemas";
-import { spanTreeCursorSchema } from "./tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
+import { spanTreeCursorSchema } from "@langwatch/contracts/traces-v2";
 
 // ---------------------------------------------------------------------------
 // Shared input fragments

@@ -7,7 +7,7 @@
  *  3. Rewrites the part to reference the stored object by URL.
  *
  * The walker speaks the langwatch tracer's `chatRichContentSchema` shape (the
- * production contract — see `src/server/tracer/types.ts`), not AG-UI's
+ * production contract — see `/contracts/tracer`), not AG-UI's
  * `InputContentSchema`. The two vocabularies overlap on `binary` but diverge
  * on image carriers: production sends `{type:"image_url", image_url:{url}}`
  * (OpenAI-shaped, possibly a `data:` URI). The visitor's `legacyImageUrl`
@@ -431,7 +431,7 @@ interface ExtractionParams {
  * No upstream Zod gate: each part is dispatched to the visitor by shape,
  * unknown shapes pass through unchanged. This is intentionally lenient
  * because the production message vocabulary (`chatRichContentSchema` —
- * see `src/server/tracer/types.ts`) covers more variants than any single
+ * see `/contracts/tracer`) covers more variants than any single
  * library schema, including `image_url` with data URIs.
  */
 async function rewriteMessage(

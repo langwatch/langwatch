@@ -5,7 +5,7 @@ import { Edit2 } from "react-feather";
 import type {
   DatasetColumns,
   DatasetRecordInput,
-} from "../../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import { DatasetPreviewTable } from "./editor/DatasetPreviewTable";
 
 export function DatasetPreview({

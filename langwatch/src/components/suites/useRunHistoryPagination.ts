@@ -5,8 +5,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

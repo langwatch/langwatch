@@ -58,7 +58,7 @@ vi.mock("../../../utils/lambdaFetch", () => ({
 }));
 
 // Mock getProjectLambdaArn to return our local nlpgo URL.
-vi.mock("../../../optimization_studio/server/lambda", () => ({
+vi.mock("~/server/optimization-studio/lambda", () => ({
   getProjectLambdaArn: async () => "http://127.0.0.1:5562",
 }));
 

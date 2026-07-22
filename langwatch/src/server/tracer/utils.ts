@@ -15,7 +15,7 @@ import type {
   RAGChunk,
   Span,
   SpanInputOutput,
-} from "./types";
+} from "@langwatch/contracts/tracer";
 
 export const getRAGChunks = (
   spans: (ElasticSearchSpan | Span)[],

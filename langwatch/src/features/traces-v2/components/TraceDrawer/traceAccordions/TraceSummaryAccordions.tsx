@@ -8,7 +8,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   SpanTreeNode,
   TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import {
   parseMediaRefs,
   RESERVED_INPUT_MEDIA_REFS,

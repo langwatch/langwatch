@@ -6,8 +6,8 @@ import type {
 import { randomUUID } from "@copilotkit/shared";
 import { createLogger } from "@langwatch/observability";
 import type z from "zod";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { addEnvs } from "~/server/optimization-studio/addEnvs";
+import { loadDatasets } from "~/server/optimization-studio/loadDatasets";
 import { LATEST_SPEC_VERSION, type LlmPromptConfigComponent, type Workflow } from "~/optimization_studio/types/dsl";
 import type {
   StudioClientEvent,
@@ -18,7 +18,7 @@ import type { runtimeInputsSchema } from "~/prompts/schemas";
 import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
-import type { ChatMessage } from "~/server/tracer/types";
+import type { ChatMessage } from "@langwatch/contracts/tracer";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";

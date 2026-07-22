@@ -1,5 +1,5 @@
-import type { FilterParam } from "../../hooks/useFilterParams";
-import type { FilterField } from "../filters/types";
+import type { FilterParam } from "@langwatch/contracts/filters";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 export const filterOutEmptyFilters = (
   filters: Partial<Record<FilterField, FilterParam | string>> | undefined,

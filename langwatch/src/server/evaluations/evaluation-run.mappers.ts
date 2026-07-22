@@ -1,4 +1,4 @@
-import type { Evaluation } from "~/server/tracer/types";
+import type { Evaluation } from "@langwatch/contracts/tracer";
 import { safeJsonParse } from "~/utils/safeJsonParse";
 import type { TraceEvaluation } from "./evaluation-run.types";
 

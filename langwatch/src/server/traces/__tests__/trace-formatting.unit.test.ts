@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatTraceSummaryDigest } from "../trace-formatting";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 
 describe("formatTraceSummaryDigest()", () => {
   const baseTrace: Pick<Trace, "trace_id" | "project_id" | "metadata" | "timestamps" | "spans"> = {

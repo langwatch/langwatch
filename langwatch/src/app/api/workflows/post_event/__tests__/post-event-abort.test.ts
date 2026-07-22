@@ -13,17 +13,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioClientEvent } from "../../../../../optimization_studio/types/events";
 
-vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
+vi.mock("~/server/optimization-studio/addEnvs", async () => {
   const actual = await vi.importActual<
-    typeof import("../../../../../optimization_studio/server/addEnvs")
-  >("../../../../../optimization_studio/server/addEnvs");
+    typeof import("~/server/optimization-studio/addEnvs")
+  >("~/server/optimization-studio/addEnvs");
   return { ...actual, getS3CacheKey: () => undefined };
 });
 
 // Each test sets the reader the engine call returns, so we can model both a
 // blocked read and a clean completion.
 let currentReader: ReadableStreamDefaultReader<Uint8Array>;
-vi.mock("../../../../../optimization_studio/server/lambda", () => ({
+vi.mock("~/server/optimization-studio/lambda", () => ({
   invokeLambda: vi.fn(async () => currentReader),
 }));
 

@@ -50,7 +50,7 @@ import {
 } from "react-feather";
 import { formatFileSize } from "react-papaparse";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { DatasetConfirmColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "@langwatch/contracts/datasets";
 import { api } from "~/utils/api";
 import { ColumnTypeIcon } from "../../shared/ColumnTypeIcon";
 import {

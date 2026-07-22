@@ -73,7 +73,7 @@ import {
   MessageHoverActions,
   useTranslationState,
 } from "../MessageHoverActions";
-import type { Trace } from "../../../server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 
 const mockUseLiteMemberGuard = vi.mocked(useLiteMemberGuard);
 

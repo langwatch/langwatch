@@ -8,7 +8,7 @@
  * seen through (a [SECRET] marker still fails the evaluation).
  */
 import { describe, expect, it, vi } from "vitest";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import {

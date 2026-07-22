@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Span } from "~/server/tracer/types";
+import type { Span } from "@langwatch/contracts/tracer";
 import { buildDisplayInput } from "../tracesV2";
 
 type InputParts = Pick<Span, "input" | "params">;

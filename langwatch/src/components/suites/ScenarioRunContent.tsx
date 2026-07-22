@@ -13,7 +13,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ScenarioGridCard } from "./ScenarioGridCard";
 import { ScenarioTargetRow } from "./ScenarioTargetRow";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 import type { ViewMode } from "./useRunHistoryStore";
 
 const VIRTUALIZE_THRESHOLD = 30;

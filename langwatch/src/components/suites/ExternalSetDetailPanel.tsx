@@ -21,8 +21,8 @@ import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
+import type { ScenarioRunData } from "@langwatch/contracts/scenarios/types";
 import { api } from "~/utils/api";
 import {
   availableGroupByOptions,

@@ -1,5 +1,5 @@
 import { evaluationRunDataSchema } from "~/server/app-layer/evaluations/types";
-import type { FilterField } from "../types";
+import type { FilterField } from "@langwatch/contracts/filters";
 import {
   ATTRIBUTE_KEYS,
   buildEvaluationRunsConditions,

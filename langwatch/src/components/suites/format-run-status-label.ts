@@ -7,7 +7,7 @@
  * @see specs/features/suites/suite-list-view-status.feature
  */
 
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 
 type CriteriaResults = {
   metCriteria: string[];

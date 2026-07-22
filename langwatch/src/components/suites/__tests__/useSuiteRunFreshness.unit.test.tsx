@@ -6,7 +6,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "@langwatch/contracts/scenarios/enums";
 import { useSuiteRunFreshness } from "../useSuiteRunFreshness";
 
 const mocks = vi.hoisted(() => ({

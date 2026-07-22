@@ -37,13 +37,13 @@ COPY Dockerfile.langyagent ./Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
 
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
-# The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
-# are consumed as source, so pnpm install must see their package.json to link them
-# and install their own dependencies (pino, pino-pretty, ...) into
-# packages/*/node_modules. Without this the app bundle build fails to resolve those
-# deps (e.g. "Rolldown failed to resolve import 'pino'"). Same reason mcp-server is
-# copied early above. node_modules is dockerignored, so only source is copied here.
-COPY langwatch/packages ./langwatch/packages
+# The root `packages/*` workspace members (e.g. @langwatch/observability,
+# @langwatch/api) are consumed as source, so pnpm install must see their
+# package.json to link them and install their own dependencies (pino,
+# pino-pretty, ...) into packages/*/node_modules. Without this the app bundle
+# build fails to resolve those deps (e.g. "Rolldown failed to resolve import
+# 'pino'"). They are copied with the root `COPY packages ./packages` above,
+# before the install below. node_modules is dockerignored, so only source lands.
 COPY langwatch/vendor ./langwatch/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN cd langwatch && CI=true pnpm install --frozen-lockfile
@@ -67,23 +67,39 @@ WORKDIR /app
 # Copy built artifacts from builder.
 # mcp-server must be copied alongside langwatch because pnpm workspace
 # symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
-# cli-cards and handled-error are other root workspace packages linked the same
-# way. Both are loaded by migration tasks as well as the running server —
-# handled-error is imported for side effects by the server and worker entry
-# points, so omitting it fails the boot outright.
+# cli-cards, handled-error and contracts are other root workspace packages
+# linked the same way. All are loaded by migration tasks as well as the running
+# server — handled-error is imported for side effects by the server and worker
+# entry points, and contracts backs several hundred import sites across the
+# app — so omitting any of them fails the boot outright. They are source-only
+# and peer-dep-only, hence package.json + src rather than the whole tree.
 COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
 COPY --from=builder /app/packages/cli-cards/package.json ./packages/cli-cards/package.json
 COPY --from=builder /app/packages/cli-cards/src ./packages/cli-cards/src
 COPY --from=builder /app/packages/handled-error/package.json ./packages/handled-error/package.json
 COPY --from=builder /app/packages/handled-error/src ./packages/handled-error/src
-# cli-cards and handled-error deliberately declare zod / @opentelemetry/api as
-# peers. Because the workspace packages live outside /app/langwatch, expose the
-# app's production copies at the nearest shared node_modules boundary after dev
-# dependencies have been pruned.
-RUN mkdir -p ./node_modules/@opentelemetry \
+COPY --from=builder /app/packages/contracts/package.json ./packages/contracts/package.json
+COPY --from=builder /app/packages/contracts/src ./packages/contracts/src
+# The remaining shared packages are copied whole (package.json + src +
+# node_modules): unlike the peer-dep-only pair above they carry their own
+# runtime deps (liquidjs, pino, ...) as node_modules symlinks into the app's
+# virtual store at langwatch/node_modules/.pnpm, which the langwatch copy
+# above already ships.
+COPY --from=builder /app/packages/api ./packages/api
+COPY --from=builder /app/packages/automations ./packages/automations
+COPY --from=builder /app/packages/observability ./packages/observability
+COPY --from=builder /app/packages/ssrf ./packages/ssrf
+# cli-cards, handled-error and contracts deliberately declare zod /
+# @opentelemetry/api / @ag-ui/core as peers. Because the workspace packages live
+# outside /app/langwatch, expose the app's production copies at the nearest
+# shared node_modules boundary after dev dependencies have been pruned.
+# @ag-ui/core is a VALUE import in contracts (EventType, MessageSchema,
+# MessagesSnapshotEventSchema), not type-only, so it must resolve at runtime.
+RUN mkdir -p ./node_modules/@opentelemetry ./node_modules/@ag-ui \
   && ln -s ../langwatch/node_modules/zod ./node_modules/zod \
-  && ln -s ../../langwatch/node_modules/@opentelemetry/api ./node_modules/@opentelemetry/api
+  && ln -s ../../langwatch/node_modules/@opentelemetry/api ./node_modules/@opentelemetry/api \
+  && ln -s ../../langwatch/node_modules/@ag-ui/core ./node_modules/@ag-ui/core
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 

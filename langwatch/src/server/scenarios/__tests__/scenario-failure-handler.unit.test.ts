@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+} from "@langwatch/contracts/scenarios/enums";
 import { ScenarioFailureHandler } from "../scenario-failure-handler";
 import {
   ScenarioInfraErrorCode,

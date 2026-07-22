@@ -6,7 +6,7 @@ import type {
   PreconditionFieldMatcher,
 } from "./precondition-matchers";
 import { PRECONDITION_FIELD_MATCHERS } from "./precondition-matchers";
-import type { FilterField, TriggerFilterValue, TriggerFilters } from "./types";
+import type { FilterField, TriggerFilterValue, TriggerFilters } from "@langwatch/contracts/filters";
 
 const EVALUATION_FIELDS: ReadonlySet<string> = new Set([
   "evaluations.evaluator_id",

@@ -16,7 +16,7 @@ import {
   type DatasetColumns,
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
-} from "../../server/datasets/types";
+} from "@langwatch/contracts/datasets";
 import { api } from "../../utils/api";
 import { tryToConvertRowsToAppropriateType } from "../AddOrEditDatasetDrawer";
 import { CSVReaderComponent } from "./UploadCSVDrawer";

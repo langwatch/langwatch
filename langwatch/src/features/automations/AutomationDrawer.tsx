@@ -32,14 +32,14 @@ import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type FilterField,
   sanitizeTriggerFilters,
   type TriggerFilterValue,
-} from "~/server/filters/types";
+} from "@langwatch/contracts/filters";
 import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import {
   EXAMPLE_MATCHES,

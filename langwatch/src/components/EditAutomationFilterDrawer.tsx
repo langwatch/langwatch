@@ -10,7 +10,7 @@ import dynamic from "~/utils/compat/next-dynamic";
 import { useCallback, useRef, useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type FilterField,
@@ -18,7 +18,7 @@ import {
   triggerFiltersPermissiveSchema,
   type TriggerFilters,
   type TriggerFilterValue,
-} from "~/server/filters/types";
+} from "@langwatch/contracts/filters";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { Switch } from "../components/ui/switch";

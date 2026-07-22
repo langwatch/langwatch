@@ -58,7 +58,7 @@ import {
   sanitizeTriggerFilters,
   triggerFiltersPermissiveSchema,
   triggerFiltersSchema,
-} from "../../filters/types";
+} from "@langwatch/contracts/filters";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { rateLimit } from "../../rateLimit";
 import { checkProjectPermission } from "../rbac";

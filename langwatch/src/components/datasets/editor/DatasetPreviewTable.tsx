@@ -20,7 +20,7 @@ import {
 import { type RefObject, useMemo, useState } from "react";
 
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 import {
   type CellPosition,
   type DatasetTableContextValue,

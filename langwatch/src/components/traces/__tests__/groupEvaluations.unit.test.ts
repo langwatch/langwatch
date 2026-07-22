@@ -7,7 +7,7 @@
  * @see specs/traces/evaluation-history-grouping.feature
  */
 import { describe, expect, it } from "vitest";
-import type { ElasticSearchEvaluation } from "../../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "@langwatch/contracts/tracer";
 import {
   groupEvaluationsByEvaluator,
   type EvaluationGroup,

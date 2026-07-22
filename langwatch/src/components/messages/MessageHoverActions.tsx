@@ -8,7 +8,7 @@ import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Trace } from "../../server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { api } from "../../utils/api";
 import { getExtractedInput } from "../../utils/traceExtraction";
 

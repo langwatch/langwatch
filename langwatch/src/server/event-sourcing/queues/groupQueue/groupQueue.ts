@@ -1973,10 +1973,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       throw new Error("Blocking Redis connection ended before ready");
     }
     await new Promise<void>((resolve, reject) => {
+      // Narrowed to the EventEmitter surface: the Redis | Cluster union's
+      // overloaded listener signatures don't unify under declaration emit.
+      const bcEvents = bc as NodeJS.EventEmitter;
       const cleanup = () => {
-        bc.off("ready", onReady);
-        bc.off("end", onEnd);
-        bc.off("error", onError);
+        bcEvents.off("ready", onReady);
+        bcEvents.off("end", onEnd);
+        bcEvents.off("error", onError);
       };
       const onReady = () => {
         cleanup();
@@ -2003,9 +2006,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           "Blocking connection error while awaiting readiness; awaiting reconnect",
         );
       };
-      bc.once("ready", onReady);
-      bc.once("end", onEnd);
-      bc.on("error", onError);
+      bcEvents.once("ready", onReady);
+      bcEvents.once("end", onEnd);
+      bcEvents.on("error", onError);
     });
   }
 

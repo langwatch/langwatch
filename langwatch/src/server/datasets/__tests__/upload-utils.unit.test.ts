@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DatasetColumns } from "../types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 import {
   convertRowsToColumnTypes,
   convertValueToColumnType,

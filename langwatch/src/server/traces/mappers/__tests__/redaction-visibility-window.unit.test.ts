@@ -3,7 +3,7 @@ import {
   TEASER_ELLIPSIS,
   TEASER_MAX_CHARS,
 } from "~/server/app-layer/traces/visibility-window.service";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import { applyTraceProtections } from "../redaction";
 

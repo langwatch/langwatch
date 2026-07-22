@@ -7,7 +7,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import type {
   LangwatchSignalBucket,
   SpanTreeNode,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import { useSpanLangwatchSignals } from "../../../hooks/useSpanLangwatchSignals";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";

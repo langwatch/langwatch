@@ -33,6 +33,11 @@
 		},
 		"plugins": []
 	},
+	// No `references`: @langwatch/* resolves to package source via the pnpm
+	// workspace symlink, so go-to-definition lands on source directly. (The
+	// tsgo build configs dropped --build/references too — see tsconfig.tsgo.json.)
+	// Deliberately broad (unlike tsconfig.tsgo.json): the editor project also
+	// covers tests, scripts and config files so every open file has a project.
 	"include": [
 		// "./src/**/*"
 		".eslintrc.cjs",

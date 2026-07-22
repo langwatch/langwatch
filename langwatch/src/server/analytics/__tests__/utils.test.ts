@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FilterParam } from "../../../hooks/useFilterParams";
-import type { FilterField } from "../../filters/types";
+import type { FilterParam } from "@langwatch/contracts/filters";
+import type { FilterField } from "@langwatch/contracts/filters";
 import { filterOutEmptyFilters } from "../utils";
 
 describe("filterOutEmptyFilters", () => {

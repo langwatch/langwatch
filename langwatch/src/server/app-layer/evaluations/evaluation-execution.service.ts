@@ -31,7 +31,7 @@ import {
   THREAD_MAPPINGS,
   type TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
-import type { Trace } from "~/server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../clients/langevals/langevals.client";

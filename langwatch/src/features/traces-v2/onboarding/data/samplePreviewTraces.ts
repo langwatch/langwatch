@@ -2,7 +2,7 @@ import type {
   SpanDetail,
   SpanTreeNode,
   TraceHeader,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { RouterOutputs } from "~/utils/api";
 import type {

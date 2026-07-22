@@ -9,7 +9,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { Trace } from "../../../server/tracer/types";
+import type { Trace } from "@langwatch/contracts/tracer";
 import { TraceMessages } from "../TraceMessages";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

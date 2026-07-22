@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import type { TraceHeader } from "@langwatch/contracts/traces-v2";
 import { useRetainedTraceHeader } from "../useRetainedTraceHeader";
 
 function makeTrace(overrides: Partial<TraceHeader> = {}): TraceHeader {

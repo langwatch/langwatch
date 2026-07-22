@@ -6,7 +6,7 @@ import type {
   ReservedTraceMetadata,
   Span,
   SpanTypes,
-} from "../tracer/types";
+} from "@langwatch/contracts/tracer";
 
 function spanTypeToESpanKind(type: SpanTypes): ESpanKind {
   switch (type) {

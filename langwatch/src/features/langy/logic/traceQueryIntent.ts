@@ -14,7 +14,7 @@
  *
  *   - `search_traces`, the analytics graph builder and the automation drawer
  *     all speak the LEGACY filter record (`Record<FilterField, string[]>`,
- *     `src/server/filters/types.ts`), keyed by URL keys from
+ *     `/contracts/filters`), keyed by URL keys from
  *     `src/server/filters/registry.ts`. Those three need no translation at all
  *     — Langy is already speaking their language.
  *   - traces-v2 speaks a Lucene-ish DSL (liqe) carried in the URL FRAGMENT

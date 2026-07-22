@@ -1,13 +1,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "@langwatch/contracts/filters";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { generateClickHouseFilterConditions } from "../clickhouse/filter-conditions";
-import type { FilterField } from "../types";
+import type { FilterField } from "@langwatch/contracts/filters";
 
 const tenantId = `test-filter-${nanoid()}`;
 // Traces with all three legacy key formats for metadata

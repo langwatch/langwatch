@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { normalizeToSnakeCase } from "../normalizeToSnakeCase";
+import { normalizeToSnakeCase } from "~/utils/normalizeToSnakeCase";
 
 /**
  * Tests for OptimizationStudioLLMConfigField normalization logic

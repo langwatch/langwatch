@@ -9,7 +9,7 @@ import {
 } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/contracts/datasets";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 

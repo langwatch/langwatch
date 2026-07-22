@@ -5,7 +5,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   CategoryPrivacy,
   ContentPrivacy,
-} from "~/server/api/routers/tracesV2.schemas";
+} from "@langwatch/contracts/traces-v2";
 import NextLink from "~/utils/compat/next-link";
 import { Tooltip } from "./tooltip";
 
