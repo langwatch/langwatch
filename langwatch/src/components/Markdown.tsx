@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { chakra } from "@chakra-ui/react";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   Children,
   isValidElement,
@@ -10,7 +11,6 @@ import {
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
-import { useRouter } from "~/utils/compat/next-router";
 import { ConfirmDialog } from "./gateway/ConfirmDialog";
 import { RenderCode } from "./code/RenderCode";
 import { getProxiedImageUrl } from "./ExternalImage";
@@ -163,6 +163,7 @@ function MarkdownLink({
 } & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "color">) {
   const router = useRouter();
   const [warningOpen, setWarningOpen] = useState(false);
+  const router = useRouter();
   const label = textOf(children);
   const mismatched = isMismatchedUrlLabel(label, href);
   const langy = variant === "langy";
