@@ -29,9 +29,9 @@ describe("nodeErrorToDomainError", () => {
     });
 
     it("attributes a bad dataset to them", () => {
-      expect(nodeErrorToDomainError({ errorType: "invalid_dataset" }).fault).toBe(
-        "customer",
-      );
+      expect(
+        nodeErrorToDomainError({ errorType: "invalid_dataset" }).fault,
+      ).toBe("customer");
     });
   });
 
@@ -50,9 +50,9 @@ describe("nodeErrorToDomainError", () => {
      * sends the customer looking at our integrations for their own bug.
      */
     it("does not blame a provider", () => {
-      expect(nodeErrorToDomainError({ errorType: "ValueError" }).fault).not.toBe(
-        "provider",
-      );
+      expect(
+        nodeErrorToDomainError({ errorType: "ValueError" }).fault,
+      ).not.toBe("provider");
     });
   });
 
