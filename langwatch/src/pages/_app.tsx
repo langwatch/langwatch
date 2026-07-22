@@ -43,6 +43,15 @@ const appConfig = defineConfig({
       background:
         "color-mix(in srgb, var(--chakra-colors-orange-emphasized) 20%, transparent) !important",
     },
+    // GraphicsQualityProvider sets this attribute when a background FPS
+    // probe finds the device can't sustain a smooth frame rate. Recipes
+    // below reference `var(--lw-backdrop-blur, blur(Npx))` instead of a
+    // literal blur value, so this one variable turns off decorative blur
+    // everywhere at once — including static recipes, which can't read
+    // React state directly.
+    'html[data-reduced-graphics="true"]': {
+      "--lw-backdrop-blur": "none",
+    },
   },
   theme: {
     tokens: {
@@ -663,7 +672,7 @@ const appConfig = defineConfig({
         base: {
           content: {
             bg: "bg.panel/85",
-            backdropFilter: "blur(8px)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
             color: "fg",
             border: "1px solid",
             borderColor: "border",
@@ -1001,7 +1010,7 @@ const appConfig = defineConfig({
           },
           content: {
             background: "bg.surface/60",
-            backdropFilter: "blur(12px)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1035,7 +1044,7 @@ const appConfig = defineConfig({
           },
           content: {
             background: "bg.panel/75",
-            backdropFilter: "blur(8px)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1113,7 +1122,7 @@ const appConfig = defineConfig({
           content: {
             maxWidth: "70%",
             background: "bg.surface/80",
-            backdropFilter: "blur(25px)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(25px))",
             border: "1px solid",
             borderColor: "border",
             borderRadius: "lg",
@@ -1140,7 +1149,7 @@ const appConfig = defineConfig({
         base: {
           root: {
             borderRadius: "xl",
-            backdropFilter: "blur(12px)",
+            backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
             border: "1px solid",
             boxShadow: "lg",
             "&[data-type=info]": {

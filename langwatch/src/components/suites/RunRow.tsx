@@ -65,7 +65,7 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           gap={3}
           flexWrap="nowrap"
           bg="bg.panel/70"
-          backdropFilter="blur(12px) saturate(140%)"
+          backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
           borderWidth="1px"
           borderColor="border.muted"
           data-testid="run-row-header"
@@ -155,7 +155,7 @@ function RunRowData({
           aria-expanded={isExpanded}
           aria-label={`Run from ${timeAgo ?? "unknown time"}`}
           bg="bg.panel/70"
-          backdropFilter="blur(12px) saturate(140%)"
+          backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
           borderWidth="1px"
           borderColor="border.muted"
           transition="border-color 0.15s ease"

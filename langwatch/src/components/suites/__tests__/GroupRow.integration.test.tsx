@@ -119,4 +119,29 @@ describe("<GroupRow/>", () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  describe("when rendering the sticky header's backdrop blur", () => {
+    /** @scenario "Blur effects turn off when the device can't keep a smooth frame rate" */
+    it("references the shared --lw-backdrop-blur CSS variable instead of a hardcoded blur", () => {
+      render(
+        <GroupRow
+          group={makeGroup()}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          onScenarioRunClick={vi.fn()}
+          resolveTargetName={() => null}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Chakra applies non-token style props via an emotion-injected
+      // stylesheet class, not an inline `style` attribute — check the
+      // injected CSS text rather than the DOM node's `.style`.
+      const injectedCss = Array.from(document.querySelectorAll("style"))
+        .map((s) => s.innerHTML)
+        .join("\n");
+      expect(injectedCss).toContain("--lw-backdrop-blur");
+    });
+  });
 });

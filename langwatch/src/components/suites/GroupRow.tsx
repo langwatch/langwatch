@@ -67,7 +67,7 @@ export function GroupRow({
           aria-expanded={isExpanded}
           aria-label={`${group.groupLabel} group`}
           bg="bg.panel/70"
-          backdropFilter="blur(12px) saturate(140%)"
+          backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
           borderWidth="1px"
           borderColor="border.muted"
           transition="border-color 0.15s ease"
