@@ -164,7 +164,12 @@ export function createEnvConfig() {
       // traces so a recorded visit is complete; the decision also reaches the
       // server, which drops the backend half of an unsampled browser trace.
       // Defaults to all of them. See ADR-058.
-      RUM_SAMPLE_RATIO: z.coerce.number().min(0).max(1).default(1),
+      // Blank in .env means "unset" — without the preprocess, z.coerce turns
+      // "" into 0 and silently records nothing.
+      RUM_SAMPLE_RATIO: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().min(0).max(1).default(1),
+      ),
       // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
       // runner; mirrored on the Python NLP side via the same env name). When
       // true: private IPs, localhost, and hostnames resolving to private IPs
