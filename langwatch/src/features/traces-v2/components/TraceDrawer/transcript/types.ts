@@ -1,4 +1,4 @@
-import type { MediaPartData } from "~/components/simulations/MediaPart";
+import type { MediaPartData } from "~/shared/traces/mediaParts";
 
 export interface ChatMessage {
   role: string;

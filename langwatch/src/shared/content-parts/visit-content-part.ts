@@ -121,22 +121,22 @@ export function visitContentPart<R>(
   const o = part as Record<string, unknown>;
 
   // text parts: {type:"text", text/content:"..."} or {text:"..."} (no type)
-  if (o["type"] === "text" || (!o["type"] && o["text"])) {
-    const text = (o["text"] ?? o["content"] ?? "") as string;
+  if (o.type === "text" || (!o.type && o.text)) {
+    const text = (o.text ?? o.content ?? "") as string;
     return visitor.text(text);
   }
 
   // media parts: image / audio / video / document with a source object
   if (
-    (o["type"] === "image" ||
-      o["type"] === "audio" ||
-      o["type"] === "video" ||
-      o["type"] === "document") &&
-    o["source"]
+    (o.type === "image" ||
+      o.type === "audio" ||
+      o.type === "video" ||
+      o.type === "document") &&
+    o.source
   ) {
     return visitor.media({
-      type: o["type"] as "image" | "audio" | "video" | "document",
-      source: o["source"] as ContentSource,
+      type: o.type as "image" | "audio" | "video" | "document",
+      source: o.source as ContentSource,
     });
   }
 
@@ -146,21 +146,20 @@ export function visitContentPart<R>(
   // either an inline base64 turn (pre-extraction) or an externalized
   // /api/files/<id> reference.
   if (
-    o["type"] === "input_audio" &&
-    typeof o["input_audio"] === "object" &&
-    o["input_audio"] !== null
+    o.type === "input_audio" &&
+    typeof o.input_audio === "object" &&
+    o.input_audio !== null
   ) {
-    const ia = o["input_audio"] as Record<string, unknown>;
-    const data = typeof ia["data"] === "string" ? ia["data"] : undefined;
-    const url = typeof ia["url"] === "string" ? ia["url"] : undefined;
+    const ia = o.input_audio as Record<string, unknown>;
+    const data = typeof ia.data === "string" ? ia.data : undefined;
+    const url = typeof ia.url === "string" ? ia.url : undefined;
     if (data || url) {
       return visitor.inputAudio
         ? visitor.inputAudio({
             data,
             url,
-            format: typeof ia["format"] === "string" ? ia["format"] : undefined,
-            mimeType:
-              typeof ia["mimeType"] === "string" ? ia["mimeType"] : undefined,
+            format: typeof ia.format === "string" ? ia.format : undefined,
+            mimeType: typeof ia.mimeType === "string" ? ia.mimeType : undefined,
           })
         : visitor.unknown?.(part);
     }
@@ -177,14 +176,14 @@ export function visitContentPart<R>(
   // payloads land in ClickHouse Messages.Content. Audio mediaTypes go to
   // `inputAudio` (preserves a playable shape downstream); other file payloads
   // go to `binary` (generic externalisation by mimeType).
-  if (o["type"] === "file" && typeof o["mediaType"] === "string") {
+  if (o.type === "file" && typeof o.mediaType === "string") {
     // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
     // file part routes the same as `audio/wav`. The dispatched part carries
     // the lowercased type — the readback allowlist and storage Content-Type
     // both expect the canonical form.
-    const mimeType = o["mediaType"].toLowerCase();
-    const data = typeof o["data"] === "string" ? o["data"] : undefined;
-    const url = typeof o["url"] === "string" ? o["url"] : undefined;
+    const mimeType = o.mediaType.toLowerCase();
+    const data = typeof o.data === "string" ? o.data : undefined;
+    const url = typeof o.url === "string" ? o.url : undefined;
     if (data || url) {
       if (mimeType.startsWith("audio/")) {
         return visitor.inputAudio
@@ -201,8 +200,8 @@ export function visitContentPart<R>(
         mimeType,
         data,
         url,
-        id: typeof o["id"] === "string" ? o["id"] : undefined,
-        filename: typeof o["filename"] === "string" ? o["filename"] : undefined,
+        id: typeof o.id === "string" ? o.id : undefined,
+        filename: typeof o.filename === "string" ? o.filename : undefined,
       });
     }
   }
@@ -214,13 +213,9 @@ export function visitContentPart<R>(
   // downstream) so the extractor externalises them; a `file_id`-only part
   // references a provider-hosted file with no bytes, so it falls through to
   // `unknown` and passes along unchanged.
-  if (
-    o["type"] === "file" &&
-    typeof o["file"] === "object" &&
-    o["file"] !== null
-  ) {
+  if (o.type === "file" && typeof o.file === "object" && o.file !== null) {
     const binPart = openAiFilePayloadToBinaryPart(
-      o["file"] as Record<string, unknown>,
+      o.file as Record<string, unknown>,
     );
     if (binPart?.mimeType.startsWith("audio/")) {
       return visitor.inputAudio
@@ -238,49 +233,69 @@ export function visitContentPart<R>(
   }
 
   // binary parts
-  if (o["type"] === "binary" && o["mimeType"]) {
+  if (o.type === "binary" && o.mimeType) {
     return visitor.binary({
       type: "binary",
-      mimeType: o["mimeType"] as string,
-      data: o["data"] as string | undefined,
-      url: o["url"] as string | undefined,
-      id: o["id"] as string | undefined,
-      filename: o["filename"] as string | undefined,
+      mimeType: o.mimeType as string,
+      data: o.data as string | undefined,
+      url: o.url as string | undefined,
+      id: o.id as string | undefined,
+      filename: o.filename as string | undefined,
     });
   }
 
   // tool_use / tool_call
-  if (o["type"] === "tool_use" || o["type"] === "tool_call") {
+  if (o.type === "tool_use" || o.type === "tool_call") {
     return visitor.toolCall({
-      name: (o["name"] ?? o["toolName"] ?? "tool") as string,
-      arguments: o["arguments"] ?? o["input"] ?? o["args"],
+      name: (o.name ?? o.toolName ?? "tool") as string,
+      arguments: o.arguments ?? o.input ?? o.args,
     });
   }
 
   // tool_result
-  if (o["type"] === "tool_result") {
-    return visitor.toolResult({ result: o["content"] ?? o["result"] });
+  if (o.type === "tool_result") {
+    return visitor.toolResult({ result: o.content ?? o.result });
   }
 
-  // OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}}
-  // (production shape; data: URI extraction handled by visitor)
-  if (
-    o["type"] === "image_url" &&
-    typeof o["image_url"] === "object" &&
-    o["image_url"] !== null &&
-    (o["image_url"] as Record<string, unknown>)["url"]
-  ) {
-    const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
-    return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
+  // OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}} or the
+  // shorthand string form {type:"image_url", image_url:"..."}.
+  // (production shapes; data: URI extraction handled by visitor)
+  {
+    const url = imageUrlFromPart(o);
+    if (url !== null) {
+      return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
+    }
   }
 
-  // Bare {image:"..."} shape (rare; some fixtures)
-  if (o["image"]) {
-    const src = o["image"] as string;
+  // Bare {image:"..."} shape (rare; some fixtures). The value must be a
+  // string — the generic value walker dispatches arbitrary objects here, and
+  // a non-string `image` property (e.g. {image: {width}}) is not a part.
+  if (typeof o.image === "string" && o.image) {
+    const src = o.image;
     return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
   }
 
   return visitor.unknown?.(part);
+}
+
+/**
+ * The `image_url` carrier in both wire forms: the OpenAI object form
+ * ({type:"image_url", image_url:{url:"..."}}) and the shorthand string form
+ * ({type:"image_url", image_url:"..."}) some SDKs emit. Returns the url, or
+ * null when the part is not an image_url carrier.
+ */
+function imageUrlFromPart(o: Record<string, unknown>): string | null {
+  if (o.type !== "image_url") return null;
+  const carrier = o.image_url;
+  if (typeof carrier === "string" && carrier) return carrier;
+  if (
+    typeof carrier === "object" &&
+    carrier !== null &&
+    typeof (carrier as Record<string, unknown>).url === "string"
+  ) {
+    return (carrier as Record<string, unknown>).url as string;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,22 +325,22 @@ export async function visitContentPartAsync<R>(
   const o = part as Record<string, unknown>;
 
   // text parts: {type:"text", text/content:"..."} or {text:"..."} (no type)
-  if (o["type"] === "text" || (!o["type"] && o["text"])) {
-    const text = (o["text"] ?? o["content"] ?? "") as string;
+  if (o.type === "text" || (!o.type && o.text)) {
+    const text = (o.text ?? o.content ?? "") as string;
     return visitor.text(text);
   }
 
   // media parts: image / audio / video / document with a source object
   if (
-    (o["type"] === "image" ||
-      o["type"] === "audio" ||
-      o["type"] === "video" ||
-      o["type"] === "document") &&
-    o["source"]
+    (o.type === "image" ||
+      o.type === "audio" ||
+      o.type === "video" ||
+      o.type === "document") &&
+    o.source
   ) {
     return visitor.media({
-      type: o["type"] as "image" | "audio" | "video" | "document",
-      source: o["source"] as ContentSource,
+      type: o.type as "image" | "audio" | "video" | "document",
+      source: o.source as ContentSource,
     });
   }
 
@@ -335,21 +350,20 @@ export async function visitContentPartAsync<R>(
   // either an inline base64 turn (pre-extraction) or an externalized
   // /api/files/<id> reference.
   if (
-    o["type"] === "input_audio" &&
-    typeof o["input_audio"] === "object" &&
-    o["input_audio"] !== null
+    o.type === "input_audio" &&
+    typeof o.input_audio === "object" &&
+    o.input_audio !== null
   ) {
-    const ia = o["input_audio"] as Record<string, unknown>;
-    const data = typeof ia["data"] === "string" ? ia["data"] : undefined;
-    const url = typeof ia["url"] === "string" ? ia["url"] : undefined;
+    const ia = o.input_audio as Record<string, unknown>;
+    const data = typeof ia.data === "string" ? ia.data : undefined;
+    const url = typeof ia.url === "string" ? ia.url : undefined;
     if (data || url) {
       return visitor.inputAudio
         ? visitor.inputAudio({
             data,
             url,
-            format: typeof ia["format"] === "string" ? ia["format"] : undefined,
-            mimeType:
-              typeof ia["mimeType"] === "string" ? ia["mimeType"] : undefined,
+            format: typeof ia.format === "string" ? ia.format : undefined,
+            mimeType: typeof ia.mimeType === "string" ? ia.mimeType : undefined,
           })
         : visitor.unknown?.(part);
     }
@@ -366,14 +380,14 @@ export async function visitContentPartAsync<R>(
   // payloads land in ClickHouse Messages.Content. Audio mediaTypes go to
   // `inputAudio` (preserves a playable shape downstream); other file payloads
   // go to `binary` (generic externalisation by mimeType).
-  if (o["type"] === "file" && typeof o["mediaType"] === "string") {
+  if (o.type === "file" && typeof o.mediaType === "string") {
     // MIME types are case-insensitive per RFC 2045 §5.1, so an `Audio/WAV`
     // file part routes the same as `audio/wav`. The dispatched part carries
     // the lowercased type — the readback allowlist and storage Content-Type
     // both expect the canonical form.
-    const mimeType = o["mediaType"].toLowerCase();
-    const data = typeof o["data"] === "string" ? o["data"] : undefined;
-    const url = typeof o["url"] === "string" ? o["url"] : undefined;
+    const mimeType = o.mediaType.toLowerCase();
+    const data = typeof o.data === "string" ? o.data : undefined;
+    const url = typeof o.url === "string" ? o.url : undefined;
     if (data || url) {
       if (mimeType.startsWith("audio/")) {
         return visitor.inputAudio
@@ -390,8 +404,8 @@ export async function visitContentPartAsync<R>(
         mimeType,
         data,
         url,
-        id: typeof o["id"] === "string" ? o["id"] : undefined,
-        filename: typeof o["filename"] === "string" ? o["filename"] : undefined,
+        id: typeof o.id === "string" ? o.id : undefined,
+        filename: typeof o.filename === "string" ? o.filename : undefined,
       });
     }
   }
@@ -403,13 +417,9 @@ export async function visitContentPartAsync<R>(
   // downstream) so the extractor externalises them; a `file_id`-only part
   // references a provider-hosted file with no bytes, so it falls through to
   // `unknown` and passes along unchanged.
-  if (
-    o["type"] === "file" &&
-    typeof o["file"] === "object" &&
-    o["file"] !== null
-  ) {
+  if (o.type === "file" && typeof o.file === "object" && o.file !== null) {
     const binPart = openAiFilePayloadToBinaryPart(
-      o["file"] as Record<string, unknown>,
+      o.file as Record<string, unknown>,
     );
     if (binPart?.mimeType.startsWith("audio/")) {
       return visitor.inputAudio
@@ -427,45 +437,45 @@ export async function visitContentPartAsync<R>(
   }
 
   // binary parts
-  if (o["type"] === "binary" && o["mimeType"]) {
+  if (o.type === "binary" && o.mimeType) {
     return visitor.binary({
       type: "binary",
-      mimeType: o["mimeType"] as string,
-      data: o["data"] as string | undefined,
-      url: o["url"] as string | undefined,
-      id: o["id"] as string | undefined,
-      filename: o["filename"] as string | undefined,
+      mimeType: o.mimeType as string,
+      data: o.data as string | undefined,
+      url: o.url as string | undefined,
+      id: o.id as string | undefined,
+      filename: o.filename as string | undefined,
     });
   }
 
   // tool_use / tool_call
-  if (o["type"] === "tool_use" || o["type"] === "tool_call") {
+  if (o.type === "tool_use" || o.type === "tool_call") {
     return visitor.toolCall({
-      name: (o["name"] ?? o["toolName"] ?? "tool") as string,
-      arguments: o["arguments"] ?? o["input"] ?? o["args"],
+      name: (o.name ?? o.toolName ?? "tool") as string,
+      arguments: o.arguments ?? o.input ?? o.args,
     });
   }
 
   // tool_result
-  if (o["type"] === "tool_result") {
-    return visitor.toolResult({ result: o["content"] ?? o["result"] });
+  if (o.type === "tool_result") {
+    return visitor.toolResult({ result: o.content ?? o.result });
   }
 
-  // OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}}
-  // (production shape; data: URI extraction handled by visitor)
-  if (
-    o["type"] === "image_url" &&
-    typeof o["image_url"] === "object" &&
-    o["image_url"] !== null &&
-    (o["image_url"] as Record<string, unknown>)["url"]
-  ) {
-    const url = (o["image_url"] as Record<string, unknown>)["url"] as string;
-    return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
+  // OpenAI-shaped image: {type:"image_url", image_url:{url:"..."}} or the
+  // shorthand string form {type:"image_url", image_url:"..."}.
+  // (production shapes; data: URI extraction handled by visitor)
+  {
+    const url = imageUrlFromPart(o);
+    if (url !== null) {
+      return visitor.imageUrl ? visitor.imageUrl(url) : visitor.unknown?.(part);
+    }
   }
 
-  // Bare {image:"..."} shape (rare; some fixtures)
-  if (o["image"]) {
-    const src = o["image"] as string;
+  // Bare {image:"..."} shape (rare; some fixtures). The value must be a
+  // string — the generic value walker dispatches arbitrary objects here, and
+  // a non-string `image` property (e.g. {image: {width}}) is not a part.
+  if (typeof o.image === "string" && o.image) {
+    const src = o.image;
     return visitor.bareImage ? visitor.bareImage(src) : visitor.unknown?.(part);
   }
 
@@ -515,10 +525,10 @@ function openAiFilePayloadToBinaryPart(
   file: Record<string, unknown>,
 ): BinaryPart | null {
   const fileData =
-    typeof file["file_data"] === "string" ? file["file_data"] : undefined;
+    typeof file.file_data === "string" ? file.file_data : undefined;
   if (!fileData) return null;
   const filename =
-    typeof file["filename"] === "string" ? file["filename"] : undefined;
+    typeof file.filename === "string" ? file.filename : undefined;
 
   if (fileData.startsWith("data:")) {
     const parsed = parseBase64DataUri(fileData);

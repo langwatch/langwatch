@@ -1,4 +1,4 @@
-import { audioPartToMediaData } from "~/components/traces/audioParts";
+import { mediaPartToMediaData } from "~/shared/traces/mediaParts";
 import type { ChatMessage, ContentBlock } from "./types";
 
 /**
@@ -476,14 +476,21 @@ export function parseContentBlocks(
       }
       case "input_audio":
       case "audio":
-      case "file": {
-        // OpenAI Realtime `input_audio`, AG-UI `audio`, and AI-SDK `file`
-        // audio parts render as an inline player, not a raw-JSON dump. The
-        // canonical decoder routes an audio `file` (mediaType "audio/…") to
-        // the same audio shape the legacy RenderInputOutput path uses, closing
-        // the both-UIs parity gap. A non-audio `file` resolves to null and
-        // falls through to the raw block below, unchanged.
-        const media = audioPartToMediaData(obj);
+      case "file":
+      case "binary":
+      case "image_url":
+      case "image":
+      case "video":
+      case "document": {
+        // Every media-part shape renders as real media, not a raw-JSON dump:
+        // OpenAI Realtime `input_audio`, AG-UI `audio`/`video`/`document`
+        // sources, AI-SDK `file`/`image`, OpenAI `image_url`, and the
+        // externalized `binary` references the ingest-side extractor mints.
+        // The canonical decoder maps each to the MediaPart vocabulary (audio
+        // player, inline image, video, attachment chip). A part it cannot
+        // resolve (e.g. provider-hosted file_id with no bytes) falls through
+        // to the raw block below, unchanged.
+        const media = mediaPartToMediaData(obj);
         if (media) {
           out.push({ kind: "media", part: media });
           break;

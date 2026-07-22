@@ -207,6 +207,7 @@ import { SuiteRunService } from "./suites/suite-run.service";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
 import { PrismaTopicRepository } from "./topic-clustering/repositories/topic.prisma.repository";
 import { TopicService } from "./topic-clustering/topic.service";
+import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
@@ -1034,6 +1035,17 @@ export function initializeDefaultApp(options?: {
       // We log at warn level and return the original commandData unchanged so
       // that ingestion is never blocked by the spool path. ADR-022.
       processCommandData: async (data) => {
+        // Media extraction runs FIRST: externalizing inline media parts to
+        // the content-addressed stored-objects store usually brings the
+        // payload back under COMMAND_INLINE_THRESHOLD, so the transient
+        // whole-payload spool below rarely needs to fire. Internally
+        // fail-open (marker-gated, flag-gated, privacy-interlocked) — on any
+        // error it returns `data` unchanged and the spool proceeds as today.
+        data = await maybeExtractSpanMedia({
+          data,
+          logger: createLogger("langwatch:traces:edge-media-extraction"),
+        });
+
         // Track which stage failed so the fail-open counter carries a useful
         // reason label (flag_store vs spool/S3) for alerting (GtVrL).
         let stage: "flag_store" | "spool" = "flag_store";
