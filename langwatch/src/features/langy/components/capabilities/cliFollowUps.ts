@@ -20,10 +20,10 @@
  *   - It renders nothing. `LangyCapabilityRenderer` draws the chips.
  *   - It carries nothing out. A suggestion is an offer; showing one must not
  *     create, mutate or persist anything (see the spec). Where an offer LANDS —
- *     the traces view already filtered, the graph builder with the search
- *     applied — is `features/langy/logic/traceQueryIntent.ts`'s job: it
- *     recompiles the tool call's INPUT into a destination URL. This module
- *     answers "which offers"; that one answers "to where".
+ *     the automation drawer with the search as its subject, or the plain
+ *     surface when nothing can carry it — is `followUpChips.ts`'s job (via the
+ *     shared `logic/traceExplorerLink.ts` reader). This module answers "which
+ *     offers"; that one answers "to where".
  *
  * The copy lives HERE, not in the map: "Add to a dataset" is how the Langy panel
  * words it, and the map describes features, not one view's chips.

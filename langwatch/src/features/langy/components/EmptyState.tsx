@@ -35,6 +35,13 @@ export interface LangySuggestion {
   prompt: string;
   /** Absent means it works from a standing start. */
   requires?: SuggestionRequirement;
+  /**
+   * Offer this ask only UNTIL the project has the named thing. Setup asks are
+   * promises about a gap — "onboard your agent" to a project that already has
+   * traces is the product not knowing its own customer — so once the gap
+   * closes, the ask is withdrawn rather than topped up.
+   */
+  until?: SuggestionRequirement;
 }
 
 /**
@@ -51,12 +58,11 @@ export interface LangySuggestion {
  * capability row. It reads THIS array rather than keeping a parallel copy, so
  * home can never promise an ask the panel does not offer.
  *
- * The `requires` field is what lets the home page offer a DIFFERENT few to a
- * project that has nothing than to one that has months of runs. The panel's own
- * list below is not filtered by it: by the time someone has opened the panel
- * they have chosen to be here, and the four rows together are how they learn
- * the range. The home page is the surface that meets people who did not choose
- * it, so that is the one that has to earn every row.
+ * The `requires` field is what lets BOTH surfaces offer a DIFFERENT few to a
+ * project that has nothing than to one that has months of runs: the panel's
+ * own list is selected by the same `selectLangySuggestions` the home page
+ * uses (see logic/langyHomeSuggestions.ts), so a project with no traces is
+ * offered ways to get set up rather than four asks that can only dead-end.
  */
 export const SUGGESTIONS: LangySuggestion[] = [
   {
@@ -113,14 +119,17 @@ export const SUGGESTIONS: LangySuggestion[] = [
 export const SETUP_SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ScanSearch,
-    label: "Send my first trace",
-    prompt: "How do I send my first trace to this project?",
+    label: "Onboard your agent",
+    prompt: "Help me onboard my agent and send its first trace to this project.",
+    // The first trace arriving is exactly what makes this ask obsolete.
+    until: "traces",
   },
   {
     icon: ShieldCheck,
     label: "Choose what to measure",
     prompt:
       "What should I measure about my agent, and which evaluators would you start with?",
+    until: "evaluations",
   },
   {
     icon: GitCompare,
@@ -146,17 +155,24 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
  * a mascot. A fresh one is picked each time the empty state mounts.
  */
 const GREETINGS = [
-  "Hey, I'm Langy. Haven't hallucinated since 1969.",
-  "I read the logs so you don't have to.",
-  "Show me where it hurts.",
+  "Hey, I'm Langy!"
 ];
 
 export function EmptyState({
   onPick,
+  suggestions,
   variant = "floating",
   panelWidth = 432,
 }: {
   onPick: (prompt: string) => void;
+  /**
+   * The asks this project can actually act on, picked by the panel via
+   * `selectLangySuggestions` from the project's reach — the same selection the
+   * home page runs, so the two surfaces can never disagree about what is
+   * honest to offer. Empty while the reach is still unknown: a row that
+   * appears and is then withdrawn is worse than a beat of nothing.
+   */
+  suggestions: LangySuggestion[];
   variant?: "floating" | "sidebar";
   /**
    * The panel's real rendered width. The floating card ranges ~340–432px with
@@ -202,7 +218,7 @@ export function EmptyState({
         marginBottom={`${metrics.heroMarginBottom}px`}
       >
         {/* The LangWatch mark, in the brand gradient — and the ONLY place it
-            appears inside the panel (the launcher is the other). Bare, no tile:
+            appears inside the panel (the minimised peek is the other). Bare, no tile:
             the orange chip that used to box it in was old-brand chrome, a
             saturated block competing with the display line right under it. It
             shrinks with the card but never below 34px, the smallest size at
@@ -222,24 +238,52 @@ export function EmptyState({
         >
           {greeting}
         </Text>
+        {/* An invitation, then the two keys worth knowing.
+            "Ask in plain language" was an instruction nobody needs — anyone
+            looking at a text box already knows they can type in it — and it
+            spent the one line under the hero saying so. The line now gets out
+            of the way, and the space goes to the two things a first-time
+            reader could not have guessed. */}
         <Text
           textStyle="sm"
           color="fg.muted"
           lineHeight="1.5"
           textAlign="center"
-          // `balance` evens the two lines instead of orphaning "of these." on a
-          // row of its own; the cap keeps the measure from running the full
-          // column so it stays a tight caption under the hero.
           textWrap="balance"
           maxWidth={`${metrics.subtitleMaxWidth}px`}
           marginTop={2}
         >
-          Ask in plain language, or start with one of these.
+          {/* "One of these" only when there are rows to point at — while the
+              project's reach is unknown the list below is empty on purpose. */}
+          {suggestions.length > 0
+            ? "Just type away, or start with one of these."
+            : "Just type away."}
+        </Text>
+        <Text
+          textStyle="xs"
+          // Quieter and lighter than the line above: this is a reference the
+          // eye should find when it goes looking, not a second invitation
+          // competing with the first.
+          fontWeight="400"
+          color="fg.subtle"
+          textAlign="center"
+          marginTop={1.5}
+        >
+          <chakra.span fontFamily="mono" color="fg.muted">
+            /
+          </chakra.span>{" "}
+          for skills{"  ·  "}
+          <chakra.span fontFamily="mono" color="fg.muted">
+            #
+          </chakra.span>{" "}
+          to add context
         </Text>
       </VStack>
 
-      <VStack align="stretch" gap={0.5}>
-        {sidebar ? (
+      {/* Cards need air between them in a way bare rows did not — at the old
+          2px they would read as one segmented control. */}
+      <VStack align="stretch" gap={1.5}>
+        {sidebar && suggestions.length > 0 ? (
           <Text
             textStyle="2xs"
             fontWeight="600"
@@ -252,7 +296,7 @@ export function EmptyState({
             Suggested
           </Text>
         ) : null}
-        {SUGGESTIONS.map(({ icon, label, prompt }) => (
+        {suggestions.map(({ icon, label, prompt }) => (
           <SuggestionRow
             key={label}
             icon={icon}
@@ -295,15 +339,39 @@ function SuggestionRow({
       textAlign="left"
       paddingX={`${paddingX}px`}
       paddingY={`${paddingY}px`}
-      borderRadius="10px"
-      background="transparent"
+      borderRadius="12px"
+      // A resting SHAPE, not a bare row. These sat as plain text on the
+      // panel's gradient with nothing but a hover fill to say they could be
+      // pressed — so until the pointer happened to cross one, the four best
+      // starting points in the product looked like a list of headings. The
+      // hairline and the glass give each one an edge at rest; the warm border
+      // on hover is the only colour they take, so the mark stays the panel's
+      // one saturated thing.
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      background="bg.panel/60"
+      backdropFilter="blur(8px)"
       color="fg"
       cursor="pointer"
-      transition="background 130ms ease"
-      _hover={{ background: "bg.subtle" }}
+      transition="background 130ms ease, border-color 130ms ease, transform 130ms ease"
+      _hover={{
+        background: "bg.panel/85",
+        borderColor: "orange.emphasized",
+        transform: "translateY(-1px)",
+      }}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "orange.emphasized",
+        outlineOffset: "2px",
+      }}
       css={{
         "&:hover .chev": { opacity: 1, transform: "translateX(0)" },
         "&:hover .row-icon": { color: "var(--chakra-colors-fg)" },
+        "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+        "@media (prefers-reduced-motion: reduce):hover": {
+          transform: "none",
+        },
       }}
     >
       {/* Neutral, not orange. Four saturated icons stacked down the empty state

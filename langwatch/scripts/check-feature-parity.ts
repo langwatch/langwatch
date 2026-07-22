@@ -39,6 +39,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "langwatch/ee",
   "langwatch/packages",
   "langwatch/scripts",
+  "packages",
   "mcp-server/src",
   "typescript-sdk/src",
   "python-sdk/src",

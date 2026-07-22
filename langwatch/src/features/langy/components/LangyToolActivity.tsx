@@ -531,24 +531,28 @@ export function LangyActivityParts({ parts }: PartsView) {
         </VStack>
       ),
     })),
-    ...(completedGroups.length === 1
+    // Finished work has ONE shape, whatever the count. It used to render as a
+    // bare ActivityCard while there was exactly one of it and as the receipt
+    // from two onward — so the moment a second action finished, the block the
+    // reader was looking at was torn down and replaced by a differently-shaped
+    // one. Within a single turn that read as the answer flickering between
+    // three unrelated card designs. The key is fixed for the same reason: it
+    // is the same receipt gaining a line, not a new element each time.
+    ...(completedGroups.length > 0
       ? [
           {
-            key: `completed:${completedGroups[0]!.key}`,
-            order: completedGroups[0]!.order,
-            node: <ActivityCard group={completedGroups[0]!} devMode={devMode} />,
+            key: "completed-batch",
+            // The receipt stands where the first step it summarises ran.
+            order: Math.min(...completedGroups.map((group) => group.order)),
+            node: (
+              <CompletedActivityBatch
+                groups={completedGroups}
+                devMode={devMode}
+              />
+            ),
           },
         ]
-      : completedGroups.length > 1
-        ? [
-            {
-              key: "completed-batch",
-              // The receipt stands where the first step it summarises ran.
-              order: Math.min(...completedGroups.map((group) => group.order)),
-              node: <CompletedActivityBatch groups={completedGroups} />,
-            },
-          ]
-        : []),
+      : []),
     ...capabilityBatches.map((batch) => ({
       key: `capability:${batch.key}`,
       order: batch.order,
@@ -586,7 +590,13 @@ export function LangyActivityParts({ parts }: PartsView) {
  * The implementation trail is one receipt, not one card per mechanism. Hover
  * previews it; click pins it open for touch/keyboard users.
  */
-function CompletedActivityBatch({ groups }: { groups: ActivityGroup[] }) {
+function CompletedActivityBatch({
+  groups,
+  devMode,
+}: {
+  groups: ActivityGroup[];
+  devMode: boolean;
+}) {
   // The receipt is an index, not a hover-only disclosure. Keep every action
   // visible by default so a seven-step dataset/evaluation flow cannot look like
   // it silently skipped three calls on touchscreens or keyboard navigation.
@@ -632,7 +642,8 @@ function CompletedActivityBatch({ groups }: { groups: ActivityGroup[] }) {
             <Check size={11} />
           </Box>
           <Text textStyle="xs" fontWeight="560" color="fg" flex={1} truncate>
-            {groups.length} actions completed
+            {groups.length} {groups.length === 1 ? "action" : "actions"}{" "}
+            completed
           </Text>
           <Text textStyle="2xs" color="fg.subtle">
             {callCount} {callCount === 1 ? "tool call" : "tool calls"}
@@ -660,32 +671,85 @@ function CompletedActivityBatch({ groups }: { groups: ActivityGroup[] }) {
           role="list"
         >
           {groups.map((group) => (
-            <HStack key={group.key} gap={2} paddingY={1.5} role="listitem">
-              <Text
-                textStyle="xs"
-                color="fg"
-                fontWeight="520"
-                flex={1}
-                // Without this the label wraps to a second line and the row
-                // grows, while the detail beside it truncates — the two halves
-                // of one row disagreeing about how to run out of space.
-                minWidth={0}
-                truncate
-              >
-                {completedActivityLabel(group.label)}
-              </Text>
-              {group.detail ? (
-                <Text
-                  textStyle="2xs"
-                  color="fg.subtle"
-                  fontFamily="mono"
-                  maxWidth="52%"
-                  truncate
-                >
-                  {group.detail}
-                </Text>
-              ) : null}
-            </HStack>
+            <CompletedActivityRow
+              key={group.key}
+              group={group}
+              devMode={devMode}
+            />
+          ))}
+        </VStack>
+      ) : null}
+    </VStack>
+  );
+}
+
+/**
+ * One finished step inside the receipt.
+ *
+ * It carries dev mode's raw-payload toggle, which used to live on the
+ * standalone card that a lone completed group rendered as. Routing every count
+ * through the receipt — so finished work has one shape instead of changing
+ * design the moment a second action lands — would otherwise have quietly taken
+ * away the only way to read a call's JSON.
+ */
+function CompletedActivityRow({
+  group,
+  devMode,
+}: {
+  group: ActivityGroup;
+  devMode: boolean;
+}) {
+  const [jsonOpen, setJsonOpen] = useState(false);
+
+  return (
+    <VStack align="stretch" gap={1} role="listitem">
+      <HStack gap={2} paddingY={1.5}>
+        <Text
+          textStyle="xs"
+          color="fg"
+          fontWeight="520"
+          flex={1}
+          // Without this the label wraps to a second line and the row grows,
+          // while the detail beside it truncates — the two halves of one row
+          // disagreeing about how to run out of space.
+          minWidth={0}
+          truncate
+        >
+          {completedActivityLabel(group.label)}
+        </Text>
+        {group.detail ? (
+          <Text
+            textStyle="2xs"
+            color="fg.subtle"
+            fontFamily="mono"
+            maxWidth="52%"
+            truncate
+          >
+            {group.detail}
+          </Text>
+        ) : null}
+        {devMode ? (
+          <Tooltip
+            content={jsonOpen ? "Hide raw data" : "Show raw data"}
+            showArrow
+          >
+            <IconButton
+              size="2xs"
+              variant="ghost"
+              color={jsonOpen ? "orange.solid" : "fg.subtle"}
+              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
+              aria-expanded={jsonOpen}
+              onClick={() => setJsonOpen((value) => !value)}
+            >
+              <Braces size={12} />
+            </IconButton>
+          </Tooltip>
+        ) : null}
+      </HStack>
+      {devMode && jsonOpen ? (
+        <VStack align="stretch" gap={1} paddingBottom={1.5}>
+          {group.calls.map((call, index) => (
+            <RawCallJson key={call.toolCallId ?? index} call={call} />
           ))}
         </VStack>
       ) : null}
@@ -991,6 +1055,11 @@ function ActivityCard({
   // Show the completed receipt long enough to read, then return the transcript
   // to a compact state. A deliberate click cancels the automatic collapse.
   const [open, setOpen] = useState(group.done);
+  // The raw payload has its OWN toggle, never the card's expansion. It used to
+  // ride `open`, which meant developer mode showed the JSON on every expanded
+  // card — including the auto-opened completion receipt — without the `{}`
+  // ever being clicked. Closed until asked, every time.
+  const [jsonOpen, setJsonOpen] = useState(false);
   const userToggled = useRef(false);
   useEffect(() => {
     if (!group.done) return;
@@ -1121,14 +1190,23 @@ function ActivityCard({
           {groupCategory(group)}
         </Text>
         {devMode ? (
-          <Tooltip content={open ? "Hide raw data" : "Show raw data"} showArrow>
+          <Tooltip
+            content={jsonOpen ? "Hide raw data" : "Show raw data"}
+            showArrow
+          >
             <IconButton
               size="2xs"
               variant="ghost"
-              color={open ? "orange.solid" : "fg.subtle"}
-              aria-label={open ? "Hide raw data" : "Show raw data"}
-              aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
+              color={jsonOpen ? "orange.solid" : "fg.subtle"}
+              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
+              aria-expanded={jsonOpen}
+              onClick={(event) => {
+                // The header row's own click collapses the card; inspecting
+                // the payload must not dismiss the card it belongs to.
+                event.stopPropagation();
+                userToggled.current = true;
+                setJsonOpen((v) => !v);
+              }}
             >
               <Braces size={12} />
             </IconButton>
@@ -1152,7 +1230,7 @@ function ActivityCard({
         </Text>
       ) : null}
 
-      {devMode && open ? (
+      {devMode && jsonOpen ? (
         <VStack align="stretch" gap={1}>
           {group.calls.map((call, index) => (
             <RawCallJson key={call.toolCallId ?? index} call={call} />

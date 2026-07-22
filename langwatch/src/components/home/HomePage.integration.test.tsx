@@ -54,8 +54,8 @@ vi.mock("~/utils/api", () => ({
     },
   },
 }));
-vi.mock("./LangyHomeLantern", () => ({
-  LangyHomeLantern: () => <div data-testid="lantern" />,
+vi.mock("./LangyHomeHero", () => ({
+  LangyHomeHero: () => <div data-testid="lantern" />,
 }));
 
 vi.mock("../DashboardLayout", () => ({
@@ -92,7 +92,6 @@ vi.mock("./OnboardingProgress", () => ({
 vi.mock("./RecentItemsSection", () => ({
   RecentItemsSection: () => <div data-testid="recent-items" />,
 }));
-vi.mock("./TimeOfDayAura", () => ({ TimeOfDayAura: () => null }));
 vi.mock("./TracesOverview", () => ({
   TracesOverview: ({ variant }: { variant?: string }) => (
     <div data-testid="traces-overview" data-variant={variant ?? "full"} />

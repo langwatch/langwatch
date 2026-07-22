@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { LangyTitleSource } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import type { LangyTitleSource } from "@langwatch/langy";
 
 /**
  * Langy conversation process manager (ADR-049 §4) — typed contracts for the

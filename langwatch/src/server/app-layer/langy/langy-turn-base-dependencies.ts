@@ -35,35 +35,40 @@ export async function resolveLangyTurnBaseDependencies(args: {
     requestedConversationId,
     modelOverride,
   } = args;
-  const [conversationResult, modelResult, credentialsResult, egressResult] =
-    await tracer.withActiveSpan(
-      "langy.chat.phase2_dependencies",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "langy.phase": "dependencies",
-        },
+  const [
+    conversationResult,
+    modelResult,
+    credentialsResult,
+    egressResult,
+    mirrorTierResult,
+  ] = await tracer.withActiveSpan(
+    "langy.chat.phase2_dependencies",
+    {
+      attributes: {
+        "tenant.id": projectId,
+        "langy.phase": "dependencies",
       },
-      async () =>
-        Promise.allSettled([
-          deps.conversations.ensureConversation({
-            projectId,
-            userId,
-            conversationId: requestedConversationId,
-          }),
-          // The default is only a configuration gate; an allowed override does
-          // not consume it, so avoid that otherwise wasted lookup.
-          modelOverride
-            ? Promise.resolve(null)
-            : deps.resolveModel({ projectId }),
-          deps.credentials.getOrProvision({
-            projectId,
-            session,
-            mintSessionKey: false,
-          }),
-          deps.credentials.getEgressAllowlist({ projectId }),
-        ]),
-    );
+    },
+    async () =>
+      Promise.allSettled([
+        deps.conversations.ensureConversation({
+          projectId,
+          userId,
+          conversationId: requestedConversationId,
+        }),
+        // The default is only a configuration gate; an allowed override does
+        // not consume it, so avoid that otherwise wasted lookup.
+        modelOverride ? Promise.resolve(null) : deps.resolveModel({ projectId }),
+        deps.credentials.getOrProvision({
+          projectId,
+          session,
+          mintSessionKey: false,
+        }),
+        deps.credentials.getEgressAllowlist({ projectId }),
+        // ADR-061 mirror tier — resolved in the same window as the egress list.
+        deps.credentials.resolveMirrorTier({ projectId }),
+      ]),
+  );
 
   if (conversationResult.status === "rejected") {
     throw conversationResult.reason;
@@ -89,6 +94,18 @@ export async function resolveLangyTurnBaseDependencies(args: {
   const credentials = credentialsResult.value;
   if (egressResult.value) {
     credentials.egressAllowlist = egressResult.value;
+  }
+  // A mirror-tier resolver failure must never fail a turn: fall back to skip
+  // (mirror nothing) rather than throw. The mirror is LangWatch's own
+  // observability of Langy, never on the customer's critical path.
+  if (mirrorTierResult.status === "fulfilled") {
+    credentials.mirrorTier = mirrorTierResult.value;
+  } else {
+    logger.warn(
+      { error: mirrorTierResult.reason, projectId },
+      "failed to resolve Langy mirror tier — mirroring nothing for this turn",
+    );
+    credentials.mirrorTier = "skip";
   }
   return {
     speculativeConversation: conversationResult.value,

@@ -72,6 +72,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							RequestBody:        call.Request.Body,
 							UpstreamStatusCode: status,
 							UpstreamErrorType:  errType,
+							MirrorTier:         call.Bundle.Config.MirrorTier,
+							MirrorSourceOrgID:  call.Bundle.OrganizationID,
 						})
 					}
 					return nil, err
@@ -89,6 +91,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						GatewayRequestID:   call.Meta.GatewayRequestID,
 						RequestBody:        call.Request.Body,
 						ResponseBody:       resp.Body,
+						MirrorTier:         call.Bundle.Config.MirrorTier,
+						MirrorSourceOrgID:  call.Bundle.OrganizationID,
 					})
 				}
 				return resp, nil
@@ -119,6 +123,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							RequestBody:        call.Request.Body,
 							UpstreamStatusCode: status,
 							UpstreamErrorType:  errType,
+							MirrorTier:         call.Bundle.Config.MirrorTier,
+							MirrorSourceOrgID:  call.Bundle.OrganizationID,
 						})
 					}
 					return nil, err
@@ -270,6 +276,8 @@ func (w *traceStreamWrapper) onClose() {
 				ResponseBody:       body,
 				UpstreamStatusCode: status,
 				UpstreamErrorType:  errType,
+				MirrorTier:         w.bundle.Config.MirrorTier,
+				MirrorSourceOrgID:  w.bundle.OrganizationID,
 			})
 			return nil
 		})

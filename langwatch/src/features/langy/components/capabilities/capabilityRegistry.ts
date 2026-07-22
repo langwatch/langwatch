@@ -32,19 +32,19 @@
  * resources it lists, and anything it has never heard of — a command the
  * backend shipped before this UI did — degrades to a humanised card on the
  * neutral `platform` surface with no deep link. WHICH card / verb tone comes
- * from the shared `@langwatch/cli-cards` contract, so the panel and the CLI
+ * from the shared `@langwatch/langy` contract, so the panel and the CLI
  * share one grammar. Only a name that is not a CLI call at all (a raw `bash`)
  * falls through to the raw view. The older MCP transport (`platform_*` /
  * `search_traces`) has been retired.
  */
 
 import {
-  type CardKind,
+  type MeasuredCardKind,
   CLI_COLLECTION_VERBS,
   type CliResultDigest,
   cardKindFor,
   cliVerbTone,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy";
 import {
   type CliCommand,
   featureForCliCommand,
@@ -64,14 +64,14 @@ export type CapabilityTone = "read" | "created" | "updated" | "removed";
 export interface CapabilityDescriptor {
   /**
    * Which bespoke renderer draws the card. The vocabulary is the shared CLI
-   * contract's `CardKind` (`@langwatch/cli-cards`), rendered by
+   * contract's `MeasuredCardKind` (`@langwatch/langy`), rendered by
    * {@link LangyCapabilityRenderer}. A `traces` kind is a trace SEARCH (the
    * sample card), `trace` a single get.
    *
    * `cardKindFor` seeds this from the command's name; when the call carries a
    * result envelope, the card stamped there wins (see {@link withDecidedCard}).
    */
-  render: CardKind;
+  render: MeasuredCardKind;
   tone: CapabilityTone;
   surface: CapabilitySurface;
   /** Mono overline label, e.g. "Traces", "New evaluator", "Delete dashboard". */
@@ -248,7 +248,7 @@ export function buildResourceHref({
  * not its verb — so its `past` is empty.
  *
  * The verb's TONE (read / create / update / remove) is the shared contract's to
- * decide (`cliVerbTone` in `@langwatch/cli-cards`); it classifies verbs for the
+ * decide (`cliVerbTone` in `@langwatch/langy`); it classifies verbs for the
  * whole card catalogue and stays the single source of that truth, so it is
  * deliberately not duplicated here.
  */
@@ -319,7 +319,7 @@ function capitalize(text: string): string {
 export interface CliCapability {
   command: CliCommand;
   surface: CapabilitySurface;
-  render: CardKind;
+  render: MeasuredCardKind;
   tone: CapabilityTone;
   /** Which body widget `LangyDeclarativeCard` draws the result with. */
   body: CapabilityBodyWidget;
@@ -337,7 +337,7 @@ export interface CliCapability {
  * card a home instead of the neutral `platform` one.
  *
  * WHICH card, and the verb's tone, are NOT here: those are CLI grammar, resolved
- * once in `@langwatch/cli-cards` (`cardKindFor`, `cliVerbTone`) and shared with
+ * once in `@langwatch/langy` (`cardKindFor`, `cliVerbTone`) and shared with
  * the CLI itself. This module owns only the view binding layered on top of them,
  * so the panel and the CLI can never disagree about what a command produced.
  */
@@ -372,7 +372,7 @@ function derivedBodyWidget({
   render,
   verb,
 }: {
-  render: CardKind;
+  render: MeasuredCardKind;
   verb: string;
 }): CapabilityBodyWidget {
   switch (render) {
@@ -413,7 +413,7 @@ function bodyWidgetFor({
   tone,
 }: {
   entry: CapabilityCatalogEntry | undefined;
-  render: CardKind;
+  render: MeasuredCardKind;
   verb: string;
   tone: CapabilityTone;
 }): CapabilityBodyWidget {
@@ -497,7 +497,7 @@ export function withDecidedCard({
   card,
 }: {
   descriptor: CapabilityDescriptor;
-  card: CardKind;
+  card: MeasuredCardKind;
 }): CapabilityDescriptor {
   if (card === descriptor.render) return descriptor;
 

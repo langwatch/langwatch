@@ -2,13 +2,17 @@ packages:
   - .
   - "packages/*"
   - "../mcp-server"
-  # The CLI's card/domain-error contract, shared with typescript-sdk. Source-only
-  # and zod-peer-dep'd, so it compiles against the app's own zod (3.25) via the
-  # `zod/v4` subpath both majors ship.
-  - "../packages/cli-cards"
   # The handled-error contract (HandledError ⇔ Go herr), shared by the app,
-  # mcp-server, CLI and SDKs. Source-only, OTel peer-dep'd like cli-cards.
+  # mcp-server, CLI and SDKs. Source-only, OTel peer-dep'd like langy.
   - "../packages/handled-error"
+  # Langy's shared contract (ADR-059, ADR-060): the CARD vocabulary and its
+  # CLI verb registry / digest / domain error (`@langwatch/langy/cards`, shared
+  # with typescript-sdk), the inline ```langy-card channel, and the
+  # conversation-projection contract. Source-only and zod-peer-dep'd, so it
+  # compiles against the app's own zod (3.25) via the `zod/v4` subpath both
+  # majors ship, and the server pipeline AND the browser panel render a turn
+  # identically from it.
+  - "../packages/langy"
 
 minimumReleaseAge: 10080
 # Adding workspace packages forces a re-resolve; these shipped fresh releases

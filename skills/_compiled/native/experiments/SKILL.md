@@ -118,7 +118,7 @@ experiment = langwatch.experiment.init("agent-regression")
 for index, row in experiment.loop(dataset.iterrows()):
     response = my_agent(row["input"])
     experiment.evaluate(
-        "ragas/answer_relevancy",
+        "ragas/response_relevancy",
         index=index,
         data={"input": row["input"], "output": response},
         settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
@@ -142,7 +142,7 @@ const experiment = await langwatch.experiments.init("agent-regression");
 
 await experiment.run(dataset, async ({ item, index }) => {
   const response = await myAgent(item.input);
-  await experiment.evaluate("ragas/answer_relevancy", {
+  await experiment.evaluate("ragas/response_relevancy", {
     index,
     data: { input: item.input, output: response },
     settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
@@ -150,7 +150,7 @@ await experiment.run(dataset, async ({ item, index }) => {
 });
 ```
 
-Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
+Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
 ## Run and Verify
 

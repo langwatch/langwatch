@@ -19,6 +19,18 @@ const (
 	langyTag     = "langy"
 )
 
+// OTel GenAI semantic-convention keys, stamped ALONGSIDE the reserved
+// LangWatch pair above. The ingest maps both spellings onto the same trace
+// metadata (metadata.ts: gen_ai.conversation.id -> thread_id, user.id ->
+// user_id), but the semconv keys are what the product's span-attribute
+// filters read (`Attributes['gen_ai.conversation.id']` in the trace
+// explorer's thread filter) and what any third-party OTel consumer
+// understands — so the relayed traces carry the standard names too.
+const (
+	attrGenAIConversationID = "gen_ai.conversation.id"
+	attrEndUserID           = "user.id"
+)
+
 // ReparentOTLP rewrites one exported OTLP trace batch so it belongs to the
 // conversation's turn:
 //
@@ -121,6 +133,14 @@ func ReparentTraces(td ptrace.Traces, conversationID, actorUserID string, turn t
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
 				stripForgedOrigin(span.Attributes())
+				// The semconv conversation id rides EVERY customer span, not
+				// just the resource: the product's thread filters read span
+				// attributes (`Attributes['gen_ai.conversation.id']`), and a
+				// worker-supplied value would be a thread forgery — swept and
+				// restamped like the resource keys. Applies whether or not the
+				// turn is known: an unreparented batch is still forwarded.
+				removeAll(span.Attributes(), attrGenAIConversationID)
+				span.Attributes().PutStr(attrGenAIConversationID, conversationID)
 				if !isTurnValid {
 					continue
 				}
@@ -156,16 +176,20 @@ func stampResource(attrs pcommon.Map, conversationID, actorUserID string) {
 
 	tags := firstValue(attrs, attrTags)
 	removeAll(attrs, attrThreadID)
+	removeAll(attrs, attrGenAIConversationID)
 	removeAll(attrs, attrTags)
 	// Overwrite, never merge: the acting user is the manager's, and a worker
 	// value here would be a spend-attribution forgery. Empty only in partial
 	// wiring / tests, where we leave the key unset rather than stamp "".
 	removeAll(attrs, attrUserID)
+	removeAll(attrs, attrEndUserID)
 	if actorUserID != "" {
 		attrs.PutStr(attrUserID, actorUserID)
+		attrs.PutStr(attrEndUserID, actorUserID)
 	}
 
 	attrs.PutStr(attrThreadID, conversationID)
+	attrs.PutStr(attrGenAIConversationID, conversationID)
 	switch {
 	case tags == "":
 		attrs.PutStr(attrTags, langyTag)

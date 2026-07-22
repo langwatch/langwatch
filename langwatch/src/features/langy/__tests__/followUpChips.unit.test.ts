@@ -5,11 +5,17 @@ import {
   type SettledCall,
 } from "../components/capabilities/followUpChips";
 
-/** A settled trace search carrying a structured error filter over the last day. */
+/**
+ * A settled trace search exactly as the live transport hands it to the panel:
+ * opencode ran the CLI through `bash`, and the envelope retyped the call to
+ * `langwatch.trace.search` while keeping the shell payload as its input.
+ */
 const traceSearch = (over: Partial<SettledCall> = {}): SettledCall => ({
   name: "langwatch.trace.search",
   state: "output-available",
-  input: { filters: { "traces.error": ["true"] }, startDate: "24h" },
+  input: {
+    command: "langwatch trace search --query 'checkout failed' --limit 25",
+  },
   output: JSON.stringify({
     traces: [{ trace_id: "trace_1" }],
     pagination: { totalHits: 1 },
@@ -17,10 +23,26 @@ const traceSearch = (over: Partial<SettledCall> = {}): SettledCall => ({
   ...over,
 });
 
+const CARRIED_ALERT = {
+  id: "traces:triggers",
+  label: "Alert me on this",
+  href: "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22",
+  carried: true,
+};
+
 describe("deriveFollowUpChips", () => {
   describe("given a trace search that found traces", () => {
-    describe("when the search filtered on errors", () => {
-      it("offers to graph the search, carrying the error filter across", () => {
+    describe("when the search carried free text", () => {
+      it("offers to alert on the search, carrying the text as the alert's subject", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch(),
+          projectSlug: "demo",
+        });
+
+        expect(chips).toContainEqual(CARRIED_ALERT);
+      });
+
+      it("keeps the graph offer honest — analytics cannot hold the text, so it only opens the surface", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
           projectSlug: "demo",
@@ -28,27 +50,13 @@ describe("deriveFollowUpChips", () => {
 
         expect(chips).toContainEqual({
           id: "traces:observability.analytics",
-          label: "Graph these",
-          href: "/demo/analytics/custom?has_error=true",
-          carried: true,
+          label: "Open in Analytics",
+          href: "/demo/analytics",
+          carried: false,
         });
       });
 
-      it("offers to alert on the search, carrying the error filter across", () => {
-        const chips = deriveFollowUpChips({
-          call: traceSearch(),
-          projectSlug: "demo",
-        });
-
-        expect(chips).toContainEqual({
-          id: "traces:triggers",
-          label: "Alert me on this",
-          href: "/demo/messages?has_error=true&drawer.open=automation",
-          carried: true,
-        });
-      });
-
-      it("puts the chips that carry the filter before the ones that only navigate", () => {
+      it("puts the chip that carries the search before the ones that only navigate", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch(),
           projectSlug: "demo",
@@ -56,6 +64,7 @@ describe("deriveFollowUpChips", () => {
 
         const firstPlain = chips.findIndex((chip) => !chip.carried);
         const lastCarried = chips.map((c) => c.carried).lastIndexOf(true);
+        expect(lastCarried).toBe(0);
         if (firstPlain !== -1) expect(lastCarried).toBeLessThan(firstPlain);
       });
 
@@ -69,21 +78,75 @@ describe("deriveFollowUpChips", () => {
       });
     });
 
-    describe("when the search had only free text, nothing a field filter", () => {
-      it("cannot carry the filter, so it offers the surfaces instead", () => {
-        // A graph and an alert need FIELDS, so nothing can be recompiled here.
-        // That used to mean silence; now the offers still resolve, worded so
-        // they never claim the search came along.
+    describe("when the search had no query to carry", () => {
+      /**
+       * A bare `langwatch trace search` is "everything in the window" — there
+       * is no subject to alert on, so no offer may claim to carry one. The
+       * offers still resolve, as plain navigation to real surfaces.
+       */
+      it("offers the surfaces as plain chips with real destinations", () => {
+        const chips = deriveFollowUpChips({
+          call: traceSearch({
+            input: { command: "langwatch trace search --limit 25" },
+          }),
+          projectSlug: "demo",
+        });
+
+        expect(chips).toEqual([
+          {
+            id: "traces:observability.analytics",
+            label: "Open in Analytics",
+            href: "/demo/analytics",
+            carried: false,
+          },
+          {
+            id: "traces:observability.annotations",
+            label: "Open in Annotations",
+            href: "/demo/annotations",
+            carried: false,
+          },
+          {
+            id: "traces:library.datasets",
+            label: "Open in Datasets",
+            href: "/demo/datasets",
+            carried: false,
+          },
+        ]);
+      });
+    });
+
+    describe("when the search arrived in the retired transport's structured shape", () => {
+      it("still carries a free-text query — the reader accepts both dialects", () => {
         const chips = deriveFollowUpChips({
           call: traceSearch({ input: { query: "refund policy" } }),
           projectSlug: "demo",
         });
 
+        expect(chips).toContainEqual({
+          id: "traces:triggers",
+          label: "Alert me on this",
+          href: "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22refund+policy%22#all-traces?q=%22refund+policy%22",
+          carried: true,
+        });
+      });
+
+      it("resolves a field-filtered search plain — nothing reads those filters any more", () => {
+        // The retired MCP transport could express field filters; no live
+        // destination consumes them, so the offers fall back to honest
+        // navigation instead of a carried label pointing at a filter that
+        // did not travel.
+        const chips = deriveFollowUpChips({
+          call: traceSearch({
+            input: { filters: { "traces.error": ["true"] }, startDate: "24h" },
+          }),
+          projectSlug: "demo",
+        });
+
         expect(chips.length).toBeGreaterThan(0);
         expect(chips.every((chip) => !chip.carried)).toBe(true);
-        expect(
-          chips.every((chip) => chip.label.startsWith("Open in ")),
-        ).toBe(true);
+        expect(chips.every((chip) => chip.label.startsWith("Open in "))).toBe(
+          true,
+        );
       });
     });
 

@@ -18,7 +18,7 @@
  * All state that must survive an instance restart is durable (runToken, the
  * turn, the dedup set); the relay instance itself is stateless beyond a cache.
  */
-import type { CliResultDigest, CliToolResult } from "@langwatch/cli-cards";
+import type { CliResultDigest, CliToolResult } from "@langwatch/langy";
 import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
 import { verifyFrame } from "./langyFrameAuth";
 import { LangyCliEnvelopeService } from "../execution/langy-cli-envelope.service";

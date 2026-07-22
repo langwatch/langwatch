@@ -23,9 +23,14 @@ import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
  * Shift and a letter within a few milliseconds, never Shift alone for a third
  * of a second.
  *
- * Nothing here fires while the user is typing. `#` is a character you type into
- * the composer and into every search box on the page; stealing it there would
- * make the app unusable.
+ * The `#` LATCH never fires while the user is typing: `#` is a character you
+ * type into the composer and into every search box on the page, and stealing
+ * it there would make the app unusable. The Shift HOLD is different — a bare
+ * modifier types nothing — so it stays live even with the composer focused,
+ * which is exactly where you reach for it: you are part-way through a message
+ * and want to point at the thing on the page you are about to ask about. The
+ * earlier blanket "ignore every key while typing" swallowed that hold too, so
+ * holding Shift inside the composer highlighted nothing at all.
  */
 
 /** How long Shift must be held alone before it counts as a deliberate hold. */
@@ -44,9 +49,11 @@ export function useLangyContextArming(): void {
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Shift") cancelHold();
-      if (isTypingInto(event.target)) return;
 
       if (event.key === "#") {
+        // The latch, and ONLY the latch, yields to typing — `#` is a real
+        // character in the composer and every search box.
+        if (isTypingInto(event.target)) return;
         event.preventDefault();
         store().toggleArm();
         return;

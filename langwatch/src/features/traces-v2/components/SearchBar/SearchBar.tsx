@@ -13,6 +13,8 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
@@ -27,7 +29,9 @@ import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 import { editorStyles } from "./editorStyles";
 import { FloatingAiBar } from "./FloatingAiBar";
 import { setFilterChipLabels } from "./filterHighlight";
-import { PlaceholderEditor } from "./PlaceholderEditor";
+import { FloatingLangyBar } from "./FloatingLangyBar";
+import { PlaceholderEditor, searchBarPlaceholder } from "./PlaceholderEditor";
+import { useAskLangyFromSearch } from "./useAskLangyFromSearch";
 import {
   ClearButton,
   type SearchBarStatus,
@@ -111,25 +115,57 @@ export const SearchBar: React.FC = () => {
     ? { kind: "error", message: parseError }
     : { kind: "ok" };
 
-  // Gate Ask AI on having at least one model provider configured. The
-  // AI mode submits requests against the user's own keys; with none
-  // enabled the request would 4xx. The button stays mounted so the
-  // affordance is discoverable, but click goes through a primer popover
-  // pointing the user at /settings/model-providers.
+  // For a user who has Langy, the ask affordance IS Langy: the button,
+  // ⌘I and ⌘+⏎ hand the question and the applied search to the panel
+  // instead of the inline AI composer. Everyone else keeps the composer.
+  // Spec: specs/traces-v2/search.feature ("The search bar's ask
+  // affordance belongs to Langy when Langy is available").
+  const { langyRoutesAsk, askLangyFromSearch } = useAskLangyFromSearch();
+  const askLabel = langyRoutesAsk ? "Ask Langy" : "Ask AI";
+  // Which Langy surface takes the question. With the panel already open,
+  // it does — the search rides over as attached context, no second
+  // composer. With it closed, a Langy-styled ask bar floats over the
+  // search bar so the question is typed at the top of the trace
+  // explorer, next to the traces it is about; Enter hands it off and
+  // opens the panel.
+  const langyPanelOpen = useLangyStore((s) => s.isOpen);
+  const [langyAskMode, setLangyAskMode] = useState(false);
+  const openLangyAsk = useCallback(() => {
+    if (useLangyStore.getState().isOpen) {
+      askLangyFromSearch();
+      return;
+    }
+    setLangyAskMode(true);
+  }, [askLangyFromSearch]);
+  // The floating ask bar exists because the panel is closed; if the panel
+  // opens some other way (its own toggle, a home banner) the bar has lost
+  // its reason and two composers would be on screen.
+  useEffect(() => {
+    if (langyPanelOpen) setLangyAskMode(false);
+  }, [langyPanelOpen]);
+
+  // Gate the inline Ask AI composer on having at least one model provider
+  // configured. The AI mode submits requests against the user's own keys;
+  // with none enabled the request would 4xx. The button stays mounted so
+  // the affordance is discoverable, but click goes through a primer
+  // popover pointing the user at /settings/model-providers. Langy needs
+  // none of this — the panel walks the user through model setup itself —
+  // so when Langy owns the affordance the primer never blocks the way in.
   const { project } = useOrganizationTeamProject();
   const { hasEnabledProviders, isLoading: isLoadingProviders } =
     useModelProvidersSettings({ projectId: project?.id });
-  const askAiNeedsProviderPrimer = !isLoadingProviders && !hasEnabledProviders;
-  // Ask AI hits a real LLM against the user's real traces. In sample
-  // mode the rows are hardcoded client-side fixtures with no server
-  // footprint, so any AI query would either error or hallucinate.
-  // Surface the button as gated with a one-line tooltip so the user
-  // knows the affordance is real, just unavailable here. The ⌘I /
-  // ⌘+⏎ shortcuts also bail in this mode so we don't dump them into
-  // a composer they can't submit from.
+  const askAiNeedsProviderPrimer =
+    !langyRoutesAsk && !isLoadingProviders && !hasEnabledProviders;
+  // Both routes work on the user's real traces. In sample mode the rows
+  // are hardcoded client-side fixtures with no server footprint, so an
+  // AI query would error or hallucinate, and a search handed to Langy
+  // would describe rows the project doesn't have. Surface the button as
+  // gated with a one-line tooltip so the user knows the affordance is
+  // real, just unavailable here. The ⌘I / ⌘+⏎ shortcuts also bail in
+  // this mode so we don't dump them somewhere they can't submit from.
   const isSamplePreview = usePreviewTracesActive();
   const askAiSampleDisabledReason = isSamplePreview
-    ? "Ask AI works on your real traces — not on the sample data."
+    ? `${askLabel} works on your real traces — not on the sample data.`
     : undefined;
 
   // Defer TipTap mount until the user actually focuses the search bar — the
@@ -169,7 +205,7 @@ export const SearchBar: React.FC = () => {
   );
 
   const placeholderRef = useRef<HTMLDivElement>(null);
-  const floatRect = useFloatRect(placeholderRef, aiMode);
+  const floatRect = useFloatRect(placeholderRef, aiMode || langyAskMode);
 
   // Delegate chip hover events on the search bar so both the cold-load
   // PlaceholderEditor and the live ProseMirror editor's
@@ -177,11 +213,11 @@ export const SearchBar: React.FC = () => {
   // `facetHoverStore`. The sidebar listens to that store and
   // cross-highlights the matching row.
   useEffect(() => {
-    // When the chip layer disappears (AI mode swap, unmount) no DOM
-    // mouseout fires for the removed chip nodes — clear up front so a
+    // When the chip layer disappears (AI/Langy ask mode swap, unmount) no
+    // DOM mouseout fires for the removed chip nodes — clear up front so a
     // mid-hover transition can't leave the sidebar latched on a chip
     // that no longer exists.
-    if (aiMode) {
+    if (aiMode || langyAskMode) {
       useFacetHoverStore.getState().clearHover();
       return;
     }
@@ -214,36 +250,59 @@ export const SearchBar: React.FC = () => {
       root.removeEventListener("mouseout", leave, true);
       useFacetHoverStore.getState().clearHover();
     };
-  }, [aiMode]);
+  }, [aiMode, langyAskMode]);
 
-  // ⌘I / Ctrl+I anywhere on the page enters AI mode. Gated through the
-  // same provider-primer popover the button uses — pressing the shortcut
-  // when no provider is configured shouldn't dump the user into a
-  // composer they can't actually submit from. The shortcut fires the
-  // animation by flipping the same `aiMode` state the button does, so
-  // the gradient activation feels identical from key or click.
+  // ⌘I / Ctrl+I anywhere on the page fires the ask affordance: the Langy
+  // handoff when Langy owns it, otherwise AI mode — gated through the
+  // same provider-primer popover the button uses, since pressing the
+  // shortcut when no provider is configured shouldn't dump the user into
+  // a composer they can't actually submit from. The AI-mode branch fires
+  // the animation by flipping the same `aiMode` state the button does,
+  // so the gradient activation feels identical from key or click.
   const handleAiShortcut = useCallback(() => {
-    if (askAiNeedsProviderPrimer) return;
     if (isSamplePreview) return;
+    if (langyRoutesAsk) {
+      openLangyAsk();
+      return;
+    }
+    if (askAiNeedsProviderPrimer) return;
     setAiMode(true);
-  }, [askAiNeedsProviderPrimer, isSamplePreview]);
+  }, [askAiNeedsProviderPrimer, isSamplePreview, langyRoutesAsk, openLangyAsk]);
   useGlobalAiShortcut(handleAiShortcut);
 
-  // ⌘+⏎ / Ctrl+⏎ from inside the editor: punt the typed text into AI
-  // mode and auto-submit it. Lets the operator triage "is this filter
-  // syntax or free text I want the AI to interpret?" without taking
-  // their hands off the keyboard.
+  // ⌘+⏎ / Ctrl+⏎ from inside the editor: punt the typed text to the ask
+  // affordance — asked to Langy outright, or auto-submitted into AI
+  // mode. Lets the operator triage "is this filter syntax or free text
+  // I want interpreted?" without taking their hands off the keyboard.
   const handleEditorAiShortcut = useCallback(
     (currentText: string) => {
-      if (askAiNeedsProviderPrimer) return;
       if (isSamplePreview) return;
+      if (langyRoutesAsk) {
+        // Typed text is already the question — hand it straight off (the
+        // applied search rides along as attached context on the panel).
+        // Nothing typed yet falls back to a place to type: the floating
+        // ask bar, or the panel when it is already open.
+        if (currentText.trim()) {
+          askLangyFromSearch(currentText);
+        } else {
+          openLangyAsk();
+        }
+        return;
+      }
+      if (askAiNeedsProviderPrimer) return;
       const trimmed = currentText.trim();
       // Empty input still opens the composer (parity with the button),
       // it just doesn't auto-submit a blank prompt.
       setAiAutoSubmitSeed(trimmed.length > 0 ? trimmed : null);
       setAiMode(true);
     },
-    [askAiNeedsProviderPrimer, isSamplePreview],
+    [
+      askAiNeedsProviderPrimer,
+      isSamplePreview,
+      langyRoutesAsk,
+      askLangyFromSearch,
+      openLangyAsk,
+    ],
   );
 
   const handleAiBarClose = useCallback(() => {
@@ -311,6 +370,23 @@ export const SearchBar: React.FC = () => {
     >
       <SyntaxHelpDrawerHost />
       <AnimatePresence>
+        {langyAskMode && (
+          // A crash inside the Langy ask surface must never cost the user
+          // their search bar. On error the surface folds away (the boundary
+          // logs it) and the structured bar comes straight back; the next
+          // click mounts a fresh boundary, so nothing stays stuck.
+          <IsolatedErrorBoundary
+            key="langy-ask-bar"
+            scope="Langy couldn't open here"
+            onError={() => setLangyAskMode(false)}
+          >
+            <FloatingLangyBar
+              rect={floatRect}
+              onClose={() => setLangyAskMode(false)}
+              onAsk={askLangyFromSearch}
+            />
+          </IsolatedErrorBoundary>
+        )}
         {aiMode && (
           <FloatingAiBar
             key="ai-bar"
@@ -333,7 +409,7 @@ export const SearchBar: React.FC = () => {
           />
         )}
       </AnimatePresence>
-      {!aiMode && (
+      {!aiMode && !langyAskMode && (
         <>
           <Flex
             align="center"
@@ -350,15 +426,20 @@ export const SearchBar: React.FC = () => {
             zIndex={1}
           >
             <AskAiButton
-              onClick={() => setAiMode(true)}
+              label={askLabel}
+              ariaLabel={langyRoutesAsk ? "Ask Langy" : undefined}
+              tooltip={
+                langyRoutesAsk ? "Ask Langy about these traces" : undefined
+              }
+              onClick={langyRoutesAsk ? openLangyAsk : () => setAiMode(true)}
               needsProviderPrimer={askAiNeedsProviderPrimer}
               disabledReason={askAiSampleDisabledReason}
             />
             {/* The standalone search glyph is only an at-rest hint — the
                 placeholder ("Search filters, free text, or Ask AI…") already
                 says what the field is. Once focused or non-empty it reads as
-                clutter wedged between Ask AI and the text, so it drops out and
-                the editor sits directly beside the Ask AI button. */}
+                clutter wedged between the ask button and the text, so it drops
+                out and the editor sits directly beside the ask button. */}
             {!editorFocused && !hasContent && (
               <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
                 <Search />
@@ -378,6 +459,7 @@ export const SearchBar: React.FC = () => {
                   onSuggestionOpenChange={setSuggestionOpen}
                   onCursorAnchorChange={setCursorAnchorX}
                   onFocusChange={setEditorFocused}
+                  placeholder={searchBarPlaceholder(askLabel)}
                 />
               ) : (
                 <PlaceholderEditor
@@ -385,13 +467,14 @@ export const SearchBar: React.FC = () => {
                   onActivate={requestEditor}
                   onApplyQueryText={applyQueryText}
                   onTokenClick={setTokenAnchor}
+                  placeholderText={searchBarPlaceholder(askLabel)}
                 />
               )}
               {hasContent &&
                 editorFocused &&
                 !suggestionOpen &&
                 !askAiNeedsProviderPrimer && (
-                  <SearchSubmitHint anchorX={cursorAnchorX} />
+                  <SearchSubmitHint anchorX={cursorAnchorX} askLabel={askLabel} />
                 )}
             </Box>
 
@@ -534,7 +617,10 @@ const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
  * thing reads as a single faint hint and never competes with the
  * input for attention.
  */
-const SearchSubmitHint: React.FC<{ anchorX: number }> = ({ anchorX }) => (
+const SearchSubmitHint: React.FC<{ anchorX: number; askLabel: string }> = ({
+  anchorX,
+  askLabel,
+}) => (
   <chakra.span
     position="absolute"
     // Bigger gap (24px) so the hint doesn't crowd the last typed glyph.
@@ -554,6 +640,6 @@ const SearchSubmitHint: React.FC<{ anchorX: number }> = ({ anchorX }) => (
     pointerEvents="none"
     userSelect="none"
   >
-    {`Press ${MOD_KEY_SYMBOL} + Enter to Ask AI`}
+    {`Press ${MOD_KEY_SYMBOL} + Enter to ${askLabel}`}
   </chakra.span>
 );
