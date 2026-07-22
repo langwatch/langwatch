@@ -181,6 +181,9 @@ import { EventExplorerService } from "./ops/event-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import { BlobStoreService } from "./ops/blob-store.service";
+import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
+import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -1168,6 +1171,11 @@ export function initializeDefaultApp(options?: {
     ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
     replay: new ReplayService(replayRepo),
+    blobStore: new BlobStoreService(
+      redis
+        ? new BlobStoreRedisRepository(redis)
+        : new NullBlobStoreRepository(),
+    ),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, queueRepo })
       : null,
@@ -1467,6 +1475,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         new NullEventExplorerRepository(),
       ),
       replay: new ReplayService(new NullReplayRepository()),
+      blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
     },
     commands: {

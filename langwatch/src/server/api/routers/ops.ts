@@ -42,6 +42,38 @@ const opsViewProbe = checkOpsPermission({
 
 const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
 
+/**
+ * The extra gate on anything that can destroy a queue payload.
+ *
+ * `ops:manage` already resolves through the admin allow-list, but it is not
+ * enough on its own here for two reasons. It is inherited by an impersonation
+ * session — `resolveOpsScope` deliberately falls back to the impersonator's own
+ * grant — and "acting as" another user is the wrong posture for irreversible
+ * infrastructure surgery, because the audit trail names the impersonated
+ * account. And deleting a blob is unrecoverable and silent at the queue level:
+ * the job that referenced it completes without its handler ever running, so
+ * there is no failure for anyone to notice. A typed confirmation makes that a
+ * deliberate act rather than a mis-click.
+ */
+function requireBlobStoreWriteAuth(
+  ctx: { session: { user: { impersonator?: { email?: string | null } | null } } },
+  confirm: string | undefined,
+) {
+  if (ctx.session.user.impersonator) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message:
+        "Blob store changes cannot be made from an impersonated session. Sign in directly to continue.",
+    });
+  }
+  if (!confirm) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This action needs to be confirmed before it can run",
+    });
+  }
+}
+
 function requireOps() {
   const ops = getApp().ops;
   if (!ops) {
@@ -865,5 +897,90 @@ export const opsRouter = createTRPCRouter({
       // break that cleanup path.
       await getFeatureFlagStore().clear(input.key, ctx.session.user.id);
       return { ok: true };
+    }),
+
+  // ---------------------------------------------------------------------------
+  // Blob store (group queue content-addressed payloads)
+  //
+  // Reads are ops:view. Everything that can destroy a payload additionally
+  // requires a non-impersonated session and a typed confirmation — see
+  // `requireBlobStoreWriteAuth`.
+  // ---------------------------------------------------------------------------
+
+  listBlobQueues: protectedProcedure.use(opsViewPermission).query(async () => {
+    return requireOps().blobStore.getQueueNames();
+  }),
+
+  getBlobStoreStats: protectedProcedure
+    .use(opsViewPermission)
+    .query(async () => {
+      return requireOps().blobStore.getStats();
+    }),
+
+  listBlobs: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        queueName: z.string().min(1).max(200),
+        cursor: z.string().max(4000).nullish(),
+        limit: z.number().int().min(1).max(200).default(50),
+        projectId: z.string().max(200).nullish(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().blobStore.getBlobs(input);
+    }),
+
+  getBlob: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        queueName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        hash: z.string().min(1).max(200),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().blobStore.getBlobById(input);
+    }),
+
+  runBlobCleanup: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        dryRun: z.boolean().default(true),
+        // Typed confirmation, required only for the destructive form. A sweep
+        // that reclaims is not something to reach by mis-clicking a toggle.
+        confirm: z.literal("RECLAIM").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!input.dryRun) {
+        requireBlobStoreWriteAuth(ctx, input.confirm);
+      }
+      return requireOps().blobStore.runCleanup({
+        dryRun: input.dryRun,
+        requestedBy: ctx.session.user.email ?? ctx.session.user.id,
+      });
+    }),
+
+  deleteBlob: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        hash: z.string().min(1).max(200),
+        confirm: z.literal("DELETE"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      requireBlobStoreWriteAuth(ctx, input.confirm);
+      return requireOps().blobStore.deleteBlob({
+        queueName: input.queueName,
+        projectId: input.projectId,
+        hash: input.hash,
+        requestedBy: ctx.session.user.email ?? ctx.session.user.id,
+      });
     }),
 });
