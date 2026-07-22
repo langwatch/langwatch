@@ -31,12 +31,19 @@ async function insertMarkedLog({
   spanId,
   agoSec,
   marked,
+  kindValue,
 }: {
   tenantId: string;
   traceId: string;
   spanId: string;
   agoSec: number;
   marked: boolean;
+  /**
+   * Explicit value for the kind attribute, so a test can set the key with an
+   * EMPTY value. That row has the key present (mapContains matches) but must
+   * still be excluded by the `!= ''` test.
+   */
+  kindValue?: string;
 }) {
   await ch.command({
     query: `
@@ -47,7 +54,13 @@ async function insertMarkedLog({
       VALUES
         ({pid:String}, {tenantId:String}, {traceId:String}, {spanId:String},
          now64(3) - {agoSec:UInt32}, 9, 'INFO', '{}',
-         ${marked ? `map('${CLAUDE_CODE_KIND_ATTR}', 'model')` : `map()`},
+         ${
+           kindValue !== undefined
+             ? `map('${CLAUDE_CODE_KIND_ATTR}', {kindValue:String})`
+             : marked
+               ? `map('${CLAUDE_CODE_KIND_ATTR}', 'model')`
+               : `map()`
+         },
          map(), 'com.anthropic.claude_code.events', NULL, now64(3), now64(3), 30)
     `,
     query_params: {
@@ -56,6 +69,7 @@ async function insertMarkedLog({
       traceId,
       spanId,
       agoSec,
+      ...(kindValue !== undefined ? { kindValue } : {}),
     },
   });
 }
@@ -103,6 +117,17 @@ describe("getMarkedClaudeCodeLogsByTrace partition hint", () => {
       agoSec: 5,
       marked: false,
     });
+    // The kind key present but EMPTY. The read pairs a mapContains index hint
+    // with the `!= ''` value test; mapContains alone would match this row, so
+    // this pins that the value test still excludes it.
+    await insertMarkedLog({
+      tenantId,
+      traceId,
+      spanId: `${tag}-d`,
+      agoSec: 5,
+      marked: true,
+      kindValue: "",
+    });
   });
 
   describe("when a TimeUnixMs hint around the turn is supplied", () => {
@@ -122,6 +147,28 @@ describe("getMarkedClaudeCodeLogsByTrace partition hint", () => {
       const rows = await repo.getMarkedClaudeCodeLogsByTrace(tenantId, traceId);
 
       expect(rows.map((r) => r.spanId)).toEqual([`${tag}-a`, `${tag}-b`]);
+    });
+  });
+
+  describe("when a record carries the kind key with an empty value", () => {
+    it("excludes it, so the mapContains index hint does not widen the result", async () => {
+      const rows = await repo.getMarkedClaudeCodeLogsByTrace(
+        tenantId,
+        traceId,
+        Date.now(),
+      );
+
+      expect(rows.map((r) => r.spanId)).not.toContain(`${tag}-d`);
+    });
+
+    it("excludes it from the count too, so count matches the get", async () => {
+      const count = await repo.countMarkedClaudeCodeLogsByTrace(
+        tenantId,
+        traceId,
+        Date.now(),
+      );
+
+      expect(count).toBe(2);
     });
   });
 });
