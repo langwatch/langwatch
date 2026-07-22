@@ -26,8 +26,9 @@
  *
  * @see specs/langy/langy-followup-suggestions.feature
  */
-import { chakra, HStack } from "@chakra-ui/react";
+import { HStack } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
+import { LangySpaAnchor } from "../LangySpaAnchor";
 import type { FollowUpChip } from "./followUpChips";
 
 export function LangyFollowUpChips({ chips }: { chips: FollowUpChip[] }) {
@@ -42,7 +43,7 @@ export function LangyFollowUpChips({ chips }: { chips: FollowUpChip[] }) {
       paddingX={0.5}
     >
       {chips.map((chip) => (
-        <chakra.a
+        <LangySpaAnchor
           key={chip.id}
           href={chip.href}
           display="inline-flex"
@@ -68,7 +69,7 @@ export function LangyFollowUpChips({ chips }: { chips: FollowUpChip[] }) {
         >
           {chip.label}
           <ArrowUpRight size={10} />
-        </chakra.a>
+        </LangySpaAnchor>
       ))}
     </HStack>
   );

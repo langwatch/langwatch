@@ -7,9 +7,9 @@ import { useLangyStore, type LangyContextChip } from "./langyStore";
  * A "target" is any object a component declares itself to be — a trace row, a
  * trace drawer, an online evaluation card, an experiment row. Components opt in
  * with `useLangyContextTarget`, which registers them here while mounted and
- * de-registers on unmount. While the Langy panel is open, a registered target
- * grows a subtle gradient ring and can be clicked to ride along as a composer
- * context chip.
+ * de-registers on unmount. Registration alone changes nothing you can see: a
+ * target only lights up, and only becomes clickable-into-context, while the
+ * page is ARMED (`#`, or a held Shift — see `armSource`).
  *
  * Deliberately a SEPARATE store from `langyStore`:
  *   - Registration churns. A virtualized trace table mounts and unmounts rows
@@ -41,14 +41,57 @@ import { useLangyStore, type LangyContextChip } from "./langyStore";
 export type LangyContextTarget = LangyContextChip;
 
 /**
+ * The drag payload's type, so the panel can tell a dragged context target from
+ * the text, files and links the browser will happily hand it otherwise. A
+ * custom MIME is also invisible to every other drop target on the page, so
+ * dragging a trace row over an unrelated one can never do something surprising.
+ */
+export const LANGY_CONTEXT_DRAG_MIME = "application/x-langy-context";
+
+/** Read a dragged target back off a drop event, or null if it isn't one. */
+export function readDraggedTarget(
+  transfer: DataTransfer | null,
+): LangyContextTarget | null {
+  const raw = transfer?.getData(LANGY_CONTEXT_DRAG_MIME);
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      typeof (parsed as LangyContextTarget).id === "string" &&
+      typeof (parsed as LangyContextTarget).label === "string"
+    ) {
+      return parsed as LangyContextTarget;
+    }
+  } catch {
+    // Another app's drag that happens to claim our MIME. Not ours; ignore it.
+  }
+  return null;
+}
+
+/**
  * The kinds the composer's `#` palette can ask to see on the page ("show me the
- * traces here") or be taken to ("browse datasets"). A subset of the chip kinds:
- * `selection` and `filter` describe table STATE, not registrable page objects,
- * and `project` / `dashboard` have no glowing element to reveal.
+ * traces here") or be taken to ("browse datasets").
+ *
+ * Every chip kind that a card or row on some list page declares itself to be.
+ * The two exclusions are not oversights: `selection` and `filter` describe table
+ * STATE rather than a registrable page object, and `project` has no list of
+ * itself to browse.
  */
 export type LangyRevealableKind = Extract<
   LangyContextTarget["kind"],
-  "trace" | "dataset" | "prompt" | "evaluation" | "scenario" | "experiment"
+  | "trace"
+  | "dataset"
+  | "prompt"
+  | "evaluation"
+  | "scenario"
+  | "experiment"
+  | "workflow"
+  | "agent"
+  | "automation"
+  | "annotation"
+  | "dashboard"
 >;
 
 /** How long a requested reveal stays lit (ms). One look, then it lets go. */
@@ -76,6 +119,17 @@ function armRevealTimer(): void {
     useLangyContextTargetStore.getState().clearReveal();
   }, REVEAL_DURATION_MS);
 }
+
+/**
+ * What put the page into pick-a-thing mode. `null` is disarmed.
+ *
+ * The two arm the same mode but release differently, which is why the source is
+ * remembered rather than a bare boolean: `#` is a LATCH (press once, it stays
+ * on until you press again, escape, or pick something), Shift is MOMENTARY (it
+ * lasts exactly as long as you hold it). A keyup on Shift must not switch off a
+ * mode that `#` turned on.
+ */
+export type LangyArmSource = "key" | "hold";
 
 interface LangyContextTargetState {
   /** Targets mounted on the page right now, keyed by their stable chip id. */
@@ -108,6 +162,34 @@ interface LangyContextTargetState {
   nearIds: Set<string>;
   hoveredId: string | null;
 
+  /**
+   * The chip the user is pointing at INSIDE the panel — the other direction.
+   *
+   * Everything else here runs page → panel: point at a row, it becomes a chip.
+   * This runs panel → page: hover "workflow: checkout" in the context list and
+   * the workflow's own card lights up where it sits. Without it a chip is just
+   * a word, and the user has to take the panel's word for which of nine cards
+   * it means.
+   *
+   * Deliberately NOT `hoveredId`: that one is written every frame by the
+   * pointer layer while armed, and a spotlight driven from the panel would be
+   * overwritten before it painted.
+   */
+  spotlightId: string | null;
+  setSpotlight: (id: string | null) => void;
+
+  /**
+   * Pick-a-thing mode. Nothing on the page reacts to Langy until this is on —
+   * no ring, no button, no click interception — so the page stays the page and
+   * "add to context" is a mode you enter on purpose rather than a state the
+   * open panel imposes on everything you look at.
+   */
+  armSource: LangyArmSource | null;
+  arm: (source: LangyArmSource) => void;
+  /** Release. `source` scopes it: a Shift keyup must not cancel a `#` latch. */
+  disarm: (source?: LangyArmSource) => void;
+  toggleArm: () => void;
+
   register: (target: LangyContextTarget) => void;
   unregister: (id: string) => void;
 
@@ -121,6 +203,15 @@ interface LangyContextTargetState {
    * light up as they arrive on the next page.
    */
   requestReveal: (request: { kind: LangyRevealableKind }) => void;
+  /**
+   * Keep a reveal alive while the pointer is on one of its targets.
+   *
+   * A reveal is an offer with a timer on it, and an offer must not expire under
+   * the hand reaching for it — the button would vanish mid-click and the row
+   * would go back to opening its drawer. Re-arms the shared expiry only; writes
+   * no state, so it is free to call on every pointer frame.
+   */
+  holdReveal: () => void;
   clearReveal: () => void;
 
   /** Published by `useLangyPageContext` on every chip-list change. */
@@ -147,6 +238,34 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()(
     pendingReveal: null,
     nearIds: new Set<string>(),
     hoveredId: null,
+    spotlightId: null,
+    armSource: null,
+
+    setSpotlight: (id) =>
+      set((state) => (state.spotlightId === id ? state : { spotlightId: id })),
+
+    arm: (source) =>
+      set((state) => (state.armSource === source ? state : { armSource: source })),
+
+    disarm: (source) =>
+      set((state) => {
+        if (state.armSource === null) return state;
+        // A Shift keyup arriving while `#` holds the latch open is not a
+        // release — it is a different gesture ending.
+        if (source && state.armSource !== source) return state;
+        return {
+          armSource: null,
+          nearIds: new Set<string>(),
+          hoveredId: null,
+        };
+      }),
+
+    toggleArm: () =>
+      set((state) =>
+        state.armSource === null
+          ? { armSource: "key" as const }
+          : { armSource: null, nearIds: new Set<string>(), hoveredId: null },
+      ),
 
     register: (target) =>
       set((state) => {
@@ -214,6 +333,11 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()(
         return { pendingReveal: { kind, requestedAt: Date.now() } };
       }),
 
+    holdReveal: () => {
+      // Only extends a reveal that is actually running — never starts one.
+      if (revealTimer) armRevealTimer();
+    },
+
     clearReveal: () =>
       set((state) => {
         if (state.revealedIds.size === 0 && state.pendingReveal === null) {
@@ -256,30 +380,70 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()(
         pendingReveal: null,
         nearIds: new Set<string>(),
         hoveredId: null,
+        spotlightId: null,
+        armSource: null,
       });
     },
   }),
 );
 
 /**
+ * FOLLOW THE PANEL'S SCOPE.
+ *
+ * `picked` is the one slice here that deliberately outlives the DOM, which is
+ * exactly what made it the one slice that leaked: a trace row clicked in project
+ * A survived the project switch (the store is a module singleton), stayed in
+ * `candidates` via `useLangyPageContext`, and was offered in project B's "+
+ * context" menu — where choosing it would have sent another project's resource
+ * ref to the agent.
+ *
+ * The dependency runs ONE WAY, and this is why it runs this way: this store
+ * already knows about `langyStore` (absorbing writes a chip there), so it
+ * REACTS to it. Having `langyStore` reach back in to clear the registry would
+ * close the loop into a cycle, and would put "what else has to be forgotten"
+ * in the store that has no idea any of this exists.
+ *
+ * Two events, two answers:
+ *   the scope changed (user / organization / project) — everything goes,
+ *     including the arm state and any reveal in flight. The page underneath is
+ *     navigating away, so its targets re-register on arrival.
+ *   a new conversation started — only the PICKS go. The registry describes what
+ *     is mounted right now, and the rows are still on screen; clearing it would
+ *     empty the `#` palette until they happened to remount.
+ */
+useLangyStore.subscribe((state, previous) => {
+  if (state.activeConversationScope !== previous.activeConversationScope) {
+    useLangyContextTargetStore.getState().reset();
+    return;
+  }
+  if (state.conversationEpoch !== previous.conversationEpoch) {
+    useLangyContextTargetStore.getState().clearPicked();
+  }
+});
+
+/**
  * Take a page target into Langy's context — the one definition of what
  * "absorb" DOES, shared by the hover affordance, the target's own toggle, and
  * the composer's `#` palette.
  *
- * Two writes, and both matter: `pick` is what makes it a chip, `restoreChip`
- * lifts any earlier dismissal so re-adding a chip you removed actually shows it
- * again instead of silently hitting the dismissal list.
+ * Two writes, and both matter: `pick` keeps the target's payload alive after the
+ * element unmounts, and `chooseChip` is what actually puts it in context —
+ * chips are opt-in, so a target that is only picked would sit in the "+ context"
+ * menu and the click would look like it did nothing.
  */
 export function absorbContextTarget(target: LangyContextTarget): void {
   useLangyContextTargetStore.getState().pick(target);
-  useLangyStore.getState().restoreChip(target.id);
+  useLangyStore.getState().chooseChip(target.id);
+  // Doing the thing retires the hint that teaches it. Nobody needs to be told
+  // how to do what they have just done.
+  useLangyStore.getState().dismissContextHint();
 }
 
 /**
  * The reverse. Unpick AND dismiss — the chip showing might have been
- * auto-derived from the route rather than picked, and unpicking alone would
- * leave it sitting in the composer, making the click look like it did nothing.
- * Dismissal is exactly what the chip's own ✕ does.
+ * derived from the route or the open drawer rather than picked, and unpicking
+ * alone would leave it sitting in the composer. Dismissal is exactly what the
+ * chip's own ✕ does.
  */
 export function releaseContextTarget(id: string): void {
   useLangyContextTargetStore.getState().unpick(id);

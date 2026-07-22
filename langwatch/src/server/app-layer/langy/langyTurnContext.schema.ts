@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LANGY_SKILLS } from "~/shared/langy/langySkills";
+import { LANGY_RESOURCE_KINDS } from "~/shared/langy/langyResourceKinds";
 
 /**
  * THE WIRE SHAPE for everything the composer attaches to a turn — and the one
@@ -46,7 +47,7 @@ import { LANGY_SKILLS } from "~/shared/langy/langySkills";
  */
 
 /** Labels are UI strings, not essays — long enough for a filter summary. */
-const MAX_LABEL_LENGTH = 200;
+export const MAX_LABEL_LENGTH = 200;
 /**
  * A ref is an id, a slug, a serialized filter query, or (for `selection`) a
  * comma-joined list of ids — and the trace table can select a lot of rows.
@@ -89,18 +90,9 @@ const SKILL_IDS = LANGY_SKILLS.filter(
  * what must actually travel.
  */
 export const langyResourceContextSchema = z.object({
-  kind: z.enum([
-    "project",
-    "experiment",
-    "trace",
-    "prompt",
-    "dataset",
-    "dashboard",
-    "scenario",
-    "evaluation",
-    "selection",
-    "filter",
-  ]),
+  // Derived, never restated — see `LANGY_RESOURCE_KINDS`. A kind the UI can
+  // mint but the server rejects is a chip that silently fails validation.
+  kind: z.enum(LANGY_RESOURCE_KINDS),
   /** Absent for the project chip — the project is already implicit in the turn. */
   ref: z.string().max(MAX_REF_LENGTH).optional(),
   label: z.string().max(MAX_LABEL_LENGTH),
@@ -144,14 +136,19 @@ export const langyTurnContextSchema = z.object({
 export type LangyTurnContext = z.infer<typeof langyTurnContextSchema>;
 
 /**
- * Flatten a client-supplied string to a single safe line.
+ * Flatten a model- or client-influenced string to a single safe line.
  *
  * The NEWLINE is the point. Everything else is hygiene; a newline is the actual
  * exploit, because it is what lets a label stop being a value on a line and start
  * being a line of its own — a forged instruction in the system block. Backticks
  * go too, so a value cannot close a fence or mimic our own framing.
+ *
+ * Exported because it is the ONE sanitiser for everything that reaches Langy's
+ * system block — the composer's chips here, and the conversation's own memory in
+ * `langyConversationMemory`. A second copy is a second thing to drift, and the
+ * drift would be a prompt-injection hole rather than a cosmetic one.
  */
-function sanitize(value: string, max: number): string {
+export function sanitizeLangyPromptValue(value: string, max: number): string {
   return (
     value
       // Control characters (incl. CR/LF) -> a space. This is the one that matters:
@@ -167,8 +164,10 @@ function sanitize(value: string, max: number): string {
 
 /** How each resource kind is described to the model, in words it can act on. */
 function describeResource(chip: LangyResourceContext): string | null {
-  const label = sanitize(chip.label, MAX_LABEL_LENGTH);
-  const ref = chip.ref ? sanitize(chip.ref, MAX_REF_LENGTH) : "";
+  const label = sanitizeLangyPromptValue(chip.label, MAX_LABEL_LENGTH);
+  const ref = chip.ref
+    ? sanitizeLangyPromptValue(chip.ref, MAX_REF_LENGTH)
+    : "";
   if (!label && !ref) return null;
 
   switch (chip.kind) {
@@ -204,8 +203,11 @@ function describeResource(chip: LangyResourceContext): string | null {
 
 /** A skill the user asked for, and what they aimed it at. */
 function describeSkill(skill: LangySkillContext): string | null {
-  const label = sanitize(skill.label, MAX_LABEL_LENGTH) || skill.id;
-  const on = skill.on ? sanitize(skill.on, MAX_LABEL_LENGTH) : "";
+  const label =
+    sanitizeLangyPromptValue(skill.label, MAX_LABEL_LENGTH) || skill.id;
+  const on = skill.on
+    ? sanitizeLangyPromptValue(skill.on, MAX_LABEL_LENGTH)
+    : "";
   return on ? `- ${label} — applied to: ${on}` : `- ${label}`;
 }
 

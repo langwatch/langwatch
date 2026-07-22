@@ -157,10 +157,13 @@ Key properties:
 - **Crash-bounded.** A crashed holder stops renewing and disappears after the lease window; no explicit release is required for convergence.
 - **Live siblings remain protected.** Every holder has its own deadline, so pruning a crashed sibling cannot remove a live job's renewed lease.
 - **Duplicate take/release is idempotent.** `ZADD` updates one member and `ZREM` of a missing member is harmless.
-- **No eager deletion.** Release and transfer mutate lease membership only. Redis TTL reclaims Redis-tier bytes. The durable tier relies on the deployment's bucket lifecycle/project-purge policy; adding lease-aware, storage-specific durable GC is separate from this change's explicitly unchanged S3 tiering behaviour.
+- **No eager deletion.** Release and transfer mutate lease membership and expiry, never blob contents. Redis TTL reclaims Redis-tier bytes. The durable tier relies on the deployment's bucket lifecycle/project-purge policy; adding lease-aware, storage-specific durable GC is separate from this change's explicitly unchanged S3 tiering behaviour.
+- **Bounded retention after the last release.** Retiring the last lease shortens the Redis-tier blob's expiry from the 4-day backstop to `BLOB_RELEASE_GRACE_TTL_SECONDS` (1 hour). Without it the backstop is the only Redis-tier reclaim path, so nothing drains a retired blob before it ages out and retention runs the full four days deep — a ceiling that was never sized against the instance it has to fit in, and that production exceeded (2026-07-21). Shortening a deadline is not deletion — the bytes stay readable and any later take re-arms the full backstop — so a producer that wrote content-addressed bytes before the release and stages after it still finds them. Withheld while any lease is live, or while the rolling-deploy holder set carries a member beyond the migration sentinel. Counted by `gq_blob_release_grace_total`.
 - **Cluster-safe.** Blob, lease, migration-guard, and queue keys share the queue's Redis hash tag.
 
-A retry or dedup-squash uses `TRANSFER_LUA` to take/renew the new lease and remove the old member atomically. The blob is never deleted on either the same-content or changed-content path.
+A retry or dedup-squash uses `TRANSFER_LUA` to take/renew the new lease and remove the old member atomically. The blob is never deleted on either the same-content or changed-content path; a changed-content transfer that retires the displaced blob's last lease puts it on the grace window.
+
+`gqGraceExpireIfUnleased` ([`blobGraceLua.ts`](./blobGraceLua.ts)) is the one definition of that decision, shared verbatim by the standalone release/transfer evals and by the dedup-squash release inlined into `STAGE_LUA`, so a release path cannot drift into leaving the full backstop where the others would not.
 
 During a rolling deploy, lease operations also write a TTL-bound sentinel into the previous release's holder set. Old release code therefore cannot observe an empty set and eagerly delete a blob written or renewed by new code. Existing ref-count-era blobs remain readable; the first new-code decode renews a lease, while finite Redis TTLs and the durable-store lifecycle policy eventually reclaim untouched legacy data.
 
@@ -293,6 +296,7 @@ This keeps the queue testable in isolation: integration tests pass an in-memory 
 | Envelope encode / decode (GQ1 + GQ2) | [`jobEnvelope.ts`](./jobEnvelope.ts) |
 | Content-addressed tiered store | [`tieredBlobStore.ts`](./tieredBlobStore.ts) |
 | Per-holder renewable lease Lua | [`blobLeases.ts`](./blobLeases.ts) |
+| Shared last-release grace-window Lua | [`blobGraceLua.ts`](./blobGraceLua.ts) |
 | Lifecycle collaborator (encode/decode + take/release/transfer) | [`envelopeBlobLifecycle.ts`](./envelopeBlobLifecycle.ts) |
 | Shared key layout (blob + lease) | [`blobKeys.ts`](./blobKeys.ts) |
 | Cluster hash-tag guard | [`redisHashTag.ts`](./redisHashTag.ts) |

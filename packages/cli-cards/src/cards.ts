@@ -80,6 +80,86 @@ export const metricsCardSchema = z.looseObject({
   previousPeriod: z.array(z.looseObject({})).optional(),
 });
 
+/**
+ * A plotted answer: one or more named series over time, optionally with a
+ * period-over-period comparison.
+ *
+ * The card the panel had no way to draw. "Compare trace cost this week to last"
+ * is two numbers and a direction, which the metrics card renders as two large
+ * decimals — technically the answer, and useless for the question actually
+ * asked, which is about a TREND. A trend needs a shape.
+ *
+ * Deliberately NOT derived from a tool payload by sniffing it. The platform
+ * returns traces, spans and buckets; which of their fields is worth plotting,
+ * against what baseline, and what the axis means are judgements about the
+ * QUESTION, not facts about the response. So the COMMAND that knows the
+ * question shapes this payload — `analytics query` knows the metric, the
+ * aggregation and the window it was asked for, and emits `series` itself (see
+ * `timeseriesShape.ts` in the CLI) — and the registry only recognises the
+ * shape once it is there (`timeseriesProbeSchema`).
+ *
+ * ADR-059 §5 also sketches a `langwatch present` command for an agent to emit
+ * a card directly. That command does not exist; nothing emits this card except
+ * a command that shaped its own answer.
+ *
+ * `graph` is an opaque passthrough: when the agent supplies a graph definition
+ * the card can offer to save it to a dashboard, and when it does not the card
+ * still draws, minus that action. The panel never invents one.
+ */
+export const timeseriesCardSchema = z.looseObject({
+  series: z
+    .array(
+      z.looseObject({
+        name: z.string(),
+        points: z.array(
+          z.looseObject({
+            /** ISO date or bucket label — whatever the x axis should read. */
+            t: z.union([z.string(), z.number()]),
+            v: z.number(),
+          }),
+        ),
+      }),
+    )
+    .min(1),
+  title: z.string().optional(),
+  /** How to format values. Drives the axis, the tooltip and the comparison. */
+  unit: z.enum(["usd", "count", "ms", "percent", "tokens"]).optional(),
+  /** The headline the plot supports: a value, its baseline, and their names. */
+  comparison: z
+    .looseObject({
+      label: z.string(),
+      value: z.number(),
+      baselineLabel: z.string(),
+      baseline: z.number(),
+    })
+    .optional(),
+  /** A `CustomGraphInput`, when the agent has one worth saving. */
+  graph: z.unknown().optional(),
+});
+
+/**
+ * The EVIDENCE that a payload is a timeseries — see `spendProbeSchema` for why
+ * this is not the card's acceptance schema.
+ *
+ * The bar is TWO points in a named series. Two, because one point is a reading
+ * and not a trend, and an axis drawn under a single value dresses it up as a
+ * shape. Named, because an unnamed array of `{t, v}` is a shape half the
+ * product could produce by accident, and this probe outranks spend — it has to
+ * earn that.
+ */
+export const timeseriesProbeSchema = z.looseObject({
+  series: z
+    .array(
+      z.looseObject({
+        name: z.string(),
+        points: z
+          .array(z.looseObject({ t: z.union([z.string(), z.number()]), v: z.number() }))
+          .min(2),
+      }),
+    )
+    .min(1),
+});
+
 /** `experiment run|results`, `scenario run`, `suite run`, `agent run` — a run card. */
 export const evalRunCardSchema = z.looseObject({
   id: z.string().optional(),
@@ -121,15 +201,152 @@ export const resourceCardSchema = z.union([
   }),
 ]);
 
+/**
+ * Keys whose value NAMES a resource. An id under any of the spellings the
+ * platform uses, or the human name a card would title itself with.
+ */
+const RESOURCE_NAME_KEYS = ["id", "slug", "name", "title", "key", "handle"];
+
+/** Keys an endpoint may return its rows under. Mirrors the digest's list. */
+const RESOURCE_COLLECTION_KEYS = [
+  "traces",
+  "data",
+  "items",
+  "results",
+  "records",
+];
+
+const isNamedValue = (value: unknown): boolean =>
+  (typeof value === "string" && value.trim().length > 0) ||
+  (typeof value === "number" && Number.isFinite(value));
+
+/**
+ * Does this payload NAME something that now exists?
+ *
+ * The question a `create` card's copy stakes everything on. "Created and ready
+ * to use", with a link through to the thing, is a claim about the world; a
+ * result carrying no id, no name and no rows cannot support it. A create that
+ * never happened — refused upstream, or re-run without its arguments — returns
+ * exactly that nothing, and the card used to render the claim anyway, complete
+ * with a deep link to a resource that was never made.
+ *
+ * Deliberately asked of CREATES only. An update or a delete is named by the
+ * command's own arguments, so an empty 200 body is a normal, honest "done";
+ * a create's identity can only come back from the server, so its absence is
+ * the whole story.
+ *
+ * Evidence, not vibes: an id/name, or a non-empty collection of rows. A bare
+ * `{ ok: true }` names nothing and does not pass — the card would have nothing
+ * to title itself with or link to, which is precisely the state this guards.
+ */
+export const namesCreatedResource = (payload: unknown): boolean => {
+  if (Array.isArray(payload)) return payload.length > 0;
+  if (!payload || typeof payload !== "object") return false;
+
+  const record = payload as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) {
+    if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
+    if (/(^|_)id$|Id$/.test(key) && isNamedValue(value)) return true;
+    if (RESOURCE_COLLECTION_KEYS.includes(key) && Array.isArray(value) && value.length > 0) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * `<resource> create` — the card that says a NEW thing exists.
+ *
+ * Strictly narrower than {@link resourceCardSchema} on purpose: this is the one
+ * write card whose copy asserts a fact the payload has to substantiate, so a
+ * payload that names nothing must not parse as one. The panel then renders the
+ * outcome as unconfirmed instead of manufacturing a success out of `[]`.
+ */
+export const createdResourceCardSchema = resourceCardSchema.refine(
+  namesCreatedResource,
+  { message: "a created-resource result must name the resource it created" },
+);
+
+/**
+ * `virtual-keys get|list`, `gateway-budgets list`, and ANY result whose rows
+ * carry cost — the spend card.
+ *
+ * Cost is a DIMENSION, not a resource: it lives on a virtual key, on a budget,
+ * on one trace and on a whole filtered set of them. A card keyed only to the
+ * resources named "spend-ish" would catch the first two and miss the two users
+ * actually ask about, which is why this one is reached by shape as well as name.
+ *
+ * The discriminator is a NAMED cost field. "Has numbers" would promote every
+ * list in the product.
+ */
+export const spendCardSchema = resourceCardSchema;
+
+/**
+ * The EVIDENCE that a payload is about spend — strictly narrower than what the
+ * card can draw.
+ *
+ * These two must not be the same schema, and conflating them is a real bug I
+ * shipped once: a card's ACCEPTANCE schema says "I can render this", and must be
+ * permissive or a deliberate `byVerb` binding breaks the moment a real payload
+ * omits a field. A card's PROBE says "this payload proves it is mine", and must
+ * be strict or it promotes everything. Acceptance is a floor; evidence is a bar.
+ */
+export const spendProbeSchema = z.union([
+  // A rolled-up total, however this endpoint spells it.
+  z.looseObject({ totalCost: z.number() }),
+  z.looseObject({ total_cost: z.number() }),
+  // Rows that each carry a cost — a trace page, a per-key spend breakdown.
+  z.looseObject({
+    traces: z.array(
+      z.looseObject({ metrics: z.looseObject({ total_cost: z.number() }) }),
+    ),
+  }),
+]);
+
+/**
+ * `evaluator get`, `monitor get` — the config card.
+ *
+ * What a user asks about an evaluator is what it checks and whether it is on, so
+ * the discriminator is an explicit enabled/type flag. A bare `{ name }` is every
+ * resource in the product and must never land here.
+ */
+export const evaluatorConfigCardSchema = resourceCardSchema;
+
+/** The evidence a payload is an evaluator's config — see `spendProbeSchema`. */
+export const evaluatorConfigProbeSchema = z.union([
+  z.looseObject({ enabled: z.boolean() }),
+  z.looseObject({ evaluatorType: z.string() }),
+  z.looseObject({ evaluator_type: z.string() }),
+]);
+
+/**
+ * `dashboard get`, `graph get` — the one resource that genuinely IS a visual.
+ *
+ * Discriminated on carrying graph/panel definitions rather than on the noun, so
+ * a dashboard payload renders as one wherever it came from.
+ */
+export const dashboardCardSchema = resourceCardSchema;
+
+/** The evidence a payload is a dashboard/graph — see `spendProbeSchema`. */
+export const dashboardProbeSchema = z.union([
+  z.looseObject({ graphs: z.array(z.looseObject({})) }),
+  z.looseObject({ panels: z.array(z.looseObject({})) }),
+  z.looseObject({ graphType: z.string() }),
+]);
+
 /** Every card the panel can draw. Mirrors the app's `CapabilityRenderKind`. */
 export const CARD_KINDS = [
   "traces",
   "trace",
   "metrics",
+  "timeseries",
   "evalRun",
   "dataset",
   "scenario",
   "promptDiff",
+  "spend",
+  "evaluatorConfig",
+  "dashboard",
   "resourceRead",
   "resourceCreated",
   "resourceUpdated",
@@ -143,12 +360,19 @@ export const SCHEMA_BY_CARD_KIND: Record<CardKind, z.ZodType> = {
   traces: tracesCardSchema,
   trace: traceCardSchema,
   metrics: metricsCardSchema,
+  timeseries: timeseriesCardSchema,
   evalRun: evalRunCardSchema,
   dataset: datasetCardSchema,
   scenario: scenarioCardSchema,
   promptDiff: promptDiffCardSchema,
+  spend: spendCardSchema,
+  evaluatorConfig: evaluatorConfigCardSchema,
+  dashboard: dashboardCardSchema,
   resourceRead: resourceCardSchema,
-  resourceCreated: resourceCardSchema,
+  // Narrower than the rest by design — see `createdResourceCardSchema`. A
+  // create that named nothing must not READ as a created-resource document,
+  // whichever consumer asks.
+  resourceCreated: createdResourceCardSchema,
   resourceUpdated: resourceCardSchema,
   resourceRemoved: resourceCardSchema,
 };

@@ -404,6 +404,36 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   };
 };
 
+/**
+ * Statuses where nothing the caller can SEND will change the answer.
+ *
+ * A machine caller — Langy runs the CLI in a shell — has exactly three moves
+ * after a failure: retry unchanged, retry with different arguments, or stop.
+ * Everything above tells it what the failure IS; this tells it which move is
+ * left, and for these statuses the answer is "stop". Not because the request was
+ * malformed (a 400/422 names the field to fix) and not because we fell over (a
+ * 429/5xx is worth one retry), but because the platform understood the request
+ * perfectly and the answer is no: the credential does not carry it (401/403),
+ * the plan does not include it (402/403), it does not exist (404), it is gone
+ * (410).
+ *
+ * Emitting this is the difference between an agent reporting a plan limit and an
+ * agent quietly re-running a create with different flags until something sticks
+ * — which is exactly what happened, and produced a second card for a thing that
+ * never existed.
+ */
+const TERMINAL_STATUSES = new Set([401, 402, 403, 404, 410]);
+
+/**
+ * True when retrying is pointless — see {@link TERMINAL_STATUSES}.
+ *
+ * Only ever said of a failure the platform NAMED. An infrastructure failure is
+ * ours and transient by default, and a status we read off a proxy's error page
+ * is not a verdict the platform reached.
+ */
+export const isTerminalFailure = (error: CliHandledError): boolean =>
+  error.isHandled && TERMINAL_STATUSES.has(error.httpStatus);
+
 /** A stable code for a failure the platform did not name itself. */
 const codeForStatus = (status: number): string => {
   if (status === 401 || status === 403) return "unauthorized";
@@ -497,13 +527,26 @@ export const parseHandledError = ({
  */
 export interface CliErrorDocument {
   ok: false;
-  error: CliHandledError;
+  error: CliHandledError & {
+    /**
+     * Whether retrying — with the same arguments or with different ones — can
+     * possibly change the answer. See {@link isTerminalFailure}.
+     *
+     * Written for the agent, which otherwise has to infer it from the code and
+     * gets it wrong in the expensive direction: it re-ran a create that had
+     * been refused on a plan limit with a different set of flags, which could
+     * never have worked and put a second card in the user's transcript for a
+     * resource that was never made. Derived, never authored by a caller.
+     */
+    terminal: boolean;
+  };
 }
 
 /** Build the `--format json` failure document. */
-export const toCliErrorDocument = (
-  error: CliHandledError,
-): CliErrorDocument => ({ ok: false, error });
+export const toCliErrorDocument = (error: CliHandledError): CliErrorDocument => ({
+  ok: false,
+  error: { ...error, terminal: isTerminalFailure(error) },
+});
 
 /**
  * Read a CLI failure document back, or null when the output is not one.

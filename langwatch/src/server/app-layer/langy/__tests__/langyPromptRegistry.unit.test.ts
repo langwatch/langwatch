@@ -110,7 +110,17 @@ describe("resolveLangyPrompt", () => {
       expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain(
         "you are Langy, the in-product LangWatch assistant.",
       );
-      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("never offer 'next actions'");
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("never hand the work back");
+    });
+
+    // The cards ARE the record of what happened. Prose that repeats them is a
+    // second source of truth that can disagree with the first, and it spends
+    // the most valuable line on screen narrating the past.
+    it("sends the prose after an action forward, not back over the card", () => {
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("never restates one");
+      expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain(
+        "what the reader might want next",
+      );
     });
   });
 });

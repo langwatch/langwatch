@@ -4,6 +4,15 @@ export interface LangyConversationRow {
   title: string | null;
   isShared: boolean;
   status: string;
+  /**
+   * The turn the conversation has IN FLIGHT right now, or null when none is.
+   *
+   * The durable answer to "which turn would a Stop stop?". A browser tab only
+   * learns a turn id from its own send, so without this a turn adopted from the
+   * record — another tab's, or one rejoined after a refresh — had a Stop button
+   * with no id behind it.
+   */
+  currentTurnId: string | null;
   lastError: string | null;
   messageCount: number;
   lastActivityAtMs: number;

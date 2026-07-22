@@ -10,6 +10,13 @@ import "@testing-library/jest-dom/vitest";
  */
 
 const langyMock = { showLangy: true, attach: vi.fn(), open: vi.fn() };
+// "Add to context" primes a question, so the bar gates on `useCanAskLangy`
+// (`langy:create`) rather than `useShowLangy` (`langy:view`). Both read the one
+// fixture flag: which grant gates which affordance is decided in the hooks, and
+// restating it here would only give the fixture a second opinion.
+vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
+  useCanAskLangy: () => langyMock.showLangy,
+}));
 vi.mock("~/features/langy/hooks/useShowLangy", () => ({
   useShowLangy: () => langyMock.showLangy,
 }));

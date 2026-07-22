@@ -21,6 +21,19 @@ interface RemediationEntry {
 }
 
 const registry = {
+  // ---- request boundary ----
+  validation_error: {
+    tips: [
+      "Read `reasons` — each entry names the offending field in meta.field and what was expected in meta.expected",
+      "Fix those fields and send the request again; retrying it unchanged will fail identically",
+    ],
+  },
+  malformed_request: {
+    tips: [
+      "The body could not be parsed at all — check for truncated JSON, a trailing comma, or a Content-Type that does not match what was sent",
+    ],
+  },
+
   // ---- traces ----
   trace_not_found: {
     tips: [
@@ -181,6 +194,12 @@ const registry = {
   langy_turn_in_progress: {
     tips: [
       "Wait for the current response to finish before sending another message",
+    ],
+  },
+  langy_turn_not_stoppable: {
+    tips: [
+      "Read the conversation to find the turn it currently has in flight, and stop that one",
+      "A turn that already finished needs no stopping — its answer is on the conversation",
     ],
   },
   langy_idempotency_mismatch: {

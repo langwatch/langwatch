@@ -37,11 +37,13 @@ export {
 export { parseCliJson } from "./cliJson.js";
 
 export {
+  CLI_CARD_OUTCOMES,
   cliToolResultSchema,
   cliToolResultPayload,
   parseCliToolResult,
   toCliTextResult,
   toCliToolResult,
+  type CliCardOutcome,
   type CliToolResult,
 } from "./tool-result.js";
 
@@ -57,9 +59,12 @@ export {
 export {
   CARD_KINDS,
   SCHEMA_BY_CARD_KIND,
+  createdResourceCardSchema,
   datasetCardSchema,
   evalRunCardSchema,
   metricsCardSchema,
+  namesCreatedResource,
+  timeseriesCardSchema,
   promptDiffCardSchema,
   resourceCardSchema,
   scenarioCardSchema,
@@ -76,9 +81,14 @@ export {
   CLI_COLLECTION_VERBS,
   CLI_SUBRESOURCE_VERBS,
   asJsonDocument,
+  assertTotalOrder,
+  CARD_PROBES,
   cardKindFor,
+  promoteCard,
+  type CardProbe,
   cardSchemaFor,
   cliVerbTone,
+  parseCardResult,
   parseCliResult,
   type CliVerbTone,
   type ParsedCliResult,
@@ -94,6 +104,7 @@ export {
  */
 export {
   handledErrorFromThrown,
+  isTerminalFailure,
   parseHandledError,
   readCliErrorDocument,
   toCliErrorDocument,

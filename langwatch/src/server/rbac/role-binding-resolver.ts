@@ -93,10 +93,20 @@ async function collectBindingsForScope({
   scope: ScopeRef;
 }): Promise<ResolvedBinding[]> {
   if (principal.type === "apiKey") {
-    return collectBindingsForApiKey({ prisma, apiKeyId: principal.id, organizationId, scope });
+    return collectBindingsForApiKey({
+      prisma,
+      apiKeyId: principal.id,
+      organizationId,
+      scope,
+    });
   }
 
-  return collectBindingsForUser({ prisma, userId: principal.id, organizationId, scope });
+  return collectBindingsForUser({
+    prisma,
+    userId: principal.id,
+    organizationId,
+    scope,
+  });
 }
 
 async function collectBindingsForUser({
@@ -121,14 +131,35 @@ async function collectBindingsForUser({
         userId,
         user: { orgMemberships: { some: { organizationId } } },
       },
-      select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
+      select: {
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
     }),
     prisma.roleBinding.findMany({
+      // Group-derived bindings carry the same current-membership gate as the
+      // direct bindings above. A GroupMembership row outlives removal from the
+      // organization, so without this an offboarded user keeps whatever their
+      // groups granted.
       where: {
         organizationId,
-        group: { members: { some: { userId } } },
+        group: {
+          members: {
+            some: {
+              userId,
+              user: { orgMemberships: { some: { organizationId } } },
+            },
+          },
+        },
       },
-      select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
+      select: {
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
     }),
   ]);
 
@@ -136,12 +167,23 @@ async function collectBindingsForUser({
 
   const ancestorScopeList = ancestorScopes(scope);
   if (scope.type !== "org") {
-    ancestorScopeList.push({ type: RoleBindingScopeType.ORGANIZATION, id: organizationId });
+    ancestorScopeList.push({
+      type: RoleBindingScopeType.ORGANIZATION,
+      id: organizationId,
+    });
   }
 
   return allOrgBindings
-    .filter((b) => ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId))
-    .map((b) => ({ role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType }));
+    .filter((b) =>
+      ancestorScopeList.some(
+        (s) => s.type === b.scopeType && s.id === b.scopeId,
+      ),
+    )
+    .map((b) => ({
+      role: b.role,
+      customRoleId: b.customRoleId,
+      scopeType: b.scopeType,
+    }));
 }
 
 async function collectBindingsForApiKey({
@@ -164,12 +206,23 @@ async function collectBindingsForApiKey({
 
   const ancestorScopeList = ancestorScopes(scope);
   if (scope.type !== "org") {
-    ancestorScopeList.push({ type: RoleBindingScopeType.ORGANIZATION, id: organizationId });
+    ancestorScopeList.push({
+      type: RoleBindingScopeType.ORGANIZATION,
+      id: organizationId,
+    });
   }
 
   return bindings
-    .filter((b) => ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId))
-    .map((b) => ({ role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType }));
+    .filter((b) =>
+      ancestorScopeList.some(
+        (s) => s.type === b.scopeType && s.id === b.scopeId,
+      ),
+    )
+    .map((b) => ({
+      role: b.role,
+      customRoleId: b.customRoleId,
+      scopeType: b.scopeType,
+    }));
 }
 
 // ============================================================================
@@ -200,9 +253,17 @@ export async function checkRoleBindingPermission({
   scope: ScopeRef;
   permission: Permission;
 }): Promise<boolean> {
-  const resolvedPrincipal: Principal = principal ?? { type: "user", id: userId! };
+  const resolvedPrincipal: Principal = principal ?? {
+    type: "user",
+    id: userId!,
+  };
 
-  const bindings = await collectBindingsForScope({ prisma, principal: resolvedPrincipal, organizationId, scope });
+  const bindings = await collectBindingsForScope({
+    prisma,
+    principal: resolvedPrincipal,
+    organizationId,
+    scope,
+  });
 
   for (const binding of bindings) {
     // A team/project binding can never grant an org-exclusive permission,
@@ -260,7 +321,10 @@ export async function checkRoleBindingPermission({
       binding.role !== TeamUserRole.CUSTOM
     ) {
       if (binding.role === TeamUserRole.ADMIN) return true;
-      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
+      if (
+        organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)
+      )
+        return true;
       continue;
     }
 

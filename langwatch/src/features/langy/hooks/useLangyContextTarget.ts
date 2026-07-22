@@ -1,8 +1,9 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, DragEvent, MouseEvent } from "react";
 import { useCallback, useEffect, useMemo } from "react";
 import "../langyContextTarget.css";
 import {
   absorbContextTarget,
+  LANGY_CONTEXT_DRAG_MIME,
   type LangyContextTarget,
   releaseContextTarget,
   useLangyContextTargetStore,
@@ -20,30 +21,43 @@ import { useLangyStore } from "../stores/langyStore";
  *
  * HOW IT BEHAVES, and every clause here is a correction of an earlier cut:
  *
- *   It does NOT touch the click. A trace row still opens its drawer, a card
- *   still opens its editor, with Langy open or closed. The first version
- *   swallowed the click in the capture phase to add the target to context, and
- *   that made every row on the page un-openable the moment the panel opened —
- *   the page stopped being the page. Adding to context is now an EXPLICIT act
- *   on an explicit control (see below), never an ambush on an existing gesture.
+ *   Nothing happens until the page is ARMED — `#`, or a held Shift; see
+ *   `useLangyContextArming`. That gate is the correction. The first version
+ *   swallowed clicks in the capture phase whenever the panel was open, and that
+ *   made every row on the page un-openable the moment you asked Langy a
+ *   question — the page stopped being the page. The version after it went the
+ *   other way and painted nothing ever, which made the whole mechanism
+ *   undiscoverable. A mode fixes both: outside it a trace row opens its drawer
+ *   exactly as it always did; inside it, a click means "give this to Langy",
+ *   the page says so, and one keystroke ends it.
  *
- *   Targets don't all light up at once. They light up AROUND THE CURSOR:
- *   `LangyContextTargetLayer` tracks the pointer and marks what's near it. A
- *   page-wide christmas tree of shimmering outlines is exactly the "over the
- *   top" failure this design keeps walking back from. What you get instead is a
- *   quiet field that follows your hand.
- *
- *   The affordance is a real button, rendered ONCE for the whole page in a
- *   portal by the layer, floated over whichever target you're hovering. Not a
+ *   Armed, targets light up and can be clicked OR dragged onto the panel. The
+ *   affordance button is also a real button, rendered ONCE for the whole page in
+ *   a portal by the layer, floated over whichever target you're hovering. Not a
  *   pseudo-element and not a node inside the target — on a <tbody> either one
  *   generates an anonymous table box and breaks the row's geometry, which is
  *   precisely what broke the trace table's expanded rows.
  *
- * ZERO COST WHEN LANGY IS CLOSED, and that is a hard requirement, not a nicety:
- *   - `targetProps` is a frozen empty object: no className (no CSS rule can
- *     match), no data attributes, no inline style, no handlers.
- *   - the registration effect early-returns, so the store stays empty.
- *   - the layer renders null and attaches no pointer listeners at all.
+ *   A REVEAL (`#trace` → "Show traces on this page") is the same offer, made
+ *   briefly and by request rather than held open by a mode. It therefore carries
+ *   the same behaviour: a revealed target lights up, can be clicked or dragged
+ *   into context, and gets the same floating button. It used to light up and do
+ *   nothing, which made the palette's own promise — "anything that lights up can
+ *   be added as context" — a lie for the 2.6s it was on screen.
+ *
+ * ZERO COST WHEN DISARMED, and that is a hard requirement, not a nicety. The
+ * property being preserved is precisely: NOTHING THE USER CAN SEE OR CLICK.
+ *   - `targetProps` carries no className (so no CSS rule can match), no visual
+ *     state attribute, no inline style, no handlers, and is not draggable.
+ *   - the ONE thing it does carry once the target is registered is
+ *     `data-langy-target` — an id, invisible, inert, matched by no stylesheet
+ *     rule and by no listener. It is how the panel finds the element it is
+ *     pointing at: hovering a context chip in the composer shines a light on the
+ *     card it names, and that is not the picking mode, it is reading the list
+ *     you already have. Locating an element cannot depend on the user first
+ *     arming the page, or the spotlight can never fire.
+ *   - with Langy closed the registration effect early-returns too, so the store
+ *     stays empty, the attribute is absent, and the layer attaches no listeners.
  *   - the highlight is an `outline` / inset shadow, both defined never to affect
  *     layout — so even when it IS on, nothing on the page moves by a pixel.
  * The one residual cost is a zustand subscription per target whose selectors
@@ -55,11 +69,28 @@ import { useLangyStore } from "../stores/langyStore";
 export interface LangyContextTargetProps {
   className?: string;
   style?: CSSProperties;
-  /** The layer finds targets by this attribute — no ref, so it never fights the
-   *  virtualizer (which already owns the trace row's ref). */
+  /**
+   * The layer finds targets by this attribute — no ref, so it never fights the
+   * virtualizer (which already owns the trace row's ref). Present for as long as
+   * the target is REGISTERED, which is wider than "lit": the panel → page
+   * spotlight has to be able to find a card the user has not armed the page for.
+   * Inert on its own — no rule in the stylesheet matches it.
+   */
   "data-langy-target"?: string;
   /** Drives the whole visual: `near` | `hover` | `added`. Absent = invisible. */
   "data-langy-target-state"?: LangyTargetVisualState;
+  /** Only while the target is OFFERED (armed, or briefly revealed). Off
+   *  otherwise, or every row on the page would become draggable the moment the
+   *  panel opened. */
+  draggable?: boolean;
+  onDragStart?: (event: DragEvent<HTMLElement>) => void;
+  /**
+   * Only while the target is offered — and capture, deliberately. Offered, a
+   * click means "add this", so it has to be taken before the row's own handler
+   * opens a drawer. Outside that the prop is absent and the element behaves
+   * exactly as it did before Langy existed.
+   */
+  onClickCapture?: (event: MouseEvent<HTMLElement>) => void;
 }
 
 export type LangyTargetVisualState = "near" | "hover" | "added";
@@ -113,9 +144,14 @@ export function useLangyContextTarget(
     isActive && id ? state.activeChipIds.has(id) : false,
   );
   // Lit by request rather than by the pointer — the composer's `#trace` →
-  // "Show traces on this page" gesture. Reads exactly like `near`.
+  // "Show traces on this page" gesture. A brief, self-ending arm: same ring,
+  // same click, same drag, released by a timer instead of a keystroke.
   const isRevealed = useLangyContextTargetStore((state) =>
     isActive && id ? state.revealedIds.has(id) : false,
+  );
+  const isArmed = useLangyContextTargetStore((state) => state.armSource !== null);
+  const isHovered = useLangyContextTargetStore((state) =>
+    isActive && id ? state.hoveredId === id : false,
   );
 
   useEffect(() => {
@@ -134,27 +170,74 @@ export function useLangyContextTarget(
     }
   }, [id, kind, label, chipRef]);
 
+  const onDragStart = useCallback(
+    (event: DragEvent<HTMLElement>) => {
+      if (!id || !kind || !label) return;
+      event.dataTransfer.setData(
+        LANGY_CONTEXT_DRAG_MIME,
+        JSON.stringify({ id, kind, label, ref: chipRef }),
+      );
+      // A plain-text fallback so dropping into the composer's textarea — which
+      // people will try — leaves the label behind rather than nothing at all.
+      event.dataTransfer.setData("text/plain", label);
+      event.dataTransfer.effectAllowed = "copy";
+    },
+    [id, kind, label, chipRef],
+  );
+
+  const onClickCapture = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggle();
+    },
+    [toggle],
+  );
+
+  // Armed OR revealed: the target is being OFFERED, and an offer the user can
+  // see has to be an offer they can take. The two differ only in what ends them
+  // — a keystroke, or a timer.
+  const isOffered = isArmed || isRevealed;
+
   const targetProps = useMemo<LangyContextTargetProps>(() => {
     if (!isActive || !id) return NO_PROPS;
+    // Not offered, the page is the page: no ring, no drag, no intercepted
+    // click. Only the locating id, which nothing paints and nothing listens to
+    // — see the ZERO COST note above for why it cannot wait for arming.
+    if (!isOffered) return { "data-langy-target": id };
     return {
       className: "langy-target",
-      // The phase offset, and it is load-bearing: it is the whole difference
-      // between a shimmer FIELD and a rainbow barcode. Targets sharing one
-      // animation start on the same frame and drift in lockstep; hashed per id,
-      // they drift out of phase, like light moving on water. Stable across
-      // renders, so the shimmer never restarts mid-cycle.
-      style: {
-        "--langy-target-delay": `-${shimmerPhaseFor(id)}ms`,
-      } as CSSProperties,
+      style: shimmerStyleFor(id),
       "data-langy-target": id,
-      // Context is now derived from the view, selection and open drawer. Do not
-      // paint persistent rings through cards or place controls over the page.
-      // A deliberate `#trace` reveal may still point out eligible resources.
-      "data-langy-target-state": isRevealed ? "near" : undefined,
+      // Offered, EVERY target lights up — the point of the mode is to answer
+      // "what can I even give it?" at a glance. That is the christmas tree the
+      // earlier always-on design was right to refuse; what makes it fine here
+      // is that it is modal, brief, and asked for.
+      "data-langy-target-state": visualState({
+        isAdded,
+        isHovered,
+        isNear: true,
+      }),
+      draggable: true,
+      onDragStart,
+      onClickCapture,
     };
-  }, [isActive, id, isRevealed]);
+  }, [isActive, id, isOffered, isAdded, isHovered, onDragStart, onClickCapture]);
 
   return { targetProps, isActive, isAdded, toggle };
+}
+
+/**
+ * The shimmer's phase offset, and it is load-bearing: it is the whole difference
+ * between a shimmer FIELD and a rainbow barcode. Targets sharing one animation
+ * start on the same frame and drift in lockstep; hashed per id, they drift out
+ * of phase, like light moving on water. Stable across renders, so the shimmer
+ * never restarts mid-cycle.
+ */
+function shimmerStyleFor(id: string): CSSProperties {
+  return {
+    "--langy-target-delay": `-${shimmerPhaseFor(id)}ms`,
+  } as CSSProperties;
 }
 
 /**

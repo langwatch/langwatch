@@ -1,8 +1,8 @@
 import {
   type LangyConversationTurnProjection,
-  LangyProjectionTurnStatus,
   Prisma,
 } from "@prisma/client";
+import { LANGY_CONVERSATION_TURN_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
@@ -40,7 +40,7 @@ function row(overrides: Partial<Row> = {}): Row {
     projectId: "project-1",
     ConversationId: "conversation-1",
     TurnId: "turn-1",
-    Status: LangyProjectionTurnStatus.completed,
+    Status: LANGY_CONVERSATION_TURN_STATUS.COMPLETED,
     QuestionParts: questionParts,
     AnswerParts: answerParts,
     ToolCalls: toolCalls,
