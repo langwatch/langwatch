@@ -165,6 +165,12 @@ func (s Stack) observabilityEnv() []string {
 		"OTEL_METRICS_ENABLED=true",
 		"LOG_OTEL_LEVEL=debug",
 		"OTEL_RESOURCE_ATTRIBUTES=" + ObservabilityWorktreeAttr + "=" + s.Slug,
+		// Browser telemetry (ADR-058). Tied to the collector rather than flagged
+		// separately: the app proxies the browser's OTLP to the same endpoint, so
+		// without a collector the exporter would post to a route with nowhere to
+		// forward to. The frontend half of a trace is exactly what a developer
+		// debugging their own worktree wants, so it is on whenever the stack is.
+		"RUM_ENABLED=true",
 	}
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
 	// Loopback: the link is followed by the developer's own browser on this machine.

@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -115,7 +116,10 @@ import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-tur
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import { PrismaProcessStore } from "../event-sourcing/process-manager";
+import {
+  InMemoryProcessStore,
+  PrismaProcessStore,
+} from "../event-sourcing/process-manager";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
 import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
@@ -178,9 +182,13 @@ import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
+import { ManagerExplorerService } from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import { BlobStoreService } from "./ops/blob-store.service";
+import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
+import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -323,17 +331,17 @@ export function initializeDefaultApp(options?: {
   );
   const spanDedup = createSpanDedupeService(redis);
 
-  // ADR-022: construct blob/IO deps and the shared span-storage repository
-  // before TraceSummaryService and SpanStorageService, so both can resolve
-  // offloaded eventref pointers (the v2 header's full=true read, and the v2
-  // spans read) from the same instances. #4888: the same factory backs the
-  // customer-facing full=true read path; the composition root passes its own
-  // ClickHouse decision/resolver so the eval-path deps stay byte-identical to
-  // the pre-#4888 inline wiring.
+  // ADR-022: construct blob/IO deps before the summary + span services so
+  // both v2 read paths (header full:true, spansFull / spanDetail) can resolve
+  // offloaded eventref pointers.
+  // #4888: the same factory backs the customer-facing full=true read path; the
+  // composition root passes its own ClickHouse decision/resolver so the
+  // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
   const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
     clickhouseEnabled,
     resolveClickHouseClient,
   });
+  // Shared between SpanStorageService and TraceSummaryService's full read.
   const spanStorageRepository = clickhouseEnabled
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
@@ -955,11 +963,14 @@ export function initializeDefaultApp(options?: {
   }
 
   // Langy operational reads come from the Postgres projections; writes remain
-  // commands against the canonical ClickHouse event log.
+  // commands against the canonical ClickHouse event log. The event READER feeds
+  // only the tail read (conversationEventsAfter, ADR-059) — null when event
+  // sourcing is disabled, in which case the tail is honestly empty.
   const langyConversations = LangyConversationService.create(
     commands.langy,
     langyConversationRepository,
     langyMessageRepository,
+    es.getEventStore<LangyConversationProcessingEvent>() ?? null,
   );
   const langyMessages = new LangyMessageService(
     langyMessageRepository,
@@ -1183,7 +1194,13 @@ export function initializeDefaultApp(options?: {
       new PrismaScheduledJobRepository(prisma),
     ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
+    managerExplorer: new ManagerExplorerService(repositories.processStore),
     replay: new ReplayService(replayRepo),
+    blobStore: new BlobStoreService(
+      redis
+        ? new BlobStoreRedisRepository(redis)
+        : new NullBlobStoreRepository(),
+    ),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, queueRepo })
       : null,
@@ -1482,7 +1499,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
+      managerExplorer: new ManagerExplorerService(new InMemoryProcessStore()),
       replay: new ReplayService(new NullReplayRepository()),
+      blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
     },
     commands: {

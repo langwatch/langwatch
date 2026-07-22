@@ -50,7 +50,10 @@ function workInProjectA(): void {
 describe("Langy state across a change of scope", () => {
   beforeEach(() => {
     targets().reset();
-    useLangyStore.setState({ activeConversationScope: null });
+    useLangyStore.setState({
+      activeConversationScope: null,
+      scopeAnnounced: false,
+    });
     devLog().clear();
   });
 
@@ -119,12 +122,26 @@ describe("Langy state across a change of scope", () => {
     });
 
     describe("when a question is handed over from the command bar", () => {
-      it("stops offering what was gathered before it", () => {
+      it("keeps what was just gathered — arm, absorb, ask is one gesture", () => {
+        // The ask starts a fresh conversation, but the context the user JUST
+        // assembled is for that very question. Wiping it here is what made the
+        // whole grabbing flow look dead from the home field: the chip appeared,
+        // the ask opened the panel, and the turn went out knowing nothing.
         workInProjectA();
 
         langy().askLangy("why is this slow?");
 
-        expect(targets().picked).toEqual([]);
+        expect(targets().picked.map((t) => t.id)).toEqual([projectATrace.id]);
+        expect(langy().chosenChipIds.has(projectATrace.id)).toBe(true);
+      });
+
+      it("still consumes the draft — the question travels as the prompt", () => {
+        workInProjectA();
+
+        langy().askLangy("why is this slow?");
+
+        expect(langy().draft).toBe("");
+        expect(langy().pendingPrompt).toBe("why is this slow?");
       });
     });
   });
@@ -147,13 +164,36 @@ describe("Langy state across a change of scope", () => {
   describe("given the scope is announced again without changing", () => {
     it("keeps what the user gathered — the same place is not somewhere else", () => {
       // Two callers announce the scope (the layout, which knows all three ids,
-      // and the panel, which knows the project). The second must not read as a
-      // move.
+      // and the panel, which knows the project) — and the org/project hook
+      // re-fires with the same ids on every refetch, window refocus included.
+      // A re-announcement is a heartbeat, not a move: nothing sweeps.
       workInProjectA();
 
       langy().resetForScope(scopeA);
 
       expect(targets().picked.map((t) => t.id)).toEqual([projectATrace.id]);
+      // The half that was actually broken: `picked` survived (the target store
+      // follows the scope REFERENCE), but the chosen-chip set and the draft
+      // were swept by the re-announcement — so the chips vanished from the
+      // composer mid-conversation, for no visible reason.
+      expect(langy().chosenChipIds.has(projectATrace.id)).toBe(true);
+      expect(langy().draft).toBe("what went wrong with");
+    });
+
+    it("still restores on the FIRST announcement after a reload", () => {
+      // The first same-scope announcement per page load is the refresh-restore:
+      // it must arm the history load for the rehydrated conversation.
+      langy().resetForScope(scopeA);
+      langy().selectConversation("conv-1");
+      langy().consumeHistoryLoad();
+      // Simulate a fresh page load: the persisted pair survives, the
+      // per-session announcement flag does not.
+      useLangyStore.setState({ scopeAnnounced: false });
+
+      langy().resetForScope(scopeA);
+
+      expect(langy().activeConversationId).toBe("conv-1");
+      expect(langy().historyLoadConversationId).toBe("conv-1");
     });
   });
 });
@@ -227,6 +267,10 @@ describe("the scope reset's coverage", () => {
           "historyLoadConversationId",
           "activeConversationScope",
           "conversationEpoch",
+          // The announcement flag is the reset's own bookkeeping: true after
+          // any announcement, so re-announcements of the same scope read as
+          // heartbeats instead of sweeps.
+          "scopeAnnounced",
         ]);
         for (const [key, initialValue] of scoped) {
           if (owned.has(key)) continue;

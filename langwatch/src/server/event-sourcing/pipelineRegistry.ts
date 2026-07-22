@@ -121,9 +121,9 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
-import { type LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
-import type { LangyConversationTurnData } from "./pipelines/langy-conversation-processing/projections/langyConversationTurn.foldProjection";
-import type { LangyMessageProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageOperational.mapProjection";
+import { type LangyConversationStateData } from "@langwatch/langy";
+import type { LangyConversationTurnData } from "@langwatch/langy";
+import type { LangyMessageProjectionRecord } from "@langwatch/langy";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
 import type { LangyWorkerPort } from "../app-layer/langy/langyWorker";
@@ -193,6 +193,8 @@ import { createRateLimitedBootstrap } from "../app-layer/topic-clustering/topicC
 import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
 import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
+import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
+import { BlobSweeper } from "./queues/groupQueue/blobSweeper";
 import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
@@ -432,6 +434,20 @@ export class PipelineRegistry {
         },
       }),
     );
+    // Queue-infrastructure maintenance. Registered unconditionally: the runtime
+    // only arms the schedule where `roleRunsWorkers` holds, so on web this is
+    // inert shape rather than a second fleet sweeping the same keyspace.
+    const blobSweeper = new BlobSweeper({ redis: this.deps.redis });
+    this.deps.eventSourcing.register(
+      createBlobMaintenancePipeline({
+        cleanup: {
+          sweep: () => blobSweeper.sweep(),
+          deleteDispatchedBefore: (params) =>
+            this.deps.repositories.processStore.deleteDispatchedBefore(params),
+        },
+      }),
+    );
+
     const automationCommands = mapCommands(automationPipeline.commands);
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
@@ -1360,6 +1376,14 @@ export interface ReactorMetadata {
   afterProjection: string;
 }
 
+export interface EventSubscriberMetadata {
+  subscriberName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** The event types this subscriber reacts to — its transition triggers. */
+  eventTypes: readonly string[];
+}
+
 export interface DejaViewProjection {
   projectionName: string;
   eventTypes: readonly string[];
@@ -1413,6 +1437,72 @@ export function getReactorMetadata(): ReactorMetadata[] {
         afterProjection: projectionName,
       }),
     );
+  });
+}
+
+/**
+ * Event subscribers registered on each pipeline — live consumers of committed
+ * events that carry no projection state. This is the DejaView-facing view of
+ * the `.withEventSubscriber` / `.withSubscriber({ events })` seam; the
+ * process-manager runtime's generated `pm:<name>` subscribers are internal
+ * plumbing and are not part of the static definition, so they are not listed.
+ */
+export function getEventSubscriberMetadata(): EventSubscriberMetadata[] {
+  return getDefinitions().flatMap((def) => {
+    const { name: pipelineName, aggregateType } = def.metadata;
+    return Array.from(def.eventSubscribers.values()).map((definition) => ({
+      subscriberName: definition.name,
+      pipelineName,
+      aggregateType,
+      eventTypes: definition.eventTypes,
+    }));
+  });
+}
+
+export interface ProcessManagerMetadata {
+  processName: string;
+  pipelineName: string;
+  aggregateType: string;
+  /** Event types that drive the machine's transitions. */
+  eventTypes: readonly string[];
+  /**
+   * Intent types the machine can emit — its cross-aggregate commands, dispatched
+   * through the transactional outbox.
+   */
+  intentTypes: string[];
+  /**
+   * True for a fixed-interval singleton (one instance, project `__global__`);
+   * false for a per-aggregate machine keyed by aggregate id.
+   */
+  scheduled: boolean;
+  /** Fixed wake interval in ms for a scheduled singleton, else null. */
+  everyMs: number | null;
+  /** True when the machine computes its own wake-ups from within `evolve`. */
+  hasWake: boolean;
+}
+
+/**
+ * The process-manager state machines mounted across the pipelines.
+ *
+ * The machine itself is implicit in each manager's `evolve` — there is no
+ * declared state set or transition table — so what is introspectable is the
+ * definition surface: which event types trigger it, which intents it can emit,
+ * and how it wakes. The per-aggregate *position* in the machine lives in the
+ * persisted instance, read separately by ref.
+ */
+export function getProcessManagerMetadata(): ProcessManagerMetadata[] {
+  return getDefinitions().flatMap((def) => {
+    const { name: pipelineName, aggregateType } = def.metadata;
+    return Array.from(def.processManagers.values()).map(({ config }) => ({
+      processName: config.name,
+      pipelineName,
+      aggregateType,
+      eventTypes: config.eventTypes,
+      intentTypes: Object.keys(config.intents ?? {}),
+      scheduled: Boolean(config.schedule),
+      everyMs: config.schedule?.everyMs ?? null,
+      hasWake: Boolean(config.onWake),
+    }));
   });
 }
 

@@ -14,7 +14,7 @@
  * @see specs/langy/langy-conversation-title.feature
  */
 import { generateText } from "ai";
-import { LANGY_TITLE_GENERATION } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import { LANGY_TITLE_GENERATION } from "@langwatch/langy";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { createLogger } from "@langwatch/observability";

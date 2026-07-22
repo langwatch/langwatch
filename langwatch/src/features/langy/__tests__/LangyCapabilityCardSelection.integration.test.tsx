@@ -24,7 +24,7 @@
  * ADR:  dev/docs/adr/059-card-selection-is-deterministic.md
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { toCliToolResult } from "@langwatch/cli-cards";
+import { toCliToolResult } from "@langwatch/langy";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";

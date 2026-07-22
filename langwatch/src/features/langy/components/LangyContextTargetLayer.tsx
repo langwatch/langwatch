@@ -76,13 +76,31 @@ function isReachable(element: HTMLElement): boolean {
 
 export function LangyContextTargetLayer() {
   const isOpen = useLangyStore((state) => state.isOpen);
-  if (!isOpen) return null;
   return (
     <>
+      {/* ALWAYS armable, whether the panel is open, peeking or shut.
+
+          This whole subtree used to sit behind `isOpen`, which meant the
+          arming listener itself was never attached unless Langy was already
+          open — so holding Shift anywhere else did nothing at all, silently.
+          That was always wrong (you reach for something on the page BEFORE
+          you go and talk about it) and the peek made it wrong most of the
+          time, since a minimised panel reads as closed.
+
+          Nothing expensive rides on this: `ArmableLayer` is one keydown
+          listener until the user actually arms, and the pointer tracking and
+          measurement stay behind that gate. */}
       <ArmableLayer />
-      {/* Outside the armed gate on purpose: pointing at a chip in the panel is
-          not the picking MODE, it is reading the list you already have. */}
-      <SpotlightLayer />
+      {/* Panel → page, so this one genuinely does need the panel: it lights
+          the card for whichever chip in the open list is under the pointer.
+          Outside the ARMED gate on purpose, though — reading the list you
+          already have is not the picking mode. */}
+      {isOpen ? <SpotlightLayer /> : null}
+      {/* Outside the armed gate: the flourish plays for the absorb that just
+          happened, and disarming is frequently the very next thing that
+          happens (a click can end the mode). Gating it on ARMED would cut the
+          confirmation off mid-play, which is precisely when it is wanted. */}
+      {isOpen ? <AbsorbFlashLayer /> : null}
     </>
   );
 }
@@ -102,6 +120,84 @@ function SpotlightLayer() {
   const spotlightId = useLangyContextTargetStore((s) => s.spotlightId);
   if (!spotlightId) return null;
   return <TargetSpotlight targetId={spotlightId} />;
+}
+
+/**
+ * The absorb flourish: purple wells up through the thing you just handed over
+ * and is gone in half a second.
+ *
+ * Drawn as an overlay rather than by the target, for the same reason the
+ * spotlight is: a `<tbody>` cannot carry a pseudo-element without generating an
+ * anonymous table box and wrecking the row's geometry, and half the things
+ * worth absorbing are table rows. An overlay works on every element there is,
+ * costs nothing when idle, and takes no clicks.
+ */
+function AbsorbFlashLayer() {
+  const absorbFlash = useLangyContextTargetStore((s) => s.absorbFlash);
+  if (!absorbFlash) return null;
+  return (
+    <AbsorbOoze
+      key={absorbFlash.nonce}
+      targetId={absorbFlash.id}
+      nonce={absorbFlash.nonce}
+    />
+  );
+}
+
+/** How long the ooze plays. Mirrors the CSS animation — keep the two equal. */
+const ABSORB_OOZE_MS = 500;
+
+function AbsorbOoze({
+  targetId,
+  nonce,
+}: {
+  targetId: string;
+  nonce: number;
+}) {
+  const clearAbsorbFlash = useLangyContextTargetStore(
+    (s) => s.clearAbsorbFlash,
+  );
+  const [box, setBox] = useState<{ rect: DOMRect; radius: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const element = document.querySelector<HTMLElement>(
+      `[data-langy-target="${CSS.escape(targetId)}"]`,
+    );
+    if (element) {
+      setBox({
+        rect: element.getBoundingClientRect(),
+        // Its own corners, read rather than guessed — a squared-off wash over a
+        // rounded card reads as something spilled on the page, not absorbed
+        // into it.
+        radius: getComputedStyle(element).borderRadius || "0px",
+      });
+    }
+    // Self-clearing: the store holds the flash only for as long as it plays, so
+    // nothing has to remember to put it away.
+    const done = window.setTimeout(() => clearAbsorbFlash(nonce), ABSORB_OOZE_MS);
+    return () => window.clearTimeout(done);
+  }, [targetId, nonce, clearAbsorbFlash]);
+
+  if (!box || typeof document === "undefined") return null;
+
+  return createPortal(
+    <chakra.div
+      className="langy-absorb-ooze"
+      data-testid="langy-absorb-ooze"
+      aria-hidden
+      position="fixed"
+      top={`${box.rect.top}px`}
+      left={`${box.rect.left}px`}
+      width={`${box.rect.width}px`}
+      height={`${box.rect.height}px`}
+      borderRadius={box.radius}
+      pointerEvents="none"
+      zIndex={1249}
+    />,
+    document.body,
+  );
 }
 
 /** Follows the element: its box, and its own corners. */
@@ -178,6 +274,56 @@ function ArmableLayer() {
   );
 }
 
+/** The hint's resting distance from the bottom edge. */
+const HINT_BOTTOM_PX = 20;
+/** Breathing room between the hint and a bar it has to sit above. */
+const HINT_BAR_GAP_PX = 8;
+
+/**
+ * How far up the hint must move to clear whatever else floats at the
+ * bottom-center — the selection action bars (`data-bottom-floating-bar`, see
+ * `SelectionActionBar`). The collision is not hypothetical: Shift is BOTH the
+ * range-select modifier and the arm gesture, so the armed hint and the "N
+ * selected" bar routinely exist at the same moment, in the same spot, and the
+ * hint used to land straight on top of the bar's buttons.
+ *
+ * Measured, not guessed: the bars differ in height and offset, so the hint
+ * clears the tallest one actually mounted. Watches the DOM while the hint is
+ * up (bars mount as selections are made mid-arm) — cheap, because the hint
+ * only exists inside the brief armed/revealed mode.
+ */
+function useBottomBarLift(): number {
+  const [lift, setLift] = useState(0);
+
+  useEffect(() => {
+    const measure = () => {
+      let needed = 0;
+      const bars = document.querySelectorAll<HTMLElement>(
+        "[data-bottom-floating-bar]",
+      );
+      for (const bar of bars) {
+        const rect = bar.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) continue;
+        const clearance =
+          window.innerHeight - rect.top + HINT_BAR_GAP_PX - HINT_BOTTOM_PX;
+        needed = Math.max(needed, clearance);
+      }
+      setLift((previous) => (previous === needed ? previous : needed));
+    };
+    measure();
+
+    const observer = new MutationObserver(measure);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", measure, { passive: true });
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  return lift;
+}
+
 /**
  * The mode indicator. A mode you cannot see is a trap — the page suddenly
  * intercepting clicks with no explanation is exactly how a feature earns a bug
@@ -187,13 +333,14 @@ function ArmableLayer() {
  */
 function OfferHint() {
   const source = useLangyContextTargetStore((s) => s.armSource);
+  const lift = useBottomBarLift();
   if (typeof document === "undefined") return null;
   return createPortal(
     <chakra.div
       className="langy-armed-hint"
       data-testid="langy-armed-hint"
       position="fixed"
-      bottom="20px"
+      bottom={`${HINT_BOTTOM_PX + lift}px`}
       left="50%"
       transform="translateX(-50%)"
       zIndex={1250}
@@ -433,6 +580,15 @@ function TargetAffordance({ targetId }: { targetId: string }) {
       type="button"
       className={`langy-target-affordance langy-target-affordance--${placement}`}
       data-testid="langy-absorb-context"
+      // THE ATTRIBUTE THE HIT TEST LOOKS FOR. Without it the pointer landing
+      // on this button read as "the pointer left the target": elementFromPoint
+      // returns the button, `closest("[data-langy-target]")` finds nothing
+      // (this is portaled to document.body, so it is not a DESCENDANT of the
+      // row it floats over), the hovered target clears, and the button
+      // unmounts from under the cursor reaching for it. The constant existed
+      // for exactly this and was never actually applied, so clicking to absorb
+      // was impossible on every surface in the app.
+      {...{ [OVERLAY_ATTR]: "" }}
       onClick={onClick}
       // "Absorb" is the verb for taking a thing on the page into Langy's
       // context. "Context" is already this composer's established vocabulary
@@ -450,8 +606,12 @@ function TargetAffordance({ targetId }: { targetId: string }) {
           ? `${box.left + AFFORDANCE_INSET_PX}px`
           : `${box.right - AFFORDANCE_INSET_PX}px`
       }
-      // Keep dialogs and drawers above the persistent context affordance.
-      zIndex={1250}
+      // Above drawers and dialogs (1300), not below them. Targets sitting
+      // BEHIND a drawer are already disqualified by the occlusion rule, so the
+      // only targets that can be hovered while one is open are the ones INSIDE
+      // it — like the trace drawer's own header, whose button was drawn
+      // underneath the very surface it belonged to and could never be seen.
+      zIndex={1350}
       display="inline-flex"
       alignItems="center"
       gap={1}

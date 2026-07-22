@@ -1,0 +1,43 @@
+{
+	"name": "@langwatch/react-rum",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Real user monitoring for React apps: browser tracing that joins to backend traces, plus session identity",
+	"type": "module",
+	"packageManager": "pnpm@10.24.0",
+	"main": "src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"test": "vitest",
+		"test:unit": "vitest run"
+	},
+	"keywords": [
+		"langwatch",
+		"rum",
+		"opentelemetry",
+		"tracing",
+		"react"
+	],
+	"license": "MIT",
+	"peerDependencies": {
+		"@opentelemetry/api": "^1.9.0",
+		"@opentelemetry/core": "^2.0.0",
+		"@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+		"@opentelemetry/instrumentation": "^0.219.0",
+		"@opentelemetry/instrumentation-document-load": "*",
+		"@opentelemetry/instrumentation-fetch": "^0.219.0",
+		"@opentelemetry/resources": "^2.0.0",
+		"@opentelemetry/sdk-trace-base": "^2.0.0",
+		"@opentelemetry/sdk-trace-web": "^2.0.0",
+		"@opentelemetry/semantic-conventions": "^1.36.0"
+	},
+	"devDependencies": {
+		"@types/node": "^26.0.1",
+		"jsdom": "^29.1.1",
+		"typescript": "^6.0.3",
+		"vitest": "^4.1.9"
+	}
+}

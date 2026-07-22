@@ -92,6 +92,26 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   ): Promise<readonly EventType[]>;
 
   /**
+   * Retrieves events with an EXPLICIT occurred-at lower bound (ms), applied
+   * verbatim for ANY aggregate type — unlike `getEvents`, whose anchor is
+   * gated to time-local aggregate types.
+   *
+   * For reads that hold a provable bound of their own, e.g. a cursor tail
+   * catch-up that only wants events accepted after its cursor. The caller
+   * owns the safety margin: the bound MUST sit far enough below the wanted
+   * range that no delayed or replayed event's occurred-at can fall under it.
+   *
+   * **Security:** Implementations MUST validate tenantId exactly as for
+   * `getEvents`.
+   */
+  getEventsOccurredSince(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    occurredAtFromMs: number,
+  ): Promise<readonly EventType[]>;
+
+  /**
    * Retrieves events for a given aggregate up to and including a specific event.
    * Returns all events that come before or equal to the specified event in chronological order.
    *

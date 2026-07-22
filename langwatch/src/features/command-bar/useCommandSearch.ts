@@ -193,7 +193,7 @@ export function useCommandSearch(query: string, isOpen: boolean) {
           label: e.name,
           description: "Evaluator",
           icon: Percent,
-          path: `/${projectSlug}/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=${e.id}`,
+          path: `/${projectSlug}/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${e.id}`,
           type: "evaluator",
         });
       });

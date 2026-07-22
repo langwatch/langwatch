@@ -24,6 +24,11 @@ type configWire struct {
 	PolicyRules          policyRulesWire           `json:"policy_rules"`
 	Budgets              []budgetWire              `json:"budgets"`
 	CacheRules           []cacheRuleWire           `json:"cache_rules"`
+	// LangyMirrorTier is the ADR-061 mirror fidelity the control-plane
+	// materialiser resolved for this VK's organization ("content" | "structural"
+	// | "skip"). Present and non-skip only for Langy virtual keys, so ordinary
+	// customer traffic is never mirrored. Empty/absent ⇒ no mirror.
+	LangyMirrorTier string `json:"langy_mirror_tier"`
 }
 
 type providerSlotWire struct {
@@ -133,6 +138,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 		Credentials:      creds,
 		TraceProjectID:   w.ProjectID,
 		ProjectOTLPToken: w.ProjectOTLPToken,
+		MirrorTier:       w.LangyMirrorTier,
 		VKDisplayPrefix:  w.DisplayPrefix,
 		AllowedModels:    w.ModelsAllowed,
 		Fallback: domain.FallbackConfig{

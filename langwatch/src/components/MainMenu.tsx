@@ -4,6 +4,7 @@ import {
   Activity,
   Anvil,
   CalendarClock,
+  Database,
   Film,
   Flag,
   History,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -312,7 +314,14 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   const router = useRouter();
   const { hasAccess } = useOpsPermission();
   const publicEnv = usePublicEnv();
-  const alwaysShow = publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
+  // Fleet-wide allowlist (env) OR a per-browser pin from the hidden Feature
+  // Flags drawer. The pin is only queried for users who already have ops
+  // access — it is a visibility convenience, never a way to widen access.
+  const envAlwaysShow = publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
+  const { enabled: opsMenuPinned } = useFeatureFlag("ops_ui_ops_menu_pinned", {
+    enabled: hasAccess,
+  });
+  const alwaysShow = envAlwaysShow || opsMenuPinned;
   const isOnOpsRoute = router.pathname.startsWith("/ops");
   const shouldShow = hasAccess && (alwaysShow || isOnOpsRoute);
 
@@ -396,6 +405,13 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         label="Scheduler"
         href="/ops/scheduler"
         isActive={router.pathname.startsWith("/ops/scheduler")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Database}
+        label="Payload store"
+        href="/ops/blobs"
+        isActive={router.pathname.startsWith("/ops/blobs")}
         showLabel={showExpanded}
       />
       <SideMenuLink

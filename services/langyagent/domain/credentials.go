@@ -57,6 +57,49 @@ type Credentials struct {
 	// outbound to floor ∪ this list. Bound at worker spawn — a change recycles
 	// the worker (see SignatureOf) so a live worker never runs a stale policy.
 	EgressAllowlist []string `json:"egressAllowlist,omitempty"`
+	// OrganizationID is the organization the project belongs to. Carried purely
+	// so the mirror lane (ADR-061) can stamp the SOURCE tenant on its copy for
+	// per-customer attribution; NOT a credential and NOT folded into the worker
+	// signature (it never changes for a project). Absent on the customer path.
+	OrganizationID string `json:"organizationId,omitempty"`
+	// MirrorTier is the ADR-061 mirror fidelity the control plane resolved for
+	// this turn's organization ("content" | "structural" | "skip"). It rides the
+	// envelope exactly like EgressAllowlist and is folded into the worker
+	// signature (see SignatureOf), so a policy change recycles the worker and the
+	// relay re-registers with the new tier rather than mirroring a live worker's
+	// turns under a stale one. Empty ⇒ skip (fail-safe: an unset policy mirrors
+	// nothing).
+	MirrorTier string `json:"mirrorTier,omitempty"`
+}
+
+// MirrorTier is the fidelity of the ADR-061 mirror copy, resolved per
+// organization by the control plane and threaded through the credentials
+// envelope. A closed vocabulary; anything unrecognised normalises to skip.
+type MirrorTier string
+
+const (
+	// MirrorTierContent carries the full turn INCLUDING content (prompts,
+	// completions, tool payloads). The v1 default.
+	MirrorTierContent MirrorTier = "content"
+	// MirrorTierStructural carries the full operational shape but no content.
+	MirrorTierStructural MirrorTier = "structural"
+	// MirrorTierSkip mirrors nothing.
+	MirrorTierSkip MirrorTier = "skip"
+)
+
+// NormalizeMirrorTier maps an envelope value to a known tier. An empty or
+// unrecognised value normalises to skip — fail-safe: a version skew (a manager
+// with a mirror configured but a control plane not yet sending the tier) never
+// leaks a turn LangWatch was not told it could see.
+func NormalizeMirrorTier(v string) MirrorTier {
+	switch MirrorTier(v) {
+	case MirrorTierContent:
+		return MirrorTierContent
+	case MirrorTierStructural:
+		return MirrorTierStructural
+	default:
+		return MirrorTierSkip
+	}
 }
 
 // Spawnable reports whether these credentials can boot a NEW worker — i.e. a
@@ -102,6 +145,12 @@ type CredentialSignature struct {
 	// never left running under the old policy. A string (not the []string
 	// itself) keeps CredentialSignature comparable with ==.
 	EgressAllowlist string
+	// MirrorTier is the resolved ADR-061 mirror fidelity ("content" |
+	// "structural" | "skip"). Folded in for the same reason as EgressAllowlist:
+	// a tier change (the control plane restricts an organization) recycles the
+	// worker so the relay re-registers with the new tier, rather than mirroring
+	// a live worker's remaining turns under the policy it booted with.
+	MirrorTier string
 }
 
 // SignatureOf derives the comparable signature from the parts that must match for
@@ -111,13 +160,17 @@ type CredentialSignature struct {
 // canonicalisation lives in ONE place and the two can never compute subtly
 // different signatures. capabilityKeys carries only capability PRESENCE, never a
 // secret, which is why the probe can supply it from a boolean.
-func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys []string) CredentialSignature {
+func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys []string, mirrorTier string) CredentialSignature {
 	return CredentialSignature{
 		ProjectID:       projectID,
 		ActorUserID:     actorUserID,
 		Model:           model,
 		Capabilities:    canonicalStrings(capabilityKeys),
 		EgressAllowlist: canonicalEgressAllowlist(egressAllowlist),
+		// Canonicalised through NormalizeMirrorTier so an empty envelope and an
+		// explicit "skip" produce the SAME signature — they mean the same thing
+		// (no mirror), and must not spuriously recycle a worker between them.
+		MirrorTier: string(NormalizeMirrorTier(mirrorTier)),
 	}
 }
 

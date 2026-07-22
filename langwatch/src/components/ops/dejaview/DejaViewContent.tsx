@@ -19,6 +19,7 @@ import { EventTimeline } from "./EventTimeline";
 import { buildFragment, parseFragment } from "./fragment";
 import { KeyboardHints } from "./KeyboardHints";
 import { LeftPanel } from "./LeftPanel";
+import { ManagerPanel } from "./ManagerPanel";
 import { ReplayHeader } from "./ReplayHeader";
 import { RightPanel } from "./RightPanel";
 import { SearchHeader } from "./SearchHeader";
@@ -150,10 +151,10 @@ export function DejaViewContent() {
     );
   }, [projectionsQuery.data, currentAggregateType]);
 
-  const matchingReactors = useMemo(() => {
+  const matchingEventSubscribers = useMemo(() => {
     if (!projectionsQuery.data || !currentAggregateType) return [];
-    return projectionsQuery.data.reactors.filter(
-      (r) => r.aggregateType === currentAggregateType,
+    return projectionsQuery.data.eventSubscribers.filter(
+      (s) => s.aggregateType === currentAggregateType,
     );
   }, [projectionsQuery.data, currentAggregateType]);
 
@@ -368,7 +369,7 @@ export function DejaViewContent() {
             <Box display="flex" flex={1} overflow="hidden" minH={0} w="full">
               <LeftPanel
                 projections={matchingProjections}
-                reactors={matchingReactors}
+                eventSubscribers={matchingEventSubscribers}
                 selectedProjection={selectedProjection}
                 onSelectProjection={setSelectedProjection}
                 currentEventType={currentEvent?.eventType ?? null}
@@ -388,6 +389,12 @@ export function DejaViewContent() {
               {selectedProjection && showEventDetail && currentEvent && (
                 <RightPanel event={currentEvent} />
               )}
+
+              <ManagerPanel
+                aggregateType={currentAggregateType ?? ""}
+                tenantId={selectedAggregate?.tenantId ?? ""}
+                aggregateId={selectedAggregate?.aggregateId ?? ""}
+              />
             </Box>
 
             <EventTimeline

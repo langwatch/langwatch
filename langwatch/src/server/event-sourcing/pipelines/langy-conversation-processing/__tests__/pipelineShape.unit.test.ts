@@ -19,7 +19,7 @@ import type { LangyAnalyticsEventProjectionRecord } from "../projections/langyAn
 import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-} from "../schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "../schemas/events";
 
 /**

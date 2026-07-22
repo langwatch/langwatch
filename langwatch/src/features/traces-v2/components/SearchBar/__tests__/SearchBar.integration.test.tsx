@@ -16,9 +16,40 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+
+// The ask affordance belongs to Langy when Langy is available (spec:
+// specs/traces-v2/search.feature). The gate hooks carry session/tRPC wiring
+// these smoke tests don't mount, so both read one fixture flag; the store is
+// a selector fixture so the handoff's calls can be asserted directly.
+const langyMock = {
+  enabled: false,
+  panelOpen: false,
+  ask: vi.fn(),
+  open: vi.fn(),
+  attach: vi.fn(),
+};
+vi.mock("~/features/langy/hooks/useShowLangy", () => ({
+  useShowLangy: () => langyMock.enabled,
+}));
+vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
+  useCanAskLangy: () => langyMock.enabled,
+}));
+vi.mock("~/features/langy/stores/langyStore", () => {
+  const state = () => ({
+    isOpen: langyMock.panelOpen,
+    askLangy: langyMock.ask,
+    openPanel: langyMock.open,
+    attachContext: langyMock.attach,
+  });
+  const useLangyStore = (
+    selector: (s: ReturnType<typeof state>) => unknown,
+  ) => selector(state());
+  useLangyStore.getState = state;
+  return { useLangyStore };
+});
 
 // SearchBar pulls in tRPC via useOrganizationTeamProject + useModelProvidersSettings
 // (used by the global AI shortcut). These tests don't wrap with withTRPC, so
@@ -69,6 +100,11 @@ afterEach(() => {
 
 beforeEach(() => {
   useFilterStore.getState().clearAll();
+  langyMock.enabled = false;
+  langyMock.panelOpen = false;
+  langyMock.ask.mockClear();
+  langyMock.open.mockClear();
+  langyMock.attach.mockClear();
 });
 
 function renderSearchBar() {
@@ -131,6 +167,133 @@ describe("<SearchBar /> wiring smoke", () => {
       renderSearchBar();
 
       expect(useFilterStore.getState().parseError).not.toBeNull();
+    });
+  });
+});
+
+describe("<SearchBar /> ask affordance", () => {
+  describe("given Langy is not available", () => {
+    it("keeps the inline Ask AI affordance", () => {
+      renderSearchBar();
+
+      expect(screen.getByText("Ask AI")).toBeInTheDocument();
+      expect(screen.queryByText("Ask Langy")).not.toBeInTheDocument();
+    });
+
+    it("keeps the Ask AI placeholder wording", () => {
+      renderSearchBar();
+
+      const placeholder = document.querySelector(
+        "[data-placeholder]",
+      ) as HTMLElement;
+      expect(placeholder.dataset.placeholder).toContain("Ask AI");
+    });
+  });
+
+  describe("given Langy is available", () => {
+    beforeEach(() => {
+      langyMock.enabled = true;
+    });
+
+    it("labels the affordance Ask Langy", () => {
+      renderSearchBar();
+
+      expect(screen.getByText("Ask Langy")).toBeInTheDocument();
+      expect(screen.queryByText("Ask AI")).not.toBeInTheDocument();
+    });
+
+    it("swaps the placeholder wording to Ask Langy", () => {
+      renderSearchBar();
+
+      const placeholder = document.querySelector(
+        "[data-placeholder]",
+      ) as HTMLElement;
+      expect(placeholder.dataset.placeholder).toContain("Ask Langy");
+    });
+
+    describe("when Ask Langy is clicked with the panel closed", () => {
+      it("floats the Langy ask bar over the search bar instead of opening the panel", () => {
+        renderSearchBar();
+
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        // The floating bar's input takes over; the structured bar steps back.
+        expect(screen.getByRole("textbox")).toBeInTheDocument();
+        expect(
+          document.querySelector("[data-placeholder]"),
+        ).not.toBeInTheDocument();
+        expect(langyMock.open).not.toHaveBeenCalled();
+        expect(langyMock.ask).not.toHaveBeenCalled();
+      });
+
+      it("shows that the applied search will go with the question", () => {
+        useFilterStore.getState().applyQueryText("@status:error");
+        renderSearchBar();
+
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        expect(
+          screen.getByText(/Goes with your question/),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when a question is typed into the floating bar and sent", () => {
+      it("asks Langy the question with the applied search attached, and the bar dissolves", () => {
+        useFilterStore.getState().applyQueryText("@status:error");
+        const applied = useFilterStore.getState().queryText;
+        renderSearchBar();
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        const input = screen.getByRole("textbox");
+        fireEvent.change(input, {
+          target: { value: "why are these failing?" },
+        });
+        fireEvent.keyDown(input, { key: "Enter" });
+
+        expect(langyMock.ask).toHaveBeenCalledWith("why are these failing?");
+        expect(langyMock.attach).toHaveBeenCalledWith({
+          type: "filter",
+          id: applied,
+          label: `filtered: ${applied}`,
+        });
+      });
+
+      it("sends nothing when the bar is dismissed with Escape", () => {
+        renderSearchBar();
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
+
+        expect(langyMock.ask).not.toHaveBeenCalled();
+        expect(langyMock.open).not.toHaveBeenCalled();
+        expect(langyMock.attach).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when Ask Langy is clicked with the panel already open", () => {
+      beforeEach(() => {
+        langyMock.panelOpen = true;
+      });
+
+      it("uses the open panel — the search attaches, no second composer floats", () => {
+        useFilterStore.getState().applyQueryText("@status:error");
+        const applied = useFilterStore.getState().queryText;
+        renderSearchBar();
+
+        fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
+
+        expect(langyMock.open).toHaveBeenCalled();
+        expect(langyMock.attach).toHaveBeenCalledWith({
+          type: "filter",
+          id: applied,
+          label: `filtered: ${applied}`,
+        });
+        // The structured search bar stays put — no floating composer.
+        expect(
+          document.querySelector("[data-placeholder]"),
+        ).toBeInTheDocument();
+      });
     });
   });
 });

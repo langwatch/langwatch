@@ -1,7 +1,13 @@
+import {
+  compareLangyEventCursors,
+  isLangyTurnProjectionTerminal,
+} from "@langwatch/langy";
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { LangyConversationUpdateSignal } from "../data/langy.dtos";
+import { useLangyDevLog } from "../stores/langyDevLog";
+import { useLangyStore } from "../stores/langyStore";
 import { useLangyConversationUpdateListener } from "./useLangyConversationUpdateListener";
 
 /**
@@ -32,16 +38,87 @@ export function useLangyFreshness(activeConversationId: string | null): void {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
 
+  /**
+   * The OPEN conversation's live path (ADR-059): the signal carries the
+   * projection's CURSOR; compare it with the local fold's and, when behind,
+   * fetch the durable event tail and fold it in place — turn state lands
+   * event-by-event without re-downloading the projection. Message CONTENT
+   * still lives in the messages query, which is refetched only at a folded
+   * TERMINAL (that is when the answer reaches the message projection) or when
+   * the signal predates cursors.
+   */
+  const catchUpOpenConversation = useCallback(
+    async (
+      projectId: string,
+      conversationId: string,
+      signalCursor: LangyConversationUpdateSignal["cursor"],
+    ) => {
+      const store = useLangyStore.getState();
+      // A signal naming the conversation is durable proof it exists — the
+      // projection updated. Confirms a freshly-minted conversation so the
+      // history read's not-found stops presenting as pending (see
+      // `unconfirmedConversations`).
+      store.confirmConversation(conversationId);
+      const local = store.turnProjection.cursor;
+      if (!signalCursor || !local) {
+        // Pre-cursor server build, or the snapshot has not seeded the local
+        // fold yet — the old signal-then-refetch path is the honest fallback.
+        void trpcUtils.langy.messages.invalidate({ projectId, conversationId });
+        return;
+      }
+      if (compareLangyEventCursors(signalCursor, local) <= 0) return;
+
+      // Bounded catch-up: each page advances the cursor; three pages is far
+      // beyond any real burst (the ceiling is a defensive log, not a path).
+      let after = local;
+      for (let page = 0; page < 3; page++) {
+        const tail = await trpcUtils.langy.conversationEventsAfter.fetch({
+          projectId,
+          conversationId,
+          after,
+        });
+        // The inspector's durable lane: the EVENT LOG as this client received
+        // it, recorded before the fold so the tape shows what arrived even if
+        // applying it turns out to be the bug.
+        for (const event of tail.events) {
+          useLangyDevLog.getState().recordDurableEvent(event);
+        }
+        useLangyStore.getState().applyTurnEvents(tail.events);
+        after = tail.cursor;
+        if (!tail.truncated) break;
+      }
+
+      if (
+        isLangyTurnProjectionTerminal(useLangyStore.getState().turnProjection)
+      ) {
+        void trpcUtils.langy.messages.invalidate({ projectId, conversationId });
+      }
+    },
+    [trpcUtils],
+  );
+
   const onConversationUpdated = useCallback(
     (signals: LangyConversationUpdateSignal[]) => {
       const projectId = project?.id;
       if (!projectId) return;
 
       for (const signal of signals) {
+        useLangyDevLog.getState().recordSignal({
+          conversationId: signal.conversationId,
+          cursor: signal.cursor ?? null,
+        });
         if (signal.conversationId === activeConversationId) {
-          void trpcUtils.langy.messages.invalidate({
+          catchUpOpenConversation(
             projectId,
-            conversationId: signal.conversationId,
+            signal.conversationId,
+            signal.cursor,
+          ).catch(() => {
+            // A failed catch-up must not strand the open thread — fall back to
+            // the plain refetch the signal used to mean.
+            void trpcUtils.langy.messages.invalidate({
+              projectId,
+              conversationId: signal.conversationId,
+            });
           });
         }
       }
@@ -51,7 +128,7 @@ export function useLangyFreshness(activeConversationId: string | null): void {
       void trpcUtils.langy.list.cancel();
       void trpcUtils.langy.list.invalidate();
     },
-    [trpcUtils, project?.id, activeConversationId],
+    [trpcUtils, project?.id, activeConversationId, catchUpOpenConversation],
   );
 
   useLangyConversationUpdateListener({
