@@ -105,9 +105,23 @@ TS7056 sites, and four of them inherit from the first.
 | `src/components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults.tsx:26` | a hook inferring off `api.*` |
 
 Plus five TS2883 "cannot be named without a reference to…" sites, which need an
-explicit annotation rather than any restructuring:
-`spanTreePagedQuery.ts:41`, `modelProviders/utils.ts:29`,
-`scenarios/execution/model.factory.ts:18`, and two overlapping the table above.
+explicit annotation rather than any restructuring. **Two are fixed** —
+`modelProviders/utils.ts:29` and `scenarios/execution/model.factory.ts:18`,
+both of which failed on `LanguageModelV3` from the transitively-installed
+`@ai-sdk/provider`. Adding it as a direct dependency and annotating with the
+provider *interface* clears them (probe: TS2883 5 → 3).
+
+That annotation has a trap worth naming, because #6018 hit it and reverted
+(`c626e8cd0`): the obvious type to reach for is `LanguageModel` from `ai`, but
+that is `GlobalProviderModelId | LanguageModelV3 | LanguageModelV2` — a union
+whose string branch has no `.modelId`, so every caller reading one breaks.
+`LanguageModelV3` carries `modelId` and is transparent to callers. Only a
+whole-program typecheck catches the difference; per-file checks do not.
+
+The three remaining TS2883 (`BatchEvaluationV2EvaluationResults.tsx:26`,
+`spanTreePagedQuery.ts:41`, `utils/api.tsx:329`) are all in the router/client
+cluster and two of them also carry TS7056, so they are expected to move with
+the `appRouter` work rather than before it.
 
 So Phase 1 is not "annotate 469 procedures". It is: shrink `appRouter` enough to
 serialize, then re-measure — the other four TS7056 sites are expected to fall

@@ -1,4 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { env } from "../../env.mjs";
 import {
   getProjectModelProviders,
@@ -26,6 +27,8 @@ import {
  * `ModelNotConfiguredError` and the surrounding tRPC interceptor maps
  * it to a sticky toast prompting the user to configure a default.
  */
+// See the note on `createModelFromParams`: this is the provider INTERFACE, not
+// the `LanguageModel` union — the union's string branch has no `.modelId`.
 export const getVercelAIModel = async ({
   projectId,
   model,
@@ -34,7 +37,7 @@ export const getVercelAIModel = async ({
   projectId: string;
   model?: string;
   featureKey?: string;
-}) => {
+}): Promise<LanguageModelV3> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });

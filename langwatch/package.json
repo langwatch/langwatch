@@ -70,6 +70,7 @@
     "@ag-ui/core": "~0.0.57",
     "@ai-sdk/openai": "^3.0.79",
     "@ai-sdk/openai-compatible": "^2.0.55",
+    "@ai-sdk/provider": "^3.0.13",
     "@ai-sdk/react": "^3.0.219",
     "@aws-sdk/client-cloudwatch-logs": "^3.1080.0",
     "@aws-sdk/client-lambda": "^3.1080.0",
