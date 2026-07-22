@@ -2,7 +2,11 @@ import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
 interface CleanupVariables {
-  dryRun: boolean;
+  // Optional to match the tRPC input, where `dryRun` carries a Zod default and
+  // so is not required at the call site. At runtime both mutate() calls pass it
+  // explicitly; `!dryRun` treats the absent case as the destructive run, which
+  // is the safe reading for closing the confirm prompt.
+  dryRun?: boolean;
 }
 
 interface DeleteVariables {
