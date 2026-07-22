@@ -1,6 +1,6 @@
 import { AlertType } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import type { Trace } from "~/server/tracer/types";
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }));

@@ -1,4 +1,4 @@
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { createLogger } from "@langwatch/observability";
 import { sendHttpDestination } from "./httpDestination";

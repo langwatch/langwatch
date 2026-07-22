@@ -31,6 +31,7 @@
 	"dependencies": {
 		"@langwatch/api": "workspace:*",
 		"@langwatch/automations": "workspace:*",
+		"@langwatch/dispatch-error": "workspace:*",
 		"@langwatch/handled-error": "workspace:*",
 		"@langwatch/observability": "workspace:*",
 		"@langwatch/ssrf": "workspace:*"

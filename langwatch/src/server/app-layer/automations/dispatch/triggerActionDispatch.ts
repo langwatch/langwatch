@@ -10,7 +10,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "@langwatch/automations/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   mapTraceToDatasetEntry,

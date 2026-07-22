@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { sendHttpDestination } from "../httpDestination";
 

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
-import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { isDispatchError } from "@langwatch/dispatch-error";
 import type {
   WebhookDeliveryInput,
   WebhookFailureResponse,

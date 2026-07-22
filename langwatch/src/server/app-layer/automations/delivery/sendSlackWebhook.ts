@@ -3,7 +3,7 @@ import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
-import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { toDispatchError } from "@langwatch/dispatch-error";
 import type { Trace } from "~/server/tracer/types";
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { env } from "~/env.mjs";

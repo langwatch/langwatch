@@ -25,7 +25,7 @@ import {
   NotificationDeliveryError,
   ProjectNotFoundError,
 } from "@langwatch/automations-server/errors";
-import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { isDispatchError } from "@langwatch/dispatch-error";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import { type SlackActionParams } from "@langwatch/automations/providers/slack";
 import {

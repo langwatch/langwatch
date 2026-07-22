@@ -25,7 +25,7 @@ import {
 import {
   DispatchError,
   isDispatchError,
-} from "~/server/event-sourcing/queues/dispatchError";
+} from "@langwatch/dispatch-error";
 import {
   sendRenderedSlackMessage,
   sendSlackWebhook,

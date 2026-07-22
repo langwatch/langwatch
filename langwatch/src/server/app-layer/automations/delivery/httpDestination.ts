@@ -1,7 +1,7 @@
 import {
   DispatchError,
   parseRetryAfterMs,
-} from "~/server/event-sourcing/queues/dispatchError";
+} from "@langwatch/dispatch-error";
 import {
   fetchWithResolvedIp,
   ssrfSafeFetch,

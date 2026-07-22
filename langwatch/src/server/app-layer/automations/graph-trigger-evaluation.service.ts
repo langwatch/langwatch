@@ -41,7 +41,7 @@ import type {
   TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import {
   graphAlertFireDigest,
   type GraphAlertDispatchInput,

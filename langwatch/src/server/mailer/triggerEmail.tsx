@@ -5,7 +5,7 @@ import { render } from "@react-email/render";
 import { createHash } from "crypto";
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
-import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { toDispatchError } from "@langwatch/dispatch-error";
 import { env } from "../../env.mjs";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import type { WebhookDeliveryInput } from "@langwatch/automations/repositories/webhook-delivery.repository";
 import { deliverWebhook } from "../deliverWebhook";
 import type { sendWebhook, WebhookSendResult } from "../sendWebhook";

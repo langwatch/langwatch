@@ -6,7 +6,7 @@ import {
   isRetryableHttpStatus,
   parseRetryAfterMs,
   toDispatchError,
-} from "../dispatchError";
+} from "../index";
 
 describe("DispatchError", () => {
   describe("when constructed", () => {

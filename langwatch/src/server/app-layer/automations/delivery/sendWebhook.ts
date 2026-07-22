@@ -6,7 +6,7 @@ import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "@langwatch/automations/providers/webhook";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import { rateLimit } from "~/server/rateLimit";
 import {
   createSSRFValidator,

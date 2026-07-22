@@ -9,7 +9,7 @@ import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/dispatch-error";
 import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import {
