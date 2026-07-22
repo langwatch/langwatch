@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { PullResult, PullRunOptions } from "./pullerAdapter";
 /**
  * OpenAI Enterprise Compliance reference puller — built on top of
  * the S3PollingPullerAdapter with the bucket-shape locked to
@@ -24,10 +25,9 @@
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
 import {
-  S3PollingPullerAdapter,
   type S3PollingConfig,
+  S3PollingPullerAdapter,
 } from "./s3PollingPullerAdapter";
-import type { PullResult, PullRunOptions } from "./pullerAdapter";
 
 /**
  * Locked reference config for OpenAI's enterprise compliance dump.

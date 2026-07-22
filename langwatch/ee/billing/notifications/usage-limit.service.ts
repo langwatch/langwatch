@@ -7,7 +7,10 @@ import { LIMIT_TYPE_DISPLAY_LABELS } from "../../../src/server/license-enforceme
 import { getCurrentMonthStart } from "../../../src/server/utils/dateUtils";
 import { TtlCache } from "../../../src/server/utils/ttlCache";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
-import type { PlanLimitNotifierInput, ResourceLimitNotifierInput } from "../types";
+import type {
+  PlanLimitNotifierInput,
+  ResourceLimitNotifierInput,
+} from "../types";
 import {
   NotificationService,
   type UsageLimitEmailData,
@@ -21,7 +24,10 @@ const USAGE_WARNING_THRESHOLDS = [50, 70, 90, 95, 100] as const; // Thresholds i
 const MIN_DAYS_BETWEEN_ALERTS = 30;
 
 // NOTE: In-memory cooldown does not survive restarts and does not coordinate across replicas. Accepted tradeoff: worst case is a duplicate Slack alert.
-const resourceLimitCooldown = new TtlCache<true>(24 * 60 * 60 * 1000, "ttlcache:billing:limitCooldown:");
+const resourceLimitCooldown = new TtlCache<true>(
+  24 * 60 * 60 * 1000,
+  "ttlcache:billing:limitCooldown:",
+);
 
 export { resourceLimitCooldown };
 
@@ -33,7 +39,10 @@ export { resourceLimitCooldown };
 // 2. planLimitCooldown (TtlCache) — blocks subsequent ticks and coordinates
 //    across pods via Redis. The DB 30-day window remains authoritative.
 const planLimitInFlight = new Set<string>();
-const planLimitCooldown = new TtlCache<true>(MIN_DAYS_BETWEEN_ALERTS * 24 * 60 * 60 * 1000, "ttlcache:billing:planLimitCooldown:");
+const planLimitCooldown = new TtlCache<true>(
+  MIN_DAYS_BETWEEN_ALERTS * 24 * 60 * 60 * 1000,
+  "ttlcache:billing:planLimitCooldown:",
+);
 
 export { planLimitCooldown, planLimitInFlight };
 
@@ -93,7 +102,13 @@ export class UsageLimitService {
     notificationService: NotificationService;
     planProvider: PlanProvider;
   }): UsageLimitService {
-    return new UsageLimitService({ notificationRepository, organizationService, usageService, notificationService, planProvider });
+    return new UsageLimitService({
+      notificationRepository,
+      organizationService,
+      usageService,
+      notificationService,
+      planProvider,
+    });
   }
 
   /**
@@ -105,9 +120,18 @@ export class UsageLimitService {
       findRecentByOrganization: async () => [],
       create: async () => ({}) as any,
     } as unknown as NotificationRepository;
-    const noopOrg = { findWithAdmins: async () => null } as unknown as OrganizationService;
-    const noopUsage = { getUsage: async () => ({ currentMonthMessagesCount: 0, maxMonthlyUsageLimit: 0 }) } as unknown as UsageService;
-    const noopPlan = { getActivePlan: async () => ({ name: "free" }) } as unknown as PlanProvider;
+    const noopOrg = {
+      findWithAdmins: async () => null,
+    } as unknown as OrganizationService;
+    const noopUsage = {
+      getUsage: async () => ({
+        currentMonthMessagesCount: 0,
+        maxMonthlyUsageLimit: 0,
+      }),
+    } as unknown as UsageService;
+    const noopPlan = {
+      getActivePlan: async () => ({ name: "free" }),
+    } as unknown as PlanProvider;
     return new UsageLimitService({
       notificationRepository: noopRepo,
       organizationService: noopOrg,
@@ -147,7 +171,8 @@ export class UsageLimitService {
         return;
       }
 
-      const organization = await this.organizationService.findWithAdmins(organizationId);
+      const organization =
+        await this.organizationService.findWithAdmins(organizationId);
 
       if (!organization) {
         await planLimitCooldown.delete(organizationId);
@@ -184,7 +209,10 @@ export class UsageLimitService {
       ]);
 
       try {
-        await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());
+        await this.organizationService.updateSentPlanLimitAlert(
+          organizationId,
+          new Date(),
+        );
       } catch (error) {
         captureException(
           new Error(
@@ -236,9 +264,8 @@ export class UsageLimitService {
       let planName = "unknown";
       try {
         planName =
-          (
-            await this.planProvider.getActivePlan({ organizationId })
-          ).name ?? "unknown";
+          (await this.planProvider.getActivePlan({ organizationId })).name ??
+          "unknown";
       } catch {
         // fall through with "unknown"
       }
@@ -254,7 +281,7 @@ export class UsageLimitService {
         max,
       });
     } catch {
-      resourceLimitCooldown.delete(cooldownKey);
+      await resourceLimitCooldown.delete(cooldownKey);
     }
   }
 
@@ -288,7 +315,8 @@ export class UsageLimitService {
       return null;
     }
 
-    const organization = await this.organizationService.findWithAdmins(organizationId);
+    const organization =
+      await this.organizationService.findWithAdmins(organizationId);
 
     if (!organization) {
       logger.warn({ organizationId }, "Organization not found");
@@ -344,7 +372,8 @@ export class UsageLimitService {
     }
 
     // Fetch projects and their usage
-    const projects = await this.organizationService.findProjectsWithName(organizationId);
+    const projects =
+      await this.organizationService.findProjectsWithName(organizationId);
 
     const projectIds = projects.map((p) => p.id);
     const counts = await this.usageService.getCountByProjects({
@@ -385,13 +414,16 @@ export class UsageLimitService {
     }
 
     try {
-      const { recipientsSuccessCount, recipientsFailureCount, failedRecipients } =
-        await this.dispatchEmails({
-          organizationId,
-          organizationName: organization.name,
-          deliverableAdmins,
-          emailContext,
-        });
+      const {
+        recipientsSuccessCount,
+        recipientsFailureCount,
+        failedRecipients,
+      } = await this.dispatchEmails({
+        organizationId,
+        organizationName: organization.name,
+        deliverableAdmins,
+        emailContext,
+      });
 
       if (recipientsSuccessCount === 0) {
         logger.error(

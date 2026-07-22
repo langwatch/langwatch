@@ -269,10 +269,14 @@ function AnomalyRulesPage() {
     try {
       thresholdConfig = JSON.parse(composer.thresholdConfig || "{}");
       destinationConfig = JSON.parse(composer.destinationConfig || "{}");
-    } catch (e) {
+    } catch (parseFailure) {
+      // Local `JSON.parse` failure on text the user typed — the syntax detail
+      // ("Unexpected token } in JSON at position 42") is the whole point, and
+      // nothing here crossed the wire, so it is safe to show verbatim.
       toaster.create({
         title: "Invalid JSON in config field",
-        description: (e as Error).message,
+        description:
+          parseFailure instanceof SyntaxError ? parseFailure.message : "",
         type: "error",
       });
       return;

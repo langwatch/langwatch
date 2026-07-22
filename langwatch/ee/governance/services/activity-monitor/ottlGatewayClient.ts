@@ -206,9 +206,7 @@ export async function validateOttlStatements(
     return { ok: true };
   }
   if (!res.ok) {
-    throw new Error(
-      `OTTL validate failed: ${res.status} ${await res.text()}`,
-    );
+    throw new Error(`OTTL validate failed: ${res.status} ${await res.text()}`);
   }
   const raw = (await res.json()) as RawValidateResponse;
   if (raw.ok) return { ok: true };
@@ -243,9 +241,7 @@ export async function transformOttlPayload(input: {
     statements: input.statements,
   });
   if (!res.ok) {
-    throw new Error(
-      `OTTL transform failed: ${res.status} ${await res.text()}`,
-    );
+    throw new Error(`OTTL transform failed: ${res.status} ${await res.text()}`);
   }
   const raw = (await res.json()) as RawTransformResponse;
   if (raw.ok) {

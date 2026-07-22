@@ -121,7 +121,8 @@ export class AnomalyRuleService {
         scope: input.scope,
         scopeId: input.scopeId,
         thresholdConfig: (input.thresholdConfig ?? {}) as Prisma.InputJsonValue,
-        destinationConfig: (input.destinationConfig ?? {}) as Prisma.InputJsonValue,
+        destinationConfig: (input.destinationConfig ??
+          {}) as Prisma.InputJsonValue,
         status: input.status ?? "active",
         createdById: input.actorUserId,
       },
@@ -162,8 +163,7 @@ export class AnomalyRuleService {
         ruleType: input.ruleType ?? existing.ruleType,
         config: input.thresholdConfig,
       });
-      data.thresholdConfig =
-        input.thresholdConfig as Prisma.InputJsonValue;
+      data.thresholdConfig = input.thresholdConfig as Prisma.InputJsonValue;
     } else if (
       input.ruleType !== undefined &&
       input.ruleType !== existing.ruleType
@@ -183,8 +183,7 @@ export class AnomalyRuleService {
       if (Object.keys(input.destinationConfig).length > 0) {
         validateDestinationConfig(input.destinationConfig);
       }
-      data.destinationConfig =
-        input.destinationConfig as Prisma.InputJsonValue;
+      data.destinationConfig = input.destinationConfig as Prisma.InputJsonValue;
     }
     if (input.status !== undefined) data.status = input.status;
     return this.prisma.anomalyRule.update({
@@ -196,9 +195,7 @@ export class AnomalyRuleService {
   async archive(id: string, organizationId: string): Promise<AnomalyRule> {
     const existing = await this.findById(id, organizationId);
     if (!existing) {
-      throw new Error(
-        `AnomalyRule ${id} not found in org ${organizationId}`,
-      );
+      throw new Error(`AnomalyRule ${id} not found in org ${organizationId}`);
     }
     return this.prisma.anomalyRule.update({
       where: { id: existing.id },

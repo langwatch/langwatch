@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  IngestionSourceService,
+  SUPPORTED_SOURCE_TYPES,
+} from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { validateOttlStatements } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
+import {
+  getStarterTemplate,
+  isOttlEnabledSourceType,
+  OTTL_ENABLED_SOURCE_TYPES,
+} from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 /**
  * tRPC router for IngestionSource admin CRUD.
  *
@@ -19,17 +29,6 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import {
-  IngestionSourceService,
-  SUPPORTED_SOURCE_TYPES,
-} from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { validateOttlStatements } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
-import {
-  getStarterTemplate,
-  isOttlEnabledSourceType,
-  OTTL_ENABLED_SOURCE_TYPES,
-} from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -121,10 +120,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         name: z.string().min(1).max(128),
         description: z.string().nullable().optional(),
         parserConfig: z.record(z.string(), z.unknown()).optional(),
-        pullConfig: z
-          .record(z.string(), z.unknown())
-          .nullable()
-          .optional(),
+        pullConfig: z.record(z.string(), z.unknown()).nullable().optional(),
         pullSchedule: z.string().min(1).max(64).nullable().optional(),
       }),
     )
@@ -201,10 +197,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .use(checkOrganizationPermission("ingestionSources:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
-      const archived = await service.archive(
-        input.id,
-        input.organizationId,
-      );
+      const archived = await service.archive(input.id, input.organizationId);
       return toDto(archived);
     }),
 

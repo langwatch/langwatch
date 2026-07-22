@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  IngestionTemplateService,
+  InvalidSourceTypeError,
+  PlatformTemplateImmutableError,
+  TemplateNotFoundError,
+} from "@ee/governance/services/ingestionTemplate.service";
 /**
  * tRPC router for IngestionTemplate (admin/platform-curated catalog).
  *
@@ -14,13 +20,6 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import {
-  IngestionTemplateService,
-  InvalidSourceTypeError,
-  PlatformTemplateImmutableError,
-  TemplateNotFoundError,
-} from "@ee/governance/services/ingestionTemplate.service";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -122,7 +121,9 @@ export const ingestionTemplatesRouter = createTRPCRouter({
           description: input.description ?? null,
           iconAsset: input.iconAsset ?? null,
           credentialSchema:
-            input.credentialSchema === "otlp_token" ? null : input.credentialSchema ?? null,
+            input.credentialSchema === "otlp_token"
+              ? null
+              : (input.credentialSchema ?? null),
           ottlRules: input.ottlRules,
           surface: "trpc",
         });

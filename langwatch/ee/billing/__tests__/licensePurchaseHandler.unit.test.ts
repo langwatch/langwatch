@@ -29,8 +29,8 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   }),
 }));
 
-import { generateLicenseKey } from "../../licensing/licenseGenerationService";
 import { sendLicenseEmail } from "../../../src/server/mailer/licenseEmail";
+import { generateLicenseKey } from "../../licensing/licenseGenerationService";
 import { handleLicensePurchase } from "../services/licensePurchaseHandler";
 
 const mockGenerateLicenseKey = generateLicenseKey as ReturnType<typeof vi.fn>;
@@ -137,7 +137,9 @@ describe("licensePurchaseHandler", () => {
             stripe: mockStripe as any,
             privateKey: "test-private-key",
           }),
-        ).rejects.toThrow("No email found in checkout session customer_details");
+        ).rejects.toThrow(
+          "No email found in checkout session customer_details",
+        );
       });
     });
 
@@ -242,9 +244,9 @@ describe("licensePurchaseHandler", () => {
           privateKey: "test-private-key",
         });
 
-        expect(
-          mockStripe.checkout.sessions.listLineItems,
-        ).toHaveBeenCalledWith("cs_specific_456");
+        expect(mockStripe.checkout.sessions.listLineItems).toHaveBeenCalledWith(
+          "cs_specific_456",
+        );
       });
     });
   });

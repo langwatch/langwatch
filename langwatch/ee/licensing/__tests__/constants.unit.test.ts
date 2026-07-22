@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   CONTACT_SALES_URL,
   FREE_PLAN,
-  LICENSE_ERRORS,
-  LICENSE_ERROR_MESSAGES,
-  UNLIMITED_PLAN,
   getUserFriendlyLicenseError,
+  LICENSE_ERROR_MESSAGES,
+  LICENSE_ERRORS,
+  UNLIMITED_PLAN,
 } from "../constants";
 
 /**
@@ -16,19 +16,19 @@ import {
 describe("LICENSE_ERROR_MESSAGES", () => {
   it("maps INVALID_FORMAT to user-friendly message", () => {
     expect(LICENSE_ERROR_MESSAGES[LICENSE_ERRORS.INVALID_FORMAT]).toBe(
-      "The license key is invalid or has been tampered with. Please check the key and try again."
+      "The license key is invalid or has been tampered with. Please check the key and try again.",
     );
   });
 
   it("maps INVALID_SIGNATURE to user-friendly message", () => {
     expect(LICENSE_ERROR_MESSAGES[LICENSE_ERRORS.INVALID_SIGNATURE]).toBe(
-      "The license key is invalid or has been tampered with. Please check the key and try again."
+      "The license key is invalid or has been tampered with. Please check the key and try again.",
     );
   });
 
   it("maps EXPIRED to user-friendly message", () => {
     expect(LICENSE_ERROR_MESSAGES[LICENSE_ERRORS.EXPIRED]).toBe(
-      "This license has expired. Please contact support to renew your license."
+      "This license has expired. Please contact support to renew your license.",
     );
   });
 });
@@ -36,19 +36,19 @@ describe("LICENSE_ERROR_MESSAGES", () => {
 describe("getUserFriendlyLicenseError", () => {
   it("returns user-friendly message for invalid format", () => {
     expect(getUserFriendlyLicenseError("Invalid license format")).toBe(
-      "The license key is invalid or has been tampered with. Please check the key and try again."
+      "The license key is invalid or has been tampered with. Please check the key and try again.",
     );
   });
 
   it("returns user-friendly message for invalid signature", () => {
     expect(getUserFriendlyLicenseError("Invalid signature")).toBe(
-      "The license key is invalid or has been tampered with. Please check the key and try again."
+      "The license key is invalid or has been tampered with. Please check the key and try again.",
     );
   });
 
   it("returns user-friendly message for expired license", () => {
     expect(getUserFriendlyLicenseError("License expired")).toBe(
-      "This license has expired. Please contact support to renew your license."
+      "This license has expired. Please contact support to renew your license.",
     );
   });
 

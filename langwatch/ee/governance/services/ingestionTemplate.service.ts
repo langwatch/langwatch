@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-
 import { createLogger } from "@langwatch/observability";
 /**
  * IngestionTemplateService — owns the catalog read + admin-authoring
@@ -15,7 +14,7 @@ import { createLogger } from "@langwatch/observability";
  * Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature
  *       specs/ai-governance/admin-ottl-authoring.feature
  */
-import { Prisma, type PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { customAlphabet } from "nanoid";
 import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
 import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
@@ -462,7 +461,7 @@ export class IngestionTemplateService {
    * have rows in the DB.
    */
   private async ensurePlatformDefaultsSeeded(): Promise<void> {
-    if (lazySeedPromise) {
+    if (lazySeedPromise !== null) {
       await lazySeedPromise;
       return;
     }
@@ -471,12 +470,19 @@ export class IngestionTemplateService {
         const result = await seedPlatformIngestionTemplates(this.prisma);
         if (result.created > 0 || result.archived > 0) {
           logger.info(
-            { created: result.created, updated: result.updated, archived: result.archived },
+            {
+              created: result.created,
+              updated: result.updated,
+              archived: result.archived,
+            },
             "platform IngestionTemplate catalog seeded on first request",
           );
         }
       } catch (err) {
-        logger.error({ err }, "lazy seeding of platform IngestionTemplates failed");
+        logger.error(
+          { err },
+          "lazy seeding of platform IngestionTemplates failed",
+        );
         // Reset so the next call retries instead of caching the failure.
         lazySeedPromise = null;
       }

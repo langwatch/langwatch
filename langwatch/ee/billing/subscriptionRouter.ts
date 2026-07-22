@@ -6,13 +6,10 @@ import {
   createTRPCRouter,
   protectedProcedure,
 } from "../../src/server/api/trpc";
-import {
-  type PlanTypes as PlanType,
-  SUBSCRIBABLE_PLANS,
-} from "./planTypes";
-import { billingErrorHandler } from "./middleware";
-import type { CustomerService } from "./services/customerService";
 import type { SubscriptionService } from "../../src/server/app-layer/subscription/subscription.service";
+import { billingErrorHandler } from "./middleware";
+import { type PlanTypes as PlanType, SUBSCRIBABLE_PLANS } from "./planTypes";
+import type { CustomerService } from "./services/customerService";
 
 const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
 

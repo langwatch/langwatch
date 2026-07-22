@@ -169,10 +169,7 @@ export interface PullerAdapter<Config = unknown> {
    *   - never advance the cursor on partial-failure (caller relies
    *     on at-least-once semantics from the cursor)
    */
-  runOnce(
-    options: PullRunOptions,
-    config: Config,
-  ): Promise<PullResult>;
+  runOnce(options: PullRunOptions, config: Config): Promise<PullResult>;
 }
 
 /**
@@ -185,9 +182,7 @@ export class PullerAdapterRegistry {
 
   register<C>(adapter: PullerAdapter<C>): void {
     if (this.adapters.has(adapter.id)) {
-      throw new Error(
-        `PullerAdapter "${adapter.id}" is already registered`,
-      );
+      throw new Error(`PullerAdapter "${adapter.id}" is already registered`);
     }
     this.adapters.set(adapter.id, adapter as PullerAdapter<unknown>);
   }

@@ -8,11 +8,7 @@
  * subscription list join, search logic, audit logs) in one place on the server.
  */
 
-export type ResourceName =
-  | "user"
-  | "organization"
-  | "project"
-  | "subscription";
+export type ResourceName = "user" | "organization" | "project" | "subscription";
 
 export type SortOrder = "ASC" | "DESC";
 
@@ -54,7 +50,10 @@ async function adminFetch<T>(
 }
 
 export const adminClient = {
-  getList<T>(resource: ResourceName, params: ListParams): Promise<ListResult<T>> {
+  getList<T>(
+    resource: ResourceName,
+    params: ListParams,
+  ): Promise<ListResult<T>> {
     const {
       pagination = { page: 1, perPage: 25 },
       sort = { field: "id", order: "ASC" as const },
