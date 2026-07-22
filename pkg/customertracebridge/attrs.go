@@ -12,4 +12,9 @@ const (
 	AttrGenAIUsageCacheRead   = "gen_ai.usage.cache_read.input_tokens"
 	AttrGenAIUsageCacheCreate = "gen_ai.usage.cache_creation.input_tokens"
 	AttrGenAIConversationID   = "gen_ai.conversation.id"
+
+	// AttrLabels carries the VK's tags; the trace pipeline ingests this
+	// exact key into metadata.labels (otel.traces.ts), which the Trace
+	// Explorer filters as "Label".
+	AttrLabels = "langwatch.labels"
 )

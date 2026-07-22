@@ -54,6 +54,11 @@ type AITraceParams struct {
 	// ReplacingMergeTree's (TenantId, BudgetId, GatewayRequestId) ORDER BY.
 	GatewayRequestID string
 
+	// VKTags are the VK's operator-assigned tags, stamped on the customer
+	// span as langwatch.labels so the trace pipeline ingests them into
+	// metadata.labels — the field the Trace Explorer filters as "Label".
+	VKTags []string
+
 	// RequestBody and ResponseBody are the raw JSON bodies for input/output
 	// extraction. Either may be nil (e.g. streaming responses).
 	RequestBody  []byte

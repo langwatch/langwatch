@@ -242,6 +242,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
               guardrailIds: [GUARDRAIL_ID, "not-a-real-guardrail-id"],
             },
           ],
+          metadata: { tags: ["app=nexttrace", "team=offsecops"] },
         },
         scopes: {
           create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
@@ -365,6 +366,18 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       expect(slot).toBeDefined();
       expect(slot!.type).toBe("openai");
       expect(slot!.base_url).toBe(OPENAI_BASE_URL_OVERRIDE);
+    });
+
+    // Spec: specs/ai-gateway/span-shape.feature §8 — the gateway stamps
+    // these tags on customer spans as langwatch.labels, and cache-rule
+    // vk_tags matchers compare against them. Without a top-level vk_tags
+    // in the bundle both consumers read a permanently-empty list.
+    it("lifts config.metadata.tags to the bundle's top-level vk_tags", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      expect(bundle.vk_tags).toEqual(["app=nexttrace", "team=offsecops"]);
     });
 
     it("hydrates model_aliases + policy_rules from the linked RoutingPolicy", async () => {

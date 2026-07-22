@@ -70,10 +70,10 @@ type BundleConfig struct {
 	// secret. Sourced from the control-plane config payload.
 	VKDisplayPrefix string
 
-	// VKTags carries VK-level labels honored by cache rule matchers
-	// (vk_tags). Currently always empty — the schema doesn't store tags
-	// yet — but plumbed end-to-end so future tag wiring is a one-line add
-	// in the control-plane materialiser.
+	// VKTags carries the VK's operator-assigned tags (config.metadata.tags
+	// on the control plane). Consumed by cache rule matchers (vk_tags) and
+	// stamped on customer spans as langwatch.labels so the Trace Explorer
+	// can filter gateway traffic by tag.
 	VKTags []string
 }
 

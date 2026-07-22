@@ -24,6 +24,10 @@ type configWire struct {
 	PolicyRules          policyRulesWire           `json:"policy_rules"`
 	Budgets              []budgetWire              `json:"budgets"`
 	CacheRules           []cacheRuleWire           `json:"cache_rules"`
+	// VKTags are the VK's operator-assigned tags (config.metadata.tags on
+	// the control plane). Stamped on customer spans as langwatch.labels and
+	// matched by cache-rule vk_tags matchers.
+	VKTags []string `json:"vk_tags"`
 }
 
 type providerSlotWire struct {
@@ -134,6 +138,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 		TraceProjectID:   w.ProjectID,
 		ProjectOTLPToken: w.ProjectOTLPToken,
 		VKDisplayPrefix:  w.DisplayPrefix,
+		VKTags:           w.VKTags,
 		AllowedModels:    w.ModelsAllowed,
 		Fallback: domain.FallbackConfig{
 			MaxAttempts: w.Fallback.MaxAttempts,
