@@ -67,7 +67,9 @@ export function useFilteredCommands(
 
   const featureFlagOverrides = useFeatureFlagOverrides();
   const featureFlagToggleCommands = useMemo<Command[]>(() => {
-    if (!isDevMode) return [];
+    // In dev, and to ops admins in any environment: flipping a local override
+    // is a legitimate admin capability, and it only ever affects this browser.
+    if (!isDevMode && !hasOpsAccess) return [];
     return FRONTEND_FEATURE_FLAGS.map((flag) => {
       const current = featureFlagOverrides[flag];
       const stateLabel =
@@ -98,7 +100,7 @@ export function useFilteredCommands(
         },
       };
     });
-  }, [isDevMode, featureFlagOverrides]);
+  }, [isDevMode, hasOpsAccess, featureFlagOverrides]);
 
   // A per-browser pin for the Ops sidebar section, offered only to users who
   // already have ops access. Unlike the dev-only feature-flag toggles above,
@@ -141,7 +143,8 @@ export function useFilteredCommands(
     let commands = hasOpsAccess
       ? actionCommands
       : actionCommands.filter((cmd) => cmd.id !== "action-send-trace");
-    if (!isDevMode) {
+    // The Feature Flags drawer opens for dev builds and for ops admins anywhere.
+    if (!isDevMode && !hasOpsAccess) {
       commands = commands.filter((cmd) => cmd.id !== "action-feature-flags");
     }
     return [...commands, ...featureFlagToggleCommands, ...opsPinCommand];
