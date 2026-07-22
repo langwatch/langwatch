@@ -238,14 +238,17 @@ export function EmptyState({
         >
           {greeting}
         </Text>
+        {/* An invitation, then the two keys worth knowing.
+            "Ask in plain language" was an instruction nobody needs — anyone
+            looking at a text box already knows they can type in it — and it
+            spent the one line under the hero saying so. The line now gets out
+            of the way, and the space goes to the two things a first-time
+            reader could not have guessed. */}
         <Text
           textStyle="sm"
           color="fg.muted"
           lineHeight="1.5"
           textAlign="center"
-          // `balance` evens the two lines instead of orphaning "of these." on a
-          // row of its own; the cap keeps the measure from running the full
-          // column so it stays a tight caption under the hero.
           textWrap="balance"
           maxWidth={`${metrics.subtitleMaxWidth}px`}
           marginTop={2}
@@ -253,12 +256,33 @@ export function EmptyState({
           {/* "One of these" only when there are rows to point at — while the
               project's reach is unknown the list below is empty on purpose. */}
           {suggestions.length > 0
-            ? "Ask in plain language, or start with one of these."
-            : "Ask in plain language."}
+            ? "Just type away, or start with one of these."
+            : "Just type away."}
+        </Text>
+        <Text
+          textStyle="xs"
+          // Quieter and lighter than the line above: this is a reference the
+          // eye should find when it goes looking, not a second invitation
+          // competing with the first.
+          fontWeight="400"
+          color="fg.subtle"
+          textAlign="center"
+          marginTop={1.5}
+        >
+          <chakra.span fontFamily="mono" color="fg.muted">
+            /
+          </chakra.span>{" "}
+          for skills{"  ·  "}
+          <chakra.span fontFamily="mono" color="fg.muted">
+            #
+          </chakra.span>{" "}
+          to add context
         </Text>
       </VStack>
 
-      <VStack align="stretch" gap={0.5}>
+      {/* Cards need air between them in a way bare rows did not — at the old
+          2px they would read as one segmented control. */}
+      <VStack align="stretch" gap={1.5}>
         {sidebar && suggestions.length > 0 ? (
           <Text
             textStyle="2xs"
@@ -315,15 +339,39 @@ function SuggestionRow({
       textAlign="left"
       paddingX={`${paddingX}px`}
       paddingY={`${paddingY}px`}
-      borderRadius="10px"
-      background="transparent"
+      borderRadius="12px"
+      // A resting SHAPE, not a bare row. These sat as plain text on the
+      // panel's gradient with nothing but a hover fill to say they could be
+      // pressed — so until the pointer happened to cross one, the four best
+      // starting points in the product looked like a list of headings. The
+      // hairline and the glass give each one an edge at rest; the warm border
+      // on hover is the only colour they take, so the mark stays the panel's
+      // one saturated thing.
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      background="bg.panel/60"
+      backdropFilter="blur(8px)"
       color="fg"
       cursor="pointer"
-      transition="background 130ms ease"
-      _hover={{ background: "bg.subtle" }}
+      transition="background 130ms ease, border-color 130ms ease, transform 130ms ease"
+      _hover={{
+        background: "bg.panel/85",
+        borderColor: "orange.emphasized",
+        transform: "translateY(-1px)",
+      }}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "orange.emphasized",
+        outlineOffset: "2px",
+      }}
       css={{
         "&:hover .chev": { opacity: 1, transform: "translateX(0)" },
         "&:hover .row-icon": { color: "var(--chakra-colors-fg)" },
+        "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+        "@media (prefers-reduced-motion: reduce):hover": {
+          transform: "none",
+        },
       }}
     >
       {/* Neutral, not orange. Four saturated icons stacked down the empty state

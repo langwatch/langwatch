@@ -47,9 +47,7 @@ export function useCommandBarItems(
       data: {
         id: "action-ask-langy",
         label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
-        description: trimmed
-          ? "Hand this question to Langy"
-          : "Ask about your project in plain language",
+        description: "Hand this question to Langy",
         icon: Sparkles,
         category: "actions",
         keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],

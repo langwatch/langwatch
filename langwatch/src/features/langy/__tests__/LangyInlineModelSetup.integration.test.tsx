@@ -334,7 +334,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
         // It replaces — not supplements — the normal empty state.
         expect(
           screen.queryByText(
-            "Ask in plain language, or start with one of these.",
+            "Just type away, or start with one of these.",
           ),
         ).not.toBeInTheDocument();
       });
@@ -384,7 +384,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
         });
         expect(
           await screen.findByText(
-            "Ask in plain language, or start with one of these.",
+            "Just type away, or start with one of these.",
           ),
         ).toBeInTheDocument();
       });
@@ -406,7 +406,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
         // The panel shows its normal empty state.
         expect(
           await screen.findByText(
-            "Ask in plain language, or start with one of these.",
+            "Just type away, or start with one of these.",
           ),
         ).toBeInTheDocument();
 

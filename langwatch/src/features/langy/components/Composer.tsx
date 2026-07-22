@@ -538,6 +538,14 @@ function ComposerImpl({
             // control height (see SigilButton) and the row centers explicitly
             // rather than by luck.
             align="center"
+            // ...and it STAYS one row. In a narrow panel the rail was breaking
+            // onto a second line, which put the model control on its own row
+            // above two left-stranded sigils and made the footer look like a
+            // stack of unrelated chrome. Nothing here may wrap; if the rail
+            // runs out of room the model pill gives up its width first (it
+            // collapses to a glyph by design), never the row's shape.
+            flexWrap="nowrap"
+            minWidth={0}
             paddingLeft={2.5}
             paddingRight={2}
             paddingBottom={2}
@@ -545,35 +553,50 @@ function ComposerImpl({
             // See the note on the context summary above: the hero stays bare.
             display={hero ? "none" : undefined}
           >
-            <LangyModelPill
-              model={model}
-              options={modelOptions}
-              langyDefaultModel={langyDefaultModel}
-              onChange={onModelChange}
-              // The model is locked in the moment a turn starts — it rode with
-              // the send and can't change mid-flight — so the picker greys out
-              // until the turn settles rather than offering a choice that
-              // wouldn't take.
-              disabled={disabled || turnActive}
-            />
-            <Box flex={1} />
+            {/* The pill goes in a shrinkable wrapper rather than straight into
+                the row. Ark's combobox root is a layout box of its own, and
+                left as the flex item it can claim the rail's whole width —
+                which squeezed the spacer to nothing and pushed the sigils onto
+                a line of their own. The wrapper is the flex item now: it may
+                shrink to nothing and it may not grow, so the row's shape can
+                never depend on how wide the selected model's name happens to
+                be. */}
+            <Box minWidth={0} flexShrink={1} flexGrow={0} overflow="hidden">
+              <LangyModelPill
+                model={model}
+                options={modelOptions}
+                langyDefaultModel={langyDefaultModel}
+                onChange={onModelChange}
+                // The model is locked in the moment a turn starts — it rode
+                // with the send and can't change mid-flight — so the picker
+                // greys out until the turn settles rather than offering a
+                // choice that wouldn't take.
+                disabled={disabled || turnActive}
+              />
+            </Box>
+            <Box flex={1} minWidth={0} />
             {/* The two keys, said out loud. A palette you can only reach by
                 guessing a keystroke is a palette most people never see, so the
                 sigils sit on the rail as real buttons: they name what each key
                 opens AND open it, which means the shortcut teaches itself the
-                first time someone clicks one. */}
-            <SigilButton
-              sigil="#"
-              label="Context"
-              hint="Add something from this page. Press #"
-              onClick={() => openPalette("context")}
-            />
-            <SigilButton
-              sigil="/"
-              label="Skills"
-              hint="Pick what Langy should do. Press /"
-              onClick={() => openPalette("skills")}
-            />
+                first time someone clicks one.
+
+                They keep a gap between them: at the rail's 4px they read as one
+                four-word control rather than as two things you can press. */}
+            <HStack gap={2} flexShrink={0} align="center">
+              <SigilButton
+                sigil="#"
+                label="Context"
+                hint="Add something from this page. Press #"
+                onClick={() => openPalette("context")}
+              />
+              <SigilButton
+                sigil="/"
+                label="Skills"
+                hint="Pick what Langy should do. Press /"
+                onClick={() => openPalette("skills")}
+              />
+            </HStack>
           </HStack>
         </Box>
       </Box>
