@@ -1099,6 +1099,10 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
+          // Single-trace header read: resolve offloaded (ADR-022) IO back to
+          // the full value, exactly like legacy traces.getById. The list read
+          // never passes this.
+          full: true,
         },
       );
       if (!summary) {
