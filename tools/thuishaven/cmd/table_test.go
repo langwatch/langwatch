@@ -80,8 +80,9 @@ func TestUnknownCommandSuggestsNearMisses(t *testing.T) {
 	}
 }
 
-// @scenario "A flag shorthand means one thing across the whole CLI" — the
-// --force half: it does not exist anywhere; --yes is the one confirmation.
+// The --force half of the constitution: it does not exist anywhere; --yes is
+// the one confirmation.
+// @scenario "A flag shorthand means one thing across the whole CLI"
 func TestNoForceFlagExists(t *testing.T) {
 	for _, spec := range table {
 		for _, f := range spec.flags {
@@ -145,8 +146,8 @@ func TestParseShortFlagExpandsToLong(t *testing.T) {
 	}
 }
 
-// @scenario "Every command has exactly one name" — the help side: a command
-// cannot exist without being documented.
+// The help side of one-name: a command cannot exist without being documented.
+// @scenario "Every command has exactly one name"
 func TestHelpDocumentsEveryVisibleCommand(t *testing.T) {
 	help := commandsHelp()
 	for _, spec := range table {
