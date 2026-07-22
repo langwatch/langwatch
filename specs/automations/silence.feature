@@ -7,6 +7,11 @@ Feature: Silencing a rule
   off-switch.
 
   See dev/docs/adr/063-automations-domain-packages-customer-api-and-agent-surface.md.
+  Related: specs/automations/dispatch-timing.feature,
+  specs/automations/process-manager-dispatch.feature, and
+  specs/triggers/event-sourced-graph-triggers.feature — their dispatch and
+  notify scenarios assume an unsilenced rule; silence adds a suppression
+  gate in front of every effect they describe.
 
   Background:
     Given a project with an alert rule that is firing

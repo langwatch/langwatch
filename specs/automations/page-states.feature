@@ -7,6 +7,10 @@ Feature: Automations page — one page, four states
   rules.
 
   See dev/docs/adr/063-automations-domain-packages-customer-api-and-agent-surface.md.
+  Related: specs/automations/authoring-drawer.feature (the detailed form the
+  page links to as "Edit details") and
+  langwatch/specs/automations/automations-list.feature (the prior list spec;
+  its per-row facts and global fire-history surface carry forward).
 
   Background:
     Given a user on the automations page of their project

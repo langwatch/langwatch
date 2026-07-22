@@ -7,6 +7,10 @@ Feature: Slack app install for automations delivery
   the platform and can never be read back.
 
   See dev/docs/adr/063-automations-domain-packages-customer-api-and-agent-surface.md.
+  Related: langwatch/specs/monitors/slack-bot-delivery.feature (the manual
+  bot-token model this install flow supersedes for acquisition — delivery
+  semantics are unchanged) and
+  specs/automations/notification-templates.feature.
 
   Background:
     Given an organization admin in integration settings

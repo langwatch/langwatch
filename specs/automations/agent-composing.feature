@@ -7,6 +7,8 @@ Feature: Composing a rule from natural language
   plan, not a form.
 
   See dev/docs/adr/063-automations-domain-packages-customer-api-and-agent-surface.md.
+  Related: specs/automations/authoring-drawer.feature — "edit details" opens
+  that staged form, and save-time validation is shared between both paths.
 
   Background:
     Given a user composing on the automations page
@@ -27,6 +29,12 @@ Feature: Composing a rule from natural language
       Given the metric the intent needs has no saved graph in the project
       When the plan is presented
       Then it states that the missing graph will be created as part of setup
+
+    Scenario: The plan states the delivery cadence before approval
+      Given an intent that results in a notification rule
+      When the plan is presented
+      Then it states how often the notification can fire
+      And approving the plan counts as having reviewed the cadence
 
   Rule: Nothing is created before approval
 

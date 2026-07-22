@@ -9,6 +9,11 @@ Feature: Versioned automations customer API
   remediation the caller can act on.
 
   See dev/docs/adr/063-automations-domain-packages-customer-api-and-agent-surface.md.
+  Related: specs/features/domain-error-contract.feature (the error contract
+  these scenarios conform to), specs/automations/dispatch-timing.feature and
+  specs/automations/spam-prevention.feature (channel timing and abuse caps),
+  and specs/features/trigger-cli.feature (a consumer of the legacy surface
+  this replaces).
 
   Background:
     Given a project with a valid API key
@@ -98,8 +103,14 @@ Feature: Versioned automations customer API
       Then each fire shows when it fired and where it delivered
 
     Scenario: A test fire is unmistakably a test
-      When the caller test-fires a rule
+      When the caller test-fires a rule delivering to Slack or a webhook
       Then a delivery arrives at the configured destination marked as a test
+
+    Scenario: An email test fire is refused over the API
+      Given a rule delivering to email recipients
+      When the caller test-fires it
+      Then the call fails with a stable code saying email test fires are app-only
+      And the error's tips point at the in-app test fire, which delivers only to the requesting user's own inbox
 
   Rule: The legacy triggers API is deprecated
 

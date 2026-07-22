@@ -8,6 +8,8 @@ Feature: Automation suggestions from project activity
   than the user's own rules.
 
   See dev/docs/adr/063-automations-domain-packages-customer-api-and-agent-surface.md.
+  Related: specs/langy/langy-followup-suggestions.feature — Langy's trace
+  cards are a second path into the same pre-filled composing flow.
 
   Background:
     Given a project with recent traffic
