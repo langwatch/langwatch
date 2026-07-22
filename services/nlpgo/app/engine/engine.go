@@ -376,7 +376,7 @@ def execute(**inputs):
     return {"result": result}
 `
 
-// Code-runner error types that the runner itself synthesises, as opposed to a
+// Code-runner error types that the runner itself synthesizes, as opposed to a
 // Python exception class raised by the customer's own code.
 const (
 	codeRunnerTimeoutType = "Timeout"
@@ -387,7 +387,7 @@ const (
 // the client knows.
 //
 // codeblock.Error.Type is an OPEN set: it is whatever Python exception class the
-// customer's code raised, plus the two types the runner synthesises. Forwarding
+// customer's code raised, plus the two types the runner synthesizes. Forwarding
 // it verbatim put a `ValueError` on the wire as if it were one of our codes, so
 // the client had no copy for it and fell through to a generic failure — and
 // nothing failed to compile, because a forwarded value is invisible to the code
