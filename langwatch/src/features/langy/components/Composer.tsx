@@ -518,6 +518,10 @@ function ComposerImpl({
                     <Box
                       display="grid"
                       placeItems="center"
+                      // No line box to inherit: the icon is the only thing in
+                      // here, and a stray half-leading would shift it off the
+                      // centre the nudge above is measured against.
+                      lineHeight={0}
                       transform="translate(1px, -1px)"
                     >
                       <Send size={14} />
