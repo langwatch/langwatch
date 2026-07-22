@@ -639,34 +639,46 @@ export function HomePageBanners({
       <Box
         position="relative"
         width="full"
-        borderRadius="14px"
-        borderWidth="1px"
-        borderColor="border.muted"
-        background="bg.surface"
-        overflow="hidden"
         isolation="isolate"
         onMouseEnter={() => (hoveredRef.current = true)}
         onMouseLeave={() => (hoveredRef.current = false)}
       >
-        {/* The ground. The SAME shared canvas the announcement card uses, at
-            the same whisper, tuned toward the Langy palette when no
-            announcement is lighting it. Everything else in this block layers
-            over it: the shader is the floor, never a decoration on top. */}
+        {/* The ground: light, not a panel.
+
+            This used to be a bordered card with the shader held at 13% behind a
+            flat gradient of the same colours. Two gradients multiplied down to
+            a whisper do not read as a moving mesh, they read as a tint — the
+            animation was there the whole time and could not be seen. So the
+            card is gone, the flat gradient is now only the fallback for a
+            machine that cannot run the shader, and what is left runs bright
+            enough to actually be light: a bloom behind the field that dissolves
+            into the page long before it reaches any text.
+
+            It bleeds past its own box on purpose. The hero is not an object on
+            the home, it is where the home is lit from. */}
         <Box
           aria-hidden
           position="absolute"
-          inset={0}
+          insetInline={{ base: "-8%", md: "-14%" }}
+          insetBlock={{ base: "-30%", md: "-45%" }}
           pointerEvents="none"
-          opacity={{ base: 0.13, _dark: 0.2 }}
+          opacity={{ base: 0.42, _dark: 0.55 }}
+          css={{
+            maskImage:
+              "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+            WebkitMaskImage:
+              "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+          }}
         >
-          <Box
-            position="absolute"
-            inset={0}
-            style={{
-              background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
-            }}
-          />
-          {!lowPerf ? (
+          {lowPerf ? (
+            <Box
+              position="absolute"
+              inset={0}
+              style={{
+                background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
+              }}
+            />
+          ) : (
             <Box position="absolute" inset={0}>
               <MeshGradient
                 colors={lanternColors}
@@ -682,28 +694,26 @@ export function HomePageBanners({
                 style={{ width: "100%", height: "100%" }}
               />
             </Box>
-          ) : null}
+          )}
         </Box>
-        {/* The signal grid, the same one the panel wears, faded out toward the
-            bottom so it never competes with the composer sitting on it. */}
-        <Box
-          aria-hidden
-          position="absolute"
-          inset={0}
-          pointerEvents="none"
-          className="langy-signal-grid langy-signal-grid--banner"
-        />
 
         <VStack
           position="relative"
           zIndex={1}
-          align="stretch"
-          gap={3}
+          align="center"
+          gap={5}
           paddingX={{ base: 4, md: 5 }}
-          paddingY={4}
+          paddingY={{ base: 8, md: 12 }}
         >
+          {children}
+
+          {/* What is new, as a ticker rather than a bar.
+              It sits BELOW the field now. An announcement is the least
+              important thing on a page whose job is to take a question, and it
+              was previously the first line in the block with the only coloured
+              link in it — so the eye landed on this and not on the field. */}
           {slide ? (
-            <HStack gap={2.5} align="center" minHeight="20px">
+            <HStack gap={2.5} align="center" minHeight="20px" maxWidth="full">
               <Box flexShrink={0} color="orange.fg" display="grid">
                 {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
               </Box>
@@ -730,7 +740,6 @@ export function HomePageBanners({
               >
                 {slide.ctaLabel}
               </chakra.button>
-              <Spacer />
               {multi ? (
                 <HStack gap={1} flexShrink={0}>
                   {eligible.map((_, i) => (
@@ -765,7 +774,6 @@ export function HomePageBanners({
               </Tooltip>
             </HStack>
           ) : null}
-          {children}
         </VStack>
       </Box>
     );

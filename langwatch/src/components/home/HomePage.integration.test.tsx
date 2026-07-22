@@ -54,8 +54,8 @@ vi.mock("~/utils/api", () => ({
     },
   },
 }));
-vi.mock("./LangyHomeLantern", () => ({
-  LangyHomeLantern: () => <div data-testid="lantern" />,
+vi.mock("./LangyHomeHero", () => ({
+  LangyHomeHero: () => <div data-testid="lantern" />,
 }));
 
 vi.mock("../DashboardLayout", () => ({
