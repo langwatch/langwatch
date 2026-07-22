@@ -7,10 +7,7 @@
  * specs/langy/langy-empty-state-suggestions.feature
  */
 import { describe, expect, it } from "vitest";
-import {
-  SETUP_SUGGESTIONS,
-  SUGGESTIONS,
-} from "../components/EmptyState";
+import { SETUP_SUGGESTIONS, SUGGESTIONS } from "../components/EmptyState";
 import {
   HOME_SUGGESTION_COUNT,
   PANEL_SUGGESTION_COUNT,
@@ -49,7 +46,7 @@ describe("selectLangySuggestions", () => {
 
       expect(chosen).toEqual(SETUP_SUGGESTIONS.slice(0, HOME_SUGGESTION_COUNT));
       expect(chosen.every((s) => !s.requires)).toBe(true);
-      expect(chosen.map((s) => s.label)).toContain("Onboard your agent");
+      expect(chosen.map((s) => s.label)).toContain("Onboard my agent");
     });
   });
 
@@ -71,7 +68,7 @@ describe("selectLangySuggestions", () => {
         count: PANEL_SUGGESTION_COUNT,
       });
 
-      expect(chosen.map((s) => s.label)).not.toContain("Onboard your agent");
+      expect(chosen.map((s) => s.label)).not.toContain("Onboard my agent");
     });
   });
 
@@ -96,7 +93,7 @@ describe("selectLangySuggestions", () => {
       });
 
       expect(chosen.map((s) => s.label)).not.toContain(
-        "Choose what to measure",
+        "What should I measure?",
       );
     });
   });
@@ -144,7 +141,7 @@ describe("selectLangySuggestions", () => {
     it("never shows a project with data how to onboard its agent", () => {
       const chosen = selectLangySuggestions({ reach: EVERYTHING });
 
-      expect(chosen.map((s) => s.label)).not.toContain("Onboard your agent");
+      expect(chosen.map((s) => s.label)).not.toContain("Onboard my agent");
     });
   });
 });

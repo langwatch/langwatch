@@ -1,13 +1,14 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SERIF } from "~/features/asaplangy";
 import { CommandPalette } from "~/features/command-bar/CommandPalette";
 import { useCommandBar } from "~/features/command-bar/CommandBarContext";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { copyCodingAgentBrief } from "./codingAgentBrief";
 import { useHomeDevState } from "./dev/homeDevState";
 import "./homeHeroScroll.css";
-import { OnboardAgentPill } from "./OnboardAgentPill";
 import { useProjectReach } from "./useProjectReach";
 import { WelcomeHeader } from "./WelcomeHeader";
 
@@ -17,10 +18,16 @@ import { WelcomeHeader } from "./WelcomeHeader";
  *
  * It is a CENTRED COLUMN, not a card. The page's question is "what do you want
  * to do", and the honest shape for that is the shape a search field has always
- * had: one field on the centre line with room around it. The block this
- * replaced put a text input inside a bordered panel with an announcement bar
- * across its top and a control shoved to the far right, which made the field
- * read as one widget on a dashboard rather than the thing the page is for.
+ * had: one field on the centre line with room around it.
+ *
+ * EVERYTHING BELOW THE FIELD IS TYPOGRAPHY, NOT CHROME. This zone used to
+ * stack three visual systems — a filled onboarding pill carrying its own icon
+ * tiles and caret, a row of bordered mono chips, and an announcement ticker
+ * with pagination bars — five bordered capsules arguing with the one field
+ * above them. Now the asks are set as quoted speech in the page's serif (the
+ * reader's own words, ready to borrow), and the only other line is the quiet
+ * setup brief an empty project offers. No borders, no fills, no glyph
+ * clusters: the field is the only object, and the words under it are words.
  *
  * THE FIELD IS THE COMMAND PALETTE. Not a copy of it, not a second box that
  * happens to look similar: the same component the Cmd+K bar renders, mounted
@@ -31,7 +38,7 @@ import { WelcomeHeader } from "./WelcomeHeader";
  *
  * NOTHING HERE CHANGES HEIGHT as the field is used. Its results are an overlay,
  * so opening them never pushes the figures and recent work down the page, and
- * the row of asks beneath keeps its footprint in every state.
+ * the line of asks beneath keeps its footprint in every state.
  *
  * Spec: specs/home/langy-home.feature
  */
@@ -40,14 +47,14 @@ import { WelcomeHeader } from "./WelcomeHeader";
 const ASK_MEASURE = "680px";
 
 /**
- * The height the ask row holds in every state.
+ * The height the ask line holds in every state.
  *
- * One chip: its line box plus its padding and border. Pinned because the row
- * has to keep this height while it has nothing to show — during the read of
- * what the project holds — and a row that sized itself to its contents would
- * grow under the reader as that answer arrived.
+ * One serif line's box. Pinned because the line has to keep this height while
+ * it has nothing to show — during the read of what the project holds — and a
+ * line that sized itself to its contents would grow under the reader as that
+ * answer arrived.
  */
-const ASK_ROW_MIN_HEIGHT = "26px";
+const ASK_ROW_MIN_HEIGHT = "24px";
 
 export function LangyHomeHero() {
   const devState = useHomeDevState();
@@ -67,15 +74,14 @@ export function LangyHomeHero() {
   // Until the project's reach is known, "has nothing" and "has not answered
   // yet" look identical, and offering the empty-project asks to a project with
   // months of runs (then swapping them out a beat later) is worse than a beat
-  // of nothing: the reader reaches for a chip that moves. A pinned dev state is
+  // of nothing: the reader reaches for an ask that moves. A pinned dev state is
   // an answer, so it skips the wait.
   const reachKnown =
     devState === "empty" || devState === "populated" || !reach.isLoading;
-  // Only once the answer is actually known. Leading with "send your first
-  // trace" at a project that already has thousands is the product not knowing
-  // its own customer, and `isNewProject` reads false while the check is still
-  // in flight.
-  const leadWithOnboarding = reachKnown && isNewProject;
+  // Only once the answer is actually known: `isNewProject` reads false while
+  // the check is still in flight, and the setup brief flashing in and out is
+  // the product changing its mind under the reader.
+  const offerSetupBrief = reachKnown && isNewProject;
   const suggestions = !reachKnown
     ? []
     : selectLangySuggestions({
@@ -112,7 +118,8 @@ export function LangyHomeHero() {
   // unmount the row before its click ever arrived.
   const onBlur = useCallback(() => {
     window.setTimeout(() => {
-      if (!fieldRef.current?.contains(document.activeElement)) setFocused(false);
+      if (!fieldRef.current?.contains(document.activeElement))
+        setFocused(false);
     }, 0);
   }, []);
 
@@ -173,29 +180,16 @@ export function LangyHomeHero() {
           />
         </Box>
 
-        {/* TWO TIERS, not one wrapping row.
-            The chips are prompts — click one and it goes to Langy. The
-            onboarding control is an ACTION: it hands you something to take
-            away, or a link to follow. They were sharing a wrapping row, so
-            whether the action ended up beside a prompt or orphaned on a line
-            of its own was decided by how long the chip labels happened to be
-            that render. Given they are different kinds, the split is the
-            composition: a settled row of asks, and the action on its own
-            centre line under them.
+        <VStack width="full" gap={2} align="center">
+          {/* The asks, as speech. Each is a sentence the reader could have
+              typed into the field above — so it is set as one, in the page's
+              serif with real quotation marks, and clicking it sends those
+              words. A row of bordered chips promised buttons; a line of
+              quoted asks demonstrates the field's grammar instead.
 
-            The row keeps its height while the project's reach is still being
-            read, because there are no honest asks to show until that lands. */}
-        <VStack width="full" gap={2.5} align="center">
-          {/* On a project with nothing in it, this LEADS. Everything else on
-              the page describes data that does not exist yet, so the one
-              control that changes that comes first — which in a stack means
-              above, not merely left. */}
-          {leadWithOnboarding ? (
-            <OnboardAgentPill
-              prominent
-              onAskLangy={canAsk ? askLangy : undefined}
-            />
-          ) : null}
+              The line keeps its height while the project's reach is still
+              being read, because there are no honest asks to show until that
+              lands. */}
           <Box
             width="full"
             minHeight={ASK_ROW_MIN_HEIGHT}
@@ -203,12 +197,16 @@ export function LangyHomeHero() {
             alignItems="center"
             justifyContent="center"
           >
-            <HStack gap={2} flexWrap="wrap" justify="center">
+            <HStack
+              gap={{ base: 3, md: 5 }}
+              rowGap={1}
+              flexWrap="wrap"
+              justify="center"
+            >
               {canAsk
                 ? suggestions.map((suggestion) => (
-                    <AskChip
+                    <AskLine
                       key={suggestion.label}
-                      icon={<suggestion.icon size={12} />}
                       label={suggestion.label}
                       onClick={() => askLangy(suggestion.prompt)}
                     />
@@ -216,9 +214,15 @@ export function LangyHomeHero() {
                 : null}
             </HStack>
           </Box>
-          {!leadWithOnboarding ? (
-            <OnboardAgentPill onAskLangy={canAsk ? askLangy : undefined} />
-          ) : null}
+
+          {/* The route for the reader whose agent lives in an editor: one
+              quiet line that hands them a brief their own coding agent can
+              act on. Only while the project is empty — the moment a trace
+              arrives this is the product not knowing its own customer, and on
+              a populated project the docs section carries the onboarding
+              control instead (see LangyHome). Langy-led onboarding is not
+              repeated here: it is already the first ask above. */}
+          {offerSetupBrief ? <SetupBriefLine connective={canAsk} /> : null}
         </VStack>
 
         {!canAsk ? (
@@ -233,50 +237,70 @@ export function LangyHomeHero() {
 }
 
 /**
- * One borrowable ask.
+ * One borrowable ask, set as the speech it is.
  *
- * Its surface is deliberately near-opaque. These sit over a moving gradient,
- * and a translucent chip on a moving ground is legible only for as long as the
- * ground happens to be dark behind it.
+ * Text only — no border, no fill, no icon. Over the moving gradient a chip
+ * needed a near-opaque surface to stay legible; a line of dark serif at text
+ * weight reads the way the greeting above it does, and the quotation marks are
+ * what say "type this" before any affordance has to. The marks live in
+ * pseudo-elements so the accessible name stays the ask itself.
  */
-function AskChip({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
+function AskLine({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <chakra.button
       type="button"
       onClick={onClick}
-      display="inline-flex"
-      alignItems="center"
-      gap={1.5}
-      fontFamily="mono"
-      fontSize="11.5px"
+      aria-label={label}
+      fontFamily={SERIF}
+      fontSize="14.5px"
+      fontWeight="400"
+      lineHeight="1.5"
       color="fg.muted"
-      background="bg.panel/90"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="full"
-      paddingX={3}
-      paddingY="4px"
+      background="transparent"
+      borderWidth={0}
+      padding={0}
       cursor="pointer"
       whiteSpace="nowrap"
-      transition="color 130ms ease, border-color 130ms ease, background 130ms ease"
-      _hover={{
-        color: "orange.fg",
-        borderColor: "orange.emphasized",
-        background: "bg.panel",
-      }}
+      transition="color 130ms ease"
+      _hover={{ color: "orange.fg" }}
+      _before={{ content: '"“"' }}
+      _after={{ content: '"”"' }}
     >
-      <chakra.span display="grid" color="fg.subtle">
-        {icon}
-      </chakra.span>
       {label}
+    </chakra.button>
+  );
+}
+
+/**
+ * The empty project's one quiet action that is not an ask.
+ *
+ * A dotted underline, not a border: it does something (copies the brief and
+ * confirms with a toast), so it carries the one hint of affordance the ask
+ * line above deliberately does not. The leading "or" ties it to the asks as
+ * their alternative — except when the asks are hidden (a reader who cannot
+ * start conversations), where a bare "or" would dangle from nothing.
+ */
+function SetupBriefLine({ connective }: { connective: boolean }) {
+  return (
+    <chakra.button
+      type="button"
+      onClick={copyCodingAgentBrief}
+      fontSize="12px"
+      color="fg.subtle"
+      background="transparent"
+      borderWidth={0}
+      padding={0}
+      cursor="pointer"
+      whiteSpace="nowrap"
+      textDecoration="underline"
+      textDecorationStyle="dotted"
+      textUnderlineOffset="3px"
+      transition="color 130ms ease"
+      _hover={{ color: "orange.fg" }}
+    >
+      {connective
+        ? "or copy a setup brief for your coding agent"
+        : "Copy a setup brief for your coding agent"}
     </chakra.button>
   );
 }

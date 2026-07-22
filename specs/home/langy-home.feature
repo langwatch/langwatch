@@ -5,10 +5,11 @@ Feature: The Langy home
   So that the first thing I meet is a way into my own work, not a lobby
 
   One lit block sits at the top of the home page. It owns the announcement
-  surface's moving canvas, wears the current announcement as a single line of
-  chrome across its top, sets a real Langy composer into its lower edge, and
-  offers a short row of example asks beneath it. The rest of the home page
-  continues underneath in the order it already has.
+  surface's moving canvas and sets a real Langy composer on its centre line.
+  Beneath the composer everything is typography rather than chrome: a quiet
+  line of example asks written as the reader would type them, and the current
+  announcement as one quiet sentence at the block's foot. The rest of the home
+  page continues underneath in the order it already has.
 
   The block only ever renders on the shared announcement canvas: it layers
   over it and never mounts a second one.
@@ -54,12 +55,13 @@ Feature: The Langy home
     Given the Langy home renders
     Then the announcement's moving canvas is the block's own ground
     And exactly one such canvas is on the page
-    And the current announcement reads as a single line across the block's top
+    And the current announcement reads as one quiet line at the block's foot
 
   Scenario: The example asks are the ones Langy actually offers
     Given the Langy home renders
     Then the row beneath the composer offers three example asks
     And each one is an ask the assistant already offers when it has nothing to show
+    And each reads as an ask in my own words, ready to borrow
     And choosing one sends it, rather than filling the box in for me
 
   Scenario: The asks grow with what the project can act on
@@ -93,6 +95,16 @@ Feature: The Langy home
     And the setup checklist takes the figures' place directly beneath the block
     And no figures or recent work are shown
 
+  # The route for the reader whose agent lives in an editor: not a menu of
+  # onboarding options, one line that hands them a brief their own coding
+  # agent can act on. Langy-led onboarding is already the first ask above it.
+  Scenario: An empty project offers a setup brief to take away
+    Given the Langy home renders
+    And the project has never received a trace
+    Then one quiet line offers a setup brief for my coding agent
+    And choosing it copies the brief and says so
+    And the line is gone once the project has traces
+
   Scenario: A project with data leads its figures with the compact strip
     Given the Langy home renders
     And the project has received traces
@@ -116,6 +128,7 @@ Feature: The Langy home
     Given the Langy home renders
     Then the docs and guides section is on the page
     And the footer's quiet resource links are still there too
+    And once the project has traces, the docs section carries the onboarding control
 
   Scenario: Developers can preview every state of this home
     Given the app is running a development build

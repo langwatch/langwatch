@@ -1,143 +1,75 @@
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
-import { LuBot, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
+import { LuBot, LuChevronDown, LuTerminal } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
-import { toaster } from "~/components/ui/toaster";
-
-const INTEGRATION_DOCS = "https://docs.langwatch.ai/integration/overview";
+import { copyCodingAgentBrief, INTEGRATION_DOCS } from "./codingAgentBrief";
 
 /**
- * The prompt you hand to YOUR coding agent.
+ * The route into agent onboarding, where onboarding is a utility rather than
+ * the page's subject: the docs section's control (DocsGuides).
  *
- * This is the honest version of "onboard your agent": most people reading this
- * line are about to go and instrument a codebase, and the fastest way through
- * that is not a tab of documentation, it is a brief their own agent can act on.
- * It names the docs rather than reciting an API, because reciting one here is
- * how it silently goes stale the next time the SDK changes.
+ * It offers the two ways people onboard from a docs card: take a brief away
+ * to the coding agent already open in their editor, or read the integration
+ * guide. The hero used to carry this pill too — prominent, with a Langy
+ * walkthrough item — but the hero's onboarding routes are language now (the
+ * "Onboard my agent" ask and the quiet setup-brief line, see LangyHomeHero),
+ * so the Langy route lives there and this control keeps only what the docs
+ * card needs. The brief itself is shared with the hero's line
+ * (codingAgentBrief.ts), so the two hand out the same thing.
+ *
+ * Spec: specs/home/langy-home.feature
  */
-const CODING_AGENT_PROMPT = `Instrument this codebase with LangWatch so I can see my agent's traces.
-
-Read the integration guide at ${INTEGRATION_DOCS} and pick the SDK that matches this project. Then:
-1. Add the dependency and initialise it where the app starts.
-2. Read the API key from the environment, never hardcode it.
-3. Instrument the main agent or LLM call path so a request produces one trace.
-4. Tell me what you changed and how to verify a trace arrives.`;
-
-/**
- * The route into agent onboarding: friendly copy, tool glyphs in their own
- * small tiles.
- *
- * Its own component because it has two homes and, more importantly, because
- * what it DOES changed. It used to be a link to the docs, which on a page
- * whose whole premise is "ask for what you want in plain language" was the one
- * control that shrugged and sent you to read. Now it offers the two ways
- * people actually onboard an agent: hand the job to Langy, or take a brief
- * away to the coding agent already open in their editor. The docs are still
- * there, third, for the reader who wanted them all along.
- *
- * `onAskLangy` is optional, and its absence is meaningful: on a page where
- * Langy is not available that item must not appear, rather than appear and
- * fail. Spec: specs/home/langy-home.feature
- */
-export function OnboardAgentPill({
-  onAskLangy,
-  prominent = false,
-}: {
-  /** Start the onboarding conversation. Omitted where Langy is unavailable. */
-  onAskLangy?: (prompt: string) => void;
-  /**
-   * Lead with it rather than tuck it away. For a project with no data, this is
-   * not one option among several — it is the only thing that makes the rest of
-   * the page mean anything, so it stops being a quiet outline at the end of a
-   * row and becomes the filled control the eye lands on.
-   */
-  prominent?: boolean;
-} = {}) {
-  // A toast, not an inline "Copied" label. The label lived inside a Menu.Item
-  // and zag's menu closes on select, so the confirmation rendered into a menu
-  // that was already gone — it was unreachable, and a copy that says nothing is
-  // indistinguishable from one that failed. The toast also gives the rejection
-  // path somewhere to go; it used to be swallowed.
-  const copyPrompt = () => {
-    void navigator.clipboard?.writeText(CODING_AGENT_PROMPT).then(
-      () =>
-        toaster.create({
-          type: "success",
-          title: "Prompt copied — paste it to your coding agent",
-        }),
-      () =>
-        toaster.create({
-          type: "error",
-          title: "Couldn't copy the prompt",
-        }),
-    );
-  };
-
+export function OnboardAgentPill() {
   return (
     <Menu.Root positioning={{ placement: "bottom-end", gutter: 6 }}>
       <Menu.Trigger asChild>
         <chakra.button
           type="button"
-          /* It opens a menu — it does not fire a prompt like the asks beside
-             it do. Announce that, and show it (the caret below). */
+          /* It opens a menu — announce that, and show it (the caret below). */
           aria-haspopup="menu"
           display="inline-flex"
           alignItems="center"
           gap={2}
           whiteSpace="nowrap"
           borderWidth="1px"
-          borderColor={prominent ? "orange.emphasized" : "border.emphasized"}
+          borderColor="border.emphasized"
           borderRadius="full"
-          /* A DIFFERENT SHADE on purpose. The asks around this are borrowable
-             questions on the panel's translucent chip surface; this is the one
-             control that goes and does something — it hands you a prompt to
-             take away, or a link to follow. Sitting it on the solid raised
-             surface, a step darker than the chips, is what says "not one of
-             those" before the caret confirms it. */
-          background={prominent ? "orange.subtle" : "bg.muted"}
-          paddingLeft={prominent ? 4 : 3}
+          background="bg.muted"
+          paddingLeft={3}
           paddingRight="4px"
-          paddingY={prominent ? "5px" : "3px"}
-          boxShadow={prominent ? "xs" : "2xs"}
+          paddingY="3px"
+          boxShadow="2xs"
           cursor="pointer"
           transition="border-color 130ms ease, background 130ms ease"
           _hover={{
-            borderColor: prominent ? "orange.solid" : "border.emphasized",
-            background: prominent ? "orange.muted" : "bg.emphasized",
+            borderColor: "border.emphasized",
+            background: "bg.emphasized",
           }}
         >
-          <chakra.span
-            fontSize={prominent ? "13px" : "12px"}
-            fontWeight={prominent ? "medium" : undefined}
-            color={prominent ? "orange.fg" : "fg"}
-          >
-            {prominent ? "Send your first trace" : "Onboard your agent"}
+          <chakra.span fontSize="12px" color="fg">
+            Onboard your agent
           </chakra.span>
           <HStack gap="3px">
-            {[
-              { Glyph: LuBot, color: "fg.muted" },
-              { Glyph: LuTerminal, color: "fg.muted" },
-              { Glyph: LuSparkles, color: "orange.fg" },
-            ].map(({ Glyph, color }, i) => (
+            {[LuBot, LuTerminal].map((Glyph, i) => (
               <Box
                 key={i}
                 boxSize="18px"
                 borderRadius="5px"
-                /* The pill's own ground went a step darker, so the tiles take
+                /* The pill's own ground is a step darker, so the tiles take
                    the raised surface to stay legible against it. */
                 background="bg.surface"
                 borderWidth="1px"
                 borderColor="border.muted"
                 display="grid"
                 placeItems="center"
-                color={color}
+                color="fg.muted"
               >
                 <Glyph size={10} />
               </Box>
             ))}
           </HStack>
-          {/* The caret is the interaction, stated. An ask fires the moment you
-              click it; this one opens and asks you to choose a route, and a
-              control should look like what it does before you touch it. */}
+          {/* The caret is the interaction, stated: this control opens and
+              asks you to choose a route, and a control should look like what
+              it does before you touch it. */}
           <Box
             aria-hidden
             display="grid"
@@ -150,28 +82,14 @@ export function OnboardAgentPill({
         </chakra.button>
       </Menu.Trigger>
       <Menu.Content minWidth="280px" padding={1}>
-        {onAskLangy ? (
-          <Menu.Item
-            value="ask-langy"
-            paddingY={2}
-            onClick={() =>
-              onAskLangy(
-                "Walk me through sending my first trace to this project. Ask me what my agent is built with, then give me the exact steps.",
-              )
-            }
-          >
-            <OnboardOption
-              icon={LuSparkles}
-              accent
-              label="Walk me through it"
-              hint="Langy asks what you are building, then gives you the steps"
-            />
-          </Menu.Item>
-        ) : null}
-        <Menu.Item value="copy-prompt" paddingY={2} onClick={copyPrompt}>
+        <Menu.Item
+          value="copy-brief"
+          paddingY={2}
+          onClick={copyCodingAgentBrief}
+        >
           <OnboardOption
             icon={LuTerminal}
-            label="Copy a prompt for your coding agent"
+            label="Copy a setup brief for your coding agent"
             hint="Paste it into Claude Code, Cursor, or whatever you use"
           />
         </Menu.Item>
@@ -193,20 +111,14 @@ function OnboardOption({
   icon: Icon,
   label,
   hint,
-  accent = false,
 }: {
   icon: typeof LuBot;
   label: string;
   hint: string;
-  accent?: boolean;
 }) {
   return (
     <HStack gap={2.5} width="full" align="start">
-      <Box
-        color={accent ? "orange.fg" : "fg.subtle"}
-        display="grid"
-        paddingTop="2px"
-      >
+      <Box color="fg.subtle" display="grid" paddingTop="2px">
         <Icon size={13} />
       </Box>
       <Box minWidth={0} flex={1}>

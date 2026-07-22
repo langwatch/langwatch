@@ -117,16 +117,21 @@ export const SUGGESTIONS: LangySuggestion[] = [
  * beside their siblings so the same constraint governs both lists.
  */
 export const SETUP_SUGGESTIONS: LangySuggestion[] = [
+  // In the reader's voice, not the product's. These are asks to borrow — the
+  // words someone would actually hand the assistant — so "onboard MY agent",
+  // never "onboard YOUR agent": a label in the product's voice reads as a
+  // button, and these are speech.
   {
     icon: ScanSearch,
-    label: "Onboard your agent",
-    prompt: "Help me onboard my agent and send its first trace to this project.",
+    label: "Onboard my agent",
+    prompt:
+      "Help me onboard my agent and send its first trace to this project.",
     // The first trace arriving is exactly what makes this ask obsolete.
     until: "traces",
   },
   {
     icon: ShieldCheck,
-    label: "Choose what to measure",
+    label: "What should I measure?",
     prompt:
       "What should I measure about my agent, and which evaluators would you start with?",
     until: "evaluations",
@@ -154,9 +159,7 @@ export const SETUP_SUGGESTIONS: LangySuggestion[] = [
  * Kept dry, never cutesy: Langy is a competent teammate having a good day, not
  * a mascot. A fresh one is picked each time the empty state mounts.
  */
-const GREETINGS = [
-  "Hey, I'm Langy!"
-];
+const GREETINGS = ["Hey, I'm Langy!"];
 
 export function EmptyState({
   onPick,

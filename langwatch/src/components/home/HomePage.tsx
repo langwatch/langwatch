@@ -47,9 +47,10 @@ import { WelcomeHeader } from "./WelcomeHeader";
  *   - SIGNAL-FOCUSED: the generated briefing sheet leads — LangWatch's read
  *     of the project's agentic signals, with the status figures folded in —
  *     then the announcement note, recent work, and setup as a hairline.
- *   - LANGY: the lit block leads, announcement compressed into a line of its
- *     chrome and a real composer set into its lower edge, then the same spine
- *     the classic home has, with the overview reduced to a compact strip.
+ *   - LANGY: the lit block leads — the command palette at hero size with the
+ *     example asks as a line of quoted speech beneath it, and the current
+ *     announcement as one quiet sentence at the block's foot — then the same
+ *     spine the classic home has, with the overview reduced to a compact strip.
  *   - CLASSIC: announcements, the traces overview, recent work, and the
  *     onboarding checklist.
  *
@@ -278,7 +279,11 @@ function LangyHome() {
   const { isNewProject } = useProjectReach();
   const devState = useHomeDevState();
   const empty =
-    devState === "empty" ? true : devState === "populated" ? false : isNewProject;
+    devState === "empty"
+      ? true
+      : devState === "populated"
+        ? false
+        : isNewProject;
 
   return (
     <>
@@ -300,10 +305,12 @@ function LangyHome() {
           question in plain language is exactly where the reader who would
           rather read the docs first needs to find them.
 
-          Its onboarding control is off here because that control moved UP into
-          the lit block, where the attention is. Two of the same on one page
-          would just be one of them going unclicked. */}
-      <DocsGuides showOnboardPill={false} />
+          Its onboarding control follows the project's state: while the
+          project is empty the hero's quiet setup-brief line carries that
+          route (two of the same on one page would just be one of them going
+          unclicked), and once traces arrive the hero stands down and the
+          control lives here, with the docs, as the utility it now is. */}
+      <DocsGuides showOnboardPill={!empty} />
     </>
   );
 }
