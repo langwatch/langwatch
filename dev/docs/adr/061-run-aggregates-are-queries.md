@@ -125,15 +125,36 @@ the compatible change.
 ### Experiment runs keep their facts and derive their counters
 
 `experiment_runs` keeps `RunId`, `ExperimentId`, `WorkflowVersionId`,
-`Targets`, `Total`, `StartedAt`, `StoppedAt` and `FinishedAt`. Every counter
-and every average is dropped from the projection and computed by grouping
-`experiment_run_items` on `(TenantId, RunId)` — a primary-key range scan, not
-a bloom-filtered scan.
+`Targets`, `Total`, `StartedAt`, `StoppedAt` and `FinishedAt`. `Progress`,
+`CompletedCount`, `FailedCount`, `TotalDurationMs`, `AvgScoreBps`,
+`PassRateBps` and the four raw accumulators are dropped from the projection
+and computed by grouping `experiment_run_items` on `(TenantId, RunId)` — a
+primary-key range scan, not a bloom-filtered scan.
 
-`TraceMetrics` is dropped with them. It is an unbounded
-`Record<traceId, { totalCost }>` held inside the fold state, so today every
-event rewrites a growing JSON blob into a ReplacingMergeTree row; the
-per-trace cost it holds is a sum over items.
+`TotalCost` does not move with them, and neither does `TraceMetrics`. Both
+need care that the rest of this section does not:
+
+`TraceMetrics` is an unbounded `Record<traceId, { totalCost }>` held in the
+fold state, and `experiment_runs` **has no column for it** — the ClickHouse
+read mapper hardcodes `TraceMetrics: {}`. It is in-memory state that never
+survives a reload. Its only job is to subtract a trace's previous cost before
+adding the new one, so `TotalCost` is not double-counted when
+`traceMetricsComputed` is redelivered for the same trace. Because the map is
+empty after any reload, that guard only holds within a single fold session:
+across a reload a redelivered event inflates `TotalCost` silently. Deleting
+the map without replacing the guard would widen that hole rather than close
+it.
+
+The fix is to give per-trace cost rows instead of a map. `traceMetricsComputed`
+writes an `experiment_run_items` row (the table already carries `TraceId`, and
+is already keyed for the group), and `TotalCost` becomes a sum over target
+cost, evaluator cost, and the latest per-trace row — deduplicated by the same
+`ReplacingMergeTree` merge that already dedups every other item. The unbounded
+map disappears and the double-count guard starts working across reloads, which
+it does not today.
+
+That makes the cost path a behaviour change rather than a pure derivation, so
+it ships separately from the counter derivation above.
 
 ### Migration
 
@@ -176,6 +197,11 @@ that does serve users already reads the source those rows were derived from.
   here.
 - The `suite_runs` retention and TTL entries stay until the drop migration, so
   existing rows keep ageing out of a table nothing writes.
+- Deriving the experiment-run counters is safe in isolation, but the cost path
+  is not: `TotalCost` currently depends on an in-memory map that never
+  persists, so it already double-counts a redelivered `traceMetricsComputed`
+  across a reload. Moving per-trace cost to rows fixes that, and is the reason
+  the experiment half splits into two changes rather than one.
 - Aggregates become self-healing: a corrected or late child row changes the
   answer on the next read, with no projection to rebuild.
 - Suite runs no longer have an event stream of their own, so anything that
