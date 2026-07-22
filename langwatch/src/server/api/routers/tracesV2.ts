@@ -1324,6 +1324,15 @@ export const tracesV2Router = createTRPCRouter({
          * few partitions.
          */
         occurredAtMs: z.number().int().optional(),
+        /**
+         * Whether to resolve any offloaded (ADR-022) input/output in full
+         * before returning. Costs one extra spans read per call — only the
+         * drawer's own detail read needs it; every other caller (hover
+         * peek, name lookups, bulk hydrators, sibling prefetch) reads a
+         * truncated preview or discards the content immediately, so they
+         * must pass false to stay a cheap read.
+         */
+        full: z.boolean(),
       }),
     )
     .use(checkProjectPermission("traces:view"))
@@ -1342,10 +1351,7 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
-          // Single-trace header read: resolve offloaded (ADR-022) IO back to
-          // the full value, exactly like legacy traces.getById. The list read
-          // never passes this.
-          full: true,
+          full: input.full,
         },
       );
       if (!summary) {
