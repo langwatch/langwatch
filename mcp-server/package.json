@@ -47,7 +47,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/scenario": "^0.4.6",
     "@opentelemetry/context-async-hooks": "^2.1.0",
-    "@opentelemetry/sdk-node": "^0.219.0",
+    "@opentelemetry/sdk-node": "^0.220.0",
     "@types/debug": "^4.1.13",
     "@types/express": "^5.0.6",
     "@types/node": "^25.6.0",
