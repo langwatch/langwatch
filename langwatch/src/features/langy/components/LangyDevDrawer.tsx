@@ -36,9 +36,12 @@
  * IT LIVES OUTSIDE THE PANEL, on purpose. The panel sets `overflow: hidden` (it
  * owns its own scrolling surface and has to clip the fold), so a child sliding
  * left would simply be cut off at the edge. The drawer is therefore a fixed
- * sibling, offset by the panel's own width so the two edges meet, and it mirrors
- * the panel's geometry per layout — bottom-anchored card when floating,
- * full-height when docked.
+ * sibling that MIRRORS the panel's exact silhouette per layout — the measured
+ * panel height on the same bottom inset when floating, the dock's full
+ * header-to-floor span when docked — so the pair always shares both horizontal
+ * edges (see resolveInspectorFrame). Its right edge tucks under the panel; the
+ * left hairline is its only border, and it wears the panel's own glass
+ * (surface at alpha over a blur) so it reads as the same material.
  */
 import {
   Box,
@@ -51,12 +54,13 @@ import {
 import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import {
-  APP_HEADER_HEIGHT,
-  FLOATING_PANEL_CSS_WIDTH,
-  SIDEBAR_PANEL_WIDTH,
+  INSPECTOR_TUCK,
+  INSPECTOR_WIDTH,
+  resolveInspectorFrame,
 } from "../logic/langyPanelLayout";
 import { resolveCliCapability } from "./capabilities/capabilityRegistry";
 import {
@@ -68,6 +72,7 @@ import {
   recordSummary,
   replayTurnProjection,
   streamRecords,
+  tapeForConversation,
   tapeUpTo,
   tokenStreamText,
   toolCallsFrom,
@@ -76,21 +81,6 @@ import {
 import { useLangyStore } from "../stores/langyStore";
 
 const MotionBox = motion.create(Box);
-
-/** Matches the panel's own symmetric viewport inset in floating mode. */
-const PANEL_INSET = 12;
-const DRAWER_WIDTH = 380;
-
-/**
- * How far the drawer slides UNDER the panel's left edge.
- *
- * Butted up exactly against the panel, the drawer's own rounded right corners
- * stayed visible as two little notches against the panel's straight edge — the
- * pair read as two cards that happened to be touching. Tucking it a few pixels
- * behind (the panel sits at a higher z-index and paints over it) buries the
- * radius, so the drawer reads as something the panel pulled out of itself.
- */
-const DRAWER_TUCK = 10;
 
 type DevTab = "log" | "tokens" | "ephemeral" | "events" | "store";
 
@@ -113,11 +103,20 @@ export function LangyDevDrawer({
   open,
   onClose,
   floating,
+  dockShellClaimed,
+  panelHeightPx,
 }: {
   open: boolean;
   onClose: () => void;
   /** Mirror the panel's layout, so the two always share an edge. */
   floating: boolean;
+  /** Sidebar mode: an app shell holds the dock below its header. */
+  dockShellClaimed: boolean;
+  /**
+   * The panel's measured height (floating mode) — what makes the drawer's
+   * silhouette EXACTLY the panel's rather than a fixed card of its own.
+   */
+  panelHeightPx: number | null;
 }) {
   const reduceMotion = useReducedMotion();
   const [tab, setTab] = useState<DevTab>("log");
@@ -141,11 +140,30 @@ export function LangyDevDrawer({
   const scrubSeq = useLangyDevLog((s) => s.scrubSeq);
   const setScrubSeq = useLangyDevLog((s) => s.setScrub);
   const allRecords = useLangyDevLog((s) => s.records);
+  // The inspector reads the OPEN conversation. The ring itself records every
+  // lane globally (switching conversations must not lose tape), but the views
+  // and the scrubber show only the active conversation's records — plus the
+  // unattributed pre-adoption ones (see tapeForConversation).
+  const activeConversationId = useLangyStore((s) => s.activeConversationId);
+  const conversationRecords = useMemo(
+    () => tapeForConversation(allRecords, activeConversationId),
+    [allRecords, activeConversationId],
+  );
   const visibleRecords = useMemo(
-    () => tapeUpTo(allRecords, scrubSeq),
-    [allRecords, scrubSeq],
+    () => tapeUpTo(conversationRecords, scrubSeq),
+    [conversationRecords, scrubSeq],
   );
   const live = scrubSeq === null;
+
+  // ONE derivation for both layouts (langyPanelLayout.resolveInspectorFrame):
+  // the drawer's top and bottom edges are the PANEL's — the measured card
+  // height on the shared inset when floating, the dock's header-to-floor span
+  // when docked — so the pair reads as one surface in either mode.
+  const frame = resolveInspectorFrame({
+    floating,
+    dockShellClaimed,
+    panelHeightPx,
+  });
 
   return (
     <AnimatePresence>
@@ -155,39 +173,21 @@ export function LangyDevDrawer({
           position="fixed"
           // Anchored to the panel's LEFT edge: offset by the panel's own width
           // plus the gutter, so the drawer and the panel meet without a seam.
-          right={
-            floating
-              ? `calc(${FLOATING_PANEL_CSS_WIDTH} + ${PANEL_INSET * 2 - DRAWER_TUCK}px)`
-              : `${SIDEBAR_PANEL_WIDTH - DRAWER_TUCK}px`
-          }
-          {...(floating
-            ? {
-                bottom: `${PANEL_INSET}px`,
-                maxHeight: "calc(80dvh - 12px)",
-                height: "min(560px, calc(80dvh - 12px))",
-                // The SAME corner as the panel (20px), not a smaller one of its
-                // own: the drawer is the panel's accessory, and two different
-                // radii meeting along one edge read as two unrelated cards.
-                borderRadius: "20px",
-                borderWidth: "1px",
-                // The top edge carries 2px. It is the one edge with nothing
-                // above it to catch light, so at a hairline it disappeared into
-                // the page behind — the drawer read as open at the top.
-                borderTopWidth: "2px",
-              }
-            : {
-                top: `${APP_HEADER_HEIGHT}px`,
-                bottom: 0,
-                borderLeftWidth: "1px",
-                borderTopWidth: "2px",
-                borderTopLeftRadius: "xl",
-              })}
+          right={frame.right}
+          {...(frame.top !== null ? { top: frame.top } : {})}
+          bottom={frame.bottom}
+          {...(frame.height !== null ? { height: frame.height } : {})}
+          {...(frame.maxHeight !== null ? { maxHeight: frame.maxHeight } : {})}
+          // Only the outward (left) corners round; the right edge is tucked
+          // under the panel and stays square so the seam is a seam.
+          borderTopLeftRadius={frame.borderTopLeftRadius}
+          borderBottomLeftRadius={frame.borderBottomLeftRadius}
           // The tucked strip is real width that nobody can see, so it is added
           // BACK on both counts: the box grows by it (visible width stays
-          // DRAWER_WIDTH) and it becomes right padding (content stops at the
+          // INSPECTOR_WIDTH) and it becomes right padding (content stops at the
           // panel's edge instead of running underneath it).
-          width={`${DRAWER_WIDTH + DRAWER_TUCK}px`}
-          paddingRight={`${DRAWER_TUCK}px`}
+          width={`${INSPECTOR_WIDTH + INSPECTOR_TUCK}px`}
+          paddingRight={`${INSPECTOR_TUCK}px`}
           maxWidth="calc(100vw - 24px)"
           // Just under the panel: the drawer is its accessory and must never
           // paint over it, or over a drawer-companion arrangement.
@@ -195,11 +195,22 @@ export function LangyDevDrawer({
           display="flex"
           flexDirection="column"
           overflow="hidden"
-          background="bg.surface"
+          // The panel's own glass, so the two read as one material: surface at
+          // alpha over a blur of the page behind. Top/bottom/right borders are
+          // GONE — the panel's silhouette already draws those edges — leaving
+          // the left hairline as the drawer's one line of its own.
+          background="bg.surface/85"
+          backdropFilter="blur(8px)"
+          borderWidth={0}
+          borderLeftWidth="1px"
           borderStyle="solid"
           borderColor="border"
           boxShadow="0 12px 28px rgba(20,20,23,0.12), 0 32px 64px rgba(20,20,23,0.10)"
-          _dark={{ boxShadow: "0 12px 28px rgba(0,0,0,0.5)" }}
+          _dark={{
+            background: "bg.surface/88",
+            backdropFilter: "blur(16px) saturate(1.1)",
+            boxShadow: "0 12px 28px rgba(0,0,0,0.5)",
+          }}
           role="complementary"
           aria-label="Langy developer inspector"
           initial={reduceMotion ? false : { opacity: 0, x: 24 }}
@@ -215,25 +226,33 @@ export function LangyDevDrawer({
         >
           <DrawerHeader tab={tab} onTabChange={setTab} onClose={onClose} />
           <TimeScrubber
-            records={allRecords}
+            records={conversationRecords}
             visibleRecords={visibleRecords}
             scrubSeq={scrubSeq}
             onScrub={setScrubSeq}
           />
           <Box flex={1} minHeight={0} overflowY="auto">
-            {tab === "log" ? (
-              <LogTab records={visibleRecords} live={live} />
-            ) : null}
-            {tab === "tokens" ? (
-              <TokensTab records={visibleRecords} live={live} />
-            ) : null}
-            {tab === "ephemeral" ? (
-              <EphemeralTab records={visibleRecords} live={live} />
-            ) : null}
-            {tab === "events" ? (
-              <EventsTab records={visibleRecords} live={live} />
-            ) : null}
-            {tab === "store" ? <StoreTab /> : null}
+            {/* The tape holds arbitrary recorded wire data; one malformed
+                record must never take the panel down with the inspector.
+                Switching tabs re-attempts. */}
+            <IsolatedErrorBoundary
+              scope="The inspector crashed"
+              resetKeys={[tab]}
+            >
+              {tab === "log" ? (
+                <LogTab records={visibleRecords} live={live} />
+              ) : null}
+              {tab === "tokens" ? (
+                <TokensTab records={visibleRecords} live={live} />
+              ) : null}
+              {tab === "ephemeral" ? (
+                <EphemeralTab records={visibleRecords} live={live} />
+              ) : null}
+              {tab === "events" ? (
+                <EventsTab records={visibleRecords} live={live} />
+              ) : null}
+              {tab === "store" ? <StoreTab /> : null}
+            </IsolatedErrorBoundary>
           </Box>
         </MotionBox>
       ) : null}
@@ -450,13 +469,7 @@ function LogTab({
   }, [records.length, live]);
 
   if (records.length === 0) {
-    return (
-      <Empty>
-        Nothing on the tape yet. Send a message — outbound commands, the
-        stream, the durable event log and freshness signals all land here in
-        arrival order.
-      </Empty>
-    );
+    return <TapeEmpty />;
   }
   return (
     <Box padding={2}>
@@ -561,9 +574,69 @@ function LogRow({ record }: { record: LangyDevLogRecord }) {
 /** Shared: the "nothing has happened yet" line, so all three tabs say it alike. */
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <Text padding={3} textStyle="xs" color="fg.muted">
+    <Text paddingX="12px" paddingY="10px" textStyle="xs" color="fg.muted">
       {children}
     </Text>
+  );
+}
+
+/** What each lane MEANS — the legend the empty tape teaches with. */
+const LANE_LEGEND: {
+  lane: LangyDevLogRecord["lane"];
+  label: string;
+  detail: string;
+}[] = [
+  { lane: "outbound", label: "outbound", detail: "what this client asked" },
+  { lane: "stream", label: "stream", detail: "tokens, signals, tool frames" },
+  { lane: "durable", label: "durable", detail: "the event log the fold replays" },
+  { lane: "signal", label: "signal", detail: "freshness pokes, with cursors" },
+];
+
+/**
+ * The empty tape, put to work. A bare sentence over a void taught nothing and
+ * read as a broken pane; the space now carries the one thing worth knowing
+ * before the first entry lands — what each lane glyph will mean — plus the
+ * tape's own terms (armed, ring-bounded, scoped to the open conversation).
+ */
+function TapeEmpty() {
+  return (
+    <VStack align="stretch" gap={3} paddingX="12px" paddingY="10px">
+      <Text textStyle="xs" color="fg.muted">
+        Armed. Send a message — everything that crosses the wire lands here in
+        arrival order.
+      </Text>
+      <VStack align="stretch" gap={1}>
+        {LANE_LEGEND.map(({ lane, label, detail }) => (
+          <HStack key={lane} gap={2} align="baseline">
+            <Text
+              textStyle="2xs"
+              color={LANE_STYLE[lane].color}
+              css={MONO}
+              minWidth="12px"
+              flexShrink={0}
+            >
+              {LANE_STYLE[lane].glyph}
+            </Text>
+            <Text
+              textStyle="2xs"
+              fontWeight="600"
+              color={LANE_STYLE[lane].color}
+              minWidth="62px"
+              flexShrink={0}
+            >
+              {label}
+            </Text>
+            <Text textStyle="2xs" color="fg.subtle" css={MONO}>
+              {detail}
+            </Text>
+          </HStack>
+        ))}
+      </VStack>
+      <Text textStyle="2xs" color="fg.subtle" css={MONO}>
+        ring · keeps the last {DEV_LOG_CAPACITY.toLocaleString()} entries ·
+        scoped to this conversation
+      </Text>
+    </VStack>
   );
 }
 

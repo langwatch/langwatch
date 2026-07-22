@@ -153,7 +153,10 @@ describe("<LangyHomeLantern/>", () => {
     it("stands down to a quiet line and raises no notice of its own", () => {
       renderLantern();
 
-      expect(screen.queryByTestId("hero-composer")).toBeNull();
+      // Hidden in place, not unmounted: the slot keeps holding the composer's
+      // own height so the block never shifts when the panel opens — but a
+      // stood-down composer must not be visible or reachable.
+      expect(screen.getByTestId("hero-composer")).not.toBeVisible();
       expect(screen.getByText("Continue in Langy")).toBeDefined();
       expect(screen.queryByRole("alert")).toBeNull();
     });

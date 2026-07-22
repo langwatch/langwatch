@@ -1,7 +1,10 @@
 /**
- * The home page's asks escalate with what the project can actually act on.
+ * The asks escalate with what the project can actually act on — on the home
+ * page's capability row AND the panel's empty state, which share the one
+ * selection.
  *
- * Spec: specs/home/langy-home.feature
+ * Spec: specs/home/langy-home.feature,
+ * specs/langy/langy-empty-state-suggestions.feature
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -10,7 +13,8 @@ import {
 } from "../components/EmptyState";
 import {
   HOME_SUGGESTION_COUNT,
-  selectHomeSuggestions,
+  PANEL_SUGGESTION_COUNT,
+  selectLangySuggestions,
 } from "../logic/langyHomeSuggestions";
 
 const NOTHING = {
@@ -24,7 +28,7 @@ const EVERYTHING = {
   hasExperiments: true,
 };
 
-describe("selectHomeSuggestions", () => {
+describe("selectLangySuggestions", () => {
   it("always offers a full row", () => {
     for (const reach of [
       NOTHING,
@@ -32,48 +36,75 @@ describe("selectHomeSuggestions", () => {
       { ...NOTHING, hasTraces: true, hasEvaluations: true },
       EVERYTHING,
     ]) {
-      expect(selectHomeSuggestions(reach)).toHaveLength(HOME_SUGGESTION_COUNT);
+      expect(selectLangySuggestions({ reach })).toHaveLength(
+        HOME_SUGGESTION_COUNT,
+      );
     }
   });
 
   describe("given a project with nothing in it", () => {
     /** @scenario A project with nothing in it yet still opens with the composer */
     it("offers ways to get set up, never asks about data that is not there", () => {
-      const chosen = selectHomeSuggestions(NOTHING);
+      const chosen = selectLangySuggestions({ reach: NOTHING });
 
       expect(chosen).toEqual(SETUP_SUGGESTIONS.slice(0, HOME_SUGGESTION_COUNT));
       expect(chosen.every((s) => !s.requires)).toBe(true);
+      expect(chosen.map((s) => s.label)).toContain("Onboard your agent");
     });
   });
 
   describe("given a project with traces but nothing built on them", () => {
     it("offers what traces alone support, and tops the row up with setup", () => {
-      const chosen = selectHomeSuggestions({ ...NOTHING, hasTraces: true });
+      const chosen = selectLangySuggestions({
+        reach: { ...NOTHING, hasTraces: true },
+      });
 
       // Nothing that needs evaluations or experiment runs to land on.
       expect(chosen.some((s) => s.requires === "evaluations")).toBe(false);
       expect(chosen.some((s) => s.requires === "experiments")).toBe(false);
       expect(chosen.some((s) => s.requires === "traces")).toBe(true);
     });
+
+    it("withdraws the onboarding ask the moment the first trace exists", () => {
+      const chosen = selectLangySuggestions({
+        reach: { ...NOTHING, hasTraces: true },
+        count: PANEL_SUGGESTION_COUNT,
+      });
+
+      expect(chosen.map((s) => s.label)).not.toContain("Onboard your agent");
+    });
   });
 
   describe("given a project that has traces and evaluations", () => {
     /** @scenario The asks grow with what the project can act on */
     it("offers an ask that lands on those evaluations", () => {
-      const chosen = selectHomeSuggestions({
-        ...NOTHING,
-        hasTraces: true,
-        hasEvaluations: true,
+      const chosen = selectLangySuggestions({
+        reach: {
+          ...NOTHING,
+          hasTraces: true,
+          hasEvaluations: true,
+        },
       });
 
       expect(chosen.some((s) => s.requires === "evaluations")).toBe(true);
+    });
+
+    it("no longer offers to choose what to measure — that gap has closed", () => {
+      const chosen = selectLangySuggestions({
+        reach: { ...NOTHING, hasTraces: true, hasEvaluations: true },
+        count: PANEL_SUGGESTION_COUNT,
+      });
+
+      expect(chosen.map((s) => s.label)).not.toContain(
+        "Choose what to measure",
+      );
     });
   });
 
   describe("given a project that has reached everything", () => {
     /** @scenario The example asks are the ones Langy actually offers */
     it("leads with the most capable ask and drops the setup asks", () => {
-      const chosen = selectHomeSuggestions(EVERYTHING);
+      const chosen = selectLangySuggestions({ reach: EVERYTHING });
 
       expect(chosen[0]?.requires).toBe("experiments");
       expect(
@@ -87,18 +118,33 @@ describe("selectHomeSuggestions", () => {
       );
 
       for (const reach of [NOTHING, EVERYTHING]) {
-        for (const suggestion of selectHomeSuggestions(reach)) {
+        for (const suggestion of selectLangySuggestions({ reach })) {
           expect(offered).toContain(suggestion.prompt);
         }
       }
     });
   });
 
-  describe("when the project gains capability", () => {
-    it("never shows a project with data how to send its first trace", () => {
-      const chosen = selectHomeSuggestions(EVERYTHING);
+  describe("given the panel's wider row", () => {
+    /** @scenario The panel's empty state offers the full range to a capable project */
+    it("shows a fully-reached project every real ask", () => {
+      const chosen = selectLangySuggestions({
+        reach: EVERYTHING,
+        count: PANEL_SUGGESTION_COUNT,
+      });
 
-      expect(chosen.map((s) => s.label)).not.toContain("Send my first trace");
+      expect(chosen).toHaveLength(SUGGESTIONS.length);
+      expect(chosen.map((s) => s.label).toSorted()).toEqual(
+        SUGGESTIONS.map((s) => s.label).toSorted(),
+      );
+    });
+  });
+
+  describe("when the project gains capability", () => {
+    it("never shows a project with data how to onboard its agent", () => {
+      const chosen = selectLangySuggestions({ reach: EVERYTHING });
+
+      expect(chosen.map((s) => s.label)).not.toContain("Onboard your agent");
     });
   });
 });

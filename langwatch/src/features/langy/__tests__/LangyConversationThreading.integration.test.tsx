@@ -190,6 +190,21 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
+    // The empty state's asks are picked from the project's reach (see
+    // useProjectReach); a fully-reached project keeps the classic four rows.
+    integrationsChecks: {
+      getCheckStatus: {
+        useQuery: () => ({
+          data: {
+            firstMessage: true,
+            onlineEvaluations: 1,
+            simulations: 1,
+            datasets: 1,
+          },
+          isLoading: false,
+        }),
+      },
+    },
     ops: {
       getScope: {
         useQuery: () => ({

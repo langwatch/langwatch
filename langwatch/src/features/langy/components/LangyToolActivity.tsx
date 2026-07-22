@@ -991,6 +991,11 @@ function ActivityCard({
   // Show the completed receipt long enough to read, then return the transcript
   // to a compact state. A deliberate click cancels the automatic collapse.
   const [open, setOpen] = useState(group.done);
+  // The raw payload has its OWN toggle, never the card's expansion. It used to
+  // ride `open`, which meant developer mode showed the JSON on every expanded
+  // card — including the auto-opened completion receipt — without the `{}`
+  // ever being clicked. Closed until asked, every time.
+  const [jsonOpen, setJsonOpen] = useState(false);
   const userToggled = useRef(false);
   useEffect(() => {
     if (!group.done) return;
@@ -1121,14 +1126,23 @@ function ActivityCard({
           {groupCategory(group)}
         </Text>
         {devMode ? (
-          <Tooltip content={open ? "Hide raw data" : "Show raw data"} showArrow>
+          <Tooltip
+            content={jsonOpen ? "Hide raw data" : "Show raw data"}
+            showArrow
+          >
             <IconButton
               size="2xs"
               variant="ghost"
-              color={open ? "orange.solid" : "fg.subtle"}
-              aria-label={open ? "Hide raw data" : "Show raw data"}
-              aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
+              color={jsonOpen ? "orange.solid" : "fg.subtle"}
+              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
+              aria-expanded={jsonOpen}
+              onClick={(event) => {
+                // The header row's own click collapses the card; inspecting
+                // the payload must not dismiss the card it belongs to.
+                event.stopPropagation();
+                userToggled.current = true;
+                setJsonOpen((v) => !v);
+              }}
             >
               <Braces size={12} />
             </IconButton>
@@ -1152,7 +1166,7 @@ function ActivityCard({
         </Text>
       ) : null}
 
-      {devMode && open ? (
+      {devMode && jsonOpen ? (
         <VStack align="stretch" gap={1}>
           {group.calls.map((call, index) => (
             <RawCallJson key={call.toolCallId ?? index} call={call} />
