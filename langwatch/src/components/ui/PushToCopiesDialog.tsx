@@ -1,6 +1,6 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { HandledErrorAlert } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { Checkbox } from "./checkbox";
 import { Dialog } from "./dialog";
 import { toaster } from "./toaster";
@@ -69,13 +69,9 @@ export function PushToCopiesDialog({
       onSuccess?.();
       onClose();
     } catch (err) {
-      toaster.create({
-        title: `Error pushing ${entityLabel.toLowerCase()}`,
-        description:
-          err && typeof err === "object" && "message" in err
-            ? String((err as { message: unknown }).message)
-            : "Unknown error",
-        type: "error",
+      showErrorToast({
+        error: err,
+        fallbackTitle: `Couldn't push the ${entityLabel.toLowerCase()}`,
       });
     }
   };

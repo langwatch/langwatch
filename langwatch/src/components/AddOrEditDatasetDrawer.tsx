@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { Drawer } from "../components/ui/drawer";
@@ -28,7 +29,6 @@ import {
   datasetRecordFormSchema,
 } from "../server/datasets/types";
 import { api } from "../utils/api";
-import { isHandledByGlobalHandler } from "../utils/trpcError";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
 import { HorizontalFormControl } from "./HorizontalFormControl";
@@ -226,23 +226,11 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           void trpc.dataset.getAll.invalidate();
         },
         onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          // Check if it's a slug conflict error from backend
-          const isConflictError =
-            error.message.includes("already exists") ||
-            (error as any).data?.code === "CONFLICT";
-
-          toaster.create({
-            title: props.datasetToSave?.datasetId
-              ? "Error updating dataset"
-              : "Error creating dataset",
-            description: isConflictError
-              ? "A dataset with this name already exists. Please choose a different name."
-              : error.message,
-            type: "error",
-            meta: {
-              closable: true,
-            },
+          showErrorToast({
+            error,
+            fallbackTitle: props.datasetToSave?.datasetId
+              ? "Couldn't update the dataset"
+              : "Couldn't create the dataset",
           });
         },
       },

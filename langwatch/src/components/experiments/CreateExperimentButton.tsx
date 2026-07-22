@@ -4,16 +4,15 @@ import { useState } from "react";
 
 import { createInitialState } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
+import { showErrorToast } from "~/features/errors";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import { PageLayout } from "../ui/layouts/PageLayout";
 import { Menu } from "../ui/menu";
-import { toaster } from "../ui/toaster";
 
 export const CreateExperimentButton = () => {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -29,17 +28,9 @@ export const CreateExperimentButton = () => {
     },
     onError: (error) => {
       setIsCreating(false);
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating experiment",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Please try again. If the problem persists, contact support.",
-        type: "error",
-        meta: {
-          closable: true,
-        },
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't create the experiment",
       });
     },
   });

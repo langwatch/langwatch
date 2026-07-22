@@ -8,10 +8,10 @@ import {
 } from "@chakra-ui/react";
 import { Crown } from "lucide-react";
 import { useState } from "react";
+import { showErrorToast } from "~/features/errors";
 import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
-import { toaster } from "../ui/toaster";
 
 type ProrationQueryResult =
   | {
@@ -129,12 +129,9 @@ export function SeatsContent({
       await variant.onConfirm();
       onClose();
     } catch (err) {
-      toaster.create({
-        title: "Error updating seats",
-        description:
-          err instanceof Error ? err.message : "An unexpected error occurred",
-        type: "error",
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't update your seats",
       });
     } finally {
       setIsConfirming(false);

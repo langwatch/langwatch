@@ -50,6 +50,7 @@ import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -106,7 +107,6 @@ import {
   selectLangySuggestions,
 } from "../logic/langyHomeSuggestions";
 import { navigateDedupKey, reserveNavigate } from "../logic/langyNavigateDedup";
-import { isInternalHref } from "../logic/spaLink";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
@@ -127,6 +127,7 @@ import {
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
+import { isInternalHref } from "../logic/spaLink";
 import {
   type LangyRevealableKind,
   useLangyContextTargetStore,
@@ -735,9 +736,7 @@ function LangyPanel({
 
           const turnId = useLangyStore.getState().activeTurnId;
           const key = navigateDedupKey({ turnId, href: entry.href });
-          if (
-            !reserveNavigate({ seen: navigatedInstructionsRef.current, key })
-          )
+          if (!reserveNavigate({ seen: navigatedInstructionsRef.current, key }))
             return;
 
           // router.push ONLY — never window.location. A same-project SPA
@@ -1570,16 +1569,10 @@ function LangyPanel({
           meta: { closable: true },
         });
       } catch (error) {
-        if (!isHandledByGlobalHandler(error)) {
-          toaster.create({
-            title: "Failed to apply",
-            description:
-              error instanceof Error ? error.message : "Unknown error",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        }
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't apply this suggestion",
+        });
       } finally {
         clearProposalApplying(proposalId);
       }
@@ -1611,13 +1604,20 @@ function LangyPanel({
     // Reading only the stream shape (as this once did) collapsed EVERY mutation
     // rejection — model-not-configured, egress-misconfigured, insufficient-scope,
     // even a raw infra throw — into the generic "unknown" card, hiding the real
-    // (and often actionable) error the server actually returned. The unknown
-    // fallback now also carries the raw message so a genuinely-unhandled error
-    // stays legible in the dev-mode debug drawer instead of being a black box.
+    // (and often actionable) error the server actually returned.
     if (error) {
-      return explainLangyError(
-        resolveLiveTurnError({ error, durableLastError: historyLastError }),
-      );
+      const domain = resolveLiveTurnError({
+        error,
+        durableLastError: historyLastError,
+      });
+      // The raw message is DEBUG context, so it is logged, not put on `meta` —
+      // `meta` is the contract for what the card renders, and since #5984 a
+      // handled error's message is only its code slug anyway. Logged solely
+      // for the case nothing could name, which is the one worth reading.
+      if (domain.code === "unknown") {
+        console.warn("[Langy] unclassified turn failure", error.message);
+      }
+      return explainLangyError(domain);
     }
     // The DURABLE failure, off the conversation fold. A turn error lived only in
     // `useChat` state, so a refresh after a failed turn left the user's question
