@@ -11,7 +11,7 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type {
   LogRecordStorageRepository,
   StoredLogRecordRow,
-} from "./log-record-storage.repository";
+} from "~/server/event-sourcing/ports/log-record-storage.repository";
 
 const TABLE_NAME = "stored_log_records" as const;
 

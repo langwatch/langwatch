@@ -1,4 +1,4 @@
-import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
+import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";

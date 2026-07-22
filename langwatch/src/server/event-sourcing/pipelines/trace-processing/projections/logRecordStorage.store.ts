@@ -1,4 +1,4 @@
-import type { LogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
+import type { LogRecordStorageRepository } from "~/server/event-sourcing/ports/log-record-storage.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   AppendStore,

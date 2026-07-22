@@ -47,18 +47,18 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
-import type { CanonicalLogRecordRepository } from "../app-layer/logs/repositories/canonical-log-record.repository";
-import type { MetricDataPointRepository } from "../app-layer/metrics/repositories/metric-data-point.repository";
+import type { CanonicalLogRecordRepository } from "~/server/event-sourcing/ports/canonical-log-record.repository";
+import type { MetricDataPointRepository } from "~/server/event-sourcing/ports/metric-data-point.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type {
   LogRecordStorageRepository,
   StoredLogRecordRow,
-} from "../app-layer/traces/repositories/log-record-storage.repository";
-import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
+} from "~/server/event-sourcing/ports/log-record-storage.repository";
+import type { TraceAnalyticsRepository } from "~/server/event-sourcing/ports/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
-import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
+import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";

@@ -1,4 +1,4 @@
-import type { MetricDataPointRepository } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
+import type { MetricDataPointRepository } from "~/server/event-sourcing/ports/metric-data-point.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   AppendStore,

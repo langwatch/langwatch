@@ -1,4 +1,4 @@
-import type { CanonicalLogRecordRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
+import type { CanonicalLogRecordRepository } from "~/server/event-sourcing/ports/canonical-log-record.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   AppendStore,

@@ -7,7 +7,7 @@ import { getProtectionsForProject } from "~/server/api/utils";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
-import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
+import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryData } from "~/server/domain/traces/types";

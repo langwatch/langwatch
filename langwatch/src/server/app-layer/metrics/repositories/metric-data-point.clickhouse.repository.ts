@@ -17,7 +17,7 @@ import type {
   MetricDataPointBulkWrite,
   MetricDataPointRepository,
   MetricDataPointWrite,
-} from "./metric-data-point.repository";
+} from "~/server/event-sourcing/ports/metric-data-point.repository";
 import {
   fromRaw,
   RAW_SELECT,

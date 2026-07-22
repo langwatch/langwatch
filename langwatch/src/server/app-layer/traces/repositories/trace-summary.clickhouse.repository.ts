@@ -8,7 +8,7 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
-import type { TraceSummaryRepository } from "./trace-summary.repository";
+import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
 

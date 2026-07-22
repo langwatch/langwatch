@@ -5,7 +5,7 @@ import { TraceNotFoundError } from "./errors";
 import type {
   FindByTraceIdOptions,
   TraceSummaryRepository,
-} from "./repositories/trace-summary.repository";
+} from "~/server/event-sourcing/ports/trace-summary.repository";
 import type { SpanStorageRepository } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/domain/traces/types";

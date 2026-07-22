@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
 import type { EvaluationRunData } from "~/server/domain/evaluations/types";
-import type { LogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
+import type { LogRecordStorageRepository } from "~/server/event-sourcing/ports/log-record-storage.repository";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
-import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
+import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";

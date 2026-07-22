@@ -17,7 +17,7 @@ import {
   CLAUDE_DROPPED_LOG_COUNT_ATTR,
   CLAUDE_TRUNCATED_LOGS_ATTR,
 } from "~/server/app-layer/traces/claude-code-log-to-span";
-import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
+import type { StoredLogRecordRow } from "~/server/event-sourcing/ports/log-record-storage.repository";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import {
   LOG_CONTRIBUTED_EVENT_TYPE,

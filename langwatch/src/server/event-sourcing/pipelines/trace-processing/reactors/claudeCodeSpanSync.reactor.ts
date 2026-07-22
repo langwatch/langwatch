@@ -7,7 +7,7 @@ import {
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeTurnToSpans,
 } from "~/server/app-layer/traces/claude-code-log-to-span";
-import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
+import type { StoredLogRecordRow } from "~/server/event-sourcing/ports/log-record-storage.repository";
 import type {
   OtlpKeyValue,
   OtlpResource,

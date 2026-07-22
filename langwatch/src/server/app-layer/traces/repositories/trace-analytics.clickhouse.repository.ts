@@ -4,7 +4,7 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import type { TraceAnalyticsRepository } from "./trace-analytics.repository";
+import type { TraceAnalyticsRepository } from "~/server/event-sourcing/ports/trace-analytics.repository";
 
 const TABLE_NAME = "trace_analytics" as const;
 

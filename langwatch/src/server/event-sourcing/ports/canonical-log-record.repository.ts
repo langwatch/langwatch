@@ -1,4 +1,4 @@
-import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
+import type { StoredLogRecordRow } from "~/server/event-sourcing/ports/log-record-storage.repository";
 import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
 
 export interface CanonicalLogRecordRepository {
