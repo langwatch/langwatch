@@ -32,10 +32,26 @@ func tree(t *testing.T, files map[string]string) string {
 }
 
 // herrPackage is the stub the fixtures import; only the shape matters, the
-// parser never type-checks.
+// parser never type-checks. Code is a defined string type here exactly as it is
+// in pkg/herr, which is what lets a bare literal stand in for it at a call site.
 const herrPackage = `package herr
 
+import "context"
+
 type Code string
+
+type M map[string]any
+
+type E struct {
+	Code Code
+	Meta M
+}
+
+func (e E) Error() string { return string(e.Code) }
+
+func New(ctx context.Context, code Code, meta M, reasons ...error) E { return E{Code: code, Meta: meta} }
+
+func NewLight(ctx context.Context, code Code, meta M, reasons ...error) E { return E{Code: code, Meta: meta} }
 
 func RegisterStatus(code Code, status int) {}
 `
@@ -504,6 +520,29 @@ const (
 	}
 }
 
+func TestParseIgnoresATrailingLineComment(t *testing.T) {
+	// A trailing comment is a note to the next Go reader — usually the status,
+	// or a "// deprecated". Rendering it as the entry's JSDoc turned it into
+	// "ErrBusy — 409", which reads as the code's definition and is not one.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const ErrBusy = herr.Code("busy") // 409
+`,
+	})
+
+	entries, _, err := herrgen.Parse(root, io.Discard)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if doc := entryFor(t, entries, "busy").Primary().Doc; doc != "" {
+		t.Errorf("busy doc = %q, want none — a trailing comment is not a doc comment", doc)
+	}
+}
+
 func TestParseRejectsAnUnmappedHTTPStatusConstant(t *testing.T) {
 	// Skipping it would emit a status-less entry, which reads exactly like a
 	// code nobody registered — a silent lie in the generated file.
@@ -560,13 +599,13 @@ const ErrHidden = Code("hidden")
 	}
 }
 
-func TestParseSkipsUnparseableFilesWithAWarning(t *testing.T) {
+func TestParseSkipsUnparseableSnippetsWithAWarning(t *testing.T) {
 	// The tree carries hand-written Go that is never compiled (documentation
 	// snippets rendered into the product UI). One of those failing to parse must
 	// not take the drift check down with it.
 	root := tree(t, map[string]string{
 		"pkg/herr/herr.go": herrPackage,
-		"langwatch/src/features/onboarding/snippets/go/openai.snippet.go": `package main
+		"langwatch/src/features/onboarding/regions/observability/codegen/snippets/go/openai.snippet.go": `package main
 
 func main() { this is not Go
 `,
@@ -586,6 +625,452 @@ const ErrBusy = herr.Code("busy")
 	entryFor(t, entries, "busy")
 	if !strings.Contains(warnings.String(), "openai.snippet.go") {
 		t.Errorf("warnings = %q, want the skipped file named", warnings.String())
+	}
+}
+
+func TestParseFailsOnAnUnparseableServiceFile(t *testing.T) {
+	// A service file failing to parse mid-refactor used to drop every code in it
+	// and exit 0, committing a truncated artifact.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"services/nlpgo/domain/errors.go": `package domain
+
+const ErrBusy = herr.Code( this is not Go
+`,
+	})
+
+	_, _, err := herrgen.Parse(root, io.Discard)
+	if err == nil {
+		t.Fatal("Parse() error = nil, want the unparseable service file to fail the run")
+	}
+	if !strings.Contains(err.Error(), "services/nlpgo/domain/errors.go") {
+		t.Errorf("Parse() error = %q, want it to name the file", err)
+	}
+}
+
+func TestParseReadsCodesOutsideAConstBlock(t *testing.T) {
+	// Every one of these compiles and puts a code on the wire. Missing any of
+	// them leaves a live code with no customer copy and the drift check green.
+	tests := []struct {
+		name   string
+		source string
+		code   string
+		// declaredBy is the const name the entry should carry, empty when the
+		// code has no const to name.
+		declaredBy string
+	}{
+		{
+			name: "a var sentinel, which is what herr.Code satisfying error invites",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+// ErrBusy is returned while another run holds the workflow.
+var ErrBusy = herr.Code("busy")
+`,
+			code:       "busy",
+			declaredBy: "ErrBusy",
+		},
+		{
+			name: "a typed var",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+var ErrBusy herr.Code = "busy"
+`,
+			code:       "busy",
+			declaredBy: "ErrBusy",
+		},
+		{
+			name: "a conversion inside a map literal",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+var byKind = map[string]herr.Code{
+	"workflow": herr.Code("busy"),
+}
+`,
+			code: "busy",
+		},
+		{
+			name: "a conversion inside a struct literal",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+type rule struct{ code herr.Code }
+
+var busyRule = rule{code: herr.Code("busy")}
+`,
+			code: "busy",
+		},
+		{
+			name: "a conversion in a function body",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+func codeFor() herr.Code {
+	return herr.Code("busy")
+}
+`,
+			code: "busy",
+		},
+		{
+			name: "a const declared inside a function body",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+func codeFor() herr.Code {
+	const ErrBusy = herr.Code("busy")
+	return ErrBusy
+}
+`,
+			code:       "busy",
+			declaredBy: "ErrBusy",
+		},
+		{
+			name: "a code assembled from adjacent literals",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+const ErrBusy = herr.Code("bu" + "sy")
+`,
+			code:       "busy",
+			declaredBy: "ErrBusy",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := tree(t, map[string]string{
+				"pkg/herr/herr.go":                herrPackage,
+				"services/nlpgo/domain/errors.go": test.source,
+			})
+
+			entries, _, err := herrgen.Parse(root, io.Discard)
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+			entry := entryFor(t, entries, test.code)
+			if got := entry.Primary().Name; got != test.declaredBy {
+				t.Errorf("entry %q names const %q, want %q", test.code, got, test.declaredBy)
+			}
+			if got := entry.Primary().Source; got != "services/nlpgo/domain/errors.go" {
+				t.Errorf("entry %q source = %q, want the declaring file", test.code, got)
+			}
+		})
+	}
+}
+
+func TestParseRejectsACodeItCannotRead(t *testing.T) {
+	// A code built from a const prefix is the one shape that must never be
+	// passed over: the string exists at runtime, so the customer meets it, and
+	// silence here is a code with no copy and a green drift check.
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "a const prefix",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+const prefix = "workflow_"
+
+const ErrBusy = herr.Code(prefix + "busy")
+`,
+		},
+		{
+			name: "a function call",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+func name() string { return "busy" }
+
+var ErrBusy = herr.Code(name())
+`,
+		},
+		{
+			name: "a typed const built from a prefix",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+const prefix = "workflow_"
+
+const ErrBusy herr.Code = prefix + "busy"
+`,
+		},
+		{
+			name: "a conversion in a function body",
+			source: `package domain
+
+import "example.com/repo/pkg/herr"
+
+func codeFor(kind string) herr.Code {
+	return herr.Code("workflow_" + kind)
+}
+`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := tree(t, map[string]string{
+				"pkg/herr/herr.go":                herrPackage,
+				"services/nlpgo/domain/errors.go": test.source,
+			})
+
+			_, _, err := herrgen.Parse(root, io.Discard)
+			if err == nil {
+				t.Fatal("Parse() error = nil, want the unreadable code to fail the run")
+			}
+			if !strings.Contains(err.Error(), "services/nlpgo/domain/errors.go") {
+				t.Errorf("Parse() error = %q, want it to name the file and line", err)
+			}
+		})
+	}
+}
+
+func TestParseReadsInlineStringCodes(t *testing.T) {
+	// herr.Code is a defined string type, so a bare literal in a constructor
+	// compiles with no conversion in sight and reaches the client identically.
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{
+			name: "herr.New",
+			source: `package httpmiddleware
+
+import (
+	"context"
+
+	"example.com/repo/pkg/herr"
+)
+
+func fail(ctx context.Context) error {
+	return herr.New(ctx, "internal_error", nil)
+}
+`,
+		},
+		{
+			name: "herr.NewLight",
+			source: `package httpmiddleware
+
+import (
+	"context"
+
+	"example.com/repo/pkg/herr"
+)
+
+func fail(ctx context.Context) error {
+	return herr.NewLight(ctx, "internal_error", nil)
+}
+`,
+		},
+		{
+			name: "a herr.E literal",
+			source: `package httpmiddleware
+
+import "example.com/repo/pkg/herr"
+
+var boom = herr.E{Code: "internal_error"}
+`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := tree(t, map[string]string{
+				"pkg/herr/herr.go":              herrPackage,
+				"pkg/httpmiddleware/recover.go": test.source,
+			})
+
+			entries, _, err := herrgen.Parse(root, io.Discard)
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+			entry := entryFor(t, entries, "internal_error")
+			if entry.Primary().Source != "pkg/httpmiddleware/recover.go" {
+				t.Errorf("internal_error source = %q, want the call site", entry.Primary().Source)
+			}
+			if entry.Primary().Name != "" {
+				t.Errorf("internal_error names const %q, want none — there is no const", entry.Primary().Name)
+			}
+		})
+	}
+
+	t.Run("a constructor given a const carries the const's doc, not a second entry", func(t *testing.T) {
+		root := tree(t, map[string]string{
+			"pkg/herr/herr.go": herrPackage,
+			"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+// ErrBusy is returned while another run holds the workflow.
+const ErrBusy = herr.Code("busy")
+`,
+			"services/nlpgo/app/run.go": `package app
+
+import (
+	"context"
+
+	"example.com/repo/pkg/herr"
+	"example.com/repo/services/nlpgo/domain"
+)
+
+func fail(ctx context.Context) error {
+	return herr.New(ctx, domain.ErrBusy, nil)
+}
+`,
+		})
+
+		entries, _, err := herrgen.Parse(root, io.Discard)
+		if err != nil {
+			t.Fatalf("Parse() error = %v", err)
+		}
+		entry := entryFor(t, entries, "busy")
+		if len(entry.Declarations) != 1 {
+			t.Errorf("busy has %d declarations, want just the const: %+v", len(entry.Declarations), entry.Declarations)
+		}
+	})
+}
+
+func TestParseRejectsAStatusItCannotRead(t *testing.T) {
+	// A registration is unmistakably a status registration, so a status herrgen
+	// cannot read would emit a status-less entry — indistinguishable from a code
+	// nobody registered.
+	tests := []struct {
+		name   string
+		status string
+	}{
+		{name: "a local const", status: "statusBusy"},
+		{name: "a call", status: "statusFor()"},
+		{name: "a selector into another package", status: "codes.Busy"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := tree(t, map[string]string{
+				"pkg/herr/herr.go": herrPackage,
+				"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const statusBusy = 409
+
+func statusFor() int { return 409 }
+
+const ErrBusy = herr.Code("busy")
+
+func RegisterStatuses() {
+	herr.RegisterStatus(ErrBusy, ` + test.status + `)
+}
+`,
+			})
+
+			_, _, err := herrgen.Parse(root, io.Discard)
+			if err == nil {
+				t.Fatal("Parse() error = nil, want the unreadable status to fail the run")
+			}
+			if !strings.Contains(err.Error(), "services/nlpgo/domain/errors.go:12") {
+				t.Errorf("Parse() error = %q, want it to name the registration", err)
+			}
+		})
+	}
+}
+
+func TestParseIsDeterministicAcrossRuns(t *testing.T) {
+	// The two renderer "stability" tests only feed a pre-sorted slice to a pure
+	// function, so a dropped sort in group or groupNodeCodes would sail past
+	// them. This runs the whole walk, whose map iteration is the actual risk.
+	root := tree(t, map[string]string{
+		"pkg/herr/herr.go": herrPackage,
+		"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const (
+	ErrBusy      = herr.Code("busy")
+	ErrNotFound  = herr.Code("not_found")
+	ErrForbidden = herr.Code("forbidden")
+)
+`,
+		"services/aigateway/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const (
+	ErrRateLimited = herr.Code("rate_limited")
+	ErrNotFound    = herr.Code("not_found")
+	ErrCircuitOpen = herr.Code("circuit_open")
+)
+`,
+		"services/langyagent/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const (
+	ErrAgentError = herr.Code("agent_error")
+	ErrBusy       = herr.Code("busy")
+	ErrSpawn      = herr.Code("worker_spawn_failed")
+	ErrNotReady   = herr.Code("worker_not_ready")
+	ErrNoFreeUID  = herr.Code("no_free_worker_uid")
+)
+`,
+		"services/nlpgo/app/engine/engine.go": `package engine
+
+type NodeError struct {
+	Type    string
+	Message string
+}
+
+var (
+	_ = NodeError{Type: "http_error"}
+	_ = NodeError{Type: "llm_error"}
+	_ = NodeError{Type: "invalid_dataset"}
+	_ = NodeError{Type: "engine_error"}
+)
+`,
+		"services/nlpgo/app/engine/code.go": `package engine
+
+var (
+	_ = NodeError{Type: "code_runner_error"}
+	_ = NodeError{Type: "http_error"}
+	_ = NodeError{Type: "context_canceled"}
+	_ = NodeError{Type: "invalid_condition"}
+	_ = NodeError{Type: "code_block_timeout"}
+	_ = NodeError{Type: "upstream_http_error"}
+)
+`,
+	})
+
+	entries, nodeCodes, err := herrgen.Parse(root, io.Discard)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if len(entries) < 8 || len(nodeCodes) < 8 {
+		t.Fatalf("fixture is too small to catch an ordering bug: %d codes, %d node codes", len(entries), len(nodeCodes))
+	}
+	first := string(herrgen.Render(entries)) + string(herrgen.RenderNodeCodes(nodeCodes))
+
+	for run := range 20 {
+		gotEntries, gotNodeCodes, err := herrgen.Parse(root, io.Discard)
+		if err != nil {
+			t.Fatalf("Parse() error on run %d = %v", run, err)
+		}
+		got := string(herrgen.Render(gotEntries)) + string(herrgen.RenderNodeCodes(gotNodeCodes))
+		if got != first {
+			t.Fatalf("run %d generated different bytes:\n%s\n\nvs\n\n%s", run, first, got)
+		}
 	}
 }
 

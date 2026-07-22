@@ -95,9 +95,46 @@ func TestRender(t *testing.T) {
 			absent: []string{"this */ in"},
 		},
 		{
+			name: "a code with no const to name leads with the code itself",
+			entries: []herrgen.Entry{{
+				Code: "internal_error",
+				Declarations: []herrgen.Declaration{
+					{Code: "internal_error", Source: "pkg/httpmiddleware/recover.go", Service: "httpmiddleware"},
+				},
+			}},
+			want: []string{
+				"   * internal_error\n",
+				"   * @source pkg/httpmiddleware/recover.go\n",
+				`  internal_error: { service: "httpmiddleware" },`,
+			},
+			// A bare literal at a call site is a use, not a declaration.
+			absent: []string{"Also declared by"},
+		},
+		{
+			name: "a source path that closes a block comment cannot end the generated one",
+			entries: []herrgen.Entry{{
+				Code: "weird",
+				Declarations: []herrgen.Declaration{{
+					Name:    "ErrWeird",
+					Code:    "weird",
+					Source:  "pkg/rpc/*/decode.go",
+					Service: "rpc",
+				}},
+			}},
+			want:   []string{`@source pkg/rpc/*\/decode.go`},
+			absent: []string{"*/decode.go"},
+		},
+		{
 			name:    "the file is valid TypeScript with no entries at all",
 			entries: nil,
 			want:    []string{"export const goErrorCodes = {\n} as const;\n", "export type GoErrorCode = keyof typeof goErrorCodes;\n"},
+		},
+		{
+			name: "an entry with no declarations renders rather than panicking",
+			// Entry is exported, so a caller can hand Render one Parse never
+			// built. Indexing [0] made that a panic three frames in.
+			entries: []herrgen.Entry{{Code: "orphaned"}},
+			want:    []string{`  orphaned: { service: "" },`},
 		},
 	}
 

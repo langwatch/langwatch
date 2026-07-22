@@ -83,13 +83,23 @@ func RenderNodeCodes(codes []NodeCode) []byte {
 	for _, code := range codes {
 		out.WriteString("  /**\n")
 		for _, source := range code.Sources {
-			fmt.Fprintf(&out, "   * @source %s\n", source)
+			fmt.Fprintf(&out, "   * @source %s\n", escapeComment(source))
 		}
 		out.WriteString("   */\n")
-		fmt.Fprintf(&out, "  %s: { service: %q },\n", propertyKey(code.Code), serviceOf(code.Sources[0]))
+		fmt.Fprintf(&out, "  %s: { service: %q },\n", propertyKey(code.Code), serviceOf(primarySource(code)))
 	}
 	out.WriteString(nodeFooter)
 	return []byte(out.String())
+}
+
+// primarySource is the path a NodeCode's service is derived from, or "" when it
+// carries none. RenderNodeCodes is exported, so an empty Sources must render an
+// entry with no service rather than panic.
+func primarySource(code NodeCode) string {
+	if len(code.Sources) == 0 {
+		return ""
+	}
+	return code.Sources[0]
 }
 
 var paragraphBreak = regexp.MustCompile(`\n[ \t]*\n`)
@@ -101,10 +111,18 @@ func docLines(entry Entry) []string {
 	// The Go convention starts a doc comment with the identifier it documents;
 	// the em dash keeps that lead-in readable once it is a TypeScript comment.
 	body := strings.TrimSpace(primary.Doc)
-	if rest, found := strings.CutPrefix(body, primary.Name); found {
-		body = strings.TrimSpace(rest)
+	if primary.Name != "" {
+		if rest, found := strings.CutPrefix(body, primary.Name); found {
+			body = strings.TrimSpace(rest)
+		}
 	}
+	// A code written as a bare string literal — `herr.New(ctx, "x", nil)`, or a
+	// herr.Code conversion inside a map — has no const name to lead with, so the
+	// code stands in for it.
 	lead := primary.Name
+	if lead == "" {
+		lead = entry.Code
+	}
 	if body != "" {
 		lead += " — " + body
 	}
@@ -124,20 +142,29 @@ func docLines(entry Entry) []string {
 
 	lines = append(lines, "")
 	for _, source := range sources(entry) {
-		lines = append(lines, "@source "+source)
+		lines = append(lines, "@source "+escapeComment(source))
 	}
 	return lines
 }
 
 // alsoDeclaredBy names the other services declaring the same code string, so a
 // reader of the generated file knows the entry is shared before changing it.
+//
+// Only named declarations: a bare string literal at a call site is a use, not a
+// declaration, and the @source lines below already name the file it is in.
 func alsoDeclaredBy(entry Entry) string {
 	if len(entry.Declarations) < 2 {
 		return ""
 	}
 	others := make([]string, 0, len(entry.Declarations)-1)
 	for _, declaration := range entry.Declarations[1:] {
+		if declaration.Name == "" {
+			continue
+		}
 		others = append(others, fmt.Sprintf("%s (%s)", declaration.Service, declaration.Name))
+	}
+	if len(others) == 0 {
+		return ""
 	}
 	slices.Sort(others)
 	return "Also declared by " + strings.Join(others, ", ") + "."

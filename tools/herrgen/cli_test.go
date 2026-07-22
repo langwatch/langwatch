@@ -9,11 +9,14 @@ import (
 	"github.com/langwatch/langwatch/tools/herrgen"
 )
 
-// oneCode is the smallest tree the CLI can generate from.
+// oneCode is the smallest tree the CLI can generate from. The destination
+// package exists, as it does in the repository: herrgen writes into it and
+// never creates it.
 func oneCode(t *testing.T) string {
 	t.Helper()
 	return tree(t, map[string]string{
-		"pkg/herr/herr.go": herrPackage,
+		"packages/handled-error/src/.keep": "",
+		"pkg/herr/herr.go":                 herrPackage,
 		"services/nlpgo/domain/errors.go": `package domain
 
 import (
@@ -117,9 +120,54 @@ const ErrCircuitOpen = herr.Code("circuit_open")
 		}
 	})
 
-	t.Run("exits 2 and writes nothing when two consts disagree on a status", func(t *testing.T) {
+	t.Run("exits 2 when the root holds no codes at all", func(t *testing.T) {
+		// The repository has more than one go.mod, so -root can point at a
+		// module that declares nothing. Writing the empty artifact there and
+		// exiting 0 is how a mistyped root deletes every code.
+		root := tree(t, map[string]string{
+			"packages/handled-error/src/.keep": "",
+			"pkg/herr/herr.go":                 herrPackage,
+		})
+
+		var stdout, stderr strings.Builder
+		code := herrgen.Run([]string{"-root", root}, &stdout, &stderr)
+		if code != 2 {
+			t.Fatalf("exit code = %d, want 2; stderr: %s", code, stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "no herr codes found") {
+			t.Errorf("stderr = %q, want it to say no codes were found", stderr.String())
+		}
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(out))); !os.IsNotExist(err) {
+			t.Error("an empty generated file was written")
+		}
+	})
+
+	t.Run("exits 2 rather than creating a destination that does not exist", func(t *testing.T) {
+		// A wrong -out used to grow a directory tree and report success.
 		root := tree(t, map[string]string{
 			"pkg/herr/herr.go": herrPackage,
+			"services/nlpgo/domain/errors.go": `package domain
+
+import "example.com/repo/pkg/herr"
+
+const ErrNotFound = herr.Code("not_found")
+`,
+		})
+
+		var stdout, stderr strings.Builder
+		code := herrgen.Run([]string{"-root", root, "-out", "nowhere/at/all/codes.ts"}, &stdout, &stderr)
+		if code != 2 {
+			t.Fatalf("exit code = %d, want 2; stderr: %s", code, stderr.String())
+		}
+		if _, err := os.Stat(filepath.Join(root, "nowhere")); !os.IsNotExist(err) {
+			t.Error("herrgen created the destination tree instead of failing")
+		}
+	})
+
+	t.Run("exits 2 and writes nothing when two consts disagree on a status", func(t *testing.T) {
+		root := tree(t, map[string]string{
+			"packages/handled-error/src/.keep": "",
+			"pkg/herr/herr.go":                 herrPackage,
 			"services/nlpgo/domain/errors.go": `package domain
 
 import (

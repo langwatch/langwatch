@@ -165,8 +165,9 @@ test-scripts:
 # Mirror the Go services' herr error codes into
 # packages/handled-error/src/codes.generated.ts, so the TypeScript control
 # plane stops compiling when a Go service gains a code with no presentation.
-# Run after adding or renaming a `herr.Code(...)` const; `herrgen-check` is the
-# same run as a CI drift check (see the generated job in go-ci.yaml).
+# Run after adding or renaming a `herr.Code(...)` const. `herrgen-check` is the
+# drift check, and go-ci.yaml's `generated` job calls this same target, so what
+# CI runs and what you run cannot drift apart.
 herrgen:
 	@go run ./cmd/herrgen
 

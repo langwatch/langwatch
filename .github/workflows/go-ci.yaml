@@ -37,15 +37,17 @@ jobs:
         with:
           filters: |
             # herrgen walks every Go file in the repo for herr code
-            # declarations (tools/herrgen/parse.go::goFiles), so this filter is
-            # a superset of that walk — not a list of the services that happen
-            # to declare codes today. Naming services individually meant a
-            # brand new `services/<name>/` could add a code and skip the drift
-            # check. `langwatch/**/*.go` is here because the walk reaches the
-            # onboarding code snippets under it; the whole `langwatch/` tree is
-            # deliberately NOT listed, since a frontend-only PR has no Go to
-            # check.
+            # declarations (tools/herrgen/parse.go::goFiles), so this filter has
+            # to be a superset of that walk — not a list of the services that
+            # happen to declare codes today. `**/*.go` is that superset, and it
+            # is the only spelling that stays one: the earlier per-prefix list
+            # left out `internal/**` and root-level `*.go`, so a code declared
+            # there changed the generated artifact while the drift job skipped
+            # and `go-ci-complete` went green on it. The whole `langwatch/` tree
+            # is still deliberately NOT listed, since a frontend-only PR has no
+            # Go to check.
             go:
+              - '**/*.go'
               - 'services/**'
               - 'pkg/**'
               - 'cmd/**'
@@ -53,7 +55,6 @@ jobs:
               - 'sdk-go/**'
               - 'clickhouse-serverless/**'
               - 'packages/handled-error/**'
-              - 'langwatch/**/*.go'
               - 'go.mod'
               - 'go.sum'
               - '.golangci.yml'
@@ -134,7 +135,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go run ./cmd/herrgen -check
+      # Through the Makefile, so the check CI runs and the check a developer
+      # runs cannot drift apart.
+      - run: make herrgen-check
 
   # The single required status check. Every job above is `if:`-gated and so
   # cannot be required directly — a skipped job never reports, and branch
