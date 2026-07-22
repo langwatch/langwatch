@@ -131,6 +131,7 @@ export const goErrorCodes = {
    *
    * Also declared by aigateway (ErrInternal), nlpgo (ErrInternal).
    *
+   * @source pkg/httpmiddleware/recover.go
    * @source services/aigateway/domain/errors.go
    * @source services/langyagent/domain/errors.go
    * @source services/nlpgo/domain/errors.go
@@ -366,6 +367,10 @@ export const nodeErrorCodes = {
    * @source services/nlpgo/app/engine/attachment.go
    */
   attachment_fetch_error: { service: "nlpgo" },
+  /**
+   * @source services/nlpgo/app/engine/engine.go
+   */
+  code_block_timeout: { service: "nlpgo" },
   /**
    * @source services/nlpgo/app/engine/engine.go
    */

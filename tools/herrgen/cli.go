@@ -32,6 +32,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+	// The repository has more than one go.mod, so -root can point somewhere
+	// plausible that holds none of the services. Writing the empty artifact
+	// there and exiting 0 is how a mistyped root deletes every code.
+	if len(entries) == 0 {
+		fmt.Fprintf(stderr,
+			"no herr codes found under %s — is -root the repository root?\nIt must be the directory whose go.mod covers the Go services.\n",
+			*root)
+		return 2
+	}
 	generated := append(Render(entries), RenderNodeCodes(nodeCodes)...)
 	target := filepath.Join(*root, *out)
 
@@ -54,16 +63,43 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
-		fmt.Fprintln(stderr, err)
-		return 2
-	}
-	if err := os.WriteFile(target, generated, 0o644); err != nil { //nolint:gosec // generated source, world-readable like the rest of the tree
+	// No MkdirAll: the destination is a package that already exists, so a path
+	// that is not there is a wrong -out, and creating the tree would hide it.
+	if err := writeAtomic(target, generated); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
 	fmt.Fprintf(stdout, "Wrote %s to %s.\n", codeCount(len(entries)), *out)
 	return 0
+}
+
+// writeAtomic replaces target in one step.
+//
+// os.WriteFile truncates first, so an interrupted run leaves a half-written
+// generated file behind — which then fails the TypeScript build for a reason
+// that has nothing to do with error codes. The temp file is written alongside
+// the target so the rename stays on one filesystem.
+func writeAtomic(target string, data []byte) error {
+	temp, err := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".*")
+	if err != nil {
+		return err
+	}
+	name := temp.Name()
+	defer func() { _ = os.Remove(name) }()
+
+	if _, err := temp.Write(data); err != nil {
+		_ = temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	// CreateTemp opens at 0600; the artifact is generated source, world-readable
+	// like the rest of the tree.
+	if err := os.Chmod(name, 0o644); err != nil { //nolint:gosec // generated source
+		return err
+	}
+	return os.Rename(name, target)
 }
 
 func codeCount(count int) string {

@@ -1,8 +1,10 @@
 package herrgen
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -12,6 +14,15 @@ import (
 // The nlpgo engine returns a failed node's error as a `NodeError{Type: "..."}`
 // literal, so the codes are read from those literals rather than from any const.
 const nodeErrorType = "NodeError"
+
+// nodeErrorPackageDir is the repository-relative package that declares it.
+//
+// Pinned for the same reason herrImportSuffix is. Matching a bare `NodeError`
+// identifier anywhere would let any type that happens to share the name
+// contribute codes to a union documented as the engine's, and would still miss a
+// qualified `engine.NodeError{...}` written from another package — which is the
+// form the adapters use.
+const nodeErrorPackageDir = "services/nlpgo/app/engine"
 
 // NodeCode is one workflow NodeError.Type produced by the nlpgo engine, folded
 // across every literal that uses it.
@@ -23,42 +34,101 @@ type NodeCode struct {
 	Sources []string
 }
 
-// nodeErrorSite is one NodeError literal found in the tree: the Type it holds
-// and the file it appears in. Many sites share a code; group folds them.
+// nodeErrorSite is one NodeError literal found in the tree. Many sites share a
+// code; groupNodeCodes folds them.
 type nodeErrorSite struct {
-	Code   string
+	// Code is the Type string the literal holds, empty when Readable is false.
+	Code string
+	// Source is the repository-relative file the literal appears in.
 	Source string
+	// Package is the repository-relative directory the literal's type resolves
+	// to: the file's own directory for a bare `NodeError`, the imported
+	// package's directory for a qualified `engine.NodeError`. Only sites whose
+	// package actually declares the type are kept.
+	Package string
+	// Position is "path:line", so an unreadable site can be named.
+	Position string
+	// Readable is false when the literal sets a `Type` that is not a string
+	// literal — a code that reaches the client and that herrgen cannot mirror.
+	Readable bool
 }
 
-// fileNodeErrorSites returns one site per NodeError composite literal in file
-// whose `Type` is a plain string constant, tagged with source.
+// fileNodeErrorSites returns one site per NodeError composite literal in file.
 //
 // Both `NodeError{...}` and `&NodeError{...}` are read: the address-of wraps the
-// same composite literal, which ast.Inspect visits either way. A literal whose
-// Type is a non-literal (e.g. `Type: res.Error.Type`, forwarding an upstream
-// code) carries nothing we can name, so it is skipped silently — the same
-// posture the herr scanner takes for a non-literal Code argument.
-func fileNodeErrorSites(file *ast.File, source string) []nodeErrorSite {
+// same composite literal, which ast.Inspect visits either way. So is a qualified
+// `engine.NodeError{...}` from another package, resolved through the file's
+// imports — matching on the bare identifier alone would both miss those and
+// count any unrelated type that happens to be called NodeError.
+func fileNodeErrorSites(
+	fset *token.FileSet,
+	file *ast.File,
+	source, pkgDir string,
+	imports map[string]string,
+	modulePath string,
+) []nodeErrorSite {
 	var sites []nodeErrorSite
 	ast.Inspect(file, func(node ast.Node) bool {
 		lit, ok := node.(*ast.CompositeLit)
 		if !ok {
 			return true
 		}
-		if ident, ok := lit.Type.(*ast.Ident); !ok || ident.Name != nodeErrorType {
+		pkg, ok := nodeErrorPackage(lit.Type, pkgDir, imports, modulePath)
+		if !ok {
 			return true
 		}
-		if code, ok := nodeErrorTypeField(lit); ok {
-			sites = append(sites, nodeErrorSite{Code: code, Source: source})
+		code, found, readable := nodeErrorTypeField(lit)
+		if !found {
+			// The literal sets no Type at all — a partially built value whose
+			// Type is assigned elsewhere. It carries no code to read here.
+			return true
 		}
+		position := fset.Position(lit.Pos())
+		sites = append(sites, nodeErrorSite{
+			Code:     code,
+			Source:   source,
+			Package:  pkg,
+			Position: fmt.Sprintf("%s:%d", filepath.ToSlash(position.Filename), position.Line),
+			Readable: readable,
+		})
 		return true
 	})
 	return sites
 }
 
+// nodeErrorPackage reports the package directory a composite literal's type
+// resolves to, when that type is named NodeError.
+func nodeErrorPackage(expr ast.Expr, pkgDir string, imports map[string]string, modulePath string) (string, bool) {
+	switch named := expr.(type) {
+	case *ast.Ident:
+		if named.Name != nodeErrorType {
+			return "", false
+		}
+		return pkgDir, true
+	case *ast.SelectorExpr:
+		if named.Sel.Name != nodeErrorType {
+			return "", false
+		}
+		qualifier, ok := named.X.(*ast.Ident)
+		if !ok {
+			return "", false
+		}
+		importPath, ok := imports[qualifier.Name]
+		if !ok || !strings.HasPrefix(importPath, modulePath+"/") {
+			return "", false
+		}
+		return strings.TrimPrefix(importPath, modulePath+"/"), true
+	}
+	return "", false
+}
+
 // nodeErrorTypeField reads the string a NodeError's `Type: "..."` field holds.
-// It reports false when the field is absent or set to a non-string-literal.
-func nodeErrorTypeField(lit *ast.CompositeLit) (string, bool) {
+//
+// found is false when the literal sets no Type at all. readable is false when it
+// sets one that is not a string literal: a code forwarded from somewhere else
+// still reaches the client, so herrgen reports it rather than dropping it — the
+// pass-through belongs at the Go boundary, normalised onto a code that exists.
+func nodeErrorTypeField(lit *ast.CompositeLit) (code string, found, readable bool) {
 	for _, element := range lit.Elts {
 		kv, ok := element.(*ast.KeyValueExpr)
 		if !ok {
@@ -69,15 +139,44 @@ func nodeErrorTypeField(lit *ast.CompositeLit) (string, bool) {
 		}
 		literal, ok := kv.Value.(*ast.BasicLit)
 		if !ok || literal.Kind != token.STRING {
-			return "", false
+			return "", true, false
 		}
-		code, err := strconv.Unquote(literal.Value)
+		unquoted, err := strconv.Unquote(literal.Value)
 		if err != nil {
-			return "", false
+			return "", true, false
 		}
-		return code, true
+		return unquoted, true, true
 	}
-	return "", false
+	return "", false, false
+}
+
+// resolveNodeErrorSites keeps the sites whose type resolves to the engine's
+// NodeError, and fails on any of those whose Type it could not read.
+func resolveNodeErrorSites(sites []nodeErrorSite) ([]nodeErrorSite, error) {
+	var (
+		kept       []nodeErrorSite
+		unreadable []string
+	)
+	for _, site := range sites {
+		if site.Package != nodeErrorPackageDir {
+			continue
+		}
+		if !site.Readable {
+			unreadable = append(unreadable, site.Position)
+			continue
+		}
+		kept = append(kept, site)
+	}
+	if len(unreadable) > 0 {
+		slices.Sort(unreadable)
+		return nil, fmt.Errorf(
+			"NodeError literals whose Type is not a string literal (the code still reaches the client, "+
+				"so it cannot be generated and would ship with no customer copy):\n  %s\n"+
+				"Normalise the upstream error onto a NodeError code written as a literal.",
+			strings.Join(unreadable, "\n  "),
+		)
+	}
+	return kept, nil
 }
 
 // groupNodeCodes folds the sites into one NodeCode per code string, its Sources

@@ -1,11 +1,18 @@
 // Package herrgen mirrors the Go services' handled-error codes into TypeScript.
 //
-// A code is Go syntax — `Name = herr.Code("name")`, in a const block or on its
-// own, with a doc comment of any length — so it is read with go/ast rather than
-// matched with a regex. HTTP statuses live somewhere else entirely (a
-// RegisterStatuses func, usually next to the router), so they are resolved by
-// finding every `herr.RegisterStatus(Name, http.StatusX)` call in the tree and
-// mapping the const it names back to the code string it holds.
+// A code is Go syntax, so it is read with go/ast rather than matched with a
+// regex — and read wherever it is written, not only where it is usually
+// written: a const block, a standalone const, a `var` sentinel, a conversion
+// inside a map or a function body, or a bare string literal handed to a herr
+// constructor (herr.Code is a defined string type, so that compiles too). Each
+// of those puts the same string on the wire, and one the generator cannot see is
+// a code with no customer copy and a green drift check. A code it can see but
+// cannot read stops the run rather than being passed over.
+//
+// HTTP statuses live somewhere else entirely (a RegisterStatuses func, usually
+// next to the router), so they are resolved by finding every
+// `herr.RegisterStatus(Name, http.StatusX)` call in the tree and mapping the
+// const it names back to the code string it holds.
 package herrgen
 
 import (
@@ -70,7 +77,16 @@ type Entry struct {
 }
 
 // Primary is the declaration the doc comment and service name come from.
-func (e Entry) Primary() Declaration { return e.Declarations[0] }
+//
+// The zero Declaration for an entry with none: Entry is exported, so a caller
+// can hand Render one that Parse never built, and a panic three frames into the
+// renderer is a worse answer than an entry with no name and no service.
+func (e Entry) Primary() Declaration {
+	if len(e.Declarations) == 0 {
+		return Declaration{}
+	}
+	return e.Declarations[0]
+}
 
 // Parse walks root and returns every herr code declared under it as one Entry
 // per distinct code string, plus every workflow NodeError.Type as one NodeCode
@@ -80,10 +96,11 @@ func (e Entry) Primary() Declaration { return e.Declarations[0] }
 // statuses: herr's registry is keyed by the string, so one of the two would
 // silently win at runtime depending on init order.
 //
-// A file that does not parse is skipped with a warning on warn rather than
-// failing the run: the tree contains hand-written Go that is never compiled
-// (documentation snippets rendered into the product UI), and one of those
-// failing to parse must not take the drift check down with it.
+// A file that does not parse fails the run, except under the hand-written
+// onboarding snippets: those are documentation rendered into the product UI and
+// are never compiled, so one of them changing shape must not take the drift
+// check down. Anywhere else an unparseable file is a service file mid-refactor,
+// and silently dropping its codes would commit a truncated artifact at exit 0.
 func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 	modulePath, err := readModulePath(root)
 	if err != nil {
@@ -114,16 +131,21 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 		// later reads as a path someone can open.
 		file, err := parser.ParseFile(fset, rel, source, parser.ParseComments)
 		if err != nil {
+			if !toleratesParseFailure(rel) {
+				return nil, nil, fmt.Errorf("%s does not parse as Go: %w", rel, err)
+			}
 			fmt.Fprintf(warn, "herrgen: skipping %s, it does not parse as Go: %v\n", rel, err)
 			continue
 		}
 
-		// NodeError literals need no import — they are plain composite literals
-		// in the engine package — so they are read from every file, before the
-		// herr import gate below can skip one.
-		nodeSites = append(nodeSites, fileNodeErrorSites(file, rel)...)
-
+		pkgDir := path.Dir(rel)
 		imports := importsOf(file)
+
+		// NodeError literals need no herr import — they are plain composite
+		// literals in the engine package — so they are read from every file,
+		// before the herr import gate below can skip one.
+		nodeSites = append(nodeSites, fileNodeErrorSites(fset, file, rel, pkgDir, imports, modulePath)...)
+
 		herrName, err := localNameFor(imports, modulePath+"/"+herrImportSuffix)
 		if err != nil {
 			return nil, nil, fmt.Errorf("%s: %w", rel, err)
@@ -134,12 +156,17 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 			continue
 		}
 
-		pkgDir := path.Dir(rel)
-		for _, decl := range fileDeclarations(file, herrName) {
+		fileDecls, err := fileDeclarations(fset, file, herrName)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, decl := range fileDecls {
 			decl.Source = rel
 			decl.Service = serviceOf(rel)
 			declarations = append(declarations, decl)
-			byConst[pkgDir+"."+decl.Name] = decl.Code
+			if decl.Name != "" {
+				byConst[pkgDir+"."+decl.Name] = decl.Code
+			}
 		}
 		fileRegs, err := fileRegistrations(fset, file, herrName, pkgDir, imports, modulePath)
 		if err != nil {
@@ -152,17 +179,30 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return group(declarations, statuses), groupNodeCodes(nodeSites), nil
+	resolvedNodeSites, err := resolveNodeErrorSites(nodeSites)
+	if err != nil {
+		return nil, nil, err
+	}
+	return group(declarations, statuses), groupNodeCodes(resolvedNodeSites), nil
+}
+
+// snippetSegment marks the hand-written Go under langwatch/ that is rendered
+// into the onboarding UI rather than compiled.
+const snippetSegment = "/codegen/snippets/"
+
+// toleratesParseFailure reports whether a file failing to parse is expected.
+// Only the onboarding snippets are: everywhere else the file is real, compiled
+// Go, and dropping it would drop its codes.
+func toleratesParseFailure(rel string) bool {
+	return strings.HasPrefix(rel, "langwatch/") && strings.Contains(rel, snippetSegment)
 }
 
 // goFiles lists the repository-relative non-test Go files under root.
 //
 // testdata is skipped for the same reason the go tool skips it: the Go inside is
-// a fixture, and its codes are not the product's. A directory with no go.mod at
-// unparseable file is skipped with a warning rather than aborting the run:
-// `langwatch/**` holds hand-written onboarding snippets that are not meant to
-// compile, and one of them changing shape must not stop the whole platform's
-// codes from generating.
+// a fixture, and its codes are not the product's. Everything else is walked,
+// including langwatch/'s onboarding snippets — see toleratesParseFailure for the
+// one place that costs us something.
 func goFiles(root string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(abs string, entry fs.DirEntry, err error) error {
@@ -255,7 +295,6 @@ func localNameFor(imports map[string]string, importPath string) (string, error) 
 	}
 	return "", nil
 }
-
 
 var modulePattern = regexp.MustCompile(`(?m)^module\s+(\S+)\s*$`)
 

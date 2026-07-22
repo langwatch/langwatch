@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -34,13 +35,10 @@ func fileRegistrations(
 			return true
 		}
 		position := fset.Position(call.Pos())
-		status, ok, err := statusValue(call.Args[1], imports)
+		status, err := statusValue(call.Args[1], imports)
 		if err != nil {
 			hasErr = true
 			errs = append(errs, fmt.Sprintf("%s:%d: %v", filepath.ToSlash(position.Filename), position.Line, err))
-			return true
-		}
-		if !ok {
 			return true
 		}
 		found = append(found, Registration{
@@ -80,39 +78,41 @@ func constKey(expr ast.Expr, pkgDir string, imports map[string]string, modulePat
 // statusValue resolves the status argument, either a net/http constant or a
 // plain integer literal.
 //
-// The three outcomes are deliberately distinct. A shape we do not read at all
-// (a variable, a helper call, a selector into some other package) returns
-// (0, false, nil) and the caller moves on. A `net/http` constant we cannot map
-// returns an error: the registration is unmistakably a status registration, so
-// skipping it would emit a status-less entry that looks exactly like a code
-// nobody registered. That is a gap in httpStatuses, and it should stop the run
-// rather than quietly change the generated file.
-func statusValue(expr ast.Expr, imports map[string]string) (int, bool, error) {
+// Every other shape is an error. Reaching this function at all means the call
+// is unmistakably a status registration, so a status we cannot read would emit a
+// status-less entry that looks exactly like a code nobody registered — a silent
+// lie in the generated file, whether the cause is a gap in httpStatuses or a
+// local const, a variable, or a helper call standing in for the number. Both
+// stop the run rather than quietly change the artifact.
+func statusValue(expr ast.Expr, imports map[string]string) (int, error) {
 	switch arg := expr.(type) {
 	case *ast.BasicLit:
 		if arg.Kind != token.INT {
-			return 0, false, nil
+			break
 		}
 		status, err := strconv.Atoi(arg.Value)
 		if err != nil {
-			return 0, false, nil
+			break
 		}
-		return status, true, nil
+		return status, nil
 	case *ast.SelectorExpr:
 		qualifier, ok := arg.X.(*ast.Ident)
 		if !ok || imports[qualifier.Name] != "net/http" {
-			return 0, false, nil
+			break
 		}
 		status, ok := httpStatuses[arg.Sel.Name]
 		if !ok {
-			return 0, false, fmt.Errorf(
+			return 0, fmt.Errorf(
 				"http.%s is not in herrgen's status map; add it to httpStatuses in tools/herrgen/status.go",
 				arg.Sel.Name,
 			)
 		}
-		return status, true, nil
+		return status, nil
 	}
-	return 0, false, nil
+	return 0, fmt.Errorf(
+		"the HTTP status %s cannot be read by herrgen; register it as a net/http constant (http.StatusConflict) or a plain integer",
+		types.ExprString(expr),
+	)
 }
 
 // resolveStatuses maps each code string to its registered status, failing when
