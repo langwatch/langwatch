@@ -57,7 +57,7 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	// driven by an agent/pipe.
 	if len(args) == 0 {
 		if isAgent {
-			return d.orch.List(true)
+			return d.orch.Status(true)
 		}
 		return runHub(ctx, d)
 	}

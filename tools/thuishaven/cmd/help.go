@@ -119,8 +119,8 @@ EXAMPLES
     haven                        # the hub: every stack + actions (git/down/destroy)
     haven git                    # git TUI for this worktree (haven git <slug> for another)
     haven seed --preset demo     # reseed past onboarding, with sample traces
-    haven list --json            # machine-readable inventory of every stack
-    haven doctor                 # is everything wired up?
+    haven status                 # every stack + shared-server health, one shot
+    haven status --json          # the same, machine-readable
     haven up --watch             # air hot-reload for gateway + nlp
     haven up --detach            # background the stack; haven logs -f to follow
     haven restart nlp            # bounce one Go service without hot reload

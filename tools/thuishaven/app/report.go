@@ -9,12 +9,44 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// List prints every running stack — which worktree owns which slug and where
-// each service is reachable. asJSON is the agent-friendly form.
-func (o *Orchestrator) List(asJSON bool) error {
+// health is one shared component's status line, JSON-shaped for agents.
+type health struct {
+	OK     bool   `json:"ok"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// Status is haven's one reporting surface: every stack (liveness, services,
+// per-service health, RAM footprint) plus the shared machinery (proxy, daemon,
+// observability, the managed database servers) in a single one-shot report.
+// asJSON is the agent-friendly form.
+func (o *Orchestrator) Status(asJSON bool) error {
+	ctx := context.Background()
 	stacks := o.store.Stacks()
 	scheme, port := o.proxy.Endpoint()
 	shared := func(svc string) string { return o.cfg.Naming.URL(svc, "", scheme, port) }
+
+	info, daemonUp := o.store.Daemon()
+	proxy := health{OK: o.proxy.Running(), Detail: fmt.Sprintf("%s on :%d", scheme, port)}
+	daemon := health{OK: daemonUp && o.sys.ProcessAlive(info.PID), Detail: fmt.Sprintf("pid %d", info.PID)}
+	servers := map[string]health{}
+	if o.obs != nil {
+		ok, detail := o.obs.Health(ctx)
+		servers["observability"] = health{OK: ok, Detail: detail}
+	}
+	if o.ch != nil && o.cfg.ShouldManageClickHouse {
+		ok, detail := o.ch.Health(ctx)
+		servers["clickhouse"] = health{OK: ok, Detail: detail}
+	}
+	if o.pg != nil && o.cfg.ShouldManagePostgres {
+		ok, detail := o.pg.Health(ctx)
+		servers["postgres"] = health{OK: ok, Detail: detail}
+	}
+	if o.rds != nil && o.cfg.ShouldManageRedis {
+		ok, detail := o.rds.Health(ctx)
+		servers["redis"] = health{OK: ok, Detail: detail}
+	}
+	live, rss := o.stackFootprint()
+
 	if asJSON {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -23,19 +55,51 @@ func (o *Orchestrator) List(asJSON bool) error {
 			"dashboard":     shared(domain.HubService),
 			"observability": shared("observability"),
 			"telemetry":     shared("telemetry"),
+			"proxy":         proxy,
+			"daemon":        daemon,
+			"servers":       servers,
+			"footprint":     map[string]any{"live": live, "rssBytes": rss},
 		})
 	}
+
 	if len(stacks) == 0 {
 		fmt.Println("no stacks running — start one with `haven up` in a worktree")
-		return nil
 	}
 	for _, s := range stacks {
-		fmt.Printf("%-18s %-6s %s  (%s)\n", s.Slug, o.liveness(s), s.Branch, s.WorktreeDir)
+		ram := ""
+		if o.sys.ProcessAlive(s.LauncherPID) {
+			if groupRSS := o.sys.GroupRSS(s.LauncherPID); groupRSS > 0 {
+				ram = "  ~" + domain.HumanBytes(int64(groupRSS))
+			}
+		}
+		fmt.Printf("%-18s %-6s %s  (%s)%s\n", s.Slug, o.liveness(s), s.Branch, s.WorktreeDir, ram)
 		for _, svc := range s.Services {
-			fmt.Printf("    %-8s %s\n", svc.Name, svc.URL)
+			dot := "·"
+			if o.sys.PortInUse(svc.Port) {
+				dot = "●"
+			}
+			fmt.Printf("  %s %-10s %s\n", dot, svc.Name, svc.URL)
 		}
 	}
-	fmt.Printf("\ndashboard %s\n", shared(domain.HubService))
+	fmt.Println()
+
+	ok := func(b bool) string {
+		if b {
+			return "ok  "
+		}
+		return "MISS"
+	}
+	fmt.Printf("%s portless proxy (%s)\n", ok(proxy.OK), proxy.Detail)
+	fmt.Printf("%s haven daemon (%s) -> %s\n", ok(daemon.OK), daemon.Detail, shared(o.cfg.Naming.Project))
+	for _, name := range []string{"observability", "clickhouse", "postgres", "redis"} {
+		h, managed := servers[name]
+		if !managed {
+			continue
+		}
+		fmt.Printf("%s %s — %s\n", ok(h.OK), name, h.Detail)
+	}
+	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
+		len(stacks), live, domain.HumanBytes(int64(rss)), shared(domain.HubService), o.cfg.Naming.TLD)
 	return nil
 }
 
@@ -44,40 +108,6 @@ func (o *Orchestrator) liveness(s domain.Stack) string {
 		return "live"
 	}
 	return "stale"
-}
-
-// Doctor reports on the moving parts so a human or agent can self-diagnose.
-func (o *Orchestrator) Doctor() error {
-	ok := func(b bool) string {
-		if b {
-			return "ok  "
-		}
-		return "MISS"
-	}
-	scheme, port := o.proxy.Endpoint()
-	url := func(svc string) string { return o.cfg.Naming.URL(svc, "", scheme, port) }
-	info, daemonUp := o.store.Daemon()
-	fmt.Printf("%s portless proxy running (%s on :%d)\n", ok(o.proxy.Running()), scheme, port)
-	fmt.Printf("%s haven daemon (pid %d) -> %s\n", ok(daemonUp && o.sys.ProcessAlive(info.PID)), info.PID, url(o.cfg.Naming.Project))
-	if o.obs != nil {
-		obsOK, detail := o.obs.Health(context.Background())
-		fmt.Printf("%s observability — %s -> %s\n", ok(obsOK), detail, url(domain.ObservabilityService))
-	}
-	if o.ch != nil && o.cfg.ShouldManageClickHouse {
-		chOK, detail := o.ch.Health(context.Background())
-		fmt.Printf("%s managed clickhouse — %s\n", ok(chOK), detail)
-	}
-	if o.pg != nil && o.cfg.ShouldManagePostgres {
-		pgOK, detail := o.pg.Health(context.Background())
-		fmt.Printf("%s managed postgres — %s\n", ok(pgOK), detail)
-	}
-	if o.rds != nil && o.cfg.ShouldManageRedis {
-		rdsOK, detail := o.rds.Health(context.Background())
-		fmt.Printf("%s managed redis — %s\n", ok(rdsOK), detail)
-	}
-	live, rss := o.stackFootprint()
-	fmt.Printf("     stacks running: %d (%d live, ~%s RAM)   tld: .%s\n", len(o.store.Stacks()), live, domain.HumanBytes(int64(rss)), o.cfg.Naming.TLD)
-	return nil
 }
 
 // stackFootprint sums the live stacks' process-group RSS — the "what are my

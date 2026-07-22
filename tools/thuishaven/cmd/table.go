@@ -158,8 +158,11 @@ func flagHint(spec commandSpec) string {
 // fails with a one-line pointer; it never keeps working silently (ADR-064:
 // clean break, no compatibility layer).
 var removed = map[string]string{
-	"ls":     "haven list",
-	"status": "haven list",
+	"ls":     "haven status",
+	"list":   "haven status",
+	"doctor": "haven status",
+	"watch":  "haven status (or bare `haven` for the live hub)",
+	"hub":    "haven (bare)",
 	"ps":     "haven",
 	"active": "haven",
 	"rs":     "haven restart",
@@ -231,19 +234,14 @@ var table = []commandSpec{
 		},
 	},
 	{
-		name:    "list",
-		summary: "every running stack: slug, branch, worktree, hostnames",
+		name:    "status",
+		summary: "one-shot report: every stack, service health, shared servers, RAM",
 		flags: []flagSpec{
 			{long: "--json", summary: "machine-readable"},
 		},
 		run: func(_ context.Context, d deps, inv invocation) error {
-			return d.orch.List(d.isAgent || inv.has("--json"))
+			return d.orch.Status(d.isAgent || inv.has("--json"))
 		},
-	},
-	{
-		name:    "doctor",
-		summary: "proxy / daemon / observability / stack health + memory footprints",
-		run:     func(_ context.Context, d deps, _ invocation) error { return d.orch.Doctor() },
 	},
 	{
 		name:    "seed",
@@ -329,11 +327,6 @@ var table = []commandSpec{
 			fmt.Print(shellInitScript)
 			return nil
 		},
-	},
-	{
-		name:    "watch",
-		summary: "passive live view of every running stack",
-		run:     func(ctx context.Context, d deps, _ invocation) error { return d.orch.Watch(ctx) },
 	},
 	{
 		name:    "setup",
