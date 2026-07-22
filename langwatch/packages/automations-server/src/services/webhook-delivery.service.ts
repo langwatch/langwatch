@@ -1,5 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
-import { PrismaWebhookDeliveryRepository } from "./repositories/webhook-delivery.prisma.repository";
 import type {
   WebhookDeliveryInput,
   WebhookDeliveryRepository,
@@ -16,12 +14,6 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  */
 export class WebhookDeliveryService {
   constructor(private readonly repo: WebhookDeliveryRepository) {}
-
-  static create(prisma: PrismaClient): WebhookDeliveryService {
-    return new WebhookDeliveryService(
-      new PrismaWebhookDeliveryRepository(prisma),
-    );
-  }
 
   /** Persist one attempt. */
   async record(input: WebhookDeliveryInput): Promise<void> {

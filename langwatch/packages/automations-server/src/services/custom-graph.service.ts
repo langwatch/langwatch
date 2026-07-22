@@ -1,5 +1,4 @@
-import type { CustomGraph, PrismaClient } from "@prisma/client";
-import { PrismaAutomationCustomGraphRepository } from "./repositories/custom-graph.prisma.repository";
+import type { CustomGraphRow } from "@langwatch/automations/domain/custom-graph";
 import type {
   AutomationCustomGraphRepository,
   CustomGraphNameRef,
@@ -8,22 +7,16 @@ import type {
 /**
  * The automations feature's read surface over custom graphs: the graph-alert
  * tenancy guard, the list enrichment, and the alert evaluator's config load.
- * Per-request factory (`create(prisma)`) like `WebhookDeliveryService` — this
- * is not a graphs domain, just the automations-owned lookups.
+ * Repository-injected like the other package services — this is not a graphs
+ * domain, just the automations-owned lookups.
  */
 export class AutomationCustomGraphService {
   constructor(private readonly repo: AutomationCustomGraphRepository) {}
 
-  static create(prisma: PrismaClient): AutomationCustomGraphService {
-    return new AutomationCustomGraphService(
-      new PrismaAutomationCustomGraphRepository(prisma),
-    );
-  }
-
   async getById(params: {
     customGraphId: string;
     projectId: string;
-  }): Promise<CustomGraph | null> {
+  }): Promise<CustomGraphRow | null> {
     return this.repo.findById(params);
   }
 

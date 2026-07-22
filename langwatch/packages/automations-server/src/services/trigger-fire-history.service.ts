@@ -1,5 +1,3 @@
-import type { PrismaClient } from "@prisma/client";
-import { PrismaTriggerFireHistoryRepository } from "./repositories/trigger-fire-history.prisma.repository";
 import type {
   TriggerFire,
   TriggerFireHistoryRepository,
@@ -17,12 +15,6 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
  */
 export class TriggerFireHistoryService {
   constructor(private readonly repo: TriggerFireHistoryRepository) {}
-
-  static create(prisma: PrismaClient): TriggerFireHistoryService {
-    return new TriggerFireHistoryService(
-      new PrismaTriggerFireHistoryRepository(prisma),
-    );
-  }
 
   /**
    * Per-trigger fire rollup for a project. `recentFireCount` covers the

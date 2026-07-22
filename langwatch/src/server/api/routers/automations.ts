@@ -43,15 +43,18 @@ import {
   extractReportFromTriggerRow,
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
-import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
-import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
+import { AutomationCustomGraphService } from "@langwatch/automations-server/services/custom-graph.service";
+import { PrismaAutomationCustomGraphRepository } from "~/server/app-layer/automations/repositories/custom-graph.prisma.repository";
+import { PrismaTriggerFireHistoryRepository } from "~/server/app-layer/automations/repositories/trigger-fire-history.prisma.repository";
+import { PrismaWebhookDeliveryRepository } from "~/server/app-layer/automations/repositories/webhook-delivery.prisma.repository";
+import { TriggerFireHistoryService } from "@langwatch/automations-server/services/trigger-fire-history.service";
 import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import {
   type DraftProject,
   validateTemplateDraft,
 } from "~/server/app-layer/automations/trigger-template.service";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
-import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
+import { WebhookDeliveryService } from "@langwatch/automations-server/services/webhook-delivery.service";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -416,9 +419,7 @@ export const automationRouter = createTRPCRouter({
         .filter((id): id is string => typeof id === "string" && id.length > 0);
       const customGraphs =
         customGraphIds.length > 0
-          ? await AutomationCustomGraphService.create(
-              ctx.prisma,
-            ).getAllNamesByIds({
+          ? await new AutomationCustomGraphService(new PrismaAutomationCustomGraphRepository(ctx.prisma)).getAllNamesByIds({
               customGraphIds,
               projectId: input.projectId,
             })
@@ -453,7 +454,7 @@ export const automationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
+      const fireHistory = new TriggerFireHistoryService(new PrismaTriggerFireHistoryRepository(ctx.prisma));
       return fireHistory.getAllFireStatsForProject({
         projectId: input.projectId,
       });
@@ -468,7 +469,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
+      const fireHistory = new TriggerFireHistoryService(new PrismaTriggerFireHistoryRepository(ctx.prisma));
       return fireHistory.getAllRecentFiresForTrigger({
         projectId: input.projectId,
         triggerId: input.triggerId,
@@ -488,7 +489,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const deliveries = WebhookDeliveryService.create(ctx.prisma);
+      const deliveries = new WebhookDeliveryService(new PrismaWebhookDeliveryRepository(ctx.prisma));
       return deliveries.getRecentByTrigger({
         projectId: input.projectId,
         triggerId: input.triggerId,
@@ -505,7 +506,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
-      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
+      const fireHistory = new TriggerFireHistoryService(new PrismaTriggerFireHistoryRepository(ctx.prisma));
       return fireHistory.getAllRecentFiresForProject({
         projectId: input.projectId,
         limit: input.limit,
@@ -948,9 +949,7 @@ export const automationRouter = createTRPCRouter({
           // The graph must belong to the calling project — multitenancy
           // gate. Without this a hostile client could attach a trigger to
           // a graph from another tenant.
-          const graphExists = await AutomationCustomGraphService.create(
-            ctx.prisma,
-          ).existsInProject({
+          const graphExists = await new AutomationCustomGraphService(new PrismaAutomationCustomGraphRepository(ctx.prisma)).existsInProject({
             customGraphId: input.customGraphId ?? "",
             projectId: input.projectId,
           });
