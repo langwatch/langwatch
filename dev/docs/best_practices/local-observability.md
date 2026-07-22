@@ -38,16 +38,16 @@ local-dev orchestrator) owns its lifecycle. That buys three things a raw
 
 ```bash
 make observability            # start the capped stack on colima (OTLP :4318, Grafana :3000)
-                              #   (equivalently: haven observability up)
+                              #   (equivalently: haven restart obs)
 make observability-connect    # mint a Grafana token + configure gcx
 # any pnpm dev stack you start while it is up exports to it automatically,
 # tagged by worktree — no .env changes needed. Already-running stacks need a
 # restart (pnpm dev) to pick it up.
-make observability-down        # stop it (haven observability down) — discards all telemetry
+LANGWATCH_HAVEN_OBS=0          # keep the next up from starting it; haven down --all stops everything
 ```
 
 Then open Grafana at http://localhost:3000 (anonymous Admin, or admin/admin), or
-ask your agent to query it. `make haven doctor` (or `haven doctor`) reports
+ask your agent to query it. `make haven status` (or `haven status`) reports
 stack health and the image actually running.
 
 ### Tuning the caps

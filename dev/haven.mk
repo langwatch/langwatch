@@ -11,14 +11,13 @@
 # Dashboard: https://langwatch.localhost
 #
 # `make haven <sub>` forwards <sub> straight to the haven CLI — so every command
-# (`up`, `down`, `doctor`, `list`, `prune`, `seed`, `observability up`, …) works
-# here with no per-command wrapper to keep in sync. See `haven help` for the set.
+# (`up`, `down`, `status`, `logs`, `db reset`, `clean`, …) works here with no
+# per-command wrapper to keep in sync. See `haven help` for the set. There is
+# no setup step: the first `haven up` bootstraps the machine itself.
 #
-#   make haven setup         # one-time: install/verify portless + trust its CA
 #   make haven install       # go install the binary, then just run `haven ...`
 #   make haven up            # start this worktree's stack (== pnpm dev:haven)
-#   make haven list          # which worktree runs what (all stacks)
-#   make haven doctor        # proxy / daemon / observability health
+#   make haven status        # every stack + shared-server health, one shot
 #   make haven               # build ./bin/haven (no subcommand)
 
 .PHONY: haven observability observability-connect observability-logs \
@@ -48,7 +47,7 @@ endif
 
 # `make haven`         -> build ./bin/haven
 # `make haven install` -> go install so plain `haven ...` works everywhere after
-# `make haven <sub>`   -> run the haven CLI with <sub> (setup, up, down, doctor, …)
+# `make haven <sub>`   -> run the haven CLI with <sub> (up, down, status, logs, …)
 haven:
 ifeq ($(strip $(HAVEN_ARGS)),)
 	@go build -o bin/haven $(HAVEN_PKG) && echo "built bin/haven"
@@ -63,28 +62,31 @@ endif
 # =============================================================================
 # An ephemeral OTLP Collector + Loki + Tempo + Prometheus + Grafana for reading
 # local logs/traces/metrics — including from an agent over the gcx CLI. Kept as
-# their own well-known targets (docs + muscle memory); the lifecycle underneath
-# is `haven observability up|status|down`. See
+# their own well-known targets (docs + muscle memory); underneath, the stack is
+# managed automatically by `haven up` (LANGWATCH_HAVEN_OBS=0 opts out) and
+# bounced with `haven restart obs`. See
 # dev/docs/best_practices/local-observability.md.
 
-# Start the stack (starts colima if needed) and wait until Grafana is healthy.
+# (Re)start the stack fresh (starts colima if needed). Telemetry resets — the
+# stack keeps no volume.
 observability:
-	@$(HAVEN) observability up
+	@$(HAVEN) restart obs
 
 # Mint a Grafana service-account token and configure the gcx CLI with it so
 # an agent can query the stack. Idempotent. (Not a haven subcommand — a script.)
 observability-connect:
 	@bash scripts/observability/connect.sh
 
-# Tail the stack logs. (Not a haven subcommand — plain docker.)
+# Tail the stack logs (same tap as every service: haven logs).
 observability-logs:
-	@docker logs -f langwatch-otel-lgtm
+	@$(HAVEN) logs obs -f
 
-# Show the stack status (also covered by `make haven doctor`).
+# Show the stack status (part of the one status report).
 observability-status:
-	@$(HAVEN) observability status
+	@$(HAVEN) status
 
-# Stop ONLY the observability stack (never the rest of the dev stack). The stack
-# keeps no volume, so this discards all collected telemetry by design.
+# The obs-only stop went with ADR-064's surface cut: the stack is managed
+# automatically, LANGWATCH_HAVEN_OBS=0 keeps the next up from starting it, and
+# `haven down --all` stops everything haven runs.
 observability-down:
-	@$(HAVEN) observability down
+	@echo "removed — LANGWATCH_HAVEN_OBS=0 stops the next up from starting it; haven down --all stops everything" && exit 1
