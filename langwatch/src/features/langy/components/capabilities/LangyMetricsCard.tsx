@@ -134,8 +134,10 @@ const MEASUREMENT_NAMES: Record<string, string> = {
 
 /** Exported for its own test — the naming rules are the interesting part. */
 export function humanMetricLabel(
-  key: string | undefined,
-  aggregation?: string | undefined,
+  key: string | null | undefined,
+  // `parseAnalytics` reports a missing aggregation as null, the CLI's own
+  // resolved payload omits it — both mean the same thing here.
+  aggregation?: string | null,
 ): string {
   if (!key) return "Metric";
   const named = aggregation
