@@ -38,22 +38,24 @@ describe("useConversationPrefetch", () => {
   });
 
   describe("given sibling turns in the same conversation", () => {
-    it("prefetches sibling headers without the extra spans read full IO resolution costs", () => {
-      renderHook(() => useConversationPrefetch("conv-1", "trace-1"));
+    describe("when prefetching sibling headers", () => {
+      it("prefetches without the extra spans read full IO resolution costs", () => {
+        renderHook(() => useConversationPrefetch("conv-1", "trace-1"));
 
-      vi.advanceTimersByTime(600);
+        vi.advanceTimersByTime(600);
 
-      expect(prefetchMock).toHaveBeenCalledWith({
-        projectId: "p1",
-        traceId: "trace-0",
-        occurredAtMs: 1_700_000_000_000,
-        full: false,
-      });
-      expect(prefetchMock).toHaveBeenCalledWith({
-        projectId: "p1",
-        traceId: "trace-2",
-        occurredAtMs: 1_700_000_002_000,
-        full: false,
+        expect(prefetchMock).toHaveBeenCalledWith({
+          projectId: "p1",
+          traceId: "trace-0",
+          occurredAtMs: 1_700_000_000_000,
+          full: false,
+        });
+        expect(prefetchMock).toHaveBeenCalledWith({
+          projectId: "p1",
+          traceId: "trace-2",
+          occurredAtMs: 1_700_000_002_000,
+          full: false,
+        });
       });
     });
   });
