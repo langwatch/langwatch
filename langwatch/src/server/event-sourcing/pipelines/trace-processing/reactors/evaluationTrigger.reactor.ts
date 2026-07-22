@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
+import type { MonitorPort } from "~/server/domain/monitors/monitor.port";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { featureFlagService } from "../../../../featureFlag";
@@ -28,7 +28,7 @@ const logger = createLogger(
 );
 
 export interface EvaluationTriggerReactorDeps {
-  monitors: MonitorService;
+  monitors: MonitorPort;
   evaluation: (
     data: ExecuteEvaluationCommandData,
     options?: QueueSendOptions<ExecuteEvaluationCommandData>,

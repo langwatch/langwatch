@@ -49,7 +49,7 @@ import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/rep
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { CanonicalLogRecordRepository } from "~/server/event-sourcing/ports/canonical-log-record.repository";
 import type { MetricDataPointRepository } from "~/server/event-sourcing/ports/metric-data-point.repository";
-import type { MonitorService } from "../app-layer/monitors/monitor.service";
+import type { MonitorPort } from "~/server/domain/monitors/monitor.port";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type {
@@ -334,7 +334,7 @@ export interface PipelineRegistryDeps {
   };
   enterprisePipelines: EnterprisePipelineSetConfig;
   projects: ProjectServicePort;
-  monitors: MonitorService;
+  monitors: MonitorPort;
   triggers: TriggerService;
   automations: { ports: AutomationDispatchPorts };
   prisma: PrismaClient;

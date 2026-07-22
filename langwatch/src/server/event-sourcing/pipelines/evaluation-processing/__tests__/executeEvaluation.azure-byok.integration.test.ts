@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Command } from "../../..";
 import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
-import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import type { MonitorPort } from "~/server/domain/monitors/monitor.port";
 import { createTenantId } from "../../../domain/tenantId";
 import { ExecuteEvaluationCommand } from "../commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
@@ -84,7 +84,7 @@ function buildCommandWithMocks({
 }) {
   const monitors = {
     getMonitorById: vi.fn().mockResolvedValue(buildMonitor(checkType)),
-  } as unknown as MonitorService;
+  } as unknown as MonitorPort;
 
   const spanStorage = {
     getSpansByTraceId: vi.fn().mockResolvedValue([]),

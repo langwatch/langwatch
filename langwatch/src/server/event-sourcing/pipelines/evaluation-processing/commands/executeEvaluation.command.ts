@@ -8,7 +8,7 @@ import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/
 import { HandledError } from "@langwatch/handled-error";
 import type { EvaluationCostPort } from "~/server/domain/evaluations/evaluation-cost.port";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
-import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import type { MonitorPort } from "~/server/domain/monitors/monitor.port";
 import {
   buildPreconditionTraceDataFromCommand,
   checkEvaluatorRequiredFields,
@@ -70,7 +70,7 @@ function isCustomerFixable(error: unknown): error is HandledError {
 }
 
 export interface ExecuteEvaluationCommandDeps {
-  monitors: MonitorService;
+  monitors: MonitorPort;
   spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string; occurredAtMs?: number }): Promise<Span[]> };
   traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
   evaluationExecution: EvaluationExecutionService;

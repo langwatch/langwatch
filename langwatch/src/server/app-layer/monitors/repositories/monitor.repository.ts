@@ -1,31 +1,14 @@
+// Both shapes live in the domain layer so event-sourcing can name them without
+// importing app-layer (ADR-063). One definition, re-exported here.
+export type {
+  MonitorSummary,
+  MonitorWithEvaluator,
+} from "~/server/domain/monitors/monitor.port";
+import type {
+  MonitorSummary,
+  MonitorWithEvaluator,
+} from "~/server/domain/monitors/monitor.port";
 import type { Monitor } from "@prisma/client";
-
-export interface MonitorSummary {
-  id: string;
-  checkType: string;
-  name: string;
-  threadIdleTimeout: number | null;
-  evaluator: { name: string } | null;
-}
-
-/**
- * Full monitor with optional linked evaluator — used by ExecuteEvaluationCommand
- * to decide sampling, preconditions, settings, and execution mode.
- */
-export interface MonitorWithEvaluator {
-  id: string;
-  checkType: string;
-  sample: number;
-  preconditions: unknown;
-  parameters: unknown;
-  mappings: unknown;
-  level: string | null;
-  evaluator: {
-    config: unknown;
-    type: string;
-    workflowId: string | null;
-  } | null;
-}
 
 export interface MonitorRepository {
   getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]>;
