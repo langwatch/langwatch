@@ -171,14 +171,21 @@ function LangyPeek({ onOpen }: { onOpen: () => void }) {
               zIndex: 1200,
               borderWidth: "1px",
               borderRadius: "20px",
-              background: "bg.surface/85",
+              borderColor: "border.emphasized",
+              // Nearly opaque, not a 15%-transparent pane: on a light page the
+              // glassy version dissolved into the white behind it.
+              background: "bg.surface/95",
               backdropFilter: "blur(8px)",
+              // Depth AND a warm brand glow. The shadow alone was
+              // rgba(…,0.04) — a rounding error against white — and depth on
+              // its own would only have made it a grey card. The orange lift
+              // is what says the thing at the bottom edge is Langy.
               boxShadow:
-                "0 -1px 2px rgba(20,20,23,0.04), 0 -8px 24px rgba(20,20,23,0.10)",
+                "0 -1px 3px rgba(20,20,23,0.10), 0 -12px 32px rgba(20,20,23,0.20), 0 -3px 18px rgba(237,137,38,0.30)",
               _dark: {
-                background: "bg.surface/88",
+                background: "bg.surface/92",
                 boxShadow:
-                  "0 -1px 2px rgba(0,0,0,0.4), 0 -10px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
+                  "0 -1px 2px rgba(0,0,0,0.45), 0 -14px 34px rgba(0,0,0,0.55), 0 -3px 20px rgba(237,137,38,0.28), inset 0 1px 0 rgba(255,255,255,0.14)",
               },
             }
           : {
@@ -194,12 +201,14 @@ function LangyPeek({ onOpen }: { onOpen: () => void }) {
               borderRightWidth: 0,
               borderTopLeftRadius: "12px",
               borderBottomLeftRadius: "12px",
+              borderColor: "border.emphasized",
               background: "bg.surface",
+              // Same correction as the floating lip, turned on its side.
               boxShadow:
-                "-1px 0 2px rgba(20,20,23,0.04), -8px 0 24px rgba(20,20,23,0.10)",
+                "-1px 0 3px rgba(20,20,23,0.10), -12px 0 32px rgba(20,20,23,0.20), -3px 0 18px rgba(237,137,38,0.30)",
               _dark: {
                 boxShadow:
-                  "-1px 0 2px rgba(0,0,0,0.4), -10px 0 28px rgba(0,0,0,0.5), inset 1px 0 0 rgba(255,255,255,0.12)",
+                  "-1px 0 2px rgba(0,0,0,0.45), -14px 0 34px rgba(0,0,0,0.55), -3px 0 20px rgba(237,137,38,0.28), inset 1px 0 0 rgba(255,255,255,0.14)",
               },
             })}
       >

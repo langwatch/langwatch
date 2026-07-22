@@ -21,13 +21,18 @@ import {
  */
 describe("langyPeekDock geometry", () => {
   describe("given the floating card is minimised", () => {
-    it("rests as a subtler sliver than it rises to", () => {
+    it("rests findably, and still visibly rises", () => {
       const rest = resolvePeekVisiblePx({ mode: "floating", phase: "rest" });
       const near = resolvePeekVisiblePx({ mode: "floating", phase: "near" });
-      expect(rest).toBeLessThan(near);
-      // The whole point of "more hidden than the screenshot": the resting
-      // sliver is a lip, not a title bar.
-      expect(rest).toBeLessThan(near / 2);
+      // The first cut rested at a lip deliberately "more hidden" than the
+      // reference — and in practice nobody could find it. A dock you have to
+      // already know about is not a dock, so the resting sliver now has to
+      // stand proud enough to read as one.
+      expect(rest).toBeGreaterThanOrEqual(20);
+      // Rising is still a real change rather than a token nudge, and the card
+      // never rises past its own height.
+      expect(near - rest).toBeGreaterThanOrEqual(12);
+      expect(near).toBeLessThan(FLOATING_PEEK_CARD_HEIGHT);
     });
 
     it("translates the sunk card so exactly the sliver stays above the edge", () => {
