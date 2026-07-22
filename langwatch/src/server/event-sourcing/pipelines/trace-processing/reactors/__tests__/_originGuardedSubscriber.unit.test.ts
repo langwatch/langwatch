@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,

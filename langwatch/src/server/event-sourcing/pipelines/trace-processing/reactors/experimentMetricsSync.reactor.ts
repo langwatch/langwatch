@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type {
   ReactorContext,
   ReactorDefinition,

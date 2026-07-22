@@ -4,7 +4,7 @@ import {
   MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 /**

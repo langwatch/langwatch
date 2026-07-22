@@ -3,7 +3,7 @@ import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,

@@ -6,7 +6,7 @@ import {
 } from "@langwatch/automations/cadences";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { DatasetRecordEntry } from "@langwatch/contracts/datasets";

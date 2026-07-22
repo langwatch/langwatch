@@ -4,7 +4,7 @@ import {
   isConversationalQuerySource,
 } from "~/server/app-layer/traces/canonicalisation/extractors/claudeCode";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,

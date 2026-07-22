@@ -4,7 +4,7 @@ import {
   type SimulationMetricsSyncReactorDeps,
 } from "../simulationMetricsSync.reactor";
 import { createTenantId } from "../../../../domain/tenantId";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { SPAN_RECEIVED_EVENT_TYPE, SPAN_RECEIVED_EVENT_VERSION_LATEST } from "../../schemas/constants";
 import type { SpanReceivedEvent } from "../../schemas/events";
 

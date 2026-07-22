@@ -1,4 +1,4 @@
-import type { TraceSummaryData } from "./types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 
 export type DerivedTraceStatus = "ok" | "error" | "warning";
 

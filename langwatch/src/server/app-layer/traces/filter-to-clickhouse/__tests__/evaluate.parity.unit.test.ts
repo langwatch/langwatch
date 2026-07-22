@@ -7,7 +7,7 @@ import {
   FACET_REGISTRY,
   type RangeFacetDef,
 } from "../../facet-registry";
-import type { TraceSummaryData } from "../../types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { translateFilterToClickHouse } from "../ast";
 import { evaluateQueryInMemory, queryNeeds } from "../evaluate";
 import { type InMemoryTrace, UNSUPPORTED } from "../field-def";

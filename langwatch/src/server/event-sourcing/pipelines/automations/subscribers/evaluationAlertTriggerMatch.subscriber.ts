@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";

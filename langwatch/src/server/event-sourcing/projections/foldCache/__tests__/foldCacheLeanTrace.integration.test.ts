@@ -28,7 +28,7 @@ import {
   IO_PREVIEW_BYTES,
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { Event } from "~/server/event-sourcing";
 import { createTenantId } from "~/server/event-sourcing";
 import {

@@ -3,7 +3,7 @@ import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-ext
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
 import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 
 const PARTIAL_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
 const SKIPPED_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;

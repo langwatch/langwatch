@@ -43,7 +43,7 @@ import type {
   TraceListSort,
   TraceListSortColumn,
 } from "./repositories/trace-list.repository";
-import type { TraceSummaryData } from "./types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { teaserOf } from "./visibility-window.service";
 
 export interface TraceListEvent {

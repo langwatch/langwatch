@@ -42,7 +42,7 @@ import type { TraceProcessingEvent } from "../trace-processing/schemas/events";
 import type { OtlpSpan } from "../trace-processing/schemas/otlp";
 import { SpanAppendStore } from "../trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "../trace-processing/projections/traceSummary.store";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL

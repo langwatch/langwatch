@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";

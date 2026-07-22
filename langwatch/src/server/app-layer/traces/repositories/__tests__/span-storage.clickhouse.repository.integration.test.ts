@@ -19,7 +19,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import type { SpanInsertData } from "../../types";
+import type { SpanInsertData } from "~/server/domain/traces/types";
 import { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
 
 const tenantId = `test-span-fetch-${nanoid()}`;

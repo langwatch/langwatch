@@ -13,7 +13,7 @@
  * input but no output even though a middle span says 'Done — output was ...'".
  */
 import { describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
 import {

@@ -20,7 +20,7 @@ import type {
   SpanSummaryRow,
 } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
-import type { SpanInsertData } from "./types";
+import type { SpanInsertData } from "~/server/domain/traces/types";
 import { redactSpanContent } from "./visibility-window.service";
 
 /**

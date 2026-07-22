@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";

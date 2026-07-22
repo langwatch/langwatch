@@ -9,7 +9,7 @@ import {
   matchesTriggerFilters,
   triggerFiltersReferenceEvents,
 } from "../triggerFilter.matcher";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 
 function makeTraceData(
   overrides: Partial<PreconditionTraceData> = {},

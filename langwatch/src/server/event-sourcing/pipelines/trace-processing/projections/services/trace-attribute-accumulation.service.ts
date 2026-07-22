@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,

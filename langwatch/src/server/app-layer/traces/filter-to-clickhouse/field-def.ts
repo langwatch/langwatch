@@ -1,7 +1,7 @@
 import type { TagToken } from "liqe";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import type { TraceSummaryData } from "../types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { FieldHandler } from "./value-helpers";
 
 /**

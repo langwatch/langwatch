@@ -4,7 +4,7 @@ import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { LogRecordStorageRepository } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";

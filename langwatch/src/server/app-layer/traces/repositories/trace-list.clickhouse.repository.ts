@@ -1,7 +1,7 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
-import type { TraceSummaryData } from "../types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
   BatchedFacetResult,

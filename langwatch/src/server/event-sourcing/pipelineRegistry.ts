@@ -62,7 +62,7 @@ import type { TraceSummaryRepository } from "../app-layer/traces/repositories/tr
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
-import type { TraceSummaryData } from "../app-layer/traces/types";
+import type { TraceSummaryData } from "../domain/traces/types";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
 import type { AutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";

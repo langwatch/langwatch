@@ -1,4 +1,4 @@
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import {
   NormalizedSpanKind,

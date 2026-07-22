@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ComputeRunMetricsCommand } from "../computeRunMetrics.command";
 import type { ComputeRunMetricsDeps } from "../computeRunMetrics.command";
 import type { ComputeRunMetricsCommandData } from "../../schemas/commands";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 
 function makeDeps(overrides: Partial<ComputeRunMetricsDeps> = {}): ComputeRunMetricsDeps {
   return {

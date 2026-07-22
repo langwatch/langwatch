@@ -6,7 +6,7 @@ import type { TraceWithGuardrail } from "@langwatch/contracts/tracer";
 import { LLM_PARAMETER_MAP } from "@langwatch/contracts/llm-parameters";
 import { HandledError } from "@langwatch/handled-error";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import {

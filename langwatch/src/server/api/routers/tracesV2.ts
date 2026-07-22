@@ -21,7 +21,7 @@ import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
 } from "~/server/app-layer/traces/trace-metadata.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   CONTENT_CATEGORIES,
   type ContentCategory,

@@ -24,7 +24,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "../budget.repository";
 import { GatewayBudgetService } from "../budget.service";

@@ -14,7 +14,7 @@ import {
 } from "@testcontainers/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { SpanInsertData } from "~/server/app-layer/traces/types";
+import type { SpanInsertData } from "~/server/domain/traces/types";
 import { prisma } from "~/server/db";
 import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types";
 import type { ClickHouseClientResolver } from "../clickhouseClient";

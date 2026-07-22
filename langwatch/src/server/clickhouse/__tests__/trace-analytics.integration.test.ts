@@ -30,7 +30,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   startTestContainers,
   stopTestContainers,

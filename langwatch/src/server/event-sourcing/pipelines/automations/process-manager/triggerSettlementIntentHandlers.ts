@@ -7,7 +7,7 @@ import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/
 import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { DatasetRecordEntry } from "@langwatch/contracts/datasets";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { NurturingService } from "../../../../../../../ee/billing/nurturing/nurturing.service";
 import type { ProjectService } from "../../../../../app-layer/projects/project.service";
 import type { ReactorContext } from "../../../../reactors/reactor.types";

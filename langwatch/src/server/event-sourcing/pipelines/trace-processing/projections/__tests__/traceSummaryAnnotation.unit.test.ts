@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "~/server/event-sourcing";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,

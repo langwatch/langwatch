@@ -1,6 +1,6 @@
 import { parse, type TagToken } from "liqe";
 import { describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "../../types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { FIELD_DEFS, KNOWN_FIELDS } from "../build-handlers";
 import { type FieldDef, type InMemoryTrace, UNSUPPORTED } from "../field-def";
 

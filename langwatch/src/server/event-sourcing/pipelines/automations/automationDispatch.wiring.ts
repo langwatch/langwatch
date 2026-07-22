@@ -10,7 +10,7 @@ import type { ProjectService } from "~/server/app-layer/projects/project.service
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";

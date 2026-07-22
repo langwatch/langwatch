@@ -5,7 +5,7 @@ import {
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,

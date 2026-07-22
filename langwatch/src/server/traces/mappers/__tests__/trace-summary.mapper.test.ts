@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { Span } from "@langwatch/contracts/tracer";
 import {
   extractEventsFromSpans,

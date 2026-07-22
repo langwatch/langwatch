@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";

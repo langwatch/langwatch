@@ -1,5 +1,5 @@
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
-import type { SpanInsertData } from "~/server/app-layer/traces/types";
+import type { SpanInsertData } from "~/server/domain/traces/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   AppendStore,

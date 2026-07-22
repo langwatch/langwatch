@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { MonitorSummary } from "~/server/app-layer/monitors/repositories/monitor.repository";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {

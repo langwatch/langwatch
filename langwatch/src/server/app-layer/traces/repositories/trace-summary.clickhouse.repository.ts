@@ -6,7 +6,7 @@ import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing
 import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
-import type { TraceSummaryData } from "../types";
+import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type { TraceSummaryRepository } from "./trace-summary.repository";
 
