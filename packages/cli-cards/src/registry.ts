@@ -250,6 +250,7 @@ export const CLI_COLLECTION_VERBS: ReadonlySet<string> = new Set([
   "list-runs",
   "records",
   "tag",
+  "types",
 ]);
 
 /**
@@ -259,6 +260,12 @@ export const CLI_COLLECTION_VERBS: ReadonlySet<string> = new Set([
  * resolved as if they named the parent resource (a record id looked up as a
  * dataset would read as "dataset gone", which is a lie), so id-reference
  * hydration skips these and the card renders the stored structure instead.
+ *
+ * `types` is the same lie in its most misleading form: `evaluator types`
+ * answers with the CATALOG an evaluator may be built from, and every row
+ * carries a `slug` the convention would happily read as an evaluator id. Left
+ * hydrating, a complete catalog resolves to nothing in the project and draws
+ * as "no evaluators" — the empty-state card that command exists to prevent.
  */
 export const CLI_SUBRESOURCE_VERBS: ReadonlySet<string> = new Set([
   "records",
@@ -268,6 +275,7 @@ export const CLI_SUBRESOURCE_VERBS: ReadonlySet<string> = new Set([
   "tag",
   "tail",
   "ingestion-templates",
+  "types",
 ]);
 
 /**

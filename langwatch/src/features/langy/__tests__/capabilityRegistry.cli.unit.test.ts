@@ -1,3 +1,4 @@
+import { CLI_SUBRESOURCE_VERBS } from "@langwatch/cli-cards";
 import { describe, expect, it } from "vitest";
 import { FEATURES } from "~/shared/langy/featureMap";
 import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
@@ -95,6 +96,25 @@ describe("resolveCapability, given a LangWatch CLI tool call", () => {
         overline: "Push prompt",
         body: "diff",
       });
+    });
+  });
+
+  // The catalog listing is what an agent reads to pick a valid evaluator type.
+  // Its rows are TYPES, not the project's saved evaluators — read as the
+  // latter, a full catalog draws as "none of these exist here", which is the
+  // empty-state card the command was added to stop.
+  describe("when the CLI listed the evaluator type catalog", () => {
+    it("renders the catalog as a collection, worded in the plural", () => {
+      expect(resolveCapability("langwatch.evaluator.types")).toMatchObject({
+        render: "resourceRead",
+        tone: "read",
+        body: "rows",
+        overline: "Evaluators",
+      });
+    });
+
+    it("keeps the rows out of saved-evaluator lookup", () => {
+      expect(CLI_SUBRESOURCE_VERBS.has("types")).toBe(true);
     });
   });
 

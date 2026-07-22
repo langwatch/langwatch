@@ -5,7 +5,12 @@
  * through a consumer.
  */
 import { describe, expect, it } from "vitest";
-import { cardKindFor, cliVerbTone, CLI_COLLECTION_VERBS } from "./registry.js";
+import {
+  cardKindFor,
+  cliVerbTone,
+  CLI_COLLECTION_VERBS,
+  CLI_SUBRESOURCE_VERBS,
+} from "./registry.js";
 
 describe("cardKindFor, given a CLI resource and verb", () => {
   describe("when the command reads traces", () => {
@@ -117,5 +122,18 @@ describe("CLI_COLLECTION_VERBS", () => {
     expect(CLI_COLLECTION_VERBS.has("search")).toBe(true);
     expect(CLI_COLLECTION_VERBS.has("records")).toBe(true);
     expect(CLI_COLLECTION_VERBS.has("get")).toBe(false);
+  });
+
+  it("counts the evaluator type catalog as a collection", () => {
+    expect(CLI_COLLECTION_VERBS.has("types")).toBe(true);
+  });
+});
+
+describe("CLI_SUBRESOURCE_VERBS", () => {
+  // `evaluator types` answers with the catalog, whose rows carry a `slug` the
+  // id convention would read as an evaluator. Hydrated as saved evaluators, a
+  // complete catalog resolves to nothing and draws as "no evaluators".
+  it("keeps the type catalog out of parent-resource id lookup", () => {
+    expect(CLI_SUBRESOURCE_VERBS.has("types")).toBe(true);
   });
 });

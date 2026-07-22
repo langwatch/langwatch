@@ -55,3 +55,69 @@ Feature: Creating an evaluator with an unknown type is recoverable
     When I run "langwatch evaluator types"
     Then I see every evaluator type with its slug, name, and category
     And no API key is required
+
+  # ============================================================================
+  # The panel: the catalog reads as a catalog, never as the project's evaluators
+  # ============================================================================
+
+  # The catalog listing answers "what may I pick", so its rows are evaluator
+  # TYPES, not the project's saved evaluators. Read as the latter it says the
+  # project has none of them — the empty-state card the whole flow exists to
+  # stop, drawn by the very command added to prevent it.
+
+  Scenario: The type catalog renders as a collection
+    When the assistant runs "langwatch evaluator types"
+    Then the result renders as rows rather than one resource's facts
+    And the card is titled in the plural
+
+  Scenario: Catalog types are never looked up as the project's saved evaluators
+    When the assistant runs "langwatch evaluator types"
+    Then the listed type slugs are not resolved as saved evaluators
+    And the card draws the catalog the command returned
+
+  # ============================================================================
+  # Instructions: nothing we ship teaches a type the platform rejects
+  # ============================================================================
+
+  # The original failure began in our own examples: an agent copied a slug we
+  # published and was guaranteed a 422. Correcting the known instances leaves
+  # the next one free to appear, so the rule is pinned instead of the values.
+
+  Scenario: No shipped instruction teaches an evaluator type the platform rejects
+    Given every evaluator type taught by a skill, the assistant's rules, or the feature map
+    Then each one is present in the platform's evaluator catalog
+
+  Scenario: The assistant is pointed at the catalog rather than the project's evaluators
+    Given the assistant's rules name the commands for an evaluation request
+    Then choosing a type is directed at the catalog listing
+    And listing the project's saved evaluators is not a step in creating one
+
+  # ============================================================================
+  # The ambiguous ask is a question card, not prose
+  # ============================================================================
+
+  Scenario: An ambiguous evaluation request is asked as a choices block
+    Given a request that names neither a dataset nor live traffic
+    Then the router asks with a choices block offering the two options
+    And nothing is created before the answer arrives
+
+  # ============================================================================
+  # The same recovery over MCP
+  # ============================================================================
+
+  # An agent on the MCP surface reads the same rejection and must be able to
+  # act on it, or the advice "pick one of the types in this error's expected
+  # list" names a list it was never given.
+
+  Scenario: A rejection over MCP carries the accepted types
+    When a tool call fails validation with an expected list
+    Then the error surfaced to the caller carries those reasons
+
+  # Not yet: the MCP schema listing reads the generated langevals catalog only,
+  # while the create route accepts that catalog merged with the natively
+  # executed evaluators. Closing it means giving the MCP image the native
+  # module the CLI already carries, so it lands with that build change.
+  @unimplemented
+  Scenario: The MCP evaluator catalog matches the one the API accepts
+    When I discover the evaluator schemas over MCP
+    Then the natively executed evaluators are listed alongside the rest

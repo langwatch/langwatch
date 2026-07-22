@@ -51,6 +51,19 @@ describe("evaluation skill boundaries", () => {
 		expect(source).not.toContain("langwatch monitor create");
 	});
 
+	/** @scenario An ambiguous evaluation request is asked as a choices block */
+	it("asks the experiment-vs-evaluator question as a choices block", () => {
+		const source = readSkill("evaluations");
+
+		// The agent's own rules make a `choices` block the ONLY sanctioned way to
+		// put a user-owned decision to the user, and "which of these gets tested"
+		// is exactly that decision. While this skill taught prose instead, it was
+		// asking the agent to break rule 3 to follow this skill.
+		expect(source).toContain('"kind": "choices"');
+		expect(source).toContain("langy-card");
+		expect(source).not.toContain("Send the question as a single line of prose");
+	});
+
 	it("organizes the dogfood scenarios into focused files", () => {
 		const scenarioFiles = fs
 			.readdirSync(__dirname)

@@ -2,7 +2,8 @@
 
 **Date:** 2026-07-22
 
-**Status:** Accepted (design; implementation not started)
+**Status:** Accepted (implemented — schemas, relay stamp, and the choices card
+render on the event-sourced frontend)
 
 **Builds on:** ADR-059 (card selection is deterministic — §5 sketched the
 model's typed-data channel this ADR now specifies), ADR-059 (event-sourced
