@@ -135,7 +135,9 @@ describe("readHandledError", () => {
         }),
       );
 
-      expect(result?.tips[0]!.length).toBeLessThan(250);
+      const clamped = result?.tips[0];
+      expect(typeof clamped).toBe("string");
+      expect(clamped?.length).toBeLessThan(250);
     });
   });
 

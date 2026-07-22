@@ -72,6 +72,26 @@ class AdminSessionExpiredError extends HandledError {
   }
 }
 
+/**
+ * The request body never parsed, so nothing was validated.
+ *
+ * A different failure from `ValidationError`'s 422: that one means we read the
+ * document and disagreed with it. This one means there was no document, which
+ * is a 400 and a code the client can recognise rather than the bare
+ * `{ message: "Bad request" }` this route used to answer with.
+ */
+class AdminMalformedBodyError extends HandledError {
+  declare readonly code: "malformed_request";
+
+  constructor() {
+    super("malformed_request", "Admin request body is not valid JSON", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "AdminMalformedBodyError";
+  }
+}
+
 const ALLOWED_RESOURCES = new Set([
   "user",
   "organization",
@@ -138,7 +158,6 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   ];
   if (missing.length > 0) {
     throw new ValidationError("Impersonation request is missing fields", {
-      httpStatus: 400,
       // `fieldErrors` is the validation_error contract the client reads —
       // `applyHandledErrorToForm` puts each one on its own input.
       meta: {
@@ -176,11 +195,7 @@ async function readJsonBody(c: any): Promise<Record<string, any>> {
   try {
     return (await c.req.json()) as Record<string, any>;
   } catch {
-    throw new ValidationError("Request body is not valid JSON", {
-      // 400, not `ValidationError`'s 422: nothing was validated, because
-      // nothing parsed.
-      httpStatus: 400,
-    });
+    throw new AdminMalformedBodyError();
   }
 }
 
@@ -205,7 +220,6 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
     throw new ValidationError(
       `Unknown admin resource "${String(body.resource)}"`,
       {
-        httpStatus: 400,
         meta: {
           fieldErrors: {
             resource: ["This isn't a resource the admin API serves."],
