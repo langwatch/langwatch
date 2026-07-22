@@ -589,10 +589,12 @@ const ErrBusy = herr.Code("busy")
 	}
 }
 
-func TestParseSkipsDirectoriesOutsideAnyModule(t *testing.T) {
+func TestParseFailsWithoutAGoModAtTheRoot(t *testing.T) {
 	root := t.TempDir()
-	// No go.mod at the root: nothing under it belongs to a module, so the walk
-	// has nothing to read and Parse says so rather than inventing codes.
+	// Named for what it asserts. It used to be called
+	// TestParseSkipsDirectoriesOutsideAnyModule, which described a walk-level
+	// skip that could never fire — `Parse` reads the root's go.mod first, so a
+	// root without one never reaches the walk at all.
 	if _, _, err := herrgen.Parse(root, io.Discard); err == nil {
 		t.Fatal("Parse() error = nil, want a missing-go.mod failure")
 	}

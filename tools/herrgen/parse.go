@@ -159,13 +159,12 @@ func Parse(root string, warn io.Writer) ([]Entry, []NodeCode, error) {
 //
 // testdata is skipped for the same reason the go tool skips it: the Go inside is
 // a fixture, and its codes are not the product's. A directory with no go.mod at
-// or above it belongs to no module, so nothing there can compile and nothing
-// there can declare a code the services actually throw.
+// unparseable file is skipped with a warning rather than aborting the run:
+// `langwatch/**` holds hand-written onboarding snippets that are not meant to
+// compile, and one of them changing shape must not stop the whole platform's
+// codes from generating.
 func goFiles(root string) ([]string, error) {
 	var files []string
-	// inModule[dir] answers "does a go.mod sit at or above this directory".
-	// The walk is top-down, so a directory's parent is always already answered.
-	inModule := map[string]bool{}
 	err := filepath.WalkDir(root, func(abs string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -178,13 +177,6 @@ func goFiles(root string) ([]string, error) {
 		if entry.IsDir() {
 			name := entry.Name()
 			if rel != "." && (strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "testdata") {
-				return filepath.SkipDir
-			}
-			// path.Dir(".") is "." and inModule has no entry for it yet, so the
-			// root falls through to its own go.mod check.
-			hasModule := inModule[path.Dir(rel)] || fileExists(filepath.Join(abs, "go.mod"))
-			inModule[rel] = hasModule
-			if !hasModule {
 				return filepath.SkipDir
 			}
 			return nil
@@ -264,10 +256,6 @@ func localNameFor(imports map[string]string, importPath string) (string, error) 
 	return "", nil
 }
 
-func fileExists(name string) bool {
-	info, err := os.Stat(name)
-	return err == nil && !info.IsDir()
-}
 
 var modulePattern = regexp.MustCompile(`(?m)^module\s+(\S+)\s*$`)
 

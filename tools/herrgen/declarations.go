@@ -11,10 +11,6 @@ import (
 // fileDeclarations returns the herr codes declared in one file.
 func fileDeclarations(file *ast.File, herrName string) []Declaration {
 	var found []Declaration
-	pkgName := ""
-	if file.Name != nil {
-		pkgName = file.Name.Name
-	}
 	for _, decl := range file.Decls {
 		gen, ok := decl.(*ast.GenDecl)
 		if !ok || gen.Tok != token.CONST {
@@ -30,7 +26,7 @@ func fileDeclarations(file *ast.File, herrName string) []Declaration {
 					continue
 				}
 				code, ok := codeLiteral(value.Values[i], herrName)
-				if !ok && isCodeType(value.Type, herrName, pkgName) {
+				if !ok && isCodeType(value.Type, herrName) {
 					// `const X herr.Code = "x"` — the conversion is in the
 					// declared type rather than around the literal.
 					code, ok = stringLiteral(value.Values[i])
@@ -62,16 +58,14 @@ func codeLiteral(expr ast.Expr, herrName string) (string, bool) {
 }
 
 // isCodeType reports whether a const's declared type is herr.Code, covering the
-// `const X herr.Code = "x"` form as well as a bare `Code` inside package herr
-// itself, where the type needs no qualifier.
-func isCodeType(expr ast.Expr, herrName, pkgName string) bool {
-	switch typ := expr.(type) {
-	case *ast.SelectorExpr:
-		return herrName != "" && isSelector(typ, herrName, "Code")
-	case *ast.Ident:
-		return pkgName == "herr" && typ.Name == "Code"
-	}
-	return false
+// `const X herr.Code = "x"` form.
+//
+// Only the qualified form: a file that does not import pkg/herr is skipped
+// before we get here, and pkg/herr declares no codes of its own outside its
+// tests (which the walk skips), so an unqualified `Code` cannot reach this.
+func isCodeType(expr ast.Expr, herrName string) bool {
+	selector, ok := expr.(*ast.SelectorExpr)
+	return ok && herrName != "" && isSelector(selector, herrName, "Code")
 }
 
 // stringLiteral unquotes an untyped string literal.
