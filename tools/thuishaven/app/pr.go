@@ -19,7 +19,7 @@ type TryPRParams struct {
 	NoInstall    bool   // skip `pnpm install`
 	Force        bool   // proceed even if the PR is not open
 	DryRun       bool   // resolve + print the plan, create nothing
-	AllowScripts bool   // run install lifecycle scripts even for a fork PR (--trusted)
+	AllowScripts bool   // run install lifecycle scripts even for a fork PR (--allow-scripts)
 	// DiscardLocalChanges overwrites a reused worktree's uncommitted tracked edits
 	// on refresh instead of stashing them first (--discard-local-changes). Off by
 	// default: a refresh autostashes local work so nothing is ever silently lost.
@@ -55,7 +55,7 @@ func TryPR(
 	ref := strings.TrimSpace(p.Ref)
 	if !looksLikePRRef(ref) {
 		return fmt.Errorf(
-			"usage: haven pr <number|github-pr-url> [--no-install] [--force]\n" +
+			"usage: haven pr <number|github-pr-url> [--no-install] [--allow-closed]\n" +
 				"  e.g. haven pr 4913  |  haven pr https://github.com/langwatch/langwatch/pull/4913")
 	}
 	if _, err := exec.LookPath("gh"); err != nil {
@@ -67,7 +67,7 @@ func TryPR(
 		return err
 	}
 	if view.State != "OPEN" && !p.Force {
-		return fmt.Errorf("PR #%d is %s, not open — pass --force to try it anyway",
+		return fmt.Errorf("PR #%d is %s, not open — pass --allow-closed to try it anyway",
 			view.Number, strings.ToLower(view.State))
 	}
 
@@ -119,7 +119,7 @@ func TryPR(
 // installDeps runs pnpm install in the PR worktree. For a fork (cross-repo) PR it
 // defaults to --ignore-scripts: this repo has a postinstall, and a fork controls
 // package scripts, so a plain install would execute fork-authored code with the
-// developer's local env/credentials the instant they try the PR. --trusted opts
+// developer's local env/credentials the instant they try the PR. --allow-scripts opts
 // back into full lifecycle scripts. (Same-repo PRs are as trusted as the base, so
 // they install normally.) Note: `haven up` still runs the PR's application code —
 // only try PRs you would be willing to run locally.
@@ -128,7 +128,7 @@ func installDeps(ctx context.Context, worktree string, view prView, allowScripts
 	if sanitizedInstall(view, allowScripts) {
 		fmt.Printf("⚠ fork PR (%s): installing with --ignore-scripts so its lifecycle scripts don't run.\n",
 			view.HeadRefName)
-		fmt.Printf("  Pass --trusted to allow them. (haven up still runs the PR's app code.)\n")
+		fmt.Printf("  Pass --allow-scripts to allow them. (haven up still runs the PR's app code.)\n")
 	}
 	fmt.Printf("→ pnpm %s\n", strings.Join(args, " "))
 	if err := runStreaming(ctx, worktree, "pnpm", args...); err != nil {

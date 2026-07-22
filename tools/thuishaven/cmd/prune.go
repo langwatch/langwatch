@@ -26,11 +26,11 @@ const sharedResourcesNote = "shared ClickHouse · Postgres · Redis · observabi
 // same scan as a read-only report and nothing is deleted. `--artifacts` keeps the
 // original conservative reclaim: regenerable build caches only, no worktree
 // removed, dry-run without `--yes`.
-func runPrune(ctx context.Context, d deps, rest []string) error {
-	if hasFlag(rest, "--artifacts") {
-		return d.orch.Prune(ctx, d.worktree, hasFlag(rest, "--yes"))
+func runPrune(ctx context.Context, d deps, inv invocation) error {
+	if inv.has("--artifacts") {
+		return d.orch.Prune(ctx, d.worktree, inv.has("--yes"))
 	}
-	threshold := pruneStaleThreshold(rest)
+	threshold := pruneStaleThreshold(inv)
 	rows, err := d.orch.PlanPrune(d.worktree, d.worktree)
 	if err != nil {
 		return err
@@ -44,14 +44,14 @@ func runPrune(ctx context.Context, d deps, rest []string) error {
 // pruneStaleThreshold resolves the idle age at which a worktree is pre-selected:
 // the built-in default (5 days), overridable by HAVEN_PRUNE_STALE_DAYS and then
 // by an explicit --stale-days N.
-func pruneStaleThreshold(rest []string) time.Duration {
+func pruneStaleThreshold(inv invocation) time.Duration {
 	days := int(app.DefaultStaleThreshold / (24 * time.Hour))
 	if v := os.Getenv("HAVEN_PRUNE_STALE_DAYS"); v != "" {
 		if n, ok := parseNonNegInt(v); ok {
 			days = n
 		}
 	}
-	if v := flagValue(rest, "--stale-days"); v != "" {
+	if v := inv.value("--stale-days"); v != "" {
 		if n, ok := parseNonNegInt(v); ok {
 			days = n
 		}
