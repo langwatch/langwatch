@@ -4,10 +4,24 @@
 
 **Status:** Proposed
 
-**Builds on:** ADR-037 (operator surfaces), ADR-040 (webhook channel), ADR-041
-(Block Kit templates), ADR-043 (facet model), ADR-044 (scheduled reports),
-ADR-045 (handled errors), ADR-052 (process-manager substrate), ADR-060
-(model-emitted blocks).
+**Builds on:** ADR-021 (tenancy), ADR-030 (transactional outbox), ADR-031
+(email abuse protections), ADR-034 (analytics materialization), ADR-035
+(persist-class debounce), ADR-036 (Liquid templates), ADR-037 (operator
+surfaces), ADR-040 (webhook channel), ADR-041 (Block Kit templates), ADR-043
+(facet model), ADR-044 (scheduled reports), ADR-045 (handled errors), ADR-052
+(process-manager substrate), ADR-053 (tenant-aware egress), ADR-058 (Langy
+user-turn controls), ADR-059 (deterministic card selection), ADR-060
+(model-emitted blocks — **in flight, not yet on main**; §8 and phase P7
+depend on it, so this ADR must not be accepted ahead of it; ADR-059 is the
+accepted foundation the plan card stands on either way).
+
+**Supersedes (in part):** ADR-037's drawer-as-primary authoring path and
+settings-list-as-operator-surface; ADR-043's Type-first drawer entry
+(Rollout §2); ADR-044's type-picker-first creation (§1 naming
+recommendation, §6); ADR-052's placement of services, dispatch helpers,
+delivery senders, and provider server halves under
+`server/app-layer/automations`. Each carries a dated amendment pointing
+here; every other contract in those ADRs stands.
 
 ## Context
 
@@ -261,7 +275,10 @@ export function buildAutomationsApi(deps: {
     `delete_rule`
   - `enable_rule` · `disable_rule` · `silence_rule` · `unsilence_rule` (§4)
   - `test_fire_rule` (banner-marked test dispatch, per the ADR-037
-    contract)
+    contract — except email: an API key carries no requester inbox, and
+    ADR-031's requester-only rule forbids sending test mail to configured
+    recipients, so email test fires are refused with a handled error whose
+    tips point at the in-app test fire)
   - `get_rule_status` (health, firing, last fired, next run) ·
     `list_rule_fires` (fire history) · `list_rule_deliveries` (webhook
     delivery log)
@@ -276,13 +293,21 @@ export function buildAutomationsApi(deps: {
 - **All five channels** are expressible in `delivery`: Slack (incoming
   webhook or installed app + channel), HTTP webhook (ADR-040 semantics),
   email, dataset, annotation queue.
+- **Auth is the project API key.** Every operation authenticates with the
+  existing project-scoped API-key middleware (`X-Auth-Token`), the same
+  convention as the other customer REST surfaces (ADR-032's precedent). The
+  key grants the project's full automations surface; finer-grained key
+  scopes are a platform-wide follow-up, not invented here.
 - **Secrets are write-only.** Read DTOs in `contracts/` structurally exclude
   secret material: webhook URLs and tokens return masked
   (`"https://hooks.slack.com/…/••••"`, header values as `"••••"`), reusing
   the existing `redactActionParamsFor` logic, now owned by the contracts
   package and enforced by the API's `output` schemas. This closes the
   `/api/triggers` leak by construction — the read schema cannot represent
-  the secret.
+  the secret. Scope note: this governs *configuration* reads. ADR-040's
+  webhook delivery log deliberately stores receiver **responses** verbatim
+  (and never persists request secrets); that split is unchanged and is not
+  overridden by this rule.
 - **Strict handled errors, built for agents.** Every failure is a typed
   `HandledError` per ADR-045 — stable `code`, `meta`, `fault`, and, on every
   customer-actionable error, `tips` and `docsUrl` from the remediation
@@ -314,6 +339,11 @@ because neither surface owns behaviour.
   breach/recover state still moves, fire history notes suppressed fires.
 - Silence is temporary by construction (a timestamp, not a flag); `active`
   remains the permanent off-switch.
+- Placement follows ADR-030's reservation ("notify-side mute … belongs
+  between match and dispatch — not inside the outbox state machine itself,
+  not inside the dispatch handler"): the suppression gate sits in the
+  dispatch layer's classing step, before any effect executes — outside the
+  process managers' state machines and outside the channel senders.
 - Exposed on both transports (`POST /:id/silence { until }` REST;
   tRPC mutation for the UI's "Silence 1h") and rendered in list/status
   surfaces ("Silenced · 43 min left").
@@ -335,6 +365,12 @@ rule the UI or Langy can open. Dismissals persist per project + detector.
 The populated page shows at most one suggestion row (the artifact's "earns
 attention by being right" rule); the empty page may show more.
 
+Detectors read the ADR-034 analytics surfaces through `AnalyticsPort`
+(rollups preferred). They are a second entry point into the same composing
+flow that Langy's trace-card suggestions
+(`specs/langy/langy-followup-suggestions.feature`) already target — both
+pre-fill a plan; neither owns a separate creation path.
+
 ### 6. Slack app install
 
 Replace manual bot-token pasting with a proper OAuth v2 install flow. The
@@ -342,11 +378,18 @@ delivery machinery already exists (`chat.postMessage`, `conversations.list`,
 retryable-error classification, scope remediation copy); what is missing is
 acquisition and storage of the token.
 
-- **`SlackIntegration`** model: one per organization (projects select a
+- **`SlackIntegration`** model: **one per organization** (projects select a
   channel against the org install), storing the encrypted bot token, team
-  id/name, granted scopes, and installer. Encrypted at rest with the
-  existing secrets encryption; the token is never returned by any read
-  API (same write-only rule as §2).
+  id/name, granted scopes, and installer. Org-level is a deliberate tenancy
+  decision (ADR-021): a workspace connection is an organization asset — one
+  workspace, many projects — and per-project installs would demand N
+  authorizations of the same app for the same workspace. It does not weaken
+  ADR-031's per-project protections, which stay keyed on the project.
+  Installing and disconnecting require organization-admin permission; the
+  `installer` field records who. Tokens are sealed with the AES-256-GCM
+  secrets encryption ADR-040 established (`SecretSealPort` is the
+  package-side port over it); the token is never returned by any read API
+  (same write-only rule as §2).
 - **Install flow:** settings-initiated OAuth redirect → callback exchanges
   the code, stores the integration, returns to settings. Scopes:
   `chat:write`, `chat:write.public`, `channels:read`.
@@ -359,6 +402,11 @@ acquisition and storage of the token.
 - This also unblocks the ADR-041/044 deferred bot-token paths (threaded
   dashboard reports, `data_visualization` blocks) — not built here, but the
   token they were waiting for now exists.
+- **Egress note (ADR-053).** Slack Web API calls and webhook deliveries are
+  tenant-directed egress. The `clients/` module is the seam ADR-053's
+  isolated egress plane will take over when it ships; this ADR moves that
+  work neither forward nor backward, but the package boundary is drawn so
+  the relocation is a wiring change, not a rewrite.
 
 ### 7. The operator page — four states, taxonomy derived
 
@@ -382,7 +430,12 @@ redesign spec:
   healthy" strip. Recovery returns the page to quiet automatically.
 - **Copy:** the page is **Automations**; individual rows are **rules**
   ("+ New rule", "1 rule firing"). Kind badges say Alert / Schedule / On
-  trace — the internal enum names never surface.
+  trace — the internal enum names never surface. The vocabulary is
+  deliberately three-layered: the data layer keeps `Trigger`/`triggerKind`
+  (ADR-044's "rename nothing in the data layer" stands), the domain
+  package's entity is `Rule` with wire discriminator `kind`
+  (`automation`/`alert`/`report` ↔ `AUTOMATION`/`ALERT`/`REPORT`), and
+  product copy says rule / Alert / Schedule / On trace.
 - The staged authoring drawer (ADR-037/043, `authoring-drawer.feature`)
   remains as the **Edit details** escape hatch, pre-filled from a plan or an
   existing rule. It is no longer the primary creation path.
@@ -502,15 +555,19 @@ deliberately its own PR with the parity test suite as the gate.
 - Follow-ups deliberately out of scope: threaded Slack dashboard reports and
   `data_visualization` blocks over the bot token (ADR-041/044 deferrals),
   idempotency keys on API writes, per-severity throttling and quiet hours
-  (the ADR-043 cadence growth points), and MCP/CLI automation commands over
-  the new API.
+  (the ADR-043 cadence growth points), MCP/CLI automation commands over the
+  new API, and an ADR for `@langwatch/api` itself — this ADR originates
+  versioning/deprecation policy on a framework documented only by its
+  README, and that policy deserves its own decision record.
 
 ## References
 
 - Redesign artifact: "Automations, redesigned — state spec" (four page
   states; one creation entry point; taxonomy derived, not chosen; status
   leads; prose over stat cards; agent proposes, human approves).
-- ADR-037, ADR-040, ADR-041, ADR-043, ADR-044, ADR-045, ADR-052, ADR-060.
+- ADR-021, ADR-030, ADR-031, ADR-034, ADR-035, ADR-036, ADR-037, ADR-040,
+  ADR-041, ADR-043, ADR-044, ADR-045, ADR-052, ADR-053, ADR-058, ADR-059,
+  ADR-060 (in flight).
 - `langwatch/packages/api/README.md` — the versioned service builder.
 - `src/server/app-layer/automations/` — the service layer being moved.
 - `src/server/app-layer/automations/delivery/slackWebApi.ts` — the existing
