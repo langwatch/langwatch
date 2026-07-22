@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { parse } from "~/server/app-layer/traces/query-language/parse";
 import {
   asFreeTextTerm,
+  buildAutomationHref,
   buildTraceExplorerHref,
   parseTraceSearchCommand,
   readTraceSearchQuery,
@@ -241,6 +242,90 @@ describe("buildTraceExplorerHref", () => {
         expect(
           buildTraceExplorerHref({ projectSlug: null, search }),
         ).toBeNull();
+      });
+    });
+  });
+});
+
+describe("buildAutomationHref", () => {
+  const search = {
+    query: "checkout failed",
+    startDate: 1750000000000,
+    endDate: 1750086400000,
+  };
+
+  describe("given the search the agent ran", () => {
+    describe("when the user chooses to alert on it", () => {
+      it("opens the automation drawer through the same URL params every drawer opens from", () => {
+        const params = searchParams(
+          buildAutomationHref({ projectSlug: "acme", search })!,
+        );
+
+        expect(params.get("drawer.open")).toBe("automation");
+        expect(params.get("drawer.initialSource")).toBe("trace");
+      });
+
+      it("seeds the alert's subject with the search text, exactly as the Explorer's own Automate button would", () => {
+        const params = searchParams(
+          buildAutomationHref({ projectSlug: "acme", search })!,
+        );
+
+        expect(params.get("drawer.initialFilterQuery")).toBe(
+          '"checkout failed"',
+        );
+      });
+
+      it("keeps free text free text — the subject parses as an implicit term, never a field filter", () => {
+        // The same load-bearing claim as `q` on the Explorer link, asked of
+        // the REAL parser: what was free text to the CLI must stay free text
+        // to the automation's matcher.
+        const params = searchParams(
+          buildAutomationHref({
+            projectSlug: "acme",
+            search: { query: "status:error" },
+          })!,
+        );
+
+        const ast = parse(params.get("drawer.initialFilterQuery")!);
+        const tag = ast as unknown as {
+          field: { type: string };
+          expression: { value: unknown };
+        };
+        expect(tag.field.type).toBe("ImplicitField");
+        expect(tag.expression.value).toBe("status:error");
+      });
+
+      it("lands on the Explorer showing the very traces the alert would match", () => {
+        const href = buildAutomationHref({ projectSlug: "acme", search })!;
+
+        expect(href.startsWith("/acme/traces?")).toBe(true);
+        expect(fragmentParams(href).get("q")).toBe('"checkout failed"');
+        expect(fragmentParams(href).get("from")).toBe("1750000000000");
+        expect(fragmentParams(href).get("to")).toBe("1750086400000");
+      });
+    });
+  });
+
+  describe("given a search with no text", () => {
+    describe("when a link is requested", () => {
+      it("returns null — a bare search has no subject to alert on", () => {
+        expect(
+          buildAutomationHref({ projectSlug: "acme", search: {} }),
+        ).toBeNull();
+        expect(
+          buildAutomationHref({
+            projectSlug: "acme",
+            search: { query: "   " },
+          }),
+        ).toBeNull();
+      });
+    });
+  });
+
+  describe("given no project slug", () => {
+    describe("when a link is requested", () => {
+      it("returns null so the caller hides the control instead of linking nowhere", () => {
+        expect(buildAutomationHref({ projectSlug: null, search })).toBeNull();
       });
     });
   });

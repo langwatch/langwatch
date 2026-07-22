@@ -35,3 +35,22 @@ export const LANGY_OPEN_PR_CRITERIA = [
   "Langy reports the resulting PR URL when a PR was opened.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
+
+/**
+ * Criteria for the ambiguous "make me an eval" flow — the ONE flow where a
+ * question is required rather than forbidden. AGENTS.md's skills-section
+ * exception makes a choice that picks what gets tested the user's, so the
+ * no-clarifying-questions core rule is dropped here and replaced with its
+ * inverse for the first turn. Everything downstream of the answer is still
+ * Langy's to carry alone — including fixing a rejected type slug from the
+ * error's own expected list instead of bouncing it back to the user.
+ */
+export const LANGY_EVAL_CREATION_CRITERIA = [
+  "On the first turn, Langy asks ONE short question distinguishing a batch experiment (offline, runs against a dataset) from an online evaluator (scores live production traffic) — and creates NOTHING until the user answers.",
+  "Langy does not run any create command (evaluator, monitor, or experiment) before the user has answered the experiment-vs-evaluator question.",
+  "After the user answers, Langy creates the matching resource and the creation succeeds — the result names the thing that was created.",
+  "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn — it never asks the user to pick a type slug and never abandons the create over a fixable field.",
+  ...LANGY_CORE_RULE_CRITERIA.filter(
+    (criterion) => !criterion.includes("clarifying question"),
+  ),
+];

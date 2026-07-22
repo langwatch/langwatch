@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
 import type { BlobStore } from "./blob-store.service";
 import { TraceNotFoundError } from "./errors";
@@ -11,18 +12,13 @@ import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
 
-const logger = createLogger(
-  "langwatch:app-layer:traces:trace-summary-service",
-);
-
 /**
- * Optional blob-offload resolution deps for the v2 trace-header read path
- * (ADR-022). When provided, `getByTraceId({ full: true })` re-fetches the
- * trace's spans, resolves any `langwatch.reserved.eventref.*` pointer via
- * `resolveOffloadedTraces` (the same primitive SpanStorageService already
- * uses for per-span resolution), and recomputes computedInput/computedOutput
- * from the resolved spans. When omitted, `full` is a no-op and the stored
- * ≤64KB preview is returned unchanged — identical to pre-ADR-022 behaviour.
+ * Optional blob-offload resolution dependencies for the `full` read path
+ * (ADR-022). When provided, `getByTraceId({ full: true })` re-reads the
+ * trace's spans, resolves any `langwatch.reserved.eventref.*` pointers from
+ * event_log, and recomputes input/output so the header shows the complete
+ * content instead of the ≤64KB preview stored in trace_summaries. When
+ * omitted, `full` is a no-op — identical to the plain summary read.
  */
 export interface TraceSummaryFullResolutionDeps {
   spanStorageRepository: SpanStorageRepository;
@@ -31,6 +27,10 @@ export interface TraceSummaryFullResolutionDeps {
 }
 
 export class TraceSummaryService {
+  private readonly logger = createLogger(
+    "langwatch:traces:trace-summary-service",
+  );
+
   constructor(
     readonly repository: TraceSummaryRepository,
     private readonly fullResolutionDeps?: TraceSummaryFullResolutionDeps,
@@ -51,95 +51,86 @@ export class TraceSummaryService {
        */
       visibilityCutoffMs?: number | null;
       /**
-       * When true AND full-resolution deps were supplied at construction,
-       * resolves any offloaded (ADR-022) input/output before returning —
-       * see `TraceSummaryFullResolutionDeps`. Default (undefined/false)
-       * returns the stored preview: no extra spans/event_log read. Only
-       * ever pass true for a single-trace read (the drawer), never for a
-       * list page — full resolution costs one spans read per trace.
+       * Resolve offloaded (ADR-022) input/output back to the full value.
+       * Only meaningful on single-trace reads with full-resolution deps
+       * supplied at construction; never used by list reads.
        */
       full?: boolean;
     },
   ): Promise<TraceSummaryData> {
-    const found = await this.repository.findByTraceId(
+    const result = await this.repository.findByTraceId(
       tenantId,
       traceId,
       options,
     );
-    if (!found) throw new TraceNotFoundError(traceId);
-
-    const result = options?.full
-      ? await this.resolveFullIO(tenantId, traceId, found, options)
-      : found;
+    if (!result) throw new TraceNotFoundError(traceId);
 
     const cutoff = options?.visibilityCutoffMs;
-    if (cutoff === null || cutoff === undefined || result.occurredAt >= cutoff) {
-      return result;
+    if (cutoff !== null && cutoff !== undefined && result.occurredAt < cutoff) {
+      // Gated reads get a teaser regardless — resolving the full value only
+      // to redact it would be a wasted spans + event_log read.
+      return {
+        ...result,
+        computedInput: result.computedInput
+          ? teaserOf(result.computedInput)
+          : result.computedInput,
+        computedOutput: result.computedOutput
+          ? teaserOf(result.computedOutput)
+          : result.computedOutput,
+        errorMessage: result.errorMessage
+          ? teaserOf(result.errorMessage)
+          : result.errorMessage,
+        redactedByVisibilityWindow: true,
+      };
     }
-    return {
-      ...result,
-      computedInput: result.computedInput
-        ? teaserOf(result.computedInput)
-        : result.computedInput,
-      computedOutput: result.computedOutput
-        ? teaserOf(result.computedOutput)
-        : result.computedOutput,
-      errorMessage: result.errorMessage
-        ? teaserOf(result.errorMessage)
-        : result.errorMessage,
-      redactedByVisibilityWindow: true,
-    };
+
+    if (options?.full && this.fullResolutionDeps) {
+      return await this.withFullIO(tenantId, result);
+    }
+    return result;
   }
 
   /**
-   * Resolves offloaded input/output for a single trace read. Never throws —
-   * any failure (missing event_log row, resolution error) logs a warning
-   * and falls back to the stored preview, matching resolveOffloadedTraces'
-   * own fail-open contract.
+   * Recomputes input/output from the trace's spans with offloaded values
+   * restored. Any failure — spans read, event_log read, a stale ref — falls
+   * back to the stored preview: a degraded header read must never become a
+   * failed one.
    */
-  private async resolveFullIO(
+  private async withFullIO(
     tenantId: string,
-    traceId: string,
     summary: TraceSummaryData,
-    options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData> {
-    if (!this.fullResolutionDeps) return summary;
-
+    const deps = this.fullResolutionDeps;
+    if (!deps) return summary;
     try {
       const normalizedSpans =
-        await this.fullResolutionDeps.spanStorageRepository.getNormalizedSpansByTraceId(
-          {
-            tenantId,
-            traceId,
-            ...(options?.occurredAtMs !== undefined
-              ? { occurredAtMs: options.occurredAtMs }
-              : {}),
-          },
-        );
+        await deps.spanStorageRepository.getNormalizedSpansByTraceId({
+          tenantId,
+          traceId: summary.traceId,
+          occurredAtMs: summary.occurredAt,
+        });
       const { recomputedInput, recomputedOutput, anyResolved } =
         await resolveOffloadedTraces({
           projectId: tenantId,
           normalizedSpans,
-          blobStore: this.fullResolutionDeps.blobStore,
-          ioExtractionService: this.fullResolutionDeps.ioExtractionService,
-          logger,
+          blobStore: deps.blobStore,
+          ioExtractionService: deps.ioExtractionService,
+          logger: this.logger,
         });
-
       if (!anyResolved) return summary;
-
       return {
         ...summary,
-        computedInput: recomputedInput?.text ?? summary.computedInput,
-        computedOutput: recomputedOutput?.text ?? summary.computedOutput,
+        ...(recomputedInput !== null
+          ? { computedInput: recomputedInput.text }
+          : {}),
+        ...(recomputedOutput !== null
+          ? { computedOutput: recomputedOutput.text }
+          : {}),
       };
     } catch (error) {
-      logger.warn(
-        {
-          tenantId,
-          traceId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to resolve full trace IO — keeping the stored preview",
+      this.logger.warn(
+        { error, tenantId, traceId: summary.traceId },
+        "full-resolution summary read failed; returning stored preview",
       );
       return summary;
     }

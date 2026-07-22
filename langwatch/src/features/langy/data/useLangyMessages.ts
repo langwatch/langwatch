@@ -1,5 +1,9 @@
+import type { LangyEventCursor } from "@langwatch/langy";
+import { useEffect } from "react";
+
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useLangyStore } from "../stores/langyStore";
 import type { LangyMessageDto } from "./langy.dtos";
 
 export interface LangyMessagesResult {
@@ -43,6 +47,14 @@ export interface LangyMessagesResult {
    * per-user quiet period) so it holds across tabs and devices.
    */
   shouldAskFeedback: boolean;
+  /**
+   * The projection's event cursor at this snapshot (ADR-059): where the local
+   * fold seeds itself before catching up on the durable tail. Null until the
+   * snapshot lands (or from servers predating the field).
+   */
+  eventCursor: LangyEventCursor | null;
+  /** The turn in flight per the durable fold — what a refresh reattaches to. */
+  currentTurnId: string | null;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -97,12 +109,23 @@ export function useLangyMessages(
     },
   );
 
+  // A successful read is durable proof the conversation's projection exists —
+  // confirms a freshly-minted conversation (see `unconfirmedConversations`).
+  const conversationRead = !!conversationId && query.isSuccess;
+  useEffect(() => {
+    if (conversationRead && conversationId) {
+      useLangyStore.getState().confirmConversation(conversationId);
+    }
+  }, [conversationRead, conversationId]);
+
   return {
     messages: (query.data?.messages ?? []) as LangyMessageDto[],
     lastError: query.data?.lastError ?? null,
     isTurnInFlight: query.data?.isTurnInFlight ?? false,
     inFlightTurnId: query.data?.inFlightTurnId ?? null,
     shouldAskFeedback: query.data?.shouldAskFeedback ?? false,
+    eventCursor: query.data?.eventCursor ?? null,
+    currentTurnId: query.data?.currentTurnId ?? null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,

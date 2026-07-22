@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -323,17 +324,17 @@ export function initializeDefaultApp(options?: {
   );
   const spanDedup = createSpanDedupeService(redis);
 
-  // ADR-022: construct blob/IO deps and the shared span-storage repository
-  // before TraceSummaryService and SpanStorageService, so both can resolve
-  // offloaded eventref pointers (the v2 header's full=true read, and the v2
-  // spans read) from the same instances. #4888: the same factory backs the
-  // customer-facing full=true read path; the composition root passes its own
-  // ClickHouse decision/resolver so the eval-path deps stay byte-identical to
-  // the pre-#4888 inline wiring.
+  // ADR-022: construct blob/IO deps before the summary + span services so
+  // both v2 read paths (header full:true, spansFull / spanDetail) can resolve
+  // offloaded eventref pointers.
+  // #4888: the same factory backs the customer-facing full=true read path; the
+  // composition root passes its own ClickHouse decision/resolver so the
+  // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
   const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
     clickhouseEnabled,
     resolveClickHouseClient,
   });
+  // Shared between SpanStorageService and TraceSummaryService's full read.
   const spanStorageRepository = clickhouseEnabled
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
@@ -955,11 +956,14 @@ export function initializeDefaultApp(options?: {
   }
 
   // Langy operational reads come from the Postgres projections; writes remain
-  // commands against the canonical ClickHouse event log.
+  // commands against the canonical ClickHouse event log. The event READER feeds
+  // only the tail read (conversationEventsAfter, ADR-059) — null when event
+  // sourcing is disabled, in which case the tail is honestly empty.
   const langyConversations = LangyConversationService.create(
     commands.langy,
     langyConversationRepository,
     langyMessageRepository,
+    es.getEventStore<LangyConversationProcessingEvent>() ?? null,
   );
   const langyMessages = new LangyMessageService(
     langyMessageRepository,

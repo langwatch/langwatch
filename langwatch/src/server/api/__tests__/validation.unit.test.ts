@@ -103,6 +103,60 @@ describe("the REST boundary's request validator", () => {
     });
   });
 
+  describe("given a schema that hands its accepted set to a refinement", () => {
+    // A catalog lookup (valid evaluator types, real column names) can't be a
+    // zod enum, so its failure is a `custom` issue — which knows nothing
+    // about what the schema wanted. The schema says so itself via `params`,
+    // and the boundary surfaces it exactly like an enum failure: same
+    // `meta.expected` / `meta.received`, one shape for every caller.
+    const catalog = new Set(["catalog/a", "catalog/b"]);
+    const catalogSchema = z.object({
+      kind: z.string().superRefine((kind, ctx) => {
+        if (!catalog.has(kind)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Unknown kind.",
+            params: { expected: [...catalog], received: kind },
+          });
+        }
+      }),
+    });
+
+    const appWithCatalog = () => {
+      const app = new Hono();
+      app.onError(handleError);
+      app.post("/", zValidator("json", catalogSchema), (c) =>
+        c.json({ ok: true }),
+      );
+      return app;
+    };
+
+    /** @scenario A schema can hand its accepted set to any validation failure */
+    it("carries the refinement's accepted set as meta.expected, like an enum's", async () => {
+      const res = await post({ kind: "catalog/nope" }, appWithCatalog());
+
+      expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.reasons[0].meta.expected).toEqual(["catalog/a", "catalog/b"]);
+      expect(body.reasons[0].meta.received).toBe("catalog/nope");
+    });
+
+    it("leaves a refinement without params as bare as before", async () => {
+      const bareSchema = z.object({
+        kind: z.string().refine(() => false, { message: "no" }),
+      });
+      const app = new Hono();
+      app.onError(handleError);
+      app.post("/", zValidator("json", bareSchema), (c) => c.json({ ok: true }));
+
+      const res = await post({ kind: "anything" }, app);
+
+      const body = await res.json();
+      expect(body.reasons[0].meta.expected).toBeUndefined();
+      expect(body.reasons[0].meta.received).toBeUndefined();
+    });
+  });
+
   describe("given a body that never parsed at all", () => {
     it("answers 400 with malformed_request, a different failure from a schema one", async () => {
       const res = await post("{ not json");

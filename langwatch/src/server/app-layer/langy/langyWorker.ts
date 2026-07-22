@@ -80,6 +80,10 @@ export interface LangyWorkerPort {
      * scoped to different repos. */
     githubRepoScopeKey?: string;
     egressAllowlist?: string[];
+    /** ADR-061 mirror tier — rides the probe (like the egress list) so a tier
+     * change is a probe MISS and the worker re-warms rather than mirroring under
+     * the tier it booted with. */
+    mirrorTier?: string;
   }): Promise<boolean>;
 
   /**
@@ -151,6 +155,7 @@ export function createLangyWorkerPort(config: {
       hasGithubAuth,
       githubRepoScopeKey,
       egressAllowlist,
+      mirrorTier,
     }) {
       try {
         // traceparent rides along (no span of its own — the probe is a single
@@ -175,6 +180,7 @@ export function createLangyWorkerPort(config: {
             hasGithubAuth,
             ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
             ...(egressAllowlist?.length ? { egressAllowlist } : {}),
+            ...(mirrorTier ? { mirrorTier } : {}),
           }),
           signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
         });

@@ -109,6 +109,14 @@ Then create the monitor with a descriptive name, a valid evaluator type or saved
 - Start with a conservative sample rate for expensive evaluators on high-volume traffic.
 - Use `ON_MESSAGE` for asynchronous online evaluation.
 
+Take the evaluator type from the catalog, never from memory:
+
+```bash
+langwatch evaluator types --format json
+```
+
+If a create still fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. That failure is yours to fix — do not ask the user to pick a type slug.
+
 Do not guess evaluator parameters. Read the evaluator docs and the installed CLI help. If an LLM evaluator is used, verify that the target project has a model provider configured.
 
 After creation, verify the saved resource:

@@ -47,9 +47,7 @@ export function useCommandBarItems(
       data: {
         id: "action-ask-langy",
         label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
-        description: trimmed
-          ? "Hand this question to Langy"
-          : "Ask about your project in plain language",
+        description: "Hand this question to Langy",
         icon: Sparkles,
         category: "actions",
         keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],
@@ -171,19 +169,25 @@ export function useCommandBarItems(
       for (const proj of filteredProjects) {
         items.push({ type: "project", data: proj });
       }
-      // Add "Search in traces" at the end
+      // Ask Langy sits under the real MATCHES and above the FALLBACKS.
+      //
+      // It used to trail everything, which sounds like the same rule but is
+      // not: "Search for X in traces" and "in docs" are offered for literally
+      // any string, so they are not matches at all — they are the two things
+      // we can always say. Ranking them above Langy meant typing a plain
+      // question and pressing Enter ran a substring search for that question,
+      // which is never what someone typing a question meant.
+      //
+      // Below genuine matches, though. A typed page name, a pasted id or a
+      // project still owns index 0, so Enter navigates the way it always did.
+      if (askLangyItem) {
+        items.push(askLangyItem);
+      }
       if (searchInTracesItem) {
         items.push(searchInTracesItem);
       }
-      // Add "Search in docs" after "Search in traces"
       if (searchInDocsItem) {
         items.push(searchInDocsItem);
-      }
-      // Ask Langy TRAILS while typing — a "or just ask" fallback under the
-      // matches, so a typed page name + Enter still navigates (index 0 stays the
-      // best match), the way Search-in-traces / Search-in-docs already do.
-      if (askLangyItem) {
-        items.push(askLangyItem);
       }
     }
 

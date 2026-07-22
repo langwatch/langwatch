@@ -65,11 +65,15 @@ export const FRONTEND_FEATURE_FLAGS = [
   // having Langy is necessary but not sufficient, so the panel can ship to a
   // project long before its home page changes shape. Outranked by
   // `release_ui_home_signal_focused_enabled`. See useHomeComposition.
-  "release_ui_home_langy_lantern_enabled",
   // The signal-focused home composition (briefing sheet leads). Decides
   // the homepage's layout ONLY — Langy access separately gates the
   // sheet's hand-to-Langy affordances. See useShowSignalFocusedHome.
   "release_ui_home_signal_focused_enabled",
+  // Langy's minimised state as an edge peek of the panel itself (spec:
+  // specs/langy/langy-peek-dock.feature). Flag off = the classic corner
+  // launcher orb. Swaps only the CLOSED-state affordance; opening, the
+  // panel and Cmd/Ctrl+I are identical either way.
+  "release_ui_langy_peek_dock_enabled",
   "release_webhook_automations",
 ] as const;
 

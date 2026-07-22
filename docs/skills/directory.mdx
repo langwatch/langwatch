@@ -329,7 +329,7 @@ experiment = langwatch.experiment.init("agent-regression")
 for index, row in experiment.loop(dataset.iterrows()):
     response = my_agent(row["input"])
     experiment.evaluate(
-        "ragas/answer_relevancy",
+        "ragas/response_relevancy",
         index=index,
         data={"input": row["input"], "output": response},
         settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
@@ -353,7 +353,7 @@ const experiment = await langwatch.experiments.init("agent-regression");
 
 await experiment.run(dataset, async ({ item, index }) => {
   const response = await myAgent(item.input);
-  await experiment.evaluate("ragas/answer_relevancy", {
+  await experiment.evaluate("ragas/response_relevancy", {
     index,
     data: { input: item.input, output: response },
     settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
@@ -361,7 +361,7 @@ await experiment.run(dataset, async ({ item, index }) => {
 });
 ```
 
-Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
+Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
 ## Run and Verify
 
@@ -558,6 +558,14 @@ Then create the monitor with a descriptive name, a valid evaluator type or saved
 - Start with a conservative sample rate for expensive evaluators on high-volume traffic.
 - Use `ON_MESSAGE` for asynchronous online evaluation.
 
+Take the evaluator type from the catalog, never from memory:
+
+```bash
+langwatch evaluator types --format json
+```
+
+If a create still fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. That failure is yours to fix — do not ask the user to pick a type slug.
+
 Do not guess evaluator parameters. Read the evaluator docs and the installed CLI help. If an LLM evaluator is used, verify that the target project has a model provider configured.
 
 After creation, verify the saved resource:
@@ -665,7 +673,7 @@ For a guardrail:
         </span>
         <div className="lw-prompt-source">
 
-````text
+`````text
 Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -684,7 +692,27 @@ Classify the user's intent:
 | Batch test a dataset, compare prompts or models, benchmark, create a CI quality gate | `experiments`        |
 | Score live traces or threads, monitor production quality, create a guardrail         | `online-evaluations` |
 
-If the request remains ambiguous after inspecting context, briefly explain the distinction and route to `experiments` as the safer pre-deployment default.
+If the request remains ambiguous after inspecting context — a bare "make me an eval" that names neither a dataset nor live traffic — do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
+
+Where `langy-card` blocks render, ask it as a `choices` block — the only sanctioned question format — last in the reply:
+
+````markdown
+```langy-card
+{
+  "kind": "choices",
+  "blockId": "eval-kind",
+  "question": "What should this evaluate?",
+  "options": [
+    { "id": "experiment", "label": "A dataset, before deployment" },
+    { "id": "online", "label": "Live production traffic" }
+  ]
+}
+```
+````
+
+Neither option names an existing entity, so neither carries a `ref`. Without that channel, ask the same question as one short line of prose.
+
+A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once — never turn a fixable slug into a question for the user.
 
 Then hand off:
 
@@ -703,7 +731,7 @@ Then hand off:
    ```
 
 Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.
-````
+`````
 
         </div>
       </div>
@@ -2779,7 +2807,7 @@ experiment = langwatch.experiment.init("agent-regression")
 for index, row in experiment.loop(dataset.iterrows()):
     response = my_agent(row["input"])
     experiment.evaluate(
-        "ragas/answer_relevancy",
+        "ragas/response_relevancy",
         index=index,
         data={"input": row["input"], "output": response},
         settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
@@ -2803,7 +2831,7 @@ const experiment = await langwatch.experiments.init("agent-regression");
 
 await experiment.run(dataset, async ({ item, index }) => {
   const response = await myAgent(item.input);
-  await experiment.evaluate("ragas/answer_relevancy", {
+  await experiment.evaluate("ragas/response_relevancy", {
     index,
     data: { input: item.input, output: response },
     settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
@@ -2811,7 +2839,7 @@ await experiment.run(dataset, async ({ item, index }) => {
 });
 ```
 
-Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
+Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
 ## Run and Verify
 
@@ -2922,6 +2950,14 @@ Then create the monitor with a descriptive name, a valid evaluator type or saved
 - Use `thread` for multi-message outcomes and configure an appropriate idle timeout in the platform when needed.
 - Start with a conservative sample rate for expensive evaluators on high-volume traffic.
 - Use `ON_MESSAGE` for asynchronous online evaluation.
+
+Take the evaluator type from the catalog, never from memory:
+
+```bash
+langwatch evaluator types --format json
+```
+
+If a create still fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. That failure is yours to fix — do not ask the user to pick a type slug.
 
 Do not guess evaluator parameters. Read the evaluator docs and the installed CLI help. If an LLM evaluator is used, verify that the target project has a model provider configured.
 

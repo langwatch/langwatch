@@ -96,7 +96,7 @@ FROM oven/bun:1.3.13-debian AS cli-builder
 
 WORKDIR /src
 
-# pnpm resolves the CLI's lockfile + the `../packages/cli-cards` workspace link;
+# pnpm resolves the CLI's lockfile + the `../packages/langy` workspace link;
 # the bun image ships no Node, and pnpm needs one.
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
@@ -104,10 +104,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && npm install -g pnpm@10.24.0 \
     && rm -rf /var/lib/apt/lists/*
 
-# typescript-sdk/pnpm-workspace.yaml declares `.` + `../packages/cli-cards`, so
-# both trees must be present for `workspace:*` to resolve. cli-cards is
+# typescript-sdk/pnpm-workspace.yaml declares `.` + `../packages/langy`, so
+# both trees must be present for `workspace:*` to resolve. langy is
 # source-only (its `main` points at src/index.ts) and is bundled into the binary.
-COPY packages/cli-cards ./packages/cli-cards
+COPY packages/langy ./packages/langy
 COPY typescript-sdk ./typescript-sdk
 
 WORKDIR /src/typescript-sdk
@@ -126,6 +126,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY langwatch/src/server/tracer/types.ts             /src/langwatch/src/server/tracer/types.ts
 COPY langwatch/src/server/filters/types.ts            /src/langwatch/src/server/filters/types.ts
 COPY langwatch/src/server/evaluations/types.ts        /src/langwatch/src/server/evaluations/types.ts
+COPY langwatch/src/server/evaluations/evaluators.native.ts /src/langwatch/src/server/evaluations/evaluators.native.ts
 COPY langwatch/src/server/modelProviders/llmModels.json /src/langwatch/src/server/modelProviders/llmModels.json
 COPY langwatch/src/app/api/openapiLangWatch.json      /src/langwatch/src/app/api/openapiLangWatch.json
 COPY langevals/ts-integration/evaluators.generated.ts /src/langevals/ts-integration/evaluators.generated.ts

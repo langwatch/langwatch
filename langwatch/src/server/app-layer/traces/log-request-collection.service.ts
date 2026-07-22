@@ -18,8 +18,7 @@ import {
 } from "../../event-sourcing/pipelines/trace-processing/projections/services";
 import { piiRedactionLevelSchema } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { LogRecordReceivedEventData } from "../../event-sourcing/pipelines/trace-processing/schemas/events";
-import { utf8Preview } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
-import { IO_PREVIEW_BYTES } from "./lean-for-projection";
+import { IO_PREVIEW_BYTES, utf8Preview } from "./lean-for-projection";
 import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface LogRequestCollectionDeps {
@@ -246,13 +245,9 @@ function makeTraceContribution(
   }
   const io = extractIOFromLogRecord(legacyView);
   const input =
-    io.input === null
-      ? null
-      : utf8Preview({ value: io.input, maxBytes: IO_PREVIEW_BYTES });
+    io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
   const output =
-    io.output === null
-      ? null
-      : utf8Preview({ value: io.output, maxBytes: IO_PREVIEW_BYTES });
+    io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
   if (input !== io.input || output !== io.output) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }

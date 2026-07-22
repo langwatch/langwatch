@@ -120,10 +120,10 @@ describe("Evaluators Endpoints", () => {
         name: "Answer Correctness",
         type: "evaluator",
         config: {
-          evaluatorType: "langevals/llm_judge",
+          evaluatorType: "langevals/llm_boolean",
           settings: {
-            model: "openai/gpt-4o",
-            criteria: "Is the answer correct?",
+            model: "openai/gpt-5-mini",
+            prompt: "Is the answer correct?",
           },
         },
       });

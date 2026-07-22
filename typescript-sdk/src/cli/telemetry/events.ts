@@ -31,7 +31,7 @@
 // The zod-free subpath, deliberately: this module is on the hot path of every
 // instrumented command, and the package root pulls in the (zod-based) card
 // schemas, which cost ~28ms an invocation to load and which nothing here needs.
-import { handledErrorFromThrown } from "@langwatch/cli-cards/handled-error";
+import { handledErrorFromThrown } from "@langwatch/langy/cards/handled-error";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import {
   LANGWATCH_EVENT_ATTRIBUTES as ATTR,

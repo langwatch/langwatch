@@ -23,22 +23,18 @@ Feature: The Langy home
     Given I am signed in on a project's home page
 
   Scenario: The Langy home renders when the signal-focused home is off
-    Given I have Langy with its home enabled for me
+    Given I have Langy
     But the signal-focused home is not enabled for me
     When the home page renders
     Then the lit block leads the page with a composer I can type into
     And recent work and the setup checklist still follow underneath
 
-  Scenario: The Langy home needs its own rollout, not just Langy
-    Given I have Langy
-    But the Langy home is not enabled for me
-    When the home page renders
-    Then the classic home renders
-    And the lit block is not shown
-
-  Scenario: Without Langy the rollout alone changes nothing
-    Given the Langy home is enabled for me
-    But I do not have Langy
+  # Having Langy IS having the Langy home — there is no second rollout to
+  # forget. A project with the panel and a classic lobby was a state nobody
+  # could explain from the page, so it is no longer a state.
+  Scenario: Without Langy the classic home renders
+    Given I do not have Langy
+    And the signal-focused home is not enabled for me
     When the home page renders
     Then the classic home renders
     And the lit block is not shown

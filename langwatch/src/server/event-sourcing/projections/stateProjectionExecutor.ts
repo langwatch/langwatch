@@ -22,7 +22,13 @@ export function compareCursors(
   if (left.acceptedAt !== right.acceptedAt) {
     return left.acceptedAt - right.acceptedAt;
   }
-  return left.eventId.localeCompare(right.eventId);
+  // BYTE-WISE tie-break, never localeCompare: KSUIDs are mixed-case base62 and
+  // ClickHouse orders `EventId ASC` byte-wise — locale collation reorders case,
+  // so a same-millisecond pair could pass the stale-guard in one order and be
+  // read back in the other. Pinned against the shared @langwatch/langy
+  // comparator by cursorContract.unit.test.ts.
+  if (left.eventId === right.eventId) return 0;
+  return left.eventId < right.eventId ? -1 : 1;
 }
 
 export function orderEvents<E extends Event>(events: readonly E[]): E[] {

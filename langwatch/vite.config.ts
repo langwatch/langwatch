@@ -152,6 +152,11 @@ export default defineConfig(async (): Promise<UserConfig> => {
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
       "@ee": path.resolve(__dirname, "./ee"),
     },
+    // ONE zod instance for the app AND linked workspace packages
+    // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
+    // z.record's key/value overload detection), so a second physical copy
+    // resolved from a package's own node_modules silently mis-parses.
+    dedupe: ["zod"],
   },
   define: {
     // Literal replacements for process.env references in browser code.

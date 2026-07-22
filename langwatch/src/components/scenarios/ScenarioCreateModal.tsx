@@ -31,7 +31,7 @@ export interface ScenarioCreateModalProps {
 const MODAL_TITLE = "Create new scenario";
 const MODAL_PLACEHOLDER =
   "Explain your agent, its goals and what behavior you want to test.";
-const GENERATING_TEXT = "Langy is drafting your scenario…";
+const GENERATING_TEXT = "Drafting your scenario…";
 
 const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
   {
@@ -149,13 +149,13 @@ export function ScenarioCreateModal({
       generatingText={GENERATING_TEXT}
       footerHint={<ResolvedModelCaption model={resolvedDefault.data?.model} />}
       assistant={{
-        name: "Langy",
+        name: "AI",
         description:
-          "Describe the behavior you care about. Langy will turn it into an editable situation and success criteria.",
+          "Describe the behavior you care about. AI will turn it into an editable situation and success criteria.",
         promptLabel: "What should this simulation prove?",
-        generateLabel: "Draft with Langy",
+        generateLabel: "Draft with AI",
         reviewHint:
-          "Langy is shaping the situation and criteria. You will review everything before it is saved.",
+          "AI is shaping the situation and criteria. You will review everything before it is saved.",
       }}
     />
   );

@@ -628,6 +628,7 @@
               "cli": [
                 "evaluator list",
                 "evaluator get",
+                "evaluator types",
                 "evaluator create",
                 "evaluator update",
                 "evaluator delete"
@@ -635,7 +636,8 @@
               "hints": {
                 "evaluator list": "langwatch evaluator list -o json",
                 "evaluator get": "langwatch evaluator get <idOrSlug> -o json",
-                "evaluator create": "langwatch evaluator create \"my judge\" --type langevals/llm_judge",
+                "evaluator types": "langwatch evaluator types -o json",
+                "evaluator create": "langwatch evaluator create \"my judge\" --type langevals/llm_boolean",
                 "evaluator update": "langwatch evaluator update <idOrSlug> --settings '{\"model\":\"openai/gpt-5-mini\"}'",
                 "evaluator delete": "langwatch evaluator delete <idOrSlug>"
               },

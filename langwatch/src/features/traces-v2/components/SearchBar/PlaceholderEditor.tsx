@@ -12,7 +12,17 @@ import {
   type TokenRef,
 } from "./filterHighlight";
 
-const PLACEHOLDER_TEXT = "Search filters, free text, or Ask AI…";
+/**
+ * The search bar's at-rest invitation, parameterised on who answers the ask —
+ * "Ask AI" for the inline composer, "Ask Langy" when Langy owns the
+ * affordance. One builder so the cold placeholder here and the live TipTap
+ * editor's placeholder can never drift apart.
+ */
+export function searchBarPlaceholder(askLabel: string): string {
+  return `Search filters, free text, or ${askLabel}…`;
+}
+
+const PLACEHOLDER_TEXT = searchBarPlaceholder("Ask AI");
 
 type DecoratedSegment =
   | {
@@ -111,6 +121,12 @@ interface PlaceholderEditorProps {
    * value-picker popover; if absent, clicks fall through to the
    * activation behaviour. */
   onTokenClick?: (payload: TokenClickPayload) => void;
+  /**
+   * Placeholder shown while the bar is empty. Defaults to the Ask AI
+   * wording; the SearchBar passes the Ask Langy variant when Langy owns
+   * the ask affordance.
+   */
+  placeholderText?: string;
 }
 
 /**
@@ -124,6 +140,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   onActivate,
   onApplyQueryText,
   onTokenClick,
+  placeholderText = PLACEHOLDER_TEXT,
 }) => {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -156,8 +173,8 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
     <Box
       tabIndex={0}
       role="textbox"
-      aria-label={PLACEHOLDER_TEXT}
-      data-placeholder={PLACEHOLDER_TEXT}
+      aria-label={placeholderText}
+      data-placeholder={placeholderText}
       onFocus={onActivate}
       onMouseDown={onActivate}
       fontFamily="var(--chakra-fonts-mono)"
@@ -170,7 +187,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
       color={isEmpty ? "fg.subtle" : undefined}
     >
       {isEmpty
-        ? PLACEHOLDER_TEXT
+        ? placeholderText
         : segments.map((seg, i) => {
             if (seg.kind === "delete") {
               const { token } = seg;

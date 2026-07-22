@@ -139,7 +139,7 @@ function registerTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_judge') to get its full schema details"
+          "When category is 'evaluators', provide a specific evaluator type (e.g. 'langevals/llm_boolean') to get its full schema details"
         ),
     },
     async ({ category, evaluatorType }) => {
