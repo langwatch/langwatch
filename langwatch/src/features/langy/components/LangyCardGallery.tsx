@@ -55,7 +55,7 @@ const TRACE_FIXTURE_NOW = Date.parse("2026-07-11T14:03:00Z");
 
 /**
  * One trace, in the shape `POST /api/trace/search` actually returns under
- * `--format json` (`traceSchema` in `server/tracer/types.ts`): snake_case ids,
+ * `--format json` (`traceSchema` in `/contracts/tracer`): snake_case ids,
  * `input`/`output` as `{ value }` envelopes, `timestamps.started_at` in epoch
  * ms, metrics nested. Fixtures that drift from the real shape are worse than no
  * fixtures — the card would render here and break in the panel.
