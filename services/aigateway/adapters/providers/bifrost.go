@@ -749,16 +749,28 @@ func rawResponseFromBifrostError(berr *bfschemas.BifrostError) ([]byte, int, boo
 // skipped this round.
 var modelsDiscoveryClient = &http.Client{Timeout: 5 * time.Second}
 
+// modelsDiscoveryConcurrency bounds how many /v1/models probes run at
+// once per ListModels call. Fan-out is otherwise one goroutine + one
+// outbound connection per credential with a base URL — uncapped, a
+// bundle with many self-hosted endpoints (or a client polling this
+// endpoint) can pile up unbounded concurrent 5s requests and starve
+// normal dispatch. A small cap keeps discovery cheap without making
+// wide bundles pay for it serially.
+const modelsDiscoveryConcurrency = 8
+
 // ListModels discovers models from credentials that carry a base URL
 // (self-hosted vLLM / LiteLLM / Anthropic-compatible servers — all serve
 // the OpenAI-shape GET /v1/models). Hosted credentials without a base URL
 // have no catalog to query and are skipped. A failing endpoint is skipped
 // too: one dead server must not blank out the whole list.
 func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, error) {
-	// Query endpoints concurrently: latency is max(endpoint), not
-	// sum(endpoint) — one slow or dead server must not stack its timeout
-	// onto the others. Results keep credential order for determinism.
+	// Query endpoints concurrently, bounded by a semaphore: latency is
+	// max(endpoint) up to the cap, not sum(endpoint) — one slow or dead
+	// server must not stack its timeout onto the others, and no single
+	// bundle can spawn unbounded outbound requests. Results keep
+	// credential order for determinism.
 	perCred := make([][]string, len(creds))
+	sem := make(chan struct{}, modelsDiscoveryConcurrency)
 	var wg sync.WaitGroup
 	for i, cred := range creds {
 		base := normalizeOpenAICompatBaseURL(credBaseURL(cred))
@@ -768,6 +780,9 @@ func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credentia
 		wg.Add(1)
 		go func(i int, cred domain.Credential, base string) {
 			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
 			// Same customer-endpoint policy Dispatch applies before using
 			// base_url (local-address blocking, HTTPS requirement, host
 			// allowlist) — discovery contacts the same customer-controlled
@@ -807,6 +822,20 @@ func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credentia
 	return out, nil
 }
 
+// modelsDiscoveryMaxResponseBytes caps how much of an upstream /v1/models
+// response discovery will read. The endpoint policy checks where the
+// request is allowed to go, not whether the response is trustworthy — a
+// misbehaving or compromised upstream could otherwise stream an
+// arbitrarily large JSON array and let any virtual-key holder use this
+// probe to run the gateway out of memory.
+const modelsDiscoveryMaxResponseBytes = 1 << 20 // 1MiB
+
+// modelsDiscoveryMaxModelIDs caps how many model IDs a single endpoint's
+// response contributes, independent of the byte cap — a response that
+// stays under the byte limit by using short, repeated IDs should still
+// not be allowed to grow the result set without bound.
+const modelsDiscoveryMaxModelIDs = 2000
+
 // fetchUpstreamModels GETs an endpoint's OpenAI-shape model list.
 func fetchUpstreamModels(ctx context.Context, baseURL, apiKey string) ([]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/v1/models", nil)
@@ -833,8 +862,12 @@ func fetchUpstreamModels(ctx context.Context, baseURL, apiKey string) ([]string,
 			ID string `json:"id"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+	limited := http.MaxBytesReader(nil, resp.Body, modelsDiscoveryMaxResponseBytes)
+	if err := json.NewDecoder(limited).Decode(&parsed); err != nil {
 		return nil, err
+	}
+	if len(parsed.Data) > modelsDiscoveryMaxModelIDs {
+		parsed.Data = parsed.Data[:modelsDiscoveryMaxModelIDs]
 	}
 	ids := make([]string, 0, len(parsed.Data))
 	for _, m := range parsed.Data {

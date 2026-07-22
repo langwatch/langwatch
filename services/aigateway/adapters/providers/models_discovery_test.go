@@ -1,11 +1,13 @@
 package providers
 
 import (
-	"time"
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -166,6 +168,79 @@ func TestListModels_SendsXAPIKeyForAnthropicStyleServers(t *testing.T) {
 	}
 	if len(models) != 1 {
 		t.Fatalf("models = %v — x-api-key header not sent, server rejected the probe", models)
+	}
+}
+
+// Fan-out is bounded: more base-URL credentials than
+// modelsDiscoveryConcurrency must not all dial at once. With N slow
+// endpoints and a cap of C, elapsed time is at least
+// ceil(N/C) * requestDuration — a single unbounded batch would instead
+// finish in ~requestDuration regardless of N.
+func TestListModels_BoundsFanOutConcurrency(t *testing.T) {
+	var mu sync.Mutex
+	inFlight, peak := 0, 0
+	n := modelsDiscoveryConcurrency + 4
+	creds := make([]domain.Credential, 0, n)
+	for i := 0; i < n; i++ {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			inFlight++
+			if inFlight > peak {
+				peak = inFlight
+			}
+			mu.Unlock()
+
+			time.Sleep(100 * time.Millisecond)
+
+			mu.Lock()
+			inFlight--
+			mu.Unlock()
+			_, _ = w.Write([]byte(`{"data":[{"id":"m"}]}`))
+		}))
+		defer srv.Close()
+		creds = append(creds, domain.Credential{
+			ID: srv.URL, ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv.URL},
+		})
+	}
+
+	router := &BifrostRouter{}
+	_, err := router.ListModels(context.Background(), creds)
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if peak > modelsDiscoveryConcurrency {
+		t.Fatalf("peak concurrent requests = %d, want <= %d (modelsDiscoveryConcurrency)", peak, modelsDiscoveryConcurrency)
+	}
+}
+
+// An oversized upstream response must not be fully buffered into memory —
+// the endpoint policy validates where the request is allowed to go, not
+// whether the response can be trusted, so a misbehaving upstream must be
+// treated as a skipped endpoint rather than an OOM risk.
+func TestListModels_RejectsOversizedResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[`))
+		entry := `{"id":"` + strings.Repeat("x", 1024) + `"},`
+		for i := 0; i < modelsDiscoveryMaxResponseBytes/len(entry)+10; i++ {
+			_, _ = w.Write([]byte(entry))
+		}
+		_, _ = w.Write([]byte(`{"id":"z"}]}`))
+	}))
+	defer srv.Close()
+
+	router := &BifrostRouter{}
+	models, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-huge", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv.URL}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(models) != 0 {
+		t.Fatalf("models = %v, want an oversized response to be skipped entirely, not partially decoded", models)
 	}
 }
 
