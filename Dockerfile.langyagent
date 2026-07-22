@@ -108,11 +108,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # both trees must be present for `workspace:*` to resolve. cli-cards is
 # source-only (its `main` points at src/index.ts) and is bundled into the binary.
 COPY packages/cli-cards ./packages/cli-cards
-# contracts is NOT a workspace member here — copy-types.sh reads its tracer and
-# filters modules by path and copies them into the SDK's generated tree
-# (ADR-063 moved them out of langwatch/src/server). Present for the generator
-# only; nothing resolves `@langwatch/contracts` in this build.
-COPY packages/contracts ./packages/contracts
 COPY typescript-sdk ./typescript-sdk
 
 WORKDIR /src/typescript-sdk
@@ -128,8 +123,13 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # expects relative to /src/typescript-sdk), then run the generators. These are
 # written INTO the image, so .dockerignore's `*.generated.*` filter (a host→context
 # rule) does not strip them.
-COPY langwatch/src/server/tracer/types.ts             /src/langwatch/src/server/tracer/types.ts
-COPY langwatch/src/server/filters/types.ts            /src/langwatch/src/server/filters/types.ts
+# tracer + filters moved to @langwatch/contracts (ADR-063), so they arrive as
+# the package rather than as two files under langwatch/src/server. It is NOT a
+# workspace member of typescript-sdk — copy-types.sh only reads its source by
+# path — so it is copied here, after `pnpm install`, rather than up with
+# cli-cards: nothing resolves it during install, and keeping it out of that
+# layer stops a contracts edit from busting the install cache.
+COPY packages/contracts/src                           /src/packages/contracts/src
 COPY langwatch/src/server/evaluations/types.ts        /src/langwatch/src/server/evaluations/types.ts
 COPY langwatch/src/server/modelProviders/llmModels.json /src/langwatch/src/server/modelProviders/llmModels.json
 COPY langwatch/src/app/api/openapiLangWatch.json      /src/langwatch/src/app/api/openapiLangWatch.json
