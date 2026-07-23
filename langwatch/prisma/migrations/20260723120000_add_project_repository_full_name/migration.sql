@@ -3,3 +3,7 @@
 -- bound yet, so tokens fall back to full-installation scope. See
 -- LangyGithubInstallationsService.mintTurnToken.
 ALTER TABLE "Project" ADD COLUMN "repositoryFullName" TEXT;
+
+-- Down (reversible — additive, nullable column). Commented out to avoid
+-- accidental data loss; to roll back, uncomment and run manually:
+-- ALTER TABLE "Project" DROP COLUMN "repositoryFullName";

@@ -333,11 +333,13 @@ describe("LangyCredentialService", () => {
         // No project-bound repo and no explicit override — the
         // `repositoryFullName` key must be absent entirely (not `undefined`
         // or `null`), preserving the pre-fix full-installation behaviour.
-        expect(mintTurnToken).toHaveBeenCalledWith(
-          expect.not.objectContaining({
-            repositoryFullName: expect.anything(),
-          }),
-        );
+        // `expect.anything()` excludes null/undefined, so a `not.objectContaining`
+        // check on it wouldn't actually catch the key being present-but-undefined;
+        // asserting directly on the recorded call argument does.
+        const [mintArgs] = mintTurnToken.mock.calls[0] as [
+          Record<string, unknown>,
+        ];
+        expect(mintArgs).not.toHaveProperty("repositoryFullName");
       });
     });
   });
