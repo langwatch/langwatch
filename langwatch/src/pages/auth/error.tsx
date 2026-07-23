@@ -108,8 +108,13 @@ export default function Error() {
       if (typeof window !== "undefined" && typeof document !== "undefined") {
         if (isAuth0) {
           const referrer = document.referrer;
-          // Check if referrer is from our own domain
-          const isValidDomain = referrer?.startsWith(window.location.origin);
+          let isValidDomain = false;
+          try {
+            isValidDomain =
+              !!referrer && new URL(referrer).origin === window.location.origin;
+          } catch {
+            isValidDomain = false;
+          }
           if (isValidDomain) {
             window.location.href = referrer;
           } else {
