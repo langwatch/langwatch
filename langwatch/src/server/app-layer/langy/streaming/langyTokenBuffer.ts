@@ -72,6 +72,13 @@ export type LangyStreamEntry =
       digest?: CliResultDigest;
       result?: CliToolResult;
     }
+  // The agent navigating the browser to a resource it surfaced, e.g. "show me
+  // the run" → the run's own detail view. `href` is ALWAYS platform-computed
+  // and already stripped to a same-app relative path — never something the
+  // agent authored (see LangyTurnRelay's resource-link cache). LIVE-ONLY by
+  // design: never a durable event, so reopening a past conversation (which
+  // reads the durable fold, not this buffer) never replays a navigation.
+  | { type: "navigate"; href: string }
   | { type: "end" }
   | { type: "error"; error: string };
 
@@ -397,6 +404,26 @@ export class LangyTokenBuffer {
       kind,
       ...(detail !== undefined ? { detail } : {}),
     });
+  }
+
+  /**
+   * Push a live-only navigate instruction. `href` must already be a
+   * same-app relative path — the caller (LangyTurnRelay) resolves it from a
+   * platform-computed link before ever calling this, so nothing agent-authored
+   * reaches the stream. No durable event is ever written for this: a navigate
+   * fires at most once, on the live edge, and reopening a past conversation
+   * (the durable fold) can never replay it.
+   */
+  async appendNavigate({
+    conversationId,
+    turnId,
+    href,
+  }: {
+    conversationId: string;
+    turnId: string;
+    href: string;
+  }): Promise<void> {
+    await this.append(conversationId, turnId, { type: "navigate", href });
   }
 
   /**

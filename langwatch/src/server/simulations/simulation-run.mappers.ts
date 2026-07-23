@@ -158,6 +158,10 @@ export function mapClickHouseRowToScenarioRunData(
     scenarioId: row.ScenarioId,
     batchRunId: row.BatchRunId,
     scenarioRunId: row.ScenarioRunId,
+    // The scenario set this run belongs to — used to group runs by suite
+    // (run-history-transforms) and to filter ClickHouse reads by set. It no
+    // longer shapes the run's platformUrl (the drawer link is run-id only).
+    scenarioSetId: row.ScenarioSetId,
     name: row.Name,
     description: row.Description,
     metadata,

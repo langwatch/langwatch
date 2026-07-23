@@ -301,6 +301,48 @@ describe("createLangyChatTransport", () => {
     });
   });
 
+  describe("given the live stream carries a navigate instruction", () => {
+    function streamHandlers() {
+      const opts = subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onComplete: () => void;
+      };
+      return opts;
+    }
+
+    it("forwards it to onNavigate as a bare passthrough, not a message chunk", async () => {
+      const onNavigate = vi.fn();
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onNavigate, onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      onData({ type: "navigate", href: "/demo/simulations/set_1/batch_1?openRun=run_1" });
+
+      expect(onNavigate).toHaveBeenCalledWith({
+        type: "navigate",
+        href: "/demo/simulations/set_1/batch_1?openRun=run_1",
+      });
+      // Not routed through onSignal (it's not a status-line concern) and not
+      // enqueued as a text/tool chunk either — a stream reader with no
+      // onNavigate wired must not silently error.
+      expect(onSignal).not.toHaveBeenCalled();
+    });
+
+    it("does not throw when no onNavigate dep is wired", async () => {
+      const { transport } = makeTransport({ conversationId: null }, {});
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      expect(() =>
+        onData({ type: "navigate", href: "/demo/x" }),
+      ).not.toThrow();
+    });
+  });
+
   describe("reconnectToStream", () => {
     it("returns null — resume is a panel-driven re-subscribe, not a transport reconnect", async () => {
       const { transport } = makeTransport();

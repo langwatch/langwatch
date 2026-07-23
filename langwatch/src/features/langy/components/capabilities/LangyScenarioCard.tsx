@@ -6,7 +6,9 @@
  * summary — and links into Simulations. Read-only.
  */
 import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { extractPlatformUrl } from "~/utils/platformHref";
 import {
+  extractPrimaryId,
   extractResourceName,
   extractToolText,
   summaryLines,
@@ -28,6 +30,7 @@ export function LangyScenarioCard({
   output,
   projectSlug,
 }: CapabilityCardInput) {
+  const id = extractPrimaryId(input, output);
   const name = extractResourceName(input, output);
   const verdict = parseVerdict(output);
   const failed = verdict ? /fail|error/i.test(verdict) : false;
@@ -55,6 +58,8 @@ export function LangyScenarioCard({
         </HStack>
       }
       projectSlug={projectSlug}
+      resourceId={id}
+      platformUrl={extractPlatformUrl(output)}
     >
       {lines.length > 0 ? (
         <VStack align="stretch" gap={0.5}>

@@ -47,6 +47,10 @@ const EXCLUDED_COMMANDS = new Set([
   // Opens a browser / prints local status — no result document to card.
   "open",
   "status",
+  // Agent-driven navigation: the relay intercepts it into a live navigate
+  // frame and deliberately renders NO card (see
+  // specs/langy/langy-agent-driven-navigation.feature).
+  "navigate",
   "init-shell",
   "request-increase",
   // Documentation fetchers: their output is prose for the agent, and the

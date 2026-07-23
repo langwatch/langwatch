@@ -1,11 +1,12 @@
 import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
 import { FEATURES } from "~/shared/langy/featureMap";
+import { extractPlatformUrl } from "~/utils/platformHref";
 import { CAPABILITY_CATALOG } from "../components/capabilities/capabilityCatalog";
 import {
   buildResourceHref,
   buildSurfaceHref,
-  resolveCapability,
+    resolveCapability,
   SURFACE_BY_FEATURE,
   withDecidedCard,
 } from "../components/capabilities/capabilityRegistry";
@@ -273,6 +274,43 @@ describe("buildResourceHref, given a row-level deep link", () => {
           resourceId: "prompt_1",
         }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("extractPlatformUrl, given a settled tool call's result payload", () => {
+  describe("when the payload carries the platform's own link", () => {
+    it("reads it off the payload", () => {
+      expect(
+        extractPlatformUrl({
+          scenarioRunId: "run_1",
+          platformUrl:
+            "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+        }),
+      ).toBe(
+        "https://app.langwatch.ai/acme/simulations/set_1/batch_1?openRun=run_1",
+      );
+    });
+  });
+
+  describe("when the payload carries no platform link", () => {
+    it("returns null", () => {
+      expect(extractPlatformUrl({ scenarioRunId: "run_1" })).toBeNull();
+    });
+  });
+
+  describe("when the output is not an object", () => {
+    it("returns null instead of throwing", () => {
+      expect(extractPlatformUrl(null)).toBeNull();
+      expect(extractPlatformUrl("Found 0 traces")).toBeNull();
+      expect(extractPlatformUrl(undefined)).toBeNull();
+    });
+  });
+
+  describe("when the platformUrl field is present but blank", () => {
+    it("returns null rather than an empty link", () => {
+      expect(extractPlatformUrl({ platformUrl: "" })).toBeNull();
+      expect(extractPlatformUrl({ platformUrl: "   " })).toBeNull();
     });
   });
 });

@@ -2269,6 +2269,24 @@ export function buildProgram(): Command {
     },
   );
 
+  // Ask the platform to open, in the user's browser, a resource this
+  // conversation already looked up. Carries only the resource's id — never
+  // an address; the platform resolves where it actually lives from the link
+  // it remembered surfacing. See specs/langy/langy-agent-driven-navigation.feature.
+  const navigateCmd = program
+    .command("navigate")
+    .description(
+      "Ask the platform to open a resource this conversation already looked up",
+    );
+
+  navigateCmd
+    .command("open <resourceId>")
+    .description("Open a previously looked-up resource by id")
+    .action(async (resourceId: string) => {
+      const { navigateOpenCommand: impl } = await import("./commands/navigate/open.js");
+      await impl(resourceId);
+    });
+
   // Add dataset command group
   const datasetCmd = program
     .command("dataset")

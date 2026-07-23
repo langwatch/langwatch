@@ -37,6 +37,11 @@ export const runDataSchema = z.object({
   scenarioId: scenarioIdSchema,
   batchRunId: batchRunIdSchema,
   scenarioRunId: scenarioRunIdSchema,
+  // The scenario set this run belongs to. Optional: only the ClickHouse
+  // repository populates it today (used to group/filter runs by suite);
+  // older/other producers of ScenarioRunData omit it. It does not shape the
+  // run's platformUrl — the drawer link is run-id only.
+  scenarioSetId: z.string().optional(),
   name: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   metadata: z

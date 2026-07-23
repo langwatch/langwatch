@@ -19,6 +19,8 @@ import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { connection } from "~/server/redis";
 import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyFrameDedup";
+import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
+import { createLangyResourceLinkStore } from "~/server/app-layer/langy/streaming/langyResourceLinks";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LangyTurnRelay } from "~/server/app-layer/langy/streaming/langyTurnRelay";
@@ -80,6 +82,8 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
       if (!handoff || handoff.projectId !== projectId) return null;
       return handoff.runToken || null;
     },
+    resourceLinks: createLangyResourceLinkStore({ redis: connection }),
+    resolveResourceUrl: resolveNavigateFallbackUrl,
     logger,
   });
 

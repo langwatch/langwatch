@@ -82,7 +82,7 @@ secured.access(requires("workflows:view")).get(
         ...toWorkflowResponse(w),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/workflows`,
+          path: `/studio/${w.id}`,
         }),
       })),
     );
@@ -128,7 +128,7 @@ secured.access(requires("workflows:view")).get(
       ...toWorkflowResponse(workflow),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/workflows`,
+        path: `/studio/${workflow.id}`,
       }),
     });
   },
@@ -189,7 +189,7 @@ secured.access(requires("workflows:update")).patch(
       ...toWorkflowResponse(updated),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/workflows`,
+        path: `/studio/${updated.id}`,
       }),
     });
   },
