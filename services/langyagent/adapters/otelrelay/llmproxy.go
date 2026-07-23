@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -124,11 +125,14 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		},
 		// Negative ⇒ flush immediately after each write: SSE pass-through.
 		FlushInterval: -1,
-		// A failed call answers with the gateway's herr envelope. Decode it back
-		// into a herr.E (herr.FromBody — the cross-process continuation) so the
-		// turn's terminal error frame carries the REAL typed cause — opencode
-		// launders this body into "AI_APICallError" prose the control plane must
-		// never trust. The body is restored untouched for the worker's SDK.
+		// EVERY failed call is captured so the turn's terminal error frame
+		// carries the REAL cause — opencode launders this body into
+		// "AI_APICallError" prose the control plane must never trust. A typed
+		// gateway herr envelope decodes losslessly (herr.FromBody — the
+		// cross-process continuation); a provider-native body the gateway
+		// forwarded verbatim (Anthropic's "credit balance too low", the codex
+		// backend's `detail`) is captured best-effort with the provider's
+		// message. The body is restored untouched for the worker's SDK.
 		ModifyResponse: func(resp *http.Response) error {
 			if resp.StatusCode < 400 {
 				// A later successful call clears the capture: a transient failure
@@ -149,12 +153,14 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				return nil // capture is best-effort; the proxied response stands.
 			}
-			var envelope herr.ErrorResponse
-			if json.Unmarshal(peeked, &envelope) != nil ||
-				(envelope.Error.Type == "" && envelope.Error.Code == "") {
-				return nil // not a herr envelope (e.g. a raw provider body) — skip.
+			e, typed := decodeLLMErrorBody(peeked)
+			if !typed {
+				clog.Get(r.baseCtx).Info("otelrelay llm error body not a typed envelope; captured best-effort",
+					zap.String("conversation", entry.info.ConversationID),
+					zap.Int("status", resp.StatusCode),
+					zap.Int("body_bytes", len(peeked)),
+					zap.String("content_type", resp.Header.Get("Content-Type")))
 			}
-			e := herr.FromBody(envelope.Error)
 			if e.Meta == nil {
 				e.Meta = herr.M{}
 			}
@@ -192,6 +198,67 @@ func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, erro
 	out.Path = strings.TrimRight(base.Path, "/") + rest
 	out.RawQuery = reqURL.RawQuery
 	return &out, nil
+}
+
+// llmUpstreamErrorCode marks a failed mediated LLM call whose response body was
+// NOT the gateway's typed herr envelope — a provider-native error the gateway
+// forwarded verbatim (an Anthropic "credit balance too low", the codex
+// backend's `{"detail": ...}`). The provider's message rides Meta["message"]
+// so the turn's terminal error frame still names the real failure.
+const llmUpstreamErrorCode = herr.Code("llm_upstream_error")
+
+// maxUpstreamMessageBytes bounds the provider message carried on a best-effort
+// capture, so a pathological body never bloats the error frame.
+const maxUpstreamMessageBytes = 2048
+
+// decodeLLMErrorBody turns a failed LLM response body into the herr.E the turn's
+// terminal error frame carries as its cause. Typed gateway envelopes decode
+// losslessly (typed=true). Anything else — provider-native error JSON the
+// gateway forwards byte-for-byte, or plain text — is captured best-effort as an
+// `llm_upstream_error` whose Meta["message"] holds the provider's own message
+// (typed=false). Provider error messages are client-facing by design (the same
+// body the SDK shows), so carrying the prose is safe.
+func decodeLLMErrorBody(peeked []byte) (e herr.E, typed bool) {
+	var envelope herr.ErrorResponse
+	if json.Unmarshal(peeked, &envelope) == nil &&
+		(envelope.Error.Type != "" || envelope.Error.Code != "") {
+		return herr.FromBody(envelope.Error), true
+	}
+	e = herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{}}
+	if message := extractUpstreamErrorMessage(peeked); message != "" {
+		e.Meta["message"] = message
+	}
+	return e, false
+}
+
+// extractUpstreamErrorMessage pulls the human-readable message out of the known
+// provider error dialects: OpenAI/Anthropic `error.message`, the codex
+// backend's `detail`, a bare `message`. Falls back to the raw body when it is
+// short, printable text. Returns "" when nothing readable is found.
+func extractUpstreamErrorMessage(body []byte) string {
+	for _, path := range []string{"error.message", "detail", "message"} {
+		if v := gjson.GetBytes(body, path); v.Type == gjson.String && v.Str != "" {
+			return boundMessage(v.Str)
+		}
+	}
+	trimmed := strings.TrimSpace(string(body))
+	if trimmed != "" && !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") {
+		return boundMessage(trimmed)
+	}
+	return ""
+}
+
+// boundMessage caps a provider message at maxUpstreamMessageBytes, backing off
+// to a rune boundary.
+func boundMessage(message string) string {
+	if len(message) <= maxUpstreamMessageBytes {
+		return message
+	}
+	cut := message[:maxUpstreamMessageBytes]
+	for len(cut) > 0 && !utf8.ValidString(cut) {
+		cut = cut[:len(cut)-1]
+	}
+	return cut + "…"
 }
 
 // traceparentHeader renders a W3C traceparent for the turn's span context.

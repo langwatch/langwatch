@@ -90,6 +90,12 @@ type sseEvent struct {
 		// token fast-path reads the same single sseEvent decode as session routing.
 		Field string `json:"field"`
 		Delta string `json:"delta"`
+		// PartID names the message part a delta belongs to. Load-bearing for
+		// reasoning routing: codex reasoning-summary parts stream their text
+		// with field=="text" (same channel as answer tokens), so the part's
+		// TYPE — learned from message.part.updated — is the only thing that
+		// tells thinking apart from the answer.
+		PartID string `json:"partID"`
 		// Part is where opencode puts the message part on `message.part.updated` —
 		// the carrier for the tool-call lifecycle (see ssePart).
 		Part ssePart `json:"part"`
@@ -490,6 +496,33 @@ func reasoningDeltaFromEvent(ev *sseEvent) (string, bool) {
 		return ev.Properties.Delta, true
 	}
 	return "", false
+}
+
+// reasoningPartType is opencode's part.type for the model's thinking. Its
+// deltas may arrive on field=="text" (the codex path streams reasoning-summary
+// text on the same field as answer tokens), so the part type — not the delta
+// field — is the authority on what a delta IS.
+const reasoningPartType = "reasoning"
+
+// deltaPartID is the message-part id a delta event belongs to: the current
+// shape carries it as properties.partID; the legacy type=="text" shape names
+// its part on part.id. Empty when the event names no part.
+func deltaPartID(ev *sseEvent) string {
+	if ev.Properties.PartID != "" {
+		return ev.Properties.PartID
+	}
+	return ev.Part.ID
+}
+
+// recordPartType notes a part's declared type from a message.part.updated (or
+// unwrapped part) event, so later deltas route by what the part IS.
+func recordPartType(partTypes map[string]string, ev *sseEvent) {
+	if id := ev.Properties.Part.ID; id != "" && ev.Properties.Part.Type != "" {
+		partTypes[id] = ev.Properties.Part.Type
+	}
+	if id := ev.Part.ID; id != "" && ev.Part.Type != "" {
+		partTypes[id] = ev.Part.Type
+	}
 }
 
 // The tool lifecycle is emitted as frames.ToolStart / frames.ToolEnd (the frames
@@ -1105,6 +1138,11 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 	dataPrefix := []byte("data:")
 	var ev sseEvent
 	tools := newToolCallTracker() // per-turn de-dupe of the tool start/end frames
+	// Part id -> declared part type, learned from message.part.updated. Routing
+	// authority for deltas: a reasoning part's deltas stream on field=="text"
+	// on the codex path, and only this map keeps that thinking out of the
+	// durable answer text.
+	partTypes := make(map[string]string)
 	// Segment tracking for the paragraph restore below: text deltas carry no
 	// message-part boundary, so "a tool settled since the last token" is how we
 	// know the next token starts a NEW segment of the answer.
@@ -1132,23 +1170,38 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 				continue
 			}
 		}
+		// Part-type bookkeeping first: an updated event declares a part's type
+		// before that part's deltas stream, and the delta routing below reads it.
+		recordPartType(partTypes, &ev)
 		// Token fast-path: emit the delta frame so time-to-first-token is not gated
 		// behind the tool frames below.
 		if delta, ok := textDeltaFromEvent(&ev); ok {
-			// Text resuming AFTER a tool call is a new message segment, but the
-			// deltas carry no boundary — everything downstream (the live text
-			// stream and the durable final alike) concatenates them into one
-			// string, and the pre-tool preamble glued straight onto the post-tool
-			// answer ("…for those traces.No traces failing…"). Restore the
-			// paragraph the model actually produced.
-			if emittedText && toolSinceText {
-				delta = "\n\n" + delta
-			}
-			emittedText = true
-			toolSinceText = false
-			if f, mErr := frames.Delta(delta); mErr == nil {
-				if !emitFrame(f) {
-					return nil // relay push broke.
+			if partTypes[deltaPartID(&ev)] == reasoningPartType {
+				// A reasoning part streaming on field=="text" (codex
+				// reasoning-summary titles) is THINKING, not the answer:
+				// route it as an ephemeral reasoning frame so it never
+				// reaches the durable final text.
+				if f, mErr := frames.Reasoning(delta); mErr == nil {
+					if !emitFrame(f) {
+						return nil // relay push broke.
+					}
+				}
+			} else {
+				// Text resuming AFTER a tool call is a new message segment, but the
+				// deltas carry no boundary — everything downstream (the live text
+				// stream and the durable final alike) concatenates them into one
+				// string, and the pre-tool preamble glued straight onto the post-tool
+				// answer ("…for those traces.No traces failing…"). Restore the
+				// paragraph the model actually produced.
+				if emittedText && toolSinceText {
+					delta = "\n\n" + delta
+				}
+				emittedText = true
+				toolSinceText = false
+				if f, mErr := frames.Delta(delta); mErr == nil {
+					if !emitFrame(f) {
+						return nil // relay push broke.
+					}
 				}
 			}
 		}

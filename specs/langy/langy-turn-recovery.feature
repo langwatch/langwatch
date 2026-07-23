@@ -57,6 +57,23 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And Langy does not re-drive the turn on its own
     And the card never flickers away into a silent retry
 
+  # A model call rejected upstream carries the provider's own explanation — an
+  # out-of-credits account, a model the plan does not include. That text is
+  # provider-facing (the same body the playground shows), and hiding it behind
+  # "Something went wrong" leaves the one actionable sentence unread. The
+  # manager's LLM proxy captures the provider's message off every failed
+  # mediated call (typed gateway envelope or provider-native body alike) and it
+  # rides the turn's error as a reason, so the card can say it. Bound by
+  # langyErrorExplainer.unit.test.ts (provider-message cases).
+  @unit
+  Scenario: A rejected model call shows the provider's own message on the card
+    Given Langy's model call is rejected by the provider
+    When the turn fails and the error reaches the panel
+    Then the card keeps the friendly reply-failed framing
+    And it includes the provider's own error message
+    And it suggests trying again or picking a different model
+    But when no provider message was captured, the stock reply-failed copy stands
+
   # The flicker had a second cause independent of the worker-stopped loop: for the
   # kinds that DO auto-retry, the red card rendered for a single frame before the
   # retry timer armed. The card must not appear at all when an automatic retry is

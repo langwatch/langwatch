@@ -162,10 +162,11 @@ func TestLLMTargetURL(t *testing.T) {
 }
 
 // The proxy's error capture is the wire that lets a turn's terminal frame name
-// the gateway's REAL typed cause (herr) instead of opencode's laundered prose.
-// Contract: a herr envelope on a >=400 answer is captured for LastLLMError; a
-// later success — or a new turn — clears it; the body always reaches the
-// worker's SDK byte-for-byte, even past the 64KB capture cap.
+// the REAL cause instead of opencode's laundered prose. Contract: EVERY >=400
+// answer leaves a capture for LastLLMError — a herr envelope losslessly, a
+// provider-native body best-effort with its message; a later success — or a
+// new turn — clears it; the body always reaches the worker's SDK
+// byte-for-byte, even past the 64KB capture cap.
 func TestLLMProxy_ErrorCapture(t *testing.T) {
 	herrBody := `{"error":{"type":"no_provider_configured","message":"no model provider configured","reasons":[{"type":"unknown","message":"unknown"}]}}`
 
@@ -267,9 +268,85 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 		if string(got) != huge {
 			t.Errorf("worker saw %d bytes, want the full %d untruncated", len(got), len(huge))
 		}
-		// Not a herr envelope, so nothing is captured — but never corrupted.
-		if _, ok := relay.LastLLMError(token); ok {
-			t.Error("a non-herr body must not be captured as a typed cause")
+		// Not a herr envelope and no readable message inside: captured
+		// best-effort as an upstream error with the status, never corrupted.
+		e, ok := relay.LastLLMError(token)
+		if !ok {
+			t.Fatal("a failed call must always leave a captured cause")
+		}
+		if string(e.Code) != string(llmUpstreamErrorCode) {
+			t.Errorf("captured code = %q, want %q", e.Code, llmUpstreamErrorCode)
+		}
+		if _, hasMessage := e.Meta["message"]; hasMessage {
+			t.Error("an unreadable body must not fabricate a message")
+		}
+	})
+
+	// Provider-native error bodies the gateway forwards byte-for-byte are NOT
+	// herr envelopes, but they carry the only actionable prose there is — the
+	// provider's own message. The capture keeps that prose so the turn's error
+	// frame (and the turn span) name the real failure.
+	t.Run("when the gateway forwards a provider-native error body", func(t *testing.T) {
+		cases := []struct {
+			name string
+			body string
+			want string
+		}{
+			{
+				name: "anthropic error.message",
+				body: `{"type":"error","error":{"message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}`,
+				want: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+			},
+			{
+				name: "codex backend detail",
+				body: `{"detail":"The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account."}`,
+				want: "The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account.",
+			},
+			{
+				name: "bare message field",
+				body: `{"message":"model overloaded"}`,
+				want: "model overloaded",
+			},
+			{
+				name: "plain text body",
+				body: `upstream exploded`,
+				want: "upstream exploded",
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				status, body := http.StatusBadRequest, tc.body
+				gateway := newGateway(&status, &body)
+				defer gateway.Close()
+
+				relay := startRelay(t)
+				token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+				relay.SetTurnContext(token, turnContext())
+
+				resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+				if err != nil {
+					t.Fatalf("proxied LLM call: %v", err)
+				}
+				got, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if string(got) != tc.body {
+					t.Errorf("worker saw body %q, want the provider's untouched", got)
+				}
+
+				e, ok := relay.LastLLMError(token)
+				if !ok {
+					t.Fatal("a failed call must always leave a captured cause")
+				}
+				if string(e.Code) != string(llmUpstreamErrorCode) {
+					t.Errorf("captured code = %q, want %q", e.Code, llmUpstreamErrorCode)
+				}
+				if e.Meta["message"] != tc.want {
+					t.Errorf("captured message = %q, want %q", e.Meta["message"], tc.want)
+				}
+				if e.Meta["http_status"] != http.StatusBadRequest {
+					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])
+				}
+			})
 		}
 	})
 }

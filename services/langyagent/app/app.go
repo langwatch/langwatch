@@ -249,12 +249,17 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// With telemetry off this is the remote (control-plane) span context; still
 	// valid, still the right parent.
 	start := time.Now()
+	// How the turn ended, when it ended in an error: set by every failing
+	// branch below, read by the deferred customer turn-span forward so the
+	// customer trace shows the failure (status + message), and mirrored onto
+	// the internal turn span. Nil means the turn completed (or handed off).
+	var failure *domain.TurnFailure
 	if sc := turnSpan.SpanContext(); sc.IsValid() {
 		worker.SetTurnTraceContext(sc)
 		// The customer's copy of the turn span, emitted when the turn ends —
 		// the real root under which the worker's re-parented spans and the
 		// gateway's retold LLM spans already sit.
-		defer func() { worker.ForwardTurnSpan(sc, start, time.Now()) }()
+		defer func() { worker.ForwardTurnSpan(sc, start, time.Now(), failure) }()
 	}
 
 	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
@@ -313,17 +318,25 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		errCh <- err
 	}()
 
+	// Records the turn's terminal failure (for the customer turn span) and
+	// pushes the matching terminal error frame in one move, so the two
+	// surfaces can never disagree about how the turn ended.
+	failTurn := func(message, code string) {
+		failure = &domain.TurnFailure{Code: code, Message: message}
+		emitError(ctx, sink, message, code)
+	}
+
 	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.ResumeToken); err != nil {
 		cancelStream()
 		<-errCh // the stream consumer has now fully returned.
 		if errors.Is(err, domain.ErrSessionNotFound) {
 			a.pool.KillSessionVanished(req.ConversationID)
-			emitError(ctx, sink, "the session ended — please retry", "session_not_found")
+			failTurn("the session ended — please retry", "session_not_found")
 			a.turnObserved(ctx, start, "session-not-found", req.Intent)
 			return
 		}
 		clog.Get(ctx).Error("post message failed", zap.Error(err))
-		emitError(ctx, sink, "the agent could not start the turn", "post_error")
+		failTurn("the agent could not start the turn", "post_error")
 		a.turnObserved(ctx, start, "post-error", req.Intent)
 		return
 	}
@@ -334,7 +347,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// letting it fall through would emit a SUCCESS final for a turn we stopped).
 	if message, code, tripped := githubGate.Tripped(); tripped {
 		clog.Get(ctx).Info("github gate stopped the turn", zap.String("code", code))
-		emitError(ctx, sink, message, code)
+		failTurn(message, code)
 		a.turnObserved(ctx, start, "github-gate", req.Intent)
 		return
 	}
@@ -358,9 +371,20 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		// across every wire.
 		clog.Get(ctx).Warn("agent reported turn error", zap.Error(streamErr))
 		var reasons []error
+		failureMessage := "the agent hit an error before finishing"
 		if llmErr, ok := worker.LastLLMError(); ok {
 			reasons = append(reasons, llmErr)
+			// The captured cause's message is the provider's own error text
+			// (client-facing by design) — the trace should name the real
+			// failure, not the generic wrapper.
+			if m, _ := llmErr.Meta["message"].(string); m != "" {
+				failureMessage = m
+			}
+		} else {
+			clog.Get(ctx).Warn("agent error carried no captured LLM cause")
 		}
+		failure = &domain.TurnFailure{Code: "agent_error", Message: failureMessage}
+		turnSpan.RecordError(streamErr)
 		he := herr.NewLight(ctx, domain.ErrAgentError,
 			herr.M{"message": "the agent hit an error before finishing"}, reasons...)
 		f, mErr := frames.ErrorFromHerr(he)
@@ -377,7 +401,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		// `worker_stopped` code into a final "Langy's worker stopped" state (never
 		// the raw prose, and never a client auto-retry into the dead worker).
 		clog.Get(ctx).Warn("stream events ended with error", zap.Error(streamErr))
-		emitError(ctx, sink, "the worker stopped before finishing", "worker_stopped")
+		failTurn("the worker stopped before finishing", "worker_stopped")
 		a.turnObserved(ctx, start, "stream-error", req.Intent)
 	default:
 		emitFinal(ctx, sink)

@@ -152,6 +152,30 @@ export function promoteCodexAgentError(
   return domain;
 }
 
+/**
+ * The first server-authored prose message in the error's reason chain
+ * (depth-first). `meta.message` is the ADR-045 prose channel: the langyagent
+ * proxy captures the model provider's own error text there when a mediated
+ * LLM call fails (llmproxy.go), and the platform serializers carry it through
+ * — so this is the "credit balance too low" the user actually needs to see.
+ */
+export function firstReasonMessage(
+  reasons: LangySerializedReason[] | undefined,
+): string | null {
+  for (const reason of reasons ?? []) {
+    const message = reason.meta?.message;
+    if (typeof message === "string" && message.length > 0) return message;
+    const nested = firstReasonMessage(reason.reasons);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/** Ends a provider message with terminal punctuation so copy can follow it. */
+function asSentence(message: string): string {
+  return /[.!?…]$/.test(message.trim()) ? message.trim() : `${message.trim()}.`;
+}
+
 function parseReasons(value: unknown): LangySerializedReason[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const reasons = value
@@ -331,19 +355,27 @@ export function explainLangyError(
         ...debug,
       };
 
-    case "langy_agent_errored":
+    case "langy_agent_errored": {
       // The agent reported its own failure — usually the model call was
       // rejected upstream. Honest copy: the reply failed; nothing crashed and
       // nothing was lost. Deterministic, so no auto-retry — the user decides.
+      //
+      // When the reason chain carries the provider's own message (captured by
+      // the langyagent LLM proxy — provider-facing text, safe to show), the
+      // card says it: "Something went wrong" for an out-of-credits account is
+      // unactionable, the provider's sentence is the whole fix.
+      const providerMessage = firstReasonMessage(domain.reasons);
       return {
         kind: domain.code,
         title: "Langy's reply failed",
-        description:
-          "Langy hit an error while writing this reply. Your message is safe — try again.",
+        description: providerMessage
+          ? `The model provider rejected this reply: ${asSentence(providerMessage)} Your message is safe. Try again, or pick a different model from the composer.`
+          : "Langy hit an error while writing this reply. Your message is safe — try again.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         ...debug,
       };
+    }
 
     case "langy_worker_spawn_failed":
       // The manager tried to start a worker for this turn and it never came up.
@@ -520,14 +552,19 @@ export function explainLangyError(
       // server-authored sentence in `meta.message` wins over the stock line —
       // that is the only channel carrying prose (ADR-045), and it is how a
       // proxied Go herr explains itself before we write copy for its code.
+      // The reason chain's first message is the fallback: the same channel,
+      // one hop deeper.
       const authored = domain.meta?.message;
+      const authoredText =
+        typeof authored === "string" && authored.length > 0
+          ? authored
+          : firstReasonMessage(domain.reasons);
       return {
         kind: domain.code,
         title: "Langy couldn't finish that",
         description:
-          typeof authored === "string" && authored.length > 0
-            ? authored
-            : "The request was rejected. Try rephrasing or start again.",
+          authoredText ??
+          "The request was rejected. Try rephrasing or start again.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         traceId: domain.traceId,

@@ -291,6 +291,56 @@ func TestStreamSession_EmitsOwnSessionFramesAndFiltersSibling(t *testing.T) {
 	}
 }
 
+// The codex path streams reasoning-summary text on field=="text" — the SAME
+// channel as answer tokens — so the part's declared type (message.part.updated)
+// is the only routing authority. Reasoning-part deltas must ride as ephemeral
+// reasoning frames and NEVER as answer deltas, or the thinking titles
+// ("**Planning task execution strategy**") corrupt the persisted final text.
+func TestStreamSession_ReasoningPartTextDeltasNeverBecomeAnswerText(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fl, _ := w.(http.Flusher)
+		emit := func(s string) {
+			fmt.Fprintf(w, "data: %s\n", s)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		// Reasoning part created, then its deltas stream on field=="text".
+		emit(`{"type":"message.part.updated","properties":{"sessionID":"mine","part":{"id":"prt_r","type":"reasoning"}}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_r","field":"text","delta":"**Planning task execution strategy**"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_r","field":"text","delta":" weighing options"}}`)
+		// Then the real answer part and its tokens.
+		emit(`{"type":"message.part.updated","properties":{"sessionID":"mine","part":{"id":"prt_t","type":"text"}}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_t","field":"text","delta":"Hello"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_t","field":"text","delta":" there"}}`)
+		emit(`{"type":"message.completed","sessionID":"mine"}`)
+	}))
+	defer srv.Close()
+
+	got := collectFrames(t, srv.URL, "mine")
+
+	var deltas, reasonings []string
+	for _, line := range got {
+		var d struct {
+			Text string `json:"text"`
+		}
+		switch frameType(t, line) {
+		case "delta":
+			_ = json.Unmarshal([]byte(line), &d)
+			deltas = append(deltas, d.Text)
+		case "reasoning":
+			_ = json.Unmarshal([]byte(line), &d)
+			reasonings = append(reasonings, d.Text)
+		}
+	}
+	if answer := strings.Join(deltas, ""); answer != "Hello there" {
+		t.Errorf("answer text = %q, want %q — reasoning must never land in the answer", answer, "Hello there")
+	}
+	if thinking := strings.Join(reasonings, ""); thinking != "**Planning task execution strategy** weighing options" {
+		t.Errorf("reasoning frames = %q, want the reasoning part's text routed as reasoning", thinking)
+	}
+}
+
 // An opencode error event must terminate the stream with ErrAgentReportedError
 // — in ALL three spellings, and even when the event carries NO session id (a
 // provider-rejection error is emitted before the session is attached; the

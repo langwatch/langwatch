@@ -108,8 +108,11 @@ type Worker interface {
 	// ForwardTurnSpan emits the turn's customer-facing root span — the real
 	// parent for everything the worker and gateway put in the customer's
 	// trace this turn. Called once at turn end with the turn's span context
-	// and wall-clock bounds; implementations without a telemetry relay no-op.
-	ForwardTurnSpan(sc trace.SpanContext, start, end time.Time)
+	// and wall-clock bounds; failure is non-nil when the turn ended in a
+	// terminal error, so the customer span carries the error status and
+	// message instead of reading as a silent success. Implementations
+	// without a telemetry relay no-op.
+	ForwardTurnSpan(sc trace.SpanContext, start, end time.Time, failure *domain.TurnFailure)
 	// LastLLMError is the typed gateway herr the worker's most recent mediated
 	// LLM call failed with this turn, if any — the real cause behind an
 	// agent-reported turn error. Implementations without mediation return

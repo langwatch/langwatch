@@ -31,6 +31,57 @@ const (
 	attrEndUserID           = "user.id"
 )
 
+// attrCostNonBillable marks a span's usage as covered by a subscription
+// (bundled) rather than paid API spend — the same span-level flag Claude Code
+// bundled tracking uses, and the signal cost classification treats as
+// authoritative. The relay stamps it on codex-turn model-call spans
+// (StampCodexNonBillable) and SWEEPS any worker-supplied value: a worker on a
+// paid API key must not be able to mark its own usage free.
+const attrCostNonBillable = "langwatch.cost.non_billable"
+
+// genAIModelSignalKeys are the span attributes that mark a relayed span as a
+// model call for cost purposes. Only these spans get the non-billable stamp —
+// tool and plumbing spans carry no cost to classify.
+var genAIModelSignalKeys = []string{
+	"gen_ai.provider.name",
+	"gen_ai.request.model",
+	"gen_ai.response.model",
+	"ai.model",
+}
+
+// StampCodexNonBillable marks every model-call span in the batch as bundled
+// usage. Call it ONLY when the manager-held provider for the turn is codex
+// (the ChatGPT-plan device-auth provider): a bare model name is
+// indistinguishable from paid API usage, so the discriminator is the
+// provider/auth mode the manager knows, never the model string or anything
+// worker-supplied. gen_ai.provider.name is left as the worker reported it —
+// the honest provider name has value; the bundled signal is this flag.
+func StampCodexNonBillable(td ptrace.Traces) {
+	rss := td.ResourceSpans()
+	for i := 0; i < rss.Len(); i++ {
+		sss := rss.At(i).ScopeSpans()
+		for j := 0; j < sss.Len(); j++ {
+			spans := sss.At(j).Spans()
+			for k := 0; k < spans.Len(); k++ {
+				span := spans.At(k)
+				if !hasModelSignal(span.Attributes()) {
+					continue
+				}
+				span.Attributes().PutStr(attrCostNonBillable, "true")
+			}
+		}
+	}
+}
+
+func hasModelSignal(attrs pcommon.Map) bool {
+	for _, key := range genAIModelSignalKeys {
+		if _, ok := attrs.Get(key); ok {
+			return true
+		}
+	}
+	return false
+}
+
 // ReparentOTLP rewrites one exported OTLP trace batch so it belongs to the
 // conversation's turn:
 //
@@ -133,6 +184,10 @@ func ReparentTraces(td ptrace.Traces, conversationID, actorUserID string, turn t
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
 				stripForgedOrigin(span.Attributes())
+				// A billing claim must come from the manager, never the worker:
+				// swept on every span, restamped by StampCodexNonBillable only
+				// when the manager-held provider really is codex.
+				removeAll(span.Attributes(), attrCostNonBillable)
 				// The semconv conversation id rides EVERY customer span, not
 				// just the resource: the product's thread filters read span
 				// attributes (`Attributes['gen_ai.conversation.id']`), and a

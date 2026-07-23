@@ -362,9 +362,15 @@ func (r *Relay) Unregister(token string) {
 // The span id is the internal langy.turn span's — the SAME id in both
 // stores is the deliberate cross-store correlation key.
 //
+// failure (nil on success) marks the span with OTel error status plus an
+// exception event carrying the vetted failure message, so a failed turn's
+// trace SHOWS the failure — the ingest folds the exception message into the
+// trace-level error the UI renders. The message is client-safe by the
+// TurnFailure contract.
+//
 // Detached and best-effort like every other telemetry leg: a failed forward
 // warns and bumps the same counter, never the turn.
-func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end time.Time) {
+func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end time.Time, failure *domain.TurnFailure) {
 	entry := r.lookup(token)
 	if entry == nil || !sc.IsValid() {
 		return
@@ -398,6 +404,21 @@ func (r *Relay) ForwardTurnSpan(token string, sc trace.SpanContext, start, end t
 	span.SetSpanID(pcommon.SpanID(sc.SpanID()))
 	span.SetStartTimestamp(pcommon.NewTimestampFromTime(start))
 	span.SetEndTimestamp(pcommon.NewTimestampFromTime(end))
+	if failure != nil {
+		span.Status().SetCode(ptrace.StatusCodeError)
+		span.Status().SetMessage(failure.Message)
+		span.Attributes().PutStr("langy.outcome", failure.Code)
+		// The ingest reads the newest exception event's exception.message as
+		// the trace-level error (span-status.service.ts), so the failure text
+		// lands where the trace views actually look.
+		event := span.Events().AppendEmpty()
+		event.SetName("exception")
+		event.SetTimestamp(pcommon.NewTimestampFromTime(end))
+		event.Attributes().PutStr("exception.type", failure.Code)
+		event.Attributes().PutStr("exception.message", failure.Message)
+	} else {
+		span.Status().SetCode(ptrace.StatusCodeOk)
+	}
 	applyCustomerTracePolicy(td, customerTracePolicy)
 	// The customer-facing identity of the turn itself — stamped AFTER the
 	// policy pass, which reserves platform names precisely so a WORKER can
@@ -604,6 +625,13 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	ReparentTraces(td, conversationID, entry.info.ActorUserID, turn)
+	// Codex turns run on the user's ChatGPT plan, not a paid API key: mark the
+	// relayed model-call spans bundled so cost tracking never bills them as
+	// API spend. The manager-held model id is the only trusted codex signal
+	// (ReparentTraces already swept any worker-supplied claim of the flag).
+	if strings.HasPrefix(entry.info.Model, codexModelPrefix) {
+		StampCodexNonBillable(td)
+	}
 	applyCustomerTracePolicy(td, customerTracePolicy)
 	out, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
 	if err != nil {

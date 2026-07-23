@@ -233,7 +233,9 @@ export abstract class HandledError extends Error {
    * handled at all?"), or compare `err.code` to pick out one subclass.
    */
   static is<T extends HandledError>(
-    this: abstract new (...args: never) => T,
+    this: abstract new (
+      ...args: never
+    ) => T,
     error: unknown,
   ): error is T {
     return error instanceof this;
@@ -267,10 +269,7 @@ export abstract class HandledError extends Error {
    * }
    * ```
    */
-  static toUserMessage(
-    error: unknown,
-    log?: (error: unknown) => void,
-  ): string {
+  static toUserMessage(error: unknown, log?: (error: unknown) => void): string {
     if (HandledError.isHandled(error)) return error.message;
     log?.(error);
     return "An unknown error occurred";
@@ -337,6 +336,17 @@ export function handledErrorFromHerr(
 
 function serializeReason(error: Error): SerializedReason {
   if (HandledError.isHandled(error)) {
+    // A HandledError's message is safe to show by the class contract, and for
+    // a reason it is often the only prose there is (a herr-deserialized cause
+    // carries its message on `.message`, not in meta — FromBody/toErrorBody
+    // promote between the two on the Go side). Fold it into `meta.message` —
+    // the ADR-045 prose channel consumers already read — so the reason chain
+    // keeps naming the real failure across this serialization too. An explicit
+    // meta.message wins; a message that merely repeats the code adds nothing.
+    const meta =
+      error.message && error.message !== error.code && !error.meta.message
+        ? { ...error.meta, message: error.message }
+        : error.meta;
     return {
       code: error.code,
       // Deprecated back-compat alias — see SerializedReason.kind.
@@ -344,7 +354,7 @@ function serializeReason(error: Error): SerializedReason {
       fault: error.fault,
       ...(error.traceId ? { traceId: error.traceId } : {}),
       ...(error.spanId ? { spanId: error.spanId } : {}),
-      ...(Object.keys(error.meta).length > 0 && { meta: error.meta }),
+      ...(Object.keys(meta).length > 0 && { meta }),
       ...(error.tips.length > 0 && { tips: error.tips }),
       ...(error.docsUrl ? { docsUrl: error.docsUrl } : {}),
       ...(error.reasons.length > 0 && {

@@ -30,10 +30,11 @@ func (w *stubWorker) ClaimTurn(string) app.ClaimOutcome {
 	}
 	return app.ClaimBusy
 }
-func (w *stubWorker) Release()                                              {}
-func (w *stubWorker) Touch()                                                {}
-func (w *stubWorker) HasServedTurn() bool                                   { return false }
-func (*stubWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time) {}
+func (w *stubWorker) Release()            {}
+func (w *stubWorker) Touch()              {}
+func (w *stubWorker) HasServedTurn() bool { return false }
+func (*stubWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time, *domain.TurnFailure) {
+}
 
 func (w *stubWorker) SetTurnTraceContext(trace.SpanContext)                     {}
 func (w *stubWorker) LastLLMError() (herr.E, bool)                              { return herr.E{}, false }

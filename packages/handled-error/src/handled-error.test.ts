@@ -1,12 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-
+import type { HandledErrorFault } from "./index";
 import {
   HandledError,
-  NotFoundError,
   handledErrorFromHerr,
+  NotFoundError,
   setTraceUrlProvider,
 } from "./index";
-import type { HandledErrorFault } from "./index";
 
 class TestError extends HandledError {
   declare readonly code: "test_error";
@@ -59,6 +58,46 @@ describe("HandledError.serialize", () => {
       docsUrl: "https://x",
     });
     expect(masked).toEqual({ code: "unknown", kind: "unknown" });
+  });
+
+  it("folds a reason's message into meta.message so the prose survives serialization", () => {
+    // A herr-deserialized cause carries its prose on `.message` (FromBody
+    // promotes meta.message to the wire message) — the serialized reason must
+    // keep it, or "credit balance too low" degrades to a bare code.
+    const providerMessage =
+      "Your credit balance is too low to access the Anthropic API.";
+    const err = new TestError("outer", {
+      reasons: [
+        handledErrorFromHerr({
+          type: "llm_upstream_error",
+          message: providerMessage,
+          meta: { http_status: 400 },
+        }),
+      ],
+    });
+
+    const [reason] = err.serialize().reasons;
+    expect(reason!.meta).toMatchObject({
+      message: providerMessage,
+      http_status: 400,
+    });
+  });
+
+  it("keeps an explicit meta.message over the error message and skips code-echo messages", () => {
+    const explicit = new TestError("outer", {
+      reasons: [
+        new TestError("real prose", { meta: { message: "authored wins" } }),
+      ],
+    });
+    expect(explicit.serialize().reasons[0]!.meta).toMatchObject({
+      message: "authored wins",
+    });
+
+    // A message that merely repeats the code adds nothing.
+    const echo = new TestError("outer", {
+      reasons: [new TestError("test_error")],
+    });
+    expect(echo.serialize().reasons[0]!.meta).toBeUndefined();
   });
 
   it("uses the configured trace URL provider", () => {
@@ -244,7 +283,13 @@ describe("serialising a reason chain", () => {
     });
 
     expect(error.serialize().reasons).toEqual([
-      { code: "span_not_found", kind: "span_not_found", fault: "customer" },
+      {
+        code: "span_not_found",
+        kind: "span_not_found",
+        fault: "customer",
+        // The reason's own prose survives via the meta.message channel.
+        meta: { message: "no span" },
+      },
     ]);
   });
 

@@ -78,6 +78,30 @@ Feature: Langy agent activity is traced into the user's project
     When a span batch is posted with that worker's token
     Then the manager rejects it and forwards nothing
 
+  # Bound by TestForwardTurnSpanFailure (otelrelay_test.go) and
+  # TestApp_Turn_ForwardsTurnSpanOutcome (app_test.go). The exception-event
+  # shape is what the ingest folds into the trace-level error message
+  # (span-status.service.ts), so the failure text lands where trace views look.
+  Scenario: A failed turn's customer span records the failure
+    Given a turn ends in a terminal error
+    When the manager emits the customer-facing langy.turn span
+    Then the span status is Error with the vetted failure message
+    And the span carries an exception event naming the failure code and message
+    And when the failure was a rejected model call, the message is the provider's own error text
+    And a completed turn's span carries OK status and no exception event
+
+  # Bound by TestRelayTracesCodexNonBillable (otelrelay_test.go). Cost
+  # classification treats the span-level flag as authoritative bundled-usage
+  # evidence, so it must come only from the manager-held provider identity.
+  Scenario: Codex-plan turns are marked bundled, and only by the manager
+    Given a turn whose manager-held model runs on the codex ChatGPT-plan provider
+    When the worker's model-call spans are relayed to the customer's project
+    Then each model-call span carries langwatch.cost.non_billable "true"
+    And tool spans carry no cost flag
+    And gen_ai.provider.name stays as the worker reported it
+    But given a turn on an API-key provider
+    Then no relayed span carries the flag, even when the worker forged it
+
   # ============================================================================
   # LangWatch's own copy of the turn — the mirror lane (ADR-061)
   #

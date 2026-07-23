@@ -204,9 +204,9 @@ func (w *Worker) SetTurnTraceContext(sc trace.SpanContext) {
 
 // ForwardTurnSpan emits the turn's customer-facing root span via the relay.
 // No relay (mediation off) is a no-op, like SetTurnTraceContext.
-func (w *Worker) ForwardTurnSpan(sc trace.SpanContext, start, end time.Time) {
+func (w *Worker) ForwardTurnSpan(sc trace.SpanContext, start, end time.Time, failure *domain.TurnFailure) {
 	if w.otelRelay != nil {
-		w.otelRelay.ForwardTurnSpan(w.otelToken, sc, start, end)
+		w.otelRelay.ForwardTurnSpan(w.otelToken, sc, start, end, failure)
 	}
 }
 
