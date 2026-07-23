@@ -42,6 +42,7 @@ const setReferrer = (value: string) => {
 
 describe("Auth error page referrer redirect", () => {
   let originalLocation: Location;
+  let originalReferrer: string;
   let origin: string;
 
   beforeEach(() => {
@@ -52,6 +53,7 @@ describe("Auth error page referrer redirect", () => {
     searchParamsRef.current = new URLSearchParams("");
 
     originalLocation = window.location;
+    originalReferrer = document.referrer;
     origin = originalLocation.origin;
     Object.defineProperty(window, "location", {
       value: { ...originalLocation, href: originalLocation.href },
@@ -68,6 +70,7 @@ describe("Auth error page referrer redirect", () => {
       writable: true,
       configurable: true,
     });
+    setReferrer(originalReferrer);
   });
 
   describe("given a same-origin referrer", () => {
