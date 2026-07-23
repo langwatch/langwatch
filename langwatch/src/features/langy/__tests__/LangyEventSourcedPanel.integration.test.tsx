@@ -338,6 +338,9 @@ vi.mock("~/utils/api", async () => {
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
     modelProvider: {
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve({ ok: true }), isPending: false }),
+      },
       getResolvedDefault: {
         useQuery: () => ({
           data: { model: "openai/gpt-5-mini" },

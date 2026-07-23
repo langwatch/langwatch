@@ -790,6 +790,55 @@ function LangyPanel({
     ? resolvedDefaultQuery.data?.model
     : null;
 
+  // The model Langy names conversations with (langy.conversation_title, role
+  // FAST). Resolved alongside the chat default so the composer's picker can
+  // mark BOTH and let the user set either from the dropdown (ADR-065).
+  const langyTitleQuery = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: projectId ?? "", featureKey: "langy.conversation_title" },
+    { enabled: !!projectId, staleTime: 300_000, refetchOnWindowFocus: false },
+  );
+  const langyTitleModel = modelOptions.includes(
+    langyTitleQuery.data?.model ?? "",
+  )
+    ? langyTitleQuery.data?.model
+    : null;
+
+  // Set a Langy model from the composer picker — writes the feature key (the
+  // same per-key write the Default Models settings use) and refetches so the
+  // marker moves.
+  const setLangyRoleModel =
+    api.modelProvider.setFeatureOverrideForScope.useMutation();
+  const langyRoleUtils = api.useContext();
+  const setLangyFeatureModel = useCallback(
+    (featureKey: "langy.chat_default" | "langy.conversation_title") =>
+      (nextModel: string) => {
+        if (!projectId) return;
+        void (async () => {
+          try {
+            await setLangyRoleModel.mutateAsync({
+              scopeType: "PROJECT",
+              scopeId: projectId,
+              featureKey,
+              model: nextModel,
+            });
+            await langyRoleUtils.modelProvider.invalidate();
+          } catch {
+            // A convenience write; a failure leaves the marker where it was
+            // rather than surfacing a card mid-compose.
+          }
+        })();
+      },
+    [projectId, setLangyRoleModel, langyRoleUtils],
+  );
+  const onSetLangyDefault = useMemo(
+    () => setLangyFeatureModel("langy.chat_default"),
+    [setLangyFeatureModel],
+  );
+  const onSetLangyTitle = useMemo(
+    () => setLangyFeatureModel("langy.conversation_title"),
+    [setLangyFeatureModel],
+  );
+
   // Seed the picker with the model the gate resolves to — but keep it inside
   // the allowlist. If the resolved default isn't allowed, start on the first
   // allowed model instead.
@@ -2708,6 +2757,9 @@ function LangyPanel({
                   model={modelOverride}
                   modelOptions={modelOptions}
                   langyDefaultModel={langyDefaultModel}
+                  langyTitleModel={langyTitleModel}
+                  onSetLangyDefault={onSetLangyDefault}
+                  onSetLangyTitle={onSetLangyTitle}
                   onModelChange={(model) => {
                     // Switching models is choosing the other way out of a dead
                     // codex session; leaving the reconnect screen up would trap
