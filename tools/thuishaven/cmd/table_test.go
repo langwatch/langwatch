@@ -108,6 +108,50 @@ func TestForceIsLifecycleOnly(t *testing.T) {
 
 func specByNameNoFatal(name string) commandSpec { return tableByName[name] }
 
+// The play half of the constitution: teardown destruction is disclosed up
+// front (in the summary the help renders), not confirmed at the end — so play
+// carries neither --yes (nothing to confirm: the data is ephemeral by
+// contract) nor --force (lifecycle-only, up/down). Its one risk flag,
+// --allow-untrusted, is about running code, not about data.
+// @scenario "Destruction is disclosed up front, not confirmed at the end"
+func TestPlayDisclosesDestructionInsteadOfConfirming(t *testing.T) {
+	spec := specByName(t, "play")
+	if !strings.Contains(strings.ToLower(spec.summary), "destroy") {
+		t.Errorf("play's summary %q must disclose that quitting destroys everything", spec.summary)
+	}
+	for _, f := range spec.flags {
+		if f.long == "--yes" || f.long == "--force" {
+			t.Errorf("play declares %s — teardown is disclosed up front, never confirmed or forced", f.long)
+		}
+	}
+}
+
+// @scenario "Agent mode never prompts about trust"
+func TestAllowUntrustedIsDeclaredOnPlay(t *testing.T) {
+	found := false
+	for _, f := range specByName(t, "play").flags {
+		if f.long == "--allow-untrusted" {
+			found = true
+			if f.short != "" {
+				t.Errorf("--allow-untrusted must have no shorthand — accepting untrusted code is typed out in full")
+			}
+		}
+	}
+	if !found {
+		t.Error("play does not declare --allow-untrusted — agent mode would have no way to proceed")
+	}
+	for _, spec := range table {
+		if spec.name == "play" {
+			continue
+		}
+		for _, f := range spec.flags {
+			if f.long == "--allow-untrusted" {
+				t.Errorf("haven %s declares --allow-untrusted — it belongs to play alone", spec.name)
+			}
+		}
+	}
+}
+
 func TestParseRejectsUndeclaredFlags(t *testing.T) {
 	if _, err := parse(specByName(t, "logs"), []string{"--nope"}); err == nil {
 		t.Error("parse accepted an undeclared flag")

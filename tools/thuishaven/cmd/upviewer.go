@@ -30,9 +30,22 @@ const viewerAllGroup = "all"
 func runUpViewer(ctx context.Context, slug, preferred string) error {
 	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
 	m.preferred = preferred
+	return runViewer(ctx, m)
+}
+
+// runPlayViewer is the same log view over a play sandbox's stack, with the
+// opposite quit contract in its banner: quitting `haven play` destroys the
+// sandbox, it never detaches.
+func runPlayViewer(ctx context.Context, slug string) error {
+	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
+	m.banner = fmt.Sprintf("\x1b[1m haven play\x1b[0m \x1b[2m· %s · EPHEMERAL sandbox · q quits and DESTROYS it (databases, containers, checkout)\x1b[0m\n", slug)
+	return runViewer(ctx, m)
+}
+
+func runViewer(ctx context.Context, m *viewerModel) error {
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx))
 	_, err := p.Run()
-	if err != nil && ctx.Err() != nil { // Ctrl-C via the signal context is a clean detach
+	if err != nil && ctx.Err() != nil { // Ctrl-C via the signal context is a clean quit
 		return nil
 	}
 	return err
@@ -47,6 +60,9 @@ type viewerModel struct {
 
 	groups   []string // tab order: "all" + captured services (CLI names)
 	selected int      // index into groups
+	// banner is the header line; the default is `haven up`'s detach contract,
+	// and `haven play` overrides it with its destroy-on-quit one.
+	banner string
 	// preferred is the group to auto-select the moment it appears (the service a
 	// `+svc` delta just added); cleared once applied or once the user picks a
 	// tab themselves.
@@ -65,6 +81,7 @@ func newViewerModel(slug, combined, capDir string) *viewerModel {
 		groups:   []string{viewerAllGroup},
 		lines:    map[string][]string{},
 		offsets:  map[string]int64{},
+		banner:   fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m— %s · running in the background · q detaches (stack keeps running) · haven down stops\x1b[0m\n", slug),
 	}
 }
 
@@ -214,7 +231,7 @@ func formatCombinedLine(raw string) string {
 
 func (m *viewerModel) View() string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m— %s · running in the background · q detaches (stack keeps running) · haven down stops\x1b[0m\n", m.slug))
+	b.WriteString(m.banner)
 	b.WriteString(" " + m.tabsLine() + "\n\n")
 	body := m.height - 4
 	if body < 1 {

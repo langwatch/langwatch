@@ -85,6 +85,12 @@ haven clean      one cleanup: interactive worktree picker + safe reclaim
                  safe categories
 haven pr <ref>   try a GitHub PR in a fresh worktree (--allow-closed,
                  --allow-scripts)
+haven play [pr]  run a PR in a throwaway sandbox: own checkout, own
+                 Postgres/ClickHouse/Redis containers, own play-<n> hostname.
+                 Quitting the view DESTROYS everything it created, every time.
+                 No argument opens a picker of open PRs (terminal only).
+                 Trust-gated: every commit author must have write access, or
+                 an explicit y/N confirmation (--allow-untrusted in agent mode)
 haven git        embedded git TUI (moron) for any worktree — `haven git <slug>`
 haven switch     print a worktree's dir by name; with `eval "$(haven shell-init)"`
                  it becomes a real cd, tab-completed
@@ -142,6 +148,20 @@ sized at creation), and the managed Redis gets a `maxmemory` ceiling
 (`HAVEN_REDIS_MAXMEMORY_MB`, default 512, `0` disables) so a leaky stack fails
 loudly instead of paging the machine. `haven status` shows each service's
 current memory use, and the hub + dashboard show each stack's RAM footprint.
+
+**Playing a PR.** `haven play 4913` reviews a PR without letting it near your
+own stacks: a dedicated checkout under the haven home, dedicated database
+containers and volumes (play-scoped names, freshly allocated ports, never the
+shared servers or volumes), migrated and seeded, served at
+`app.play-4913.langwatch.localhost` under the same attached log view as `up`.
+The defining difference from `up`: quitting the view destroys everything the
+sandbox created, always. That is the contract, disclosed up front, so no
+`--yes` is asked at teardown. Before anything is checked out, a trust gate
+collects every commit author and committer on the PR and checks their write
+access; anyone without it (including commits with no GitHub account) stops
+play for an explicit default-no confirmation, and in agent mode only
+`--allow-untrusted` proceeds. If a play dies hard, `haven clean` finds its
+record and finishes the teardown.
 
 **Git across worktrees.** `haven git` opens [moron](https://github.com/0xdeafcafe/moron)
 in-process (a Go module dependency — nothing extra to install) for the current

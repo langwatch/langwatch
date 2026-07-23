@@ -34,6 +34,7 @@ func runClean(ctx context.Context, d deps, inv invocation) error {
 			return err
 		}
 		reapOrphanRuntimes(d)
+		reapOrphanPlays(ctx, d)
 		return nil
 	}
 	threshold := pruneStaleThreshold(inv)
@@ -48,7 +49,21 @@ func runClean(ctx context.Context, d deps, inv invocation) error {
 		return err
 	}
 	reapOrphanRuntimes(d)
+	reapOrphanPlays(ctx, d)
 	return nil
+}
+
+// reapOrphanPlays finishes the teardown of play sandboxes whose owning process
+// died hard - safe by contract: a play sandbox's data is ephemeral, disclosed
+// as destroyed-on-exit before it was ever created.
+func reapOrphanPlays(ctx context.Context, d deps) {
+	n, err := d.orch.ReapOrphanPlays(ctx)
+	if err != nil {
+		fmt.Printf("play sandbox reaping hit errors (re-run haven clean): %v\n", err)
+	}
+	if n > 0 {
+		fmt.Printf("reaped %d orphaned play sandbox(es)\n", n)
+	}
 }
 
 // reapOrphanRuntimes is the always-safe tail of a clean: kill dev runtimes
@@ -150,6 +165,14 @@ func printPruneReport(ctx context.Context, d deps, rows []app.PruneRow, threshol
 		}
 		fmt.Printf(" %s %-26s %-9s  %-6s %s\n",
 			mark, truncateCell(domain.SlugOrBase(r.Slug, r.Dir), 26), reportIdle(meta), domain.DBChips(meta.HasCHDB, meta.HasPGDB), reportFlags(r, meta))
+	}
+
+	if orphans := d.orch.OrphanPlays(); len(orphans) > 0 {
+		fmt.Printf("\n%d orphaned play sandbox(es) awaiting teardown:\n", len(orphans))
+		for _, rec := range orphans {
+			fmt.Printf("   pr-%d  %s\n", rec.Number, rec.Checkout)
+		}
+		fmt.Println("Run `haven clean --yes` (or `haven clean` in a terminal) to reap them.")
 	}
 
 	days := int(threshold / (24 * time.Hour))

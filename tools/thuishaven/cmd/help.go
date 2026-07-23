@@ -118,6 +118,9 @@ EXAMPLES
     haven up -nlp                # stop running nlp here (hostname falls back to the baseline)
     haven up +workers            # standalone workers lane instead of in-process
     haven pr 4913                # try PR #4913 locally in a fresh worktree
+    haven play 4913              # run PR #4913 in a throwaway sandbox: own databases,
+                                 # trust-gated authors; quitting destroys all of it
+    haven play                   # pick an open PR to play (terminal only)
     haven                        # the hub: every stack + actions (git/down/destroy)
     haven git                    # git TUI for this worktree (haven git <slug> for another)
     haven db seed demo           # reseed in place: past onboarding + sample data (drops nothing)
