@@ -610,8 +610,39 @@ export function deserializeAttributes(
 }
 
 /**
+ * Sanitizes a string to well-formed UTF-16 before it crosses the ClickHouse
+ * write boundary.
+ *
+ * JS strings are UTF-16 and can hold a lone (unpaired) surrogate half
+ * (`\uD800`–`\uDFFF`) — e.g. a value truncated mid-emoji, or binary/garbage
+ * text captured by an SDK. `JSONEachRow` serializes such a half as a `\uD800`-
+ * style escape with no second part, and ClickHouse's JSON parser rejects it
+ * ("missing second part of surrogate pair"), failing the whole insert. Because
+ * the pipeline retries and then dead-letters, that span is lost forever.
+ *
+ * `String.prototype.toWellFormed()` replaces each lone surrogate with U+FFFD
+ * (the Unicode replacement character) and leaves every valid string untouched,
+ * so it is lossless for well-formed input and the correct, minimal fix here.
+ * Applied once, at the write boundary, to every string a span contributes to a
+ * `stored_spans` row.
+ */
+function toWellFormedString(value: string): string {
+  return value.toWellFormed();
+}
+
+/** Nullable variant of {@link toWellFormedString} for optional string columns. */
+function toWellFormedStringOrNull(value: string | null): string | null {
+  return value === null ? null : value.toWellFormed();
+}
+
+/**
  * Serializes attribute values for ClickHouse Map(String, String) columns.
  * Non-scalar values are JSON-stringified at the write boundary.
+ *
+ * Every map KEY and every string VALUE is passed through
+ * {@link toWellFormedString}: a lone UTF-16 surrogate in either half triggers
+ * the same ClickHouse insert rejection, so both are sanitized here at the
+ * write boundary.
  *
  * @internal Exported for unit testing
  */
@@ -619,10 +650,11 @@ export function serializeAttributes(
   attrs: Record<string, unknown>,
 ): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(attrs)) {
+  for (const [rawKey, value] of Object.entries(attrs)) {
     if (value === null || value === undefined) continue;
+    const key = toWellFormedString(rawKey);
     if (typeof value === "string") {
-      result[key] = value;
+      result[key] = toWellFormedString(value);
     } else if (
       typeof value === "number" ||
       typeof value === "boolean" ||
@@ -633,6 +665,9 @@ export function serializeAttributes(
       try {
         const serialized = JSON.stringify(value);
         if (typeof serialized === "string") {
+          // `JSON.stringify` already escapes any lone surrogate inside the
+          // value as a `\uXXXX` sequence, so its output is well-formed UTF-16
+          // as-is — no further sanitization needed on this branch.
           result[key] = serialized;
         }
       } catch {
@@ -2017,17 +2052,24 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       StartTime: new Date(span.startTimeUnixMs),
       EndTime: new Date(span.endTimeUnixMs),
       DurationMs: Math.round(span.durationMs),
-      SpanName: span.name,
+      // Every free-text string below is sanitized to well-formed UTF-16: a lone
+      // surrogate in any of them fails the JSONEachRow insert identically to one
+      // in SpanAttributes (see toWellFormedString). Attribute maps are handled
+      // inside serializeAttributes (keys + values); Links.TraceId/SpanId are
+      // structural OTel ids, not free text, so they are left as-is.
+      SpanName: toWellFormedString(span.name),
       SpanKind: span.kind,
-      ServiceName: serviceName,
+      ServiceName: toWellFormedString(serviceName),
       ResourceAttributes: serializeAttributes(span.resourceAttributes),
       SpanAttributes: serializeAttributes(span.spanAttributes),
       StatusCode: span.statusCode,
-      StatusMessage: span.statusMessage,
-      ScopeName: span.instrumentationScope.name,
-      ScopeVersion: span.instrumentationScope.version ?? null,
+      StatusMessage: toWellFormedStringOrNull(span.statusMessage),
+      ScopeName: toWellFormedString(span.instrumentationScope.name),
+      ScopeVersion: toWellFormedStringOrNull(
+        span.instrumentationScope.version ?? null,
+      ),
       "Events.Timestamp": span.events.map((e) => new Date(e.timeUnixMs)),
-      "Events.Name": span.events.map((e) => e.name),
+      "Events.Name": span.events.map((e) => toWellFormedString(e.name)),
       "Events.Attributes": span.events.map((e) =>
         serializeAttributes(e.attributes),
       ),

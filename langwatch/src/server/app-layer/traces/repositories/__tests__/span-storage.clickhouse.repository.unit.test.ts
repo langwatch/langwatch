@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { SpanInsertData } from "../../types";
 import {
   deserializeAttributes,
   mapSpanSummaryRow,
@@ -11,6 +12,29 @@ import {
   MAX_DERIVATION_SPANS,
   MAX_LIGHT_SPAN_READ_ROWS,
 } from "../span-storage.repository";
+
+// A lone (unpaired) UTF-16 surrogate half — the shape a string takes when it is
+// truncated mid-emoji or an SDK captured binary/garbage text. `JSONEachRow`
+// serialises it as a `\uD83D`-style escape with no second part, which is what
+// ClickHouse's JSON parser rejects ("missing second part of surrogate pair"),
+// dead-lettering the span forever.
+const LONE_HIGH_SURROGATE = "\uD83D";
+const LONE_LOW_SURROGATE = "\uDC00";
+
+/** Recursively collects every string (object keys included) from a value. */
+function collectStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === "string") {
+    out.push(value);
+  } else if (Array.isArray(value)) {
+    for (const item of value) collectStrings(item, out);
+  } else if (value && typeof value === "object") {
+    for (const [key, val] of Object.entries(value)) {
+      out.push(key);
+      collectStrings(val, out);
+    }
+  }
+  return out;
+}
 
 describe("serializeAttributes", () => {
   describe("when given string values", () => {
@@ -71,6 +95,56 @@ describe("serializeAttributes", () => {
       circular.self = circular;
       const result = serializeAttributes({ ok: "yes", bad: circular });
       expect(result).toEqual({ ok: "yes" });
+    });
+  });
+
+  describe("given an attribute key or value with a lone UTF-16 surrogate", () => {
+    describe("when serializing for the ClickHouse write boundary", () => {
+      it("replaces a lone surrogate in a string value with U+FFFD", () => {
+        const result = serializeAttributes({
+          key: `bad${LONE_HIGH_SURROGATE}`,
+        });
+        expect(result.key!.isWellFormed()).toBe(true);
+        expect(result.key).toBe("bad�");
+      });
+
+      it("replaces a lone surrogate in a map key with U+FFFD", () => {
+        const result = serializeAttributes({
+          [`k${LONE_LOW_SURROGATE}`]: "value",
+        });
+        const keys = Object.keys(result);
+        expect(keys).toHaveLength(1);
+        expect(keys[0]!.isWellFormed()).toBe(true);
+        expect(keys[0]).toBe("k�");
+      });
+
+      it("produces keys and values that survive a JSON encode/decode round-trip well-formed", () => {
+        // JSONEachRow encodes the map with JSON; a strict consumer (ClickHouse)
+        // decodes it. A lone surrogate would survive the encode as a `\uXXXX`
+        // escape and blow up the decode — sanitising leaves nothing to reject.
+        const result = serializeAttributes({
+          [`k${LONE_HIGH_SURROGATE}`]: `v${LONE_LOW_SURROGATE}`,
+        });
+        const reparsed = JSON.parse(JSON.stringify(result)) as Record<
+          string,
+          string
+        >;
+        for (const [key, value] of Object.entries(reparsed)) {
+          expect(key.isWellFormed()).toBe(true);
+          expect(value.isWellFormed()).toBe(true);
+        }
+      });
+
+      it("emits a well-formed map value when a lone surrogate is nested inside a JSON-serialized object", () => {
+        // `JSON.stringify` escapes the lone surrogate to a literal `\uXXXX`
+        // sequence, so the map-value string handed to ClickHouse carries no
+        // lone surrogate code unit — and the outer JSONEachRow encode
+        // double-escapes it, so ClickHouse's parser accepts it as text.
+        const result = serializeAttributes({
+          nested: { text: `deep${LONE_HIGH_SURROGATE}` },
+        });
+        expect(result.nested!.isWellFormed()).toBe(true);
+      });
     });
   });
 });
@@ -710,6 +784,120 @@ describe("mapSpanSummaryRow", () => {
         }),
       );
       expect(result.cost).toBeCloseTo(1000 * 0.001 + 1000 * 0.0001, 10);
+    });
+  });
+});
+
+describe("SpanStorageClickHouseRepository ClickHouse record building", () => {
+  function repoWithInsertSpy() {
+    const insert = vi.fn().mockResolvedValue(undefined);
+    const repo = new SpanStorageClickHouseRepository((async () => ({
+      insert,
+    })) as unknown as ConstructorParameters<
+      typeof SpanStorageClickHouseRepository
+    >[0]);
+    return { repo, insert };
+  }
+
+  function spanWithLoneSurrogates(): SpanInsertData {
+    return {
+      id: "proj-1",
+      tenantId: "proj-1",
+      traceId: "t-1",
+      spanId: "s-1",
+      parentSpanId: null,
+      parentTraceId: null,
+      parentIsRemote: null,
+      sampled: true,
+      startTimeUnixMs: 1_700_000_000_000,
+      endTimeUnixMs: 1_700_000_000_100,
+      durationMs: 100,
+      name: `span name ${LONE_HIGH_SURROGATE}`,
+      kind: 0,
+      resourceAttributes: {
+        [`res.key.${LONE_HIGH_SURROGATE}`]: `res.val.${LONE_LOW_SURROGATE}`,
+      },
+      spanAttributes: {
+        [`attr.key.${LONE_HIGH_SURROGATE}`]: `attr.val.${LONE_LOW_SURROGATE}`,
+        nested: { text: `deep ${LONE_HIGH_SURROGATE}` },
+      },
+      statusCode: 2,
+      statusMessage: `error: ${LONE_LOW_SURROGATE}`,
+      instrumentationScope: {
+        name: `scope ${LONE_HIGH_SURROGATE}`,
+        version: `v1 ${LONE_LOW_SURROGATE}`,
+      },
+      events: [
+        {
+          name: `event ${LONE_HIGH_SURROGATE}`,
+          timeUnixMs: 1_700_000_000_050,
+          attributes: {
+            [`ev.key.${LONE_HIGH_SURROGATE}`]: `ev.val.${LONE_LOW_SURROGATE}`,
+          },
+        },
+      ],
+      links: [
+        {
+          traceId: "lt-1",
+          spanId: "ls-1",
+          attributes: {
+            [`ln.key.${LONE_HIGH_SURROGATE}`]: `ln.val.${LONE_LOW_SURROGATE}`,
+          },
+        },
+      ],
+      droppedAttributesCount: 0,
+      droppedEventsCount: 0,
+      droppedLinksCount: 0,
+      cost: null,
+      nonBilledCost: null,
+      retentionDays: 0,
+    };
+  }
+
+  describe("given a span whose name, status, scope, events and attributes carry lone UTF-16 surrogates", () => {
+    describe("when the repository builds the record for the JSONEachRow insert", () => {
+      it("sanitises every string in the record to well-formed UTF-16", async () => {
+        const { repo, insert } = repoWithInsertSpy();
+
+        await repo.insertSpans([spanWithLoneSurrogates()]);
+
+        const record = insert.mock.calls[0]?.[0]?.values?.[0];
+        expect(record).toBeDefined();
+        for (const s of collectStrings(record)) {
+          expect(s.isWellFormed()).toBe(true);
+        }
+      });
+
+      it("replaces the lone surrogates with U+FFFD instead of dropping the fields", async () => {
+        const { repo, insert } = repoWithInsertSpy();
+
+        await repo.insertSpans([spanWithLoneSurrogates()]);
+
+        const record = insert.mock.calls[0]?.[0]?.values?.[0];
+        // Assert the marker landed so the test cannot pass vacuously against an
+        // unsanitised record — the fix must actually have run on each field.
+        expect(record.SpanName).toContain("�");
+        expect(record.StatusMessage).toContain("�");
+        expect(record.ScopeName).toContain("�");
+        expect(record.ScopeVersion).toContain("�");
+        expect(record["Events.Name"][0]).toContain("�");
+      });
+
+      it("emits a record that survives a JSON encode/decode round-trip well-formed, which a lone surrogate would not", async () => {
+        const { repo, insert } = repoWithInsertSpy();
+
+        await repo.insertSpans([spanWithLoneSurrogates()]);
+
+        const record = insert.mock.calls[0]?.[0]?.values?.[0];
+        // The client sends the record as JSON (JSONEachRow); ClickHouse decodes
+        // it strictly. A lone surrogate would survive JSON.stringify as a
+        // `\uD83D`-style escape and reconstruct as an unpaired half on decode —
+        // the exact input ClickHouse rejects. A well-formed record cannot.
+        const reparsed = JSON.parse(JSON.stringify(record));
+        for (const s of collectStrings(reparsed)) {
+          expect(s.isWellFormed()).toBe(true);
+        }
+      });
     });
   });
 });
