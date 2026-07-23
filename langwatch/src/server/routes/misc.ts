@@ -715,28 +715,101 @@ secured
 // =============================================
 // Self-hosted instances report anonymous daily usage counts here with no
 // credential to present (see usageStatsWorker.ts), so the route stays public.
-// What it accepts is bounded instead: only the one event self-hosted
-// deployments actually send, a capped payload size, and per-IP + per-instance
-// rate limits — otherwise it is an open, unauthenticated write into the
-// analytics pipeline.
-const TRACK_USAGE_ALLOWED_EVENTS = ["daily_usage_stats"] as const;
-const TRACK_USAGE_MAX_PROPERTIES = 30;
-const TRACK_USAGE_PROPERTY_VALUE_SCHEMA = z.union([
-  z.string().max(500),
-  z.number(),
-  z.boolean(),
-  z.null(),
-]);
+// What it accepts is bounded instead:
+//   - `.strict()` schema matching exactly the one report `collectUsageStats`
+//     produces, so a spoofed event can't also smuggle arbitrary properties
+//     into PostHog even once it gets the event name right
+//   - a capped payload size
+//   - a global rate limit — the actual bound. `ip` and `instance_id` are both
+//     values the caller supplies, so an abuser rotates either one and lands
+//     in a fresh bucket every request (mirrors the reasoning in
+//     rum-ingest.service.ts). Checked first, on a fixed key, so a flood the
+//     global bucket is already refusing doesn't also mint a fresh per-caller
+//     Redis key on every request.
+//   - per-IP and per-instance limits on top, for fairness once under the cap
+const TRACK_USAGE_EVENT = "daily_usage_stats";
 const trackUsageBodySchema = z
   .object({
-    event: z.enum(TRACK_USAGE_ALLOWED_EVENTS),
+    event: z.literal(TRACK_USAGE_EVENT),
     instance_id: z.string().min(1).max(200),
+    install_method: z.string().max(100).optional(),
+    hostname: z.string().max(255).optional(),
+    environment: z.string().max(50).optional(),
+    totalTraces: z.number(),
+    totalScenarioEvents: z.number(),
+    annotations: z.number(),
+    annotationQueues: z.number(),
+    annotationQueueItems: z.number(),
+    annotationScores: z.number(),
+    batchEvaluations: z.number(),
+    customGraphs: z.number(),
+    datasets: z.number(),
+    datasetRecords: z.number(),
+    experiments: z.number(),
+    triggers: z.number(),
+    workflows: z.number(),
+    timestamp: z.string().optional(),
   })
-  .catchall(TRACK_USAGE_PROPERTY_VALUE_SCHEMA)
-  .refine(
-    (body) => Object.keys(body).length <= TRACK_USAGE_MAX_PROPERTIES,
-    "Too many properties",
-  );
+  .strict();
+
+// A self-hosted instance sends this once per organization per day
+// (usageStatsWorker.ts), so these ceilings stay generous for legitimate
+// traffic while bounding abuse.
+const TRACK_USAGE_GLOBAL_PER_MINUTE = 500;
+const TRACK_USAGE_PER_IP_PER_MINUTE = 10;
+const TRACK_USAGE_PER_INSTANCE_PER_HOUR = 5;
+
+interface TrackUsageRateLimitVerdict {
+  allowed: boolean;
+  retryAfterSeconds: number;
+}
+
+function toVerdict(result: {
+  allowed: boolean;
+  resetAt: number;
+}): TrackUsageRateLimitVerdict {
+  return {
+    allowed: result.allowed,
+    retryAfterSeconds: Math.max(
+      1,
+      Math.ceil((result.resetAt - Date.now()) / 1000),
+    ),
+  };
+}
+
+/**
+ * Checked before the body is even parsed, on keys no request-body field can
+ * influence, so a flood of malformed JSON is capped exactly like valid
+ * traffic — an attacker can't dodge the limiter just by sending garbage.
+ */
+async function enforceGlobalAndIpRateLimit(
+  ip: string,
+): Promise<TrackUsageRateLimitVerdict> {
+  const global = await rateLimit({
+    key: "track_usage:global",
+    windowSeconds: 60,
+    max: TRACK_USAGE_GLOBAL_PER_MINUTE,
+  });
+  if (!global.allowed) return toVerdict(global);
+
+  const perIp = await rateLimit({
+    key: `track_usage:ip:${ip}`,
+    windowSeconds: 60,
+    max: TRACK_USAGE_PER_IP_PER_MINUTE,
+  });
+  return toVerdict(perIp);
+}
+
+async function enforceInstanceRateLimit(
+  instanceId: string,
+): Promise<TrackUsageRateLimitVerdict> {
+  const perInstance = await rateLimit({
+    key: `track_usage:instance:${instanceId}`,
+    windowSeconds: 3600,
+    max: TRACK_USAGE_PER_INSTANCE_PER_HOUR,
+  });
+  return toVerdict(perInstance);
+}
 
 secured
   .access(publicEndpoint("anonymous product telemetry, no credential"))
@@ -745,12 +818,10 @@ secured
     bodyLimit({ maxSize: 10 * 1024 }),
     async (c) => {
       const ip = getClientIpFromHonoContext(c) ?? "unknown";
-      const ipLimit = await rateLimit({
-        key: `track_usage:ip:${ip}`,
-        windowSeconds: 60,
-        max: 10,
-      });
+
+      const ipLimit = await enforceGlobalAndIpRateLimit(ip);
       if (!ipLimit.allowed) {
+        c.header("Retry-After", String(ipLimit.retryAfterSeconds));
         return c.json({ message: "Too many requests" }, 429);
       }
 
@@ -767,12 +838,9 @@ secured
       }
       const { event, instance_id, ...properties } = parsed.data;
 
-      const instanceLimit = await rateLimit({
-        key: `track_usage:instance:${instance_id}`,
-        windowSeconds: 3600,
-        max: 5,
-      });
+      const instanceLimit = await enforceInstanceRateLimit(instance_id);
       if (!instanceLimit.allowed) {
+        c.header("Retry-After", String(instanceLimit.retryAfterSeconds));
         return c.json({ message: "Too many requests" }, 429);
       }
 
