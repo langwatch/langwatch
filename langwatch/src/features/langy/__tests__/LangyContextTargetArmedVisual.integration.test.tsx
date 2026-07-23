@@ -72,14 +72,11 @@ describe("armed context targets", () => {
       });
     });
 
-    describe("when the user holds Shift deliberately", () => {
+    describe("when the user latches the mode with #", () => {
       it("puts the lit ring marker on the target", () => {
         renderPage();
 
-        press("Shift");
-        act(() => {
-          vi.advanceTimersByTime(400);
-        });
+        press("#");
 
         const card = screen.getByTestId("trace-card");
         expect(card.className).toContain("langy-target");
@@ -92,7 +89,9 @@ describe("armed context targets", () => {
         renderPage();
         press("#");
         expect(
-          screen.getByTestId("trace-card").getAttribute("data-langy-target-state"),
+          screen
+            .getByTestId("trace-card")
+            .getAttribute("data-langy-target-state"),
         ).toBe("near");
 
         press("Escape");
