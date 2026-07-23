@@ -15,6 +15,11 @@ Feature: The app backs off decorative blur effects on a struggling device
   # sample window is discarded rather than counted if the tab was backgrounded
   # partway through it, since a backgrounded tab's real elapsed time no longer
   # reflects how many frames it should have rendered.
+  #
+  # A manual choice (always reduce / never reduce / let the automatic check
+  # decide) is available on top of the automatic probe, for anyone who already
+  # knows their situation and doesn't want to wait for a check. It's remembered
+  # on this device.
   # ---------------------------------------------------------------------------
 
   @unit
@@ -76,3 +81,21 @@ Feature: The app backs off decorative blur effects on a struggling device
     When the app waits for the next scheduled check
     Then the probe does no work in the meantime
     And it resumes checking once the wait is over
+
+  @integration
+  Scenario: A manual choice to always reduce graphics is respected
+    Given the user has chosen to always reduce graphics on this device
+    When the automatic check would otherwise measure a smooth frame rate
+    Then the app stays in reduced-graphics mode
+
+  @integration
+  Scenario: A manual choice to never reduce graphics is respected
+    Given the user has chosen to never reduce graphics on this device
+    When the automatic check would otherwise measure a struggling frame rate
+    Then the app never marks itself as running in reduced-graphics mode
+
+  @integration
+  Scenario: Choosing automatic hands control back to the probe
+    Given the user had chosen to always reduce graphics on this device
+    When the user switches the choice back to automatic
+    Then the automatic check resumes deciding reduced-graphics mode

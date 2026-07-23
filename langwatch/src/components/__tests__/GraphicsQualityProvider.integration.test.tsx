@@ -21,6 +21,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GraphicsQualityProvider } from "../GraphicsQualityProvider";
 import { useGraphicsQuality } from "~/hooks/useGraphicsQuality";
+import { useGraphicsQualityOverrideStore } from "~/stores/graphicsQualityOverrideStore";
 
 let pendingCallback: FrameRequestCallback | null = null;
 let rafCallCount = 0;
@@ -91,6 +92,7 @@ describe("<GraphicsQualityProvider/>", () => {
       configurable: true,
       value: false,
     });
+    useGraphicsQualityOverrideStore.setState({ override: "auto" });
   });
 
   describe("when the background probe is running", () => {
@@ -282,6 +284,71 @@ describe("<GraphicsQualityProvider/>", () => {
       runWindow({ windowMs: 1000, frames: 2 });
 
       expect(screen.getByTestId("consumer").textContent).toBe("true");
+    });
+  });
+
+  describe("when a manual override is set", () => {
+    /** @scenario "A manual choice to always reduce graphics is respected" */
+    it("stays in reduced-graphics mode even while the probe would measure a smooth rate", () => {
+      act(() => {
+        useGraphicsQualityOverrideStore.setState({ override: "on" });
+      });
+
+      render(
+        <GraphicsQualityProvider sampleWindowMs={1000} minFps={50}>
+          <Consumer />
+        </GraphicsQualityProvider>,
+      );
+
+      expect(screen.getByTestId("consumer").textContent).toBe("true");
+      expect(
+        document.documentElement.getAttribute("data-reduced-graphics"),
+      ).toBe("true");
+      // The probe is paused while overridden — nothing to measure, no
+      // point spending rAF cycles on a result that would be discarded.
+      expect(pendingCallback).toBeNull();
+    });
+
+    /** @scenario "A manual choice to never reduce graphics is respected" */
+    it("never marks reduced-graphics mode even while the probe would measure a struggling rate", () => {
+      act(() => {
+        useGraphicsQualityOverrideStore.setState({ override: "off" });
+      });
+
+      render(
+        <GraphicsQualityProvider sampleWindowMs={1000} minFps={50}>
+          <Consumer />
+        </GraphicsQualityProvider>,
+      );
+
+      expect(screen.getByTestId("consumer").textContent).toBe("false");
+      expect(
+        document.documentElement.hasAttribute("data-reduced-graphics"),
+      ).toBe(false);
+      expect(pendingCallback).toBeNull();
+    });
+
+    /** @scenario "Choosing automatic hands control back to the probe" */
+    it("resumes the probe once switched back to automatic", () => {
+      act(() => {
+        useGraphicsQualityOverrideStore.setState({ override: "on" });
+      });
+
+      render(
+        <GraphicsQualityProvider sampleWindowMs={1000} minFps={50}>
+          <Consumer />
+        </GraphicsQualityProvider>,
+      );
+      expect(pendingCallback).toBeNull();
+
+      act(() => {
+        useGraphicsQualityOverrideStore.setState({ override: "auto" });
+      });
+
+      // The probe resumes and, absent any measurement yet, defers to a
+      // smooth default rather than staying stuck on the override's value.
+      expect(pendingCallback).not.toBeNull();
+      expect(screen.getByTestId("consumer").textContent).toBe("false");
     });
   });
 });

@@ -39,9 +39,15 @@
  * theme recipes, which can't read React state); the context
  * (useGraphicsQuality) is a secondary channel for the rare consumer that
  * needs the signal programmatically.
+ *
+ * A manual per-device override (useGraphicsQualityOverrideStore) sits on
+ * top of the probe: "on"/"off" wins outright and the probe is paused
+ * entirely (no point spending rAF/setTimeout cycles on a measurement that
+ * would just be discarded); "auto" is today's probe-driven behavior.
  */
 import { useEffect, useRef, useState } from "react";
 import { GraphicsQualityContext } from "~/hooks/useGraphicsQuality";
+import { useGraphicsQualityOverrideStore } from "~/stores/graphicsQualityOverrideStore";
 import { evaluateFpsSample } from "~/utils/evaluateFpsSample";
 
 const RESAMPLE_INTERVAL_MS = 60_000;
@@ -74,15 +80,21 @@ export function GraphicsQualityProvider({
   hiddenRetryMs?: number;
   children: React.ReactNode;
 }) {
-  const [reducedGraphics, setReducedGraphics] = useState(false);
-  const reducedGraphicsRef = useRef(reducedGraphics);
-  reducedGraphicsRef.current = reducedGraphics;
+  const override = useGraphicsQualityOverrideStore((s) => s.override);
+  const [probeReducedGraphics, setProbeReducedGraphics] = useState(false);
+  const probeReducedGraphicsRef = useRef(probeReducedGraphics);
+  probeReducedGraphicsRef.current = probeReducedGraphics;
+
+  const reducedGraphics =
+    override === "auto" ? probeReducedGraphics : override === "on";
 
   useEffect(() => {
     applyReducedGraphicsAttribute(reducedGraphics);
   }, [reducedGraphics]);
 
   useEffect(() => {
+    if (override !== "auto") return;
+
     let rafId: number | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     let sample: { start: number; frames: number } | null = null;
@@ -127,8 +139,8 @@ export function GraphicsQualityProvider({
       const shouldReduceGraphics = isStruggling
         ? strugglingStreak >= consecutiveStrugglingSamples
         : false;
-      if (shouldReduceGraphics !== reducedGraphicsRef.current) {
-        setReducedGraphics(shouldReduceGraphics);
+      if (shouldReduceGraphics !== probeReducedGraphicsRef.current) {
+        setProbeReducedGraphics(shouldReduceGraphics);
       }
       sample = null;
       scheduleNextWindow(resampleIntervalMs);
@@ -152,6 +164,7 @@ export function GraphicsQualityProvider({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [
+    override,
     sampleWindowMs,
     minFps,
     resampleIntervalMs,
