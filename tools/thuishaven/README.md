@@ -58,10 +58,13 @@ surface is six verbs; `db` and `clean` are the only destructive nouns.
 ```text
 haven            the hub: every stack + actions on the selected one (agents/pipes
                  get the plain status report)
-haven up         start or reconcile this worktree's stack. +svc/-svc picks
-                 services and sticks (+langy, -nlp, +workers, -gateway); a fresh
-                 worktree runs app + nlp + gateway, langy off. -w watches the Go
-                 services via air; -d detaches; --rebuild forces container images
+haven up         start or reconcile this worktree's stack — in a terminal it
+                 runs in the BACKGROUND under an attached log view: ←/→/tab/digits
+                 switch between "all" and per-service logs, q detaches (the stack
+                 keeps running; haven down stops it). +svc/-svc picks services and
+                 sticks (+langy, -nlp, +workers, -gateway); a fresh worktree runs
+                 app + nlp + gateway, langy off. -w watches the Go services via
+                 air; -d detaches without the view; --rebuild forces images
 haven down       stop this worktree's stack — data is always kept;
                  --all stops every stack, the shared servers, daemon, and proxy
 haven restart    bounce one supervised service (or all) in place; `restart obs`
