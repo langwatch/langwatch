@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.35.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.34.0...typescript-sdk@v0.35.0) (2026-07-23)
+
+
+### Features
+
+* **cli:** agent-first `lw` CLI ([#5921](https://github.com/langwatch/langwatch/issues/5921)) ([efdaafc](https://github.com/langwatch/langwatch/commit/efdaafc09e8195720896315018f9bc05ee82020d))
+* **langy:** event-sourced frontend, model-emitted cards, and a home built on one field ([#6027](https://github.com/langwatch/langwatch/issues/6027)) ([5d72c7e](https://github.com/langwatch/langwatch/commit/5d72c7efc7b27fbc683ed77df7a943d01fb6b7a9))
+* **langy:** langy goes large - event driven orchestration, ideated on a design concept, made the go agent well tuff ([#5741](https://github.com/langwatch/langwatch/issues/5741)) ([5982038](https://github.com/langwatch/langwatch/commit/59820384139fdf275a799719fa677c3106b64ad1))
+* **langy:** stop a turn for real, choose what Langy sees, and a home to ask from (ADR-058) ([#6026](https://github.com/langwatch/langwatch/issues/6026)) ([a29667a](https://github.com/langwatch/langwatch/commit/a29667a4723b1db697ab21d7692e65ccb03685b4))
+
+
+### Bug Fixes
+
+* **cli:** agent-output follow-ups from the [#5921](https://github.com/langwatch/langwatch/issues/5921) review ([#6017](https://github.com/langwatch/langwatch/issues/6017)) ([a1a2b55](https://github.com/langwatch/langwatch/commit/a1a2b5535813966eccb2e25c614c1ebea1e664e3))
+* **security:** raise js-yaml and dompurify override floors (langwatch, skills, mastra example) ([bc79476](https://github.com/langwatch/langwatch/commit/bc79476fd684208745f4afb083fd5faa954ea79d))
+* **security:** raise js-yaml and dompurify override floors across JS workspaces ([#5364](https://github.com/langwatch/langwatch/issues/5364)) ([bc79476](https://github.com/langwatch/langwatch/commit/bc79476fd684208745f4afb083fd5faa954ea79d))
+* **security:** raise python-sdk bleach and onnx transitive floors ([#5542](https://github.com/langwatch/langwatch/issues/5542)) ([6abdc66](https://github.com/langwatch/langwatch/commit/6abdc6608ca8414a789e81e2b3c6f2aa42e03095))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump the typescript-native-preview group across 3 directories with 1 update ([#5721](https://github.com/langwatch/langwatch/issues/5721)) ([6e44614](https://github.com/langwatch/langwatch/commit/6e44614f5b193cf959203bb32e357cc7407e4b16))
+* **deps-dev:** bump the typescript-native-preview group across 3 directories with 1 update ([#5755](https://github.com/langwatch/langwatch/issues/5755)) ([1508d35](https://github.com/langwatch/langwatch/commit/1508d359e5bc5a8f382dbec25d53c5448b910d90))
+* **deps-dev:** bump the vitest group across 1 directory with 2 updates ([#5681](https://github.com/langwatch/langwatch/issues/5681)) ([ec90589](https://github.com/langwatch/langwatch/commit/ec90589907bfe703bc0907ce42cafa87f5b03945))
+
 ## [0.34.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.2...typescript-sdk@v0.34.0) (2026-07-08)
 
 
