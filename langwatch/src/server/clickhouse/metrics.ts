@@ -342,6 +342,16 @@ export async function collectStorageStats(
 
     const rows = await result.json<TableStats>();
 
+    // Reset before repopulating (mirrors the per-disk gauges below). Without
+    // this, a table that TTL-drops to zero active parts — or is simply absent
+    // from one tick's `system.parts` result — keeps its last non-zero value
+    // forever, so `clickhouse_table_bytes`/`_rows`/`_parts` report phantom size
+    // long after the data is gone (these feed the DB-size and trace_summaries
+    // alerts). Placed after the query resolves so a query error keeps the last
+    // known values rather than zeroing them.
+    clickhouseTableRows.reset();
+    clickhouseTableBytes.reset();
+    clickhouseTableParts.reset();
     for (const row of rows.data) {
       setClickHouseTableRows(row.table, parseInt(row.total_rows, 10));
       setClickHouseTableBytes(row.table, parseInt(row.total_bytes, 10));
