@@ -6,13 +6,14 @@
  *   - Scenario runs, evaluations, and experiment runs span the WHOLE window;
  *     they travel as event-sourcing commands whose occurredAt the substrate
  *     honours verbatim, so deep history lands in old event-log partitions.
- *   - Trace fixtures are attached only inside the collector's ingest window
- *     (TRACE_WINDOW_DAYS): the collector refuses older spans by design, and
- *     the seeder respects that contract instead of weakening it.
+ *   - Every run and every organic conversation carries a trace fixture for
+ *     the whole window. The SEEDER routes them by age: traces inside the
+ *     collector's ingest window (TRACE_WINDOW_DAYS) go through the real
+ *     collector; older ones are dispatched as recordSpan pipeline commands,
+ *     so the public boundary's age guard stays intact.
  */
 import {
   DAY_MS,
-  TRACE_WINDOW_DAYS,
   dateKey,
   mulberry32,
   utcDayStart,
@@ -33,8 +34,7 @@ export interface MassScenarioRun {
   passed: boolean;
   score: number;
   latencyMs: number;
-  /** Present only inside the collector's trace window. */
-  trace?: TraceFixture;
+  trace: TraceFixture;
 }
 
 export interface MassExperimentRun {
@@ -57,8 +57,6 @@ export interface MassTimeline {
 export interface MassTimelineOptions {
   months: number;
   now: number;
-  /** Override for tests; defaults to the collector's contract. */
-  traceWindowDays?: number;
 }
 
 const DAYS_PER_MONTH = 30;
@@ -71,10 +69,8 @@ function passProbability(trend: number, scenarioIndex: number): number {
 export function buildMassTimeline(options: MassTimelineOptions): MassTimeline {
   const months = Math.max(1, Math.floor(options.months));
   const days = months * DAYS_PER_MONTH;
-  const traceWindowDays = options.traceWindowDays ?? TRACE_WINDOW_DAYS;
   const lastDayStart = utcDayStart(options.now) - DAY_MS;
   const firstDayStart = lastDayStart - (days - 1) * DAY_MS;
-  const traceCutoff = options.now - traceWindowDays * DAY_MS;
 
   const scenarioRuns: MassScenarioRun[] = [];
   const organicTraces: TraceFixture[] = [];
@@ -104,17 +100,16 @@ export function buildMassTimeline(options: MassTimelineOptions): MassTimeline {
       const runId = `mass-scenario-${day}-${ordinal + 1}`;
       const score = passed ? 0.74 + random() * 0.24 : 0.2 + random() * 0.45;
 
-      const run: MassScenarioRun = {
+      const batchRunId = `mass-batch-${day}`;
+      scenarioRuns.push({
         runId,
-        batchRunId: `mass-batch-${day}`,
+        batchRunId,
         scenarioIndex,
         startedAt,
         passed,
         score,
         latencyMs,
-      };
-      if (startedAt >= traceCutoff) {
-        run.trace = {
+        trace: {
           traceId: `mass-trace-${day}-${ordinal + 1}`,
           userId: `mass-user-${1 + Math.floor(random() * 24)}`,
           threadId: `mass-thread-${day}-${ordinal + 1}`,
@@ -130,42 +125,38 @@ export function buildMassTimeline(options: MassTimelineOptions): MassTimeline {
             labels: ["mass-seed", "scenario", passed ? "passed" : "failed"],
             "scenario.run_id": runId,
             "scenario.id": scenario.scenarioId,
-            "scenario.batch_run_id": run.batchRunId,
+            "scenario.batch_run_id": batchRunId,
             "agent.id": DEMO_PLATFORM_IDS.agents.support,
             "seed.cohort": "mass-history",
           },
-        };
-      }
-      scenarioRuns.push(run);
+        },
+      });
     }
 
-    // Organic traffic exists only where the collector will accept it.
-    if (dayStart + DAY_MS > traceCutoff) {
-      const conversations = 6 + Math.floor(random() * 8);
-      for (let i = 0; i < conversations; i++) {
-        const startedAt =
-          dayStart + (9 * 60 + i * 55 + Math.floor(random() * 30)) * 60_000;
-        if (startedAt < traceCutoff) continue;
-        const topic = ORGANIC_TRAFFIC[Math.floor(random() * ORGANIC_TRAFFIC.length)]!;
-        const latencyMs = Math.round(700 + random() * 2_600);
-        organicTraces.push({
-          traceId: `mass-organic-${day}-${i + 1}`,
-          userId: `mass-user-${1 + Math.floor(random() * 40)}`,
-          threadId: `mass-organic-thread-${day}-${i + 1}`,
-          input: topic.input,
-          output: topic.output,
-          model: random() < 0.7 ? "gpt-5-mini" : "gpt-4.1-mini",
-          latencyMs,
-          promptTokens: 60 + Math.floor(random() * 120),
-          completionTokens: 30 + Math.floor(random() * 90),
-          cost: Number((0.0016 + random() * 0.005).toFixed(6)),
-          finishedAtMs: startedAt + latencyMs,
-          metadata: {
-            labels: ["mass-seed", "organic"],
-            "seed.cohort": "mass-organic",
-          },
-        });
-      }
+    // Organic support traffic every day of the window.
+    const conversations = 6 + Math.floor(random() * 8);
+    for (let i = 0; i < conversations; i++) {
+      const startedAt =
+        dayStart + (9 * 60 + i * 55 + Math.floor(random() * 30)) * 60_000;
+      const topic = ORGANIC_TRAFFIC[Math.floor(random() * ORGANIC_TRAFFIC.length)]!;
+      const latencyMs = Math.round(700 + random() * 2_600);
+      organicTraces.push({
+        traceId: `mass-organic-${day}-${i + 1}`,
+        userId: `mass-user-${1 + Math.floor(random() * 40)}`,
+        threadId: `mass-organic-thread-${day}-${i + 1}`,
+        input: topic.input,
+        output: topic.output,
+        model: random() < 0.7 ? "gpt-5-mini" : "gpt-4.1-mini",
+        latencyMs,
+        promptTokens: 60 + Math.floor(random() * 120),
+        completionTokens: 30 + Math.floor(random() * 90),
+        cost: Number((0.0016 + random() * 0.005).toFixed(6)),
+        finishedAtMs: startedAt + latencyMs,
+        metadata: {
+          labels: ["mass-seed", "organic"],
+          "seed.cohort": "mass-organic",
+        },
+      });
     }
 
     // One experiment run pair per week, scores drifting up over the window.

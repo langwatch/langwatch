@@ -23,24 +23,28 @@ describe("buildMassTimeline", () => {
       expect(NOW - oldest).toBeGreaterThan(85 * DAY_MS);
     });
 
-    // @scenario "Backdated traces stay inside the collector's window"
-    it("attaches trace fixtures only inside the collector's ingest window", () => {
+    // @scenario "Traces cover the whole window without weakening the collector's guard"
+    it("attaches a trace to every run and every day, on both sides of the collector's window", () => {
       const cutoff = NOW - 30 * DAY_MS;
       for (const run of timeline.scenarioRuns) {
-        if (run.trace) {
-          expect(run.startedAt).toBeGreaterThanOrEqual(cutoff);
-        } else {
-          expect(run.startedAt).toBeLessThan(cutoff);
-        }
+        expect(run.trace.finishedAtMs).toBe(run.startedAt + run.latencyMs);
       }
-      expect(timeline.scenarioRuns.some((run) => run.trace)).toBe(true);
-      expect(timeline.scenarioRuns.some((run) => !run.trace)).toBe(true);
-      for (const trace of timeline.organicTraces) {
-        expect(trace.finishedAtMs! - trace.latencyMs).toBeGreaterThanOrEqual(
-          cutoff,
-        );
-      }
-      expect(timeline.organicTraces.length).toBeGreaterThan(100);
+      const startedAt = (trace: { finishedAtMs?: number; latencyMs: number }) =>
+        trace.finishedAtMs! - trace.latencyMs;
+      const all = [
+        ...timeline.scenarioRuns.map((run) => run.trace),
+        ...timeline.organicTraces,
+      ];
+      // Both routing branches exist: recent traces for the real collector,
+      // older ones for the pipeline command seam.
+      expect(all.some((trace) => startedAt(trace) >= cutoff)).toBe(true);
+      expect(all.some((trace) => startedAt(trace) < cutoff)).toBe(true);
+      const organicDays = new Set(
+        timeline.organicTraces.map((trace) =>
+          Math.floor(startedAt(trace) / DAY_MS),
+        ),
+      );
+      expect(organicDays.size).toBe(timeline.days);
     });
 
     it("is deterministic for the same window", () => {
@@ -51,7 +55,7 @@ describe("buildMassTimeline", () => {
     it("keeps every generated id in the mass- cohort", () => {
       for (const run of timeline.scenarioRuns) {
         expect(run.runId).toMatch(/^mass-scenario-/);
-        if (run.trace) expect(run.trace.traceId).toMatch(/^mass-trace-/);
+        expect(run.trace.traceId).toMatch(/^mass-trace-/);
       }
       for (const exp of timeline.experimentRuns) {
         expect(exp.runId).toMatch(/^mass-exp-/);

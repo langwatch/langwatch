@@ -40,7 +40,7 @@ var seedPresets = map[string]seedPreset{
 	// Event-sourced products are seeded through their event logs (replayed by
 	// the projection workers); traces backdate through the collector inside
 	// its 31-day window. HAVEN_SEED_MONTHS tunes the window (default 3).
-	"mass": {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{"seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated activity (HAVEN_SEED_MONTHS, default 3)"},
+	"mass": {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{"seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated traces, runs, and metric series (HAVEN_SEED_MONTHS, default 3)"},
 }
 
 // SeedPresetNames lists the registry for errors and help, sorted.
