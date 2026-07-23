@@ -1,3 +1,4 @@
+import type { Context } from "hono";
 import type { NextApiRequest } from "~/types/next-stubs";
 
 export function getClientIp(
@@ -62,4 +63,15 @@ export function getClientIp(
   }
 
   return undefined;
+}
+
+/**
+ * Adapts a Hono request's headers into the `NextApiRequest` shape `getClientIp`
+ * expects, so Hono routes can reuse the same header-priority IP resolution as
+ * the legacy pages-router handlers instead of re-implementing it.
+ */
+export function getClientIpFromHonoContext(c: Context): string | undefined {
+  return getClientIp({
+    headers: c.req.header(),
+  } as unknown as NextApiRequest);
 }

@@ -72,6 +72,7 @@ import {
   type MaybeStoredLLMModelCost,
 } from "~/server/modelProviders/llmModelCost";
 import { getPostHogInstance } from "~/server/posthog";
+import { rateLimit } from "~/server/rateLimit";
 import { connection as redis } from "~/server/redis";
 import {
   estimateCost,
@@ -83,6 +84,7 @@ import {
 } from "~/server/tracer/types";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { encrypt } from "~/utils/encryption";
+import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
@@ -711,33 +713,85 @@ secured
 // =============================================
 // POST /api/track_usage
 // =============================================
+// Self-hosted instances report anonymous daily usage counts here with no
+// credential to present (see usageStatsWorker.ts), so the route stays public.
+// What it accepts is bounded instead: only the one event self-hosted
+// deployments actually send, a capped payload size, and per-IP + per-instance
+// rate limits — otherwise it is an open, unauthenticated write into the
+// analytics pipeline.
+const TRACK_USAGE_ALLOWED_EVENTS = ["daily_usage_stats"] as const;
+const TRACK_USAGE_MAX_PROPERTIES = 30;
+const TRACK_USAGE_PROPERTY_VALUE_SCHEMA = z.union([
+  z.string().max(500),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+const trackUsageBodySchema = z
+  .object({
+    event: z.enum(TRACK_USAGE_ALLOWED_EVENTS),
+    instance_id: z.string().min(1).max(200),
+  })
+  .catchall(TRACK_USAGE_PROPERTY_VALUE_SCHEMA)
+  .refine(
+    (body) => Object.keys(body).length <= TRACK_USAGE_MAX_PROPERTIES,
+    "Too many properties",
+  );
+
 secured
   .access(publicEndpoint("anonymous product telemetry, no credential"))
-  .post("/track_usage", async (c) => {
-    let body: Record<string, any>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
-
-    const { event, instance_id, ...properties } = body;
-
-    const posthog = getPostHogInstance();
-    if (posthog) {
-      try {
-        posthog.capture({
-          distinctId: instance_id,
-          event,
-          properties,
-        });
-      } catch (error) {
-        captureException(toError(error));
+  .post(
+    "/track_usage",
+    bodyLimit({ maxSize: 10 * 1024 }),
+    async (c) => {
+      const ip = getClientIpFromHonoContext(c) ?? "unknown";
+      const ipLimit = await rateLimit({
+        key: `track_usage:ip:${ip}`,
+        windowSeconds: 60,
+        max: 10,
+      });
+      if (!ipLimit.allowed) {
+        return c.json({ message: "Too many requests" }, 429);
       }
-    }
 
-    return c.json({ message: "Event captured" });
-  });
+      let rawBody: unknown;
+      try {
+        rawBody = await c.req.json();
+      } catch {
+        return c.json({ message: "Bad request" }, 400);
+      }
+
+      const parsed = trackUsageBodySchema.safeParse(rawBody);
+      if (!parsed.success) {
+        return c.json({ message: "Bad request" }, 400);
+      }
+      const { event, instance_id, ...properties } = parsed.data;
+
+      const instanceLimit = await rateLimit({
+        key: `track_usage:instance:${instance_id}`,
+        windowSeconds: 3600,
+        max: 5,
+      });
+      if (!instanceLimit.allowed) {
+        return c.json({ message: "Too many requests" }, 429);
+      }
+
+      const posthog = getPostHogInstance();
+      if (posthog) {
+        try {
+          posthog.capture({
+            distinctId: instance_id,
+            event,
+            properties,
+          });
+        } catch (error) {
+          captureException(toError(error));
+        }
+      }
+
+      return c.json({ message: "Event captured" });
+    },
+  );
 
 // =============================================
 // POST /api/trigger/slack
