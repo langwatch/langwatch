@@ -83,6 +83,7 @@ import {
   useLangyTurnRecovery,
 } from "../hooks/useLangyTurnRecovery";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
+import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
@@ -107,6 +108,7 @@ import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
+  LANGY_DODGE_RELEASE_DELAY_MS,
   LANGY_TRANSITION,
   langyRestingFloorPx,
   PANEL_LAYOUT_TRANSITION,
@@ -342,9 +344,14 @@ function LangyLauncher({
   const reduceMotion = useReducedMotion();
   // A right-anchored drawer fills the right edge while the panel is closed, so
   // the bottom-right launcher would sit on top of it (and the table pager).
-  // Dodge to the bottom-LEFT corner while a drawer is open.
+  // Dodge to the bottom-LEFT corner while a drawer is open; hop back only a
+  // beat after the drawer has left, on the same cadence as the panel's dodge.
   const { currentDrawer } = useDrawer();
-  const dodgeLeft = !!currentDrawer;
+  const dodgeLeft = useLingeringDodge({
+    active: !!currentDrawer,
+    releaseDelayMs: LANGY_DODGE_RELEASE_DELAY_MS,
+    immediate: reduceMotion,
+  });
   // The orb leans + glows toward the cursor as it approaches (the one place a
   // Langy surface reacts to the pointer — a hover affordance on the target
   // itself, not ambient chrome). Disabled under reduced motion. `transform` is
@@ -566,7 +573,15 @@ function LangyPanel({
   const { currentDrawer } = useDrawer();
   const hasDrawer = isOpen && !!currentDrawer;
   const isDrawerCompanion = hasDrawer && !floating;
-  const floatingDodgesDrawer = hasDrawer && floating;
+  // The dodge releases on a delay: the drawer leaves the right edge first,
+  // then the panel glides back. Only the FLOATING dodge lingers, the docked
+  // companion ride releases with the drawer itself.
+  const drawerEdgeHeld = useLingeringDodge({
+    active: !!currentDrawer,
+    releaseDelayMs: LANGY_DODGE_RELEASE_DELAY_MS,
+    immediate: reduceMotion,
+  });
+  const floatingDodgesDrawer = isOpen && drawerEdgeHeld && floating;
   const viewportWidth = useViewportWidth();
   const floatingPanelWidth = resolveFloatingPanelWidth(viewportWidth);
 
@@ -595,8 +610,9 @@ function LangyPanel({
     enabled: peeking && !reduceMotion,
     mode: panelMode,
     // A right-anchored drawer owns the bottom-right corner, so the floating
-    // panel dodges left — and the proximity zone has to follow it there.
-    dodgeLeft: !!currentDrawer && floating,
+    // panel dodges left — and the proximity zone has to follow it there,
+    // on the same lingering release as the panel itself.
+    dodgeLeft: drawerEdgeHeld && floating,
   });
   const [peekHovered, setPeekHovered] = useState(false);
   const [peekFocused, setPeekFocused] = useState(false);

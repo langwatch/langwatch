@@ -3,6 +3,7 @@ import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import {
   LANGY_DOCK_GAP,
+  LANGY_DODGE_ENTER_DELAY_MS,
   LANGY_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
 } from "~/features/langy/logic/langyPanelLayout";
@@ -70,8 +71,9 @@ export const DrawerContent = React.forwardRef<
     : undefined;
 
   // Floating Langy dodges to the left when a drawer opens. Hold the drawer's
-  // entrance back briefly so the panel clears out FIRST and the drawer then
-  // slides in behind it — the two moving in lockstep read as one clumsy jump.
+  // entrance back until the panel has fully cleared out, so the sequence reads
+  // as Langy going first and the drawer following — the two moving in lockstep
+  // read as one clumsy jump.
   // FROZEN at mount: the drawer that triggered the dodge gets the delay; a
   // drawer opened later (panel already parked) enters normally.
   const isLangyOpenFloating = useLangyStore(
@@ -81,7 +83,10 @@ export const DrawerContent = React.forwardRef<
     () => isLangyOpenFloating,
   );
   const langyStaggerEnter = staggerBehindFloatingLangy
-    ? { animationDelay: "200ms", animationFillMode: "backwards" as const }
+    ? {
+        animationDelay: `${LANGY_DODGE_ENTER_DELAY_MS}ms`,
+        animationFillMode: "backwards" as const,
+      }
     : undefined;
 
   // Crash inside the drawer body should NOT close the drawer. Wrap the
