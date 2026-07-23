@@ -2947,24 +2947,31 @@ function PanelHeader({
         gap={1}
         flexShrink={0}
       >
-        <Box
-          flex={1}
-          minWidth={0}
-          textStyle="sm"
-          fontWeight="600"
-          letterSpacing="-0.01em"
-          lineHeight="1.25"
-          color="fg"
-          whiteSpace="nowrap"
-          overflow="hidden"
-          textOverflow="ellipsis"
-        >
-          {conversationTitle ? (
-            <AnimatedConversationTitle title={conversationTitle} />
-          ) : (
-            "Langy"
-          )}
-        </Box>
+        {/* Identity leads: the LangWatch mark, then the label. The mark is a
+            fixed glyph the truncating title can never crowd out (flexShrink
+            0), so the header keeps a stable left edge whatever the title reads.
+            One line still — the mark sits inline before the label, not a
+            masthead above it. */}
+        <HStack flex={1} minWidth={0} gap={1.5} align="center">
+          <LangyMark size={15} />
+          <Box
+            minWidth={0}
+            textStyle="sm"
+            fontWeight="600"
+            letterSpacing="-0.01em"
+            lineHeight="1.25"
+            color="fg"
+            whiteSpace="nowrap"
+            overflow="hidden"
+            textOverflow="ellipsis"
+          >
+            {conversationTitle ? (
+              <AnimatedConversationTitle title={conversationTitle} />
+            ) : (
+              "Langy"
+            )}
+          </Box>
+        </HStack>
 
         <HStack gap={0.5} flexShrink={0}>
           <Tooltip content="New chat" positioning={{ placement: "bottom" }}>
