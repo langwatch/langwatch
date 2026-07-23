@@ -167,7 +167,11 @@ describe("requireApiKeyPermission()", () => {
         const res = await app.request("/");
 
         expect(res.status).toBe(403);
-        await expect(res.json()).resolves.toMatchObject({ error: "Forbidden" });
+        // The full handled-error body (ADR-045): the code is the part a
+        // caller can branch on, so pin that rather than a display string.
+        await expect(res.json()).resolves.toMatchObject({
+          error: "api_key_permission_denied",
+        });
         expect(handler).not.toHaveBeenCalled();
       });
     });
