@@ -417,14 +417,14 @@ export function initializeDefaultApp(options?: {
     "SpanStorageService",
   );
   const logRecordStorage = traced(
-    new LogRecordStorageService(
-      clickhouseEnabled
+    new LogRecordStorageService({
+      repository: clickhouseEnabled
         ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
         : new NullLogRecordStorageRepository(),
-      clickhouseEnabled
+      canonical: clickhouseEnabled
         ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
         : new NullCanonicalLogRecordRepository(),
-    ),
+    }),
     "LogRecordStorageService",
   );
   const experiments = traced(
@@ -1388,10 +1388,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           "SpanStorageService",
         ),
         logRecords: traced(
-          new LogRecordStorageService(
-            new NullLogRecordStorageRepository(),
-            new NullCanonicalLogRecordRepository(),
-          ),
+          new LogRecordStorageService({
+            repository: new NullLogRecordStorageRepository(),
+            canonical: new NullCanonicalLogRecordRepository(),
+          }),
           "LogRecordStorageService",
         ),
         collection: traced(

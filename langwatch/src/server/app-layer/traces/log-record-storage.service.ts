@@ -28,16 +28,25 @@ import {
  * in time order — the same pattern the claude-marked read established.
  */
 export class LogRecordStorageService {
+  readonly repository: LogRecordStorageRepository;
+  private readonly canonical: CanonicalLogRecordRepository;
+
   /**
    * `canonical` is REQUIRED: canonical `log_records` is the only table still
    * receiving writes, so a service built without it reads legacy-only and
    * silently returns nothing for every trace ingested after the cutover.
    * Deployments without ClickHouse pass NullCanonicalLogRecordRepository.
    */
-  constructor(
-    readonly repository: LogRecordStorageRepository,
-    private readonly canonical: CanonicalLogRecordRepository,
-  ) {}
+  constructor({
+    repository,
+    canonical,
+  }: {
+    repository: LogRecordStorageRepository;
+    canonical: CanonicalLogRecordRepository;
+  }) {
+    this.repository = repository;
+    this.canonical = canonical;
+  }
 
   async insertLogRecord(record: NormalizedLogRecord): Promise<void> {
     await this.repository.insertLogRecord(record);
@@ -89,12 +98,16 @@ export function createDefaultLogRecordStorageService(): LogRecordStorageService 
     return client;
   };
   return isClickHouseEnabled()
-    ? new LogRecordStorageService(
-        new LogRecordStorageClickHouseRepository(resolveClickHouseClient),
-        new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient),
-      )
-    : new LogRecordStorageService(
-        new NullLogRecordStorageRepository(),
-        new NullCanonicalLogRecordRepository(),
-      );
+    ? new LogRecordStorageService({
+        repository: new LogRecordStorageClickHouseRepository(
+          resolveClickHouseClient,
+        ),
+        canonical: new CanonicalLogRecordClickHouseRepository(
+          resolveClickHouseClient,
+        ),
+      })
+    : new LogRecordStorageService({
+        repository: new NullLogRecordStorageRepository(),
+        canonical: new NullCanonicalLogRecordRepository(),
+      });
 }

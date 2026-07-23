@@ -43,7 +43,7 @@ function makeService({
     getLogsByTraceId: canonicalGetLogsByTraceId,
   } as unknown as CanonicalLogRecordRepository;
   return {
-    service: new LogRecordStorageService(repository, canonical),
+    service: new LogRecordStorageService({ repository, canonical }),
     getLogsByTraceId,
     canonicalGetLogsByTraceId,
   };
