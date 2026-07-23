@@ -442,6 +442,12 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 		t.Errorf("config.json set store on a non-codex model; store:false is codex-only\n%s", raw)
 	}
 
+	// An openai/ model runs the NATIVE openai provider (Responses dialect);
+	// the generic chat-completions lane must not be declared alongside it.
+	if strings.Contains(string(raw), gatewayProviderID+"/") {
+		t.Errorf("native openai model must not route through the generic lane\n%s", raw)
+	}
+
 	target, err := os.Readlink(skillsDir(home))
 	if err != nil {
 		t.Fatalf("skills symlink missing — with MCP gone, skills + CLI are the entire capability surface: %v", err)
@@ -601,6 +607,119 @@ func TestProvision_CodexModelRunsStateless(t *testing.T) {
 	if opts["reasoningSummary"] != "auto" {
 		t.Errorf("codex config must keep reasoningSummary:auto; options=%v", opts)
 	}
+}
+
+// The generic chat-completions lane: every model whose provider is not the
+// native openai/codex Responses path gets a config-declared OpenAI-compatible
+// provider pointed at the worker's LLM base URL env, with the FULL
+// provider-prefixed id preserved verbatim as the model — dots, colons, and
+// extra slashes included. One shape for every provider; nothing here may
+// branch per provider name.
+func TestProvision_GenericProviderLane(t *testing.T) {
+	for _, model := range []string{
+		"anthropic/claude-sonnet-4-6",
+		"gemini/gemini-2.5-pro",
+		"azure/my-gpt4-deployment",
+		"bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
+		"vertex_ai/gemini/gemini-2.5-pro",
+	} {
+		t.Run(model, func(t *testing.T) {
+			home := t.TempDir()
+			workspace := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
+				t.Fatalf("mkdir shared skills: %v", err)
+			}
+
+			err := NewAgent(0).Provision(ProvisionInput{
+				Home:          home,
+				WorkspaceRoot: workspace,
+				Creds: domain.Credentials{
+					Model:             model,
+					LangwatchAPIKey:   "sk-lw-test-key",
+					LLMVirtualKey:     "vk-test",
+					GatewayBaseURL:    "https://gateway.test",
+					LangwatchEndpoint: "https://app.test",
+				},
+				UID:            0,
+				AgentsTemplate: "# AGENTS\n",
+				Runner:         localunsafe.Runner{},
+			})
+			if err != nil {
+				t.Fatalf("Provision: %v", err)
+			}
+
+			raw, err := os.ReadFile(filepath.Join(home, ".config", "opencode", "config.json"))
+			if err != nil {
+				t.Fatalf("read config.json: %v", err)
+			}
+			var cfg map[string]any
+			if err := json.Unmarshal(raw, &cfg); err != nil {
+				t.Fatalf("unmarshal config.json: %v", err)
+			}
+
+			// opencode splits the model reference at the FIRST slash, so this
+			// targets the gateway provider with the full prefixed id intact.
+			if want := gatewayProviderID + "/" + model; cfg["model"] != want {
+				t.Errorf("config model = %v, want %q", cfg["model"], want)
+			}
+
+			lane := genericProviderBlock(t, cfg)
+			// Bundled into the opencode binary — instantiating it costs zero
+			// package installs on the turn's critical path.
+			if lane["npm"] != "@ai-sdk/openai-compatible" {
+				t.Errorf("generic lane npm = %v, want @ai-sdk/openai-compatible", lane["npm"])
+			}
+			options, ok := lane["options"].(map[string]any)
+			if !ok {
+				t.Fatalf("generic lane missing options: %v", lane)
+			}
+			// The env placeholders keep the config free of URLs and keys: the
+			// SAME worker env feeds both the native and the generic lane, so
+			// mediated and unmediated wiring both keep working unchanged.
+			if options["baseURL"] != "{env:OPENAI_BASE_URL}" {
+				t.Errorf("generic lane baseURL = %v, want the env placeholder", options["baseURL"])
+			}
+			if options["apiKey"] != "{env:OPENAI_API_KEY}" {
+				t.Errorf("generic lane apiKey = %v, want the env placeholder", options["apiKey"])
+			}
+			if strings.Contains(string(raw), "vk-test") {
+				t.Errorf("config.json contains the virtual key; credentials ride the env, never the file")
+			}
+			models, ok := lane["models"].(map[string]any)
+			if !ok {
+				t.Fatalf("generic lane missing models: %v", lane)
+			}
+			if _, present := models[model]; !present {
+				t.Errorf("generic lane models must key the full id %q verbatim, got %v", model, models)
+			}
+			// No fabricated limits: absent limit metadata disables opencode's
+			// auto-compaction rather than inventing a context window the model
+			// may not have.
+			if strings.Contains(string(raw), `"limit"`) {
+				t.Errorf("generic lane must not fabricate model limits; got\n%s", raw)
+			}
+			// The Responses-dialect options are native-lane concerns; the
+			// generic lane's request must stay free of provider-specific knobs.
+			if strings.Contains(string(raw), "reasoningSummary") {
+				t.Errorf("generic lane must not carry the openai reasoningSummary option; got\n%s", raw)
+			}
+		})
+	}
+}
+
+// genericProviderBlock digs provider.<gatewayProviderID> out of the parsed
+// config, failing the test if the path is not shaped as expected.
+func genericProviderBlock(t *testing.T, cfg map[string]any) map[string]any {
+	t.Helper()
+	provider, ok := cfg["provider"].(map[string]any)
+	if !ok {
+		t.Fatalf("config missing provider block: %v", cfg["provider"])
+	}
+	lane, ok := provider[gatewayProviderID].(map[string]any)
+	if !ok {
+		t.Fatalf("config missing provider.%s: %v", gatewayProviderID, provider)
+	}
+	return lane
 }
 
 // codexModelOptions digs the provider.openai.models.<id>.options map out of the

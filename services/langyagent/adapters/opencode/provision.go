@@ -139,6 +139,15 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		model = "openai/" + bare
 		isCodex = true
 	}
+	// Which dialect serves the model. openai/ models (codex included, mapped
+	// above) run opencode's native openai provider against the gateway's
+	// Responses surface. EVERY other model runs the generic chat-completions
+	// lane: a config-declared OpenAI-compatible provider pointed at the same
+	// base URL, carrying the FULL provider-prefixed id verbatim so the
+	// gateway's own prefix routing is the single source of provider fan-out.
+	// No provider is named here — anthropic, gemini, azure, bedrock, and
+	// whatever ships next all take the same lane unmodified.
+	nativeOpenAI := strings.HasPrefix(model, "openai/")
 
 	// No "plugin" block. The worker previously loaded an external OpenTelemetry
 	// plugin (@devtheops/opencode-plugin-otel), but evaluating that ~2 MB bundle
@@ -196,7 +205,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 	// thinking glimpse has nothing to show — a verified 4-5s per LLM call of
 	// dead silence on gpt-5-mini. With it, opencode streams reasoning deltas
 	// that ride the existing frames → relay → glimpse pipe end to end.
-	if providerID, modelID, ok := strings.Cut(model, "/"); ok && providerID == "openai" {
+	if _, modelID, ok := strings.Cut(model, "/"); ok && nativeOpenAI {
 		options := map[string]any{"reasoningSummary": "auto"}
 		if isCodex {
 			// Codex's backend is stateless: store:false, no server-side
@@ -215,6 +224,33 @@ func (a *Agent) Provision(in ProvisionInput) error {
 					modelID: map[string]any{
 						"options": options,
 					},
+				},
+			},
+		}
+	}
+	if !nativeOpenAI {
+		// The generic chat-completions lane. `@ai-sdk/openai-compatible` is
+		// compiled into the opencode binary's bundled-provider map, so this
+		// entry instantiates with ZERO runtime package installs — nothing new
+		// lands on the turn's critical path. The provider id is split off the
+		// config model at the FIRST slash, so the model id keeps its full
+		// provider-prefixed form (dots, colons, and further slashes included)
+		// and rides the request body verbatim to the gateway's
+		// /chat/completions, exactly as the prompt playground reaches it. The
+		// {env:...} placeholders resolve at opencode's config load from the
+		// worker env, so mediated and unmediated wiring both keep working and
+		// no base URL or key is baked into the file at provision time.
+		config["model"] = gatewayProviderID + "/" + model
+		config["provider"] = map[string]any{
+			gatewayProviderID: map[string]any{
+				"npm":  "@ai-sdk/openai-compatible",
+				"name": "LangWatch Gateway",
+				"options": map[string]any{
+					"baseURL": "{env:OPENAI_BASE_URL}",
+					"apiKey":  "{env:OPENAI_API_KEY}",
+				},
+				"models": map[string]any{
+					model: map[string]any{"name": model},
 				},
 			},
 		}
@@ -367,6 +403,14 @@ func workerBaseEnv() []string {
 // header with the real virtual key on the forward. It exists only because the
 // OpenAI SDK refuses an empty key.
 const mediatedLLMPlaceholderKey = "langy-mediated"
+
+// gatewayProviderID is the opencode provider id of the generic
+// chat-completions lane (see Provision). opencode resolves a model reference
+// by splitting at the FIRST slash, so a config model of
+// "langwatch/anthropic/claude-…" targets this provider with the full
+// "anthropic/claude-…" id as the model — the id the gateway routes by prefix.
+// The name has no models.dev catalog entry, so nothing merges over it.
+const gatewayProviderID = "langwatch"
 
 // langyIdentityPluginFilename is where Provision writes the identity plugin,
 // relative to the worker's opencode config dir. opencode auto-discovers every

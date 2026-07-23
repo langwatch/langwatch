@@ -53,9 +53,9 @@ import {
   LangyIdempotencyMismatchError,
   LangyInsufficientScopeError,
   LangyModelNotAllowedError,
+  LangyModelNotConfiguredError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
-  langyEngineCanRunModel,
 } from "./errors";
 import type { LangyConversationService } from "./langy-conversation.service";
 import { buildFinalAssistantParts } from "./langy-final-parts";
@@ -131,8 +131,13 @@ export interface StartConversationTurnInput {
 export interface LangyTurnServiceDeps {
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
-  /** Resolve the project's default model; rejects when none is configured. */
-  resolveModel: (args: { projectId: string }) => Promise<unknown>;
+  /**
+   * Resolve the project's configured Langy model; rejects when none is
+   * configured. The returned `modelId` is the full provider-prefixed id and
+   * is FORWARDED to the worker (ADR-065) — with no per-send override, the
+   * turn runs on this model, never on the worker's own built-in default.
+   */
+  resolveModel: (args: { projectId: string }) => Promise<{ modelId: string }>;
   /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
    * is the best-effort worker abort behind a user Stop (ADR-058). */
   worker: Pick<LangyWorkerPort, "probe" | "dispatch" | "cancel"> | null;
@@ -255,7 +260,7 @@ export class LangyTurnService {
         projectId,
         userId,
       });
-      if (!conv || !conv.isOwn) {
+      if (!conv?.isOwn) {
         throw new LangyConversationNotOwnedError(conversationId);
       }
       // The turn id is client input, and a stop is the one place it buys a
@@ -346,7 +351,7 @@ export class LangyTurnService {
     const conversationService = this.deps.conversations;
     const credentialService = this.deps.credentials;
 
-    const { speculativeConversation, credentials } =
+    const { speculativeConversation, credentials, resolvedModel } =
       await resolveLangyTurnBaseDependencies({
         deps: this.deps,
         projectId,
@@ -355,6 +360,15 @@ export class LangyTurnService {
         requestedConversationId,
         ...(modelOverride ? { modelOverride } : {}),
       });
+
+    // The model this turn runs on: the per-send override when the user picked
+    // one, the project's configured Langy model otherwise. Forwarded to the
+    // worker on every path (probe, handoff, dispatch) so the worker never
+    // falls back to its own built-in default (ADR-065).
+    const turnModel = modelOverride ?? resolvedModel;
+    if (!turnModel) {
+      throw new LangyModelNotConfiguredError();
+    }
 
     // The receipt and active-turn row are the authoritative admission boundary.
     // Stable ids make every sibling write and every later request replay collapse
@@ -434,7 +448,10 @@ export class LangyTurnService {
           projectId,
           actorUserId: userId,
           conversationId: conversation.id,
-          ...(modelOverride ? { model: modelOverride } : {}),
+          // The model is part of the worker signature, so a model change —
+          // override or configured default — is a probe MISS and the worker
+          // re-provisions rather than running on the model it booted with.
+          model: turnModel,
           hasGithubAuth: !!credentials.githubToken,
           ...(credentials.githubRepoScopeKey
             ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
@@ -475,12 +492,10 @@ export class LangyTurnService {
               projectId,
               conversationId: conversation.id,
             }),
-        modelOverride
-          ? credentialService.getModelsAllowed({
-              projectId,
-              organizationId: credentials.organizationId,
-            })
-          : Promise.resolve(null),
+        credentialService.getModelsAllowed({
+          projectId,
+          organizationId: credentials.organizationId,
+        }),
         // The conversation's own history. Overlapped with the reads above so
         // remembering costs no extra latency window. A fresh conversation has
         // nothing to read, so it does not pay for the round trip either. The
@@ -499,31 +514,23 @@ export class LangyTurnService {
           ? (runTokenResult.value ?? "")
           : "";
 
-      if (modelOverride) {
-        if (modelsAllowedResult.status === "rejected") {
-          throw modelsAllowedResult.reason;
-        }
-        const modelsAllowed = modelsAllowedResult.value;
-        if (modelsAllowed && !modelsAllowed.includes(modelOverride)) {
-          logger.warn(
-            { projectId, modelOverride, allowedCount: modelsAllowed.length },
-            "modelOverride not in VK allowlist — rejecting",
-          );
-          throw new LangyModelNotAllowedError(modelOverride);
-        }
-        // Configured is not the same as runnable: the engine only speaks the
-        // OpenAI dialect today, so a configured Anthropic (or other) model
-        // would reach the worker with no lane and die as an opaque failure.
-        // Refuse it here with the engine-reason card instead.
-        if (!langyEngineCanRunModel(modelOverride)) {
-          logger.warn(
-            { projectId, modelOverride },
-            "modelOverride provider not wired into the engine — rejecting",
-          );
-          throw new LangyModelNotAllowedError(modelOverride, {
-            reason: "engine",
-          });
-        }
+      // The project's Langy allowlist is the ONLY runnable-set gate, and it
+      // covers the effective model on BOTH paths — a per-send override and
+      // the configured default alike — so a disallowed model is a clean card
+      // at turn start, never a mid-turn gateway rejection. The engine itself
+      // is provider-blind: whatever passes here is dispatched with its full
+      // provider-prefixed id and the gateway's prefix routing picks the
+      // provider.
+      if (modelsAllowedResult.status === "rejected") {
+        throw modelsAllowedResult.reason;
+      }
+      const modelsAllowed = modelsAllowedResult.value;
+      if (modelsAllowed && !modelsAllowed.includes(turnModel)) {
+        logger.warn(
+          { projectId, turnModel, allowedCount: modelsAllowed.length },
+          "turn model not in VK allowlist — rejecting",
+        );
+        throw new LangyModelNotAllowedError(turnModel);
       }
 
       // Projection read is only a rollout/back-compat hint. The Postgres
@@ -631,7 +638,7 @@ export class LangyTurnService {
             actorUserId: userId,
             prompt: userText,
             system,
-            ...(modelOverride ? { modelOverride } : {}),
+            modelOverride: turnModel,
             credentials,
             runToken,
             permitReserved: permit.reserved,
@@ -708,7 +715,7 @@ export class LangyTurnService {
             system,
             conversationId: conversation.id,
             credentials,
-            ...(modelOverride ? { modelOverride } : {}),
+            modelOverride: turnModel,
             ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
           })
           .then((outcome) => {

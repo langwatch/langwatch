@@ -453,25 +453,10 @@ export function explainLangyError(
         ...debug,
       };
 
-    case "langy_model_not_allowed": {
-      // Deterministic either way — the identical request fails again — so no
-      // retry. `meta.reason` tells the two refusals apart by exact match: the
-      // engine case is a configured model whose provider Langy cannot execute
-      // yet, so the fix is picking a runnable model in the composer, not the
-      // project's model settings.
-      const meta = (domain.meta ?? {}) as { model?: unknown; reason?: unknown };
-      if (meta.reason === "engine") {
-        const model = typeof meta.model === "string" ? meta.model : null;
-        return {
-          kind: domain.code,
-          title: "Langy can't run that model yet",
-          description: `${
-            model ? `"${model}" is` : "That model is"
-          } configured for your project, but Langy currently runs on OpenAI and Codex models only. Pick one of those from the composer's model menu.`,
-          render: "card",
-          ...debug,
-        };
-      }
+    case "langy_model_not_allowed":
+      // Deterministic — the identical request fails again — so no retry. The
+      // allowlist is the only runnable-set gate: any model on it runs, so the
+      // fix is picking an allowed model or changing the configuration.
       return {
         kind: domain.code,
         title: "That model isn't available here",
@@ -481,7 +466,6 @@ export function explainLangyError(
         action: { label: "Configure model", kind: "configure-model" },
         ...debug,
       };
-    }
 
     case "langy_egress_misconfigured":
       // Fail-closed network policy: Langy refuses to run rather than leak. Not a

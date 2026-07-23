@@ -56,9 +56,12 @@ export async function resolveLangyTurnBaseDependencies(args: {
           userId,
           conversationId: requestedConversationId,
         }),
-        // The default is only a configuration gate; an allowed override does
-        // not consume it, so avoid that otherwise wasted lookup.
-        modelOverride ? Promise.resolve(null) : deps.resolveModel({ projectId }),
+        // The resolved default is forwarded to the worker (ADR-065), so with
+        // no override the lookup is load-bearing, not just a gate. An
+        // override wins outright and skips it.
+        modelOverride
+          ? Promise.resolve(null)
+          : deps.resolveModel({ projectId }),
         deps.credentials.getOrProvision({
           projectId,
           session,
@@ -110,5 +113,9 @@ export async function resolveLangyTurnBaseDependencies(args: {
   return {
     speculativeConversation: conversationResult.value,
     credentials,
+    // The project's configured Langy model, forwarded to the worker so the
+    // turn runs on it rather than the worker's own built-in default. Null
+    // exactly when an override made the lookup unnecessary.
+    resolvedModel: modelResult.value?.modelId ?? null,
   };
 }

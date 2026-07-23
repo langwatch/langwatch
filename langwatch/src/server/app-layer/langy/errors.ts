@@ -111,47 +111,26 @@ export class LangyModelNotConfiguredError extends HandledError {
 }
 
 /**
- * A `modelOverride` Langy cannot run (HTTP 400). Two distinct reasons share
- * the kind, told apart by `meta.reason` so the card can say the right thing:
- * `allowlist` means the model is not on the project's Langy VK allowlist;
- * `engine` means the model is configured but its provider is not wired into
- * Langy's engine yet (the engine runs OpenAI and Codex models today).
+ * A model Langy may not run for this project (HTTP 400): it is not on the
+ * project's Langy allowlist. The allowlist is the ONLY runnable-set gate —
+ * the engine itself is provider-blind, dispatching whatever model it is
+ * given with its full provider-prefixed id and letting the AI gateway's
+ * prefix routing pick the provider.
  */
 export class LangyModelNotAllowedError extends HandledError {
   declare readonly code: "langy_model_not_allowed";
-  constructor(
-    public readonly model: string,
-    options: { reason?: "allowlist" | "engine" } = {},
-  ) {
-    const reason = options.reason ?? "allowlist";
+  constructor(public readonly model: string) {
     super(
       "langy_model_not_allowed",
-      reason === "engine"
-        ? `Langy can't run "${model}" yet: its provider isn't wired into Langy's engine. Pick an OpenAI or Codex model.`
-        : `Model "${model}" is not allowed for this project's Langy. Pick from the configured models.`,
+      `Model "${model}" is not allowed for this project's Langy. Pick from the configured models.`,
       {
-        meta: { model, reason },
+        meta: { model },
         httpStatus: 400,
         ...remediation("langy_model_not_allowed"),
       },
     );
     this.name = "LangyModelNotAllowedError";
   }
-}
-
-/**
- * The provider lanes Langy's engine can execute today: the engine speaks the
- * OpenAI dialect through the gateway, which serves OpenAI models and the
- * codex account provider on that surface. Every other configured provider is
- * refused at turn start with the engine-reason card until its lane exists.
- */
-export const LANGY_ENGINE_MODEL_PREFIXES = [
-  "openai/",
-  "openai_codex/",
-] as const;
-
-export function langyEngineCanRunModel(model: string): boolean {
-  return LANGY_ENGINE_MODEL_PREFIXES.some((prefix) => model.startsWith(prefix));
 }
 
 /** The project's Langy egress allow-list is misconfigured; fail closed (HTTP 409). */

@@ -89,7 +89,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     conversations:
       conversations as unknown as LangyTurnServiceDeps["conversations"],
     credentials: credentials as unknown as LangyTurnServiceDeps["credentials"],
-    resolveModel: vi.fn(async () => ({})),
+    resolveModel: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })),
     worker: { probe, dispatch },
     reservePermit,
     releasePermit,
@@ -329,23 +329,34 @@ describe("LangyTurnService.startConversationTurn", () => {
     expect(mocks.reservePermit).not.toHaveBeenCalled();
   });
 
-  it("refuses a configured model whose provider the engine cannot run", async () => {
+  // The engine is provider-blind: any model on the project's Langy allowlist
+  // is dispatched with its full provider-prefixed id — dots, colons, and all
+  // — and the gateway's own prefix routing picks the provider. Nothing here
+  // may branch per provider name.
+  /** @scenario Any allowed provider's model is dispatched with its full id */
+  it.each([
+    "anthropic/claude-sonnet-4-5",
+    "gemini/gemini-2.5-pro",
+    "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
+  ])("accepts and forwards the allowed model %s verbatim", async (model) => {
     (
       deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(["anthropic/claude-sonnet-4-5"]);
+    ).mockResolvedValue([model]);
 
-    const rejection = LangyTurnService.create(deps).startConversationTurn(
-      input({ modelOverride: "anthropic/claude-sonnet-4-5" }),
+    const result = await LangyTurnService.create(deps).startConversationTurn(
+      input({ modelOverride: model }),
     );
-    await expect(rejection).rejects.toBeInstanceOf(LangyModelNotAllowedError);
-    await expect(rejection).rejects.toMatchObject({
-      meta: { reason: "engine", model: "anthropic/claude-sonnet-4-5" },
-    });
 
-    expect(mocks.abort).toHaveBeenCalledOnce();
-    expect(mocks.dispatch).not.toHaveBeenCalled();
+    expect(result.conversationId).toBe("conv-1");
+    expect(mocks.probe).toHaveBeenCalledWith(
+      expect.objectContaining({ model }),
+    );
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ modelOverride: model }),
+    );
   });
 
+  /** @scenario A per-send override still wins over the configured Langy model */
   it("does not resolve an unused default model when an override is allowed", async () => {
     (
       deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
@@ -356,6 +367,46 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
 
     expect(deps.resolveModel).not.toHaveBeenCalled();
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ modelOverride: "openai/gpt-5-mini" }),
+    );
+  });
+
+  /** @scenario The configured Langy model is forwarded to the worker */
+  it("forwards the resolved default model to the worker when nothing overrides it", async () => {
+    (deps.resolveModel as ReturnType<typeof vi.fn>).mockResolvedValue({
+      modelId: "anthropic/claude-opus-4-8",
+    });
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    // Probe, handoff stash, and dispatch all carry the resolved model, so the
+    // worker signature keys on it and the worker never runs its own default.
+    expect(mocks.probe).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "anthropic/claude-opus-4-8" }),
+    );
+    expect(mocks.stash).toHaveBeenCalledWith(
+      expect.objectContaining({ modelOverride: "anthropic/claude-opus-4-8" }),
+    );
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ modelOverride: "anthropic/claude-opus-4-8" }),
+    );
+  });
+
+  it("rejects a resolved default that is not on the allowlist before dispatch", async () => {
+    (deps.resolveModel as ReturnType<typeof vi.fn>).mockResolvedValue({
+      modelId: "anthropic/claude-opus-4-8",
+    });
+    (
+      deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(["openai/gpt-5-mini"]);
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(input()),
+    ).rejects.toBeInstanceOf(LangyModelNotAllowedError);
+
+    expect(mocks.abort).toHaveBeenCalledOnce();
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 
   it("fails before admission when no default model is configured", async () => {

@@ -62,14 +62,6 @@ Feature: Langy recovers from a failed turn without making the user re-ask
   # usually the whole fix, and hiding it behind "Something went wrong" leaves
   # it unread, so the card names what the provider rejected.
   @unit
-  Scenario: A model Langy's engine cannot run yet is refused with a clear card
-    Given the project has an Anthropic model configured
-    When the user picks it in the composer and sends a message
-    Then the turn is refused before it starts
-    And the card names the model and says Langy runs on OpenAI and Codex models today
-    And the fix offered is picking a runnable model from the composer
-
-  @unit
   Scenario: A rejected model call shows the provider's own message on the card
     Given Langy's model call is rejected by the provider
     When the turn fails and the error reaches the panel
