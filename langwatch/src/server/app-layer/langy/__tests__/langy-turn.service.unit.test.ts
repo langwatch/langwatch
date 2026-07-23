@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
@@ -10,11 +10,11 @@ import {
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,
+  langyTurnIdentity,
   type StartConversationTurnInput,
 } from "../langy-turn.service";
-import { langyTurnIdentity } from "../langy-turn.service";
-import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
 import type { LangyMessageRow } from "../repositories/langy-message.repository";
+import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
 
 const REQUEST_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION = {
@@ -329,6 +329,23 @@ describe("LangyTurnService.startConversationTurn", () => {
     expect(mocks.reservePermit).not.toHaveBeenCalled();
   });
 
+  it("refuses a configured model whose provider the engine cannot run", async () => {
+    (
+      deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(["anthropic/claude-sonnet-4-5"]);
+
+    const rejection = LangyTurnService.create(deps).startConversationTurn(
+      input({ modelOverride: "anthropic/claude-sonnet-4-5" }),
+    );
+    await expect(rejection).rejects.toBeInstanceOf(LangyModelNotAllowedError);
+    await expect(rejection).rejects.toMatchObject({
+      meta: { reason: "engine", model: "anthropic/claude-sonnet-4-5" },
+    });
+
+    expect(mocks.abort).toHaveBeenCalledOnce();
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+
   it("does not resolve an unused default model when an override is allowed", async () => {
     (
       deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
@@ -523,8 +540,9 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     const { deps, mocks } = makeDeps();
     mocks.findAllByConversation.mockRejectedValue(new Error("projection down"));
 
-    const result =
-      await LangyTurnService.create(deps).startConversationTurn(input());
+    const result = await LangyTurnService.create(deps).startConversationTurn(
+      input(),
+    );
 
     expect(result).toMatchObject({ conversationId: "conv-1" });
     expect(mocks.dispatch).toHaveBeenCalledOnce();
@@ -559,7 +577,10 @@ describe("langyTurnIdentity", () => {
   });
 
   it("treats a model override change as different content", () => {
-    const other = langyTurnIdentity({ ...base, modelOverride: "openai/gpt-5-mini" });
+    const other = langyTurnIdentity({
+      ...base,
+      modelOverride: "openai/gpt-5-mini",
+    });
     expect(other.turnId).not.toBe(langyTurnIdentity(base).turnId);
   });
 });
@@ -568,7 +589,9 @@ describe("when the idempotency key is reused with different content", () => {
   it("rejects with the mismatch error instead of replaying the original send", async () => {
     const { deps } = makeDeps({
       admission: {
-        claim: vi.fn(async () => ({ kind: "mismatch" }) as LangyTurnAdmissionClaim),
+        claim: vi.fn(
+          async () => ({ kind: "mismatch" }) as LangyTurnAdmissionClaim,
+        ),
         commit: vi.fn(async () => {}),
         abort: vi.fn(async () => {}),
         release: vi.fn(async () => {}),
@@ -611,9 +634,9 @@ describe("LangyTurnService.stopTurn", () => {
     // Declared with its argument even though the body ignores it: a zero-arg
     // `vi.fn` types `mock.calls` as an empty tuple, so reading `calls[0][0]` —
     // which is the whole point of the assertions below — cannot typecheck.
-    const finalizeTurn = vi.fn(
-      async (_args: Record<string, unknown>) => ({ messageId: "a1" }),
-    );
+    const finalizeTurn = vi.fn(async (_args: Record<string, unknown>) => ({
+      messageId: "a1",
+    }));
     const findByIdVisible = vi.fn(async () => ({
       isOwn: over.isOwn ?? true,
       currentTurnId:
@@ -641,7 +664,10 @@ describe("LangyTurnService.stopTurn", () => {
       worker: { cancel } as unknown as LangyTurnServiceDeps["worker"],
       tokenBuffer: over.noBuffer
         ? null
-        : ({ readTail, markEnd } as unknown as LangyTurnServiceDeps["tokenBuffer"]),
+        : ({
+            readTail,
+            markEnd,
+          } as unknown as LangyTurnServiceDeps["tokenBuffer"]),
       reservePermit: vi.fn(),
       releasePermit: vi.fn(),
       perDayPrCap: 0,
@@ -657,7 +683,14 @@ describe("LangyTurnService.stopTurn", () => {
     } as LangyTurnServiceDeps;
     return {
       deps,
-      mocks: { finalizeTurn, findByIdVisible, isTurnActor, markEnd, cancel, readTail },
+      mocks: {
+        finalizeTurn,
+        findByIdVisible,
+        isTurnActor,
+        markEnd,
+        cancel,
+        readTail,
+      },
     };
   }
 
@@ -683,7 +716,9 @@ describe("LangyTurnService.stopTurn", () => {
       };
       expect(call.outcome).toBe("stopped");
       // The partial answer is the joined durable delta tail, preserved verbatim.
-      expect(call.parts.map((p) => p.text ?? "").join("")).toBe("half an answer");
+      expect(call.parts.map((p) => p.text ?? "").join("")).toBe(
+        "half an answer",
+      );
       expect(mocks.markEnd).toHaveBeenCalledTimes(1);
       expect(mocks.cancel).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: "conv-1", turnId: "turn-1" }),
@@ -696,7 +731,10 @@ describe("LangyTurnService.stopTurn", () => {
   describe("given the caller is neither the actor nor the owner", () => {
     /** @scenario Only someone who can control the conversation may stop its turn */
     it("refuses with a handled not-owned error and records no terminal", async () => {
-      const { deps, mocks } = makeStopDeps({ isTurnActor: false, isOwn: false });
+      const { deps, mocks } = makeStopDeps({
+        isTurnActor: false,
+        isOwn: false,
+      });
 
       await expect(
         LangyTurnService.create(deps).stopTurn(stopArgs),

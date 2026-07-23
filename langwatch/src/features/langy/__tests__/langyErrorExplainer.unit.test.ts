@@ -130,6 +130,43 @@ describe("explainLangyError", () => {
     });
   });
 
+  describe("given a model whose provider the engine cannot run yet", () => {
+    describe("when the refusal is explained", () => {
+      /** @scenario A model Langy's engine cannot run yet is refused with a clear card */
+      it("names the model and points at the composer's runnable models", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_model_not_allowed",
+            meta: { model: "anthropic/claude-sonnet-4-5", reason: "engine" },
+          }),
+        );
+
+        expect(presentation.kind).toBe("langy_model_not_allowed");
+        expect(presentation.title).toBe("Langy can't run that model yet");
+        expect(presentation.description).toContain(
+          '"anthropic/claude-sonnet-4-5"',
+        );
+        expect(presentation.description).toContain("OpenAI and Codex");
+        expect(presentation.action).toBeUndefined();
+      });
+
+      it("keeps the allowlist refusal on the settings action", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_model_not_allowed",
+            meta: { model: "evil/model", reason: "allowlist" },
+          }),
+        );
+
+        expect(presentation.title).toBe("That model isn't available here");
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+    });
+  });
+
   describe("given an agent failure whose reason chain carries the provider's message", () => {
     describe("when the failure is explained", () => {
       /** @scenario A rejected model call shows the provider's own message on the card */

@@ -19,46 +19,47 @@
  * Errors are thrown as DomainErrors (each carries its httpStatus); the route
  * renders them. Infrastructure failures throw and surface generically.
  */
-import type { Session } from "~/server/auth";
-import { createHash } from "node:crypto";
 
+import { createHash } from "node:crypto";
+import type { LangyMessagePart } from "@langwatch/langy";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
-import { getLangyTurnsCounter } from "~/server/metrics";
-import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
-import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
-import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
-import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
-import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import {
   extractLangyConversationMemory,
-  renderLangyConversationMemory,
   LANGY_REFERENT_POLICY,
+  renderLangyConversationMemory,
 } from "~/server/app-layer/langy/langyConversationMemory";
+import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
+import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import type {
   LangyMessageRepository,
   LangyMessageRow,
 } from "~/server/app-layer/langy/repositories/langy-message.repository";
-import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
-import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
+import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import type { Session } from "~/server/auth";
+import { getLangyTurnsCounter } from "~/server/metrics";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
-  LangyInsufficientScopeError,
-  LangyModelNotAllowedError,
   LangyEmptyMessageError,
   LangyIdempotencyMismatchError,
+  LangyInsufficientScopeError,
+  LangyModelNotAllowedError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
+  langyEngineCanRunModel,
 } from "./errors";
 import type { LangyConversationService } from "./langy-conversation.service";
 import { buildFinalAssistantParts } from "./langy-final-parts";
 import { extractTextFromParts } from "./langy-message.service";
-import type { LangyMessagePart } from "@langwatch/langy";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
 import { resolveLangyTurnBaseDependencies } from "./langy-turn-base-dependencies";
 import type { LangyTurnAdmissionRepository } from "./repositories/langy-turn-admission.repository";
@@ -289,7 +290,8 @@ export class LangyTurnService {
     // mutation, and a wedged worker must not delay the stop the user already got.
     await Promise.allSettled([
       tokenBuffer?.markEnd({ conversationId, turnId }) ?? Promise.resolve(),
-      worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
+      worker?.cancel({ conversationId, turnId, projectId }) ??
+        Promise.resolve(),
     ]);
   }
 
@@ -508,6 +510,19 @@ export class LangyTurnService {
             "modelOverride not in VK allowlist — rejecting",
           );
           throw new LangyModelNotAllowedError(modelOverride);
+        }
+        // Configured is not the same as runnable: the engine only speaks the
+        // OpenAI dialect today, so a configured Anthropic (or other) model
+        // would reach the worker with no lane and die as an opaque failure.
+        // Refuse it here with the engine-reason card instead.
+        if (!langyEngineCanRunModel(modelOverride)) {
+          logger.warn(
+            { projectId, modelOverride },
+            "modelOverride provider not wired into the engine — rejecting",
+          );
+          throw new LangyModelNotAllowedError(modelOverride, {
+            reason: "engine",
+          });
         }
       }
 

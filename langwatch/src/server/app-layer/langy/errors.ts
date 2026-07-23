@@ -57,11 +57,16 @@ export class LangyConversationNotFoundError extends NotFoundError {
     conversationId: string,
     options: { reasons?: readonly Error[] } = {},
   ) {
-    super("langy_conversation_not_found", "Langy conversation", conversationId, {
-      meta: { conversationId },
-      ...remediation("langy_conversation_not_found"),
-      ...options,
-    });
+    super(
+      "langy_conversation_not_found",
+      "Langy conversation",
+      conversationId,
+      {
+        meta: { conversationId },
+        ...remediation("langy_conversation_not_found"),
+        ...options,
+      },
+    );
     this.name = "LangyConversationNotFoundError";
   }
 }
@@ -105,21 +110,48 @@ export class LangyModelNotConfiguredError extends HandledError {
   }
 }
 
-/** A `modelOverride` not on the project's Langy VK allowlist (HTTP 400). */
+/**
+ * A `modelOverride` Langy cannot run (HTTP 400). Two distinct reasons share
+ * the kind, told apart by `meta.reason` so the card can say the right thing:
+ * `allowlist` means the model is not on the project's Langy VK allowlist;
+ * `engine` means the model is configured but its provider is not wired into
+ * Langy's engine yet (the engine runs OpenAI and Codex models today).
+ */
 export class LangyModelNotAllowedError extends HandledError {
   declare readonly code: "langy_model_not_allowed";
-  constructor(public readonly model: string) {
+  constructor(
+    public readonly model: string,
+    options: { reason?: "allowlist" | "engine" } = {},
+  ) {
+    const reason = options.reason ?? "allowlist";
     super(
       "langy_model_not_allowed",
-      `Model "${model}" is not allowed for this project's Langy. Pick from the configured models.`,
+      reason === "engine"
+        ? `Langy can't run "${model}" yet: its provider isn't wired into Langy's engine. Pick an OpenAI or Codex model.`
+        : `Model "${model}" is not allowed for this project's Langy. Pick from the configured models.`,
       {
-        meta: { model },
+        meta: { model, reason },
         httpStatus: 400,
         ...remediation("langy_model_not_allowed"),
       },
     );
     this.name = "LangyModelNotAllowedError";
   }
+}
+
+/**
+ * The provider lanes Langy's engine can execute today: the engine speaks the
+ * OpenAI dialect through the gateway, which serves OpenAI models and the
+ * codex account provider on that surface. Every other configured provider is
+ * refused at turn start with the engine-reason card until its lane exists.
+ */
+export const LANGY_ENGINE_MODEL_PREFIXES = [
+  "openai/",
+  "openai_codex/",
+] as const;
+
+export function langyEngineCanRunModel(model: string): boolean {
+  return LANGY_ENGINE_MODEL_PREFIXES.some((prefix) => model.startsWith(prefix));
 }
 
 /** The project's Langy egress allow-list is misconfigured; fail closed (HTTP 409). */
