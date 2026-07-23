@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.36.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.35.0...typescript-sdk@v0.36.0) (2026-07-23)
+
+
+### Features
+
+* **coding-agent:** pipeline with a session aggregate (ADR-056) ([#6005](https://github.com/langwatch/langwatch/issues/6005)) ([11b5881](https://github.com/langwatch/langwatch/commit/11b58812165660d7dc9843a3b67932efd17e450c))
+
 ## [0.35.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.34.0...typescript-sdk@v0.35.0) (2026-07-23)
 
 
