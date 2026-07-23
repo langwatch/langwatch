@@ -130,14 +130,6 @@ Feature: MCP HTTP Server In-App Integration (Phase 1)
     And it does not import any main app server or database modules
 
   # --- OAuth Authorization Code + PKCE: redirect_uri / client_id binding ---
-  #
-  # RFC 6749 §10.6 / §4.1.3 / §3.2.1 + RFC 7591 dynamic client registration.
-  # Regression class: /oauth/register did not persist a client's
-  # redirect_uris, so /mcp/authorize accepted ANY redirect_uri regardless of
-  # what the client_id had registered, and /oauth/token never re-checked
-  # redirect_uri or client_id at exchange time either. PKCE alone does not
-  # defend against this — whoever crafts the authorization request controls
-  # the code_challenge/code_verifier pair too, not just the approving user.
 
   @regression @integration
   Scenario: Dynamic client registration persists the redirect_uris binding

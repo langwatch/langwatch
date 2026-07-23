@@ -30,57 +30,70 @@ describe("OAuth client registry", () => {
     await stopTestContainers();
   }, 60_000);
 
-  describe("when a client is registered then looked up", () => {
-    /** @scenario Dynamic client registration persists the redirect_uris binding */
-    it("round-trips the exact redirect_uris and client_name", async () => {
-      const clientId = `mcp_${nanoid(12)}`;
-      await registerOAuthClient(clientId, {
-        redirectUris: ["https://registered.example/callback"],
-        clientName: "Round-trip client",
+  describe("given a client is registered", () => {
+    describe("when it is looked up", () => {
+      /** @scenario Dynamic client registration persists the redirect_uris binding */
+      it("round-trips the exact redirect_uris and client_name", async () => {
+        const clientId = `mcp_${nanoid(12)}`;
+        await registerOAuthClient({
+          clientId,
+          client: {
+            redirectUris: ["https://registered.example/callback"],
+            clientName: "Round-trip client",
+          },
+        });
+
+        const found = await getOAuthClient(clientId);
+
+        expect(found).toEqual({
+          redirectUris: ["https://registered.example/callback"],
+          clientName: "Round-trip client",
+        });
       });
+    });
+  });
 
-      const found = await getOAuthClient(clientId);
-
-      expect(found).toEqual({
-        redirectUris: ["https://registered.example/callback"],
-        clientName: "Round-trip client",
+  describe("given no client was ever registered with a client_id", () => {
+    describe("when it is looked up", () => {
+      it("returns null", async () => {
+        const found = await getOAuthClient(
+          `mcp_${nanoid(12)}_never_registered`,
+        );
+        expect(found).toBeNull();
       });
     });
   });
 
-  describe("when the client_id was never registered", () => {
-    it("returns null", async () => {
-      const found = await getOAuthClient(`mcp_${nanoid(12)}_never_registered`);
-      expect(found).toBeNull();
+  describe("given the stored registration is corrupted JSON", () => {
+    describe("when it is looked up", () => {
+      it("returns null instead of throwing", async () => {
+        const clientId = `mcp_${nanoid(12)}`;
+        if (!redis) throw new Error("Redis required");
+        await redis.set(`mcp:oauth:client:${clientId}`, "{not json", "EX", 60);
+
+        const found = await getOAuthClient(clientId);
+
+        expect(found).toBeNull();
+      });
     });
   });
 
-  describe("when the stored registration is corrupted JSON", () => {
-    it("returns null instead of throwing", async () => {
-      const clientId = `mcp_${nanoid(12)}`;
-      if (!redis) throw new Error("Redis required");
-      await redis.set(`mcp:oauth:client:${clientId}`, "{not json", "EX", 60);
+  describe("given the stored registration has a non-array redirectUris", () => {
+    describe("when it is looked up", () => {
+      it("returns null instead of trusting the malformed shape", async () => {
+        const clientId = `mcp_${nanoid(12)}`;
+        if (!redis) throw new Error("Redis required");
+        await redis.set(
+          `mcp:oauth:client:${clientId}`,
+          JSON.stringify({ redirectUris: "not-an-array", clientName: "x" }),
+          "EX",
+          60,
+        );
 
-      const found = await getOAuthClient(clientId);
+        const found = await getOAuthClient(clientId);
 
-      expect(found).toBeNull();
-    });
-  });
-
-  describe("when the stored registration has a non-array redirectUris", () => {
-    it("returns null instead of trusting the malformed shape", async () => {
-      const clientId = `mcp_${nanoid(12)}`;
-      if (!redis) throw new Error("Redis required");
-      await redis.set(
-        `mcp:oauth:client:${clientId}`,
-        JSON.stringify({ redirectUris: "not-an-array", clientName: "x" }),
-        "EX",
-        60,
-      );
-
-      const found = await getOAuthClient(clientId);
-
-      expect(found).toBeNull();
+        expect(found).toBeNull();
+      });
     });
   });
 });

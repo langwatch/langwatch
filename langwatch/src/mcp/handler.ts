@@ -746,9 +746,9 @@ export function createMcpHandler(): McpHandler {
       typeof body.client_name === "string" ? body.client_name : "MCP Client";
 
     try {
-      await registerOAuthClient(clientId, {
-        redirectUris: body.redirect_uris,
-        clientName,
+      await registerOAuthClient({
+        clientId,
+        client: { redirectUris: body.redirect_uris, clientName },
       });
     } catch (err) {
       logger.error({ error: err }, "Failed to persist OAuth client registration");

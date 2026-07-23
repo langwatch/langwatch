@@ -27,10 +27,13 @@ export interface RegisteredOAuthClient {
   clientName: string;
 }
 
-export async function registerOAuthClient(
-  clientId: string,
-  client: RegisteredOAuthClient,
-): Promise<void> {
+export async function registerOAuthClient({
+  clientId,
+  client,
+}: {
+  clientId: string;
+  client: RegisteredOAuthClient;
+}): Promise<void> {
   if (!redis) {
     throw new Error("Redis is not available");
   }
