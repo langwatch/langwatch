@@ -49,8 +49,15 @@ const appConfig = defineConfig({
     // literal blur value, so this one variable turns off decorative blur
     // everywhere at once — including static recipes, which can't read
     // React state directly.
+    //
+    // --lw-panel-alpha goes with it: these surfaces are semi-transparent
+    // specifically because the blur diffuses whatever shows through. Turn
+    // off the blur alone and the same transparency reads as a plain
+    // see-through tint instead of frosted glass — so reduced-graphics mode
+    // also pushes every paired background to fully opaque.
     'html[data-reduced-graphics="true"]': {
       "--lw-backdrop-blur": "none",
+      "--lw-panel-alpha": "100%",
     },
   },
   theme: {
@@ -671,7 +678,7 @@ const appConfig = defineConfig({
         slots: ["content", "arrow", "arrowTip"],
         base: {
           content: {
-            bg: "bg.panel/85",
+            bg: "color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 85%), transparent)",
             backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
             color: "fg",
             border: "1px solid",
@@ -1009,7 +1016,8 @@ const appConfig = defineConfig({
             fontWeight: "500",
           },
           content: {
-            background: "bg.surface/60",
+            background:
+              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 60%), transparent)",
             backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
             border: "1px solid",
             borderColor: "border",
@@ -1043,7 +1051,8 @@ const appConfig = defineConfig({
             background: "bg.surface/65",
           },
           content: {
-            background: "bg.panel/75",
+            background:
+              "color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 75%), transparent)",
             backdropFilter: "var(--lw-backdrop-blur, blur(8px))",
             border: "1px solid",
             borderColor: "border",
@@ -1121,7 +1130,8 @@ const appConfig = defineConfig({
         base: {
           content: {
             maxWidth: "70%",
-            background: "bg.surface/80",
+            background:
+              "color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)",
             backdropFilter: "var(--lw-backdrop-blur, blur(25px))",
             border: "1px solid",
             borderColor: "border",
@@ -1154,8 +1164,10 @@ const appConfig = defineConfig({
             boxShadow: "lg",
             "&[data-type=info]": {
               bg: {
-                _light: "blue.solid/85",
-                _dark: "rgba(37, 99, 235, 0.8)",
+                _light:
+                  "color-mix(in srgb, var(--chakra-colors-blue-solid) var(--lw-panel-alpha, 85%), transparent)",
+                _dark:
+                  "color-mix(in srgb, rgb(37, 99, 235) var(--lw-panel-alpha, 80%), transparent)",
               },
               borderColor: {
                 _light: "blue.solid/30",
@@ -1167,8 +1179,10 @@ const appConfig = defineConfig({
             },
             "&[data-type=success]": {
               bg: {
-                _light: "green.solid/85",
-                _dark: "rgba(22, 163, 74, 0.8)",
+                _light:
+                  "color-mix(in srgb, var(--chakra-colors-green-solid) var(--lw-panel-alpha, 85%), transparent)",
+                _dark:
+                  "color-mix(in srgb, rgb(22, 163, 74) var(--lw-panel-alpha, 80%), transparent)",
               },
               borderColor: {
                 _light: "green.solid/30",
@@ -1178,8 +1192,10 @@ const appConfig = defineConfig({
             },
             "&[data-type=error]": {
               bg: {
-                _light: "red.solid/88",
-                _dark: "rgba(220, 38, 38, 0.8)",
+                _light:
+                  "color-mix(in srgb, var(--chakra-colors-red-solid) var(--lw-panel-alpha, 88%), transparent)",
+                _dark:
+                  "color-mix(in srgb, rgb(220, 38, 38) var(--lw-panel-alpha, 80%), transparent)",
               },
               borderColor: {
                 _light: "red.solid/30",
@@ -1189,8 +1205,10 @@ const appConfig = defineConfig({
             },
             "&[data-type=warning]": {
               bg: {
-                _light: "yellow.solid/88",
-                _dark: "rgba(217, 119, 6, 0.8)",
+                _light:
+                  "color-mix(in srgb, var(--chakra-colors-yellow-solid) var(--lw-panel-alpha, 88%), transparent)",
+                _dark:
+                  "color-mix(in srgb, rgb(217, 119, 6) var(--lw-panel-alpha, 80%), transparent)",
               },
               borderColor: {
                 _light: "yellow.solid/30",
@@ -1200,8 +1218,10 @@ const appConfig = defineConfig({
             },
             "&[data-type=loading]": {
               bg: {
-                _light: "white/80",
-                _dark: "rgba(30, 30, 36, 0.8)",
+                _light:
+                  "color-mix(in srgb, white var(--lw-panel-alpha, 80%), transparent)",
+                _dark:
+                  "color-mix(in srgb, rgb(30, 30, 36) var(--lw-panel-alpha, 80%), transparent)",
               },
               borderColor: {
                 _light: "black/8",
