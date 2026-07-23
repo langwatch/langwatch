@@ -36,11 +36,11 @@ var seedPresets = map[string]seedPreset{
 	"onboarding":      {env: []string{"HAVEN_SEED_FIRST_MESSAGE=0"}, summary: "a fresh onboarding journey (first-trace flag cleared)"},
 	"post-onboarding": {env: []string{"HAVEN_SEED_FIRST_MESSAGE=1"}, summary: "past onboarding, no demo content"},
 	"bare":            {env: []string{"HAVEN_SEED_MODEL_PROVIDERS=0", "HAVEN_SEED_FEATURE_FLAGS=0"}, summary: "identity only — no env-derived providers, stock feature flags"},
-	// mass: months of coherent, backdated activity across every product —
-	// event-sourced products are seeded through their event logs (replayed by
-	// the projection workers), traces backdate through the collector.
-	// HAVEN_SEED_MONTHS tunes the window (default 3).
-	"mass": {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{"seed:sample-traces", "seed:mass"}, summary: "months of backdated activity across every product (HAVEN_SEED_MONTHS, default 3)"},
+	// mass: a superset of demo — months of coherent, backdated activity.
+	// Event-sourced products are seeded through their event logs (replayed by
+	// the projection workers); traces backdate through the collector inside
+	// its 31-day window. HAVEN_SEED_MONTHS tunes the window (default 3).
+	"mass": {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{"seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated activity (HAVEN_SEED_MONTHS, default 3)"},
 }
 
 // SeedPresetNames lists the registry for errors and help, sorted.

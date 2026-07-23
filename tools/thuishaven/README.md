@@ -130,10 +130,11 @@ sibling that starts from a fresh, migrated database. Both take a preset:
 traces + realistic platform lifecycles through the running stack's real
 collector (the stack must be up; re-running is idempotent), `traces` ingests
 just the sample traces, `onboarding` / `post-onboarding` flip the first-trace
-flag, and `bare` seeds the identity alone. A `mass` preset (months of
-backdated data across every product, seeded through the event logs and
-replayed by the projection workers) is the designed follow-up in
-`specs/setup/haven-seed-presets.feature`.
+flag, and `bare` seeds the identity alone. `mass` is demo plus months of
+backdated activity (`HAVEN_SEED_MONTHS`, default 3): event-sourced products
+are seeded through their event logs with backdated `occurredAt` and replayed
+by the projection workers — read models are never written directly — while
+traces ingest through the collector inside its 31-day window.
 
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
 container and the observability stack are memory-capped (and their colima VM is

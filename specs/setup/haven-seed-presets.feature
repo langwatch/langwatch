@@ -69,20 +69,35 @@ Feature: Seed presets — a database that is ready to look at
     And re-running updates the same credential instead of duplicating it
     And the bare preset seeds no providers
 
-  # --- The mass preset (designed follow-up, not yet implemented) ---
-  # Months of coherent, backdated activity across every product, so analytics,
-  # topic clustering, retention windows, and dashboards all have something real
-  # to chew on. Implementation direction: for the event-sourced products
-  # (scenarios, evals v3, topic clustering, Langy) seed COMMANDS/EVENTS into
-  # the event log with backdated occurrence times and let the projection
-  # workers replay them into read models — one writer, every read model derived
-  # the way production derives it. Traces are not event-sourced: they ingest
-  # through the collector with backdated timestamps. Hand-writing read-model
-  # rows is the explicit non-goal (they drift from the projections).
-  @e2e @unimplemented
+  # --- The mass preset ---
+  # Months of coherent, backdated activity, implemented in
+  # langwatch/scripts/seed-mass.ts on the pure timeline generator in
+  # scripts/seed-lib/mass-timeline.ts. Event-sourced products (scenario
+  # simulations, evaluations, experiment runs) are seeded as real commands
+  # whose backdated occurredAt the substrate honours verbatim — events land in
+  # old event-log partitions and the running worker's projections build every
+  # read model the way production does; read models are never written
+  # directly. Traces are not event-sourced: they ingest through the collector,
+  # which by design refuses spans older than 31 days (partition-pruning
+  # guard), so trace fixtures exist only inside that window while the deep
+  # history lives in the event log. HAVEN_SEED_MONTHS tunes the window
+  # (default 3).
+  @unit
   Scenario: The mass preset fills months of data across every product
+    When I run "haven db seed mass"
+    Then months of backdated scenario runs, evaluations, and experiment runs are seeded through their event logs
+    And they are replayed into read models by the projection workers, never written directly
+    And re-running is idempotent (deterministic ids, same window → same story)
+
+  @unit
+  Scenario: Backdated traces stay inside the collector's window
+    Given the collector refuses spans more than 31 days old to protect partition pruning
+    When the mass timeline is built
+    Then trace fixtures are attached only to activity inside that window
+    And older activity still exists as event-sourced history without a trace
+
+  @e2e @unimplemented
+  Scenario: A mass seed lands end to end on a live stack
     Given this worktree's stack is running
     When I run "haven db seed mass"
-    Then months of backdated activity exist across traces, evaluations, experiments, scenarios, prompts, and automations
-    And event-sourced products are seeded through their event logs and replayed, never by writing read models directly
-    And re-running is idempotent
+    Then the projections report every seeded scenario run, evaluation, experiment run, and windowed trace
