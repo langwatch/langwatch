@@ -102,7 +102,7 @@ import {
 } from "../logic/langyErrorExplainer";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import { navigateDedupKey, reserveNavigate } from "../logic/langyNavigateDedup";
-import { isInternalHref } from "../logic/spaLink";
+import { isInternalHref } from "~/components/Markdown";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
