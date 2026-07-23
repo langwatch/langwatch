@@ -142,7 +142,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
               >
                 <Progress.Track
                   borderRadius="full"
-                  backgroundColor="rgba(255,255,255,0.12)"
+                  backgroundColor="nav.trackBg"
                   height="8px"
                 >
                   <Progress.Range />

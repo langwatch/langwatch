@@ -5,11 +5,11 @@ Feature: Sidebar collapse preference (global, remembered)
   So that I control how much room the navigation takes without re-deciding on
   every page
 
-  The toggle lives where the logo sits, top-left of the header: when the
-  sidebar is expanded, hovering the logo area reveals a collapse control at
-  its right edge; when the sidebar is collapsed, hovering the logo itself
-  swaps it for the expand control. The preference is a single global choice,
-  not a per-page one.
+  The toggle lives where the logo sits, at the top of the navigation rail:
+  when the sidebar is expanded, hovering the logo area reveals a collapse
+  control at its right edge; when the sidebar is collapsed, hovering the
+  logo itself swaps it for the expand control. The preference is a single
+  global choice, not a per-page one.
 
   Background:
     Given a signed-in user on a desktop-sized screen

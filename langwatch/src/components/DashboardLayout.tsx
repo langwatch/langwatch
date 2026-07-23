@@ -57,18 +57,15 @@ import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { SidebarHeaderToggle } from "./sidebar/SidebarHeaderToggle";
-import { useSidebarCollapseHotkey } from "./sidebar/useSidebarCollapseHotkey";
+import { ConsoleRail } from "./sidebar/ConsoleRail";
 import { useSidebarCollapsed } from "./sidebar/useSidebarCollapsed";
+import { useSidebarCollapseHotkey } from "./sidebar/useSidebarCollapseHotkey";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
-
-/** The sidebar column's logo/collapse row, above the nav. */
-const SIDEBAR_LOGO_ROW_HEIGHT = 52;
 
 const CrumbSeparator = () => (
   <Text color="fg.subtle" userSelect="none" aria-hidden fontWeight="300">
@@ -633,38 +630,18 @@ export const DashboardLayout = ({
       <HStack width="full" alignItems="stretch" gap={0} height="100vh">
         {/* Console rail: logo/collapse control up top, nav below, gauge at
             the bottom, ink for the full viewport height. */}
-        <Box
-          className="dark"
-          data-theme="dark"
+        <ConsoleRail
           width={menuWidth}
-          minWidth={menuWidth}
-          height="100vh"
-          background="nav.bg"
-          display="flex"
-          flexDirection="column"
+          isCollapsed={compactMenu}
+          canToggle={canToggle}
+          onToggleCollapsed={setCollapsed}
         >
-          <Box
-            height={`${SIDEBAR_LOGO_ROW_HEIGHT}px`}
-            flexShrink={0}
-            display="flex"
-            alignItems="center"
-            justifyContent={compactMenu ? "center" : "flex-start"}
-            paddingX={compactMenu ? 0 : 2}
-          >
-            <SidebarHeaderToggle
-              isCollapsed={compactMenu}
-              canToggle={canToggle}
-              onToggle={setCollapsed}
-            />
-          </Box>
-          <Box flex={1} minHeight={0}>
-            {isPersonalScopeRoute ? (
-              <PersonalSidebar isCompact={compactMenu} />
-            ) : (
-              <MainMenu isCompact={compactMenu} />
-            )}
-          </Box>
-        </Box>
+          {isPersonalScopeRoute ? (
+            <PersonalSidebar isCompact={compactMenu} />
+          ) : (
+            <MainMenu isCompact={compactMenu} />
+          )}
+        </ConsoleRail>
 
         {/* Workspace column: flat and edge-to-edge; while Langy is docked,
             its flush pane reserves this width at the viewport's right edge. */}
@@ -808,7 +785,7 @@ export const DashboardLayout = ({
             </HStack>
           </HStack>
 
-          {/* Scrollable page region below the card header */}
+          {/* Scrollable page region below the workspace header */}
           <Box flex={1} minHeight={0} overflow="auto" display="flex">
             <VStack width="full" gap={0} {...props}>
               {/* Alert banners */}

@@ -17,8 +17,7 @@ const announcements: Announcement[] = [
     id: "litellm-vulnerability-2026-03",
     message:
       "Your data is safe — LangWatch was not affected by the recent LiteLLM vulnerability.",
-    linkUrl:
-      "https://langwatch.ai/blog/a-note-on-the-litellm-vulnerability",
+    linkUrl: "https://langwatch.ai/blog/a-note-on-the-litellm-vulnerability",
     linkLabel: "Read our full statement",
     expiresAt: new Date("2026-03-27T00:00:00Z"),
   },
@@ -40,22 +39,15 @@ function AnnouncementItem({ announcement }: { announcement: Announcement }) {
       width="full"
       border="1px solid"
       borderColor="colorPalette.muted"
-      // Top-left only — matches the inner page chrome's rounded
-      // top-left corner (`borderTopLeftRadius="xl"`) so the banner's
-      // curve continues from the chrome. All other corners flush.
+      // Square — the banner sits flush against the flat, edge-to-edge
+      // workspace. Spec: specs/navigation/shell-visual-language.feature
       borderRadius={0}
-      borderTopLeftRadius="xl"
     >
       <Alert.Indicator />
       <Alert.Content>
         <HStack width="full">
           <Text>{announcement.message}</Text>
-          <Button
-            size="xs"
-            variant="outline"
-            colorPalette="blue"
-            asChild
-          >
+          <Button size="xs" variant="outline" colorPalette="blue" asChild>
             <a
               href={announcement.linkUrl}
               target="_blank"

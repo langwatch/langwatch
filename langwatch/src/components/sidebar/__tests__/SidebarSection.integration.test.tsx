@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  *
  * @see specs/evaluations/experiments-online-evaluations-separation.feature
+ * @see specs/navigation/shell-visual-language.feature
  */
 import { ChakraProvider, defaultSystem, Text } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -64,7 +65,7 @@ describe("<SidebarSection />", () => {
     ).toHaveAttribute("aria-expanded", "false");
   });
 
-  /** @scenario Collapse primary navigation sections */
+  /** @scenario Section chevrons are quiet affordances */
   it("keeps the caret invisible while expanded and shows it dim while collapsed", async () => {
     const user = userEvent.setup();
     renderSection();

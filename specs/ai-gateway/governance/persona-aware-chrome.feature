@@ -49,7 +49,7 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
   @bdd @ui @persona-chrome @persona-3 @home-routing
   Scenario: LLMOps admin clicking Home stays in project context
     Given user is on "/[project]/messages" as Persona 3
-    When the user clicks the LangWatch logo in the header
+    When the user clicks the LangWatch logo at the top of the navigation rail
     Then the browser navigates to "/" which redirects via `governance.resolveHome`
     And the resolver returns destination "/[project]/messages"
     And the user lands back on their project home — NOT on /me, NOT on /governance
@@ -245,7 +245,7 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
   #   the persona-4 conjunctive gate above. Already wired for Govern via
   #   `setupState.governanceActive`; Gateway already gated via FF + permission.
   # - `/` page redirects via `governance.resolveHome` (already shipped).
-  # - The LangWatch logo in the header links to `/` so all three personas
+  # - The LangWatch logo at the top of the navigation rail links to `/` so all three personas
   #   route through the resolver when clicking Home.
 
   @bdd @ui @persona-chrome @no-regression

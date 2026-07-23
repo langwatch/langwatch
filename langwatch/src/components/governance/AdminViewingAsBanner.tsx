@@ -98,12 +98,8 @@ export function AdminViewingAsBanner({
         borderBottomWidth="1px"
         borderColor="border.subtle"
         bg="bg.subtle"
-        // Only the top-left corner curves — the banner sits at the
-        // very top of the inner page chrome and inherits that chrome's
-        // rounded top-left so the curve is continuous. All other
-        // corners are flush against the page edges.
+        // Square — flush against the flat, edge-to-edge workspace.
         borderRadius={0}
-        borderTopLeftRadius="xl"
       >
         <HStack gap={2} fontSize="xs" color="fg.muted">
           <Eye size={12} />
@@ -143,10 +139,8 @@ export function AdminViewingAsBanner({
     <Alert.Root
       status="info"
       variant="surface"
-      // Top-left only — matches the inner page chrome's rounded
-      // top-left corner so the banner continues that curve.
+      // Square — flush against the flat, edge-to-edge workspace.
       borderRadius={0}
-      borderTopLeftRadius="xl"
     >
       <Alert.Indicator>
         <Eye size={16} />

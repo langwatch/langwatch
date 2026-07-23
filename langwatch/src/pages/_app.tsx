@@ -53,6 +53,11 @@ const appConfig = defineConfig({
         body: {
           value: interFontFamily,
         },
+        // The utility monospace face (console labels, engraved chrome text).
+        mono: {
+          value:
+            "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+        },
       },
       colors: colorSystem,
       // TODO: those are not working, we need to manually override cursors below
@@ -407,15 +412,14 @@ const appConfig = defineConfig({
           // Ink lifts: active sits one clear step above hover.
           bgActive: { value: "rgba(255,255,255,0.10)" },
           bgHover: { value: "rgba(255,255,255,0.055)" },
+          // Recessed wells on the ink (gauge track, scrollbar thumb).
+          trackBg: { value: "rgba(255,255,255,0.12)" },
         },
 
-        // Label semantic tokens - for form labels, section headers
+        // Label semantic tokens - for form labels
         label: {
           fg: {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
-          },
-          fgMuted: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.500}" },
           },
         },
 

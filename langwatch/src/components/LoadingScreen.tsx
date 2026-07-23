@@ -112,7 +112,9 @@ export const LoadingScreen = () => {
         width="full"
         height="full"
         minHeight="100vh"
-        bg="bg.page"
+        // The console shell's ground: matches the flat workspace so the
+        // load → shell swap doesn't flash a different color.
+        bg="bg.surface"
         position="relative"
         paddingBottom={16}
         display="flex"

@@ -117,6 +117,7 @@ export const SideMenuItem = ({
           Spec: specs/navigation/shell-visual-language.feature */}
       {isActive && (
         <Box
+          data-testid="nav-active-indicator"
           position="absolute"
           left="2px"
           top="50%"
@@ -125,7 +126,7 @@ export const SideMenuItem = ({
           height="4px"
           borderRadius="full"
           backgroundColor="orange.solid"
-          boxShadow="0 0 6px 1.5px rgba(237,137,38,0.55)"
+          boxShadow="0 0 6px 1.5px color-mix(in srgb, var(--chakra-colors-orange-solid) 55%, transparent)"
           pointerEvents="none"
         />
       )}

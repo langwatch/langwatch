@@ -233,13 +233,13 @@ interface LangyState extends TurnPhaseState {
   /**
    * How many mounted app shells have claimed the docked panel's placement.
    *
-   * The app shell (DashboardLayout) draws the page as a rounded content card
-   * on the gray page ground. When such a shell is mounted it CLAIMS the dock:
-   * it reserves the panel's room inside its own content row (keeping the
-   * header full-width) and the docked panel renders as a second rounded card
-   * below the header. Pages without a shell (full-screen tools like the
-   * studio) leave the count at zero and keep the flush full-height dock with
-   * the page-level width reservation. A count, not a boolean, so nested or
+   * The dock's geometry is the same everywhere — a flush full-height pane on
+   * the viewport's right edge — so a claim decides only WHO reserves the
+   * pane's width: a mounted app shell (DashboardLayout) reserves it inside
+   * its workspace column and the page-level wrapper (LangyShiftedRoot)
+   * stands down, so the width is never reserved twice. Pages without a
+   * shell (full-screen tools like the studio) leave the count at zero and
+   * the wrapper reserves instead. A count, not a boolean, so nested or
    * twin mounts (StrictMode) stay correct. Never persisted: it mirrors what
    * is mounted right now. Spec: specs/langy/langy-panel-layout.feature
    */

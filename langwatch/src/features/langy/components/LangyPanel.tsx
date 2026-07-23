@@ -9,23 +9,23 @@ import {
 } from "@chakra-ui/react";
 import {
   LANGY_CHOICE_SELECTION_PART_TYPE,
-  renderLangyChoiceSelectionText,
-  type LangyDerivedCard,
   type LangyChoiceSelection,
+  type LangyDerivedCard,
   type LangyDerivedChoicesCard,
+  renderLangyChoiceSelectionText,
 } from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import {
   AppWindow,
   ArrowDown,
   Braces,
-  PanelLeftOpen,
   Check,
+  History,
   LayoutGrid,
   type LucideIcon,
-  History,
   Minus,
   MoreHorizontal,
+  PanelLeftOpen,
   PanelRight,
   PictureInPicture2,
   Square,
@@ -42,6 +42,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useProjectReach } from "~/components/home/useProjectReach";
 import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
@@ -53,7 +54,6 @@ import { ModelProviderScreen } from "~/features/onboarding/components/sections/M
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useProjectReach } from "~/components/home/useProjectReach";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 // ONE definition of the wire shape, server-side, imported by both ends, the
 // route spreads `langyTurnContextSchema.shape` into its body schema, and this
@@ -70,40 +70,42 @@ import { useLangyConversationList } from "../data/useLangyConversationList";
 import { useLangyMessages } from "../data/useLangyMessages";
 import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
 import { useLangyChatEngine } from "../hooks/useLangyChatEngine";
+import { useLangyContextDropZone } from "../hooks/useLangyContextDropZone";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import { useLangyExternalLinkGuard } from "../hooks/useLangyExternalLinkGuard";
 import { useLangyFreshness } from "../hooks/useLangyFreshness";
 import { useLangyOrbProximity } from "../hooks/useLangyOrbProximity";
-import { useLangyPeekProximity } from "../hooks/useLangyPeekProximity";
 import { useLangyPageContext } from "../hooks/useLangyPageContext";
-import { useLangyContextDropZone } from "../hooks/useLangyContextDropZone";
+import { useLangyPeekProximity } from "../hooks/useLangyPeekProximity";
 import { useLangyStickToBottom } from "../hooks/useLangyStickToBottom";
 import {
   turnHadSideEffects,
   useLangyTurnRecovery,
 } from "../hooks/useLangyTurnRecovery";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
+import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,
 } from "../logic/langyChatTransport";
+import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { mergeContextChips } from "../logic/langyContextChips";
-import {
-  PANEL_SUGGESTION_COUNT,
-  selectLangySuggestions,
-} from "../logic/langyHomeSuggestions";
 import { SURFACE_PATH_FOR_KIND } from "../logic/langyContextKindIntent";
 import {
   explainLangyError,
   readLangyStreamError,
   readLangyTrpcError,
 } from "../logic/langyErrorExplainer";
-import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
+import {
+  PANEL_SUGGESTION_COUNT,
+  selectLangySuggestions,
+} from "../logic/langyHomeSuggestions";
 import {
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
+  LANGY_COMPANION_INSET,
   LANGY_TRANSITION,
   langyRestingFloorPx,
   PANEL_LAYOUT_TRANSITION,
@@ -112,11 +114,12 @@ import {
 } from "../logic/langyPanelLayout";
 import {
   FLOATING_PEEK_NEAR_PX,
-  SIDEBAR_PEEK_NEAR_PX,
   type LangyPeekPhase,
   resolvePeekTranslate,
+  SIDEBAR_PEEK_NEAR_PX,
 } from "../logic/langyPeekDock";
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
+import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import {
   type LangyRevealableKind,
@@ -138,15 +141,12 @@ import {
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyCardGallery } from "./LangyCardGallery";
-import { LangyDevDrawer } from "./LangyDevDrawer";
-import { buildTimeTravelView } from "../logic/langyTimeTravel";
-import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
+import { LangyDevDrawer } from "./LangyDevDrawer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
-import { RecentChatsView } from "./RecentChatsView";
 import { LangyThinkingLine } from "./LangyThinkingLine";
 import { toPendingCapabilities } from "./LangyToolActivity";
 import { LangyWave } from "./LangyWave";
@@ -155,6 +155,7 @@ import {
   MessageContent,
   type ProposalHandlers,
 } from "./MessageContent";
+import { RecentChatsView } from "./RecentChatsView";
 import { StreamingStatusLine } from "./StreamingStatusLine";
 // Langy's own skin: scoped warm/cream palette + serif display face. The
 // `.langy-root` class (below) is where the Chakra semantic-token overrides land.
@@ -172,11 +173,6 @@ const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
 // peek, so none of the three can drift apart by a pixel.
 const PANEL_INSET = FLOATING_PANEL_INSET;
 
-// A Chakra Box that also takes framer-motion props — used for the thinking
-// line's blur-crossfade when its text changes. `css` still routes through
-// emotion (so the shimmer keyframes inject), while motion drives opacity /
-// blur / y.
-const MotionText = motion.create(Box);
 // The "still replying" notice slides up out of the composer (height + fade)
 // rather than snapping in — see the composer-notice branch below.
 const MotionNotice = motion.create(Box);
@@ -2026,9 +2022,9 @@ function LangyPanel({
               // left. EXACTLY the drawer's chrome (the app drawer recipe:
               // surface at alpha over the drawer blur, the same hairline,
               // radius and shadow) so the pair reads as two of one thing.
-              top: "8px",
-              right: "8px",
-              bottom: "8px",
+              top: `${LANGY_COMPANION_INSET}px`,
+              right: `${LANGY_COMPANION_INSET}px`,
+              bottom: `${LANGY_COMPANION_INSET}px`,
               background: "bg.surface/80",
               backdropFilter: "blur(25px)",
               borderWidth: "1px",

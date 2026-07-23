@@ -16,7 +16,11 @@ import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
-import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
+import {
+  MENU_WIDTH_COMPACT,
+  MENU_WIDTH_EXPANDED,
+  RAIL_OVERLAY_SHADOW,
+} from "./MainMenu";
 import { GovernSection } from "./sidebar/GovernSection";
 import { isOnlineEvaluationsActivePath } from "./sidebar/navigationActiveState";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
@@ -112,9 +116,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
         overflow="hidden"
         // Hover-expanded over the workspace, the ink overlay needs a cast
         // shadow to read as a layer; at rest the rail is flat.
-        boxShadow={
-          isCompact && isHovered ? "0 12px 32px rgba(0,0,0,0.45)" : "none"
-        }
+        boxShadow={isCompact && isHovered ? RAIL_OVERLAY_SHADOW : "none"}
       >
         <VStack
           paddingX={2}

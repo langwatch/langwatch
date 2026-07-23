@@ -34,6 +34,12 @@ export const MENU_WIDTH_EXPANDED = "200px";
 export const MENU_WIDTH_COMPACT = "56px";
 export const MENU_WIDTH = MENU_WIDTH_EXPANDED;
 
+/**
+ * Cast shadow for the compact rail's hover-expanded ink overlay — shared by
+ * both rail menus (MainMenu, PersonalSidebar) so the treatment cannot drift.
+ */
+export const RAIL_OVERLAY_SHADOW = "0 12px 32px rgba(0,0,0,0.45)";
+
 export type MainMenuProps = {
   isCompact?: boolean;
 };
@@ -76,9 +82,7 @@ export const MainMenu = React.memo(function MainMenu({
         overflow="hidden"
         // Hover-expanded over the workspace, the ink overlay needs a cast
         // shadow to read as a layer; at rest the rail is flat.
-        boxShadow={
-          isCompact && isHovered ? "0 12px 32px rgba(0,0,0,0.45)" : "none"
-        }
+        boxShadow={isCompact && isHovered ? RAIL_OVERLAY_SHADOW : "none"}
       >
         <VStack
           paddingX={2}
@@ -102,7 +106,7 @@ export const MainMenu = React.memo(function MainMenu({
               scrollbarWidth: "thin",
               "&::-webkit-scrollbar": { width: "4px" },
               "&::-webkit-scrollbar-thumb": {
-                background: "rgba(255,255,255,0.14)",
+                background: "var(--chakra-colors-nav-track-bg)",
                 borderRadius: "2px",
               },
               "&::-webkit-scrollbar-track": { background: "transparent" },

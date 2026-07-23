@@ -8,8 +8,9 @@ Feature: App shell visual language
   edge-to-edge workspace next to it that responds to the theme. There are
   no floating cards, insets, or shadows in the chrome — the seam between
   rail and workspace is the contrast itself. The brand color appears in
-  exactly three chrome places: the logo mark, the active row's indicator
-  light, and the usage gauge.
+  exactly two chrome places — the active row's indicator light and the
+  usage gauge; dev-only and ops-only badges sit outside that budget.
+  ADR: dev/docs/adr/062-console-shell-visual-language.md
 
   @bdd @ui @shell
   Scenario: The rail keeps its ink in both themes
@@ -18,13 +19,17 @@ Feature: App shell visual language
     And the same warm-ink column in the dark theme
     And elements inside the rail render in their dark-theme form in both themes
 
+  # Dock and drawer-companion geometry is owned by
+  # specs/langy/langy-panel-layout.feature — while a drawer is open the
+  # docked panel rides beside it as a floating companion card instead.
   @bdd @ui @shell
   Scenario: The workspace is flat and edge-to-edge
     When any page renders inside the app shell
     Then the content fills the viewport from the rail to the right edge
     And the header is a flat row separated from the page by a hairline
-    But while the assistant panel is docked, it sits as a flush full-height
-        pane on the right edge, separated by its own hairline
+    But while the assistant panel is docked and no drawer is open, it sits
+        as a flush full-height pane on the right edge, separated by its own
+        hairline
 
   @bdd @ui @shell @header
   Scenario: The header row belongs to the workspace

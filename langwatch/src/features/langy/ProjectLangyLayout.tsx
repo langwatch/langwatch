@@ -60,10 +60,10 @@ export default function ProjectLangyLayout() {
  * min-height) stays in DashboardLayout so non-project routes are unaffected.
  *
  * When the page renders an app shell (DashboardLayout), the SHELL claims the
- * dock instead: it keeps its header full-width and reserves the room inside
- * its own content row, so the docked panel can sit as a second content card
- * below the header. This wrapper then stands down, padding here too would
- * reserve the width twice. Spec: specs/langy/langy-panel-layout.feature
+ * dock instead and reserves the pane's width inside its workspace column
+ * (the dock itself is the same flush pane either way). This wrapper then
+ * stands down, padding here too would reserve the width twice.
+ * Spec: specs/langy/langy-panel-layout.feature
  */
 function LangyShiftedRoot({
   showLangy,

@@ -26,7 +26,14 @@ test("documentation links use normal text with an underline and section carets s
   await expectNormalTextLink(onlineDocumentation);
   await expect(page.getByRole("link", { name: "Online Evals" })).toBeVisible();
   const observeSection = page.getByRole("button", { name: "Collapse Observe" });
-  await expect(observeSection.locator("svg")).toHaveCount(0);
+  // Quiet affordance: the expanded caret is rendered but invisible until
+  // the pointer hovers the heading; folded carets sit dim.
+  // Spec: specs/navigation/shell-visual-language.feature
+  await expect(observeSection.locator("svg")).toHaveCount(1);
+  await expect(observeSection.locator("svg").locator("xpath=..")).toHaveCSS(
+    "opacity",
+    "0",
+  );
   await observeSection.click();
   const collapsedObserveSection = page.getByRole("button", {
     name: "Expand Observe",
@@ -34,12 +41,12 @@ test("documentation links use normal text with an underline and section carets s
   const observeCaret = collapsedObserveSection
     .locator("svg")
     .locator("xpath=..");
-  await expect(observeCaret).toHaveCSS("opacity", "0.5");
+  await expect(observeCaret).toHaveCSS("opacity", "0.6");
   const governSection = page.getByRole("button", { name: "Expand Govern" });
   await expect(governSection.locator("svg")).toHaveCount(1);
   await expect(governSection.locator("svg").locator("xpath=..")).toHaveCSS(
     "opacity",
-    "0.5",
+    "0.6",
   );
   await page.screenshot({
     path: testInfo.outputPath("online-evals-underlined-link.png"),

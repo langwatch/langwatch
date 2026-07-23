@@ -14,6 +14,7 @@ Feature: Langy panel layout modes
   pages and on full-screen tools without the shell, so the dock never
   changes shape as the user moves between them. Only the floating card
   overlays and rounds; the dock is always a pane.
+  ADR: dev/docs/adr/062-console-shell-visual-language.md
 
   Background:
     Given I am signed in with access to a project that has Langy
@@ -98,7 +99,5 @@ Feature: Langy panel layout modes
     So closing the drawer, not Langy, is the obvious action
 
   # The closed state is a PEEK of the panel itself, not a separate launcher —
-  # see specs/langy/langy-peek-dock.feature for its states and geometry.
-  Scenario: The minimised peek dodges the drawer
-    Given the Langy panel is minimised in floating mode and a right-anchored drawer is open
-    Then the peek sliver rests along the bottom-LEFT edge, clear of the drawer and the table pager
+  # its states and geometry, including how it dodges an open drawer, are
+  # owned by specs/langy/langy-peek-dock.feature.

@@ -28,6 +28,13 @@ export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
  */
 export const LANGY_COMPANION_GAP = 12;
 
+/**
+ * The companion card's viewport inset (top, right, bottom) while it rides
+ * beside an open drawer. Shared with the drawer's yield math, which offsets
+ * by this same inset — one definition, or the pair drifts.
+ */
+export const LANGY_COMPANION_INSET = 8;
+
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
 /**

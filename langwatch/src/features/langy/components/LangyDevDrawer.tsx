@@ -62,7 +62,6 @@ import {
   INSPECTOR_WIDTH,
   resolveInspectorFrame,
 } from "../logic/langyPanelLayout";
-import { resolveCliCapability } from "./capabilities/capabilityRegistry";
 import {
   DEV_LOG_CAPACITY,
   type DevToolCall,
@@ -79,6 +78,7 @@ import {
   useLangyDevLog,
 } from "../stores/langyDevLog";
 import { useLangyStore } from "../stores/langyStore";
+import { resolveCliCapability } from "./capabilities/capabilityRegistry";
 
 const MotionBox = motion.create(Box);
 

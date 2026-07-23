@@ -83,7 +83,7 @@ const SidebarSectionToggle = ({
           /* Engraved console label: the utility mono face, small, uppercase,
              widely tracked. Spec: specs/navigation/shell-visual-language.feature */
           <Text
-            fontFamily="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace"
+            fontFamily="mono"
             fontSize="10px"
             fontWeight="medium"
             letterSpacing="0.14em"

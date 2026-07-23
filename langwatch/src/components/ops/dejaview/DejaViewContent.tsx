@@ -342,7 +342,6 @@ export function DejaViewContent() {
         height="calc(100vh - 56px)"
         overflow="hidden"
         w="full"
-        borderTopLeftRadius="xl"
       >
         <ReplayHeader
           aggregateId={selectedAggregate.aggregateId}
