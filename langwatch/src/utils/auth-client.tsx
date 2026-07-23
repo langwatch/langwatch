@@ -255,9 +255,28 @@ export const navigate = (href: string): void => {
 };
 
 /**
+ * True if `url` resolves to the same origin as `origin` (default:
+ * `window.location.origin`). Used to guard against open redirects — a
+ * protocol-relative value like `//evil.com` or a cross-origin absolute URL
+ * resolves to a different origin and returns false. Invalid URLs (e.g.
+ * `javascript:...`) also return false rather than throwing.
+ */
+export const isSameOrigin = (
+  url: string,
+  origin: string = typeof window !== "undefined" ? window.location.origin : "",
+): boolean => {
+  try {
+    return new URL(url, origin).origin === origin;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Same-origin redirect guard. Blocks open-redirect attempts like
- * `?callbackUrl=https://evil.com` by rejecting anything that isn't a
- * same-origin path. Relative paths (`/foo`) are always allowed.
+ * `?callbackUrl=https://evil.com` or `?callbackUrl=//evil.com` by rejecting
+ * anything that isn't a same-origin path. Relative paths (`/foo`) are always
+ * allowed.
  *
  * Exported for unit testing. `origin` defaults to `window.location.origin`
  * in the browser runtime and is passed explicitly by tests.
@@ -270,13 +289,9 @@ export const safeRedirectTarget = (
   if (callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
     return callbackUrl;
   }
-  try {
+  if (isSameOrigin(callbackUrl, origin)) {
     const url = new URL(callbackUrl, origin);
-    if (url.origin === origin) {
-      return url.pathname + url.search + url.hash;
-    }
-  } catch {
-    // fall through to "/"
+    return url.pathname + url.search + url.hash;
   }
   return "/";
 };
