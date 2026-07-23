@@ -48,8 +48,9 @@ func defaultCacheAction(resolved *domain.ResolvedModel) (domain.CacheAction, boo
 	switch resolved.ProviderID {
 	case domain.ProviderAnthropic:
 		return domain.CacheActionForce, true
+	default:
+		return "", false
 	}
-	return "", false
 }
 
 // applyDefaultCacheControl applies the provider-default cache action without
@@ -84,8 +85,9 @@ func applyDefaultCacheControl(body []byte, action domain.CacheAction, reqType do
 			return body, false
 		}
 		return applyCacheControl(body, action, reqType), true
+	default:
+		return body, false
 	}
-	return body, false
 }
 
 // injectTopLevelEphemeral sets the request-level cache_control field on an
