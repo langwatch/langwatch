@@ -156,14 +156,14 @@ describe("recordInstallation", () => {
 
   describe("when two organizations race for the same fresh installation", () => {
     it("lets only the first writer claim it; the second sees the committed org and rejects", async () => {
-      // Regression test for the TOCTOU the old check-then-upsert code had:
-      // a separate `findByInstallationId` read followed by a later `upsert`
-      // left an await-gap where two concurrent /setup calls could both
-      // observe "unclaimed" and both write, the second silently overwriting
-      // the first's org. `insertOrGetExisting` closes that gap by making the
-      // claim atomic (see the fake repo's comment above) — this test would
-      // have failed (both promises fulfilling, no rejection) under the old
-      // read-then-write code.
+      // Pins the SERVICE's interpretation of an atomic repo result: given a
+      // repo that reports "claimed" for exactly one caller, the service must
+      // reject the other with the conflict error rather than, say, both
+      // succeeding or both throwing. The fake models atomicity synchronously
+      // (see its comment above) to exercise that branch — it does NOT prove
+      // Postgres actually serializes the concurrent writes; that guarantee is
+      // proven against a real database in
+      // langy-github-installations.prisma.repository.integration.test.ts.
       const repo = makeRepo();
       // The stub must echo back the requested id — the default stub returns a
       // fixed "inst-1" regardless of input, which would key both calls' rows
