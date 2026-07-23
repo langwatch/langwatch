@@ -1,23 +1,22 @@
-import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
-
 import {
+  applyLangyTurnEvents,
+  initialLangyTurnProjection,
   initialTurnPhaseState,
-  type TurnPhaseState,
+  isLangyTurnProjectionTerminal,
+  type LangyConversationTurnWireEvent,
+  type LangyEventCursor,
+  type LangyTurnProjectionState,
   abandonStop as reduceAbandonStop,
   beginTurn as reduceBeginTurn,
   observeBackendTurn as reduceObserveBackendTurn,
   requestStop as reduceRequestStop,
   settleTurn as reduceSettleTurn,
-  applyLangyTurnEvents,
-  initialLangyTurnProjection,
-  isLangyTurnProjectionTerminal,
   seedLangyTurnProjection,
-  type LangyConversationTurnWireEvent,
-  type LangyEventCursor,
-  type LangyTurnProjectionState,
+  type TurnPhaseState,
 } from "@langwatch/langy";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
 
 /**
  * Single client/UI-state store for the Langy panel (ADR-046 frontend).
@@ -222,6 +221,18 @@ interface LangyState extends TurnPhaseState {
   /** The panel has taken the queued prompt — clear it so it fires once. */
   consumePendingPrompt: () => void;
 
+  /**
+   * An `askLangy` handoff also asks the panel's composer to take focus: the
+   * reader just handed a question over and expects to keep typing, not to
+   * click the field first. A flag rather than an imperative call because the
+   * composer may not be mounted yet when the handoff fires — it honors the
+   * request on mount or on change, then consumes it so focus is taken exactly
+   * once. Ephemeral, like `pendingPrompt`.
+   */
+  composerFocusRequested: boolean;
+  /** The composer has taken the requested focus — clear it so it fires once. */
+  consumeComposerFocus: () => void;
+
   // Layout mode (Floating / Sidebar) — user-picked, persisted
   panelMode: LangyPanelMode;
   setPanelMode: (mode: LangyPanelMode) => void;
@@ -311,6 +322,18 @@ interface LangyState extends TurnPhaseState {
   /** Per-session model override for the next send. "" = use the project default. */
   modelOverride: string;
   setModelOverride: (model: string) => void;
+  /**
+   * The project's coding default changed server-side (a codex connect flow
+   * wrote the LANGY role default). Follow it with the composer's pill ONLY
+   * when the pill is still on the default it replaced: an empty override, or
+   * one equal to the outgoing default (the panel seeds the override from the
+   * resolved default on open), both mean the user never explicitly diverged.
+   * A model the user picked on purpose is never hijacked.
+   */
+  followCodingDefaultChange: (change: {
+    previousDefault: string | null;
+    nextDefault: string;
+  }) => void;
 
   /**
    * Page-context chips the user has CHOSEN, by id.
@@ -642,8 +665,13 @@ export const useLangyStore = create<LangyState>()(
           // AFTER the spread: emptyConversationState() nulls `pendingPrompt`, so
           // the queued question is written last or it would be wiped out.
           pendingPrompt: prompt.trim() || null,
+          // The reader expects to keep typing in the panel they just opened.
+          composerFocusRequested: true,
         })),
       consumePendingPrompt: () => set({ pendingPrompt: null }),
+
+      composerFocusRequested: false,
+      consumeComposerFocus: () => set({ composerFocusRequested: false }),
 
       // Sidebar by default: docked inside the app shell as a second content
       // card, working alongside the page. Floating stays one toggle away in
@@ -709,6 +737,12 @@ export const useLangyStore = create<LangyState>()(
       setDraft: (draft) => set({ draft }),
       modelOverride: "",
       setModelOverride: (modelOverride) => set({ modelOverride }),
+      followCodingDefaultChange: ({ previousDefault, nextDefault }) =>
+        set((state) =>
+          state.modelOverride === "" || state.modelOverride === previousDefault
+            ? { modelOverride: nextDefault }
+            : state,
+        ),
 
       chosenChipIds: new Set<string>(),
       chooseChip: (id) =>
