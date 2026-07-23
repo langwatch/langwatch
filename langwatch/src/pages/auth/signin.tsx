@@ -13,7 +13,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
-import { signIn, useSession } from "~/utils/auth-client";
+import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -45,8 +45,7 @@ export default function SignIn() {
     // callback (or dashboard) instead of staring at a 'Redirecting to Sign
     // in...' splash forever (ariana dogfood finding #2).
     if (session) {
-      const dest = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
-      window.location.replace(dest);
+      window.location.replace(safeRedirectTarget(callbackUrl));
       return;
     }
 
