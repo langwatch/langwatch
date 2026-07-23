@@ -18,9 +18,11 @@ import {
   LoaderCircle,
   SlidersHorizontal,
   Sparkles,
+  Star,
+  Type,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { useModelSelectionOptions } from "~/components/ModelSelector";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -46,8 +48,19 @@ interface ModelItem {
   /** What the filter + typeahead match against (provider + name). */
   searchText: string;
   isLangyDefault: boolean;
+  isLangyTitle: boolean;
   profile: ReturnType<typeof profileLangyModel>;
 }
+
+/**
+ * Set-a-Langy-model actions, provided at the root so every row can offer them
+ * without threading callbacks through the suggested + grouped lists. Absent
+ * (undefined callbacks) on surfaces that only pick a per-send model.
+ */
+const ModelRowActionsContext = createContext<{
+  onSetLangyDefault?: (model: string) => void;
+  onSetLangyTitle?: (model: string) => void;
+}>({});
 
 const MODEL_GROUPS: Array<{
   id: LangyModelGroup;
@@ -107,6 +120,9 @@ export function LangyModelPill({
   options,
   onChange,
   langyDefaultModel,
+  langyTitleModel,
+  onSetLangyDefault,
+  onSetLangyTitle,
   disabled = false,
 }: {
   ref?: React.Ref<HTMLButtonElement>;
@@ -117,6 +133,14 @@ export function LangyModelPill({
   onChange: (model: string) => void;
   /** Model selected by the project's Langy routing configuration. */
   langyDefaultModel?: string | null;
+  /** Model Langy names conversations with. */
+  langyTitleModel?: string | null;
+  /** Set a model as Langy's chat default (writes the feature key). Enables the
+   * in-row "make default" marker. */
+  onSetLangyDefault?: (model: string) => void;
+  /** Set a model as Langy's title model (writes the feature key). Enables the
+   * in-row "use for titles" marker. */
+  onSetLangyTitle?: (model: string) => void;
   /** Lock the picker (e.g. while a turn is in flight) — greyed, can't open. */
   disabled?: boolean;
 }) {
@@ -148,6 +172,7 @@ export function LangyModelPill({
           provider,
           searchText: `${provider} ${option.label}`.toLowerCase(),
           isLangyDefault: option.value === langyDefaultModel,
+          isLangyTitle: option.value === langyTitleModel,
           profile: profileLangyModel({
             modelId: option.value,
             metadata: getModelById(option.value),
@@ -155,7 +180,7 @@ export function LangyModelPill({
           }),
         };
       }),
-    [selectOptions, langyDefaultModel],
+    [selectOptions, langyDefaultModel, langyTitleModel],
   );
 
   // Build the collection reactively from the CURRENT items (the model list
@@ -206,6 +231,9 @@ export function LangyModelPill({
   const moreOpen = showMore || searching || suggested.length === 0;
 
   return (
+    <ModelRowActionsContext.Provider
+      value={{ onSetLangyDefault, onSetLangyTitle }}
+    >
     <Combobox.Root
       collection={collection}
       disabled={disabled}
@@ -518,11 +546,62 @@ export function LangyModelPill({
         </Combobox.Positioner>
       </Portal>
     </Combobox.Root>
+    </ModelRowActionsContext.Provider>
+  );
+}
+
+/**
+ * An in-row toggle marking (and setting) a model's Langy role. Active = this IS
+ * the current default/title (coloured, filled). Inactive = a quiet affordance to
+ * make it so. It must NOT select the row for the composer, so it stops the
+ * pointer + click before Ark's item handler sees them.
+ */
+function RoleMarker({
+  active,
+  activeColor,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  activeColor: string;
+  icon: typeof Star;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip content={label} positioning={{ placement: "top" }}>
+      <chakra.button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onClick();
+        }}
+        display="grid"
+        placeItems="center"
+        flexShrink={0}
+        boxSize="18px"
+        borderRadius="sm"
+        color={active ? activeColor : "fg.subtle"}
+        opacity={active ? 1 : 0.4}
+        transition="opacity 120ms ease, color 120ms ease"
+        _hover={{ opacity: 1, color: active ? activeColor : "fg" }}
+      >
+        <Icon size={12} fill={active ? "currentColor" : "none"} />
+      </chakra.button>
+    </Tooltip>
   );
 }
 
 function ModelRow({ item }: { item: ModelItem }) {
   const hasProviderIcon = item.provider in modelProviderIcons;
+  const { onSetLangyDefault, onSetLangyTitle } = useContext(
+    ModelRowActionsContext,
+  );
   return (
     <Combobox.Item
       item={item}
@@ -574,7 +653,36 @@ function ModelRow({ item }: { item: ModelItem }) {
             <ModelTrait label="Multimodal" icon={Image} />
           ) : null}
         </HStack>
-        {item.isLangyDefault ? (
+        {onSetLangyDefault || onSetLangyTitle ? (
+          // Set BOTH Langy roles from the picker (ADR-065): a filled marker is
+          // the current default/title; a quiet one makes this model that role.
+          <HStack gap={0.5} flexShrink={0}>
+            {onSetLangyDefault ? (
+              <RoleMarker
+                active={item.isLangyDefault}
+                activeColor="orange.fg"
+                icon={Star}
+                label={
+                  item.isLangyDefault
+                    ? "Langy's model"
+                    : "Make Langy's model"
+                }
+                onClick={() => onSetLangyDefault(item.value)}
+              />
+            ) : null}
+            {onSetLangyTitle ? (
+              <RoleMarker
+                active={item.isLangyTitle}
+                activeColor="blue.fg"
+                icon={Type}
+                label={
+                  item.isLangyTitle ? "Titles model" : "Use for titles"
+                }
+                onClick={() => onSetLangyTitle(item.value)}
+              />
+            ) : null}
+          </HStack>
+        ) : item.isLangyDefault ? (
           <Text
             textStyle="2xs"
             color="orange.fg"

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Search, BookOpen, Sparkles } from "lucide-react";
 import type { ListItem } from "../getIconInfo";
 import type { Command, RecentItem, SearchResult } from "../types";
+import { SUGGESTIONS } from "~/features/langy/components/EmptyState";
 import type { FilteredCommands } from "./useFilteredCommands";
 import type { FilteredProject } from "./useFilteredProjects";
 import { topLevelNavigationCommands } from "../command-registry";
@@ -24,6 +25,7 @@ export function useCommandBarItems(
   groupedItems: GroupedRecentItems,
   projectSlug: string | undefined,
   langyEnabled: boolean,
+  askLangy: (prompt: string) => void,
 ): {
   allItems: ListItem[];
   recentItemsLimited: RecentItem[];
@@ -31,6 +33,7 @@ export function useCommandBarItems(
   searchInDocsItem: ListItem | null;
   easterEggItem: ListItem | null;
   askLangyItem: ListItem | null;
+  askLangySuggestionItems: ListItem[];
 } {
   const availableTopLevelNav = topLevelNavigationCommands;
 
@@ -54,6 +57,27 @@ export function useCommandBarItems(
       } as Command,
     };
   }, [langyEnabled, projectSlug, query]);
+
+  // The getting-started asks that sit UNDER the Ask Langy CTA on an empty bar
+  // — the same items as the home chips (SUGGESTIONS). Selecting one hands its
+  // prompt straight to Langy via the command's `action`. Gated exactly like the
+  // CTA (a real project + the rollout), and empty otherwise so nothing shows
+  // while typing.
+  const askLangySuggestionItems = useMemo<ListItem[]>(() => {
+    if (!langyEnabled || !projectSlug) return [];
+    return SUGGESTIONS.slice(0, 3).map((suggestion, i) => ({
+      type: "command" as const,
+      data: {
+        id: `langy-suggest-${i}`,
+        label: suggestion.label,
+        description: "Hand this to Langy",
+        icon: suggestion.icon,
+        category: "actions",
+        action: () => askLangy(suggestion.prompt),
+        keywords: ["langy", "ask", suggestion.label.toLowerCase()],
+      } as Command,
+    }));
+  }, [langyEnabled, projectSlug, askLangy]);
 
   // Get top recent items across all time groups
   const recentItemsLimited = useMemo(() => {
@@ -129,6 +153,11 @@ export function useCommandBarItems(
       if (askLangyItem) {
         items.push(askLangyItem);
       }
+      // The getting-started asks sit directly under the CTA (same order as the
+      // Ask Langy group's display), so keyboard nav walks CTA → asks → recent.
+      for (const suggestion of askLangySuggestionItems) {
+        items.push(suggestion);
+      }
 
       // Add up to 5 recent items first
       for (const item of recentItemsLimited) {
@@ -197,6 +226,7 @@ export function useCommandBarItems(
     recentItemsLimited,
     availableTopLevelNav,
     askLangyItem,
+    askLangySuggestionItems,
     easterEggItem,
     idResult,
     filteredCommands,
@@ -213,5 +243,6 @@ export function useCommandBarItems(
     searchInDocsItem,
     easterEggItem,
     askLangyItem,
+    askLangySuggestionItems,
   };
 }

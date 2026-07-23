@@ -2,8 +2,9 @@
  * @vitest-environment jsdom
  *
  * The hero after the setup control moved to the empty states (spec:
- * specs/skills/empty-state-skill-setup.feature). Only the ask chips remain
- * under the field; the onboarding pill is gone in every reach state.
+ * specs/skills/empty-state-skill-setup.feature) AND the ask chips moved into
+ * the command bar. The hero now carries only the field: no onboarding pill, no
+ * chip row — the getting-started asks live inside the palette.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
@@ -51,7 +52,7 @@ beforeEach(() => {
 describe("LangyHomeHero", () => {
   describe("when the project has no traces yet", () => {
     /** @scenario The home no longer carries the setup control */
-    it("renders the ask chips row and no onboarding pill", () => {
+    it("renders no chip row and no onboarding pill", () => {
       reachMock.mockReturnValue({
         isLoading: false,
         isNewProject: true,
@@ -62,15 +63,15 @@ describe("LangyHomeHero", () => {
       renderHero();
 
       expect(screen.queryByText(/send your first trace/i)).toBeNull();
-      // The "Onboard your agent" ASK CHIP legitimately stays (it is a
-      // borrowable prompt); what is gone is the setup MENU control, which
-      // was the only menu trigger the hero carried.
+      // The setup MENU control is gone — it was the only menu trigger the hero
+      // carried.
       const menuTriggers = screen
         .queryAllByRole("button")
         .filter((b) => b.getAttribute("aria-haspopup") === "menu");
       expect(menuTriggers).toHaveLength(0);
-      // The chips row still offers the empty-project asks.
-      expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
+      // The ask chips moved INTO the command bar, so the hero itself no longer
+      // renders any chip buttons — only the field (mocked here as the input).
+      expect(screen.queryAllByRole("button")).toHaveLength(0);
     });
   });
 

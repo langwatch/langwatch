@@ -790,6 +790,59 @@ function LangyPanel({
     ? resolvedDefaultQuery.data?.model
     : null;
 
+  // The model Langy names conversations with (langy.conversation_title, role
+  // FAST). Resolved alongside the chat default so the composer's picker can
+  // mark BOTH and let the user set either from the dropdown (ADR-065).
+  const langyTitleQuery = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: projectId ?? "", featureKey: "langy.conversation_title" },
+    { enabled: !!projectId, staleTime: 300_000, refetchOnWindowFocus: false },
+  );
+  const langyTitleModel = modelOptions.includes(
+    langyTitleQuery.data?.model ?? "",
+  )
+    ? langyTitleQuery.data?.model
+    : null;
+
+  // Set a Langy model from the composer picker — writes the feature key (the
+  // same per-key write the Default Models settings use) and refetches so the
+  // marker moves.
+  const setLangyRoleModel =
+    api.modelProvider.setFeatureOverrideForScope.useMutation();
+  const langyRoleUtils = api.useContext();
+  const setLangyFeatureModel = useCallback(
+    (featureKey: typeof LANGY_GATE_FEATURE_KEY | "langy.conversation_title") =>
+      (nextModel: string) => {
+        if (!projectId) return;
+        void (async () => {
+          try {
+            await setLangyRoleModel.mutateAsync({
+              scopeType: "PROJECT",
+              scopeId: projectId,
+              featureKey,
+              model: nextModel,
+            });
+            await langyRoleUtils.modelProvider.invalidate();
+          } catch {
+            // A convenience write; a failure leaves the marker where it was
+            // rather than surfacing a card mid-compose.
+          }
+        })();
+      },
+    [projectId, setLangyRoleModel, langyRoleUtils],
+  );
+  // Write the SAME key the marker reads and the resolver recognises
+  // (LANGY_GATE_FEATURE_KEY, "langy.chat"). There is no separate
+  // "langy.chat_default" key — writing one would land somewhere nothing reads,
+  // so the marker wouldn't move and Langy wouldn't pick it up.
+  const onSetLangyDefault = useMemo(
+    () => setLangyFeatureModel(LANGY_GATE_FEATURE_KEY),
+    [setLangyFeatureModel],
+  );
+  const onSetLangyTitle = useMemo(
+    () => setLangyFeatureModel("langy.conversation_title"),
+    [setLangyFeatureModel],
+  );
+
   // Seed the picker with the model the gate resolves to — but keep it inside
   // the allowlist. If the resolved default isn't allowed, start on the first
   // allowed model instead.
@@ -2708,6 +2761,9 @@ function LangyPanel({
                   model={modelOverride}
                   modelOptions={modelOptions}
                   langyDefaultModel={langyDefaultModel}
+                  langyTitleModel={langyTitleModel}
+                  onSetLangyDefault={onSetLangyDefault}
+                  onSetLangyTitle={onSetLangyTitle}
                   onModelChange={(model) => {
                     // Switching models is choosing the other way out of a dead
                     // codex session; leaving the reconnect screen up would trap
@@ -2895,24 +2951,31 @@ function PanelHeader({
         gap={1}
         flexShrink={0}
       >
-        <Box
-          flex={1}
-          minWidth={0}
-          textStyle="sm"
-          fontWeight="600"
-          letterSpacing="-0.01em"
-          lineHeight="1.25"
-          color="fg"
-          whiteSpace="nowrap"
-          overflow="hidden"
-          textOverflow="ellipsis"
-        >
-          {conversationTitle ? (
-            <AnimatedConversationTitle title={conversationTitle} />
-          ) : (
-            "Langy"
-          )}
-        </Box>
+        {/* Identity leads: the LangWatch mark, then the label. The mark is a
+            fixed glyph the truncating title can never crowd out (flexShrink
+            0), so the header keeps a stable left edge whatever the title reads.
+            One line still — the mark sits inline before the label, not a
+            masthead above it. */}
+        <HStack flex={1} minWidth={0} gap={1.5} align="center">
+          <LangyMark size={15} />
+          <Box
+            minWidth={0}
+            textStyle="sm"
+            fontWeight="600"
+            letterSpacing="-0.01em"
+            lineHeight="1.25"
+            color="fg"
+            whiteSpace="nowrap"
+            overflow="hidden"
+            textOverflow="ellipsis"
+          >
+            {conversationTitle ? (
+              <AnimatedConversationTitle title={conversationTitle} />
+            ) : (
+              "Langy"
+            )}
+          </Box>
+        </HStack>
 
         <HStack gap={0.5} flexShrink={0}>
           <Tooltip content="New chat" positioning={{ placement: "bottom" }}>

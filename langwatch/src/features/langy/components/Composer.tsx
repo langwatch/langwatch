@@ -104,6 +104,9 @@ function ComposerImpl({
   model,
   modelOptions,
   langyDefaultModel,
+  langyTitleModel,
+  onSetLangyDefault,
+  onSetLangyTitle,
   onModelChange,
   onSend,
   onStop,
@@ -123,6 +126,12 @@ function ComposerImpl({
   modelOptions: string[];
   /** Model selected by the project's Langy routing configuration. */
   langyDefaultModel?: string | null;
+  /** Model Langy names conversations with. */
+  langyTitleModel?: string | null;
+  /** Set the given model as Langy's chat default (writes the feature key). */
+  onSetLangyDefault?: (model: string) => void;
+  /** Set the given model as Langy's title model (writes the feature key). */
+  onSetLangyTitle?: (model: string) => void;
   onModelChange: (model: string) => void;
   onSend: (input: string) => void;
   /** Stop the in-flight turn (the panel owns the real backend stop, ADR-058). */
@@ -391,6 +400,7 @@ function ComposerImpl({
               onRemoveChip={onRemoveChip}
               onAddChip={onAddChip}
               compact={!floating}
+              disabled={disabled}
             />
           )}
 
@@ -579,6 +589,9 @@ function ComposerImpl({
                 model={model}
                 options={modelOptions}
                 langyDefaultModel={langyDefaultModel}
+                langyTitleModel={langyTitleModel}
+                onSetLangyDefault={onSetLangyDefault}
+                onSetLangyTitle={onSetLangyTitle}
                 onChange={onModelChange}
                 // The model is locked in the moment a turn starts — it rode
                 // with the send and can't change mid-flight — so the picker
@@ -755,12 +768,16 @@ function ContextSummaryMenu({
   onRemoveChip,
   onAddChip,
   compact,
+  disabled = false,
 }: {
   contextChips: LangyContextChip[];
   addableChips: LangyContextChip[];
   onRemoveChip?: (id: string) => void;
   onAddChip?: (id: string) => void;
   compact: boolean;
+  /** Locked while the composer is (e.g. during model setup there is nothing to
+   * give context to yet). Greyed and can't open. */
+  disabled?: boolean;
 }) {
   const primary = contextChips[0];
   const extra = Math.max(0, contextChips.length - 1);
@@ -787,6 +804,7 @@ function ContextSummaryMenu({
       <Menu.Trigger asChild>
         <chakra.button
           type="button"
+          disabled={disabled}
           aria-label={`Context: ${contextChips.length} included`}
           display="inline-flex"
           alignItems="center"
@@ -803,6 +821,7 @@ function ContextSummaryMenu({
           background="bg.muted/55"
           color="fg.muted"
           _hover={{ borderColor: "border.emphasized", color: "fg" }}
+          _disabled={{ opacity: 0.5, cursor: "not-allowed" }}
           _focusVisible={{
             outline: "2px solid",
             outlineColor: "orange.focusRing",
