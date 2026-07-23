@@ -11,146 +11,37 @@ import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
 import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
+import { seedDemoPlatform } from "../prisma/seed-demo-platform";
+import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import {
-  DEMO_PLATFORM_IDS,
-  seedDemoPlatform,
-} from "../prisma/seed-demo-platform";
+  assertLocalUrl,
+  dateKey,
+  ingestTrace,
+  mulberry32,
+  utcDayStart,
+  type CollectorTarget,
+  type TraceFixture,
+} from "./seed-lib/seed-primitives";
+import {
+  EXPERIMENT_ROWS,
+  EXPERIMENT_VARIANTS,
+  SCENARIO_FIXTURES,
+} from "./seed-lib/platform-fixtures";
 
 const PROJECT_ID = "local-dev-project";
 const USER_ID = "local-dev-admin-user";
-const ENDPOINT = process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560";
-const API_KEY =
-  process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key";
+const target: CollectorTarget = {
+  endpoint: process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560",
+  apiKey:
+    process.env.HAVEN_SEED_LANGWATCH_API_KEY ?? "sk-lw-local-development-key",
+};
 const BASE_TIME = Date.UTC(2026, 6, 15, 10, 0, 0);
 const DAY_MS = 24 * 60 * 60_000;
 const HISTORY_DAYS = 21;
 
-function assertLocalUrl(name: string, value: string | undefined): void {
-  if (!value) throw new Error(`${name} is required`);
-  const hostname = new URL(value).hostname
-    .replace(/^\[|\]$/g, "")
-    .toLowerCase();
-  if (
-    hostname !== "localhost" &&
-    hostname !== "127.0.0.1" &&
-    hostname !== "::1" &&
-    !hostname.endsWith(".localhost")
-  ) {
-    throw new Error(`Refusing to seed: ${name} host ${hostname} is not local`);
-  }
-}
-
-assertLocalUrl("HAVEN_SEED_ENDPOINT", ENDPOINT);
+assertLocalUrl("HAVEN_SEED_ENDPOINT", target.endpoint);
 assertLocalUrl("DATABASE_URL", process.env.DATABASE_URL);
 assertLocalUrl("CLICKHOUSE_URL", process.env.CLICKHOUSE_URL);
-
-interface TraceFixture {
-  traceId: string;
-  userId: string;
-  threadId: string;
-  input: string;
-  output: string;
-  model: string;
-  latencyMs: number;
-  promptTokens: number;
-  completionTokens: number;
-  cost: number;
-  metadata: Record<string, string | string[]>;
-  finishedAtMs?: number;
-  hasError?: boolean;
-}
-
-const EXPERIMENT_ROWS = [
-  {
-    input: "I was charged twice for my Pro subscription. Please fix it.",
-    expected:
-      "I’m sorry about the duplicate charge. I’ll help verify both transactions and route the confirmed duplicate for refund; refunds normally appear in 3–5 business days.",
-  },
-  {
-    input: "How can I invite five teammates and choose their roles?",
-    expected:
-      "Open Settings → Members, choose Invite, paste all five addresses, and select the role each teammate should receive before sending.",
-  },
-  {
-    input: "What happens when the traces API rate limit is exceeded?",
-    expected:
-      "The API returns HTTP 429 with Retry-After. Back off and retry; the SDKs handle short bursts automatically. Check your plan for the exact limit.",
-  },
-  {
-    input: "Checkout returned 500s after a deploy. Summarize the incident.",
-    expected:
-      "Checkout failed after the deploy because a required environment variable was absent. Rollback restored service; add configuration validation to the release gate.",
-  },
-  {
-    input: "A customer asks for a refund outside policy and is angry.",
-    expected:
-      "Acknowledge the frustration, explain the policy clearly, and escalate with the account and request context without promising an exception.",
-  },
-] as const;
-
-const EXPERIMENT_VARIANTS = [
-  {
-    name: "baseline",
-    runId: "demo-experiment-run-baseline",
-    scores: [0.62, 0.74, 0.41, 0.81, 0.57],
-    outputs: [
-      "I have refunded the second charge. It should arrive soon.",
-      "Go to your team settings and invite each person.",
-      "The limit is exactly 3,000 requests per minute.",
-      "A deploy caused checkout errors. We rolled back and fixed it.",
-      "I can make an exception and refund it for you.",
-    ],
-  },
-  {
-    name: "improved",
-    runId: "demo-experiment-run-improved",
-    scores: [0.93, 0.91, 0.88, 0.94, 0.86],
-    outputs: EXPERIMENT_ROWS.map((row) => row.expected),
-  },
-] as const;
-
-const SCENARIO_FIXTURES = [
-  {
-    scenarioId: DEMO_PLATFORM_IDS.scenarios.refund,
-    name: "Duplicate charge refund",
-    user: "I can see two identical charges. Refund the duplicate now.",
-    baseline:
-      "I’ve refunded it already. The money will be in your account tomorrow.",
-    improved:
-      "I’m sorry about the duplicate. I’ll verify both transaction IDs and route the confirmed duplicate for refund; banks usually post it in 3–5 business days.",
-    criteria: [
-      "Acknowledges the duplicate charge",
-      "Does not claim an unverified refund was completed",
-      "Explains the expected refund timeline",
-    ],
-  },
-  {
-    scenarioId: DEMO_PLATFORM_IDS.scenarios.groundedness,
-    name: "Unknown documentation limit",
-    user: "What is the exact daily export limit?",
-    baseline: "The exact daily export limit is 50,000 rows.",
-    improved:
-      "The retrieved documentation doesn’t state an exact daily export limit. I can check your plan details or point you to support for the account-specific value.",
-    criteria: [
-      "Does not invent a numeric limit",
-      "States that the supplied context is insufficient",
-      "Offers a concrete next step",
-    ],
-  },
-  {
-    scenarioId: DEMO_PLATFORM_IDS.scenarios.escalation,
-    name: "Angry customer escalation",
-    user: "Your refund policy is ridiculous. Make an exception or I cancel.",
-    baseline: "Fine, I’ll make an exception and refund the charge.",
-    improved:
-      "I understand why this is frustrating. I can’t promise an exception, but I’ll escalate the request with the charge and account context so a specialist can review it quickly.",
-    criteria: [
-      "Uses empathetic language",
-      "Does not promise a policy exception",
-      "Escalates to a human with useful context",
-    ],
-  },
-] as const;
 
 interface HistoricalScenarioRun {
   runId: string;
@@ -160,26 +51,6 @@ interface HistoricalScenarioRun {
   passed: boolean;
   score: number;
   trace: TraceFixture;
-}
-
-/** Small deterministic PRNG: random-looking local history, stable on reseed. */
-function mulberry32(seed: number): () => number {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let value = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
-  };
-}
-
-function utcDayStart(epochMs: number): number {
-  const date = new Date(epochMs);
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
-
-function dateKey(epochMs: number): string {
-  return new Date(epochMs).toISOString().slice(0, 10);
 }
 
 /**
@@ -321,75 +192,6 @@ function buildTraceFixtures(
     ...scenarioTraces,
     ...historicalRuns.map((run) => run.trace),
   ];
-}
-
-async function ingestTrace(
-  trace: TraceFixture,
-  index: number,
-  total: number,
-): Promise<void> {
-  const finishedAt =
-    trace.finishedAtMs ?? Date.now() - (total - index) * 4 * 60_000;
-  const startedAt = finishedAt - trace.latencyMs;
-  const response = await fetch(`${ENDPOINT}/api/collector`, {
-    method: "POST",
-    headers: {
-      "X-Auth-Token": API_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      trace_id: trace.traceId,
-      spans: [
-        {
-          trace_id: trace.traceId,
-          span_id: `${trace.traceId}-agent`,
-          type: "agent",
-          name: "support-agent",
-          input: { type: "text", value: trace.input },
-          output: { type: "text", value: trace.output },
-          timestamps: { started_at: startedAt, finished_at: finishedAt },
-        },
-        {
-          trace_id: trace.traceId,
-          span_id: `${trace.traceId}-llm`,
-          parent_id: `${trace.traceId}-agent`,
-          type: "llm",
-          name: "chat-completion",
-          model: trace.model,
-          vendor: "openai",
-          input: {
-            type: "chat_messages",
-            value: [{ role: "user", content: trace.input }],
-          },
-          output: {
-            type: "chat_messages",
-            value: [{ role: "assistant", content: trace.output }],
-          },
-          metrics: {
-            prompt_tokens: trace.promptTokens,
-            completion_tokens: trace.completionTokens,
-            cost: trace.cost,
-          },
-          timestamps: {
-            started_at: startedAt + 80,
-            first_token_at: startedAt + Math.round(trace.latencyMs * 0.28),
-            finished_at: finishedAt,
-          },
-        },
-      ],
-      metadata: {
-        user_id: trace.userId,
-        thread_id: trace.threadId,
-        ...trace.metadata,
-      },
-    }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `collector rejected ${trace.traceId}: ${response.status} ${await response.text()}`,
-    );
-  }
 }
 
 async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
@@ -649,10 +451,10 @@ async function main(): Promise<void> {
     const historicalRuns = buildHistoricalScenarioRuns();
     const traces = buildTraceFixtures(historicalRuns);
     for (const [index, trace] of traces.entries()) {
-      await ingestTrace(trace, index, traces.length);
+      await ingestTrace(target, trace, Date.now() - (traces.length - index) * 4 * 60_000);
     }
     console.log(
-      `🌱 Ingested ${traces.length} linked traces through ${ENDPOINT}`,
+      `🌱 Ingested ${traces.length} linked traces through ${target.endpoint}`,
     );
 
     await dispatchEventLifecycles(traces);

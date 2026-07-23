@@ -100,8 +100,10 @@ Data and cleanup (the only destructive nouns):
 haven db reset [preset] [--yes]   fresh migrated+seeded databases for this stack
 haven db seed [preset]            reseed in place — idempotent, drops nothing
 haven db url [postgres|clickhouse|redis]   connection strings
-  presets (shared): demo · traces · onboarding · post-onboarding · bare
-  (`mass` — months of backdated data via event-log seed + projection replay — is the designed follow-up)
+  presets (shared): demo · traces · onboarding · post-onboarding · bare · mass
+  (mass = demo plus months of backdated history: event-log seeding with backdated
+  occurredAt + projection replay for the event-sourced products; traces through the
+  collector inside its 31-day window — the ingest guard is deliberately not weakened)
 haven clean [--yes]   one interactive cleanup: worktrees, artifacts, idle DBs, orphan processes
 ```
 
