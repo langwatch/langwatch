@@ -332,6 +332,11 @@ describe("Feature: Agent REST API", () => {
       expect(body.name).toBe("Detail Agent");
       expect(body.type).toBe("signature");
       expect(body.config).toBeDefined();
+      // The platform link addresses THIS agent (its editor drawer), never the
+      // bare /agents index.
+      expect(body.platformUrl).toContain(
+        `drawer.agentId=${encodeURIComponent(agent.id)}`,
+      );
     });
 
     /** @scenario Get agent returns 404 for non-existent id */
