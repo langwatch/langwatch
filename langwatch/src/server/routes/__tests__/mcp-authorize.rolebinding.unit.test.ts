@@ -27,7 +27,17 @@ const ERROR = "Project not found or you don't have access";
 const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
   return {
     SESSION: { user: { id: "member_rolebinding_only" }, expires: "1" },
-    mockRedis: { set: vi.fn().mockResolvedValue("OK") },
+    // get() stands in for the OAuth client registry lookup: client_1 is
+    // "registered" with exactly the redirect_uri validBody uses below.
+    mockRedis: {
+      set: vi.fn().mockResolvedValue("OK"),
+      get: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          redirectUris: ["https://example.com/callback"],
+          clientName: "Test client",
+        }),
+      ),
+    },
     mockPrisma: {
       // resolveProjectPermission fails closed on current org membership before
       // it ever looks at bindings: a genuine team member is always an
