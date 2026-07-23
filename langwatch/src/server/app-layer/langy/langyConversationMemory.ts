@@ -27,7 +27,9 @@
  *
  * That is a plumbing failure, not a wording failure, and no amount of prompt
  * editing fixes it. This module is the plumbing, in two layers read off the
- * same durable message projection and rendered into the turn's system block:
+ * same durable message projection and carried on the turn as the HISTORY SEED
+ * (folded into the first message a fresh worker session receives; see
+ * `renderLangyConversationTranscript` for why not the system block):
  *
  *   - the TRANSCRIPT (`renderLangyConversationTranscript`): what was already
  *     said, so a fresh worker (model switch, idle reap, deploy, a resume days
@@ -293,15 +295,16 @@ function renderTranscriptMessage(role: "user" | "assistant", text: string) {
  * Render the conversation's durable messages as the transcript block (what
  * has already been said, oldest first), or null when there is nothing to say.
  *
- * WHY THIS RIDES EVERY TURN of an existing conversation, not just the first
- * turn after a worker recycle: the agent's own memory lives in its disposable
- * worker process (recycled on a model switch, reaped on idle, gone on a
- * deploy), and the runtime applies the system block per-turn: only the block
- * sent WITH a message reaches the model. A fresh worker's session knows
- * nothing; a warm worker's session knows only the turns since it spawned.
- * Carrying the durable transcript on every turn makes the conversation
- * continuable whatever happened to the worker, with no one keeping track of
- * which worker still remembers what.
+ * This block is the HISTORY SEED: it rides every dispatch (so the outbox and
+ * liveness re-drives have it too), and the worker manager folds it into the
+ * FIRST message posted to a fresh session, where it persists as part of the
+ * session's own transcript from then on. The agent's memory lives in its
+ * disposable worker process (recycled on a model switch, reaped on idle, gone
+ * on a deploy); seeding the fresh session's first message from the durable
+ * record makes the conversation continuable whatever happened to the worker.
+ * Deliberately NOT re-sent on later turns of the same session: the session
+ * already carries it, and a byte-stable request prefix is what lets provider
+ * prompt caching read (not re-write) the conversation turn over turn.
  *
  * `currentPrompt` is the message this turn answers. On a re-drive the message
  * is already on the durable record, so a trailing user message with exactly
@@ -374,8 +377,13 @@ export function renderLangyConversationTranscript({
 }
 
 /**
- * How a bare reference is resolved — rendered on EVERY turn, memory or no
- * memory.
+ * How a bare reference is resolved. Rendered on EVERY turn, memory or no
+ * memory, inside the STABLE system lane: the policy is a constant, so it never
+ * varies a byte across a conversation's turns (provider prompt caching depends
+ * on that stability), while the data it talks about (the transcript, the
+ * resource memory, the screen context) rides the turn's user message. The
+ * wording is therefore position-neutral: "you have already been told", never
+ * "described above".
  *
  * Two failures happened in that transcript and this addresses the second one.
  * The agent did not merely fail to find "it"; it invented an unrelated,
@@ -394,12 +402,13 @@ export function renderLangyConversationTranscript({
  */
 export const LANGY_REFERENT_POLICY = [
   "RESOLVING WHAT THE USER MEANS.",
-  'A bare reference — "it", "that one", "the first one", "the scenario you just',
-  "made\" — points at something already described above: this conversation's own",
-  "history, or what the user has on screen. Take the newest thing that matches",
-  "and act on THAT.",
-  "If nothing described above matches, say so in one plain line. Never substitute",
-  "a different action for the one you were asked for: a two-word instruction is",
-  "not a licence to run a broad search, fan out over many records, or produce an",
-  "analysis nobody asked for.",
+  'A bare reference ("it", "that one", "the first one", "the scenario you just',
+  "made\") points at something you have already been told: this conversation's",
+  "own history, or what the user has on screen. Both arrive as DATA blocks",
+  "inside the conversation, ahead of the user's message. Take the newest thing",
+  "that matches and act on THAT.",
+  "If nothing you have been told matches, say so in one plain line. Never",
+  "substitute a different action for the one you were asked for: a two-word",
+  "instruction is not a licence to run a broad search, fan out over many",
+  "records, or produce an analysis nobody asked for.",
 ].join("\n");

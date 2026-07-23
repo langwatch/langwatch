@@ -47,6 +47,8 @@ type fakeWorker struct {
 	touched          int
 	posted           int
 	postErr          error
+	gotPrompt        string
+	gotHistorySeed   string
 	gotResumeToken   string
 	streamErr        error
 	streamWrites     bool // emit one delta frame on the stream (happy path)
@@ -89,8 +91,10 @@ func (w *fakeWorker) SetTurnTraceContext(sc trace.SpanContext) {
 	w.turnTraceContexts = append(w.turnTraceContexts, sc)
 }
 func (w *fakeWorker) LastLLMError() (herr.E, bool) { return w.llmErr, w.llmErrOK }
-func (w *fakeWorker) PostMessage(_ context.Context, _, _, resumeToken string) error {
+func (w *fakeWorker) PostMessage(_ context.Context, _, prompt, historySeed, resumeToken string) error {
 	w.posted++
+	w.gotPrompt = prompt
+	w.gotHistorySeed = historySeed
 	w.gotResumeToken = resumeToken
 	return w.postErr
 }

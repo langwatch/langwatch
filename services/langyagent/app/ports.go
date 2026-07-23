@@ -93,10 +93,14 @@ type Worker interface {
 	HasServedTurn() bool
 	// Touch resets the idle timer.
 	Touch()
-	// PostMessage queues the turn on the worker's opencode session. resumeToken
+	// PostMessage queues the turn on the worker's opencode session. historySeed
+	// is the control plane's conversation-so-far block: folded in ahead of the
+	// prompt on the FIRST message this worker's session receives, ignored once a
+	// prompt has been delivered (the session's own transcript carries it from
+	// then on, and re-sending it would bloat every later message). resumeToken
 	// (ADR-048) carries an opaque prior-turn checkpoint to resume from; empty on
 	// a cold start.
-	PostMessage(ctx context.Context, system, prompt, resumeToken string) error
+	PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error
 	// StreamEvents forwards this session's opencode events into sink until a
 	// terminal event or ctx cancellation.
 	StreamEvents(ctx context.Context, sink ChatSink) error

@@ -116,7 +116,14 @@ type ChatRequest struct {
 	ConversationID string
 	Prompt         string
 	System         string
-	Credentials    domain.Credentials
+	// HistorySeed is the control plane's conversation-so-far block (transcript +
+	// resource memory). It rides every dispatch; the WORKER folds it in ahead of
+	// the prompt only on its session's first message (see Worker.PostMessage),
+	// so a fresh session continues the conversation while a warm session's
+	// requests keep a byte-stable, provider-cacheable prefix. Empty for a
+	// brand-new conversation.
+	HistorySeed string
+	Credentials domain.Credentials
 	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a prior
 	// turn that handed off on shutdown. Threaded into PostMessage so opencode
 	// resumes from it; empty on a normal cold start.
@@ -332,7 +339,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		emitError(ctx, sink, message, code)
 	}
 
-	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.ResumeToken); err != nil {
+	if err := worker.PostMessage(ctx, req.System, req.Prompt, req.HistorySeed, req.ResumeToken); err != nil {
 		cancelStream()
 		<-errCh // the stream consumer has now fully returned.
 		if errors.Is(err, domain.ErrSessionNotFound) {

@@ -25,6 +25,15 @@ export interface LangyTurnHandoff {
   actorUserId: string;
   prompt: string;
   system: string;
+  /**
+   * The conversation-so-far seed (transcript + resource memory) the worker
+   * manager folds into the FIRST message of a fresh session. Carried on every
+   * stash so an outbox or liveness re-drive that lands on a fresh worker still
+   * continues the conversation; a warm session ignores it (its own transcript
+   * already carries the seed from its first post). Absent for a brand-new
+   * conversation.
+   */
+  historySeed?: string;
   modelOverride?: string;
   credentials: LangyCredentials;
   /**

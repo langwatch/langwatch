@@ -1,5 +1,9 @@
+import {
+  cursorHasReachedEvent,
+  LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_CONVERSATION_STATUS,
+} from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
-
 import {
   LangyWorkerStoppedError,
   serializeLangyTurnError,
@@ -9,16 +13,10 @@ import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
-import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
-import {
-  LANGY_CONVERSATION_EVENT_TYPES,
-  LANGY_CONVERSATION_STATUS,
-} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-
-import { cursorHasReachedEvent } from "@langwatch/langy";
+import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
 import { projectionNotReadyError } from "./projection-cursor";
 
@@ -99,10 +97,7 @@ export function createAgentTurnLivenessSubscriber(
         projectId,
         conversationId,
       });
-      if (
-        !conversation ||
-        !cursorHasReachedEvent(conversation.cursor, event)
-      ) {
+      if (!conversation || !cursorHasReachedEvent(conversation.cursor, event)) {
         throw projectionNotReadyError({
           projectionName: "langyConversation",
           eventId: event.id,
@@ -215,6 +210,9 @@ export function createAgentTurnLivenessSubscriber(
         runToken: handoff.runToken,
         prompt: handoff.prompt,
         system: handoff.system,
+        // A stalled turn's re-drive may land on a fresh worker; the seed keeps
+        // the conversation continuable there too.
+        ...(handoff.historySeed ? { historySeed: handoff.historySeed } : {}),
         credentials: handoff.credentials,
         ...(handoff.modelOverride
           ? { modelOverride: handoff.modelOverride }

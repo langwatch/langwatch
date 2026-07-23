@@ -519,8 +519,13 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     createdAt: new Date(),
   };
 
-  const systemOf = (dispatch: ReturnType<typeof vi.fn>): string =>
-    (dispatch.mock.calls[0]![0] as { system: string }).system;
+  interface DispatchedTurn {
+    system: string;
+    prompt: string;
+    historySeed?: string;
+  }
+  const dispatchedOf = (dispatch: ReturnType<typeof vi.fn>): DispatchedTurn =>
+    dispatch.mock.calls[0]![0] as DispatchedTurn;
 
   /** @scenario A follow-up turn carries what earlier turns created */
   /** @scenario The memory survives the agent forgetting */
@@ -528,7 +533,8 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     const { deps, mocks } = makeDeps();
     mocks.findAllByConversation.mockResolvedValue([scenarioCreated]);
     // A warm worker would still hold the session — the point is that this does
-    // not depend on it.
+    // not depend on it: the seed rides the dispatch either way, and the
+    // manager folds it in whenever the session turns out to be fresh.
     mocks.probe.mockResolvedValue(true);
 
     await LangyTurnService.create(deps).startConversationTurn(
@@ -537,9 +543,9 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       }),
     );
 
-    const system = systemOf(mocks.dispatch);
-    expect(system).toContain("scenario_0002E069Y90C5aaw1h325gUZ7TE0W");
-    expect(system).toContain("Customer support agent");
+    const { historySeed } = dispatchedOf(mocks.dispatch);
+    expect(historySeed).toContain("scenario_0002E069Y90C5aaw1h325gUZ7TE0W");
+    expect(historySeed).toContain("Customer support agent");
     expect(mocks.findAllByConversation).toHaveBeenCalledWith({
       conversationId: "conv-1",
       projectId: "p1",
@@ -547,8 +553,8 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
   });
 
   /** @scenario Every turn carries the rule for resolving a bare reference */
-  /** @scenario The rule is read after everything it talks about */
-  it("carries the rule for resolving a bare reference, after the things it resolves against", async () => {
+  /** @scenario The data blocks arrive ahead of the message they explain */
+  it("keeps the resolution rule in the stable instructions and the data ahead of the ask", async () => {
     const { deps, mocks } = makeDeps();
     mocks.findAllByConversation.mockResolvedValue([scenarioCreated]);
 
@@ -562,21 +568,21 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       }),
     );
 
-    const system = systemOf(mocks.dispatch);
+    const { system, prompt } = dispatchedOf(mocks.dispatch);
     expect(system).toContain("RESOLVING WHAT THE USER MEANS");
-    // The policy says "described above", so both data blocks must precede it.
-    expect(
-      system.indexOf("WHAT THIS CONVERSATION HAS ALREADY DONE"),
-    ).toBeLessThan(system.indexOf("RESOLVING WHAT THE USER MEANS"));
-    expect(system.indexOf("WHAT THE USER IS LOOKING AT")).toBeLessThan(
-      system.indexOf("RESOLVING WHAT THE USER MEANS"),
+    // The screen-context DATA precedes the labelled ask inside the message,
+    // so the model reads what "this trace" could mean before the words that
+    // may say it.
+    expect(prompt.indexOf("WHAT THE USER IS LOOKING AT")).toBeLessThan(
+      prompt.indexOf("THE USER'S MESSAGE:"),
     );
+    expect(prompt.trimEnd().endsWith("hi")).toBe(true);
   });
 
   /** @scenario A follow-up turn carries the conversation so far */
   /** @scenario What was said survives the worker being replaced */
   /** @scenario Switching models mid-conversation keeps the conversation */
-  it("carries the transcript so a fresh worker on another model continues the conversation", async () => {
+  it("carries the transcript seed so a fresh worker on another model continues the conversation", async () => {
     const { deps, mocks } = makeDeps();
     mocks.findAllByConversation.mockResolvedValue([
       {
@@ -609,20 +615,64 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       }),
     );
 
-    const system = systemOf(mocks.dispatch);
-    expect(system).toContain("THE CONVERSATION SO FAR");
-    expect(system).toContain("User: my name is rogerio");
-    expect(system).toContain("Langy: Nice to meet you, Rogerio!");
-    // The transcript precedes the referent policy, so "described above" is true.
-    expect(system.indexOf("THE CONVERSATION SO FAR")).toBeLessThan(
-      system.indexOf("RESOLVING WHAT THE USER MEANS"),
-    );
-    // The stash carries the same seeded system: an outbox or liveness
-    // re-dispatch to a fresh worker continues the conversation too.
+    const { system, prompt, historySeed } = dispatchedOf(mocks.dispatch);
+    expect(historySeed).toContain("THE CONVERSATION SO FAR");
+    expect(historySeed).toContain("User: my name is rogerio");
+    expect(historySeed).toContain("Langy: Nice to meet you, Rogerio!");
+    // The volatile transcript must NOT ride the system lane: a per-turn
+    // system re-writes the provider's cached prefix every turn.
+    expect(system).not.toContain("THE CONVERSATION SO FAR");
+    // The ask is labelled so the manager-folded seed can never blur into the
+    // user's own words.
+    expect(prompt).toContain("THE USER'S MESSAGE:\nwhat is my name?");
+    // The stash carries the same seed: an outbox or liveness re-dispatch to a
+    // fresh worker continues the conversation too.
     const stashed = (
-      mocks.stash.mock.calls[0] as unknown as [{ system: string }]
+      mocks.stash.mock.calls[0] as unknown as [
+        { system: string; historySeed?: string },
+      ]
     )[0];
+    expect(stashed.historySeed).toBe(historySeed);
     expect(stashed.system).toBe(system);
+  });
+
+  /** @scenario Carrying the conversation does not defeat prompt caching */
+  it("sends byte-identical instructions on consecutive turns of one conversation", async () => {
+    const first = makeDeps();
+    first.mocks.findAllByConversation.mockResolvedValue([scenarioCreated]);
+    await LangyTurnService.create(first.deps).startConversationTurn(
+      input({
+        messages: [{ role: "user", parts: [{ type: "text", text: "run it" }] }],
+      }),
+    );
+
+    const second = makeDeps();
+    second.mocks.findAllByConversation.mockResolvedValue([
+      scenarioCreated,
+      {
+        id: "m2",
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Ran it: all passed." },
+        ] as LangyMessageRow["parts"],
+        createdAt: new Date(),
+      },
+    ]);
+    await LangyTurnService.create(second.deps).startConversationTurn(
+      input({
+        idempotencyKey: "00000000-0000-4000-8000-000000000002",
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "and again" }] },
+        ],
+      }),
+    );
+
+    const turn1 = dispatchedOf(first.mocks.dispatch);
+    const turn2 = dispatchedOf(second.mocks.dispatch);
+    // The instructions lane is what providers cache as the request prefix:
+    // it must not vary a byte while the conversation grows.
+    expect(turn2.system).toBe(turn1.system);
+    expect(turn2.historySeed).not.toBe(turn1.historySeed);
   });
 
   /** @scenario A brand-new conversation carries no memory */
@@ -633,9 +683,10 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     await LangyTurnService.create(deps).startConversationTurn(input());
 
     expect(mocks.findAllByConversation).not.toHaveBeenCalled();
-    expect(systemOf(mocks.dispatch)).not.toContain(
-      "WHAT THIS CONVERSATION HAS ALREADY DONE",
-    );
+    const { prompt, historySeed } = dispatchedOf(mocks.dispatch);
+    expect(historySeed).toBeUndefined();
+    // Nothing to prepend, nothing to set apart: the bare ask stays bare.
+    expect(prompt).toBe("hi");
   });
 
   /** @scenario A conversation whose record cannot be read still answers */
@@ -649,9 +700,7 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
 
     expect(result).toMatchObject({ conversationId: "conv-1" });
     expect(mocks.dispatch).toHaveBeenCalledOnce();
-    expect(systemOf(mocks.dispatch)).not.toContain(
-      "WHAT THIS CONVERSATION HAS ALREADY DONE",
-    );
+    expect(dispatchedOf(mocks.dispatch).historySeed).toBeUndefined();
   });
 });
 

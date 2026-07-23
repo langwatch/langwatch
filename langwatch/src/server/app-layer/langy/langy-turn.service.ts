@@ -109,6 +109,49 @@ export function langyTurnIdentity(input: {
   return { turnId: `langyturn_${digest}`, messageId: `langymsg_${digest}` };
 }
 
+/**
+ * The label that marks where the user's own words start inside a composed
+ * prompt. Everything before it is control-plane-authored DATA (screen context,
+ * the turn-scoped cap note) or, on a fresh session's first post, the
+ * manager-folded history seed; everything after it is the user speaking.
+ */
+export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
+
+/**
+ * Compose the turn's user-message prompt.
+ *
+ * A bare ask stays a bare ask: when nothing is (or could be) prepended, the
+ * prompt is exactly the user's text, as it always was. The moment anything
+ * rides ahead of it (the screen-context block, the cap note, or a history
+ * seed the manager may fold in), the ask is set apart under
+ * {@link LANGY_USER_MESSAGE_LABEL} so no prepended DATA can blur into the
+ * user's own words. `hasHistorySeed` exists because the SEED is prepended by
+ * the worker manager, not here: the label must already be in place on the
+ * wire for the composition the manager may produce.
+ *
+ * Volatile content lives HERE, in the message, and never in the system
+ * parameter: the system lane must stay byte-identical across a conversation's
+ * turns for provider prompt caching to read the prefix instead of re-writing
+ * it (see the composition site in `startConversationTurn`).
+ */
+export function composeLangyTurnPrompt({
+  contextBlock,
+  capNote,
+  hasHistorySeed,
+  userText,
+}: {
+  contextBlock: string | null;
+  capNote: string;
+  hasHistorySeed: boolean;
+  userText: string;
+}): string {
+  const preamble = [contextBlock, capNote]
+    .map((block) => (block ?? "").trim())
+    .filter((block) => block.length > 0);
+  if (preamble.length === 0 && !hasHistorySeed) return userText;
+  return [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join("\n\n");
+}
+
 export interface LangyChatMessageInput {
   role: "user" | "assistant" | "system";
   parts: LangyMessagePart[];
@@ -594,13 +637,6 @@ export class LangyTurnService {
       }
       const durableMessages =
         memoryResult.status === "fulfilled" ? memoryResult.value : [];
-      // The transcript rides EVERY turn of an existing conversation, not just
-      // the one after a probe miss, because the worker serving it is
-      // disposable at any point between here and the model call: recycled by a
-      // model switch, reaped on idle, dead by the time the outbox or liveness
-      // re-dispatches this same stashed system to a fresh one. Seeding
-      // unconditionally is what makes "the conversation can always be
-      // continued" hold on every path with no freshness bookkeeping.
       const conversationTranscript = renderLangyConversationTranscript({
         messages: durableMessages,
         currentPrompt: userText,
@@ -609,20 +645,36 @@ export class LangyTurnService {
         extractLangyConversationMemory({ messages: durableMessages }),
       );
 
-      // ORDER IS THE POINT. The three DATA blocks describe what "it" could mean
-      // (what this conversation already said, what it created, then the user's
-      // screen) and the referent policy comes last so "described above" names
-      // all of them.
-      const system = [
-        LANGY_OVERRIDE,
-        conversationTranscript,
-        conversationMemory,
-        renderLangyTurnContext(turnContext),
-        LANGY_REFERENT_POLICY,
-        capReachedNote,
-      ]
+      // THE SPLIT IS THE POINT (provider prompt caching). The system lane
+      // carries only the two constants, byte-identical across a conversation's
+      // turns: anything varying per turn inside it would shift the provider's
+      // cache breakpoint and re-write the whole prefix at the write premium
+      // every turn instead of reading it. Everything volatile rides the turn's
+      // USER message instead: the history seed below, and the per-turn context
+      // inside the composed prompt.
+      const system = [LANGY_OVERRIDE, LANGY_REFERENT_POLICY].join("\n\n");
+
+      // The history seed rides EVERY dispatch, not just the one after a probe
+      // miss, because the worker serving the turn is disposable at any point
+      // between here and the model call: recycled by a model switch, reaped on
+      // idle, dead by the time the outbox or liveness re-dispatches this same
+      // stashed payload to a fresh one. The manager holds the ground truth of
+      // session freshness and folds the seed into the session's FIRST message
+      // only; once in, it persists in the session's own transcript (and in the
+      // provider's cached prefix) for every later turn.
+      const historySeed = [conversationTranscript, conversationMemory]
         .filter((block): block is string => !!block && block.trim().length > 0)
         .join("\n\n");
+
+      // The per-turn user-message lane: what the user is looking at and the
+      // turn-scoped cap note precede a clearly labelled ask, so the model
+      // reads the DATA before the message that may refer to it.
+      const prompt = composeLangyTurnPrompt({
+        contextBlock: renderLangyTurnContext(turnContext),
+        capNote: capReachedNote,
+        hasHistorySeed: historySeed.length > 0,
+        userText,
+      });
 
       if (handoffResult.status === "rejected") {
         logger.warn(
@@ -649,8 +701,9 @@ export class LangyTurnService {
             conversationId: conversation.id,
             turnId,
             actorUserId: userId,
-            prompt: userText,
+            prompt,
             system,
+            ...(historySeed ? { historySeed } : {}),
             modelOverride: turnModel,
             credentials,
             runToken,
@@ -724,8 +777,9 @@ export class LangyTurnService {
             userId,
             runToken,
             turnId,
-            prompt: userText,
+            prompt,
             system,
+            ...(historySeed ? { historySeed } : {}),
             conversationId: conversation.id,
             credentials,
             modelOverride: turnModel,
