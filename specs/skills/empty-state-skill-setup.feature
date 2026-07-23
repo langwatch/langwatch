@@ -11,7 +11,9 @@ Feature: Set up with AI from every empty page
   Scenario: The home no longer carries the setup control
     When I open the Langy home
     Then no onboarding pill renders in the hero
-    And the ask chips row is the only row under the field
+    And no ask chips row renders under the field
+    # The getting-started asks moved into the command bar (under the Ask Langy
+    # CTA), so the hero itself carries only the field.
 
   Scenario Outline: Every empty surface offers its own skill
     When I open the <surface> page with no <surface> yet
