@@ -47,5 +47,30 @@ describe("DrawerContent transparency", () => {
       const backdrop = document.querySelector("[data-part='backdrop']");
       expect(backdrop).toBeNull();
     });
+
+    /** @scenario "Blur effects turn off when the device can't keep a smooth frame rate" */
+    it("references the shared --lw-backdrop-blur and --lw-panel-alpha CSS variables instead of hardcoded values", () => {
+      // No `bg` override here (unlike renderDrawer()'s helper default) --
+      // this exercises DrawerContent's OWN background/backdropFilter props
+      // (see src/components/ui/drawer.tsx), which every real caller in the
+      // app relies on by not overriding them. If either is ever hardcoded
+      // again, reduced-graphics mode would silently stop affecting every
+      // drawer in the app despite the "drawer" recipe in _app.tsx still
+      // looking correct.
+      render(
+        <Drawer.Root open={true} placement="end">
+          <Drawer.Content>
+            <Drawer.Body>Content</Drawer.Body>
+          </Drawer.Content>
+        </Drawer.Root>,
+        { wrapper: Wrapper },
+      );
+
+      const injectedCss = Array.from(document.querySelectorAll("style"))
+        .map((s) => s.innerHTML)
+        .join("\n");
+      expect(injectedCss).toContain("--lw-backdrop-blur");
+      expect(injectedCss).toContain("--lw-panel-alpha");
+    });
   });
 });

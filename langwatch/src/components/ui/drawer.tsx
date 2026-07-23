@@ -101,8 +101,8 @@ export const DrawerContent = React.forwardRef<
           margin={2}
           pointerEvents="auto"
           borderRadius="lg"
-          background="bg.surface/80"
-          backdropFilter="blur(25px)"
+          background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)"
+          backdropFilter="var(--lw-backdrop-blur, blur(25px))"
           {...rest}
           marginTop={marginTopProp}
           marginEnd={langyYieldMarginEnd}
