@@ -28,9 +28,15 @@ import {
  * in time order — the same pattern the claude-marked read established.
  */
 export class LogRecordStorageService {
+  /**
+   * `canonical` is REQUIRED: canonical `log_records` is the only table still
+   * receiving writes, so a service built without it reads legacy-only and
+   * silently returns nothing for every trace ingested after the cutover.
+   * Deployments without ClickHouse pass NullCanonicalLogRecordRepository.
+   */
   constructor(
     readonly repository: LogRecordStorageRepository,
-    private readonly canonical?: CanonicalLogRecordRepository,
+    private readonly canonical: CanonicalLogRecordRepository,
   ) {}
 
   async insertLogRecord(record: NormalizedLogRecord): Promise<void> {
@@ -53,12 +59,12 @@ export class LogRecordStorageService {
   ): Promise<StoredLogRecordRow[]> {
     const [legacy, canonical] = await Promise.all([
       this.repository.getLogsByTraceId(tenantId, traceId, occurredAtMs, limit),
-      this.canonical?.getLogsByTraceId({
+      this.canonical.getLogsByTraceId({
         tenantId,
         traceId,
         occurredAtMs,
         limit,
-      }) ?? Promise.resolve([]),
+      }),
     ]);
     // Keep-last dedup: canonical goes LAST so it wins a divergent duplicate,
     // matching "canonical is the authoritative store".
