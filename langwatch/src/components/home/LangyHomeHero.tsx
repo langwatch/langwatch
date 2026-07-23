@@ -1,10 +1,8 @@
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCommandBar } from "~/features/command-bar/CommandBarContext";
 import { CommandPalette } from "~/features/command-bar/CommandPalette";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
-import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useHomeDevState } from "./dev/homeDevState";
 import "./homeHeroScroll.css";
 import { useProjectReach } from "./useProjectReach";
@@ -38,16 +36,6 @@ import { WelcomeHeader } from "./WelcomeHeader";
 /** The field's reading measure. Wider and it stops reading as one question. */
 const ASK_MEASURE = "680px";
 
-/**
- * The height the ask row holds in every state.
- *
- * One chip: its line box plus its padding and border. Pinned because the row
- * has to keep this height while it has nothing to show — during the read of
- * what the project holds — and a row that sized itself to its contents would
- * grow under the reader as that answer arrived.
- */
-const ASK_ROW_MIN_HEIGHT = "26px";
-
 export function LangyHomeHero() {
   const devState = useHomeDevState();
   const { registerInlinePalette } = useCommandBar();
@@ -62,26 +50,6 @@ export function LangyHomeHero() {
       : devState === "populated"
         ? false
         : reach.isNewProject;
-
-  // Until the project's reach is known, "has nothing" and "has not answered
-  // yet" look identical, and offering the empty-project asks to a project with
-  // months of runs (then swapping them out a beat later) is worse than a beat
-  // of nothing: the reader reaches for a chip that moves. A pinned dev state is
-  // an answer, so it skips the wait.
-  const reachKnown =
-    devState === "empty" || devState === "populated" || !reach.isLoading;
-  const suggestions = !reachKnown
-    ? []
-    : selectLangySuggestions({
-        reach:
-          devState === "empty"
-            ? { hasTraces: false, hasEvaluations: false, hasExperiments: false }
-            : devState === "populated"
-              ? { hasTraces: true, hasEvaluations: true, hasExperiments: true }
-              : reach,
-      });
-
-  const askLangy = useLangyStore((s) => s.askLangy);
 
   // The home's own query, deliberately NOT the Cmd+K bar's. The two are the
   // same palette but not the same session: what someone half-typed here should
@@ -175,32 +143,6 @@ export function LangyHomeHero() {
           />
         </Box>
 
-        {/* The asks worth borrowing. Setup lives where the gap actually is —
-            each empty page carries its own set-up-with-AI control — so the
-            home's row stays purely prompts. The row keeps its height while
-            the project's reach is still being read, because there are no
-            honest asks to show until that lands. */}
-        <Box
-          width="full"
-          minHeight={ASK_ROW_MIN_HEIGHT}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <HStack gap={2} flexWrap="wrap" justify="center">
-            {canAsk
-              ? suggestions.map((suggestion) => (
-                  <AskChip
-                    key={suggestion.label}
-                    icon={<suggestion.icon size={12} />}
-                    label={suggestion.label}
-                    onClick={() => askLangy(suggestion.prompt)}
-                  />
-                ))
-              : null}
-          </HStack>
-        </Box>
-
         {!canAsk ? (
           <Text fontSize="12px" color="fg.subtle" textAlign="center">
             You can read Langy conversations here. To start one, ask whoever
@@ -209,53 +151,5 @@ export function LangyHomeHero() {
         ) : null}
       </VStack>
     </VStack>
-  );
-}
-
-/**
- * One borrowable ask.
- *
- * Its surface is deliberately near-opaque. These sit over a moving gradient,
- * and a translucent chip on a moving ground is legible only for as long as the
- * ground happens to be dark behind it.
- */
-function AskChip({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <chakra.button
-      type="button"
-      onClick={onClick}
-      display="inline-flex"
-      alignItems="center"
-      gap={1.5}
-      fontSize="12px"
-      color="fg.muted"
-      background="bg.panel/90"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="full"
-      paddingX={3}
-      paddingY="4px"
-      cursor="pointer"
-      whiteSpace="nowrap"
-      transition="color 130ms ease, border-color 130ms ease, background 130ms ease"
-      _hover={{
-        color: "orange.fg",
-        borderColor: "orange.emphasized",
-        background: "bg.panel",
-      }}
-    >
-      <chakra.span display="grid" color="fg.subtle">
-        {icon}
-      </chakra.span>
-      {label}
-    </chakra.button>
   );
 }

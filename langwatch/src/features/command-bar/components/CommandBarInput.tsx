@@ -37,7 +37,16 @@ export function CommandBarInput({
   const hero = size === "hero";
 
   return (
-    <HStack px={{ base: 4, md: 5 }} py={hero ? 4 : 3.5} gap={hero ? 3 : 3.5}>
+    <HStack
+      // Fill the field and pin left: HStack's inherited justify defaults to
+      // center, which — when this row isn't stretched by its container — floats
+      // the icon+input to the middle instead of spanning the field.
+      width="full"
+      justify="flex-start"
+      px={{ base: 4, md: 5 }}
+      py={hero ? 4 : 3.5}
+      gap={hero ? 3 : 3.5}
+    >
       <Box color="fg.subtle" flexShrink={0}>
         <Search size={hero ? 18 : 19} strokeWidth={1.8} />
       </Box>

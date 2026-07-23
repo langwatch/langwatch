@@ -35,9 +35,9 @@ export const getTimeOfDay = (hour: number): TimeOfDay => {
 };
 
 const GREETINGS: Record<TimeOfDay, { named: string; anonymous: string }> = {
-  morning: { named: "Good morning, ", anonymous: "Good morning" },
-  afternoon: { named: "Good afternoon, ", anonymous: "Good afternoon" },
-  evening: { named: "Good evening, ", anonymous: "Good evening" },
+  morning: { named: "Good Morning, ", anonymous: "Good Morning" },
+  afternoon: { named: "Good Afternoon, ", anonymous: "Good Afternoon" },
+  evening: { named: "Good Evening, ", anonymous: "Good Evening" },
 };
 
 export const getGreeting = ({

@@ -80,19 +80,19 @@ describe("WelcomeHeader", () => {
     describe("when name is provided", () => {
       it("returns personalized morning greeting", () => {
         expect(getGreeting({ timeOfDay: "morning", name: "Alice" })).toBe(
-          "Good morning, Alice",
+          "Good Morning, Alice",
         );
       });
 
       it("returns personalized afternoon greeting", () => {
         expect(getGreeting({ timeOfDay: "afternoon", name: "Bob" })).toBe(
-          "Good afternoon, Bob",
+          "Good Afternoon, Bob",
         );
       });
 
       it("returns personalized evening greeting", () => {
         expect(getGreeting({ timeOfDay: "evening", name: "Carol" })).toBe(
-          "Good evening, Carol",
+          "Good Evening, Carol",
         );
       });
     });
@@ -100,19 +100,19 @@ describe("WelcomeHeader", () => {
     describe("when name is null", () => {
       it("returns anonymous morning greeting", () => {
         expect(getGreeting({ timeOfDay: "morning", name: null })).toBe(
-          "Good morning",
+          "Good Morning",
         );
       });
 
       it("returns anonymous afternoon greeting", () => {
         expect(getGreeting({ timeOfDay: "afternoon", name: null })).toBe(
-          "Good afternoon",
+          "Good Afternoon",
         );
       });
 
       it("returns anonymous evening greeting", () => {
         expect(getGreeting({ timeOfDay: "evening", name: null })).toBe(
-          "Good evening",
+          "Good Evening",
         );
       });
     });

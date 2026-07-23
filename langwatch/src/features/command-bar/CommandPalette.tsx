@@ -309,6 +309,7 @@ export function CommandPalette({
     searchInDocsItem,
     easterEggItem,
     askLangyItem,
+    askLangySuggestionItems,
   } = useCommandBarItems(
     query,
     filteredCommands,
@@ -318,6 +319,7 @@ export function CommandPalette({
     groupedItems,
     project?.slug,
     langyEnabled,
+    askLangy,
   );
 
   const { triggerEffect } = useEasterEggEffects();
@@ -426,6 +428,14 @@ export function CommandPalette({
 
         if (cmd.id.startsWith("page-traces-")) {
           handleTracesPageCommand(cmd.id, router, onDone);
+          return;
+        }
+
+        // Action commands (e.g. the Ask-Langy getting-started asks) run their
+        // own handler and close the bar — no navigation.
+        if (cmd.action) {
+          cmd.action();
+          onDone();
           return;
         }
 
@@ -567,6 +577,7 @@ export function CommandPalette({
       recentItemsLimited={recentItemsLimited}
       easterEggItem={easterEggItem}
       askLangyItem={askLangyItem}
+      askLangySuggestionItems={askLangySuggestionItems}
       isLoading={searchLoading}
     />
   );
