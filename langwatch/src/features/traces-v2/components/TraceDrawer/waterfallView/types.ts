@@ -12,6 +12,8 @@ import {
   LuWrench,
 } from "react-icons/lu";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import { SPAN_TYPE_COLORS } from "../../../utils/formatters";
+import { isSkillSpan } from "../transcript/skillInvocation";
 
 export interface WaterfallViewProps {
   spans: SpanTreeNode[];
@@ -99,4 +101,19 @@ export function getSpanPalette(type: string | null | undefined): string {
     module: "gray",
   };
   return palette[type ?? "span"] ?? "gray";
+}
+
+/**
+ * Resolved Chakra color token (e.g. `"purple.solid"`) for a span/group bar —
+ * the timeline pane's counterpart to `getSpanPalette`. Skill runs get the
+ * same purple accent as their tree-row twin (`isSkillSpan`), so the two
+ * halves of a waterfall row never disagree; everything else falls back to
+ * `SPAN_TYPE_COLORS`.
+ */
+export function getSpanBarColor(
+  type: string | null | undefined,
+  name: string | null | undefined,
+): string {
+  if (isSkillSpan({ type, name })) return "purple.solid";
+  return (SPAN_TYPE_COLORS[type ?? "span"] as string) ?? "gray.solid";
 }

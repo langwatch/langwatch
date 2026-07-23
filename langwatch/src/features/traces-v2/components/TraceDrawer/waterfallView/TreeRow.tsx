@@ -6,6 +6,7 @@ import {
   LuChevronRight,
   LuPin,
   LuPinOff,
+  LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -18,6 +19,7 @@ import {
   formatDuration,
 } from "../../../utils/formatters";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
+import { isSkillSpan } from "../transcript/skillInvocation";
 import { TipCell } from "./TipCell";
 import {
   getSpanPalette,
@@ -98,9 +100,16 @@ export const TreeRow = memo(function TreeRow({
   const isError = span.status === "error";
   const isLlm = span.type === "llm" && span.model != null;
   const rowH = isLlm ? LLM_ROW_HEIGHT : ROW_HEIGHT;
-  const TypeIcon =
-    SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!;
-  const palette = getSpanPalette(span.type);
+  // A skill run (a `Skill` tool span) gets the sparkles glyph + purple chip so
+  // it stands out from ordinary tool spans in the tree — the waterfall node
+  // carries no input, so this flags the invocation without naming the skill
+  // (the transcript card shows the slug). Mirrors the block-cost classifier's
+  // skill_invocation category.
+  const isSkill = isSkillSpan({ type: span.type, name: span.name });
+  const TypeIcon = isSkill
+    ? LuSparkles
+    : SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!;
+  const palette = isSkill ? "purple" : getSpanPalette(span.type);
   const duration = span.durationMs;
   const isZeroDuration = duration === 0;
   const offsetMs = Math.max(0, span.startTimeMs - rootStart);
@@ -134,7 +143,7 @@ export const TreeRow = memo(function TreeRow({
           borderColor="colorPalette.muted"
           fontWeight="semibold"
         >
-          {(span.type ?? "span").toUpperCase()}
+          {isSkill ? "SKILL" : (span.type ?? "span").toUpperCase()}
         </Text>
         {isError && (
           <Text

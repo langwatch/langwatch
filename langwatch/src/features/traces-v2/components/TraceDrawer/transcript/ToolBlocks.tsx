@@ -1,12 +1,18 @@
 import { Box, chakra, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { type ReactNode, useMemo, useState } from "react";
-import { LuChevronDown, LuChevronRight, LuWrench } from "react-icons/lu";
+import {
+  LuChevronDown,
+  LuChevronRight,
+  LuSparkles,
+  LuWrench,
+} from "react-icons/lu";
 import { hasAnsi } from "../../../utils/ansi/ansi";
 // Direct file import (not the barrel) so we don't pull TerminalView -> transcript
 // back into transcript and form an import cycle. TerminalOutput has no
 // transcript dependency of its own.
 import { TerminalOutput } from "../terminalView/TerminalOutput";
 import { toolResultBodyToString, tryPrettyJson } from "./parsing";
+import { skillInvocationFromToolUse } from "./skillInvocation";
 import type { ChatMessage } from "./types";
 
 /**
@@ -64,6 +70,15 @@ export function ToolPairCard({
 }) {
   const [open, setOpen] = useState(false);
 
+  // A `Skill` tool_use is a skill run, not an ordinary tool call — surface it
+  // with its own glyph/accent and the invoked skill's name in the header so a
+  // reader spots skill invocations at a glance.
+  const skill = useMemo(
+    () => skillInvocationFromToolUse({ name, input }),
+    [name, input],
+  );
+  const isSkill = skill !== null;
+
   const argEntries = useMemo<Array<[string, unknown]> | null>(() => {
     if (input && typeof input === "object" && !Array.isArray(input)) {
       return Object.entries(input as Record<string, unknown>);
@@ -118,8 +133,10 @@ export function ToolPairCard({
     <Box
       borderRadius="md"
       borderWidth="1px"
-      borderColor={isError ? "red.muted" : "border.muted"}
-      bg="bg.subtle"
+      borderColor={
+        isError ? "red.muted" : isSkill ? "purple.muted" : "border.muted"
+      }
+      bg={isSkill ? "purple.subtle/40" : "bg.subtle"}
       overflow="hidden"
     >
       <chakra.button
@@ -132,26 +149,28 @@ export function ToolPairCard({
         cursor="pointer"
         onClick={() => setOpen((v) => !v)}
         width="full"
-        _hover={{ bg: "bg.muted" }}
+        _hover={{ bg: isSkill ? "purple.subtle/60" : "bg.muted" }}
         transition="background 0.12s ease"
         textAlign="left"
       >
         <Icon
-          as={LuWrench}
+          as={isSkill ? LuSparkles : LuWrench}
           boxSize={3}
-          color={isError ? "red.fg" : "fg.subtle"}
+          color={isError ? "red.fg" : isSkill ? "purple.fg" : "fg.subtle"}
           flexShrink={0}
         />
         <Text
           textStyle="xs"
           fontFamily="mono"
-          color="fg"
+          color={isSkill ? "purple.fg" : "fg"}
           fontWeight="medium"
           flexShrink={0}
         >
-          {name}
+          {isSkill && skill?.slug ? `Skill · ${skill.slug}` : name}
         </Text>
-        {argSummary ? (
+        {isSkill ? (
+          <Box flex={1} />
+        ) : argSummary ? (
           <Text
             textStyle="2xs"
             fontFamily="mono"
