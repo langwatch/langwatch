@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  *
  * The "Set up a model provider" onboarding step renders the REAL provider
- * grid on its onboarding surface (Codex leads with a Recommended badge and
- * the paid-OpenAI-account copy), and both finishing the setup and "Skip for
+ * grid on its onboarding surface (Codex leads with a Recommended badge over
+ * a one-line step description), and both finishing the setup and "Skip for
  * now" advance the flow. The credential form is mocked at its module seam:
  * the grid ordering, the badge, the copy, and the advance wiring are what's
  * under test, not the save mechanics.
@@ -86,18 +86,19 @@ describe("ModelProviderStepScreen", () => {
       expect(screen.getByText("Recommended")).toBeInTheDocument();
     });
 
-    it("pins the paid-OpenAI-account recommendation copy", () => {
+    it("keeps the step description to one line, with no recommendation blurb", () => {
+      // The Recommended badge carries the recommendation on its own; the
+      // provider sales pitch that used to trail the description is gone.
       renderStep();
-      expect(
-        screen.getByText(
-          /Codex is recommended if you have a paid OpenAI account/,
-        ),
-      ).toBeInTheDocument();
       expect(
         screen.getByText(
           /The model LangWatch's AI assistant and AI assists run on/,
         ),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Codex is recommended if you have a paid OpenAI/),
+      ).toBeNull();
+      expect(screen.queryByText(/paste its key/)).toBeNull();
     });
 
     it("hands the setup form the onboarding surface", () => {

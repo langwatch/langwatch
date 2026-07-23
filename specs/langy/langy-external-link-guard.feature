@@ -170,6 +170,27 @@ Feature: Langy shows where a link goes before it leaves LangWatch
       When I click it
       Then I am shown where the link goes before anything opens
 
+  Rule: Only links written by the model are checked
+
+    # The guard exists because answers are model output: their links are shaped
+    # by whatever data the agent read. The panel's own chrome (the codex
+    # sign-in's "Open openai.com" button, and any hardcoded affordance like it)
+    # is authored by LangWatch, and a warning there would make the product read
+    # as distrusting its own buttons. Chrome links declare themselves with a
+    # marker the markdown renderer can never emit, so an answer cannot claim it.
+
+    @integration
+    Scenario: A button of LangWatch's own that leaves the app opens straight away
+      Given the panel shows a LangWatch-authored button that opens an off-site page
+      When I click it
+      Then the page opens with no dialog in between
+
+    @integration
+    Scenario: An answer linking to the same address is still checked
+      Given Langy's answer links to the same off-site address
+      When I click it
+      Then I am shown where the link goes before anything opens
+
   Rule: The check cannot be switched off
 
     @integration

@@ -17,6 +17,24 @@ export interface LangyExternalLinkGuard {
 }
 
 /**
+ * Marks an anchor as LangWatch's own chrome: a link one of our components
+ * hardcodes (the codex sign-in's "Open openai.com" button, say), as opposed
+ * to a link written by the model. The guard lets marked anchors straight
+ * through: the dialog exists to read destinations the AGENT wrote, and
+ * stopping the product's own buttons makes them sound dangerous.
+ *
+ * Safe as an opt-out because model output can never carry it: the markdown
+ * pipeline renders no raw HTML and emits no data attributes on anchors, so
+ * the marker only exists where a LangWatch component spelled it out.
+ */
+export const LANGY_FIRST_PARTY_LINK_ATTRIBUTE = "data-langy-first-party-link";
+
+/** Spread onto a first-party anchor (`<Link {...langyFirstPartyLinkProps}>`). */
+export const langyFirstPartyLinkProps = {
+  [LANGY_FIRST_PARTY_LINK_ATTRIBUTE]: "true",
+} as const;
+
+/**
  * One guard for every link the Langy panel renders.
  *
  * It listens at the panel root in the CAPTURE phase, so it sees a click before
@@ -45,6 +63,10 @@ export function useLangyExternalLinkGuard(): LangyExternalLinkGuard {
     const target = event.target as Element | null;
     const anchor = target?.closest?.<HTMLAnchorElement>("a[href]");
     if (!anchor) return;
+
+    // Our own chrome, declared as such, not the model's writing. It opens
+    // exactly as authored (target, rel and all), with no dialog.
+    if (anchor.hasAttribute(LANGY_FIRST_PARTY_LINK_ATTRIBUTE)) return;
 
     // The ATTRIBUTE, not `anchor.href`: the DOM property has already been
     // resolved against the page, which quietly rewrites `//evil.com` and a

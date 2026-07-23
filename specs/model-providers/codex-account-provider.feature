@@ -111,11 +111,35 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     And the Fast default becomes the codex model as well
     And evaluations, playground and workflows keep their existing defaults
 
+  # The sign-in itself saves the provider row server-side the moment the poll
+  # completes, so once connected there is nothing left for the drawer's Save
+  # button to do. A drawer left open with a dead Save reads as broken.
+  Scenario: Connecting Codex from settings finishes the drawer's job
+    When I complete the Codex sign-in from the model-providers settings drawer
+    Then the drawer closes on its own over the refreshed provider list
+    And no coding-defaults dialog was mounted inside the drawer
+
   Scenario: Connecting Codex from settings asks before touching defaults
     When I connect Codex from the model-providers settings page
     Then a dialog asks whether Codex should become the default for Langy and the fast assists
+    And the dialog lives on the page, outliving the drawer that started the sign-in
     And accepting applies the same Langy and Fast defaults the Langy setup writes
     And declining leaves every default untouched
+
+  Scenario: Re-authenticating does not re-ask an already-answered question
+    Given Codex already is the Langy default
+    When I re-authenticate the Codex connection from settings
+    Then the coding-defaults dialog does not appear
+
+  Scenario: Langy's model pill follows the new coding default immediately
+    Given the Langy panel is open with its model pill following the current default
+    When the coding defaults switch to the codex model
+    Then the pill shows the codex model without a page reload
+
+  Scenario: A model the user picked on purpose is not hijacked
+    Given the Langy panel's model pill is on a model the user picked themselves
+    When the coding defaults switch to the codex model
+    Then the pill keeps the user's pick
 
   # The tiny assists set a sampling temperature the wider Responses API accepts
   # but the codex backend refuses with a 400. The gateway drops those options so
@@ -134,14 +158,15 @@ Feature: Codex, the sign-in-with-OpenAI model provider
 
   # ── Placement per surface ──────────────────────────────────────────────────
 
+  # The badge carries the recommendation on its own; the surface description
+  # stays one short line with no provider sales pitch appended.
   Scenario: Codex leads the Langy setup with a recommendation
     When Langy asks me to pick a provider on first use
     Then Codex is the first option, marked "Recommended"
-    And the copy says it suits paid OpenAI accounts, and that the other providers take an API key instead
 
   Scenario: Codex leads the onboarding model step the same way
     When onboarding reaches the model-provider step
-    Then Codex is the first option, marked "Recommended", with the same copy
+    Then Codex is the first option, marked "Recommended"
 
   Scenario: Codex sits last when adding a provider in settings
     When I open settings to add a model provider

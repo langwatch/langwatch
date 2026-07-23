@@ -1,18 +1,8 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Check, ExternalLink, LogOut, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { langyFirstPartyLinkProps } from "~/features/langy/hooks/useLangyExternalLinkGuard";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
-import { api } from "~/utils/api";
-import {
-  DialogBody,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "../ui/dialog";
 import { Link } from "../ui/link";
-import { toaster } from "../ui/toaster";
 import {
   type CodexSignInPhase,
   useCodexDeviceSignIn,
@@ -29,6 +19,12 @@ import {
  * server-side (which is also where the provider row + optional coding
  * defaults are written). The state machine lives in `useCodexDeviceSignIn`;
  * this file only renders its phases.
+ *
+ * The settings surface passes `setAsCodingDefaults: false` and asks about
+ * the defaults AFTER the connect instead: that ask lives on the
+ * model-providers page (`CodexCodingDefaultsAsk`), outside the drawer this
+ * component sits in, because the drawer closes as soon as the connect
+ * completes.
  */
 export function CodexSignIn({
   projectId,
@@ -44,120 +40,29 @@ export function CodexSignIn({
   setAsCodingDefaults: boolean;
   onConnected?: (account: { email: string; plan: string }) => void;
 }) {
-  // The settings flow does NOT write coding defaults during sign-in
-  // (setAsCodingDefaults is false there); it asks with a dialog once the
-  // account connects, and applies the same role defaults on "yes".
-  const [askDefaults, setAskDefaults] = useState(false);
   const signIn = useCodexDeviceSignIn({
     projectId,
     scopes,
     setAsCodingDefaults,
-    onConnected: (account) => {
-      if (!setAsCodingDefaults) setAskDefaults(true);
-      onConnected?.(account);
-    },
+    onConnected,
   });
   const { phase, connected } = signIn;
 
-  const defaultsDialog = (
-    <CodexCodingDefaultsDialog
-      open={askDefaults}
-      projectId={projectId}
-      scopes={scopes}
-      onClose={() => setAskDefaults(false)}
-    />
-  );
-
   if (connected && phase.name !== "pending" && phase.name !== "starting") {
     return (
-      <>
-        <ConnectedPanel
-          account={connected}
-          canDisconnect={!!signIn.storedProviderId}
-          disconnecting={signIn.disconnecting}
-          onReauthenticate={() => void signIn.begin()}
-          onDisconnect={signIn.disconnect}
-        />
-        {defaultsDialog}
-      </>
+      <ConnectedPanel
+        account={connected}
+        canDisconnect={!!signIn.storedProviderId}
+        disconnecting={signIn.disconnecting}
+        onReauthenticate={() => void signIn.begin()}
+        onDisconnect={signIn.disconnect}
+      />
     );
   }
   if (phase.name === "pending") {
     return <PendingApprovalPanel pending={phase} onCancel={signIn.cancel} />;
   }
   return <StartPanel phase={phase} onStart={() => void signIn.begin()} />;
-}
-
-/**
- * Post-connect ask on the settings surface: point the coding-assistant
- * roles (Langy + the fast assists) at the just-connected codex model. The
- * Langy and onboarding flows do this inline during sign-in; settings asks
- * first because someone adding a provider row is not necessarily choosing
- * their org's defaults.
- */
-function CodexCodingDefaultsDialog({
-  open,
-  projectId,
-  scopes,
-  onClose,
-}: {
-  open: boolean;
-  projectId: string;
-  scopes: ScopeAssignment[];
-  onClose: () => void;
-}) {
-  const apply = api.modelProvider.codexApplyCodingDefaults.useMutation();
-  const utils = api.useUtils();
-
-  return (
-    <DialogRoot open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Set Codex as your coding default?</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <Text fontSize="sm">
-            Langy and the fast AI assists (search, chat titles, autocomplete,
-            translations) across LangWatch will run on this OpenAI account's
-            plan. The playground, evaluations and workflows keep their current
-            models.
-          </Text>
-        </DialogBody>
-        <DialogFooter>
-          <Button size="sm" variant="ghost" onClick={onClose}>
-            Not now
-          </Button>
-          <Button
-            size="sm"
-            colorPalette="orange"
-            loading={apply.isLoading}
-            onClick={() =>
-              void apply
-                .mutateAsync({ projectId, scopes })
-                .then(async () => {
-                  await utils.modelProvider.invalidate();
-                  toaster.create({
-                    title: "Codex set as the Langy and Fast default",
-                    type: "success",
-                  });
-                  onClose();
-                })
-                .catch((error: unknown) => {
-                  toaster.create({
-                    title: "Could not set the defaults",
-                    description:
-                      error instanceof Error ? error.message : undefined,
-                    type: "error",
-                  });
-                })
-            }
-          >
-            Set as default
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
-  );
 }
 
 /** Connected state: who is signed in, plus re-authenticate / disconnect. */
@@ -233,10 +138,16 @@ function PendingApprovalPanel({
           {pending.userCode}
         </Text>
         <Button asChild size="sm" colorPalette="orange">
+          {/* The link recipe's own text colour would override the solid
+              button's white label, and Langy's leave-confirmation dialog
+              would stop a click on a button we authored ourselves: the
+              first-party marker lets it open directly. */}
           <Link
             href={pending.verificationUrl}
             isExternal
-            _hover={{ textDecoration: "none" }}
+            color="white"
+            _hover={{ textDecoration: "none", color: "white" }}
+            {...langyFirstPartyLinkProps}
           >
             Open openai.com <ExternalLink size={13} />
           </Link>

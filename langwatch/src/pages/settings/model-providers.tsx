@@ -20,6 +20,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
+import { CodexCodingDefaultsAskHost } from "../../components/settings/CodexCodingDefaultsAsk";
 import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
@@ -426,6 +427,12 @@ export default function ModelsPage() {
           hierarchy={hierarchy}
           displayNames={defaultModelsDisplayNames}
         />
+
+        {/* The codex drawer closes itself the moment its sign-in completes
+            (the poll persisted the row already); the coding-defaults ask it
+            queues is rendered here, on the page, so the question survives
+            the drawer. */}
+        <CodexCodingDefaultsAskHost />
 
         <Dialog.Root
           open={!!providerToDelete}

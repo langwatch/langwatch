@@ -9,14 +9,23 @@
  *   registry catalog);
  * - Save (name / scope edits) skips the API-key schema validation that
  *   gates every api-key provider, since the sign-in itself persisted the
- *   credentials.
+ *   credentials;
+ * - a completed sign-in closes the drawer (the poll persisted the row, so
+ *   Save has nothing left to do) and queues the coding-defaults ask to the
+ *   page-level host instead of mounting a dialog inside the drawer.
  *
  * Mirrors ModelProviderForm.azure-safety.integration.test.tsx's mock
  * setup; the api mock additionally feeds CodexSignIn's status/sign-in
  * endpoints so the real component renders.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type {
@@ -34,11 +43,17 @@ const {
   mockUseModelProvidersSettings,
   mockListAllForOrgQuery,
   mockListAllForProjectQuery,
+  mockCloseDrawer,
+  mockCodexSignInStart,
+  mockCodexSignInPoll,
 } = vi.hoisted(() => ({
   mockUseModelProviderForm: vi.fn(),
   mockUseModelProvidersSettings: vi.fn(),
   mockListAllForOrgQuery: vi.fn(),
   mockListAllForProjectQuery: vi.fn(),
+  mockCloseDrawer: vi.fn(),
+  mockCodexSignInStart: vi.fn(),
+  mockCodexSignInPoll: vi.fn(),
 }));
 
 vi.mock("../../../hooks/useModelProviderForm", () => ({
@@ -53,7 +68,7 @@ vi.mock("../../../hooks/useModelProvidersSettings", () => ({
 
 vi.mock("../../../hooks/useDrawer", () => ({
   useDrawer: () => ({
-    closeDrawer: vi.fn(),
+    closeDrawer: mockCloseDrawer,
     openDrawer: vi.fn(),
   }),
 }));
@@ -96,10 +111,16 @@ vi.mock("../../../utils/api", () => ({
         useQuery: () => ({ data: { connected: false }, isLoading: false }),
       },
       codexSignInStart: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isLoading: false }),
+        useMutation: () => ({
+          mutateAsync: mockCodexSignInStart,
+          isLoading: false,
+        }),
       },
       codexSignInPoll: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isLoading: false }),
+        useMutation: () => ({
+          mutateAsync: mockCodexSignInPoll,
+          isLoading: false,
+        }),
       },
       delete: {
         useMutation: () => ({ mutateAsync: vi.fn(), isLoading: false }),
@@ -109,6 +130,7 @@ vi.mock("../../../utils/api", () => ({
 }));
 
 // Import after mocks
+import { useCodexCodingDefaultsAskStore } from "../CodexCodingDefaultsAsk";
 import { EditModelProviderForm } from "../ModelProviderForm";
 
 // ---------------------------------------------------------------------------
@@ -245,6 +267,7 @@ function renderForm(providerKey: string) {
 describe("Feature: Codex model provider form rendering", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useCodexCodingDefaultsAskStore.setState({ pending: null });
   });
 
   afterEach(() => {
@@ -296,6 +319,64 @@ describe("Feature: Codex model provider form rendering", () => {
         fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
         expect(actions.submit).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the sign-in completes inside the drawer", () => {
+      const codexScopes = [
+        { scopeType: "PROJECT" as const, scopeId: "proj-1" },
+      ];
+
+      beforeEach(async () => {
+        // A full device sign-in, driven for real through the hook: start
+        // hands back a device code, the zero-interval poll completes on its
+        // first tick and persists the provider row server-side.
+        mockCodexSignInStart.mockResolvedValue({
+          userCode: "MHBV-RVX1N",
+          deviceAuthId: "device-auth-1",
+          verificationUrl: "https://auth.openai.com/device",
+          intervalSeconds: 0,
+        });
+        mockCodexSignInPoll.mockResolvedValue({
+          status: "complete",
+          providerId: "mp-codex-1",
+          email: "dev@acme.dev",
+          plan: "plus",
+        });
+        primeHooksForProvider({
+          providerKey: "openai_codex",
+          displayKeys: { CODEX_ACCESS_TOKEN: z.string() },
+          state: { scopes: codexScopes },
+        });
+        renderForm("openai_codex");
+
+        fireEvent.click(
+          screen.getByRole("button", { name: /sign in with openai/i }),
+        );
+        await waitFor(() => expect(mockCodexSignInPoll).toHaveBeenCalled());
+      });
+
+      /** @scenario Connecting Codex from settings finishes the drawer's job */
+      it("closes the drawer on its own, since the row is already saved", async () => {
+        await waitFor(() => expect(mockCloseDrawer).toHaveBeenCalledTimes(1));
+      });
+
+      /** @scenario Connecting Codex from settings finishes the drawer's job */
+      it("mounts no coding-defaults dialog inside the drawer", async () => {
+        await waitFor(() => expect(mockCloseDrawer).toHaveBeenCalled());
+        expect(
+          screen.queryByText("Set Codex as your coding default?"),
+        ).toBeNull();
+      });
+
+      /** @scenario Connecting Codex from settings asks before touching defaults */
+      it("queues the coding-defaults ask for the page-level host", async () => {
+        await waitFor(() =>
+          expect(useCodexCodingDefaultsAskStore.getState().pending).toEqual({
+            projectId: "proj-1",
+            scopes: codexScopes,
+          }),
+        );
       });
     });
   });
