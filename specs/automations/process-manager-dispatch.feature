@@ -6,6 +6,10 @@ Feature: Automation dispatch on the process-manager substrate
   ADR-031, graph alerts per ADR-034, persist class per ADR-035, templates per
   ADR-036/041, and webhook delivery per ADR-040.)
 
+  Silence note (ADR-063): specs/automations/silence.feature adds a
+  suppression gate ahead of intent effects — these scenarios assume an
+  unsilenced automation.
+
   Background:
     Given a project with active automations
 

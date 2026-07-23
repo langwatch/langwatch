@@ -67,3 +67,14 @@ being scattered across "conditions" and "schedule."
    it touches the same alert render path.
 4. Cadence consolidation — fold re-notify / debounce / quiet-hours into the one
    Cadence facet over subsequent slices.
+
+## Amendment 2026-07-22 (ADR-063)
+
+The facet model stands, and its entities move into the
+`@langwatch/automations` domain package
+([ADR-063](./063-automations-domain-packages-customer-api-and-agent-surface.md)).
+Superseded: the drawer entry — "Picking Type first fixes which later facets
+show" and Rollout §2's facet-order drawer as *the* authoring surface.
+Creation is now intent-first composing that derives the kind; the staged
+drawer becomes the "Edit details" escape hatch, its sections still mapping
+onto the facets.

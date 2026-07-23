@@ -3,6 +3,11 @@ Feature: Slack delivery via a bot connection (Web API)
   I want to deliver via a Slack app (bot token), not only an incoming webhook
   So that the richer Block Kit blocks (charts, tables, alerts) actually render
 
+  # Acquisition note (ADR-063): manual bot-token entry is superseded by the
+  # Slack app install flow (specs/automations/slack-app-install.feature);
+  # existing tokens fold into the managed integration. Delivery semantics
+  # below are unchanged.
+
   Background:
     Given the incoming-webhook surface renders only a subset of Block Kit
     And the Web API (chat.postMessage) surface renders the newer blocks

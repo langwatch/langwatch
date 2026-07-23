@@ -3,6 +3,12 @@ Feature: Seeing what your automations are doing
   I want to see what runs on a schedule, what reacts to events, and what already happened
   So that I can trust they still work — without opening each one
 
+  # Redesign note (ADR-063): the list presentation this file describes is
+  # being redesigned as the four-state page in
+  # specs/automations/page-states.feature ("rule" rows, prose header,
+  # incident takeover). The per-row facts and the global history surface
+  # specified here carry forward.
+
   Background:
     Given an automation fires when something matches
     And an alert fires when a metric crosses a threshold

@@ -9,6 +9,11 @@ Feature: Trigger email spam prevention
 
   See dev/docs/adr/031-trigger-email-abuse-protections.md.
 
+  API surface note (ADR-063): the customer API refuses email test fires
+  outright — an API key carries no requester inbox to deliver to (see
+  specs/automations/customer-api.feature). The requester-inbox rule below
+  is the in-app behavior.
+
   Background:
     Given a project with automations enabled
 

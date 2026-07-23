@@ -20,6 +20,11 @@ Feature: Per-trigger dispatch timing — cadence and trace-readiness debounce
   See dev/docs/adr/026-per-trigger-dispatch-timing.md and
   dev/docs/adr/052-automations-on-process-manager-substrate.md.
 
+  Silence note (ADR-063): specs/automations/silence.feature adds a temporary
+  suppression gate in front of every effect below — a silenced trigger's
+  notify and persist dispatches are suppressed while the silence lasts. The
+  scenarios in this file assume an unsilenced trigger.
+
   Background:
     Given a project with automations enabled
 

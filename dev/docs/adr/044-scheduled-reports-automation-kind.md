@@ -593,3 +593,14 @@ for the other kinds.
 - `ee/governance/services/pullers/pullerQueue.ts` + `IngestionSource.pullSchedule` —
   the one existing per-entity cron primitive (BullMQ `repeat.pattern`, no timezone)
   the report scheduler's representation learns from and improves on.
+
+## Amendment 2026-07-22 (ADR-063)
+
+The taxonomy, `triggerKind` discriminator, schedule model, and scheduler
+all stand. Superseded
+([ADR-063](./063-automations-domain-packages-customer-api-and-agent-surface.md)):
+§1's recommendation to "surface the three kinds as first-class cards in the
+type picker" and §6's type-picker card — creation is intent-first (three
+outcome cards; the kind is derived). On the wire, the customer API names
+the discriminator `kind` (`automation` | `alert` | `report`), mapping 1:1
+onto `triggerKind`; the data layer renames nothing, as decided here.

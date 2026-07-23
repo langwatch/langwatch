@@ -160,3 +160,15 @@ We do not block the management surface on the deferred dispatch wiring: the alwa
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence + debounce columns the cadence secondary edits
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid templates + test-fire banner the Configuration secondary edits
 - Code touched: `src/components/AddAutomationDrawer.tsx`, `src/components/EditTriggerTemplatesDrawer.tsx`, `src/pages/[project]/automations.tsx`, `src/server/api/routers/automations.ts`, `src/server/app-layer/automations/trigger-template.service.ts`, `src/automations/**`, `src/features/automations/**`
+
+## Amendment 2026-07-22 (ADR-063)
+
+The staged drawer is no longer the primary creation path: creation starts
+in the composing flow of the four-state automations page
+([ADR-063](./063-automations-domain-packages-customer-api-and-agent-surface.md)),
+and the drawer remains as the "Edit details" escape hatch and the editor
+for existing automations. The "automations list page becomes the operator
+activity surface" consequence is likewise replaced by that page. Everything
+else here stands — the staged sections, stateless preview, test-fire
+contract, provider model, and fire-history surfaces are unchanged and are
+consumed by ADR-063's surfaces.
