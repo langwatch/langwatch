@@ -525,6 +525,10 @@ export const CARD_SHAPE = {
   evalRun: "resource",
   dataset: "resource",
   scenario: "resource",
+  // A simulation run (one, or a listed/launched set) is a looked-up result —
+  // the platform went and read its status, messages, verdict.
+  simulationRun: "resource",
+  simulationSetRun: "resource",
   promptDiff: "resource",
   spend: "resource",
   evaluatorConfig: "resource",
@@ -556,6 +560,11 @@ export const MEASURED_CARD_KINDS = [
   "evalRun",
   "dataset",
   "scenario",
+  // `simulation-run get` → one run; `simulation-run list` / `scenario run` /
+  // `suite run` → a set. Both are produced by CLI commands, so both are
+  // measured kinds with a payload schema below.
+  "simulationRun",
+  "simulationSetRun",
   "promptDiff",
   "spend",
   "evaluatorConfig",
