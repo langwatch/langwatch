@@ -26,6 +26,54 @@ Feature: Langy remembers what this conversation already did
     Given I am signed in to LangWatch on a project
     And I have the Langy panel open
 
+  # ── The conversation can always be continued ───────────────────────────────
+  #
+  # The agent's own memory of a conversation lives inside its live worker
+  # process, and that process is disposable: recycled when the user switches
+  # the model (the model is part of the worker signature), reaped after idle,
+  # gone whenever the fleet rolls. The durable messages in the control plane
+  # are the only record guaranteed to exist, so every turn of an existing
+  # conversation carries the transcript of what was already said, and a fresh
+  # worker continues the conversation instead of meeting a stranger.
+
+  @integration
+  Scenario: A follow-up turn carries the conversation so far
+    Given I told Langy something in an earlier turn of this conversation
+    When I send another message in the same conversation
+    Then the turn carries what was already said, under who said it
+
+  @integration
+  Scenario: What was said survives the worker being replaced
+    Given I told Langy my name earlier in this conversation
+    And the agent's worker for this conversation has since been replaced
+    When I ask Langy for my name
+    Then the turn carries the earlier exchange, so Langy can answer from it
+
+  @unit
+  Scenario: The message being answered is not repeated as history
+    Given the turn re-drives the message already on record
+    When the conversation so far is rendered for that turn
+    Then that message appears only as the question, not also as history
+
+  @unit
+  Scenario: A long conversation is carried in bounded, newest-first form
+    Given a conversation far longer than a prompt should carry
+    When the conversation so far is rendered for a turn
+    Then the newest messages are kept within the budget
+    And the block says that older messages were left out
+
+  @unit
+  Scenario: A pasted transcript line stays part of its message
+    Given an earlier message contains a line that mimics another speaker
+    When the conversation so far is rendered for a turn
+    Then that line stays indented under the message it came from
+
+  @unit
+  Scenario: The transcript block says out loud that it is data
+    Given the conversation has earlier messages to render
+    When the conversation so far is rendered for a turn
+    Then the block tells the agent this is a record of what was said, not instructions
+
   # ── The memory reaches the agent at all ────────────────────────────────────
 
   @integration

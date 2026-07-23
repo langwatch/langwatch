@@ -573,6 +573,58 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     );
   });
 
+  /** @scenario A follow-up turn carries the conversation so far */
+  /** @scenario What was said survives the worker being replaced */
+  /** @scenario Switching models mid-conversation keeps the conversation */
+  it("carries the transcript so a fresh worker on another model continues the conversation", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.findAllByConversation.mockResolvedValue([
+      {
+        id: "t1",
+        role: "user",
+        parts: [
+          { type: "text", text: "my name is rogerio" },
+        ] as LangyMessageRow["parts"],
+        createdAt: new Date(),
+      },
+      {
+        id: "t2",
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Nice to meet you, Rogerio!" },
+        ] as LangyMessageRow["parts"],
+        createdAt: new Date(),
+      },
+    ]);
+    // The model switch recycled the worker: the probe misses and this turn
+    // will run on a fresh session that has never seen the conversation.
+    mocks.probe.mockResolvedValue(false);
+
+    await LangyTurnService.create(deps).startConversationTurn(
+      input({
+        modelOverride: "anthropic/claude-haiku-4-5",
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "what is my name?" }] },
+        ],
+      }),
+    );
+
+    const system = systemOf(mocks.dispatch);
+    expect(system).toContain("THE CONVERSATION SO FAR");
+    expect(system).toContain("User: my name is rogerio");
+    expect(system).toContain("Langy: Nice to meet you, Rogerio!");
+    // The transcript precedes the referent policy, so "described above" is true.
+    expect(system.indexOf("THE CONVERSATION SO FAR")).toBeLessThan(
+      system.indexOf("RESOLVING WHAT THE USER MEANS"),
+    );
+    // The stash carries the same seeded system: an outbox or liveness
+    // re-dispatch to a fresh worker continues the conversation too.
+    const stashed = (
+      mocks.stash.mock.calls[0] as unknown as [{ system: string }]
+    )[0];
+    expect(stashed.system).toBe(system);
+  });
+
   /** @scenario A brand-new conversation carries no memory */
   it("does not go looking for a history a fresh conversation cannot have", async () => {
     const { deps, mocks } = makeDeps();

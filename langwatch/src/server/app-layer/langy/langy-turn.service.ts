@@ -31,6 +31,7 @@ import {
   extractLangyConversationMemory,
   LANGY_REFERENT_POLICY,
   renderLangyConversationMemory,
+  renderLangyConversationTranscript,
 } from "~/server/app-layer/langy/langyConversationMemory";
 import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
 import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
@@ -591,18 +592,30 @@ export class LangyTurnService {
           "failed to read langy conversation memory — the turn runs without it",
         );
       }
+      const durableMessages =
+        memoryResult.status === "fulfilled" ? memoryResult.value : [];
+      // The transcript rides EVERY turn of an existing conversation, not just
+      // the one after a probe miss, because the worker serving it is
+      // disposable at any point between here and the model call: recycled by a
+      // model switch, reaped on idle, dead by the time the outbox or liveness
+      // re-dispatches this same stashed system to a fresh one. Seeding
+      // unconditionally is what makes "the conversation can always be
+      // continued" hold on every path with no freshness bookkeeping.
+      const conversationTranscript = renderLangyConversationTranscript({
+        messages: durableMessages,
+        currentPrompt: userText,
+      });
       const conversationMemory = renderLangyConversationMemory(
-        extractLangyConversationMemory({
-          messages:
-            memoryResult.status === "fulfilled" ? memoryResult.value : [],
-        }),
+        extractLangyConversationMemory({ messages: durableMessages }),
       );
 
-      // ORDER IS THE POINT. The two DATA blocks describe what "it" could mean —
-      // this conversation's own history, then the user's screen — and the
-      // referent policy comes last so "described above" names both of them.
+      // ORDER IS THE POINT. The three DATA blocks describe what "it" could mean
+      // (what this conversation already said, what it created, then the user's
+      // screen) and the referent policy comes last so "described above" names
+      // all of them.
       const system = [
         LANGY_OVERRIDE,
+        conversationTranscript,
         conversationMemory,
         renderLangyTurnContext(turnContext),
         LANGY_REFERENT_POLICY,

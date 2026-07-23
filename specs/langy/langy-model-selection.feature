@@ -34,3 +34,10 @@ Feature: Langy runs on the model the project chose
     When the user picks it in the composer and sends a message
     Then the turn is accepted rather than refused
     And the model reaches the worker with its provider-prefixed id intact
+
+  @unit
+  Scenario: Switching models mid-conversation keeps the conversation
+    Given a conversation with earlier turns on one model
+    When the user switches the composer to a model from another provider and sends a follow-up
+    Then the turn carries what was already said in this conversation
+    And the new model can answer from it
