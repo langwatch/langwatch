@@ -46,3 +46,17 @@ Rule: The span waterfall flags skill spans
     Given a trace has five or more sibling tool spans named "Skill"
     When the waterfall folds them into an "×N repeated" group row
     Then the group row keeps the purple skill accent
+
+Rule: The waterfall's timeline pane agrees with its tree pane
+  The tree row and timeline bar are two halves of the same waterfall row —
+  the timeline pane must not disagree with the tree pane's skill accent.
+
+  Scenario: A skill span's timeline bar matches its tree row's accent
+    Given a trace has a tool span named "Skill"
+    When the waterfall renders
+    Then that span's timeline bar uses the purple skill accent, matching its tree row
+
+  Scenario: A folded skill group's timeline bar matches its group row's accent
+    Given a trace has five or more sibling tool spans named "Skill"
+    When the waterfall folds them into an "×N repeated" group row
+    Then the group's timeline bar keeps the purple skill accent, matching its group row
