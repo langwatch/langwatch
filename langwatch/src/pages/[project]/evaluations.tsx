@@ -23,6 +23,7 @@ import {
 import { CreateExperimentButton } from "~/components/experiments/CreateExperimentButton";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { ListTable } from "~/components/ui/ListTable";
 import { FullWidthListPageContent } from "~/components/ui/layouts/FullWidthListPageContent";
 import { Link } from "~/components/ui/link";
@@ -168,9 +169,10 @@ export function ExperimentsPage() {
                 </Text>
               }
             >
-              <Box marginTop={4}>
+              <HStack marginTop={4} gap={2}>
                 <CreateExperimentButton />
-              </Box>
+                <SetupWithAgentButton surface="experiments" />
+              </HStack>
             </NoDataInfoBlock>
           </PageLayout.Content>
         </PageLayout.Container>
