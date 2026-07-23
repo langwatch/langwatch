@@ -1,13 +1,16 @@
 /**
  * @vitest-environment node
  *
- * Regression guard for POST /api/track_usage. The endpoint is intentionally
- * public (self-hosted instances have no credential to present), but it
- * previously accepted any event name/shape with no rate limiting — an
- * unauthenticated caller could inject arbitrary events into the analytics
- * pipeline at unlimited volume. The fix allowlists the one event self-hosted
- * deployments actually send, bounds the payload, and rate-limits per-IP and
+ * Regression guard for POST /api/track_usage (security report). The endpoint
+ * is intentionally public (self-hosted instances have no credential to
+ * present), but it previously accepted any event name/shape at unlimited
+ * volume — an unauthenticated caller could inject arbitrary events into the
+ * analytics pipeline. The fix allowlists the one event self-hosted
+ * deployments actually send with a `.strict()` schema (no smuggled
+ * properties), bounds the payload size, and rate-limits globally, per-IP, and
  * per-instance.
+ *
+ * @regression
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -39,13 +42,32 @@ beforeEach(() => {
   _resetMemoryRateLimitStore();
 });
 
-function request({
-  body,
-  ip = "203.0.113.5",
-}: {
-  body: unknown;
-  ip?: string;
-}) {
+const VALID_STATS_FIELDS = {
+  totalTraces: 0,
+  totalScenarioEvents: 0,
+  annotations: 0,
+  annotationQueues: 0,
+  annotationQueueItems: 0,
+  annotationScores: 0,
+  batchEvaluations: 0,
+  customGraphs: 0,
+  datasets: 0,
+  datasetRecords: 0,
+  experiments: 0,
+  triggers: 0,
+  workflows: 0,
+};
+
+function dailyUsageStatsBody(overrides: Record<string, unknown> = {}) {
+  return {
+    event: "daily_usage_stats",
+    instance_id: "acme__org_1",
+    ...VALID_STATS_FIELDS,
+    ...overrides,
+  };
+}
+
+function request({ body, ip = "203.0.113.5" }: { body: unknown; ip?: string }) {
   return app.request("/api/track_usage", {
     method: "POST",
     headers: {
@@ -58,20 +80,16 @@ function request({
 
 describe("POST /api/track_usage", () => {
   describe("when the event is the allowlisted daily_usage_stats report", () => {
-    it("accepts it and forwards to PostHog", async () => {
+    it("accepts it and forwards exactly the known fields to PostHog", async () => {
       const res = await request({
-        body: {
-          event: "daily_usage_stats",
-          instance_id: "acme__org_1",
-          totalTraces: 42,
-        },
+        body: dailyUsageStatsBody({ totalTraces: 42 }),
       });
 
       expect(res.status).toBe(200);
       expect(capture).toHaveBeenCalledWith({
         distinctId: "acme__org_1",
         event: "daily_usage_stats",
-        properties: { totalTraces: 42 },
+        properties: { ...VALID_STATS_FIELDS, totalTraces: 42 },
       });
     });
   });
@@ -79,11 +97,7 @@ describe("POST /api/track_usage", () => {
   describe("when the event name is not on the allowlist", () => {
     it("rejects with 400 and never calls PostHog", async () => {
       const res = await request({
-        body: {
-          event: "arbitrary_spoofed_event",
-          instance_id: "attacker",
-          marker: "single",
-        },
+        body: dailyUsageStatsBody({ event: "arbitrary_spoofed_event" }),
       });
 
       expect(res.status).toBe(400);
@@ -93,7 +107,19 @@ describe("POST /api/track_usage", () => {
 
   describe("when instance_id is missing", () => {
     it("rejects with 400", async () => {
-      const res = await request({ body: { event: "daily_usage_stats" } });
+      const { instance_id: _drop, ...body } = dailyUsageStatsBody();
+      const res = await request({ body });
+      expect(res.status).toBe(400);
+      expect(capture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the body carries a property outside the known schema", () => {
+    it("rejects with 400 rather than forwarding the extra field", async () => {
+      const res = await request({
+        body: dailyUsageStatsBody({ injected_marker: "attacker-controlled" }),
+      });
+
       expect(res.status).toBe(400);
       expect(capture).not.toHaveBeenCalled();
     });
@@ -113,46 +139,33 @@ describe("POST /api/track_usage", () => {
     });
   });
 
-  describe("when properties exceed the field-count cap", () => {
-    it("rejects with 400", async () => {
-      const body: Record<string, unknown> = {
-        event: "daily_usage_stats",
-        instance_id: "acme__org_1",
-      };
-      for (let i = 0; i < 40; i++) body[`field_${i}`] = i;
-
-      const res = await request({ body });
-      expect(res.status).toBe(400);
-      expect(capture).not.toHaveBeenCalled();
-    });
-  });
-
   describe("when a single caller floods the endpoint", () => {
-    it("returns 429 once the per-IP window is exhausted", async () => {
+    it("returns 429 with Retry-After once the per-IP window is exhausted", async () => {
       // Distinct instance_id per request so the per-instance bucket (5/hour)
       // never trips first — this test isolates the per-IP bucket (10/minute).
       const ip = "203.0.113.9";
 
       for (let i = 0; i < 10; i++) {
         const ok = await request({
-          body: { event: "daily_usage_stats", instance_id: `acme__org_${i}` },
+          body: dailyUsageStatsBody({ instance_id: `acme__org_${i}` }),
           ip,
         });
         expect(ok.status).toBe(200);
       }
 
       const limited = await request({
-        body: { event: "daily_usage_stats", instance_id: "acme__org_last" },
+        body: dailyUsageStatsBody({ instance_id: "acme__org_last" }),
         ip,
       });
       expect(limited.status).toBe(429);
+      expect(Number(limited.headers.get("Retry-After"))).toBeGreaterThan(0);
       expect(capture).toHaveBeenCalledTimes(10);
     });
   });
 
   describe("when a single instance_id is spammed from rotating IPs", () => {
     it("returns 429 once the per-instance window is exhausted", async () => {
-      const body = { event: "daily_usage_stats", instance_id: "acme__org_1" };
+      const body = dailyUsageStatsBody();
 
       for (let i = 0; i < 5; i++) {
         const ok = await request({ body, ip: `203.0.113.${i}` });
@@ -162,6 +175,28 @@ describe("POST /api/track_usage", () => {
       const limited = await request({ body, ip: "203.0.113.99" });
       expect(limited.status).toBe(429);
       expect(capture).toHaveBeenCalledTimes(5);
+    });
+  });
+
+  describe("when traffic is distributed across rotating IPs and instance ids", () => {
+    it("returns 429 once the global window is exhausted", async () => {
+      // Every request uses a fresh IP and a fresh instance_id — defeating
+      // both the per-IP and per-instance buckets by construction — so only
+      // the global cap (500/minute) can be the thing that trips.
+      for (let i = 0; i < 500; i++) {
+        const ok = await request({
+          body: dailyUsageStatsBody({ instance_id: `acme__org_${i}` }),
+          ip: `10.0.${Math.floor(i / 256)}.${i % 256}`,
+        });
+        expect(ok.status).toBe(200);
+      }
+
+      const limited = await request({
+        body: dailyUsageStatsBody({ instance_id: "acme__org_last" }),
+        ip: "10.0.2.0",
+      });
+      expect(limited.status).toBe(429);
+      expect(capture).toHaveBeenCalledTimes(500);
     });
   });
 });
