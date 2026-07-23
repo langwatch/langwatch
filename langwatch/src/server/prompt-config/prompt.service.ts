@@ -95,7 +95,9 @@ export type VersionedPrompt = {
   authorId: string | null;
   author?: {
     id: string;
-    name: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
   } | null;
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
@@ -1311,7 +1313,9 @@ export class PromptService {
       author: config.latestVersion.author
         ? {
             id: config.latestVersion.author.id,
-            name: config.latestVersion.author.name,
+            name: config.latestVersion.author.name ?? null,
+            email: config.latestVersion.author.email ?? null,
+            image: config.latestVersion.author.image ?? null,
           }
         : null,
       updatedAt: config.updatedAt,

@@ -26,7 +26,12 @@ const configSchemaV1_0 = z.object({
   author: z
     .object({
       id: z.string(),
-      name: z.string(),
+      // name is nullable: many SSO/OAuth providers return a profile with no
+      // display name, and the User.name column is nullable. Requiring a string
+      // here made the version-history read path throw for name-less authors.
+      name: z.string().nullable(),
+      email: z.string().nullable().optional(),
+      image: z.string().nullable().optional(),
     })
     .nullable()
     .optional(),

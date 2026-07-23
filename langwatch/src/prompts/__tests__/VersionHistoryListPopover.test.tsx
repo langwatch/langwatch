@@ -305,4 +305,55 @@ describe("VersionHistoryListPopover", () => {
       });
     });
   });
+
+  describe("when displaying the author of a version", () => {
+    const openPopover = async () => {
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+      await waitFor(() => {
+        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+      });
+    };
+
+    const renderWithAuthor = (author: unknown) => {
+      mockUseQuery.mockReturnValue({
+        data: [
+          {
+            id: "config-1",
+            versionId: "version-1",
+            version: 1,
+            commitMessage: "Initial version",
+            author,
+          },
+        ] as unknown as VersionedPrompt[],
+        isLoading: false,
+      });
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+    };
+
+    it("shows the author's name when present", async () => {
+      renderWithAuthor({
+        id: "u1",
+        name: "Ada Lovelace",
+        email: "ada@example.com",
+      });
+      await openPopover();
+
+      expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+    });
+
+    it("falls back to the email when the author has no name", async () => {
+      renderWithAuthor({ id: "u1", name: null, email: "grace@example.com" });
+      await openPopover();
+
+      expect(screen.getByText("grace@example.com")).toBeInTheDocument();
+    });
+
+    it("labels the row 'Unknown author' when no author is recorded", async () => {
+      renderWithAuthor(null);
+      await openPopover();
+
+      expect(screen.getByText("Unknown author")).toBeInTheDocument();
+    });
+  });
 });
