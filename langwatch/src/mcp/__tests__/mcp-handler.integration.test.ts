@@ -542,6 +542,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
 
   describe("when the token exchange omits redirect_uri", () => {
+    /** @scenario Token exchange is rejected when redirect_uri is missing */
     it("returns 400 with invalid_request error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -559,6 +560,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when the token exchange omits client_id", () => {
+    /** @scenario Token exchange is rejected when client_id is missing */
     it("returns 400 with invalid_request error", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -576,6 +578,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when the token exchange presents a different redirect_uri than the one bound at authorize", () => {
+    /** @scenario Token exchange is rejected when redirect_uri does not match the authorization request */
     it("returns 400 with invalid_grant and never issues a token", async () => {
       const code = randomUUID();
       const { codeVerifier, codeChallenge } = createPkceChallenge();
@@ -598,6 +601,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when the token exchange presents a different client_id than the one bound at authorize", () => {
+    /** @scenario Token exchange is rejected when client_id does not match the authorization request */
     it("returns 400 with invalid_grant and never issues a token", async () => {
       const code = randomUUID();
       const { codeVerifier, codeChallenge } = createPkceChallenge();
@@ -622,6 +626,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // --- Security: dynamic client registration persistence (RFC 7591) ---
 
   describe("when a new OAuth client registers", () => {
+    /** @scenario Dynamic client registration persists the redirect_uris binding */
     it("persists the client_id -> redirect_uris binding to Redis", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;
@@ -653,6 +658,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when OAuth client registration is missing redirect_uris", () => {
+    /** @scenario Dynamic client registration rejects a request with no redirect_uris */
     it("returns 400 with invalid_client_metadata", async () => {
       const addr = server.address();
       const port = typeof addr === "object" && addr ? addr.port : 0;

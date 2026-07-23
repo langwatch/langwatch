@@ -102,6 +102,7 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
   });
 
   describe("when redirect_uri exactly matches a registered URI for client_id", () => {
+    /** @scenario Authorization succeeds when redirect_uri exactly matches the registered client */
     it("issues an authorization code", async () => {
       mockRedis.get.mockResolvedValueOnce(registeredClient());
 
@@ -115,6 +116,7 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
   });
 
   describe("when redirect_uri does not match any URI registered for client_id (the exfiltration attempt)", () => {
+    /** @scenario Authorization is rejected when redirect_uri does not match the registered client */
     it("rejects with 400 and never mints an authorization code", async () => {
       // client_id genuinely registered — just with a DIFFERENT redirect_uri
       // than the one this request supplies. This is the exact reported
@@ -136,6 +138,7 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
   });
 
   describe("when client_id was never registered via /oauth/register", () => {
+    /** @scenario Authorization is rejected for an unregistered client_id */
     it("rejects with 400 and never mints an authorization code", async () => {
       mockRedis.get.mockResolvedValueOnce(null);
 
@@ -149,6 +152,7 @@ describe("POST /api/mcp/authorize — redirect_uri binding", () => {
   });
 
   describe("when client_id is omitted", () => {
+    /** @scenario Authorization is rejected when client_id is missing */
     it("rejects with 400 before ever looking up a registration", async () => {
       const res = await authorize({ client_id: undefined });
       const json = (await res.json()) as { error?: string };
