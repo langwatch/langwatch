@@ -18,15 +18,16 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 const { mockUseQuery, mockOpenDrawer, mockUpdateListener } = vi.hoisted(() => ({
   mockUseQuery: vi.fn(),
   mockOpenDrawer: vi.fn(),
-  mockUpdateListener: vi.fn(() => ({ isConnected: false })),
+  // Typed arg so `.mock.calls` is `[{ enabled?: boolean }][]` — the SSE
+  // lifecycle assertions read `enabled` off it without a cast.
+  mockUpdateListener: vi.fn((_opts: { enabled?: boolean }) => ({
+    isConnected: false,
+  })),
 }));
 
 /** The `enabled` flag of the listener's LAST render — the SSE lifecycle gate. */
 function lastListenerEnabled(): boolean {
-  const call = mockUpdateListener.mock.calls.at(-1) as
-    | [{ enabled?: boolean }]
-    | undefined;
-  return call?.[0]?.enabled ?? false;
+  return mockUpdateListener.mock.calls.at(-1)?.[0]?.enabled ?? false;
 }
 
 vi.mock("~/utils/api", () => ({
@@ -221,10 +222,8 @@ describe("Feature: the run card renders the platform's live state for the run it
       mockUseQuery.mockReturnValue({ data: runData(), error: null });
       renderCard({ scenarioRunId: RUN_ID, status: "SUCCESS" });
 
-      for (const call of mockUpdateListener.mock.calls as Array<
-        [{ enabled?: boolean }]
-      >) {
-        expect(call[0]?.enabled).toBe(false);
+      for (const [opts] of mockUpdateListener.mock.calls) {
+        expect(opts?.enabled).toBe(false);
       }
     });
 
