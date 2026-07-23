@@ -411,17 +411,25 @@ func stackLogPath(slug string) string {
 	return filepath.Join(havenHome(), "logs", slug+".log")
 }
 
-// runUpDetached backgrounds `haven up`: it re-invokes haven's own up in a new
-// session with stdout/stderr streaming to a per-slug log file, then returns
-// immediately. Follow with `haven logs -f`; stop with `haven down`.
-func runUpDetached(d deps, rest []string) error {
+// detachedStack describes a stack startDetachedUp just backgrounded.
+type detachedStack struct {
+	slug    string
+	pid     int
+	logPath string
+}
+
+// startDetachedUp backgrounds `haven up`: it re-invokes haven's own up in a new
+// session with stdout/stderr streaming to the per-slug combined log file, then
+// returns immediately. The child owns provisioning + supervision; its process
+// group survives this terminal, so only `haven down` stops it.
+func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 	slug, err := d.orch.ResolveSlug(d.params)
 	if err != nil {
-		return err
+		return detachedStack{}, err
 	}
 	logPath := stackLogPath(slug)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
-		return err
+		return detachedStack{}, err
 	}
 	argv := selfArgv(d.worktree, "up")
 	for _, a := range rest {
@@ -436,26 +444,59 @@ func runUpDetached(d deps, rest []string) error {
 	// admin password and access tokens.
 	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if ferr != nil {
-		return fmt.Errorf("opening log file %s: %w", logPath, ferr)
+		return detachedStack{}, fmt.Errorf("opening log file %s: %w", logPath, ferr)
 	}
 	// Chmod too — the mode above only applies on create, and older runs
 	// created this file 0644.
 	if err := f.Chmod(0o600); err != nil {
 		_ = f.Close()
-		return fmt.Errorf("securing log file %s: %w", logPath, err)
+		return detachedStack{}, fmt.Errorf("securing log file %s: %w", logPath, err)
 	}
 	cmd.Stdout, cmd.Stderr = f, f
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		_ = f.Close()
-		return err
+		return detachedStack{}, err
 	}
 	_ = f.Close()
 	go func() { _ = cmd.Wait() }() // reap if it exits while we're still around
-	fmt.Printf("stack %q starting detached (pid %d)\n", slug, cmd.Process.Pid)
-	fmt.Printf("  logs:   haven logs -f    (%s)\n", logPath)
+	return detachedStack{slug: slug, pid: cmd.Process.Pid, logPath: logPath}, nil
+}
+
+// runUpDetached is `haven up -d`: background the stack and return.
+func runUpDetached(d deps, rest []string) error {
+	st, err := startDetachedUp(d, rest)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("stack %q starting detached (pid %d)\n", st.slug, st.pid)
+	fmt.Printf("  logs:   haven logs -f    (%s)\n", st.logPath)
 	fmt.Printf("  stop:   haven down\n")
 	return nil
+}
+
+// runUpAttached is `haven up` in a human's terminal: the stack still runs in
+// the background (same detached launcher as -d), and this process merely
+// attaches the interactive log view on top — so closing the view, or the
+// terminal, never takes the stack down. `haven down` is what stops it.
+func runUpAttached(ctx context.Context, d deps, rest []string) error {
+	st, err := startDetachedUp(d, rest)
+	if err != nil {
+		return err
+	}
+	if err := runUpViewer(ctx, st.slug); err != nil {
+		return err
+	}
+	fmt.Printf("detached — stack %q keeps running in the background\n", st.slug)
+	fmt.Printf("  logs:   haven logs -f   ·   attach again: haven up   ·   stop: haven down\n")
+	return nil
+}
+
+// stdoutIsTTY reports whether a human terminal is on the other end — what
+// decides between the attached log view and plain foreground streaming.
+func stdoutIsTTY() bool {
+	fi, err := os.Stdout.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
 // prWorktreeBase is where `haven pr` puts new PR worktrees: HAVEN_WORKTREE_DIR if

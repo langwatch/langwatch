@@ -41,6 +41,23 @@ Feature: haven lifecycle usability
     Then every locally-run service is bounced
     And baseline fallbacks and the shared database servers are untouched
 
+  @unit
+  Scenario: Up in a terminal never holds the stack hostage
+    When the developer runs "haven up" in a terminal
+    Then the stack runs in the background and an interactive log view attaches
+    And quitting the view (q, esc, or Ctrl-C) detaches — the stack keeps running
+    And "haven down" is what stops it
+
+  @unit
+  Scenario: Switching between service log groups is a keypress
+    Given the attached log view is open
+    Then arrow keys, tab, or a digit switch between "all" and each service's own log
+    And the lines are coloured by service with warnings and errors highlighted
+
+  Scenario: A piped up streams in the foreground
+    When "haven up" runs with output piped (pnpm dev:haven | tee)
+    Then it streams plainly in the foreground and Ctrl-C stops the stack
+
   Scenario: A detached up logs the same as an attached one
     When the developer runs "haven up --detach"
     Then the stack starts in the background

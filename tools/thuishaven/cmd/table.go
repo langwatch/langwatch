@@ -209,6 +209,12 @@ var table = []commandSpec{
 			if inv.has("--detach") {
 				return runUpDetached(d, inv.raw)
 			}
+			// A human terminal gets the background stack + attached log view (quit
+			// detaches, the stack keeps running). A pipe (pnpm dev:haven | tee) or
+			// agent mode keeps plain foreground streaming, where Ctrl-C owns the stack.
+			if !d.isAgent && stdoutIsTTY() {
+				return runUpAttached(ctx, d, inv.raw)
+			}
 			return d.orch.Up(ctx, d.params, d.opts)
 		},
 	},

@@ -224,23 +224,31 @@ func filterLogLines(lines []logLine, since time.Time, level string) []logLine {
 	return out
 }
 
-func printLogLine(l logLine, plain bool) {
+func printLogLine(l logLine, plain bool) { fmt.Println(formatLogLine(l, plain)) }
+
+// formatLogLine renders one captured line: plain for pipes/agents, coloured
+// label + warn/error highlighting for humans. Shared by `haven logs` and the
+// attached up viewer so a service reads the same everywhere.
+func formatLogLine(l logLine, plain bool) string {
 	if plain {
-		fmt.Printf("%s %-8s | %s\n", l.ts.Format("15:04:05.000"), l.service, l.text)
-		return
+		return fmt.Sprintf("%s %-8s | %s", l.ts.Format("15:04:05.000"), l.service, l.text)
 	}
 	color := logServiceColors[l.service]
 	if color == "" {
 		color = "37"
 	}
-	text := l.text
+	return fmt.Sprintf("\x1b[2m%s\x1b[0m \x1b[%sm%-8s\x1b[0m │ %s", l.ts.Format("15:04:05.000"), color, l.service, highlightLevel(l.text))
+}
+
+// highlightLevel paints a line red at error-or-worse, yellow at warn.
+func highlightLevel(text string) string {
 	switch rank := lineLevelRank(text); {
 	case rank >= 5:
-		text = "\x1b[31m" + text + "\x1b[0m"
+		return "\x1b[31m" + text + "\x1b[0m"
 	case rank == 4:
-		text = "\x1b[33m" + text + "\x1b[0m"
+		return "\x1b[33m" + text + "\x1b[0m"
 	}
-	fmt.Printf("\x1b[2m%s\x1b[0m \x1b[%sm%-8s\x1b[0m │ %s\n", l.ts.Format("15:04:05.000"), color, l.service, text)
+	return text
 }
 
 // followLogs streams appended lines until interrupted, re-scanning the

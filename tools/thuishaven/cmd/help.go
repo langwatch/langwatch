@@ -113,7 +113,7 @@ ENVIRONMENT
                                  — zero token waste when an AI agent drives haven.
 
 EXAMPLES
-    haven up                     # bring this worktree's stack up (or apply a selection change)
+    haven up                     # stack up in the background + attached log view (q detaches)
     haven up +langy              # add langy here, now and from now on
     haven up -nlp                # stop running nlp here (hostname falls back to the baseline)
     haven up +workers            # standalone workers lane instead of in-process
