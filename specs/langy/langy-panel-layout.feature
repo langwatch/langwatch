@@ -119,3 +119,12 @@ Feature: Langy panel layout modes
   Scenario: The minimised peek dodges the drawer
     Given the Langy panel is minimised in floating mode and a right-anchored drawer is open
     Then the peek sliver rests along the bottom-LEFT edge, clear of the drawer and the table pager
+
+  # The conversation column dissolves into the panel edges with a soft mask so
+  # scrolled-off content never hard-clips against the header or composer seams.
+  Scenario: The conversation fades at the top only once messages are scrolled off above
+    Given the Langy panel is open on a conversation taller than its viewport
+    When the conversation sits at the very top
+    Then the first message is fully opaque with no fade above it
+    When part of the conversation is scrolled off above
+    Then the column dissolves under the header with a soft fade

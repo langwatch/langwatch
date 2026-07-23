@@ -4,21 +4,73 @@ import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangyTurnMetric } from "../hooks/useLangyTurnSignals";
 import type { LangyProgressSample } from "../stores/langyStore";
+import { LangyObserverGlyph } from "./LangyObservationState";
 import { NumberTicker } from "./NumberTicker";
 import { StreamingStatCard } from "./StreamingStatCard";
-import { LangyObserverGlyph } from "./LangyObservationState";
 
 const MotionBox = motion.create(Box);
+
+/**
+ * ONE geometry for every pre-work / thinking / status line of a live turn.
+ *
+ * The startup sequence used to hop between layouts: "Starting up…" drew as the
+ * bare thinking line, "Waking Langy up…" as an orb-led status row with its own
+ * gap and no padding, and the first real work line flipped back — three
+ * different left offsets and baselines for what reads as one evolving line.
+ * Both components (LangyThinkingLine, StreamingStatusLine) now share this row
+ * frame — same leading-indicator slot, same gap, same padding, same text
+ * metrics — so the words change and nothing moves.
+ */
+export const STATUS_LINE_ROW = {
+  gap: 2,
+  paddingY: 0.5,
+  paddingLeft: 0.5,
+} as const;
+
+/** The shared text metrics of the status/thinking line. */
+export const STATUS_LINE_TEXT = {
+  fontSize: "13px",
+  lineHeight: "1.5",
+  letterSpacing: "-0.005em",
+} as const;
 
 /**
  * The status dot, alive: a warm core with a soft halo that breathes. A moving
  * light next to "working…" copy reads as progress, so the wait feels shorter
  * than the same words beside a dead dot. Reduced motion gets a static lit orb.
+ *
+ * The orb is the shared leading-indicator slot of {@link STATUS_LINE_ROW}: it
+ * occupies the same 10px whatever the line says, so swapping between the
+ * status row and the thinking line never shifts the text. `active={false}`
+ * (a stuck turn) keeps the slot but drops the glow to a static muted dot —
+ * the one state that must not claim "alive".
  */
-function StatusOrb() {
+export function StatusOrb({ active = true }: { active?: boolean }) {
   const reduce = useReducedMotion();
+  if (!active) {
+    return (
+      <Box
+        data-status-orb="idle"
+        position="relative"
+        width="10px"
+        height="10px"
+        flexShrink={0}
+        display="grid"
+        placeItems="center"
+      >
+        <Box
+          width="6px"
+          height="6px"
+          borderRadius="full"
+          background="fg.subtle"
+          opacity={0.6}
+        />
+      </Box>
+    );
+  }
   return (
     <Box
+      data-status-orb="active"
       position="relative"
       width="10px"
       height="10px"
@@ -209,10 +261,15 @@ export function StreamingStatusLine({
   return (
     <VStack align="stretch" gap={2.5} alignSelf="stretch">
       {hasStatus ? (
-        <HStack gap={2} align="center">
+        <HStack
+          gap={STATUS_LINE_ROW.gap}
+          align="center"
+          paddingY={STATUS_LINE_ROW.paddingY}
+          paddingLeft={STATUS_LINE_ROW.paddingLeft}
+        >
           {isObserving ? <LangyObserverGlyph /> : <StatusOrb />}
           <Text
-            textStyle="xs"
+            {...STATUS_LINE_TEXT}
             color="fg.muted"
             role="status"
             aria-live="polite"
