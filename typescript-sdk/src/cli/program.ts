@@ -1762,6 +1762,10 @@ export function buildProgram(): Command {
       .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
       .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
       .option("--limit <n>", "Max results to return (default: 25)")
+      .option(
+        "--origin <origins>",
+        "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (_options: unknown, command: Command) => {
     const { searchTracesCommand: impl } = await import("./commands/traces/search.js");
@@ -1777,10 +1781,14 @@ export function buildProgram(): Command {
     .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
     .option("--end-date <date>", "End date (ISO string, default: now)")
     .option("-q, --query <query>", "Text search query to filter traces")
+    .option(
+      "--origin <origins>",
+      "Filter by trace origin, comma-separated (e.g. application,evaluation,simulation,playground,langy); 'application' includes traces with no recorded origin",
+    )
     .option("-f, --format <format>", "Output format: jsonl (default), csv, or json", "jsonl")
     .option("-o, --output <file>", "Write output to file instead of stdout")
     .option("--limit <n>", "Max traces to export (default: 1000)")
-    .action(async (options: { startDate?: string; endDate?: string; query?: string; format?: string; output?: string; limit?: string }) => {
+    .action(async (options: { startDate?: string; endDate?: string; query?: string; origin?: string; format?: string; output?: string; limit?: string }) => {
       const { exportTracesCommand: impl } = await import("./commands/traces/export.js");
       await impl(options);
     });

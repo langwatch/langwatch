@@ -22,8 +22,13 @@ vi.mock("ora", () => ({
   }),
 }));
 
+vi.mock("@/cli/utils/governance/resolveEndpoint", () => ({
+  resolveControlPlaneUrl: () => "https://langwatch.test",
+}));
+
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { searchTracesCommand } from "../search";
+import { exportTracesCommand } from "../export";
 import { getTraceCommand } from "../get";
 
 class ProcessExitError extends Error {
@@ -107,6 +112,97 @@ describe("searchTracesCommand()", () => {
       );
 
       await expect(searchTracesCommand({})).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when --origin is provided", () => {
+    /** @scenario Search traces filtered by origin */
+    it("passes the origin as a traces.origin filter to the search API", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({ origin: "application" });
+
+      expect(mockSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: { "traces.origin": ["application"] },
+        }),
+      );
+    });
+
+    /** @scenario Search traces filtered by multiple origins */
+    it("splits comma-separated origins into one filter value each", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({ origin: "application, evaluation" });
+
+      expect(mockSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filters: { "traces.origin": ["application", "evaluation"] },
+        }),
+      );
+    });
+  });
+
+  describe("when --origin is not provided", () => {
+    it("sends no filters field so the search body stays unchanged", async () => {
+      mockSearch.mockResolvedValue({
+        traces: [],
+        pagination: { totalHits: 0 },
+      });
+
+      await searchTracesCommand({});
+
+      expect(mockSearch.mock.calls[0]![0]).not.toHaveProperty("filters");
+    });
+  });
+});
+
+describe("exportTracesCommand()", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ traces: [], pagination: { totalHits: 0 } }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    mockProcessExit();
+  });
+
+  describe("when --origin is provided", () => {
+    /** @scenario Export traces filtered by origin */
+    it("passes the origin as a traces.origin filter to the search API", async () => {
+      await exportTracesCommand({ origin: "application,evaluation" });
+
+      const body = JSON.parse(
+        (fetchMock.mock.calls[0]![1] as { body: string }).body,
+      ) as Record<string, unknown>;
+      expect(body.filters).toEqual({
+        "traces.origin": ["application", "evaluation"],
+      });
+    });
+  });
+
+  describe("when --origin is not provided", () => {
+    it("sends no filters field so the export body stays unchanged", async () => {
+      await exportTracesCommand({});
+
+      const body = JSON.parse(
+        (fetchMock.mock.calls[0]![1] as { body: string }).body,
+      ) as Record<string, unknown>;
+      expect(body).not.toHaveProperty("filters");
     });
   });
 });
