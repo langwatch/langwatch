@@ -76,8 +76,10 @@ haven logs       captured service logs from any terminal, attached or detached:
                  --stack <slug> reads another worktree, `logs obs` streams LGTM
 haven status     one-shot report: selection, per-service health, shared servers,
                  RAM footprints (--json for machines)
-haven db         this stack's data: `db reset [--demo]` (drop + migrate + seed,
-                 confirmed; --yes for scripts) · `db url [engine]`
+haven db         this stack's data: `db seed [preset]` (reseed in place, drops
+                 nothing) · `db reset [preset]` (fresh database, confirmed;
+                 --yes for scripts) · `db url [engine]`. Presets: demo, traces,
+                 onboarding, post-onboarding, bare
 haven clean      one cleanup: interactive worktree picker + safe reclaim
                  (build artifacts, orphaned processes); --yes applies only the
                  safe categories
@@ -121,13 +123,17 @@ the worktree entirely: stack stopped, ClickHouse + Postgres databases dropped,
 directory deleted, confirmed by typing the stack's name. The primary checkout
 and the worktree haven runs from can never be destroyed.
 
-**Fresh data.** `haven db reset` drops, recreates, migrates, and seeds this
-stack's databases in one confirmed step. `--demo` additionally marks the
-project as already past onboarding and ingests a deterministic set of sample
-traces through the running stack's real collector — so the UI opens on
-populated lists instead of the first-message journey. The stack must be up for
-the traces (they exercise the actual ingestion pipeline; re-running is
-idempotent).
+**Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
+only add or refresh, never discard — and `haven db reset` is the destructive
+sibling that starts from a fresh, migrated database. Both take a preset:
+`demo` marks the project past onboarding and ingests deterministic sample
+traces + realistic platform lifecycles through the running stack's real
+collector (the stack must be up; re-running is idempotent), `traces` ingests
+just the sample traces, `onboarding` / `post-onboarding` flip the first-trace
+flag, and `bare` seeds the identity alone. A `mass` preset (months of
+backdated data across every product, seeded through the event logs and
+replayed by the projection workers) is the designed follow-up in
+`specs/setup/haven-seed-presets.feature`.
 
 **Resource caps.** Everything haven manages is bounded: the ClickHouse
 container and the observability stack are memory-capped (and their colima VM is

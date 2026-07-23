@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -16,15 +17,12 @@ import (
 // drop and asks, `--yes` replaces the prompt for scripts, and agent mode
 // never destroys without it.
 func runDB(ctx context.Context, d deps, inv invocation) error {
-	const usage = "usage: haven db reset [--demo] [--yes] | haven db url [postgres|clickhouse|redis]"
+	usage := "usage: haven db reset [preset] [--yes] | haven db seed [preset] | haven db url [postgres|clickhouse|redis]\n  presets: " + strings.Join(app.SeedPresetNames(), ", ")
 	if len(inv.args) == 0 {
-		return fmt.Errorf(usage)
+		return errors.New(usage)
 	}
 	switch inv.args[0] {
 	case "reset":
-		if len(inv.args) > 1 {
-			return fmt.Errorf(usage)
-		}
 		if err := guardSeedEnv(d.lwDir); err != nil {
 			return err
 		}
@@ -46,10 +44,18 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 				return nil
 			}
 		}
-		return d.orch.DBReset(ctx, d.params, app.DBResetOptions{Demo: inv.has("--demo")})
+		return d.orch.DBReset(ctx, d.params, dbPresetArg(inv))
+	case "seed":
+		if inv.has("--yes") {
+			return fmt.Errorf("db seed is non-destructive (an idempotent upsert, nothing dropped) — no confirmation to give")
+		}
+		if err := guardSeedEnv(d.lwDir); err != nil {
+			return err
+		}
+		return d.orch.DBSeed(ctx, d.params, dbPresetArg(inv))
 	case "url":
-		if inv.has("--demo") || inv.has("--yes") {
-			return fmt.Errorf("--demo/--yes only apply to `haven db reset`")
+		if inv.has("--yes") {
+			return fmt.Errorf("--yes does not apply to `haven db url`")
 		}
 		engine := ""
 		if len(inv.args) > 1 {
@@ -59,4 +65,12 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 	default:
 		return fmt.Errorf("unknown `haven db` subcommand %q — %s", inv.args[0], usage)
 	}
+}
+
+// dbPresetArg is the optional positional preset after reset/seed.
+func dbPresetArg(inv invocation) string {
+	if len(inv.args) > 1 {
+		return inv.args[1]
+	}
+	return ""
 }

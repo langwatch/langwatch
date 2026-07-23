@@ -63,7 +63,6 @@ func liveStackStore() *fakeStore {
 }
 
 // @scenario "Fresh data is an explicit, confirmed noun"
-// @scenario "The default seed is unchanged"
 // @scenario "The demo preset needs the stack for its traces"
 func TestDBReset(t *testing.T) {
 	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x", LwDir: "/wt/feat-x/langwatch"}
@@ -74,7 +73,7 @@ func TestDBReset(t *testing.T) {
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, ch, pg)
 
 		t.Run("when resetting, both databases are dropped then migrated and seeded", func(t *testing.T) {
-			if err := o.DBReset(context.Background(), params, DBResetOptions{}); err != nil {
+			if err := o.DBReset(context.Background(), params, ""); err != nil {
 				t.Fatalf("DBReset: %v", err)
 			}
 			if len(ch.dropped) != 1 || ch.dropped[0] != "lw_feat_x" {
@@ -108,7 +107,7 @@ func TestDBReset(t *testing.T) {
 	t.Run("given the seed run also flips the dev feature flags on", func(t *testing.T) {
 		sup := &fakeSupervisor{}
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
-		if err := o.DBReset(context.Background(), params, DBResetOptions{}); err != nil {
+		if err := o.DBReset(context.Background(), params, ""); err != nil {
 			t.Fatalf("DBReset: %v", err)
 		}
 		shell := sup.shells[1]
@@ -136,7 +135,7 @@ func TestDBReset(t *testing.T) {
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, ch, &fakeDBServer{})
 
 		t.Run("when resetting, it fails hard and nothing is rebuilt", func(t *testing.T) {
-			err := o.DBReset(context.Background(), params, DBResetOptions{})
+			err := o.DBReset(context.Background(), params, "")
 			if err == nil || !strings.Contains(err.Error(), "clickhouse") {
 				t.Fatalf("expected the drop failure to propagate, got %v", err)
 			}
@@ -151,7 +150,7 @@ func TestDBReset(t *testing.T) {
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
 
 		t.Run("when resetting, the error propagates and the seed never runs", func(t *testing.T) {
-			err := o.DBReset(context.Background(), params, DBResetOptions{})
+			err := o.DBReset(context.Background(), params, "")
 			if err == nil || !strings.Contains(err.Error(), "migrations failed") {
 				t.Fatalf("expected the migration failure, got %v", err)
 			}
@@ -166,7 +165,7 @@ func TestDBReset(t *testing.T) {
 		o := dbOrchestrator(sup, liveStackStore(), &fakeSystem{alive: map[int]bool{42: true}}, &fakeDBServer{}, &fakeDBServer{})
 
 		t.Run("when resetting with demo, the error propagates and traces never run", func(t *testing.T) {
-			err := o.DBReset(context.Background(), params, DBResetOptions{Demo: true})
+			err := o.DBReset(context.Background(), params, "demo")
 			if err == nil || !strings.Contains(err.Error(), "seed failed") {
 				t.Fatal("expected the seed error to propagate")
 			}
@@ -181,7 +180,7 @@ func TestDBReset(t *testing.T) {
 		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
 
 		t.Run("when resetting, the seed carries the preset but traces are refused with the retry command", func(t *testing.T) {
-			err := o.DBReset(context.Background(), params, DBResetOptions{Demo: true})
+			err := o.DBReset(context.Background(), params, "demo")
 			if err == nil || !strings.Contains(err.Error(), "not running") {
 				t.Fatalf("expected a stack-not-running error, got %v", err)
 			}
@@ -203,7 +202,7 @@ func TestDBReset(t *testing.T) {
 		o := dbOrchestrator(sup, liveStackStore(), sys, &fakeDBServer{}, &fakeDBServer{})
 
 		t.Run("when resetting, traces are refused", func(t *testing.T) {
-			err := o.DBReset(context.Background(), params, DBResetOptions{Demo: true})
+			err := o.DBReset(context.Background(), params, "demo")
 			if err == nil || !strings.Contains(err.Error(), "not answering") {
 				t.Fatalf("expected a not-answering refusal, got %v", err)
 			}
@@ -219,7 +218,7 @@ func TestDBReset(t *testing.T) {
 		o := dbOrchestrator(sup, liveStackStore(), sys, &fakeDBServer{}, &fakeDBServer{})
 
 		t.Run("when resetting, demo data is ingested through the app's loopback port", func(t *testing.T) {
-			if err := o.DBReset(context.Background(), params, DBResetOptions{Demo: true}); err != nil {
+			if err := o.DBReset(context.Background(), params, "demo"); err != nil {
 				t.Fatalf("DBReset: %v", err)
 			}
 			if len(sup.shells) != 4 {
@@ -255,7 +254,7 @@ func TestDBReset(t *testing.T) {
 		o := dbOrchestrator(sup, store, sys, &fakeDBServer{}, &fakeDBServer{})
 
 		t.Run("when resetting, the fallback app is not a local target so traces are refused", func(t *testing.T) {
-			err := o.DBReset(context.Background(), params, DBResetOptions{Demo: true})
+			err := o.DBReset(context.Background(), params, "demo")
 			if err == nil || !strings.Contains(err.Error(), "not answering") {
 				t.Fatalf("expected a not-answering refusal, got %v", err)
 			}
@@ -268,7 +267,7 @@ func TestDBReset(t *testing.T) {
 		o.cfg.ShouldManageClickHouse, o.cfg.ShouldManagePostgres = false, false
 
 		t.Run("when resetting, it refuses and nothing runs", func(t *testing.T) {
-			err := o.DBReset(context.Background(), params, DBResetOptions{})
+			err := o.DBReset(context.Background(), params, "")
 			if err == nil || !strings.Contains(err.Error(), "disabled") {
 				t.Fatalf("expected the disabled refusal, got %v", err)
 			}
@@ -286,4 +285,99 @@ func TestDBURLRejectsUnknownEngine(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "postgres, clickhouse, or redis") {
 		t.Fatalf("expected the engine list, got %v", err)
 	}
+}
+
+// @scenario "The default seed is unchanged"
+// @scenario "The demo preset needs the stack for its traces"
+// @scenario "Unknown presets are rejected with the available choices"
+// @scenario "Reseeding drops nothing"
+func TestDBSeed(t *testing.T) {
+	params := UpParams{ExplicitSlug: "feat-x", WorktreeDir: "/wt/feat-x", LwDir: "/wt/feat-x/langwatch"}
+
+	t.Run("given no preset", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		ch, pg := &fakeDBServer{databases: []string{"lw_feat_x"}}, &fakeDBServer{databases: []string{"lw_feat_x"}}
+		o := dbOrchestrator(sup, liveStackStore(), &fakeSystem{alive: map[int]bool{42: true}}, ch, pg)
+
+		t.Run("when seeding, only the idempotent seed runs and nothing is dropped", func(t *testing.T) {
+			if err := o.DBSeed(context.Background(), params, ""); err != nil {
+				t.Fatalf("DBSeed: %v", err)
+			}
+			if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
+				t.Errorf("db seed must never drop, got ch=%v pg=%v", ch.dropped, pg.dropped)
+			}
+			if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "prisma:seed") {
+				t.Fatalf("shells = %v, want just prisma:seed (no migrations, no drops)", sup.shells)
+			}
+			joined := strings.Join(sup.envs[0], " ")
+			if !strings.Contains(joined, "HAVEN_SEED_LANGWATCH_API_KEY=sk-lw-local-development-key") {
+				t.Errorf("env = %v, want the local API key", sup.envs[0])
+			}
+			if strings.Contains(joined, "HAVEN_SEED_PRESET") {
+				t.Errorf("env = %v, want no preset by default", sup.envs[0])
+			}
+		})
+	})
+
+	t.Run("given an unknown preset", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when seeding, it fails listing the available presets and runs nothing", func(t *testing.T) {
+			err := o.DBSeed(context.Background(), params, "nosuch")
+			if err == nil || !strings.Contains(err.Error(), "demo") || !strings.Contains(err.Error(), "traces") {
+				t.Fatalf("expected the preset list, got %v", err)
+			}
+			if len(sup.shells) != 0 {
+				t.Errorf("nothing may run, got %v", sup.shells)
+			}
+		})
+	})
+
+	t.Run("given the demo preset with the stack not running", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, &fakeStore{}, &fakeSystem{}, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when seeding, the base seed lands but traces are refused with the retry command", func(t *testing.T) {
+			err := o.DBSeed(context.Background(), params, "demo")
+			if err == nil || !strings.Contains(err.Error(), "not running") {
+				t.Fatalf("expected a stack-not-running error, got %v", err)
+			}
+			if !strings.Contains(err.Error(), "haven db seed demo") {
+				t.Errorf("err = %v, want the retry command", err)
+			}
+			if len(sup.shells) != 1 || !strings.Contains(strings.Join(sup.envs[0], " "), "HAVEN_SEED_PRESET=demo") {
+				t.Errorf("want one seed run carrying the demo preset, got %v", sup.shells)
+			}
+		})
+	})
+
+	t.Run("given the traces preset with a live, answering stack", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
+		o := dbOrchestrator(sup, liveStackStore(), sys, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when seeding, the sample traces are ingested without the platform layer", func(t *testing.T) {
+			if err := o.DBSeed(context.Background(), params, "traces"); err != nil {
+				t.Fatalf("DBSeed: %v", err)
+			}
+			if len(sup.shells) != 2 || !strings.Contains(sup.shells[1], "seed:sample-traces") {
+				t.Fatalf("shells = %v, want seed then sample-traces only", sup.shells)
+			}
+		})
+	})
+
+	t.Run("given the onboarding preset", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		o := dbOrchestrator(sup, liveStackStore(), &fakeSystem{alive: map[int]bool{42: true}}, &fakeDBServer{}, &fakeDBServer{})
+
+		t.Run("when seeding, the first-trace flag is cleared and nothing is ingested", func(t *testing.T) {
+			if err := o.DBSeed(context.Background(), params, "onboarding"); err != nil {
+				t.Fatalf("DBSeed: %v", err)
+			}
+			if len(sup.shells) != 1 || !strings.Contains(strings.Join(sup.envs[0], " "), "HAVEN_SEED_FIRST_MESSAGE=0") {
+				t.Errorf("want one seed run with the cleared flag, got %v / %v", sup.shells, sup.envs)
+			}
+		})
+	})
 }

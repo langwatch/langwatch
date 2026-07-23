@@ -8,25 +8,67 @@ package app
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// DBResetOptions tune `haven db reset`.
-type DBResetOptions struct {
-	// Demo seeds the demo preset after the reset: onboarding marked done, sample
-	// traces + realistic platform data ingested through the running stack's real
-	// collector (the stack must be up for that part).
-	Demo bool
+// seedPreset is one seed variant: env switches for prisma:seed plus which
+// post-seed ingest steps run through the live stack's collector. Presets are
+// positional (`haven db seed demo`), validated against this registry, and the
+// same set works on reset (`haven db reset demo`).
+type seedPreset struct {
+	env      []string
+	traces   bool // ingest the deterministic sample traces (stack must be up)
+	platform bool // ingest realistic platform lifecycles (stack must be up)
+	summary  string
+}
+
+// seedPresets is the registry of variants. `mass` (months of backdated data
+// across every product, seeded through the event log and replayed) is the
+// designed follow-up — see specs/setup/haven-seed-presets.feature.
+var seedPresets = map[string]seedPreset{
+	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, traces: true, platform: true, summary: "past onboarding + sample traces + realistic platform data"},
+	"traces":          {traces: true, summary: "the deterministic sample traces on top of the stable identity"},
+	"onboarding":      {env: []string{"HAVEN_SEED_FIRST_MESSAGE=0"}, summary: "a fresh onboarding journey (first-trace flag cleared)"},
+	"post-onboarding": {env: []string{"HAVEN_SEED_FIRST_MESSAGE=1"}, summary: "past onboarding, no demo content"},
+	"bare":            {env: []string{"HAVEN_SEED_MODEL_PROVIDERS=0", "HAVEN_SEED_FEATURE_FLAGS=0"}, summary: "identity only — no env-derived providers, stock feature flags"},
+}
+
+// SeedPresetNames lists the registry for errors and help, sorted.
+func SeedPresetNames() []string {
+	names := make([]string, 0, len(seedPresets))
+	for name := range seedPresets {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// resolveSeedPreset validates a preset name ("" is the plain identity seed).
+func resolveSeedPreset(name string) (seedPreset, error) {
+	if name == "" {
+		return seedPreset{}, nil
+	}
+	pre, ok := seedPresets[name]
+	if !ok {
+		return seedPreset{}, fmt.Errorf("unknown seed preset %q — available: %s", name, strings.Join(SeedPresetNames(), ", "))
+	}
+	return pre, nil
 }
 
 // DBReset gives this stack fresh databases: drop, recreate, migrate, seed.
 // Every failure is hard — a reset that silently kept old data (or stopped
 // half-way) would let the next `up` reuse stale state while the developer
 // believes it is clean. The confirmation ceremony is the caller's job.
-func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, opts DBResetOptions) error {
+func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, preset string) error {
+	pre, err := resolveSeedPreset(preset)
+	if err != nil {
+		return err
+	}
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
@@ -59,9 +101,7 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, opts DBResetOpti
 		return err
 	}
 	env = append(env, "DOTENV_CONFIG_QUIET=true")
-	if opts.Demo {
-		env = append(env, "HAVEN_SEED_PRESET=demo")
-	}
+	env = append(env, pre.env...)
 	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
 		return fmt.Errorf("migrations failed on the fresh database: %w", err)
 	}
@@ -69,14 +109,21 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, opts DBResetOpti
 		return fmt.Errorf("seed failed: %w", err)
 	}
 	fmt.Printf("stack %q databases reset — migrated and seeded fresh\n", slug)
-	if !opts.Demo {
-		return nil
+	return o.runSeedIngest(ctx, p, pre, "haven db reset "+preset)
+}
+
+// runSeedIngest runs a preset's live-stack ingest steps (sample traces,
+// realistic platform lifecycles) after the base seed landed.
+func (o *Orchestrator) runSeedIngest(ctx context.Context, p UpParams, pre seedPreset, retryCmd string) error {
+	if pre.traces {
+		if err := o.seedSampleTraces(ctx, p, retryCmd); err != nil {
+			return err
+		}
 	}
-	const retryCmd = "haven db reset --demo"
-	if err := o.seedSampleTraces(ctx, p, retryCmd); err != nil {
-		return err
+	if pre.platform {
+		return o.seedRealisticPlatformData(ctx, p, retryCmd)
 	}
-	return o.seedRealisticPlatformData(ctx, p, retryCmd)
+	return nil
 }
 
 // managedStackEnv builds the environment a database-rebuilding child runs
@@ -101,6 +148,42 @@ func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]stri
 		return reg.OverlayEnv(), nil
 	}
 	return st.OverlayEnv(), nil
+}
+
+// DBSeed reseeds this stack's database WITHOUT dropping anything — the
+// idempotent, non-destructive sibling of DBReset. The seed is an upsert (a
+// no-op once the stable identity exists), so it needs no confirmation: it can
+// only add or refresh, never discard. preset ("" = plain identity) picks a
+// variant from the registry.
+func (o *Orchestrator) DBSeed(ctx context.Context, p UpParams, preset string) error {
+	pre, err := resolveSeedPreset(preset)
+	if err != nil {
+		return err
+	}
+	env := append(o.seedEnv(p), pre.env...)
+	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+		return fmt.Errorf("seed failed: %w", err)
+	}
+	return o.runSeedIngest(ctx, p, pre, "haven db seed "+preset)
+}
+
+// seedEnv builds the environment for a non-destructive seed: the registered
+// stack's overlay when one exists (so the seed writes into this worktree's
+// per-slug databases rather than whatever DATABASE_URL is inherited), always
+// carrying HAVEN_SEED_LANGWATCH_API_KEY so a re-seed keeps the well-known
+// local key instead of rotating it (a rotation would 401 the trace ingest).
+// With no stack registered the child inherits the (guarded) environment.
+func (o *Orchestrator) seedEnv(p UpParams) []string {
+	var env []string
+	if slug, err := o.resolveSlug(p); err == nil {
+		if st, ok := o.stackBySlug(slug); ok {
+			env = st.OverlayEnv()
+		}
+	}
+	if o.cfg.LocalAPIKey != "" && !hasEnvKey(env, "HAVEN_SEED_LANGWATCH_API_KEY") {
+		env = append(env, "HAVEN_SEED_LANGWATCH_API_KEY="+o.cfg.LocalAPIKey)
+	}
+	return env
 }
 
 // DBURL prints this stack's connection string for one engine — or all of
