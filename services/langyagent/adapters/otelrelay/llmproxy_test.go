@@ -2,6 +2,7 @@ package otelrelay
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/langwatch/langwatch/pkg/herr"
 )
 
 func TestLLMProxy(t *testing.T) {
@@ -168,7 +171,9 @@ func TestLLMTargetURL(t *testing.T) {
 // new turn — clears it; the body always reaches the worker's SDK
 // byte-for-byte, even past the 64KB capture cap.
 func TestLLMProxy_ErrorCapture(t *testing.T) {
-	herrBody := `{"error":{"type":"no_provider_configured","message":"no model provider configured","reasons":[{"type":"unknown","message":"unknown"}]}}`
+	// The gateway's real wire shape (pkg/herr toErrorBody): `type` and `code`
+	// carry the same value, `message` is always present.
+	herrBody := `{"error":{"type":"no_provider_configured","code":"no_provider_configured","message":"no model provider configured","reasons":[{"type":"unknown","message":"unknown"}]}}`
 
 	newGateway := func(status *int, body *string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -248,6 +253,41 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 		}
 	})
 
+	// The gateway authors this envelope itself (codexSessionExpiredError):
+	// `type` and `code` matched plus a message, no reasons. It must round-trip
+	// typed, or the control plane loses the exact-code classification that
+	// renders the re-authenticate card.
+	t.Run("when the gateway answers the codex session-expired envelope", func(t *testing.T) {
+		status := http.StatusUnauthorized
+		body := `{"error":{"type":"codex_session_expired","code":"codex_session_expired","message":"Your OpenAI session expired. Sign in to Codex again to keep using it."}}`
+		gateway := newGateway(&status, &body)
+		defer gateway.Close()
+
+		relay := startRelay(t)
+		token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+		relay.SetTurnContext(token, turnContext())
+
+		resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatalf("proxied LLM call: %v", err)
+		}
+		resp.Body.Close()
+
+		e, ok := relay.LastLLMError(token)
+		if !ok {
+			t.Fatal("LastLLMError must expose the captured herr")
+		}
+		if string(e.Code) != "codex_session_expired" {
+			t.Errorf("captured code = %q, want the gateway's typed code preserved", e.Code)
+		}
+		if e.Meta["message"] != "Your OpenAI session expired. Sign in to Codex again to keep using it." {
+			t.Errorf("captured message = %v, want the envelope's message in meta", e.Meta["message"])
+		}
+		if e.Meta["http_status"] != http.StatusUnauthorized {
+			t.Errorf("captured http_status = %v, want 401", e.Meta["http_status"])
+		}
+	})
+
 	t.Run("when the error body exceeds the capture cap", func(t *testing.T) {
 		huge := `{"pad":"` + strings.Repeat("x", maxErrorBodyBytes) + `"}`
 		status := http.StatusInternalServerError
@@ -283,19 +323,39 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 	})
 
 	// Provider-native error bodies the gateway forwards byte-for-byte are NOT
-	// herr envelopes, but they carry the only actionable prose there is — the
-	// provider's own message. The capture keeps that prose so the turn's error
-	// frame (and the turn span) name the real failure.
+	// herr envelopes, even when they reuse `error.type` (Anthropic) or carry an
+	// unmatched `error.code` (OpenAI), but they hold the only actionable prose
+	// there is: the provider's own message. Every one of them must land as an
+	// `llm_upstream_error` with that prose in meta, so the turn's error frame
+	// (and the turn span) name the real failure. A body that names its own
+	// error type keeps that discriminant as a typed reason, so exact-code
+	// consumers (the codex plan-limit promotion) still classify it.
 	t.Run("when the gateway forwards a provider-native error body", func(t *testing.T) {
 		cases := []struct {
 			name string
 			body string
 			want string
+			// The provider's own error discriminant, expected as the captured
+			// cause's single typed reason. Empty means no reason is captured.
+			wantCauseType string
 		}{
 			{
-				name: "anthropic error.message",
-				body: `{"type":"error","error":{"message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}`,
-				want: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+				name:          "anthropic real credit-balance body",
+				body:          `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}`,
+				want:          "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+				wantCauseType: "invalid_request_error",
+			},
+			{
+				name:          "codex backend usage limit",
+				body:          `{"error":{"type":"usage_limit_reached","message":"You've hit your usage limit."}}`,
+				want:          "You've hit your usage limit.",
+				wantCauseType: "usage_limit_reached",
+			},
+			{
+				name:          "openai unmatched type and code pair",
+				body:          `{"error":{"type":"invalid_request_error","code":"invalid_api_key","message":"Incorrect API key provided."}}`,
+				want:          "Incorrect API key provided.",
+				wantCauseType: "invalid_request_error",
 			},
 			{
 				name: "codex backend detail",
@@ -345,6 +405,19 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 				}
 				if e.Meta["http_status"] != http.StatusBadRequest {
 					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])
+				}
+				if tc.wantCauseType == "" {
+					if len(e.Reasons) != 0 {
+						t.Errorf("captured reasons = %v, want none for a body without an error type", e.Reasons)
+					}
+					return
+				}
+				if len(e.Reasons) != 1 {
+					t.Fatalf("captured reasons = %d, want exactly the provider's discriminant", len(e.Reasons))
+				}
+				var cause herr.E
+				if !errors.As(e.Reasons[0], &cause) || string(cause.Code) != tc.wantCauseType {
+					t.Errorf("captured cause = %v, want code %q", e.Reasons[0], tc.wantCauseType)
 				}
 			})
 		}

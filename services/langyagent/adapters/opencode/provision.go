@@ -248,6 +248,11 @@ func (a *Agent) Provision(in ProvisionInput) error {
 	if err := os.WriteFile(pluginPath, []byte(langyIdentityPluginJS), 0o600); err != nil {
 		return fmt.Errorf("write identity plugin: %w", err)
 	}
+	// WriteFile's mode applies only on create; a plugin file surviving from an
+	// earlier provision keeps whatever mode it had, so tighten it explicitly.
+	if err := os.Chmod(pluginPath, 0o600); err != nil {
+		return fmt.Errorf("chmod identity plugin: %w", err)
+	}
 	if err := in.Runner.Chown(pluginPath, in.UID); err != nil {
 		return fmt.Errorf("chown identity plugin: %w", err)
 	}

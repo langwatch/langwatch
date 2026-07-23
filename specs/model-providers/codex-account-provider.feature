@@ -111,18 +111,19 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     And the Fast default becomes the codex model as well
     And evaluations, playground and workflows keep their existing defaults
 
-  # The sign-in itself saves the provider row server-side the moment the poll
-  # completes, so once connected there is nothing left for the drawer's Save
-  # button to do. A drawer left open with a dead Save reads as broken.
+  # Approving the sign-in in the browser completes the connection by itself,
+  # so once connected there is nothing left for the drawer's Save button to
+  # do. A drawer left open with a dead Save reads as broken.
   Scenario: Connecting Codex from settings finishes the drawer's job
     When I complete the Codex sign-in from the model-providers settings drawer
-    Then the drawer closes on its own over the refreshed provider list
-    And no coding-defaults dialog was mounted inside the drawer
+    Then the drawer closes on its own
+    And Codex shows as connected in the provider list
+    And the coding-defaults question is not asked inside the drawer
 
   Scenario: Connecting Codex from settings asks before touching defaults
     When I connect Codex from the model-providers settings page
     Then a dialog asks whether Codex should become the default for Langy and the fast assists
-    And the dialog lives on the page, outliving the drawer that started the sign-in
+    And the question appears after the drawer has closed and stays open on the settings page
     And accepting applies the same Langy and Fast defaults the Langy setup writes
     And declining leaves every default untouched
 

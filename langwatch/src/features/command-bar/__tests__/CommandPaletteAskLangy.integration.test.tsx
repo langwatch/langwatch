@@ -118,28 +118,15 @@ afterEach(() => {
   resetLangyStore();
 });
 
-describe("CommandPalette Ask Langy routing", () => {
-  describe("when a question is already typed", () => {
+describe("given a question is already typed in the bar", () => {
+  describe("when the Ask Langy row is selected with Enter", () => {
     /** @scenario Selecting Ask Langy with a typed question hands it off in one step */
-    it("hands the question to Langy on Enter with no intermediate composer", () => {
+    it("hands the question to Langy with no intermediate composer", () => {
       const { container, onDone } = renderPalette({ query: QUESTION });
 
       // Nothing else matches this query, so the Ask Langy row is selected.
       screen.getByText(`Ask Langy: "${QUESTION}"`);
       fireEvent.keyDown(paletteInput(), { key: "Enter" });
-
-      const state = useLangyStore.getState();
-      expect(state.isOpen).toBe(true);
-      expect(state.pendingPrompt).toBe(QUESTION);
-      expect(onDone).toHaveBeenCalledTimes(1);
-      expect(langyModeSurface(container)).toBeNull();
-    });
-
-    /** @scenario Selecting Ask Langy with a typed question hands it off in one step */
-    it("hands the question off the same way on click", () => {
-      const { container, onDone } = renderPalette({ query: QUESTION });
-
-      fireEvent.click(screen.getByText(`Ask Langy: "${QUESTION}"`));
 
       const state = useLangyStore.getState();
       expect(state.isOpen).toBe(true);
@@ -170,6 +157,21 @@ describe("CommandPalette Ask Langy routing", () => {
     });
   });
 
+  describe("when the Ask Langy row is clicked", () => {
+    /** @scenario Selecting Ask Langy with a typed question hands it off in one step */
+    it("hands the question off the same way", () => {
+      const { container, onDone } = renderPalette({ query: QUESTION });
+
+      fireEvent.click(screen.getByText(`Ask Langy: "${QUESTION}"`));
+
+      const state = useLangyStore.getState();
+      expect(state.isOpen).toBe(true);
+      expect(state.pendingPrompt).toBe(QUESTION);
+      expect(onDone).toHaveBeenCalledTimes(1);
+      expect(langyModeSurface(container)).toBeNull();
+    });
+  });
+
   describe("when the surface deactivates during the handoff overlap", () => {
     // The panel's composer takes focus with the handoff, which blurs the
     // home's inline field and deactivates the palette before the scheduled
@@ -189,8 +191,10 @@ describe("CommandPalette Ask Langy routing", () => {
       expect(onDone).toHaveBeenCalledTimes(1);
     });
   });
+});
 
-  describe("when the bar is empty", () => {
+describe("given the bar is empty", () => {
+  describe("when the Ask Langy row is selected with Enter", () => {
     /** @scenario Selecting Ask Langy on an empty bar turns it into AI mode */
     it("enters the composer mode and sends nothing", () => {
       const { container, onDone } = renderPalette({ query: "" });

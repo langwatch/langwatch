@@ -506,6 +506,49 @@ func TestProvision_WritesLangyIdentityPlugin(t *testing.T) {
 	}
 }
 
+// os.WriteFile applies its mode only when it creates the file. A worker home
+// can be provisioned in place over an earlier run, so an identity plugin left
+// at a wider mode must come out of Provision tightened back to 0600.
+func TestProvision_TightensAPreexistingIdentityPluginMode(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
+		t.Fatalf("mkdir shared skills: %v", err)
+	}
+	pluginPath := filepath.Join(home, ".config", "opencode", "plugin", "langy-identity.js")
+	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o755); err != nil {
+		t.Fatalf("mkdir plugin dir: %v", err)
+	}
+	if err := os.WriteFile(pluginPath, []byte("stale"), 0o644); err != nil {
+		t.Fatalf("seed wide-mode plugin: %v", err)
+	}
+
+	err := NewAgent(0).Provision(ProvisionInput{
+		Home:          home,
+		WorkspaceRoot: workspace,
+		Creds: domain.Credentials{
+			LangwatchAPIKey:   "sk-lw-test-key",
+			LLMVirtualKey:     "vk-test",
+			GatewayBaseURL:    "https://gateway.test",
+			LangwatchEndpoint: "https://app.test",
+		},
+		UID:            0,
+		AgentsTemplate: "# AGENTS\n",
+		Runner:         localunsafe.Runner{},
+	})
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+
+	info, err := os.Stat(pluginPath)
+	if err != nil {
+		t.Fatalf("stat identity plugin: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Errorf("identity plugin mode = %o, want 0600 even when the file predates this provision", got)
+	}
+}
+
 // A codex model must run stateless: store:false in the generated config. The
 // codex backend keeps no server-side response state, so opencode's AI SDK has
 // to round-trip the encrypted reasoning content across a tool loop's steps,

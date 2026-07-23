@@ -102,6 +102,23 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
     });
   });
 
+  describe("when the cache invalidation fails after the write", () => {
+    it("resolves and still snaps the pill via the written codex model", async () => {
+      useLangyStore.getState().setModelOverride(OLD_DEFAULT);
+      const { utils, invalidate } = buildUtils({
+        previousModel: OLD_DEFAULT,
+        nextModel: CODEX_MODEL,
+      });
+      invalidate.mockRejectedValue(new Error("cache sync unavailable"));
+
+      await expect(
+        syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" }),
+      ).resolves.toBeUndefined();
+
+      expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL);
+    });
+  });
+
   describe("when the previous default is read", () => {
     it("reads it from the cache BEFORE invalidating, for the langy chat key", async () => {
       const { utils, getData, invalidate } = buildUtils({
@@ -118,6 +135,22 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
       expect(getData.mock.invocationCallOrder[0]!).toBeLessThan(
         invalidate.mock.invocationCallOrder[0]!,
       );
+    });
+  });
+
+  describe("when the resolver is re-read after the write", () => {
+    it("asks for the same project and langy chat key the cache read used", async () => {
+      const { utils, fetch } = buildUtils({
+        previousModel: OLD_DEFAULT,
+        nextModel: CODEX_MODEL,
+      });
+
+      await syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" });
+
+      expect(fetch).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        featureKey: "langy.chat",
+      });
     });
   });
 });

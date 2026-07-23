@@ -74,9 +74,9 @@ export function assertCrispChatHidden(): void {
 }
 
 /**
- * Deliberate open path (sidebar Chat button): lifts suppression, then lets
- * Crisp toggle the chat box. Closing the box fires "chat:closed", which
- * restores suppression.
+ * Deliberate open path (sidebar Chat button, command palette "Open chat"):
+ * lifts suppression, then lets Crisp toggle the chat box. Closing the box
+ * fires "chat:closed", which restores suppression.
  */
 export function toggleSupportChat(): void {
   const crisp = getCrisp();

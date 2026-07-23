@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -338,6 +339,101 @@ func TestStreamSession_ReasoningPartTextDeltasNeverBecomeAnswerText(t *testing.T
 	}
 	if thinking := strings.Join(reasonings, ""); thinking != "**Planning task execution strategy** weighing options" {
 		t.Errorf("reasoning frames = %q, want the reasoning part's text routed as reasoning", thinking)
+	}
+}
+
+// The stream carries no ordering guarantee between a part's first
+// message.part.delta and the message.part.updated that declares its type. A
+// reasoning delta that arrives BEFORE its declaration must still ride as a
+// reasoning frame, never as answer text: the manager holds an undeclared
+// part's deltas and replays them, in arrival order, once the declaration
+// lands. Answer deltas keep their relative order throughout.
+func TestStreamSession_ReasoningDeltaBeforeDeclarationStaysOutOfAnswer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fl, _ := w.(http.Flusher)
+		emit := func(s string) {
+			fmt.Fprintf(w, "data: %s\n", s)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		// The reasoning part's deltas stream BEFORE the event that declares
+		// what the part is.
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_r","field":"text","delta":"**Planning**"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_r","field":"text","delta":" weighing options"}}`)
+		emit(`{"type":"message.part.updated","properties":{"sessionID":"mine","part":{"id":"prt_r","type":"reasoning"}}}`)
+		// Then the answer part, declared before its deltas as usual.
+		emit(`{"type":"message.part.updated","properties":{"sessionID":"mine","part":{"id":"prt_t","type":"text"}}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_t","field":"text","delta":"Hello"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_t","field":"text","delta":" there"}}`)
+		emit(`{"type":"message.completed","sessionID":"mine"}`)
+	}))
+	defer srv.Close()
+
+	got := collectFrames(t, srv.URL, "mine")
+
+	var deltas, reasonings []string
+	for _, line := range got {
+		var d struct {
+			Text string `json:"text"`
+		}
+		switch frameType(t, line) {
+		case "delta":
+			_ = json.Unmarshal([]byte(line), &d)
+			deltas = append(deltas, d.Text)
+		case "reasoning":
+			_ = json.Unmarshal([]byte(line), &d)
+			reasonings = append(reasonings, d.Text)
+		}
+	}
+	if want := []string{"Hello", " there"}; !slices.Equal(deltas, want) {
+		t.Errorf("answer deltas = %v, want %v unreordered, with no early reasoning landing in the answer", deltas, want)
+	}
+	if want := []string{"**Planning**", " weighing options"}; !slices.Equal(reasonings, want) {
+		t.Errorf("reasoning frames = %v, want the buffered deltas replayed in arrival order %v", reasonings, want)
+	}
+}
+
+// A part that streamed deltas but was never declared by the time the turn
+// settles flushes as answer text, exactly once: with no declaration there is
+// no evidence it was thinking, and its text must not be silently dropped from
+// the final.
+func TestStreamSession_UndeclaredPartDeltasFlushAsAnswerOnSettle(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fl, _ := w.(http.Flusher)
+		emit := func(s string) {
+			fmt.Fprintf(w, "data: %s\n", s)
+			if fl != nil {
+				fl.Flush()
+			}
+		}
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_x","field":"text","delta":"never"}}`)
+		emit(`{"type":"message.part.delta","properties":{"sessionID":"mine","partID":"prt_x","field":"text","delta":" declared"}}`)
+		emit(`{"type":"message.completed","sessionID":"mine"}`)
+	}))
+	defer srv.Close()
+
+	got := collectFrames(t, srv.URL, "mine")
+
+	var deltas, reasonings []string
+	for _, line := range got {
+		var d struct {
+			Text string `json:"text"`
+		}
+		switch frameType(t, line) {
+		case "delta":
+			_ = json.Unmarshal([]byte(line), &d)
+			deltas = append(deltas, d.Text)
+		case "reasoning":
+			_ = json.Unmarshal([]byte(line), &d)
+			reasonings = append(reasonings, d.Text)
+		}
+	}
+	if want := []string{"never", " declared"}; !slices.Equal(deltas, want) {
+		t.Errorf("answer deltas = %v, want the undeclared part flushed once as %v", deltas, want)
+	}
+	if len(reasonings) != 0 {
+		t.Errorf("reasoning frames = %v, want none for an undeclared part", reasonings)
 	}
 }
 

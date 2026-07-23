@@ -11,6 +11,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useSession } from "~/utils/auth-client";
 import type { NextRouter } from "~/utils/compat/next-router";
 import { useRouter } from "~/utils/compat/next-router";
+import { toggleSupportChat } from "~/utils/crispBubblePolicy";
 import { CommandBarFooter } from "./components/CommandBarFooter";
 import { CommandBarInput } from "./components/CommandBarInput";
 import { CommandBarLangyMode } from "./components/CommandBarLangyMode";
@@ -389,13 +390,9 @@ export function CommandPalette({
         }
 
         if (cmd.id === "action-open-chat") {
-          const crisp = (
-            window as unknown as {
-              $crisp?: { push: (args: unknown[]) => void };
-            }
-          ).$crisp;
-          crisp?.push(["do", "chat:show"]);
-          crisp?.push(["do", "chat:toggle"]);
+          // Deliberate open: must go through the policy so the suppression
+          // backstop lifts before the widget is asked to show.
+          toggleSupportChat();
           onDone();
           return;
         }

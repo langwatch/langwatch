@@ -27,7 +27,7 @@ Feature: Trace CLI Commands
     Given my project has traces from application traffic and from platform activity like evaluations and Langy conversations
     When I run "langwatch trace search --origin application"
     Then I see only traces from my application traffic
-    And traces without a recorded origin count as application traffic
+    And that includes all my production traffic, even traces ingested before origins existed or sent by SDKs that do not report one
 
   Scenario: Search traces filtered by multiple origins
     When I run "langwatch trace search --origin application,evaluation"

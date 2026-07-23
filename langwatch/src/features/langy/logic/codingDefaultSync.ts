@@ -34,13 +34,14 @@ export async function syncLangyAfterCodingDefaultsWrite({
     utils.modelProvider.getResolvedDefault.getData(resolvedInput)?.model ??
     null;
 
-  await utils.modelProvider.invalidate();
-
-  const nextDefault = await utils.modelProvider.getResolvedDefault
-    .fetch(resolvedInput)
+  // The role defaults are already written server-side; the invalidate and
+  // the resolver re-read only bring the open UI along. Neither failure may
+  // surface to the caller as the write failing: the written codex model is
+  // still the right thing to show.
+  const nextDefault = await utils.modelProvider
+    .invalidate()
+    .then(() => utils.modelProvider.getResolvedDefault.fetch(resolvedInput))
     .then((resolved) => resolved?.model ?? CODEX_DEFAULT_MODEL)
-    // The role default was just written; if the resolver read fails the
-    // written model is still the right thing to show.
     .catch(() => CODEX_DEFAULT_MODEL);
 
   useLangyStore

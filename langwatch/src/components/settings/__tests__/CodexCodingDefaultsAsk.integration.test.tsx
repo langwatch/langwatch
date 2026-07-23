@@ -127,6 +127,26 @@ describe("Feature: Codex coding-defaults ask on the model-providers page", () =>
       ).toBeTruthy();
     });
 
+    it("keeps the description short and lists every fast assist in the info tooltip", async () => {
+      renderHost();
+
+      // The description names the gist only; the full assist list lives
+      // behind the (i), per dev/docs/best_practices/copywriting.md.
+      expect(
+        await screen.findByText(
+          /Langy and the fast AI assists\s*across LangWatch will run/,
+        ),
+      ).toBeTruthy();
+
+      fireEvent.click(screen.getByLabelText("More info"));
+
+      expect(
+        await screen.findByText(
+          "The fast assists are the small AI helpers across the product: search, chat titles, autocomplete, and translations.",
+        ),
+      ).toBeTruthy();
+    });
+
     describe("when the user accepts", () => {
       /** @scenario Connecting Codex from settings asks before touching defaults */
       it("applies the defaults at the scopes the sign-in saved at", async () => {

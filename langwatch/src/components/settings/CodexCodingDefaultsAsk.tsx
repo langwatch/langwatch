@@ -1,6 +1,7 @@
 import { Button, Text } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { create } from "zustand";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { syncLangyAfterCodingDefaultsWrite } from "~/features/langy/logic/codingDefaultSync";
 import {
   isCodexModel,
@@ -94,6 +95,48 @@ export function CodexCodingDefaultsAskHost() {
 }
 
 /**
+ * The accept path: run the same LANGY+FAST role writes the Langy and
+ * onboarding sign-ins perform inline, bring the open UI along, toast the
+ * outcome, and close. On failure the error rides the toast and the dialog
+ * stays open for another try.
+ */
+async function acceptCodexCodingDefaults({
+  applyDefaults,
+  utils,
+  projectId,
+  scopes,
+  onClose,
+}: {
+  applyDefaults: (input: {
+    projectId: string;
+    scopes: ScopeAssignment[];
+  }) => Promise<unknown>;
+  utils: Parameters<typeof syncLangyAfterCodingDefaultsWrite>[0]["utils"];
+  projectId: string;
+  scopes: ScopeAssignment[];
+  onClose: () => void;
+}): Promise<void> {
+  try {
+    await applyDefaults({ projectId, scopes });
+    // Refreshes every default-model cache AND snaps Langy's model pill to the
+    // new default when it was following the old one, so the open panel
+    // updates without a reload.
+    await syncLangyAfterCodingDefaultsWrite({ utils, projectId });
+    toaster.create({
+      title: "Codex set as the Langy and Fast default",
+      type: "success",
+    });
+    onClose();
+  } catch (error) {
+    toaster.create({
+      title: "Could not set the defaults",
+      description: error instanceof Error ? error.message : undefined,
+      type: "error",
+    });
+  }
+}
+
+/**
  * The question itself: point the coding-assistant roles (Langy + the fast
  * assists) at the just-connected codex model, the same role writes the
  * Langy and onboarding flows perform inline during sign-in.
@@ -120,10 +163,13 @@ export function CodexCodingDefaultsDialog({
         </DialogHeader>
         <DialogBody>
           <Text fontSize="sm">
-            Langy and the fast AI assists (search, chat titles, autocomplete,
-            translations) across LangWatch will run on this OpenAI account's
-            plan. The playground, evaluations and workflows keep their current
-            models.
+            Langy and the fast AI assists
+            <FieldInfoTooltip
+              description="The fast assists are the small AI helpers across the product: search, chat titles, autocomplete, and translations."
+              testId="codex-fast-assists-info"
+            />{" "}
+            across LangWatch will run on this OpenAI account's plan. The
+            playground, evaluations and workflows keep their current models.
           </Text>
         </DialogBody>
         <DialogFooter>
@@ -135,30 +181,13 @@ export function CodexCodingDefaultsDialog({
             colorPalette="orange"
             loading={apply.isLoading}
             onClick={() =>
-              void apply
-                .mutateAsync({ projectId, scopes })
-                .then(async () => {
-                  // Refreshes every default-model cache AND snaps Langy's
-                  // model pill to the new default when it was following the
-                  // old one, so the open panel updates without a reload.
-                  await syncLangyAfterCodingDefaultsWrite({
-                    utils,
-                    projectId,
-                  });
-                  toaster.create({
-                    title: "Codex set as the Langy and Fast default",
-                    type: "success",
-                  });
-                  onClose();
-                })
-                .catch((error: unknown) => {
-                  toaster.create({
-                    title: "Could not set the defaults",
-                    description:
-                      error instanceof Error ? error.message : undefined,
-                    type: "error",
-                  });
-                })
+              void acceptCodexCodingDefaults({
+                applyDefaults: apply.mutateAsync,
+                utils,
+                projectId,
+                scopes,
+                onClose,
+              })
             }
           >
             Set as default

@@ -326,7 +326,11 @@ function MessageContentImpl({
             point; all mapping lives in LangyToolActivity. */}
         {plan ? (
           <LangyCardBoundary scope="the plan">
-            <LangyPlanCard plan={plan} isStreaming={isStreaming} />
+            <LangyPlanCard
+              plan={plan}
+              reasoningTitles={reasoningFold.titles}
+              isStreaming={isStreaming}
+            />
           </LangyCardBoundary>
         ) : (
           <LangyCardBoundary scope="the tool activity">

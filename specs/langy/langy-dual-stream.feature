@@ -86,17 +86,15 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     And a reasoning delta is not treated as an answer token
 
   @unit
-  # Bound by TestStreamSession_ReasoningPartTextDeltasNeverBecomeAnswerText
-  # (opencode_test.go). The codex path streams reasoning-summary text on the
-  # SAME field as answer tokens, so the part's declared type is the routing
-  # authority — without it the thinking titles corrupt the persisted answer.
-  Scenario: A reasoning part streaming on the text field is still thinking, not the answer
-    Given the stream declares a reasoning part and then streams its text as plain text deltas
-    And a text part follows with the real answer tokens
-    When the manager forwards the turn
-    Then the reasoning part's deltas ride as ephemeral reasoning frames
-    And only the text part's deltas become answer tokens
-    And the durable final text contains none of the reasoning
+  # Some models narrate their thinking in the same live stream as the answer,
+  # in whatever order the pieces arrive. That narration belongs on the live
+  # reasoning display while Langy works, never in the reply that is kept.
+  Scenario: Thinking narrated alongside the answer stays out of the reply
+    Given Langy thinks out loud while it writes a reply
+    When I watch the turn live
+    Then the thinking appears as live reasoning while Langy works
+    And the reply I keep reads as the answer alone, in the order Langy wrote it
+    And none of the thinking ends up in it
 
   @integration
   Scenario: Reasoning streams to the browser and vanishes when the turn settles

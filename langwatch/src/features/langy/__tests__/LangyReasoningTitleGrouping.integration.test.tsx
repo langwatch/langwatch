@@ -11,7 +11,7 @@
  * client and recharts (loaded transitively by the derived-card renderers).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -200,6 +200,66 @@ describe("given a settled turn whose parts carry reasoning parts", () => {
     expect(
       rows.some((row) => row.includes("Summarizing recent trace counts")),
     ).toBe(true);
+  });
+});
+
+describe("given a settled turn whose process record is a plan", () => {
+  // With a plan, the plan card replaces the completed-actions receipt as the
+  // turn's process record, so the folded headlines must ride the plan card:
+  // stripped from the reply but never dropped.
+  function planMessage(): UIMessage {
+    const text = [
+      "**Planning task execution strategy**",
+      "",
+      `**Summarizing recent trace counts**${REPLY}`,
+    ].join("\n");
+    return assistantMessage([
+      {
+        type: "tool-todowrite",
+        toolCallId: "call-plan",
+        state: "output-available",
+        input: {
+          todos: [
+            { content: "Search the traces", status: "completed" },
+            { content: "Summarize the findings", status: "completed" },
+          ],
+        },
+        output: "ok",
+      },
+      { type: "text", text, role: "assistant" },
+    ]);
+  }
+
+  it("renders no headline as a standalone bold paragraph", () => {
+    const { container } = renderMessage(planMessage());
+    const boldRuns = Array.from(container.querySelectorAll("strong")).map(
+      (el) => el.textContent,
+    );
+    expect(boldRuns).not.toContain("Planning task execution strategy");
+    expect(boldRuns).not.toContain("Summarizing recent trace counts");
+  });
+
+  it("shows the folded headlines inside the plan card's expanded checklist", () => {
+    renderMessage(planMessage());
+
+    fireEvent.click(screen.getByRole("button", { name: /plan · 2 of 2/i }));
+
+    const planCard = screen.getByLabelText("Langy plan");
+    const rows = Array.from(planCard.querySelectorAll("[role='listitem']")).map(
+      (row) => row.textContent ?? "",
+    );
+    expect(
+      rows.some((row) => row.includes("Planning task execution strategy")),
+    ).toBe(true);
+    expect(
+      rows.some((row) => row.includes("Summarizing recent trace counts")),
+    ).toBe(true);
+  });
+
+  it("renders the reply as its own block below the plan card", () => {
+    renderMessage(planMessage());
+    const reply = screen.getByText(REPLY);
+    expect(reply.closest("p")?.textContent).toBe(REPLY);
   });
 });
 

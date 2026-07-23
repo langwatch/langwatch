@@ -211,24 +211,52 @@ const llmUpstreamErrorCode = herr.Code("llm_upstream_error")
 // capture, so a pathological body never bloats the error frame.
 const maxUpstreamMessageBytes = 2048
 
+// maxProviderTypeBytes bounds the provider error type carried as a typed
+// reason on a best-effort capture; a longer string is not a discriminant
+// anyone classifies on.
+const maxProviderTypeBytes = 128
+
 // decodeLLMErrorBody turns a failed LLM response body into the herr.E the turn's
-// terminal error frame carries as its cause. Typed gateway envelopes decode
-// losslessly (typed=true). Anything else — provider-native error JSON the
-// gateway forwards byte-for-byte, or plain text — is captured best-effort as an
-// `llm_upstream_error` whose Meta["message"] holds the provider's own message
-// (typed=false). Provider error messages are client-facing by design (the same
-// body the SDK shows), so carrying the prose is safe.
+// terminal error frame carries as its cause. Typed gateway envelopes (see
+// isGatewayEnvelope) decode losslessly (typed=true). Anything else, whether
+// provider-native error JSON the gateway forwards byte-for-byte or plain text,
+// is captured best-effort as an `llm_upstream_error` whose Meta["message"]
+// holds the provider's own message (typed=false). Provider error messages are
+// client-facing by design (the same body the SDK shows), so carrying the prose
+// is safe. When a provider-native body names its own error type, that
+// discriminant rides as a typed reason under the `llm_upstream_error`: the
+// control plane classifies known provider discriminants by exact reason code
+// (the codex backend's `usage_limit_reached` becomes the plan-limit card)
+// while the top-level cause still says the failure came from upstream.
 func decodeLLMErrorBody(peeked []byte) (e herr.E, typed bool) {
 	var envelope herr.ErrorResponse
-	if json.Unmarshal(peeked, &envelope) == nil &&
-		(envelope.Error.Type != "" || envelope.Error.Code != "") {
+	if json.Unmarshal(peeked, &envelope) == nil && isGatewayEnvelope(envelope.Error) {
 		return herr.FromBody(envelope.Error), true
 	}
 	e = herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{}}
 	if message := extractUpstreamErrorMessage(peeked); message != "" {
 		e.Meta["message"] = message
 	}
+	if t := gjson.GetBytes(peeked, "error.type"); t.Type == gjson.String &&
+		t.Str != "" && len(t.Str) <= maxProviderTypeBytes {
+		e.Reasons = []error{herr.E{Code: herr.Code(t.Str)}}
+	}
 	return e, false
+}
+
+// isGatewayEnvelope reports whether a failed response body is the gateway's
+// own herr envelope rather than provider-native error JSON. The gateway
+// always emits `error.type` and `error.code` with the SAME value plus a
+// non-empty `error.message` (pkg/herr's toErrorBody dual emission); provider
+// dialects reuse the field names but not the matched pair: Anthropic sends
+// `type` without `code`, the codex backend sends `type` only or a bare
+// `detail`, and OpenAI's `code` (when present) rarely matches its `type`.
+// A provider body that does emit the full matched shape decodes typed; its
+// message is preserved in Meta["message"] either way (herr.FromBody), so the
+// terminal error frame names the real failure regardless of which side of
+// the gate a body lands on.
+func isGatewayEnvelope(body herr.ErrorBody) bool {
+	return body.Code != "" && body.Type == body.Code && body.Message != ""
 }
 
 // extractUpstreamErrorMessage pulls the human-readable message out of the known

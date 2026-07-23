@@ -17,7 +17,6 @@ export function Codex() {
   return (
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
       <title>Codex</title>
-      {/* Light mode: the white rounded tile with the purple-blue gradient glyph. */}
       <Box as="g" _dark={{ display: "none" }}>
         <path
           d="M19.503 0H4.496A4.496 4.496 0 000 4.496v15.007A4.496 4.496 0 004.496 24h15.007A4.496 4.496 0 0024 19.503V4.496A4.496 4.496 0 0019.503 0z"
@@ -28,7 +27,6 @@ export function Codex() {
           fill="url(#codex-brand-gradient)"
         />
       </Box>
-      {/* Dark mode: the bare glyph at full bleed, in white. */}
       <Box as="g" display="none" _dark={{ display: "inline" }}>
         <path
           fill="#fff"

@@ -567,20 +567,6 @@ function ComposerImpl({
             // See the note on the context summary above: the hero stays bare.
             display={hero ? "none" : undefined}
           >
-            {/* The pill goes in a shrinkable wrapper rather than straight into
-                the row. Ark's combobox root is a layout box of its own, and
-                left as the flex item it can claim the rail's whole width —
-                which squeezed the spacer to nothing and pushed the sigils onto
-                a line of their own. The wrapper is the flex item now: it may
-                shrink to nothing and it may not grow, so the row's shape can
-                never depend on how wide the selected model's name happens to
-                be. */}
-            <Box
-              minWidth={0}
-              flexShrink={1}
-              flexGrow={0}
-              overflow="hidden"
-            ></Box>
             <Box flex={1} minWidth={0} />
             {/* The two keys, said out loud. A palette you can only reach by
                 guessing a keystroke is a palette most people never see, so the

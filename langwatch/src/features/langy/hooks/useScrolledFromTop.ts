@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from "react";
 export function useScrolledFromTop(
   scrollRef: React.RefObject<HTMLElement | null>,
 ): boolean {
-  const [scrolledFromTop, setScrolledFromTop] = useState(false);
+  const [isScrolledFromTop, setIsScrolledFromTop] = useState(false);
   const subscribedRef = useRef<HTMLElement | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
@@ -31,12 +31,12 @@ export function useScrolledFromTop(
     unsubscribeRef.current = null;
     subscribedRef.current = el;
     if (!el) {
-      setScrolledFromTop(false);
+      setIsScrolledFromTop(false);
       return;
     }
     // A pixel of slack: fractional zoom and smooth-scroll settling can leave
     // sub-pixel residue at the top, which must still count as "at the top".
-    const update = () => setScrolledFromTop(el.scrollTop > 1);
+    const update = () => setIsScrolledFromTop(el.scrollTop > 1);
     update();
     el.addEventListener("scroll", update, { passive: true });
     unsubscribeRef.current = () => el.removeEventListener("scroll", update);
@@ -44,5 +44,5 @@ export function useScrolledFromTop(
 
   useEffect(() => () => unsubscribeRef.current?.(), []);
 
-  return scrolledFromTop;
+  return isScrolledFromTop;
 }

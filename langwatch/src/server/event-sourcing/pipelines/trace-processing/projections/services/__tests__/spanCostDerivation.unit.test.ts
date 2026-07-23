@@ -129,46 +129,48 @@ describe("deriveSpanCost", () => {
       });
     };
 
-    /** @scenario A codex span's computed cost is classified as bundled */
-    it("computes a positive cost from the underlying OpenAI pricing and reports it all as bundled", () => {
-      // The gateway's wire shape: codex provider name, the bare underlying
-      // model id, and a zero usage cost (the plan is billed, not tokens).
-      const span = canonicalizedCodexSpan({
-        "gen_ai.provider.name": "openai_codex",
-        "gen_ai.operation.name": "responses",
-        "gen_ai.request.model": "gpt-5.6-terra",
-        "gen_ai.usage.input_tokens": 37749,
-        "gen_ai.usage.output_tokens": 181,
-        "gen_ai.usage.cost": 0,
-        "langwatch.span.type": "llm",
+    describe("when its per-span cost is derived", () => {
+      /** @scenario A codex span's computed cost is classified as bundled */
+      it("computes a positive cost from the underlying OpenAI pricing and reports it all as bundled", () => {
+        // The gateway's wire shape: codex provider name, the bare underlying
+        // model id, and a zero usage cost (the plan is billed, not tokens).
+        const span = canonicalizedCodexSpan({
+          "gen_ai.provider.name": "openai_codex",
+          "gen_ai.operation.name": "responses",
+          "gen_ai.request.model": "gpt-5.6-terra",
+          "gen_ai.usage.input_tokens": 37749,
+          "gen_ai.usage.output_tokens": 181,
+          "gen_ai.usage.cost": 0,
+          "langwatch.span.type": "llm",
+        });
+
+        const { cost, nonBilledCost } = deriveSpanCost({
+          span,
+          spanCostService,
+        });
+
+        expect(cost).not.toBeNull();
+        expect(cost).toBeGreaterThan(0);
+        expect(nonBilledCost).toBe(cost);
       });
 
-      const { cost, nonBilledCost } = deriveSpanCost({
-        span,
-        spanCostService,
+      it("prices a codex-prefixed model id from the same OpenAI entry and keeps it bundled", () => {
+        const span = canonicalizedCodexSpan({
+          "gen_ai.request.model": "openai_codex/gpt-5.6-terra",
+          "gen_ai.usage.input_tokens": 1000,
+          "gen_ai.usage.output_tokens": 500,
+          "langwatch.span.type": "llm",
+        });
+
+        const { cost, nonBilledCost } = deriveSpanCost({
+          span,
+          spanCostService,
+        });
+
+        expect(cost).not.toBeNull();
+        expect(cost).toBeGreaterThan(0);
+        expect(nonBilledCost).toBe(cost);
       });
-
-      expect(cost).not.toBeNull();
-      expect(cost).toBeGreaterThan(0);
-      expect(nonBilledCost).toBe(cost);
-    });
-
-    it("prices a codex-prefixed model id from the same OpenAI entry and keeps it bundled", () => {
-      const span = canonicalizedCodexSpan({
-        "gen_ai.request.model": "openai_codex/gpt-5.6-terra",
-        "gen_ai.usage.input_tokens": 1000,
-        "gen_ai.usage.output_tokens": 500,
-        "langwatch.span.type": "llm",
-      });
-
-      const { cost, nonBilledCost } = deriveSpanCost({
-        span,
-        spanCostService,
-      });
-
-      expect(cost).not.toBeNull();
-      expect(cost).toBeGreaterThan(0);
-      expect(nonBilledCost).toBe(cost);
     });
   });
 });

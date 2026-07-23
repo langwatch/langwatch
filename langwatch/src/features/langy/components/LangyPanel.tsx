@@ -1253,7 +1253,7 @@ function LangyPanel({
   // Drives the scroller's top mask (see CONVERSATION_EDGE_MASK_*): the fade
   // may only dim content actually scrolled off above, never the first
   // message at rest.
-  const conversationScrolledFromTop = useScrolledFromTop(scrollRef);
+  const isConversationScrolledFromTop = useScrolledFromTop(scrollRef);
 
   // The setup verdict arrives ASYNC (the resolved-default query): between the
   // panel opening and `langyNeedsModel` flipping true, auto-follow is still
@@ -2343,10 +2343,10 @@ function LangyPanel({
                     // scroll position is documented at CONVERSATION_EDGE_MASK_*.
                     css={{
                       "&:focus-visible": { outline: "none" },
-                      maskImage: conversationScrolledFromTop
+                      maskImage: isConversationScrolledFromTop
                         ? CONVERSATION_EDGE_MASK_SCROLLED
                         : CONVERSATION_EDGE_MASK_AT_TOP,
-                      WebkitMaskImage: conversationScrolledFromTop
+                      WebkitMaskImage: isConversationScrolledFromTop
                         ? CONVERSATION_EDGE_MASK_SCROLLED
                         : CONVERSATION_EDGE_MASK_AT_TOP,
                     }}
