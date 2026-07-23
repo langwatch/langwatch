@@ -111,6 +111,7 @@ Workflow tier, unchanged in behaviour but de-aliased:
 
 ```
 haven pr <ref>        try a GitHub PR in a fresh worktree (--force renamed --allow-closed)
+haven play [pr]       run a PR in a throwaway sandbox; quitting destroys everything it created
 haven git [target]    embedded git TUI across worktrees
 haven switch [name]   cd helper (with shell-init)
 haven shell-init      emit the shell function + completion
@@ -221,6 +222,46 @@ view in attached mode is just a live rendering of the same tap. Consequently:
 | `git --list` vs `switch --list` divergence | `--json` on `git`; `switch --list` stays (completion) |
 | selection env vars | sticky `up +svc` / `-svc` (one-release warning bridge) |
 | `HAVEN_LANGY_REBUILD` | content-hashed images + `--rebuild` |
+
+### haven play: an ephemeral PR sandbox
+
+`haven play [pr]` is a workflow-tier verb, sibling of `pr`, not a daily
+driver: it exists for reviewing someone else's work, which happens a few
+times a day at most, while the daily tier is about your own worktree. The
+two commands split one job cleanly: `pr` gives a PR a persistent worktree on
+the shared servers (a lasting checkout you might edit), `play` gives it a
+disposable sandbox with dedicated infrastructure that is destroyed the
+moment you quit.
+
+The rules it adds, and how they honour the constitution:
+
+- **Isolation is total.** The sandbox gets its own git checkout (under the
+  haven home, not among real worktrees), its own Postgres, ClickHouse, and
+  Redis containers and volumes (all `haven-play-<n>-*` names on freshly
+  allocated loopback ports, provably disjoint from the shared
+  `langwatch-db-data`/`langwatch-clickhouse-data`/`langwatch-redis-data`
+  volumes and the shared Redis on 6379), and its own `play-<n>` slug, which
+  can never equal a `haven pr` checkout's `pr-<n>` slug, so both can exist
+  for the same PR.
+- **Trust is gated before checkout.** Every commit author AND committer on
+  the PR is checked for write access; an identity with no GitHub account is
+  untrusted by definition. Any untrusted identity stops play: a real y/N
+  prompt (default no) naming the authors in a terminal, a hard failure in
+  agent mode, where `--allow-untrusted` is the only way past. Not `--force`:
+  that letter is lifecycle-only, and accepting untrusted code deserves a
+  flag that says exactly what it does.
+- **Quitting always destroys everything** (processes, hostnames, containers,
+  volumes, checkout, record), the exact opposite of `up`, where q detaches.
+  No `--yes` is asked at teardown: the data-loss-is-explicit rule is
+  satisfied by upfront disclosure instead, in the command's help line and in
+  a banner printed before anything is created. Teardown is ordered,
+  best-effort (a failed step never stops the rest), and deferred behind the
+  signal context, so SIGINT/SIGTERM/panic still run it.
+- **A hard death is recoverable.** The sandbox is recorded before any
+  resource exists; `haven clean` reaps any sandbox whose owning process is
+  gone by finishing the same teardown.
+
+Spec: `specs/setup/haven-play.feature`.
 
 ## Rationale / Trade-offs
 

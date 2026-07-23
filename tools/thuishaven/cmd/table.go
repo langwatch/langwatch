@@ -313,6 +313,25 @@ var table = []commandSpec{
 		},
 	},
 	{
+		name:    "play",
+		summary: "run a PR in a throwaway sandbox: own checkout + databases; quitting DESTROYS everything it created",
+		args:    "[pr]",
+		maxArgs: 1,
+		flags: []flagSpec{
+			{long: "--allow-untrusted", summary: "proceed although not every PR author has write access (the only way in agent mode)"},
+		},
+		run: runPlay,
+	},
+	{
+		// The backgrounded sandbox launcher `haven play` spawns in the play
+		// checkout - internal, like daemon: dispatchable, absent from help.
+		name:    "play-launch",
+		args:    "<number>",
+		maxArgs: 1,
+		hidden:  true,
+		run:     runPlayLaunchCmd,
+	},
+	{
 		name:    "git",
 		summary: "embedded git TUI for a worktree (slug, name, or path)",
 		args:    "[target]",
