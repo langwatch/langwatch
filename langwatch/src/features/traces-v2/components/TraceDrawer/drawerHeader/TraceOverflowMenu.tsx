@@ -31,6 +31,8 @@ interface TraceOverflowMenuProps {
   dejaViewHref: string | null;
   onOpenRawJson: () => void;
   onShowShortcuts: () => void;
+  /** Opens the share dialog. Rendered by the header so the menu returns no JSX. */
+  onShare: () => void;
   /** Current dock state. When true the drawer stays open on outside clicks. */
   pinned: boolean;
   onTogglePinned: () => void;
@@ -50,11 +52,13 @@ export function TraceOverflowMenu({
   dejaViewHref,
   onOpenRawJson,
   onShowShortcuts,
+  onShare,
   pinned,
   onTogglePinned,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const canShare = hasPermission("traces:share");
 
   const utils = api.useUtils();
   const pinQuery = api.pinnedTrace.getPin.useQuery(
@@ -183,13 +187,14 @@ export function TraceOverflowMenu({
           </Menu.Item>
         )}
 
-        <Menu.Item value="share" disabled>
-          <HStack gap={2} opacity={0.5}>
-            <Icon as={LuShare2} boxSize={3.5} />
-            <Text>Share</Text>
-          </HStack>
-          <Menu.ItemCommand>soon</Menu.ItemCommand>
-        </Menu.Item>
+        {canShare && (
+          <Menu.Item value="share" onClick={onShare}>
+            <HStack gap={2}>
+              <Icon as={LuShare2} boxSize={3.5} />
+              <Text>Share</Text>
+            </HStack>
+          </Menu.Item>
+        )}
 
         {project && (
           <Menu.Item

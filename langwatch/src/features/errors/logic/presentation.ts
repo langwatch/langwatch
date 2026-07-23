@@ -269,6 +269,48 @@ const presentations = {
     describe: () => "Pick a different name for this dataset.",
   },
 
+  // ---- shared trace links (ADR-057) ----
+  // The first five answer the anonymous share surface, so the reader is a
+  // recipient who did nothing wrong and cannot fix the link — the copy points
+  // them back at whoever shared it. `share_link_not_found` deliberately reads
+  // the same whether the token never existed, sharing was switched off, or the
+  // trace is gone: the server collapses all three so a prober learns nothing,
+  // and the copy must not undo that by hinting which happened.
+  share_link_not_found: {
+    title: "This shared link isn't available",
+    describe: () =>
+      "It may have been removed, or sharing has been turned off. Ask whoever shared it for a new link.",
+  },
+  share_link_forbidden: {
+    // 401, not 403: the viewer is invited to sign in rather than told the link
+    // is dead. Copy works for the anonymous prober and the wrong-account member
+    // alike.
+    title: "You need access to view this",
+    describe: () =>
+      "This link is limited to certain people. Sign in with an account that can see it.",
+  },
+  share_link_expired: {
+    title: "This shared link has expired",
+    describe: () => "Ask whoever shared it for a new link.",
+  },
+  share_link_exhausted: {
+    title: "This shared link has already been viewed",
+    describe: () =>
+      "It was set to open a limited number of times. Ask whoever shared it for a new link.",
+  },
+  share_read_rate_limited: {
+    title: "This shared trace is busy right now",
+    describe: () =>
+      "It's being opened a lot at the moment. Wait a few seconds, then refresh.",
+  },
+  // The one sharer-facing code here: raised when someone tries to mint a trace
+  // link while the project has sharing switched off.
+  trace_sharing_disabled: {
+    title: "Sharing is turned off for this project",
+    describe: () =>
+      "Ask a project admin to turn on trace sharing before creating a link.",
+  },
+
   // ---- suites (run plans) ----
   suite_not_found: { title: "Run plan not found" },
   suite_name_taken: {

@@ -86,6 +86,11 @@ export const APP_ERROR_CODES = [
   "rum_rate_limited",
   "scenario_set_limit_exceeded",
   "schema_failure",
+  "share_link_exhausted",
+  "share_link_expired",
+  "share_link_forbidden",
+  "share_link_not_found",
+  "share_read_rate_limited",
   "span_not_found",
   "subscription_service_unavailable",
   "suite_all_scenarios_archived",
@@ -101,6 +106,7 @@ export const APP_ERROR_CODES = [
   "time_range_too_wide",
   "trace_not_evaluatable",
   "trace_not_found",
+  "trace_sharing_disabled",
   // Also a Go code, with copy already written under the shared/transport
   // heading — an app-level subclass raises it too (`ee/admin/routes/admin.ts`),
   // and the scan is right to insist it be listed here as well.

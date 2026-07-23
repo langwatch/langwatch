@@ -26,6 +26,7 @@ import type { ReplayService } from "./ops/replay.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
+import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import type { ShareService } from "./share/share.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
@@ -144,6 +145,7 @@ export interface AppDependencies {
   retentionPolicyCache: RetentionPolicyCache;
   dataRetention: DataRetentionDependencies;
   share: ShareService;
+  sharedTraceCache: SharedTracePayloadCache;
   commands: AppCommands;
   ops?: OpsDependencies;
 

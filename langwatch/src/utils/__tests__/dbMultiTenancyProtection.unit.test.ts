@@ -829,3 +829,132 @@ describe("project-tenancy regime partition", () => {
     expect(withoutProjectId).toEqual([]);
   });
 });
+
+/**
+ * ShareLink query shapes (ADR-057). Anonymous share resolution presents only a
+ * secret token — the row is what teaches the caller its projectId — so the
+ * token/id lookups are exempt, and NOTHING else is. Every *write* must still
+ * be project-scoped. `consumeView` (né `incrementViewCount`) originally used
+ * `update({ where: { id } })` and blew up at runtime on the first share
+ * resolve; these lock the real repository's query shapes in.
+ */
+describe("guardProjectId — ShareLink", () => {
+  describe("findUnique by token (the anonymous capability lookup)", () => {
+    it("does NOT throw — projectId cannot be known before the row is read", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "findUnique",
+          args: { where: { token: "tok_abc" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findUnique by id", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "findUnique",
+          args: { where: { id: "share_1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findFirst by resourceType + resourceId without projectId", () => {
+    it("throws — only the token/id capability lookups are exempt", async () => {
+      // Regression guard: the exemption once covered this shape for a
+      // repository method that no longer exists; nothing may quietly start
+      // enumerating another tenant's share rows by resource id.
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "findFirst",
+          args: { where: { resourceType: "TRACE", resourceId: "trace_a" } },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+
+  describe("updateMany scoped by id + projectId + view cap (consumeView)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "updateMany",
+          args: {
+            where: { id: "share_1", projectId: "project_1", viewCount: { lt: 1 } },
+            data: { viewCount: { increment: 1 } },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("update scoped only by primary key", () => {
+    it("throws — a write must carry projectId", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "update",
+          args: {
+            where: { id: "share_1" },
+            data: { viewCount: { increment: 1 } },
+          },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+
+  describe("create carrying projectId in data", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "create",
+          args: {
+            data: {
+              token: "tok_abc",
+              projectId: "project_1",
+              resourceType: "TRACE",
+              resourceId: "trace_a",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("deleteMany scoped by id + projectId (revokeById)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "deleteMany",
+          args: { where: { id: "share_1", projectId: "project_1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("count scoped by projectId (hasActiveShareForResource)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "count",
+          args: {
+            where: {
+              projectId: "project_1",
+              resourceType: "TRACE",
+              resourceId: "trace_a",
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
