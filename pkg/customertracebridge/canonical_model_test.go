@@ -47,6 +47,6 @@ func TestEndSpan_CanonicalModelID(t *testing.T) {
 	})
 
 	t.Run("reports an empty model as empty", func(t *testing.T) {
-		assert.Equal(t, "", canonicalModelID(domain.ProviderAnthropic, ""))
+		assert.Empty(t, canonicalModelID(domain.ProviderAnthropic, ""))
 	})
 }
