@@ -143,9 +143,31 @@ Independently of the store: fix the **session = traceId fallback** so one large 
 ## Adopters & sequencing
 
 1. **Now (relief):** `refoldOnOutOfOrder: false` on `codingAgentSession` — safe today (order-insensitive derivation), stops the replay storm. Small standalone PR.
-2. **Pillar 1, first adopter:** `codingAgentSession` → lossless read-back store (kills `refoldOnStoreMiss` on the hot path). Then roll the same pattern to any other lossy-row fold.
+2. **Pillar 1, first adopter:** `codingAgentSession` → lossless read-back store (kills `refoldOnStoreMiss` on the hot path). The concrete shape is in *"codingAgentSession decomposition"* below. Then roll the same pattern to any other lossy-row fold.
 3. **Pillar 2, first adopter:** append coalescing for `recordTriggerMatch`; audit other high-fan-in `event_log` producers and coalesce them.
 4. **Durable dedup watermark** in fold state — closes the cold idempotency hole so "throw-and-retry" is truly idempotent even across cache loss (the applied-event-id set is cache-only today).
+
+## codingAgentSession decomposition (Pillar 1 adopter #1)
+
+The reason `codingAgentSession.get()` returns `null` today is **not** that the row is inherently un-round-trippable — it is that the projection is carrying two things it shouldn't, and dropping one field on the way to the row. The generic store does not serialize state to a blob; ClickHouse keeps a **typed, indexed, queryable row**. The fix is to close the round-trip gap with typed columns and to move the one field that is really a *different projection* out of the fold.
+
+The real gap between `CodingAgentSessionState` and the persisted row is five things, four of them trivial:
+
+| Gap | Cause | Fix |
+|---|---|---|
+| `subAgentIds: string[]` | "bookkeeping only, not projected" — the dedup set behind the `subAgents` count | add a bounded `Array(String)` column |
+| `previousCallContextTokens: number` | "bookkeeping only" — last call's context size, to detect the *next* cache rebuild | add a `UInt64` column (read-back is **more** faithful than a sorted refold here) |
+| `steps[].startedAtMs` | `SessionStep` has four fields; `projectToRow` writes a **3-tuple** `[name,count,failed]`, dropping `startedAtMs` | persist the 4-tuple — this, not "first-seen identity", is the genuine ordering gap the old store comment blamed |
+| `createdAt` / `updatedAt` / `LastEventOccurredAt` | fold bookkeeping timestamps not on the row | three scalar columns |
+| `metricSeries: Record<string, MetricSeriesFact>` | "bookkeeping only" — the converged units behind 8 metric-fed columns, **recomputed in the fold on every metric event** | **leaves the fold entirely** — see below |
+
+**Metric series is the wrong-shape field, and it already has its own projection.** `sessionMetricSeries` (map projection → `session_metric_series`) already materialises exactly these converged units, LWW-deduped, read as `SUM(...) GROUP BY`. The fold keeps a *second* in-memory copy (`metricSeries`) only to re-derive 8 denormalised columns (`linesAdded`, `linesRemoved`, `commits`, `pullRequests`, `editsAccepted`, `editsRejected`, `languagesEdited`, `atMentions`). That duplicated aggregate is the one piece of fold state that resists round-tripping — so it is the piece to remove, not to persist:
+
+- **Drop `metricSeries` from the fold state and the 8 metric-fed columns from `coding_agent_sessions`.** The fold still *reacts* to `metric_facts_contributed` (for identity, `startedAtMs`, and so a metric-only session still produces a row) but stores nothing metric-derived.
+- **The 8 values are read from `session_metric_series`** where they already live — a bounded per-session `SUM(...) GROUP BY` overlay at read time. That is a *map/rollup projection read*, not fold-state read-time aggregation, so it does not violate caveat 4 (which is about fold state).
+- **If a list/analytics view needs the 8 values as cheap columns across many sessions**, that is the case for a keyed **rollup projection** — a `session_metrics_rollup` table keyed by `(TenantId, SessionId)`, fed by the same metric contributions (ADR-034 rollup pattern) — added *only* when the per-session overlay's read cost proves it, and still a separate projection, never fold state on the session.
+
+Net: the session fold becomes round-trippable by construction (four typed columns, no blob, no exotic type), `get()` reads its own last row via `fromRow`, `refoldOnStoreMiss`/`refoldOnOutOfOrder` are deleted, and the metric aggregate stays where it already correctly lives. Supersedes the bespoke read-back of PR #6081, which hand-rolled recovery inside the projection's own store instead of using the platform store.
 
 ## Server-side ClickHouse settings (defense-in-depth)
 
