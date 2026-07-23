@@ -208,6 +208,24 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     Then both call sites invoke the same leanForProjection function
     And the derived shapes are byte-identical
 
+  @unit @track2
+  # A blind byte cut of an over-budget JSON chat payload leaves unparseable
+  # JSON in the preview, and everything computed from the leaned span — the
+  # fold's ComputedInput/ComputedOutput, the trace list, the Summary and
+  # Conversation views — degrades to a raw JSON blob. A coding-agent turn's
+  # developer/system prompt alone exceeds the budget, so every such turn used
+  # to lose its short user message ("hi") past the cut. Bound by
+  # lean-for-projection.unit.test.ts + trace-io-extraction.service.unit.test.ts.
+  Scenario: The preview of an over-budget chat payload stays structured and extractable
+    Given a span whose gen_ai.input.messages is a JSON chat array over the preview budget
+    And the array starts with a developer-role message larger than the whole budget
+    And the array ends with the user's short message
+    When leanForProjection derives the preview
+    Then the preview is valid JSON within the budget
+    And long message contents are clamped rather than the JSON cut mid-string
+    And middle messages are dropped before the first message or the newest tail
+    And trace input extraction on the leaned span still yields the user's message text
+
   @integration @track2
   # Already bound to span-attribute-keys.unit.test.ts via the existing
   # @scenario annotation on its test cases. Carry forward from ADR-021.

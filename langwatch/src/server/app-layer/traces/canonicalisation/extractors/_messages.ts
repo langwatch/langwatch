@@ -135,7 +135,7 @@ export const extractSystemInstructionFromMessages = (
   }
 
   const first = messages[0];
-  if (!isMessageLike(first) || first.role !== "system") {
+  if (!isMessageLike(first) || !isSystemRole(first.role)) {
     return null;
   }
 
@@ -161,8 +161,17 @@ export const extractSystemInstructionFromMessages = (
 };
 
 /**
- * Filters out system-role messages from a messages array.
- * System instructions are extracted separately via extractSystemInstructionFromMessages.
+ * True for the roles that carry SYSTEM instructions: the standard "system"
+ * and the OpenAI Responses-dialect "developer" spelling. One predicate shared
+ * by extraction and stripping so the two can never disagree on what counts.
+ */
+export const isSystemRole = (role: unknown): boolean =>
+  role === "system" || role === "developer";
+
+/**
+ * Filters out system-role messages (including the `developer` spelling) from
+ * a messages array. System instructions are extracted separately via
+ * extractSystemInstructionFromMessages.
  */
 export const stripSystemMessages = (messages: unknown[]): unknown[] =>
   messages.filter(
@@ -170,7 +179,7 @@ export const stripSystemMessages = (messages: unknown[]): unknown[] =>
       !(
         m &&
         typeof m === "object" &&
-        (m as Record<string, unknown>).role === "system"
+        isSystemRole((m as Record<string, unknown>).role)
       ),
   );
 
