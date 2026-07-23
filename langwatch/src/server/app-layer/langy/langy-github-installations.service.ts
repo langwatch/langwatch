@@ -41,6 +41,33 @@ export type LangyGithubWebhookAction =
   | "added"
   | "removed";
 
+/**
+ * Thrown when a `/setup` callback tries to bind an installation that another
+ * organization already owns — the cross-tenant installation-takeover guard.
+ *
+ * The `installation_id` at `/setup` is an attacker-controllable query param that
+ * is NOT part of the signed state, and `getInstallation` authenticates as the
+ * App (so it returns metadata for ANY installation of this App, on ANY account).
+ * Without this guard, a caller holding a valid signed state for their OWN org
+ * could point `/setup` at a victim org's installation id and have the upsert
+ * rebind that unique-`installationId` row to their org — silently stealing
+ * 1h `contents:write`/`pull_requests:write` tokens on the victim's private
+ * repos. The route maps this to the generic install-failed message so a blocked
+ * attacker learns nothing about whether the id exists.
+ */
+export class LangyGithubInstallationConflictError extends Error {
+  constructor(
+    public readonly installationId: string,
+    public readonly existingOrganizationId: string,
+    public readonly attemptedOrganizationId: string,
+  ) {
+    super(
+      `GitHub installation ${installationId} is already connected to a different organization`,
+    );
+    this.name = "LangyGithubInstallationConflictError";
+  }
+}
+
 export class LangyGithubInstallationsService {
   constructor(
     private readonly repo: LangyGithubInstallationsRepository,
@@ -86,6 +113,23 @@ export class LangyGithubInstallationsService {
     organizationId: string;
   }): Promise<{ accountLogin: string }> {
     const details = await this.appTokens.getInstallation(installationId);
+
+    // Cross-tenant takeover guard: never let a `/setup` call rebind an
+    // installation another org already owns. `installationId` is unique, so an
+    // upsert would otherwise overwrite the existing row's `organizationId`. A
+    // genuine re-install of the same account under the SAME org still upserts
+    // cleanly (same org → no conflict). See LangyGithubInstallationConflictError.
+    const existing = await this.repo.findByInstallationId(
+      details.installationId,
+    );
+    if (existing && existing.organizationId !== organizationId) {
+      throw new LangyGithubInstallationConflictError(
+        details.installationId,
+        existing.organizationId,
+        organizationId,
+      );
+    }
+
     let repositories: LangyGithubRepositoryRef[] | null = null;
     if (details.repositorySelection === "selected") {
       // Best-effort: cache the selected repo list so settings can show it

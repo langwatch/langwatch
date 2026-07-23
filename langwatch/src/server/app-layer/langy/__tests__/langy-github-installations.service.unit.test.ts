@@ -8,7 +8,10 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { LangyGithubInstallationsService } from "../langy-github-installations.service";
+import {
+  LangyGithubInstallationConflictError,
+  LangyGithubInstallationsService,
+} from "../langy-github-installations.service";
 import { computeRepoScopeKey } from "../langyGithubAppToken";
 import type {
   LangyGithubInstallationRow,
@@ -108,6 +111,43 @@ describe("recordInstallation", () => {
         repositorySelection: "all",
       }),
     );
+  });
+
+  describe("when the installation is already owned by a different organization", () => {
+    it("rejects the rebind and never upserts (cross-tenant takeover guard)", async () => {
+      // inst-1 already belongs to org-1; a /setup call bound to org-2 (an
+      // attacker's own org, with a valid signed state) must not steal it.
+      const repo = makeRepo([row({ installationId: "inst-1", organizationId: "org-1" })]);
+      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+
+      await expect(
+        svc.recordInstallation({
+          installationId: "inst-1",
+          organizationId: "org-2",
+        }),
+      ).rejects.toBeInstanceOf(LangyGithubInstallationConflictError);
+
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the same organization re-installs the same installation", () => {
+    it("upserts cleanly (no conflict on a genuine re-install)", async () => {
+      const repo = makeRepo([row({ installationId: "inst-1", organizationId: "org-1" })]);
+      const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
+
+      await svc.recordInstallation({
+        installationId: "inst-1",
+        organizationId: "org-1",
+      });
+
+      expect(repo.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          installationId: "inst-1",
+          organizationId: "org-1",
+        }),
+      );
+    });
   });
 });
 
