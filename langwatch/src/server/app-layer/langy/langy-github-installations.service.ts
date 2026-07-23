@@ -56,15 +56,26 @@ export type LangyGithubWebhookAction =
  * attacker learns nothing about whether the id exists.
  */
 export class LangyGithubInstallationConflictError extends Error {
-  constructor(
-    public readonly installationId: string,
-    public readonly existingOrganizationId: string,
-    public readonly attemptedOrganizationId: string,
-  ) {
+  public readonly installationId: string;
+  public readonly existingOrganizationId: string;
+  public readonly attemptedOrganizationId: string;
+
+  constructor({
+    installationId,
+    existingOrganizationId,
+    attemptedOrganizationId,
+  }: {
+    installationId: string;
+    existingOrganizationId: string;
+    attemptedOrganizationId: string;
+  }) {
     super(
       `GitHub installation ${installationId} is already connected to a different organization`,
     );
     this.name = "LangyGithubInstallationConflictError";
+    this.installationId = installationId;
+    this.existingOrganizationId = existingOrganizationId;
+    this.attemptedOrganizationId = attemptedOrganizationId;
   }
 }
 
@@ -114,22 +125,6 @@ export class LangyGithubInstallationsService {
   }): Promise<{ accountLogin: string }> {
     const details = await this.appTokens.getInstallation(installationId);
 
-    // Cross-tenant takeover guard: never let a `/setup` call rebind an
-    // installation another org already owns. `installationId` is unique, so an
-    // upsert would otherwise overwrite the existing row's `organizationId`. A
-    // genuine re-install of the same account under the SAME org still upserts
-    // cleanly (same org → no conflict). See LangyGithubInstallationConflictError.
-    const existing = await this.repo.findByInstallationId(
-      details.installationId,
-    );
-    if (existing && existing.organizationId !== organizationId) {
-      throw new LangyGithubInstallationConflictError(
-        details.installationId,
-        existing.organizationId,
-        organizationId,
-      );
-    }
-
     let repositories: LangyGithubRepositoryRef[] | null = null;
     if (details.repositorySelection === "selected") {
       // Best-effort: cache the selected repo list so settings can show it
@@ -145,7 +140,8 @@ export class LangyGithubInstallationsService {
         );
       }
     }
-    await this.repo.upsert({
+
+    const input = {
       installationId: details.installationId,
       organizationId,
       accountLogin: details.accountLogin,
@@ -153,7 +149,28 @@ export class LangyGithubInstallationsService {
       accountId: details.accountId,
       repositorySelection: details.repositorySelection,
       repositories,
-    });
+    };
+
+    // Cross-tenant takeover guard, made race-safe: `insertOrGetExisting`
+    // claims the installation atomically via the DB's unique index rather
+    // than this code checking-then-writing across two awaits, so two
+    // concurrent `/setup` calls racing for the same fresh installation id can
+    // never both observe "unclaimed". Whichever loses the race always sees
+    // the winner's committed org here.
+    const { inserted, row } = await this.repo.insertOrGetExisting(input);
+    if (!inserted) {
+      if (row.organizationId !== organizationId) {
+        throw new LangyGithubInstallationConflictError({
+          installationId: details.installationId,
+          existingOrganizationId: row.organizationId,
+          attemptedOrganizationId: organizationId,
+        });
+      }
+      // Genuine re-install under the SAME org: refresh the cached account +
+      // repo fields (the initial insert attempt above never landed).
+      await this.repo.upsert(input);
+    }
+
     return { accountLogin: details.accountLogin };
   }
 

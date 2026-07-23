@@ -113,6 +113,40 @@ export class PrismaLangyGithubInstallationsRepository
     });
   }
 
+  async insertOrGetExisting(
+    input: UpsertLangyGithubInstallationInput,
+  ): Promise<{ inserted: boolean; row: LangyGithubInstallationRow }> {
+    try {
+      const created = await this.prisma.langyGithubInstallation.create({
+        data: {
+          installationId: input.installationId,
+          organizationId: input.organizationId,
+          accountLogin: input.accountLogin,
+          accountType: input.accountType,
+          accountId: input.accountId,
+          repositorySelection: input.repositorySelection,
+          repositories: reposToJson(input.repositories),
+          suspendedAt: null,
+        },
+      });
+      return { inserted: true, row: toRow(created) };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        // Another request already committed this installationId first — the
+        // unique index is the atomicity guarantee, not a check we ran
+        // ourselves, so this read always sees the winner's committed row.
+        const existing = await this.prisma.langyGithubInstallation.findUnique(
+          { where: { installationId: input.installationId } },
+        );
+        if (existing) return { inserted: false, row: toRow(existing) };
+      }
+      throw error;
+    }
+  }
+
   async setRepositories({
     installationId,
     repositorySelection,
