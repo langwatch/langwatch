@@ -289,6 +289,72 @@ describe("GET /api/github-langy/setup", () => {
     });
   });
 
+  describe("when the installation is already owned by another organization", () => {
+    async function mockConflictRejection() {
+      const { LangyGithubInstallationConflictError } = await import(
+        "~/server/app-layer/langy/langy-github-installations.service"
+      );
+      recordInstallation.mockRejectedValue(
+        new LangyGithubInstallationConflictError({
+          installationId: "555",
+          existingOrganizationId: "victim-org",
+          attemptedOrganizationId: "org1",
+        }),
+      );
+    }
+
+    it("returns the generic failure and audits the blocked cross-tenant rebind (redirect)", async () => {
+      // The attack: a caller with a valid signed state for their OWN org points
+      // installation_id at a victim org's installation. recordInstallation now
+      // throws the conflict guard; the route must not leak that the id exists
+      // (generic message) but must record the attempt for detection.
+      await mockConflictRejection();
+      const state = await makeState({ mode: "redirect" });
+
+      const res = await request(
+        `http://localhost/api/github-langy/setup?installation_id=555&state=${encodeURIComponent(state)}`,
+      );
+
+      // Generic failure surfaced via the returnTo redirect — no leak.
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toContain("githubError=");
+      // The success audit must NOT fire; the rejection audit must.
+      expect(auditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "langy.github.install.rejected_cross_tenant",
+        }),
+      );
+      expect(auditLog).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: "langy.github.install" }),
+      );
+    });
+
+    it("returns the generic failure via the popup postMessage shim, not a redirect", async () => {
+      await mockConflictRejection();
+      const state = await makeState({ mode: "popup" });
+
+      const res = await request(
+        `http://localhost/api/github-langy/setup?installation_id=555&state=${encodeURIComponent(state)}`,
+      );
+
+      // Popup mode never redirects — the failure comes back as an HTML shim
+      // that postMessages the opener, same generic wording as the redirect
+      // path (no leak of victim-org / existence either way).
+      expect(res.status).toBe(502);
+      expect(res.headers.get("location")).toBeNull();
+      const body = await res.text();
+      expect(body).not.toContain("victim-org");
+      expect(auditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "langy.github.install.rejected_cross_tenant",
+        }),
+      );
+      expect(auditLog).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: "langy.github.install" }),
+      );
+    });
+  });
+
   describe("when Langy access was revoked after the install began", () => {
     it("re-checks the gate and refuses to persist the installation", async () => {
       // Install started while allowed; the rollout is now off for this
