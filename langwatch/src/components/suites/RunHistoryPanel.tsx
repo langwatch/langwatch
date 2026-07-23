@@ -18,6 +18,7 @@ import {
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Period } from "~/components/PeriodSelector";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
@@ -449,6 +450,11 @@ export function RunHistoryPanel({
                   ? "Run this suite to see results here."
                   : "Execute a suite to see results here."}
             </EmptyState.Description>
+            {/* Only when the project truly has nothing to run yet — a
+                filtered-empty list is a search miss, not a setup gap. */}
+            {!hasFiltersApplied ? (
+              <SetupWithAgentButton surface="simulationRuns" />
+            ) : null}
           </EmptyState.Content>
         </EmptyState.Root>
       ) : (

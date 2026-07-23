@@ -255,9 +255,32 @@ export const navigate = (href: string): void => {
 };
 
 /**
+ * True if `url` resolves to the same origin as `origin` (default:
+ * `window.location.origin`). Used to guard against open redirects — a
+ * protocol-relative value like `//evil.com` or a cross-origin absolute URL
+ * resolves to a different origin and returns false. Invalid URLs (e.g.
+ * `javascript:...`) also return false rather than throwing.
+ */
+export const isSameOrigin = (
+  url: string,
+  origin: string = typeof window !== "undefined" ? window.location.origin : "",
+): boolean => {
+  try {
+    return new URL(url, origin).origin === origin;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Same-origin redirect guard. Blocks open-redirect attempts like
- * `?callbackUrl=https://evil.com` by rejecting anything that isn't a
- * same-origin path. Relative paths (`/foo`) are always allowed.
+ * `?callbackUrl=https://evil.com`, `?callbackUrl=//evil.com`, or the
+ * backslash variant `?callbackUrl=/\evil.com` (the WHATWG URL parser treats
+ * a leading `/\`, `\/`, or `\\` as authority-introducing for special
+ * schemes, same as `//`) by rejecting anything that isn't a same-origin
+ * destination. Always resolves through `new URL()` rather than a string
+ * prefix check, so there is exactly one place that decides what counts as
+ * "same origin" — no fast path that a parser quirk can slip past.
  *
  * Exported for unit testing. `origin` defaults to `window.location.origin`
  * in the browser runtime and is passed explicitly by tests.
@@ -266,19 +289,9 @@ export const safeRedirectTarget = (
   callbackUrl: string | undefined,
   origin: string = typeof window !== "undefined" ? window.location.origin : "",
 ): string => {
-  if (!callbackUrl) return "/";
-  if (callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
-    return callbackUrl;
-  }
-  try {
-    const url = new URL(callbackUrl, origin);
-    if (url.origin === origin) {
-      return url.pathname + url.search + url.hash;
-    }
-  } catch {
-    // fall through to "/"
-  }
-  return "/";
+  if (!callbackUrl || !isSameOrigin(callbackUrl, origin)) return "/";
+  const url = new URL(callbackUrl, origin);
+  return url.pathname + url.search + url.hash;
 };
 
 export const signOut = async (opts?: {

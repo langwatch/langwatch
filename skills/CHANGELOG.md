@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.7.0](https://github.com/langwatch/langwatch/compare/skills@v0.6.1...skills@v0.7.0) (2026-07-23)
+
+
+### Features
+
+* **cli:** agent-first `lw` CLI ([#5921](https://github.com/langwatch/langwatch/issues/5921)) ([efdaafc](https://github.com/langwatch/langwatch/commit/efdaafc09e8195720896315018f9bc05ee82020d))
+* **langy:** event-sourced frontend, model-emitted cards, and a home built on one field ([#6027](https://github.com/langwatch/langwatch/issues/6027)) ([5d72c7e](https://github.com/langwatch/langwatch/commit/5d72c7efc7b27fbc683ed77df7a943d01fb6b7a9))
+* **langy:** langy goes large - event driven orchestration, ideated on a design concept, made the go agent well tuff ([#5741](https://github.com/langwatch/langwatch/issues/5741)) ([5982038](https://github.com/langwatch/langwatch/commit/59820384139fdf275a799719fa677c3106b64ad1))
+* **langy:** ship Langy in-product AI assistant — workers, GitHub PRs, setup ([#4913](https://github.com/langwatch/langwatch/issues/4913)) ([897f039](https://github.com/langwatch/langwatch/commit/897f039b05bb81b08636c3f559488e89910abe79))
+* **langy:** stop a turn for real, choose what Langy sees, and a home to ask from (ADR-058) ([#6026](https://github.com/langwatch/langwatch/issues/6026)) ([a29667a](https://github.com/langwatch/langwatch/commit/a29667a4723b1db697ab21d7692e65ccb03685b4))
+* separate experiments from online evaluations ([#5916](https://github.com/langwatch/langwatch/issues/5916)) ([27d66a6](https://github.com/langwatch/langwatch/commit/27d66a60f09b99477c2e139dff2dffa7ece8f144))
+* **skills:** evolve the insight skills into a diagnosis-to-improvement ladder ([#5968](https://github.com/langwatch/langwatch/issues/5968)) ([f0b458d](https://github.com/langwatch/langwatch/commit/f0b458dd97041f5a29024e360130ca6cacf76593))
+
+
+### Bug Fixes
+
+* **docs:** repair SKILL.md downloads and restore SSR on skills directory pages ([#5946](https://github.com/langwatch/langwatch/issues/5946)) ([6114d40](https://github.com/langwatch/langwatch/commit/6114d4091d6826d8088f1c3a6190ffc4da178bfc))
+* **langy:** hoist release_langy_enabled flag hook above early returns (React [#310](https://github.com/langwatch/langwatch/issues/310)) ([897f039](https://github.com/langwatch/langwatch/commit/897f039b05bb81b08636c3f559488e89910abe79))
+* **langy:** red-team + expanded scenario coverage, fix root causes found along the way ([#5986](https://github.com/langwatch/langwatch/issues/5986)) ([48ccc7d](https://github.com/langwatch/langwatch/commit/48ccc7daa9fd5324b44779c6887247eb19c3d632))
+* **security:** bump hono&gt;=4.12.25 and langsmith&gt;=0.8.18 ([5dd4178](https://github.com/langwatch/langwatch/commit/5dd41782beee86ce4333c255d0914357a4e9716d))
+* **security:** bump hono&gt;=4.12.25 and langsmith&gt;=0.8.18 (Dependabot [#1500](https://github.com/langwatch/langwatch/issues/1500), [#1516](https://github.com/langwatch/langwatch/issues/1516)) ([#5211](https://github.com/langwatch/langwatch/issues/5211)) ([5dd4178](https://github.com/langwatch/langwatch/commit/5dd41782beee86ce4333c255d0914357a4e9716d))
+* **security:** raise js-yaml and dompurify override floors (langwatch, skills, mastra example) ([bc79476](https://github.com/langwatch/langwatch/commit/bc79476fd684208745f4afb083fd5faa954ea79d))
+* **security:** raise js-yaml and dompurify override floors across JS workspaces ([#5364](https://github.com/langwatch/langwatch/issues/5364)) ([bc79476](https://github.com/langwatch/langwatch/commit/bc79476fd684208745f4afb083fd5faa954ea79d))
+* **security:** raise python-sdk bleach and onnx transitive floors ([#5542](https://github.com/langwatch/langwatch/issues/5542)) ([6abdc66](https://github.com/langwatch/langwatch/commit/6abdc6608ca8414a789e81e2b3c6f2aa42e03095))
+
 ## [0.6.1](https://github.com/langwatch/langwatch/compare/skills@v0.6.0...skills@v0.6.1) (2026-06-19)
 
 

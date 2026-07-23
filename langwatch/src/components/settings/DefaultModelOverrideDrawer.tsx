@@ -34,6 +34,10 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  isModelAllowedAsRoleDefault,
+  isModelAllowedForFeature,
+} from "~/server/modelProviders/codexRestrictions";
 import { buildCustomModelDisplayNames } from "~/server/modelProviders/customModelDisplayNames";
 import { LATEST_ALIAS_PROVIDERS } from "~/server/modelProviders/latestAliases";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -47,13 +51,14 @@ type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ConfigRow = Payload["configs"][number];
 type FeatureProjection = Payload["features"][number];
 type ScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
-type ModelRoleKey = "DEFAULT" | "FAST" | "EMBEDDINGS";
+type ModelRoleKey = "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
 
-const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "EMBEDDINGS"];
+const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"];
 
 const ROLE_LABEL: Record<ModelRoleKey, string> = {
   DEFAULT: "Default",
   FAST: "Fast",
+  LANGY: "Langy",
   EMBEDDINGS: "Embeddings",
 };
 
@@ -61,8 +66,39 @@ const ROLE_BLURB: Record<ModelRoleKey, string> = {
   DEFAULT:
     "Picked when a prompt or evaluator is created, and any high-stakes call without a specific override.",
   FAST: "Background and assistive surfaces like search, autocomplete, commit messages, topic clustering.",
+  LANGY: "The model Langy chats and works with.",
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
 };
+
+/**
+ * Restricted-provider gating for the drawer's pickers (codex is the only
+ * restricted provider today). A role-level default applies across every
+ * feature in the role, so restricted models are offered only for the
+ * roles whose whole feature set is licensed to run them (Langy, Fast);
+ * a feature-override row re-admits them only when its own feature key
+ * is licensed. Exported for tests.
+ */
+export function roleSelectModelOptions({
+  options,
+  role,
+}: {
+  options: string[];
+  role: ModelRoleKey;
+}): string[] {
+  return options.filter((model) => isModelAllowedAsRoleDefault(model, role));
+}
+
+export function featureRowModelOptions({
+  options,
+  featureKey,
+}: {
+  options: string[];
+  featureKey: string;
+}): string[] {
+  return options.filter((model) =>
+    isModelAllowedForFeature({ modelId: model, featureKey }),
+  );
+}
 
 interface Props {
   /** Config id when editing an existing policy; absent = create. The
@@ -103,6 +139,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     ({
       DEFAULT: null,
       FAST: null,
+      LANGY: null,
       EMBEDDINGS: null,
     } as Payload["effective"]);
 
@@ -133,6 +170,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const [expanded, setExpanded] = useState<Record<ModelRoleKey, boolean>>({
     DEFAULT: false,
     FAST: false,
+    LANGY: false,
     EMBEDDINGS: false,
   });
   const [busy, setBusy] = useState(false);
@@ -152,7 +190,12 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       setScopes([]);
       setConfig({});
     }
-    setExpanded({ DEFAULT: false, FAST: false, EMBEDDINGS: false });
+    setExpanded({
+      DEFAULT: false,
+      FAST: false,
+      LANGY: false,
+      EMBEDDINGS: false,
+    });
   }, [open, editing]);
 
   const inheritedQuery = api.modelProvider.getInheritedValuesForScopes.useQuery(
@@ -176,6 +219,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     const m: Record<ModelRoleKey, FeatureProjection[]> = {
       DEFAULT: [],
       FAST: [],
+      LANGY: [],
       EMBEDDINGS: [],
     };
     for (const f of features) m[f.role as ModelRoleKey]?.push(f);
@@ -261,6 +305,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       // Aliases at the top of chat lists; concrete models below.
       DEFAULT: [...aliasChatOptions, ...chatOptions],
       FAST: [...aliasChatOptions, ...chatOptions],
+      LANGY: [...aliasChatOptions, ...chatOptions],
       EMBEDDINGS: filterByMode("embedding"),
     } satisfies Record<ModelRoleKey, string[]>;
   }, [projectProviders.data]);
@@ -479,7 +524,7 @@ function RoleRow({
         <Box width="240px" flexShrink={0}>
           <ProviderModelSelector
             model={current}
-            options={modelOptions}
+            options={roleSelectModelOptions({ options: modelOptions, role })}
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={inheritOption}
             disabled={unsupportedAtScope}
@@ -612,7 +657,10 @@ function FeatureRow({
       <Box width="240px" flexShrink={0}>
         <ProviderModelSelector
           model={override}
-          options={modelOptions}
+          options={featureRowModelOptions({
+            options: modelOptions,
+            featureKey: feature.key,
+          })}
           onChange={(m) => onSetOverride(feature.key, m)}
           inheritOption={inheritOption ?? undefined}
           displayNames={displayNames}

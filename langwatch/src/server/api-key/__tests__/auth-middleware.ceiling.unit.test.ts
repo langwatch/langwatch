@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
-import type { ResolvedToken } from "../token-resolver";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   requireApiKeyPermission,
 } from "../auth-middleware";
+import type { ResolvedToken } from "../token-resolver";
 
 /**
  * Enforcement side of the API-key ceiling — the middleware and the guard it

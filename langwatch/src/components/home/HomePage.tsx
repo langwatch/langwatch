@@ -1,7 +1,7 @@
 import {
   Box,
-  chakra,
   Container,
+  chakra,
   Grid,
   HStack,
   Skeleton,
@@ -22,9 +22,9 @@ import {
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DashboardLayout } from "../DashboardLayout";
+import { DocsGuides } from "./DocsGuides";
 import { HomeStateSwitcher } from "./dev/HomeStateSwitcher";
 import { chartVariantFor, useHomeDevState } from "./dev/homeDevState";
-import { DocsGuides } from "./DocsGuides";
 import { HomeFortune } from "./HomeFortune";
 import { HomePageBanners } from "./HomePageBanners";
 import { LangyHomeHero } from "./LangyHomeHero";
@@ -77,7 +77,17 @@ export function HomePage() {
             the page, so the column narrows to keep its lines composed. */}
         <Container maxW="7xl" padding={5} position="relative" zIndex={1}>
           <VStack gap={4} width="full" align="start">
-            <HStack width="full" align="center" gap={2}>
+            {/* Positioned above the hero's bleed on purpose: the lantern's
+                ground (and its light-mode bloom) are positioned layers that
+                would otherwise paint over this static row. The page's order
+                is colour, then bloom, then every element on top. */}
+            <HStack
+              width="full"
+              align="center"
+              gap={2}
+              position="relative"
+              zIndex={2}
+            >
               {/* The Langy home greets from the centre of its own hero, where
                   the question is being asked. Rendering the greeting here as
                   well would put it on the page twice. */}
@@ -278,7 +288,11 @@ function LangyHome() {
   const { isNewProject } = useProjectReach();
   const devState = useHomeDevState();
   const empty =
-    devState === "empty" ? true : devState === "populated" ? false : isNewProject;
+    devState === "empty"
+      ? true
+      : devState === "populated"
+        ? false
+        : isNewProject;
 
   return (
     <>
@@ -303,7 +317,7 @@ function LangyHome() {
           Its onboarding control is off here because that control moved UP into
           the lit block, where the attention is. Two of the same on one page
           would just be one of them going unclicked. */}
-      <DocsGuides showOnboardPill={false} />
+      <DocsGuides />
     </>
   );
 }

@@ -25,6 +25,8 @@ export class App {
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly topicClustering: AppDependencies["topicClustering"] &
     AppCommands["topicClustering"];
+  readonly codingAgents: AppDependencies["codingAgents"] &
+    AppCommands["codingAgents"];
   readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
@@ -87,6 +89,10 @@ export class App {
     this.topicClustering = {
       ...deps.topicClustering,
       ...deps.commands.topicClustering,
+    };
+    this.codingAgents = {
+      ...deps.codingAgents,
+      ...deps.commands.codingAgents,
     };
     this.commands = deps.commands;
     this.langy = deps.langy;

@@ -44,7 +44,7 @@ export type LangyErrorRender =
 
 export interface LangyErrorAction {
   label: string;
-  kind: "connect-github" | "configure-model" | "retry";
+  kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry";
 }
 
 /** One serialized reason from the HandledError chain (recursive). */
@@ -135,7 +135,47 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_egress_misconfigured",
   "langy_insufficient_scope",
   "langy_turn_in_progress",
+  // Codex (the sign-in-with-OpenAI provider): the OAuth session died and the
+  // user must re-authenticate, or their ChatGPT plan's usage limit refused
+  // the turn. Promoted off the agent-errored reason chain — see
+  // promoteCodexAgentError. Spec: specs/model-providers/codex-account-provider.feature
+  "langy_codex_session_expired",
+  "langy_codex_plan_limit",
 ] as const;
+
+/**
+ * The gateway's typed codex failures ride the received reason chain of a
+ * `langy_agent_errored` (herr ⇄ HandledError, one model across the wire).
+ * Promote them to their own kinds by EXACT reason-code match — never by
+ * sniffing message strings — so the panel renders the re-authenticate card /
+ * the plan-limit explanation instead of a generic "reply failed".
+ */
+export function promoteCodexAgentError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  const flat: LangySerializedReason[] = [];
+  const walk = (reasons?: LangySerializedReason[]) => {
+    for (const reason of reasons ?? []) {
+      flat.push(reason);
+      walk(reason.reasons);
+    }
+  };
+  walk(domain.reasons);
+  if (flat.some((reason) => reason.kind === "codex_session_expired")) {
+    return { ...domain, code: "langy_codex_session_expired" };
+  }
+  if (
+    flat.some(
+      (reason) =>
+        reason.kind === "usage_limit_reached" ||
+        reason.kind === "codex_plan_limit",
+    )
+  ) {
+    return { ...domain, code: "langy_codex_plan_limit" };
+  }
+  return domain;
+}
 
 function parseReasons(value: unknown): LangySerializedReason[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -237,8 +277,9 @@ function registryCopy(domain: LangyDomainError) {
 }
 
 export function explainLangyError(
-  domain: LangyDomainError,
+  received: LangyDomainError,
 ): LangyErrorPresentation {
+  const domain = promoteCodexAgentError(received);
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
     meta: Object.keys(domain.meta).length > 0 ? domain.meta : undefined,
@@ -332,6 +373,34 @@ export function explainLangyError(
       // The caller holds none of Langy's permissions in this project. A
       // permissions gap an admin resolves — retrying won't change it.
       return { ...copy, render: "card", ...debug };
+
+    case "langy_codex_session_expired":
+      // The stored OpenAI session could not be refreshed. A setup step, not a
+      // fault: the fix is signing in again (the action opens the inline Codex
+      // sign-in), or picking another configured model from the composer.
+      return {
+        kind: domain.code,
+        title: "Your OpenAI session expired",
+        description:
+          "Codex runs on your OpenAI account, and its sign-in has expired. Sign in again to keep using it, or pick another model from the composer.",
+        render: "card",
+        action: { label: "Sign in to Codex", kind: "reconnect-codex" },
+        ...debug,
+      };
+
+    case "langy_codex_plan_limit":
+      // OpenAI's plan limit refused the turn. Deterministic until the window
+      // resets, so the useful moves are waiting or switching models; retry is
+      // still offered for after the reset.
+      return {
+        kind: domain.code,
+        title: "Your OpenAI plan hit its usage limit",
+        description:
+          "Codex usage counts against your ChatGPT plan, and OpenAI says the limit is reached for now. Pick another model from the composer to keep going, or try again after the limit resets.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
 
     case "langy_turn_in_progress":
       // One turn at a time per conversation. A retry would just 409 again, so

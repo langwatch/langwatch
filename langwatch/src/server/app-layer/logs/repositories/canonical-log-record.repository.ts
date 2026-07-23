@@ -10,17 +10,18 @@ export interface CanonicalLogRecordRepository {
     records: CanonicalLogRecord[],
     retentionDays?: number,
   ): Promise<void>;
-  getMarkedClaudeCodeLogsByTrace(params: {
+  /**
+   * Every canonical log record correlated to one trace (generic — no
+   * provider filter), oldest first, capped. The transcript derivation and
+   * the drawer's log reads live on this; the trace-drill sort key
+   * `(TenantId, CorrelationTraceId, TimeUnixMs, RecordId)` is built for it.
+   */
+  getLogsByTraceId(params: {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]>;
-  countMarkedClaudeCodeLogsByTrace(params: {
-    tenantId: string;
-    traceId: string;
-    occurredAtMs?: number;
-  }): Promise<number>;
 }
 
 export class NullCanonicalLogRecordRepository
@@ -40,20 +41,12 @@ export class NullCanonicalLogRecordRepository
     return;
   }
 
-  async getMarkedClaudeCodeLogsByTrace(_params: {
+  async getLogsByTraceId(_params: {
     tenantId: string;
     traceId: string;
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]> {
     return [];
-  }
-
-  async countMarkedClaudeCodeLogsByTrace(_params: {
-    tenantId: string;
-    traceId: string;
-    occurredAtMs?: number;
-  }): Promise<number> {
-    return 0;
   }
 }

@@ -341,6 +341,15 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"region":           getString("region"),
 			"auth_credentials": getString("auth_credentials"),
 		}
+	case domain.ProviderOpenAICodex:
+		// OAuth session, not an API key: the access token rides APIKey (it
+		// is the bearer), the ChatGPT account id becomes a request header,
+		// and the provider row id is the refresh callback's address.
+		cred.APIKey = getString("access_token")
+		cred.Extra = map[string]string{
+			"account_id":      getString("account_id"),
+			"provider_row_id": getString("provider_row_id"),
+		}
 	default:
 		cred.APIKey = getString("api_key")
 	}
@@ -369,6 +378,8 @@ func normalizeProviderType(t string) domain.ProviderID {
 		return domain.ProviderAnthropic
 	case "openai":
 		return domain.ProviderOpenAI
+	case "openai_codex":
+		return domain.ProviderOpenAICodex
 	default:
 		return domain.ProviderID(t)
 	}

@@ -12,21 +12,20 @@
  * The command handler reads no trace-level state - it is a pure per-log
  * transform (PII redaction + oversized-field cap) that emits one
  * `log_record_received` event stamped `aggregateId = traceId`. So the *command*
- * need not serialise on the trace; only the trace-summary *fold* and the
- * claude-span-sync *reactor* do, and both run on their own aggregate-keyed
- * queue, untouched by this key. Splitting the command key into `traceId:<shard>`
- * lets a hot turn's logs drain across up to `shardCount` groups in parallel
- * while the fold and reactor stay ordered per trace.
+ * need not serialise on the trace; only the trace-summary *fold* does, and it
+ * runs on its own aggregate-keyed queue, untouched by this key. Splitting the
+ * command key into `traceId:<shard>` lets a hot turn's logs drain across up to
+ * `shardCount` groups in parallel while the fold stays ordered per trace.
  *
  * The trace id MUST stay the whole-turn `traceId` as the aggregate: a tool
  * call's output is not carried on its own log record - it is recovered from the
  * NEXT model call's request body within the SAME trace's record set (see
- * claude-code-log-to-span.ts and canonicalisation/extractors/claudeCode.ts). The
- * span-sync reactor re-reads the whole turn by trace id to perform that
- * cross-record join, so splitting a turn across traces would lose tool outputs.
- * Sharding here only fans the *command's* GroupQueue lane; the emitted event's
- * aggregate stays the turn's single trace, so the fold, reactor, and UI are
- * untouched.
+ * canonicalisation/extractors/claudeCode.ts). The Terminal transcript
+ * derivation reads a trace's whole record set (`getLogsByTraceId`) to perform
+ * that cross-record join at read time, so splitting a turn across traces would
+ * lose tool outputs. Sharding here only fans the *command's* GroupQueue lane;
+ * the emitted event's aggregate stays the turn's single trace, so the fold and
+ * UI are untouched.
  *
  * `shardCount <= 1` returns the bare trace id - byte-identical to the historic
  * key - so the feature is off until an operator raises the count. The per-tenant

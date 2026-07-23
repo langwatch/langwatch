@@ -128,6 +128,17 @@ func (a *Agent) Provision(in ProvisionInput) error {
 	if model == "" {
 		model = "openai/gpt-5-mini"
 	}
+	// Codex models run opencode's NATIVE openai provider: the codex backend
+	// speaks the same Responses dialect, opencode has no "openai_codex"
+	// provider of its own, and the manager's LLM proxy restores the full
+	// prefixed id on the wire so the gateway routes to the codex credential
+	// (see otelrelay's rewriteCodexModelBody). The reasoning-summary option
+	// below then applies to codex turns too.
+	isCodex := false
+	if bare, ok := strings.CutPrefix(model, "openai_codex/"); ok {
+		model = "openai/" + bare
+		isCodex = true
+	}
 
 	// No "plugin" block. The worker previously loaded an external OpenTelemetry
 	// plugin (@devtheops/opencode-plugin-otel), but evaluating that ~2 MB bundle
@@ -186,11 +197,23 @@ func (a *Agent) Provision(in ProvisionInput) error {
 	// dead silence on gpt-5-mini. With it, opencode streams reasoning deltas
 	// that ride the existing frames → relay → glimpse pipe end to end.
 	if providerID, modelID, ok := strings.Cut(model, "/"); ok && providerID == "openai" {
+		options := map[string]any{"reasoningSummary": "auto"}
+		if isCodex {
+			// Codex's backend is stateless: store:false, no server-side
+			// response state, so every reasoning item has to be replayed across
+			// a tool loop's steps. opencode's AI SDK only round-trips the
+			// encrypted reasoning content, and only asks the backend to return
+			// it, when it knows the store is off. Without this it replays bare
+			// reasoning ids the backend rejects, and every multi-step codex turn
+			// dies with a 400. The gateway pins store:false on the wire too (see
+			// codexRequestBody); this keeps opencode's view in step with that.
+			options["store"] = false
+		}
 		config["provider"] = map[string]any{
 			"openai": map[string]any{
 				"models": map[string]any{
 					modelID: map[string]any{
-						"options": map[string]any{"reasoningSummary": "auto"},
+						"options": options,
 					},
 				},
 			},

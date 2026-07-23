@@ -152,7 +152,7 @@ export function isHandledByMissingModelHandler(error: unknown): boolean {
 export interface MissingModelExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   projectId?: string;
 }
 
@@ -184,7 +184,12 @@ export function extractMissingModelInfo(
   if (!cause.featureKey || !cause.role) return null;
 
   const role = cause.role as MissingModelExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
 
@@ -210,7 +215,7 @@ export function isHandledByProviderDisabledHandler(error: unknown): boolean {
 export interface ProviderDisabledExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   projectId: string;
   resolvedScope: "project" | "team" | "organization";
   resolvedModel: string;
@@ -261,7 +266,12 @@ export function extractProviderDisabledInfo(
   }
 
   const role = cause.role as ProviderDisabledExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
   const resolvedScope =
@@ -300,7 +310,7 @@ export const AI_CALL_FAILED_CAUSE = "AI_CALL_FAILED" as const;
 export interface AiCallFailedExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   /** Best-effort short message from the provider/SDK. */
   errorMessage?: string;
 }
@@ -322,7 +332,12 @@ export function extractAiCallFailedInfo(
   if (cause?.code !== AI_CALL_FAILED_CAUSE) return null;
   if (!cause.featureKey || !cause.role) return null;
   const role = cause.role as AiCallFailedExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
 

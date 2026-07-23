@@ -30,6 +30,7 @@ export const APP_ERROR_CODES = [
   "cannot_impersonate_admin",
   "cannot_impersonate_deactivated_user",
   "clickhouse_unavailable",
+  "codex_auth_failed",
   "dataset_name_taken",
   "dspy_step_not_found",
   "evaluation_not_found",

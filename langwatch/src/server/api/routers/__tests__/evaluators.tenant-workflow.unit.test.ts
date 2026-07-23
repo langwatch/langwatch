@@ -1,4 +1,9 @@
 import type { PrismaClient } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
@@ -9,28 +14,45 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
   return { ...actual, enforceLicenseLimit: vi.fn() };
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+// Mutations audit through the global prisma, not ctx.prisma — unmocked, the
+// middleware reaches for a real database this unit environment does not have.
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
 
 const workflowFindFirst = vi.fn();
 const evaluatorFindFirst = vi.fn();
 const evaluatorCreate = vi.fn();
 
+// The caller is seeded as an org admin so the REAL rbac middleware resolves
+// and grants project permissions. (No vi.mock on the rbac module: under the
+// unit pool's shared module registry a module mock can silently fail to
+// apply depending on which files preceded this one in the worker, letting
+// the real middleware run against a stub that could not serve it. The
+// seeded-admin path has no such order sensitivity.)
 const prisma = {
   workflow: { findFirst: workflowFindFirst },
   evaluator: {
     findFirst: evaluatorFindFirst,
     create: evaluatorCreate,
+  },
+  project: {
+    findUnique: vi.fn().mockResolvedValue({
+      team: { id: "team_1", organizationId: "org_1" },
+    }),
+  },
+  organizationUser: {
+    findFirst: vi.fn().mockResolvedValue({ role: OrganizationUserRole.ADMIN }),
+  },
+  groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
+  roleBinding: {
+    findMany: vi.fn().mockResolvedValue([
+      {
+        role: TeamUserRole.ADMIN,
+        customRoleId: null,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+      },
+    ]),
   },
 } as unknown as PrismaClient;
 

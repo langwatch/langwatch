@@ -8,8 +8,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
@@ -25,6 +28,44 @@ const llmPrefix = "/llm"
 // decode the gateway's herr envelope. Real envelopes are tiny; the cap keeps
 // a pathological upstream from ballooning proxy memory.
 const maxErrorBodyBytes = 64 * 1024
+
+// codexModelPrefix marks a turn whose model is served by the gateway's codex
+// provider. The worker itself never sees the prefix (opencode runs its native
+// openai provider); the proxy restores it request-side so the gateway routes
+// to the codex credential.
+const codexModelPrefix = "openai_codex/"
+
+// rewriteCodexModelBody swaps the outbound request body's "model" field for
+// the turn's full provider-prefixed id on codex turns. A no-op for every
+// other turn (checked before any read) and for bodies without a model field
+// (the proxied request stands untouched).
+//
+// The body IS buffered once: rewriting a JSON field and re-stamping
+// Content-Length both need the complete document, and a request body is
+// bounded by the model's context window anyway. The swap itself is a
+// surgical gjson/sjson field set — the messages payload is never decoded —
+// and the SSE response path streams through untouched.
+func rewriteCodexModelBody(out *http.Request, turnModel string) {
+	if !strings.HasPrefix(turnModel, codexModelPrefix) || out.Body == nil {
+		return
+	}
+	raw, err := io.ReadAll(out.Body)
+	_ = out.Body.Close()
+	if err != nil {
+		out.Body = io.NopCloser(bytes.NewReader(nil))
+		out.ContentLength = 0
+		return
+	}
+	rewritten := raw
+	if gjson.GetBytes(raw, "model").Exists() {
+		if b, err := sjson.SetBytes(raw, "model", turnModel); err == nil {
+			rewritten = b
+		}
+	}
+	out.Body = io.NopCloser(bytes.NewReader(rewritten))
+	out.ContentLength = int64(len(rewritten))
+	out.Header.Set("Content-Length", strconv.Itoa(len(rewritten)))
+}
 
 // handleLLM mediates one worker LLM call (phase 2): the worker's
 // OPENAI_BASE_URL points at /w/{token}/llm, so the OpenAI-compatible path it
@@ -58,6 +99,11 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// The worker authenticated to US with a placeholder (its env holds no
 			// virtual key). Replace it with the real credential.
 			pr.Out.Header.Set("Authorization", "Bearer "+entry.info.LLMVirtualKey)
+			// Codex turns run opencode's NATIVE openai provider (the Responses
+			// dialect the codex backend speaks), so the worker's request says
+			// "gpt-…"; restore the full provider-prefixed id on the wire and
+			// the gateway routes it to the codex credential. See provision.go.
+			rewriteCodexModelBody(pr.Out, entry.info.Model)
 			// Stamp the TURN's traceparent so the gateway's customer-facing
 			// gen_ai span joins the turn's trace. The worker's own traceparent
 			// is deliberately NOT continued, for two reasons: its trace id is

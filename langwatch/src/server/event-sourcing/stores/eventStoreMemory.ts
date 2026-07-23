@@ -1,6 +1,7 @@
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event } from "../domain/types";
 import { ConfigurationError } from "../services/errorHandling";
+import { compareOrdinal } from "../utils/compareOrdinal";
 import { AbstractEventStore } from "./abstractEventStore";
 import { eventToRecord } from "./eventStoreUtils";
 import type { EventRepository } from "./repositories/eventRepository.types";
@@ -45,7 +46,7 @@ export class EventStoreMemory<
     // the shared cursor comparator on same-millisecond ties.
     const sorted = [...events].sort((a, b) => {
       if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      return compareOrdinal(a.id, b.id);
     });
 
     // Deep clone to prevent mutation

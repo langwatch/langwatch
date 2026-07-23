@@ -67,13 +67,14 @@ import {
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
 type ConfigRow = Payload["configs"][number];
-type ModelRoleKey = "DEFAULT" | "FAST" | "EMBEDDINGS";
+type ModelRoleKey = "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
 
-const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "EMBEDDINGS"];
+const ROLES: ModelRoleKey[] = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"];
 
 const ROLE_LABEL: Record<ModelRoleKey, string> = {
   DEFAULT: "Default",
   FAST: "Fast",
+  LANGY: "Langy",
   EMBEDDINGS: "Embeddings",
 };
 
@@ -114,7 +115,7 @@ export function DefaultModelsSection({
   hierarchy,
   displayNames,
 }: DefaultModelsSectionProps = {}) {
-  const { project, team, organization } = useOrganizationTeamProject();
+  const { project, team } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
   const dataQuery = api.modelProvider.getDefaultModelsForProject.useQuery(
@@ -352,9 +353,11 @@ function AllConfigsView({
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-          <Table.ColumnHeader>Default</Table.ColumnHeader>
-          <Table.ColumnHeader>Fast</Table.ColumnHeader>
-          <Table.ColumnHeader>Embeddings</Table.ColumnHeader>
+          {ROLES.map((role) => (
+            <Table.ColumnHeader key={role}>
+              {ROLE_LABEL[role]}
+            </Table.ColumnHeader>
+          ))}
           <Table.ColumnHeader textAlign="right" />
         </Table.Row>
       </Table.Header>
@@ -661,9 +664,11 @@ function DefaultModelsTableSkeleton() {
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-              <Table.ColumnHeader>Default</Table.ColumnHeader>
-              <Table.ColumnHeader>Fast</Table.ColumnHeader>
-              <Table.ColumnHeader>Embeddings</Table.ColumnHeader>
+              {ROLES.map((role) => (
+                <Table.ColumnHeader key={role}>
+                  {ROLE_LABEL[role]}
+                </Table.ColumnHeader>
+              ))}
               <Table.ColumnHeader textAlign="right" />
             </Table.Row>
           </Table.Header>
@@ -673,15 +678,11 @@ function DefaultModelsTableSkeleton() {
                 <Table.Cell>
                   <Skeleton width="100px" height="20px" borderRadius="full" />
                 </Table.Cell>
-                <Table.Cell>
-                  <Skeleton width="160px" height="16px" />
-                </Table.Cell>
-                <Table.Cell>
-                  <Skeleton width="160px" height="16px" />
-                </Table.Cell>
-                <Table.Cell>
-                  <Skeleton width="160px" height="16px" />
-                </Table.Cell>
+                {ROLES.map((role) => (
+                  <Table.Cell key={role}>
+                    <Skeleton width="160px" height="16px" />
+                  </Table.Cell>
+                ))}
                 <Table.Cell textAlign="right">
                   <Skeleton
                     width="24px"

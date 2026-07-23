@@ -75,6 +75,15 @@ export const goErrorCodes = {
    */
   code_block_timeout: { service: "nlpgo", httpStatus: 504 },
   /**
+   * ErrCodexSessionExpired — means the codex provider's OAuth session is dead
+   * (refresh rejected) — the user must sign in with OpenAI again. Clients
+   * receive it as a 401 with this code so Langy can render the re-authenticate
+   * card instead of a generic provider error.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  codex_session_expired: { service: "aigateway" },
+  /**
    * ConfigInvalid — is the herr code for configuration validation failures.
    *
    * @source pkg/config/validate.go

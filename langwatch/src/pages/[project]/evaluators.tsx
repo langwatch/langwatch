@@ -2,6 +2,7 @@ import {
   Center,
   EmptyState,
   Grid,
+  HStack,
   Skeleton,
   Spacer,
   Text,
@@ -14,6 +15,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { CopyEvaluatorDialog } from "~/components/evaluators/CopyEvaluatorDialog";
 import { EvaluatorCard } from "~/components/evaluators/EvaluatorCard";
 import { PushToCopiesDialog } from "~/components/evaluators/PushToCopiesDialog";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -220,9 +222,12 @@ function Page() {
                 Create reusable scoring functions for experiments, online
                 evaluations, and guardrails.
               </EmptyState.Description>
-              <PageLayout.HeaderButton onClick={handleCreateNewEvaluator}>
-                <Plus size={16} /> Create your first evaluator
-              </PageLayout.HeaderButton>
+              <HStack gap={2}>
+                <PageLayout.HeaderButton onClick={handleCreateNewEvaluator}>
+                  <Plus size={16} /> Create your first evaluator
+                </PageLayout.HeaderButton>
+                <SetupWithAgentButton surface="evaluators" />
+              </HStack>
             </EmptyState.Content>
           </EmptyState.Root>
         </Center>

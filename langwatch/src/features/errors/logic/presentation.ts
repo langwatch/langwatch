@@ -185,6 +185,17 @@ const presentations = {
     describe: () => "It doesn't include the required scope.",
   },
 
+  // ---- model providers (Codex / OpenAI account) ----
+  codex_auth_failed: {
+    // Raised while connecting or refreshing "Sign in with your OpenAI account"
+    // (CodexAuthError). fault is provider — the failure is on OpenAI's side or
+    // in the sign-in round trip, not the customer's input — so the copy points
+    // at retrying the connection rather than fixing a field.
+    title: "OpenAI sign-in didn't go through",
+    describe: () =>
+      "Codex couldn't reach or verify your OpenAI account. Connect it again to continue.",
+  },
+
   // ---- access, org & limits ----
   project_not_found: { title: "Project not found" },
   organization_not_found_for_team: { title: "Organization not found" },
@@ -581,6 +592,15 @@ const presentations = {
   virtual_key_revoked: {
     title: "This API key has been revoked",
     describe: () => "Generate a new one in settings.",
+  },
+  codex_session_expired: {
+    // The gateway's own code for a dead Codex OAuth session (401). Langy has a
+    // richer inline card for the same failure (`langy_codex_session_expired`
+    // with a "Sign in to Codex" action); this is the plain registry copy for
+    // when the gateway proxies the code to any other surface.
+    title: "Your OpenAI session expired",
+    describe: () =>
+      "Codex runs on your OpenAI account, and its sign-in has expired. Sign in again to keep using it.",
   },
   budget_exceeded: {
     title: "You've reached your spending limit",

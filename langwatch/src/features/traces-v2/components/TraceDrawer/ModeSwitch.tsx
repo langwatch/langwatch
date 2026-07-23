@@ -33,6 +33,11 @@ interface ModeSwitchProps {
   /** Trace id used to scope the per-mode peer presence dots. */
   traceId?: string;
   /**
+   * True for coding-agent traces (Claude Code and friends), which carry a
+   * terminal session worth replaying. Gates the Terminal tab's existence.
+   */
+  showTerminal?: boolean;
+  /**
    * Right-aligned trailing content for this row — typically the trace ID
    * + relative timestamp. Sits in the same horizontal band as the tabs so
    * the meta tucks neatly into the corner.
@@ -152,6 +157,7 @@ export function ModeSwitch({
   isConversationLoading = false,
   isConversationHidden = false,
   traceId,
+  showTerminal = false,
   endSlot,
 }: ModeSwitchProps) {
   // Tristate gate: no conversationId → permanently disabled; has id
@@ -169,14 +175,17 @@ export function ModeSwitch({
   return (
     <HStack paddingX={4} gap={4} align="center">
       {/*
-        Tab order: Summary | Trace | Conversation. Summary leads because
-        it's the friendlier default for non-engineering users who just want
-        I/O + metadata at a glance; Trace sits middle for the waterfall +
-        span detail workflow; Conversation comes last and gates on
-        `hasConversation`. The previous order put Trace first to match the
-        store default — surfacing Summary instead lets the
-        last-used-mode persistence (see `drawerStore.lastModeChosen`)
-        carry observability-first users straight back to where they were.
+        Tab order: Summary | Trace | [Session | Terminal] | Conversation.
+        Summary leads because it's the friendlier default for non-engineering
+        users who just want I/O + metadata at a glance; Trace sits middle for
+        the waterfall + span detail workflow. On a coding-agent trace, Session
+        and Terminal are what you open the drawer FOR — the raw conversation
+        transcript is the fallback view once you already know what happened,
+        so it moves after them rather than sitting between Trace and Session.
+        The previous order put Trace first to match the store default —
+        surfacing Summary instead lets the last-used-mode persistence (see
+        `drawerStore.lastModeChosen`) carry observability-first users straight
+        back to where they were.
       */}
       <ModeTab
         label="Summary"
@@ -192,6 +201,41 @@ export function ModeSwitch({
         onClick={() => onViewModeChange("trace")}
         presence={presenceFor("trace")}
       />
+      {/*
+        Terminal only exists for coding-agent traces (Claude Code and friends):
+        it replays the turn the way the CLI drew it. A normal LLM trace has no
+        terminal session to show, so the tab isn't rendered at all rather than
+        being shown disabled — an always-greyed tab on every other trace would
+        be noise.
+      */}
+      {showTerminal && (
+        <>
+          {/*
+            "Usage" (not "Session" — that word already means the agent's own
+            process/session id elsewhere in this UI, and reads as jargon here)
+            before Terminal: it answers "what happened, what did it cost, what
+            went wrong" in one screen, which is what someone opening a
+            coding-agent trace wants first. Terminal is the replay you go to
+            once you know which moment you're looking for.
+          */}
+          <ModeTab
+            label="Usage"
+            shortcut="U"
+            active={viewMode === "session"}
+            onClick={() => onViewModeChange("session")}
+            presence={presenceFor("session")}
+          />
+          <ModeTab
+            label="Terminal"
+            // NOT M — that's Maximize. The tab advertised a shortcut that did
+            // something else entirely, which is worse than having none.
+            shortcut="E"
+            active={viewMode === "terminal"}
+            onClick={() => onViewModeChange("terminal")}
+            presence={presenceFor("terminal")}
+          />
+        </>
+      )}
       {!isConversationHidden && (
         <ModeTab
           label="Conversation"

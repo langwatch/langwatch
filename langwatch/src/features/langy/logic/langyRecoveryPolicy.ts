@@ -235,6 +235,15 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   langy_insufficient_scope: terminal("langy_insufficient_scope"),
   langy_turn_in_progress: terminal("langy_turn_in_progress"),
 
+  // Codex (sign-in-with-OpenAI). Both TERMINAL: an auto-retry re-drives the
+  // SAME failure. A dead OAuth session is fixed only by re-authenticating (the
+  // explainer's card carries the "Sign in to Codex" action, which re-drives the
+  // turn once connected), and a ChatGPT plan limit persists until it resets or
+  // the user switches models — so the card offers a manual "Try again" rather
+  // than a spinner that would hit the cap again instantly.
+  langy_codex_session_expired: terminal("langy_codex_session_expired"),
+  langy_codex_plan_limit: terminal("langy_codex_plan_limit"),
+
   // Unhandled. We do not know what we would be retrying INTO, so we don't.
   unknown: terminal("unknown"),
 };

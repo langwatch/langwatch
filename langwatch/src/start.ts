@@ -484,13 +484,24 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
  *     no body and are left alone (a 304 revision-poll or 204 long-poll no-diff
  *     must stay empty).
  *
+ * Forwards every argument `getRequestListener` passes to `honoApp.fetch` —
+ * notably the second (`{ incoming, outgoing }`, Hono's `env`) — rather than
+ * declaring only `request`. Node's calling convention silently drops extra
+ * arguments a function doesn't declare, so a one-parameter wrapper here means
+ * `c.env` is `undefined` in every route handler despite `getRequestListener`
+ * always supplying it; that in turn makes `@hono/node-server/conninfo`'s
+ * `getConnInfo(c)` throw for every request in production (it reads
+ * `c.env.incoming.socket`). No existing handler reads `c.env` today, so this
+ * is additive — it only starts mattering for code that begins relying on it
+ * (see `~/utils/getClientIp.ts`'s `getConnInfo` fallback).
+ *
  * Exported for the langwatch#5219 + streaming-bridge regression tests.
  */
 export function honoFetchForNode(
   honoApp: Pick<Hono, "fetch">,
-): (request: Request) => Promise<Response> {
-  return async (request) => {
-    const response = await honoApp.fetch(request);
+): (...args: Parameters<Hono["fetch"]>) => Promise<Response> {
+  return async (request, ...rest) => {
+    const response = await honoApp.fetch(request, ...rest);
 
     if (response.status === 404) {
       const text = await response.clone().text();

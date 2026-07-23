@@ -35,6 +35,8 @@ import {
   VirtualKeyCryptoError,
 } from "~/server/gateway/virtualKey.crypto";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { CodexGatewayRefreshService } from "~/server/modelProviders/codexAccount.service";
+import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 
 // `verifySecret` applies the HMAC verifier as the builder chain for every
 // route (uniform with `files/.../app.ts`), rather than an app-wide
@@ -345,6 +347,74 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
     revision: vk.revision.toString(),
     key_id: vk.id,
     display_prefix: vk.displayPrefix,
+  });
+});
+
+/**
+ * Codex token refresh — the gateway's recovery road for a 401 from OpenAI's
+ * codex backend. Refreshes the provider row's stored OAuth session (single
+ * issuer round-trip under concurrent 401 bursts — see the service) and hands
+ * back a fresh access token; a dead session comes back as
+ * `codex_session_expired`, which the gateway forwards so Langy can render
+ * the re-authenticate card. Spec:
+ * specs/model-providers/codex-account-provider.feature
+ *
+ * Request:  { provider_row_id }
+ * Response: { access_token, account_id } | error codex_session_expired /
+ *           codex_not_connected
+ */
+secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    provider_row_id?: string;
+  };
+  if (!body.provider_row_id || typeof body.provider_row_id !== "string") {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "missing_provider_row_id",
+          message: "provider_row_id is required",
+        },
+      },
+      400,
+    );
+  }
+  const service = new CodexGatewayRefreshService(
+    new ModelProviderRepository(prisma),
+    new ChangeEventRepository(prisma),
+  );
+  const result = await service.refreshForGateway(body.provider_row_id);
+  if (result.status === "not_connected") {
+    return c.json(
+      {
+        error: {
+          type: "codex_not_connected",
+          code: "codex_not_connected",
+          message: "no connected Codex account on this provider",
+        },
+      },
+      404,
+    );
+  }
+  if (result.status === "session_expired") {
+    logger.warn(
+      { providerRowId: body.provider_row_id },
+      "codex session expired; user must sign in again",
+    );
+    return c.json(
+      {
+        error: {
+          type: "codex_session_expired",
+          code: "codex_session_expired",
+          message: "OpenAI session expired; sign in to Codex again",
+        },
+      },
+      401,
+    );
+  }
+  return c.json({
+    access_token: result.accessToken,
+    account_id: result.accountId,
   });
 });
 

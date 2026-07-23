@@ -16,11 +16,6 @@ export function automationProcessDefinition({
   deps?: Partial<AutomationsPipelineDeps>;
 }): ProcessManagerDefinition {
   const pipeline = createAutomationsPipeline({
-    automationAuditStore: {
-      append: async () => {
-        // inert stub — projection storage is not under test here
-      },
-    } as unknown as AutomationsPipelineDeps["automationAuditStore"],
     dispatch: {} as AutomationsPipelineDeps["dispatch"],
     sweep: {
       decideSweepCandidates: async () => [],

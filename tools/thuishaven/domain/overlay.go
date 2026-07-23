@@ -59,7 +59,10 @@ func (s Stack) OverlayEnv() []string {
 		"GATEWAY_CONTROL_PLANE_URL=" + apiInternal,
 		"LW_GATEWAY_BASE_URL=" + apiInternal,
 		"LW_GATEWAY_PUBLIC_URL=" + gw.URL,
-		"LW_GATEWAY_INTERNAL_URL=" + gw.URL,
+		// Same loopback principle as LANGWATCH_API_URL above: the control
+		// plane's server-side gateway calls (codex assists) must not depend
+		// on Node trusting the portless CA.
+		fmt.Sprintf("LW_GATEWAY_INTERNAL_URL=http://127.0.0.1:%d", gw.Port),
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
 		// Pretty, human-readable console logging for the Go services (clog reads
 		// LOG_FORMAT; the TS app's pino is already pretty in dev via NODE_ENV). Haven
