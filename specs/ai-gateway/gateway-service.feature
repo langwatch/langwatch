@@ -48,7 +48,7 @@ Feature: Gateway service — public HTTP surface and operational basics
         | GET    | /readyz                      | application/json               |
         | GET    | /startupz                    | application/json               |
 
-    @integration @unimplemented
+    @unit
     Scenario: /v1/models reflects effective VK allowlist
       Given the VK has model_aliases {"chat": "openai/gpt-5-mini"} and models_allowed ["gpt-5-mini"]
       When I GET /v1/models

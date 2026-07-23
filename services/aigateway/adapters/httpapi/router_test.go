@@ -687,3 +687,54 @@ func TestRouter_GeminiPassthrough_Streaming_PicksStream(t *testing.T) {
 	assert.True(t, gotReq.Passthrough.Stream)
 	assert.Equal(t, "alt=sse", gotReq.Passthrough.RawQuery)
 }
+
+// @scenario "/v1/models reflects effective VK allowlist"
+// The endpoint must emit OpenAI list shape — {"id", "object": "model"}
+// entries under an always-present data array — for the VK's aliases and
+// allowlist, or model-picker clients (OpenWebUI, LibreChat) cannot parse it.
+func TestRouter_ModelsEndpoint_EmitsOpenAIListShape(t *testing.T) {
+	bundle := testBundle()
+	bundle.Config.ModelAliases = map[string]domain.ModelAlias{
+		"chat": {ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"},
+	}
+	bundle.Config.AllowedModels = []string{"gpt-5-mini"}
+
+	router := buildRouter(
+		app.WithLogger(zap.NewNop()),
+		app.WithAuth(&mockAuth{
+			resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+				return bundle, nil
+			},
+		}),
+		app.WithProviders(&mockProvider{}),
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer vk-test-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var parsed struct {
+		Object string `json:"object"`
+		Data   []struct {
+			ID      string `json:"id"`
+			Object  string `json:"object"`
+			OwnedBy string `json:"owned_by"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &parsed))
+	assert.Equal(t, "list", parsed.Object)
+	require.NotNil(t, parsed.Data, "data must be an array, never null")
+
+	ids := make(map[string]string, len(parsed.Data))
+	ownedBy := make(map[string]string, len(parsed.Data))
+	for _, m := range parsed.Data {
+		ids[m.ID] = m.Object
+		ownedBy[m.ID] = m.OwnedBy
+	}
+	assert.Equal(t, "model", ids["chat"], `response must include {"id": "chat", "object": "model"}`)
+	assert.Equal(t, "model", ids["gpt-5-mini"], `response must include {"id": "gpt-5-mini", "object": "model"}`)
+	assert.Equal(t, "openai", ownedBy["gpt-5-mini"],
+		"the bundle's sole credential provider must be attributed to a plain allowlist entry")
+}

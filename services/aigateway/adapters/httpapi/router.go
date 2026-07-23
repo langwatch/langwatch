@@ -438,10 +438,21 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
+		// OpenAI list shape: model-picker clients (OpenWebUI, LibreChat,
+		// SDKs) expect {"id", "object": "model"} entries and an always-
+		// present data array (null breaks some parsers).
+		data := make([]map[string]any, 0, len(models))
+		for _, m := range models {
+			data = append(data, map[string]any{
+				"id":       m.ID,
+				"object":   "model",
+				"owned_by": string(m.ProviderID),
+			})
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = sonic.ConfigDefault.NewEncoder(w).Encode(map[string]any{
 			"object": "list",
-			"data":   models,
+			"data":   data,
 		})
 	}
 }
