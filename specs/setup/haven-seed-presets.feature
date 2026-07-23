@@ -71,17 +71,18 @@ Feature: Seed presets — a database that is ready to look at
 
   # --- The mass preset ---
   # Months of coherent, backdated activity, implemented in
-  # langwatch/scripts/seed-mass.ts on the pure timeline generator in
-  # scripts/seed-lib/mass-timeline.ts. Event-sourced products (scenario
-  # simulations, evaluations, experiment runs) are seeded as real commands
-  # whose backdated occurredAt the substrate honours verbatim — events land in
-  # old event-log partitions and the running worker's projections build every
-  # read model the way production does; read models are never written
-  # directly. Traces are not event-sourced: they ingest through the collector,
-  # which by design refuses spans older than 31 days (partition-pruning
-  # guard), so trace fixtures exist only inside that window while the deep
-  # history lives in the event log. HAVEN_SEED_MONTHS tunes the window
-  # (default 3).
+  # langwatch/scripts/seed-mass.ts on the pure generators in
+  # scripts/seed-lib/mass-timeline.ts and scripts/seed-lib/mass-metrics.ts.
+  # Event-sourced products (scenario simulations, evaluations, experiment
+  # runs) are seeded as real commands whose backdated occurredAt the substrate
+  # honours verbatim — events land in old event-log partitions and the running
+  # worker's projections build every read model the way production does; read
+  # models are never written directly. Traces cover the whole window: the last
+  # month goes through the real collector, and older traces are dispatched as
+  # recordSpan pipeline commands, so the collector's public 31-day age guard
+  # (partition-pruning protection) is never weakened. Metric series go through
+  # the real OTLP metrics endpoint for the whole window — metrics have no
+  # ingest-age guard. HAVEN_SEED_MONTHS tunes the window (default 3).
   @unit
   Scenario: The mass preset fills months of data across every product
     When I run "haven db seed mass"
@@ -90,14 +91,29 @@ Feature: Seed presets — a database that is ready to look at
     And re-running is idempotent (deterministic ids, same window → same story)
 
   @unit
-  Scenario: Backdated traces stay inside the collector's window
+  Scenario: Traces cover the whole window without weakening the collector's guard
     Given the collector refuses spans more than 31 days old to protect partition pruning
     When the mass timeline is built
-    Then trace fixtures are attached only to activity inside that window
-    And older activity still exists as event-sourced history without a trace
+    Then every scenario run and organic conversation carries a trace across the whole window
+    And the seeder sends recent traces through the real collector and older ones as pipeline commands
+    And the collector's public age guard stays exactly as it is
+
+  @unit
+  Scenario: Three months of metric series go through the real metrics endpoint
+    Given metric ingestion accepts backdated timestamps by design
+    When the mass metrics are built
+    Then deterministic hourly token, cost, latency, request, and user series cover every day of the window
+    And they tell an improving story: traffic grows while errors and latency fall
+
+  @unit
+  Scenario: Backdated history outlives the default retention horizon
+    Given rows are stamped to expire relative to their data time, 49 days by default
+    When the mass seed prepares its window
+    Then an organisation retention policy is pinned that outlives the whole window with margin
+    And months two and three are not written pre-expired
 
   @e2e @unimplemented
   Scenario: A mass seed lands end to end on a live stack
     Given this worktree's stack is running
     When I run "haven db seed mass"
-    Then the projections report every seeded scenario run, evaluation, experiment run, and windowed trace
+    Then the projections report every seeded scenario run, evaluation, experiment run, trace, and metric point
