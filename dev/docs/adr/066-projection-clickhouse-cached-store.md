@@ -1,4 +1,4 @@
-# ADR-066: Projection state storage — the ClickHouse-cached store
+# ADR-066: Taking `event_log` off the per-item hot path — read-through fold store + append coalescing
 
 **Date:** 2026-07-23
 
@@ -30,7 +30,22 @@ The result was a production outage (2026-07-23). A coding-agent session keyed by
 
 Underneath the incident is a design smell: the cache and the ClickHouse store were treated as two things a projection *assembles*, with knobs — read back or return null, refold or don't, what TTL. **Every knob is a way to get it wrong**, and one projection got it wrong in the way that takes production down.
 
+### The same table was overwhelmed from the *other* side too
+
+`event_log` did not part-buildup from the fold refolds alone. The other heavy contributor was **producer-side**: a hot automation trigger firing tens of thousands of times minted **one tiny `async_insert` into `event_log` per match** (`recordTriggerMatch` has no coalescing — it appends one `TRIGGER_MATCH_RECORDED` event per match). Tens of thousands of individual inserts feed exactly the small-parts explosion that starves merges.
+
+So the outage had one shape from two directions:
+
+- **Read side (folds):** every cache miss / out-of-order event *replays* `event_log` → unbounded reads.
+- **Write side (producers):** every item *inserts* into `event_log` → unbounded tiny parts.
+
+The unifying decision of this ADR is therefore not just "fix the store" — it is **take `event_log` off the per-item hot path in both directions**: read-through fold store (reads become one-row state look-ups, never replays) and append coalescing (writes become one insert per batch, never per item). Fixing only one side leaves the part-buildup a re-occurrence away.
+
 ## Decision
+
+This ADR has **two pillars** under one principle — *no per-item `event_log` traffic on the hot path*. Pillar 1 is the read side (the fold store); Pillar 2 is the write side (append coalescing).
+
+## Pillar 1 — the read-through fold store
 
 ### The principle (substrate-independent)
 
@@ -64,6 +79,18 @@ What the contract removes:
 
 **Why this is "impossible to foul up":** a projection author supplies exactly two things — the derivation, and the state↔row mapping. They do **not** choose a store, a cache, a TTL, or a refold flag. There is one store, and there is no configuration surface on which to repeat the `codingAgentSession` mistake.
 
+## Pillar 2 — producer-side append coalescing
+
+Pillar 1 stops the *reads*. It does nothing for the *writes*, and the writes were the other half of the outage.
+
+**A command that appends one `event_log` event per item, at high fan-in, MUST coalesce its appends into batched inserts** — N items become one `INSERT` of N rows, not N inserts of one row. `event_log` inserts already use `async_insert: 1, wait_for_async_insert: 1`; batching at the producer is what keeps each flush from becoming its own part.
+
+- The trigger of this ADR's incident, `recordTriggerMatch`, appends one `TRIGGER_MATCH_RECORDED` per match with no coalescing (`serializeByAggregate: true` only, no `coalesceMaxBatch`). A hot trigger firing 27k times is 27k inserts. It is both a *victim* of the `event_log` stall (its jobs can't commit) and a *contributor* to it.
+- The queue substrate already supports coalescing (`coalesceMaxBatch` / `processBatch` on the GroupQueue — the same mechanism the fold side uses). Producers this hot opt into it; the batched handler stores one multi-row insert per drained batch.
+- This is **not** the fold store — a producer has no read-modify-write state to read back. It is the write-side sibling of the same principle: keep `event_log` off the per-item hot path.
+
+Coalescing is applied where fan-in is high, not everywhere — a producer minting one event per human action does not need it. The rule is: **if one aggregate can mint events faster than they drain, its producer coalesces.** Whatever bounds coverage (which producers, what batch cap) is logged, not silent — an un-coalesced high-fan-in producer is a latent part-buildup source.
+
 ## Rationale / Trade-offs
 
 - **Read-back is correct for every fold, regardless of order-sensitivity**, because it returns the last *committed* state and only new events fold on top. That is why storage-unification is universal while ordering stays a derivation concern — the two are independent axes, and we stopped conflating them.
@@ -90,6 +117,35 @@ What the contract removes:
 - **Migrations for existing lossy projections.** `codingAgentSession` is the first adopter: give `coding_agent_sessions` a lossless state representation, make `get()` read it back, delete its refold reliance, and declare it order-insensitive.
 - **Replay (ADR-015) is unchanged in mechanism but narrowed in role** — projection-version migration and disaster recovery only, never the delivery path.
 
+## Scope — the two workloads that motivated this
+
+The principle is general; these are the components it lands on. Note that only the *fold* takes Pillar 1, and only the *high-fan-in producer* takes Pillar 2 — most components take neither.
+
+**Coding-agent pipeline** — one fold, several producers/maps:
+
+| Component | Kind | Lever |
+|---|---|---|
+| `codingAgentSession` fold | CH fold, lossy row, refolds `event_log` | **Pillar 1 adopter #1** — the component on fire |
+| `codingAgentTraceSessions`, `sessionMetricSeries` | map projections (append-only) | None — append stores, not read-modify-write; leave as-is |
+| `codingAgentSpanFactsDispatch` (+ log / metric) subscribers | event producers | None from this ADR — but move the coding-agent-name gate **before enqueue** so non-agent spans never mint jobs |
+| `contributeSpanFacts` command | producer | None |
+
+Independently of the store: fix the **session = traceId fallback** so one large trace does not become one unbounded aggregate (the amplifier behind the refold cost).
+
+**Trigger-matched workload** (the 27k-pending group):
+
+| Component | Kind | Lever |
+|---|---|---|
+| `recordTriggerMatch` command | producer — one `TRIGGER_MATCH_RECORDED` per match, no coalescing | **Pillar 2 adopter #1** — append coalescing |
+| `triggerSettlement` | ADR-052 process manager, Postgres outbox state | None — evolves state incrementally from a PM store, never refolds `event_log`; its backlog is pure `event_log`-stall *symptom*, not a cause |
+
+## Adopters & sequencing
+
+1. **Now (relief):** `refoldOnOutOfOrder: false` on `codingAgentSession` — safe today (order-insensitive derivation), stops the replay storm. Small standalone PR.
+2. **Pillar 1, first adopter:** `codingAgentSession` → lossless read-back store (kills `refoldOnStoreMiss` on the hot path). Then roll the same pattern to any other lossy-row fold.
+3. **Pillar 2, first adopter:** append coalescing for `recordTriggerMatch`; audit other high-fan-in `event_log` producers and coalesce them.
+4. **Durable dedup watermark** in fold state — closes the cold idempotency hole so "throw-and-retry" is truly idempotent even across cache loss (the applied-event-id set is cache-only today).
+
 ## Rules
 
 - Every ClickHouse-backed fold projection uses the platform ClickHouse-cached store. No projection wires its own store or cache. (Operational folds use the Postgres cursor store of ADR-049 — same read-back principle, different tier.)
@@ -100,9 +156,11 @@ What the contract removes:
 - `store()` writes ClickHouse first (throws on failure), then Redis. A cache-write failure is logged, never thrown — ClickHouse already holds the durable state.
 - Folds declare their ordering contract. `event_log` is never read on the delivery path — only by the replay tool, for version migration or recovery.
 - Redelivery dedup travels with the state (applied-event-id set, reset on each fresh delivery, bounded to the in-flight batch).
+- **High-fan-in `event_log` producers coalesce their appends** — a batched multi-row insert per drained batch, not one insert per item. A producer where a single aggregate can mint events faster than they drain, and does not coalesce, is a part-buildup regression. Any cap on coalescing coverage is logged, not silent.
 
 ## References
 
+- **Behavioural contract:** [specs/event-sourcing/fold-read-back-store.feature](../../../specs/event-sourcing/fold-read-back-store.feature) (pillar 1), [specs/event-sourcing/producer-append-coalescing.feature](../../../specs/event-sourcing/producer-append-coalescing.feature) (pillar 2)
 - [ADR-007](./007-event-sourcing-architecture.md) — event-sourcing architecture (this ADR hardens its storage model)
 - [ADR-015](./015-projection-replay-coordination.md) — replay coordination (narrowed to off-hot-path)
 - [ADR-021](./021-lean-fold-cache.md) — lean fold cache (fold-cache mechanics superseded here)
