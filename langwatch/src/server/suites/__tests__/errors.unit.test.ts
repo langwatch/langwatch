@@ -6,8 +6,9 @@
  * messages are server copy for a log line; asserting on them pins prose that
  * is free to change.
  */
-import { describe, expect, it } from "vitest";
+
 import { HandledError } from "@langwatch/handled-error";
+import { describe, expect, it } from "vitest";
 import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,

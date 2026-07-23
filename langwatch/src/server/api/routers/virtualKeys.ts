@@ -14,31 +14,28 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
-import { GuardrailAttachForbiddenError } from "~/server/gateway/errors";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import type { PrismaClient } from "@prisma/client";
-
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import type { Session } from "~/server/auth";
-
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import {
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-  type GuardrailAttachment,
-} from "~/server/gateway/virtualKey.config";
-import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
-import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-
-import { authorizeInResolver, hasProjectPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { GuardrailAttachForbiddenError } from "~/server/gateway/errors";
 import {
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
   isVisibleToMembership,
   loadMembershipSet,
 } from "~/server/gateway/virtualKey.authz";
+import {
+  type GuardrailAttachment,
+  parseVirtualKeyConfig,
+  virtualKeyConfigSchema,
+} from "~/server/gateway/virtualKey.config";
+import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import { authorizeInResolver, hasProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInputSchema = scopeAssignmentSchema;
 
