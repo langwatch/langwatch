@@ -92,7 +92,7 @@ describe("useLangyContextTarget", () => {
     describe("when the page is armed with the panel still closed", () => {
       it("offers the target — the ring and the intercepted click", () => {
         render(<HostRow onOpen={() => undefined} />);
-        act(() => targets().arm("hold"));
+        act(() => targets().arm("key"));
 
         expect(row().className).toContain("langy-target");
       });

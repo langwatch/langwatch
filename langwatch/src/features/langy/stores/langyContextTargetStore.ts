@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { useLangyStore, type LangyContextChip } from "./langyStore";
+import { type LangyContextChip, useLangyStore } from "./langyStore";
 
 /**
  * The registry of things on the page Langy can take as context.
@@ -9,7 +9,7 @@ import { useLangyStore, type LangyContextChip } from "./langyStore";
  * with `useLangyContextTarget`, which registers them here while mounted and
  * de-registers on unmount. Registration alone changes nothing you can see: a
  * target only lights up, and only becomes clickable-into-context, while the
- * page is ARMED (`#`, or a held Shift — see `armSource`).
+ * page is ARMED (`#` — see `armSource`).
  *
  * Deliberately a SEPARATE store from `langyStore`:
  *   - Registration churns. A virtualized trace table mounts and unmounts rows
@@ -129,7 +129,7 @@ function armRevealTimer(): void {
  * lasts exactly as long as you hold it). A keyup on Shift must not switch off a
  * mode that `#` turned on.
  */
-export type LangyArmSource = "key" | "hold";
+export type LangyArmSource = "key";
 
 interface LangyContextTargetState {
   /** Targets mounted on the page right now, keyed by their stable chip id. */
@@ -265,12 +265,14 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()(
       ),
 
     arm: (source) =>
-      set((state) => (state.armSource === source ? state : { armSource: source })),
+      set((state) =>
+        state.armSource === source ? state : { armSource: source },
+      ),
 
     disarm: (source) =>
       set((state) => {
         if (state.armSource === null) return state;
-        // A Shift keyup arriving while `#` holds the latch open is not a
+        // A disarm for a source that is not the one holding the latch is not a
         // release — it is a different gesture ending.
         if (source && state.armSource !== source) return state;
         return {
@@ -299,7 +301,10 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()(
         // mounting on the page it navigated to. Light each one up as it
         // arrives (capped), and let the shared timer close the burst.
         const pending = state.pendingReveal;
-        if (pending && Date.now() - pending.requestedAt > PENDING_REVEAL_TTL_MS) {
+        if (
+          pending &&
+          Date.now() - pending.requestedAt > PENDING_REVEAL_TTL_MS
+        ) {
           return { targets, pendingReveal: null };
         }
         if (

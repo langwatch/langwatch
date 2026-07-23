@@ -97,7 +97,7 @@ Feature: Langy lights up what it can use as context ("glow and go")
     Then the thing each row names lights up on the page as I reach it
 
   Scenario: Reading the context list is not entering the picking mode
-    Given the Langy panel is open and I have not pressed "#" or held Shift
+    Given the Langy panel is open and I have not pressed "#"
     When I rest my pointer on a chip in the context list
     Then that chip's card still lights up where it sits on the page
     And the rest of the page is untouched — nothing else glows, and every row

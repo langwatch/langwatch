@@ -32,7 +32,7 @@ import { useLangyStore } from "../stores/langyStore";
  *     the row's geometry. A fixed-position portal touches nothing.
  *
  * Both jobs are gated on the page OFFERING its targets, which is two states, not
- * one: ARMED — `#` or a held Shift, see `useLangyContextArming` — or REVEALED,
+ * one: ARMED — `#`, see `useLangyContextArming` — or REVEALED,
  * the brief `#trace` → "Show traces on this page" glow. Both light targets up
  * and both make them clickable, so both need the pointer layer; a reveal that
  * lit rows the button never appeared over made the palette's own promise
@@ -147,13 +147,7 @@ function AbsorbFlashLayer() {
 /** How long the ooze plays. Mirrors the CSS animation — keep the two equal. */
 const ABSORB_OOZE_MS = 500;
 
-function AbsorbOoze({
-  targetId,
-  nonce,
-}: {
-  targetId: string;
-  nonce: number;
-}) {
+function AbsorbOoze({ targetId, nonce }: { targetId: string; nonce: number }) {
   const clearAbsorbFlash = useLangyContextTargetStore(
     (s) => s.clearAbsorbFlash,
   );
@@ -176,7 +170,10 @@ function AbsorbOoze({
     }
     // Self-clearing: the store holds the flash only for as long as it plays, so
     // nothing has to remember to put it away.
-    const done = window.setTimeout(() => clearAbsorbFlash(nonce), ABSORB_OOZE_MS);
+    const done = window.setTimeout(
+      () => clearAbsorbFlash(nonce),
+      ABSORB_OOZE_MS,
+    );
     return () => window.clearTimeout(done);
   }, [targetId, nonce, clearAbsorbFlash]);
 
@@ -363,11 +360,7 @@ function OfferHint() {
       <Sparkles size={12} />
       Click anything highlighted to give it to Langy
       <chakra.span color="fg.subtle">
-        {source === null
-          ? "these fade in a moment"
-          : source === "hold"
-            ? "release Shift to stop"
-            : "# or Esc to stop"}
+        {source === null ? "these fade in a moment" : "# or Esc to stop"}
       </chakra.span>
     </chakra.div>,
     document.body,
