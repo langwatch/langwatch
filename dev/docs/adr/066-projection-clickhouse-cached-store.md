@@ -146,6 +146,16 @@ Independently of the store: fix the **session = traceId fallback** so one large 
 3. **Pillar 2, first adopter:** append coalescing for `recordTriggerMatch`; audit other high-fan-in `event_log` producers and coalesce them.
 4. **Durable dedup watermark** in fold state — closes the cold idempotency hole so "throw-and-retry" is truly idempotent even across cache loss (the applied-event-id set is cache-only today).
 
+## Server-side ClickHouse settings (defense-in-depth)
+
+Pillars 1 and 2 take `event_log` off the per-item hot path in the application. The ClickHouse server config is the complementary layer, and one knob on the prod `event_log` cluster was left un-tuned for part reduction:
+
+- **Flush window.** `async_insert_busy_timeout_ms` decides how many buffered inserts coalesce into one part. Prod ran at **200ms** (ClickHouse's default), which batches almost nothing under a burst — so a spike of tiny inserts (per-span coding-agent, per-match trigger) became a flood of tiny parts. Raise it to **1000ms** (the value the repo's own `clickhouse-serverless` config already uses). `async_insert_max_data_size` (10 MB) still flushes early under heavy load, so peak-load throughput is unaffected; the win lands in the medium-burst regime that caused the outage. Prod config: `langwatch-saas/infrastructure/clickhouse.tf`.
+- **Keep `async_insert_wait = 1`.** Durability plus protective backpressure. `wait = 0` on a source-of-truth log would ack a job before its event is durable (data loss) and remove the safety valve — never do it.
+- **The real merge-OOM fix is memory headroom, not async batching.** The 2026-07-23 cascade was background merges failing with `MEMORY_LIMIT_EXCEEDED` against the server memory cap; async tuning only reduces the *rate* parts are created, it does not let a starved merge complete. Server memory (`max_server_memory_usage` / pod memory) and merge sizing (`max_bytes_to_merge_at_max_space_in_pool`, vertical merge) are the levers there, and they live in infra, not this repo.
+
+Recorded here so the application-side and server-side levers are visible together; the server values themselves are owned by infra.
+
 ## Rules
 
 - Every ClickHouse-backed fold projection uses the platform ClickHouse-cached store. No projection wires its own store or cache. (Operational folds use the Postgres cursor store of ADR-049 — same read-back principle, different tier.)
