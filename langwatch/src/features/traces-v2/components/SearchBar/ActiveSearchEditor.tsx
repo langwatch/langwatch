@@ -42,6 +42,12 @@ interface ActiveSearchEditorProps {
   onCursorAnchorChange?: (anchorX: number) => void;
   /** Mirrors the editor's focus state so the parent can gate chrome. */
   onFocusChange?: (focused: boolean) => void;
+  /**
+   * Placeholder shown while the editor is empty. Defaults to the Ask AI
+   * wording; the SearchBar passes the Ask Langy variant when Langy owns
+   * the ask affordance.
+   */
+  placeholder?: string;
 }
 
 /**
@@ -60,6 +66,7 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   onSuggestionOpenChange,
   onCursorAnchorChange,
   onFocusChange,
+  placeholder,
 }) => {
   const {
     editor,
@@ -69,13 +76,14 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
     endAnchorX,
     isFocused,
   } = useFilterEditor({
-      queryText,
-      applyQueryText,
-      onHasContentChange,
-      valueResolver,
-      onTokenClick,
-      onAiShortcut,
-    });
+    queryText,
+    applyQueryText,
+    onHasContentChange,
+    valueResolver,
+    onTokenClick,
+    onAiShortcut,
+    placeholder,
+  });
 
   useGlobalSlashFocus(editor);
 
@@ -92,7 +100,9 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   // dropdown never overlap.
   useEffect(() => {
     if (!onSuggestionOpenChange) return;
-    onSuggestionOpenChange(suggestion.state.open && suggestion.items.length > 0);
+    onSuggestionOpenChange(
+      suggestion.state.open && suggestion.items.length > 0,
+    );
   }, [suggestion.state.open, suggestion.items.length, onSuggestionOpenChange]);
 
   useEffect(() => {

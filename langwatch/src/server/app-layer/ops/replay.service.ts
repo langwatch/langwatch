@@ -1,17 +1,26 @@
+import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
-import type {
-  ReplayRepository,
-  ReplayStatus,
-  ReplayHistoryEntry,
-} from "./repositories/replay.repository";
+import { env } from "~/env.mjs";
 import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
 import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
-import { env } from "~/env.mjs";
-import { createLogger } from "~/utils/logger/server";
+import type {
+  ReplayHistoryEntry,
+  ReplayRepository,
+  ReplayStatus,
+} from "./repositories/replay.repository";
 
 const logger = createLogger("langwatch:ops:replay-service");
 
 const REPLAY_LOCK_TTL_SECONDS = 3600;
+
+/**
+ * How often the running replay re-extends its lock on a standalone heartbeat
+ * timer. Running independently of progress/batch callbacks keeps the lock
+ * alive even when a single batch phase (a huge tenant's drain wait, a slow
+ * ClickHouse load) emits nothing for longer than REPLAY_LOCK_TTL_SECONDS,
+ * whose expiry used to silently stop status updates mid-run.
+ */
+export const LOCK_REFRESH_INTERVAL_MS = 60_000;
 
 class ReplayCancelledError extends Error {
   constructor() {
@@ -94,7 +103,10 @@ export class ReplayService {
     if (status.state !== "running") {
       return { cancelled: false };
     }
-    await this.repo.setCancelled({ ttlSeconds: 60 });
+    // TTL matches the lock TTL so the flag cannot expire between polls
+    // during a long callback-silent batch phase — the heartbeat checks it
+    // every LOCK_REFRESH_INTERVAL_MS.
+    await this.repo.setCancelled({ ttlSeconds: REPLAY_LOCK_TTL_SECONDS });
     return { cancelled: true };
   }
 
@@ -131,8 +143,18 @@ export class ReplayService {
       const selectedProjections = runtime.projections.filter((p) =>
         params.projectionNames.includes(p.projectionName),
       );
+      const selectedMapProjections = runtime.mapProjections.filter((p) =>
+        params.projectionNames.includes(p.projectionName),
+      );
+      const selectedStateProjections = runtime.stateProjections.filter((p) =>
+        params.projectionNames.includes(p.projectionName),
+      );
 
-      if (selectedProjections.length === 0) {
+      if (
+        selectedProjections.length === 0 &&
+        selectedMapProjections.length === 0 &&
+        selectedStateProjections.length === 0
+      ) {
         await this.finalizeWithError({
           runId: params.runId,
           errorMessage: "No matching projections found",
@@ -150,44 +172,103 @@ export class ReplayService {
       let lastCancelCheck = Date.now();
       const CANCEL_CHECK_INTERVAL_MS = 3000;
 
-      const result = await runtime.service.replayOptimized(
-        {
+      const heartbeatTick = () => {
+        this.repo
+          .refreshLock({
+            runId: params.runId,
+            ttlSeconds: REPLAY_LOCK_TTL_SECONDS,
+          })
+          .then((stillHeld) => {
+            if (!stillHeld) {
+              // Lock expired and another run took over — abort this stale
+              // run via the existing cancellation path so it stops touching
+              // the shared projection pause keys. Warn once and stop the
+              // heartbeat: the lock is confirmed gone, so there is nothing
+              // left to refresh and no point re-warning every interval.
+              logger.warn(
+                { runId: params.runId },
+                "Replay lock lost to another run; aborting stale replay",
+              );
+              cancelledFlag = true;
+              clearInterval(heartbeat);
+            }
+          })
+          .catch((err) => {
+            logger.warn({ error: err }, "Failed to refresh replay lock");
+          });
+
+        // Poll the cancel flag from the heartbeat too, so a cancel request
+        // is picked up even during batch phases that emit no callbacks for
+        // longer than the progress-driven check interval.
+        this.repo
+          .isCancelled()
+          .then((cancelled) => {
+            if (cancelled) cancelledFlag = true;
+          })
+          .catch((err) => {
+            logger.warn({ error: err }, "Failed to poll replay cancel flag");
+          });
+      };
+
+      // Heartbeat: refresh the lock on a standalone timer for the duration
+      // of the runtime call, so the lock survives runs longer than its TTL
+      // even when a single batch phase emits no callbacks for that long.
+      const heartbeat = setInterval(heartbeatTick, LOCK_REFRESH_INTERVAL_MS);
+      heartbeat.unref();
+
+      let result;
+      try {
+        const replayConfig = {
           projections: selectedProjections,
+          mapProjections: selectedMapProjections,
+          stateProjections: selectedStateProjections,
           tenantIds: params.tenantIds,
           since: params.since,
           aggregateIds: params.aggregateIds,
-        },
-        {
-          onProgress: (progress: ReplayProgress) => {
-            this.updateProgress({ runId: params.runId, progress }).catch(
-              (err) => {
-                logger.warn(
-                  { error: err },
-                  "Failed to update replay progress",
-                );
-              },
-            );
+        };
+        const replayCallbacks = {
+            onProgress: (progress: ReplayProgress) => {
+              this.updateProgress({ runId: params.runId, progress }).catch(
+                (err) => {
+                  logger.warn(
+                    { error: err },
+                    "Failed to update replay progress",
+                  );
+                },
+              );
 
-            const now = Date.now();
-            if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
-              lastCancelCheck = now;
-              this.repo
-                .isCancelled()
-                .then((cancelled) => {
-                  if (cancelled) cancelledFlag = true;
-                })
-                .catch(() => {});
-            }
+              const now = Date.now();
+              if (now - lastCancelCheck > CANCEL_CHECK_INTERVAL_MS) {
+                lastCancelCheck = now;
+                this.repo
+                  .isCancelled()
+                  .then((cancelled) => {
+                    if (cancelled) cancelledFlag = true;
+                  })
+                  .catch(() => {});
+              }
 
-            if (cancelledFlag) {
-              throw new ReplayCancelledError();
-            }
-          },
-        },
-      );
+              if (cancelledFlag) {
+                throw new ReplayCancelledError();
+              }
+            },
+          };
+        result =
+          selectedStateProjections.length > 0
+            ? await runtime.service.replay(replayConfig, replayCallbacks)
+            : await runtime.service.replayOptimized(
+                replayConfig,
+                replayCallbacks,
+              );
+      } finally {
+        clearInterval(heartbeat);
+      }
 
+      // Mirror the catch-path guard: only a takeover by ANOTHER run skips
+      // finalization. A null holder (lock expired, no successor) still
+      // finalizes so a completed run is never left stuck in "running".
       const lockHolder = await this.repo.getLockHolder();
-      if (lockHolder !== params.runId) return;
+      if (lockHolder !== null && lockHolder !== params.runId) return;
 
       if (result.batchErrors > 0) {
         await this.finalizeWithError({
@@ -224,7 +305,17 @@ export class ReplayService {
         });
       }
     } catch (err) {
-      if (err instanceof ReplayCancelledError) {
+      // If another run has taken the lock over, it owns the status row now —
+      // finalizing here would overwrite the successor's "running" status with
+      // this stale run's cancelled/failed state. A null holder (expired, no
+      // successor) still finalizes so the run's end state stays observable.
+      const lockHolder = await this.repo.getLockHolder();
+      if (lockHolder !== null && lockHolder !== params.runId) {
+        logger.warn(
+          { runId: params.runId, lockHolder },
+          "Skipping replay finalization: lock now held by another run",
+        );
+      } else if (err instanceof ReplayCancelledError) {
         await this.finalizeCancelled({
           runId: params.runId,
           historyCtx: params,

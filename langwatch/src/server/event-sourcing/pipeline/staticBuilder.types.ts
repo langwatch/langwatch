@@ -2,7 +2,6 @@ import type { FeatureFlagKey } from "../../featureFlag/registry";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { Event, Projection } from "../domain/types";
-import type { OutboxReactorDefinition } from "../outbox/outboxReactor.types";
 import type {
   FoldProjectionDefinition,
   FoldProjectionOptions,
@@ -11,8 +10,11 @@ import type {
   MapProjectionDefinition,
   MapProjectionOptions,
 } from "../projections/mapProjection.types";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type { ProcessManagerDefinition } from "./processManagerDefinition";
 import type { PipelineMetadata } from "./types";
 
 /**
@@ -37,6 +39,8 @@ export interface KillSwitchOptions {
 export interface CommandHandlerOptions<Payload = any> {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
+  /** Share one command queue group per tenant and aggregate across command types. */
+  serializeByAggregate?: boolean;
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
@@ -92,6 +96,9 @@ export interface StaticPipelineDefinition<
     }
   >;
 
+  /** Default operational state projections registered via `.withProjection()`. */
+  stateProjections?: Map<string, StateProjectionDefinition<any, EventType>>;
+
   /** Map projections (stateless, transform individual events) registered in this pipeline */
   mapProjections: Map<
     string,
@@ -125,27 +132,11 @@ export interface StaticPipelineDefinition<
     { projectionName: string; definition: ReactorDefinition<EventType> }
   >;
 
-  /**
-   * Outbox-backed reactors attached to fold projections. Dispatch
-   * runs through the ReactorOutbox + drainer rather than firing
-   * inline. See dev/docs/adr/024.
-   */
-  foldOutboxReactors: Map<
-    string,
-    {
-      projectionName: string;
-      definition: OutboxReactorDefinition<EventType>;
-    }
-  >;
+  /** Live event consumers that are independent of fold/map projections. */
+  eventSubscribers: Map<string, EventSubscriberDefinition<EventType>>;
 
-  /** Outbox-backed reactors attached to map projections. */
-  mapOutboxReactors: Map<
-    string,
-    {
-      projectionName: string;
-      definition: OutboxReactorDefinition<EventType>;
-    }
-  >;
+  /** Process managers mounted on this pipeline (ADR-049/052). */
+  processManagers: Map<string, ProcessManagerDefinition>;
 
   /** Feature flag service for kill switches */
   featureFlagService?: FeatureFlagServiceInterface;

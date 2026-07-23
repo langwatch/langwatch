@@ -4,6 +4,7 @@ import {
   API_KEYS_AND_SECRETS_DETECTION,
   isNativeEvaluatorType,
 } from "../evaluators.native";
+import { getEvaluatorDefinitions } from "../getEvaluator";
 
 describe("native evaluator merge into the facade", () => {
   it("exposes the native secrets evaluator in AVAILABLE_EVALUATORS", () => {
@@ -31,5 +32,11 @@ describe("native evaluator merge into the facade", () => {
   it("identifies native vs langevals evaluator types", () => {
     expect(isNativeEvaluatorType(API_KEYS_AND_SECRETS_DETECTION)).toBe(true);
     expect(isNativeEvaluatorType("presidio/pii_detection")).toBe(false);
+  });
+
+  it("resolves native evaluators through the shared definition lookup", () => {
+    expect(
+      getEvaluatorDefinitions(API_KEYS_AND_SECRETS_DETECTION)?.isGuardrail,
+    ).toBe(true);
   });
 });

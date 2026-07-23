@@ -10,27 +10,28 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
+
+import { decrypt } from "~/utils/encryption";
+import { AgentRepository, type TypedAgent } from "../../agents/agent.repository";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { AgentRepository, type TypedAgent } from "../../agents/agent.repository";
 import { prisma } from "../../db";
 import { PromptService, type VersionedPrompt } from "../../prompt-config/prompt.service";
 import { ScenarioService } from "../scenario.service";
-import { decrypt } from "~/utils/encryption";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
@@ -335,11 +336,11 @@ export async function prefetchScenarioData(
       modelParams: modelParamsResult.params,
       simulatorModelParams: simulatorParamsResult.params,
       judgeModelParams: judgeParamsResult.params,
-      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? "http://localhost:8080",
+      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
     },
     telemetry: {
-      endpoint: process.env.LANGWATCH_ENDPOINT!,
+      endpoint: env.LANGWATCH_ENDPOINT,
       apiKey: project.apiKey,
     },
   };
@@ -659,15 +660,32 @@ async function hydrateLlmParameters({
   const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
   if (nodes.length === 0) return { success: true, dsl };
 
-  // Resolve the fallback model: workflow.default_llm.model or DEFAULT_MODEL
+  // Legacy fallback. `default_llm` only exists on raw persisted DSLs from
+  // spec_version <= 1.4 (nodes own their config since 1.5); this reader
+  // keeps tolerating it because scenario agents can reference old workflow
+  // versions that were never re-saved. On 1.5+ DSLs a modelless llm
+  // parameter is stale state and must NOT be silently substituted — leave
+  // it unhydrated so the engine raises its typed llm_model_not_set error.
+  const specParts =
+    typeof dsl.spec_version === "string"
+      ? dsl.spec_version.split(".").map(Number)
+      : [];
+  const specMajor = specParts[0] ?? NaN;
+  const specMinor = specParts[1] ?? 0;
+  const legacyDsl =
+    !Number.isFinite(specMajor) ||
+    !Number.isFinite(specMinor) ||
+    specMajor < 1 ||
+    (specMajor === 1 && specMinor < 5);
   const defaultLlm =
-    typeof dsl.default_llm === "object" && dsl.default_llm !== null
+    legacyDsl && typeof dsl.default_llm === "object" && dsl.default_llm !== null
       ? (dsl.default_llm as Record<string, unknown>)
       : null;
-  const defaultModel =
-    typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
+  const defaultModel = legacyDsl
+    ? typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
       ? defaultLlm.model
-      : DEFAULT_MODEL;
+      : DEFAULT_MODEL
+    : undefined;
 
   // Collect unique models needed before hitting the provider
   const modelsNeeded = new Set<string>();
@@ -691,7 +709,7 @@ async function hydrateLlmParameters({
         typeof value?.model === "string" && value.model.length > 0
           ? value.model
           : defaultModel;
-      modelsNeeded.add(model);
+      if (model) modelsNeeded.add(model);
     }
   }
 
@@ -746,6 +764,7 @@ async function hydrateLlmParameters({
         typeof existingValue?.model === "string" && existingValue.model.length > 0
           ? existingValue.model
           : defaultModel;
+      if (!model) return param;
 
       const litellmParams = litellmParamsByModel.get(model);
       if (!litellmParams) return param;

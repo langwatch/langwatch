@@ -16,9 +16,9 @@ export const generatedScenarioSchema = z.object({
  */
 export type GeneratedScenario = z.infer<typeof generatedScenarioSchema>;
 
-/** Serialized DomainError shape the generate endpoint attaches to handled failures */
-const serializedDomainErrorSchema = z.object({
-  kind: z.string(),
+/** Serialized HandledError shape the generate endpoint attaches to handled failures */
+const serializedHandledErrorSchema = z.object({
+  code: z.string(),
   meta: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -69,27 +69,43 @@ export async function generateScenarioWithAI(
     }),
   });
 
-  if (!response.ok) {
-    const error = await response.json();
-    const domainError = serializedDomainErrorSchema.safeParse(
-      error.domainError,
+  // The endpoint answers with JSON on every outcome — 200 success and 4xx/5xx
+  // error envelopes alike. A NON-JSON body therefore did not come from the
+  // route handler; it came from a layer in FRONT of the app: a reverse-proxy
+  // or gateway 502/504, an auth-redirect login page, a timeout error page, or
+  // an older self-hosted build. Parsing it as JSON throws a raw
+  // `Unexpected token '<', "<!DOCTYPE "...` that masks the real HTTP status and
+  // strands the user — convert it into an actionable, status-bearing error
+  // instead (langwatch#5758).
+  let payload: { error?: string; domainError?: unknown; scenario?: unknown };
+  try {
+    payload = await response.json();
+  } catch {
+    const statusText = response.statusText ? ` ${response.statusText}` : "";
+    throw new Error(
+      `The server returned an unexpected response (HTTP ${response.status}${statusText}) instead of scenario data. This is usually temporary — please try again in a moment.`,
     );
-    if (domainError.success) {
-      throw new ScenarioGenerationError(
-        error.error || "Failed to generate scenario",
-        domainError.data.kind,
-        domainError.data.meta,
-      );
-    }
-    throw new Error(error.error || "Failed to generate scenario");
   }
 
-  const data = await response.json();
-  if (!data.scenario) {
+  if (!response.ok) {
+    const handled = serializedHandledErrorSchema.safeParse(
+      payload.domainError,
+    );
+    if (handled.success) {
+      throw new ScenarioGenerationError(
+        payload.error || "Failed to generate scenario",
+        handled.data.code,
+        handled.data.meta,
+      );
+    }
+    throw new Error(payload.error || "Failed to generate scenario");
+  }
+
+  if (!payload.scenario) {
     throw new Error("Invalid response: missing scenario data");
   }
 
-  const parsed = generatedScenarioSchema.safeParse(data.scenario);
+  const parsed = generatedScenarioSchema.safeParse(payload.scenario);
   if (!parsed.success) {
     throw new Error(`Invalid scenario data: ${parsed.error.message}`);
   }

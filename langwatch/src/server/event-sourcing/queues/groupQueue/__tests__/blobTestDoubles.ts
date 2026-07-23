@@ -7,10 +7,29 @@ import type { ObjectStore } from "../tieredBlobStore";
 /** In-memory stand-in for the Redis blob tier (a {@link JobBlobStore}). */
 export class InMemoryJobBlobStore implements JobBlobStore {
   readonly store = new Map<string, Buffer>();
-  async put({ id, data }: { id: string; data: Buffer }): Promise<void> {
+  /** TTLs observed per call, so tests can pin which backstop each tier passes. */
+  readonly putTtls: Array<number | undefined> = [];
+  readonly getTtls: Array<number | undefined> = [];
+  async put({
+    id,
+    data,
+    ttlSeconds,
+  }: {
+    id: string;
+    data: Buffer;
+    ttlSeconds?: number;
+  }): Promise<void> {
+    this.putTtls.push(ttlSeconds);
     this.store.set(id, data);
   }
-  async get({ id }: { id: string }): Promise<Buffer | null> {
+  async get({
+    id,
+    ttlSeconds,
+  }: {
+    id: string;
+    ttlSeconds?: number;
+  }): Promise<Buffer | null> {
+    this.getTtls.push(ttlSeconds);
     return this.store.get(id) ?? null;
   }
   /** In-memory doubles have no TTL so peek and get behave identically. */

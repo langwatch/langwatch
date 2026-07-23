@@ -1,6 +1,9 @@
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../../schemas/spans";
-import { NormalizedSpanKind, NormalizedStatusCode } from "../../../schemas/spans";
+import {
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "../../../schemas/spans";
 import { TraceSummaryFoldProjection } from "../../traceSummary.foldProjection";
 
 const traceSummaryProjection = new TraceSummaryFoldProjection({
@@ -38,6 +41,8 @@ export function createTestSpan(
     droppedAttributesCount: 0 as const,
     droppedEventsCount: 0 as const,
     droppedLinksCount: 0 as const,
+    cost: null,
+    nonBilledCost: null,
     ...overrides,
   };
 }

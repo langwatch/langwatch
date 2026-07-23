@@ -8,8 +8,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -42,11 +42,13 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), bundleCtxKey{}, bundle)
 
-			// Enrich context logger with identity fields.
-			ctx = clog.With(ctx,
-				zap.String("project_id", bundle.ProjectID),
-				zap.String("team_id", bundle.TeamID),
-			)
+			// Enrich context logger with identity fields (project + team +
+			// organization/tenant). No user_id — the gateway is API-key auth.
+			ctx = clog.WithIdentity(ctx, clog.Identity{
+				ProjectID:      bundle.ProjectID,
+				TeamID:         bundle.TeamID,
+				OrganizationID: bundle.OrganizationID,
+			})
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -66,11 +68,22 @@ func TraceRegistryMiddleware(registry *customertracebridge.Registry, defaultEndp
 				return
 			}
 			if registry != nil {
+				// Both halves come from Config so they are always the pair the
+				// control plane materialized together. Bundle.ProjectID rides the
+				// auth JWT on a slower refresh clock; pairing it with the config's
+				// token exports one project's traces under another's ingest token.
+				traceProjectID := bundle.Config.TraceProjectID
+				if traceProjectID == "" && bundle.Config.ProjectOTLPToken != "" {
+					// Inconsistent payload: fail closed rather than guess an id.
+					// Guessing is what leaks; dropping only costs telemetry.
+					clog.Get(r.Context()).Warn("otlp_trace_project_missing",
+						zap.String("vk_id", bundle.VirtualKeyID))
+				}
 				if err := registry.SetFromBundle(
-					bundle.ProjectID, bundle.Config.ProjectOTLPToken, defaultEndpoint,
+					traceProjectID, bundle.Config.ProjectOTLPToken, defaultEndpoint,
 				); err != nil {
 					clog.Get(r.Context()).Warn("otlp_endpoint_rejected",
-						zap.String("project_id", bundle.ProjectID), zap.Error(err))
+						zap.String("project_id", traceProjectID), zap.Error(err))
 				}
 			}
 			next.ServeHTTP(w, r)

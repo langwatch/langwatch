@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
@@ -7,7 +8,6 @@ import {
   eventSourcingStoreDurationHistogram,
   getEventSourcingEventsStoredCounter,
 } from "~/server/metrics";
-import { createLogger } from "~/utils/logger/server";
 import type { AggregateType } from "../domain/aggregateType";
 import { createTenantId } from "../domain/tenantId";
 import type { Event, Projection } from "../domain/types";
@@ -61,9 +61,11 @@ export class EventSourcingService<
     aggregateType,
     eventStore,
     foldProjections,
+    stateProjections,
     mapProjections,
     reactors,
     mapReactors,
+    subscribers,
     serviceOptions,
     logger,
     globalQueue,
@@ -90,7 +92,9 @@ export class EventSourcingService<
       process.env.NODE_ENV === "production" &&
       !globalQueue &&
       ((foldProjections && foldProjections.length > 0) ||
-        (mapProjections && mapProjections.length > 0))
+        (stateProjections && stateProjections.length > 0) ||
+        (mapProjections && mapProjections.length > 0) ||
+        (subscribers && subscribers.length > 0))
     ) {
       this.logger.warn(
         { aggregateType },
@@ -141,13 +145,96 @@ export class EventSourcingService<
             );
           };
         }
+        // Companion loader for refoldOnStoreMiss: history up to AND including
+        // the delivered event in log order, so a store-miss re-fold can never
+        // pre-apply an event that is persisted but still queued for this
+        // projection (per-aggregate FIFO delivers it next).
+        if (!fold.eventLoaderUpTo && eventStore) {
+          const capturedAggregateType = aggregateType;
+          const capturedEventStore = eventStore;
+          fold.eventLoaderUpTo = async (ctx: {
+            tenantId: string;
+            aggregateId: string;
+            upToEvent: Event;
+          }) => {
+            const events = await capturedEventStore.getEventsUpTo(
+              ctx.aggregateId,
+              { tenantId: createTenantId(ctx.tenantId) },
+              capturedAggregateType,
+              ctx.upToEvent as EventType,
+            );
+            return [...events].sort(
+              (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
+            );
+          };
+        }
+        // Paginated companion loader for the store-miss re-fold streaming path.
+        // Returns one (timestamp, eventId)-ordered page — the executor pages
+        // through it so a huge aggregate's history never lands in memory whole.
+        // No occurredAt re-sort: the streaming path is used only for
+        // order-insensitive folds, where page order is immaterial.
+        if (
+          !fold.eventLoaderUpToPaged &&
+          eventStore &&
+          eventStore.getEventsUpToPaged
+        ) {
+          const capturedAggregateType = aggregateType;
+          const capturedEventStore = eventStore;
+          fold.eventLoaderUpToPaged = async (ctx: {
+            tenantId: string;
+            aggregateId: string;
+            upToEvent: Event;
+            after: { timestamp: number; eventId: string } | undefined;
+            limit: number;
+          }) => {
+            const events = await capturedEventStore.getEventsUpToPaged!({
+              aggregateId: ctx.aggregateId,
+              context: { tenantId: createTenantId(ctx.tenantId) },
+              aggregateType: capturedAggregateType,
+              upToEvent: ctx.upToEvent as EventType,
+              after: ctx.after,
+              limit: ctx.limit,
+            });
+            return [...events];
+          };
+        }
         this.router.registerFoldProjection(fold);
+      }
+    }
+
+    // Default state projections deliberately receive no event-log loaders.
+    // Their injected repository is read directly under the queue's key lock.
+    if (stateProjections) {
+      for (const projection of stateProjections) {
+        this.router.registerStateProjection(projection);
       }
     }
 
     // Register map projections
     if (mapProjections) {
       for (const mapProj of mapProjections) {
+        // Auto-wire the log-ordered history loader for
+        // `options.dedupeByIdempotencyKey` — same shape as the fold
+        // projections' eventLoaderUpTo.
+        if (!mapProj.eventLoaderUpTo && eventStore) {
+          const capturedAggregateType = aggregateType;
+          const capturedEventStore = eventStore;
+          mapProj.eventLoaderUpTo = async (ctx: {
+            tenantId: string;
+            aggregateId: string;
+            upToEvent: Event;
+          }) => {
+            const events = await capturedEventStore.getEventsUpTo(
+              ctx.aggregateId,
+              { tenantId: createTenantId(ctx.tenantId) },
+              capturedAggregateType,
+              ctx.upToEvent as EventType,
+            );
+            return [...events].sort(
+              (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
+            );
+          };
+        }
         this.router.registerMapProjection(mapProj);
       }
     }
@@ -166,6 +253,12 @@ export class EventSourcingService<
       }
     }
 
+    if (subscribers) {
+      for (const subscriber of subscribers) {
+        this.router.registerEventSubscriber(subscriber);
+      }
+    }
+
     // All processes register all entries — the shared pipeline queue's Worker
     // must know every job type so it can dispatch any job it picks up.
     if (globalQueue && mapProjections && mapProjections.length > 0) {
@@ -174,6 +267,14 @@ export class EventSourcingService<
 
     if (globalQueue && foldProjections && foldProjections.length > 0) {
       this.router.initializeFoldQueues();
+    }
+
+    if (globalQueue && stateProjections && stateProjections.length > 0) {
+      this.router.initializeStateProjectionQueues();
+    }
+
+    if (globalQueue && subscribers && subscribers.length > 0) {
+      this.router.initializeSubscriberQueues();
     }
 
     if (
@@ -268,7 +369,10 @@ export class EventSourcingService<
         // Dispatch events to all projections (fold + map) via unified router
         if (
           leanedEvents.length > 0 &&
-          (this.router.hasFoldProjections || this.router.hasMapProjections)
+          (this.router.hasFoldProjections ||
+            this.router.hasStateProjections ||
+            this.router.hasMapProjections ||
+            this.router.hasEventSubscribers)
         ) {
           span.addEvent("projection.dispatch.start");
           try {

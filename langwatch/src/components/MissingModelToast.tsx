@@ -24,7 +24,7 @@ export type MissingModelInfo = {
   /** User-facing label for the feature, from the dev-side registry. */
   featureDisplayName: string;
   /** Role the unresolved feature belongs to. */
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   /** Project slug used to deep-link the action button. */
   projectSlug?: string;
   /** Whether the caller has permission to configure model providers. */
@@ -34,6 +34,7 @@ export type MissingModelInfo = {
 const ROLE_LABEL: Record<MissingModelInfo["role"], string> = {
   DEFAULT: "Default",
   FAST: "Fast",
+  LANGY: "Langy",
   EMBEDDINGS: "Embeddings",
 };
 

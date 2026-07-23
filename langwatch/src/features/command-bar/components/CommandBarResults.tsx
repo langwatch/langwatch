@@ -1,11 +1,11 @@
-import { forwardRef, useMemo } from "react";
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { CommandGroup } from "./CommandGroup";
-import type { ListItem } from "../getIconInfo";
-import type { Command, RecentItem, SearchResult } from "../types";
-import type { FilteredProject } from "../hooks/useFilteredProjects";
-import { COMMAND_BAR_MAX_HEIGHT } from "../constants";
+import { forwardRef, useMemo } from "react";
 import { topLevelNavigationCommands } from "../command-registry";
+import { COMMAND_BAR_MAX_HEIGHT } from "../constants";
+import type { ListItem } from "../getIconInfo";
+import type { FilteredProject } from "../hooks/useFilteredProjects";
+import type { Command, RecentItem, SearchResult } from "../types";
+import { CommandGroup } from "./CommandGroup";
 
 interface CommandBarResultsProps {
   query: string;
@@ -25,6 +25,7 @@ interface CommandBarResultsProps {
   idResult: SearchResult | null;
   recentItemsLimited: RecentItem[];
   easterEggItem: ListItem | null;
+  askLangyItem: ListItem | null;
   isLoading: boolean;
 }
 
@@ -59,6 +60,7 @@ export const CommandBarResults = forwardRef<
     idResult,
     recentItemsLimited,
     easterEggItem,
+    askLangyItem,
     isLoading,
   },
   ref,
@@ -173,20 +175,6 @@ export const CommandBarResults = forwardRef<
       });
     }
 
-    if (searchInTracesItem) {
-      groups.push({
-        label: "Search Traces",
-        items: [searchInTracesItem],
-      });
-    }
-
-    if (searchInDocsItem) {
-      groups.push({
-        label: "Search Docs",
-        items: [searchInDocsItem],
-      });
-    }
-
     return groups;
   }, [
     easterEggItem,
@@ -198,11 +186,40 @@ export const CommandBarResults = forwardRef<
     filteredPage,
     searchResults,
     filteredProjects,
-    searchInTracesItem,
-    searchInDocsItem,
   ]);
 
-  const groups = query === "" ? emptyQueryGroups : queryGroups;
+  /**
+   * The two things we can always offer, for any string at all. They are not
+   * matches, and must never outrank one — see the ordering note in
+   * `useCommandBarItems`, which this has to mirror exactly or the running
+   * keyboard index stops agreeing with what is on screen.
+   */
+  const fallbackGroups = useMemo<GroupConfig[]>(() => {
+    const groups: GroupConfig[] = [];
+    if (searchInTracesItem) {
+      groups.push({ label: "Search Traces", items: [searchInTracesItem] });
+    }
+    if (searchInDocsItem) {
+      groups.push({ label: "Search Docs", items: [searchInDocsItem] });
+    }
+    return groups;
+  }, [searchInTracesItem, searchInDocsItem]);
+
+  // Ask Langy leads on an empty bar; while typing it sits under the real
+  // matches and above the fallbacks.
+  const groups = useMemo<GroupConfig[]>(() => {
+    const askGroup: GroupConfig | null = askLangyItem
+      ? { label: "Ask Langy", items: [askLangyItem] }
+      : null;
+    if (query === "") {
+      return askGroup ? [askGroup, ...emptyQueryGroups] : emptyQueryGroups;
+    }
+    return [
+      ...queryGroups,
+      ...(askGroup ? [askGroup] : []),
+      ...fallbackGroups,
+    ];
+  }, [query, emptyQueryGroups, queryGroups, askLangyItem, fallbackGroups]);
 
   // Render groups with running index calculation
   const renderGroups = () => {
@@ -233,9 +250,9 @@ export const CommandBarResults = forwardRef<
       ref={ref}
       maxHeight={COMMAND_BAR_MAX_HEIGHT}
       overflowY="auto"
-      paddingBottom={3}
+      paddingBottom={2.5}
       borderTop="1px solid"
-      borderColor="border.muted"
+      borderColor="border.subtle"
     >
       <VStack align="stretch" gap={0}>
         {renderGroups()}

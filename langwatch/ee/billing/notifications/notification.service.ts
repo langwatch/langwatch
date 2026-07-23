@@ -1,11 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
-import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
-import { createLogger } from "../../../src/utils/logger/server";
-import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
 import type { AppConfig } from "../../../src/server/app-layer/config";
+import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
+import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,

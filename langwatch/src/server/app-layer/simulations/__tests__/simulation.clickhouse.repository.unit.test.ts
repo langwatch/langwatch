@@ -108,39 +108,6 @@ describe("SimulationClickHouseRepository", () => {
     });
   });
 
-  describe("getScenarioRunDataByScenarioId()", () => {
-    describe("when rows exist", () => {
-      it("returns mapped scenario run data", async () => {
-        setQueryResult(clickhouse, [
-          makeRunRow({ ScenarioRunId: "run-1" }),
-          makeRunRow({ ScenarioRunId: "run-2" }),
-        ]);
-
-        const result = await repo.getScenarioRunDataByScenarioId({
-          projectId: "proj-1",
-          scenarioId: "scenario-1",
-        });
-
-        expect(result).toHaveLength(2);
-        expect(result![0]!.scenarioRunId).toBe("run-1");
-        expect(result![1]!.scenarioRunId).toBe("run-2");
-      });
-    });
-
-    describe("when no rows exist", () => {
-      it("returns null", async () => {
-        setQueryResult(clickhouse, []);
-
-        const result = await repo.getScenarioRunDataByScenarioId({
-          projectId: "proj-1",
-          scenarioId: "scenario-1",
-        });
-
-        expect(result).toBeNull();
-      });
-    });
-  });
-
   describe("getAllRunDataForScenarioSet()", () => {
     describe("when rows exist", () => {
       it("returns all mapped runs", async () => {

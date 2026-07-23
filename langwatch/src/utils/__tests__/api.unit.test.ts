@@ -218,7 +218,7 @@ describe("Global mutation error handler", () => {
       expect(extractLiteMemberRestrictionInfo(error)).toBeNull();
     });
 
-    it("returns null for UNAUTHORIZED without domainError", () => {
+    it("returns null for UNAUTHORIZED without a handled error", () => {
       const error = new TRPCClientError("Unauthorized", {
         result: {
           error: {
@@ -229,14 +229,14 @@ describe("Global mutation error handler", () => {
       expect(extractLiteMemberRestrictionInfo(error)).toBeNull();
     });
 
-    it("returns null for UNAUTHORIZED with wrong domainError kind", () => {
+    it("returns null for UNAUTHORIZED with wrong handled error code", () => {
       const error = new TRPCClientError("Unauthorized", {
         result: {
           error: {
             data: {
               code: "UNAUTHORIZED",
               httpStatus: 401,
-              domainError: { kind: "some_other_error" },
+              error: { code: "some_other_error" },
             },
           },
         },
@@ -244,15 +244,15 @@ describe("Global mutation error handler", () => {
       expect(extractLiteMemberRestrictionInfo(error)).toBeNull();
     });
 
-    it("extracts resource from lite_member_restricted domainError", () => {
+    it("extracts resource from lite_member_restricted handled error", () => {
       const error = new TRPCClientError("Unauthorized", {
         result: {
           error: {
             data: {
               code: "UNAUTHORIZED",
               httpStatus: 401,
-              domainError: {
-                kind: "lite_member_restricted",
+              error: {
+                code: "lite_member_restricted",
                 meta: { resource: "prompts" },
               },
             },
@@ -271,8 +271,8 @@ describe("Global mutation error handler", () => {
             data: {
               code: "UNAUTHORIZED",
               httpStatus: 401,
-              domainError: {
-                kind: "lite_member_restricted",
+              error: {
+                code: "lite_member_restricted",
                 meta: {},
               },
             },
@@ -281,6 +281,27 @@ describe("Global mutation error handler", () => {
       });
       expect(extractLiteMemberRestrictionInfo(error)).toEqual({
         resource: undefined,
+      });
+    });
+
+    it("extracts resource from the deprecated `kind` discriminant (old server)", () => {
+      const error = new TRPCClientError("Unauthorized", {
+        result: {
+          error: {
+            data: {
+              code: "UNAUTHORIZED",
+              httpStatus: 401,
+              // A pre-HandledError server serialises the discriminant as `kind`.
+              error: {
+                kind: "lite_member_restricted",
+                meta: { resource: "prompts" },
+              },
+            },
+          },
+        },
+      });
+      expect(extractLiteMemberRestrictionInfo(error)).toEqual({
+        resource: "prompts",
       });
     });
   });
@@ -368,8 +389,8 @@ describe("Global mutation error handler", () => {
             data: {
               code: "UNAUTHORIZED",
               httpStatus: 401,
-              domainError: {
-                kind: "lite_member_restricted",
+              error: {
+                code: "lite_member_restricted",
                 meta: { resource: "prompts" },
               },
             },
@@ -423,8 +444,8 @@ describe("Global mutation error handler", () => {
             data: {
               code: "UNAUTHORIZED",
               httpStatus: 401,
-              domainError: {
-                kind: "lite_member_restricted",
+              error: {
+                code: "lite_member_restricted",
                 meta: { resource: "datasets" },
               },
             },
@@ -464,8 +485,8 @@ describe("Global mutation error handler", () => {
             data: {
               code: "UNAUTHORIZED",
               httpStatus: 401,
-              domainError: {
-                kind: "lite_member_restricted",
+              error: {
+                code: "lite_member_restricted",
                 meta: { resource: "datasets" },
               },
             },

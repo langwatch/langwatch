@@ -45,7 +45,9 @@ export async function givenIAmOnTheScenariosListPage(page: Page) {
 export async function givenIAmOnTheSimulationsPage(page: Page) {
   const projectSlug = await getProjectSlug(page);
   await page.goto(`/${projectSlug}/simulations`);
-  await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
+  await expect
+    .poll(() => new URL(page.url()).pathname, { timeout: 10000 })
+    .toBe(`/${projectSlug}/simulations`);
 }
 
 /**
@@ -73,9 +75,49 @@ export async function thenISeeNewScenarioButton(page: Page) {
 
 /**
  * When I click "New Scenario"
+ * Dismisses the AI-assist modal that now appears first.
  */
 export async function whenIClickNewScenario(page: Page) {
   await page.getByRole("button", { name: /new scenario/i }).click();
+
+  // Step 1: Handle ScenarioWelcomeModal — shown when user has zero scenarios
+  // and has not previously dismissed the welcome screen (localStorage flag).
+  // This modal appears BEFORE the scenario creation modals in step 2.
+  const welcomeButton = page.getByRole("button", {
+    name: /create your first scenario/i,
+  });
+  const welcomeVisible = await welcomeButton
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (welcomeVisible) {
+    await welcomeButton.click();
+  }
+
+  // Step 2: Handle interstitial modals before the scenario form drawer opens.
+  //   1. ModelProviderRequiredModal ("Proceed anyway") — shown when no model
+  //      provider is configured (typical in CI).
+  //   2. AICreateModal ("I'll write it myself") — shown when a provider exists.
+  // Race both locators; whichever becomes visible first wins.
+  const dismissed = await Promise.race([
+    page
+      .getByRole("button", { name: /proceed anyway/i })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => "proceed" as const)
+      .catch(() => null),
+    page
+      .getByRole("button", { name: /i'll write it myself/i })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => "skip" as const)
+      .catch(() => null),
+  ]);
+
+  if (dismissed === "proceed") {
+    await page.getByRole("button", { name: /proceed anyway/i }).click();
+  } else if (dismissed === "skip") {
+    await page.getByRole("button", { name: /i'll write it myself/i }).click();
+  }
+  // If neither modal appeared the form drawer opened directly — no action needed.
 }
 
 /**
@@ -93,19 +135,24 @@ export async function thenISeeTheScenarioEditor(page: Page) {
  * Then I see the scenario form fields (Name, Situation, Criteria, Labels)
  */
 export async function thenISeeScenarioFormFields(page: Page) {
-  // Name field
+  // Name field — SectionHeader renders as <p> not <label>, so there is no
+  // ARIA name association; match by placeholder instead. .last() picks the
+  // visible dialog when Chakra renders duplicates (same reason as the sibling
+  // fill/assert helpers in this file).
   await expect(
-    page.getByRole("textbox", { name: "Name", exact: true }).first()
+    page.getByPlaceholder(/angry refund request/i).last()
   ).toBeVisible();
 
-  // Situation field (using placeholder as fallback - no label available)
+  // Situation field
   await expect(
-    page.getByPlaceholder(/a frustrated premium subscriber/i).first()
+    page.getByPlaceholder(/a frustrated premium subscriber/i).last()
   ).toBeVisible();
 
-  // Criteria field (using placeholder as fallback - no label available)
+  // Criteria field — CriteriaInput mounts the entry textarea only after the
+  // add button is clicked (isAddingNew), so assert the reveal control instead
+  // of the not-yet-rendered placeholder textarea.
   await expect(
-    page.getByPlaceholder(/must apologize for the inconvenience/i).first()
+    page.getByRole("button", { name: /add.*criteria/i }).last()
   ).toBeVisible();
 }
 
@@ -113,8 +160,9 @@ export async function thenISeeScenarioFormFields(page: Page) {
  * When I fill in "Name" with "<name>"
  */
 export async function whenIFillInNameWith(page: Page, name: string) {
+  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
   await page
-    .getByRole("textbox", { name: "Name", exact: true })
+    .getByPlaceholder(/angry refund request/i)
     .last()
     .fill(name);
 }
@@ -133,23 +181,28 @@ export async function whenIFillInSituationWith(page: Page, situation: string) {
  * When I add criterion "<criterion>"
  */
 export async function whenIAddCriterion(page: Page, criterion: string) {
-  await page
+  // CriteriaInput hides the entry textarea behind an "Add ... criteria" button
+  // (label is "Add the first criteria" when empty, "Add criteria" otherwise);
+  // the textarea only mounts once adding starts (isAddingNew).
+  await page.getByRole("button", { name: /add.*criteria/i }).last().click();
+  const input = page
     .getByPlaceholder(/must apologize for the inconvenience/i)
-    .last()
-    .fill(criterion);
-  await page.getByRole("button", { name: "Add" }).last().click();
+    .last();
+  await input.fill(criterion);
+  // Enter commits the new criterion (handleAddKeyDown → handleSaveNew).
+  await input.press("Enter");
 }
 
 /**
  * Then the criterion appears in the criteria list
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
-  // Criteria appear as textbox inputs with the criterion as their value
-  const criterionInput = page
-    .getByRole("textbox")
-    .filter({ hasText: criterion })
-    .last();
-  await expect(criterionInput).toBeVisible({ timeout: 5000 });
+  // Committed criteria render as plain text within the criteria-list container
+  // (not as inputs). Scope to that container so we don't match the criterion
+  // text elsewhere on the page; .last() picks the visible Chakra dialog when
+  // duplicate dialogs are rendered.
+  const criteriaList = page.getByTestId("criteria-list").last();
+  await expect(criteriaList.getByText(criterion)).toBeVisible({ timeout: 5000 });
 }
 
 /**
@@ -167,7 +220,12 @@ export async function whenIClickSave(page: Page) {
   await expect(saveWithoutRunning).toBeVisible({ timeout: 5000 });
   await saveWithoutRunning.click();
 
-  // Wait for save to complete by checking dialog closes or list updates
+  // Wait for save to complete, then let the drawer close itself.
+  // ScenarioFormDrawer calls onClose() automatically after the success toast,
+  // so clicking Close here would race the auto-close and cause flakiness.
+  const successToast = page.getByText(/scenario (created|updated)/i);
+  await expect(successToast).toBeVisible({ timeout: 10000 });
+
   await expect(saveButton).not.toBeVisible({ timeout: 10000 });
 }
 
@@ -199,8 +257,9 @@ export async function whenIClickOnScenarioInList(page: Page, name: string) {
  * Then the form is populated with the existing data
  */
 export async function thenFormIsPopulatedWithName(page: Page, name: string) {
+  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
   const nameField = page
-    .getByRole("textbox", { name: "Name", exact: true })
+    .getByPlaceholder(/angry refund request/i)
     .last();
   await expect(nameField).toHaveValue(name);
 }
@@ -209,8 +268,9 @@ export async function thenFormIsPopulatedWithName(page: Page, name: string) {
  * When I change the name to "<name>"
  */
 export async function whenIChangeNameTo(page: Page, name: string) {
+  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
   const nameField = page
-    .getByRole("textbox", { name: "Name", exact: true })
+    .getByPlaceholder(/angry refund request/i)
     .last();
   await nameField.clear();
   await nameField.fill(name);

@@ -13,9 +13,25 @@
  * unclassified, unauthorized endpoint to the surface by accident. There is no
  * legacy allowlist: the migration is complete and every family is on the builder.
  */
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
+import {
+  hasPermissionWithHierarchy,
+  organizationRoleHasPermission,
+  type Permission,
+  teamRoleHasPermission,
+  EXTERNAL_MEMBER_PERMISSIONS,
+} from "~/server/api/rbac";
 import { allRegisteredRoutes } from "../route-registry";
+
+/**
+ * The registry is populated as a side effect of the app modules loading, so
+ * anything asserting over it must import the composed router first.
+ */
+const loadRouter = async (): Promise<void> => {
+  await import("~/server/api-router");
+};
 
 /**
  * A method-"ALL" route on a wildcard path is either app-level middleware
@@ -95,23 +111,141 @@ describe("API router endpoint authorization guarantee", () => {
     });
   });
 
-  // Regression: pull request #4913 originally classified /github-langy/connect
-  // as publicEndpoint together with the protocol-mandated /callback. Connect is
+  // Regression: pull request #4913 originally classified the OAuth entry point
+  // as publicEndpoint together with the protocol-mandated callback. Install is
   // session-gated (it requires a logged-in user before signing state) — keeping
   // both under one policy made the registry lie about what is actually open to
   // the internet. Pin the policies separately so a future edit can't quietly
   // re-merge them.
   describe("when the GitHub OAuth endpoints are registered", () => {
-    it("treats /github-langy/connect as handler-managed (session-gated) and /github-langy/callback as public", () => {
+    it("treats /github-langy/install as handler-managed and /github-langy/setup as public", () => {
       const byPath = new Map(
         allRegisteredRoutes().map((r) => [`${r.method} ${r.path}`, r.policy]),
       );
-      const connect = byPath.get("GET /api/github-langy/connect");
-      const callback = byPath.get("GET /api/github-langy/callback");
-      expect(connect, "/connect must be registered").toBeDefined();
-      expect(callback, "/callback must be registered").toBeDefined();
-      expect(connect?.kind).toBe("handlerManaged");
-      expect(callback?.kind).toBe("public");
+      const install = byPath.get("GET /api/github-langy/install");
+      const setup = byPath.get("GET /api/github-langy/setup");
+      expect(install, "/install must be registered").toBeDefined();
+      expect(setup, "/setup must be registered").toBeDefined();
+      expect(install?.kind).toBe("handlerManaged");
+      expect(setup?.kind).toBe("public");
+    });
+  });
+
+  /**
+   * The grain sweep — routes moved off `:manage` onto `:create` / `:update` so
+   * a credential issued at the write grain is honoured instead of refused.
+   *
+   * These run over the WHOLE registry rather than a list of route names,
+   * because the risk is not "did this one route change" — it is "did a change
+   * anywhere quietly hand a viewer a write, or strand a route no role can
+   * reach". Both directions are checked here, through the same
+   * `hasPermissionWithHierarchy` the request path uses.
+   */
+  describe("when a route's declared permission is compared to the role model", () => {
+    const permissionRoutes = () =>
+      allRegisteredRoutes().flatMap((r) =>
+        r.policy.kind === "permission" || r.policy.kind === "apiKeyPermission"
+          ? [{ route: `${r.method} ${r.path}`, permission: r.policy.permission }]
+          : [],
+      );
+
+    const resourceOf = (permission: string) => permission.split(":")[0]!;
+
+    /** @scenario "Every route still admits the roles that could already reach it" */
+    it("admits a manage holder on every route", async () => {
+      await loadRouter();
+      const stranded = permissionRoutes().filter(
+        ({ permission }) =>
+          !hasPermissionWithHierarchy(
+            [`${resourceOf(permission)}:manage`],
+            permission,
+          ),
+      );
+
+      expect(
+        stranded.map((s) => `${s.route} -> ${s.permission}`),
+        `These routes ask for a grain that the resource's own :manage does NOT ` +
+          `imply, so moving to them silently removed everyone who held :manage:`,
+      ).toEqual([]);
+    });
+
+    /** @scenario "A read-only role gains no write from a finer grain" */
+    it("refuses a project viewer on every route that is not a read", async () => {
+      await loadRouter();
+      const leaked = permissionRoutes().filter(
+        ({ permission }) =>
+          !permission.endsWith(":view") &&
+          teamRoleHasPermission(TeamUserRole.VIEWER, permission as Permission),
+      );
+
+      expect(
+        leaked.map((l) => `${l.route} -> ${l.permission}`),
+        `A project VIEWER can reach these non-read routes. A finer grain must ` +
+          `never be one a read-only role happens to hold:`,
+      ).toEqual([]);
+    });
+
+    /** @scenario "A read-only role gains no write from a finer grain" */
+    it("refuses a lite external member on every route that is not a read", async () => {
+      // EXTERNAL is the only built-in bag that holds a bare `:create`/`:update`
+      // WITHOUT the `:manage` that would imply it (annotations). Every other
+      // role is all-`:view` or holds `:manage`, so the VIEWER sweep above
+      // cannot see this class: the day someone applies the `:manage` → `:create`
+      // pattern to an annotations route, a lite member silently gains a write
+      // and that test stays green.
+      await loadRouter();
+      const leaked = permissionRoutes().filter(
+        ({ permission }) =>
+          !permission.endsWith(":view") &&
+          EXTERNAL_MEMBER_PERMISSIONS.includes(permission as Permission),
+      );
+
+      expect(
+        leaked.map((l) => `${l.route} -> ${l.permission}`),
+        `An external (lite) member can reach these non-read routes:`,
+      ).toEqual([]);
+    });
+
+    /** @scenario "Every declared permission is reachable by a built-in role" */
+    it("keeps every route reachable by a built-in administrator", async () => {
+      await loadRouter();
+      const unreachable = permissionRoutes().filter(
+        ({ permission }) =>
+          !teamRoleHasPermission(TeamUserRole.ADMIN, permission as Permission) &&
+          !organizationRoleHasPermission(
+            OrganizationUserRole.ADMIN,
+            permission as Permission,
+          ),
+      );
+
+      expect(
+        unreachable.map((u) => `${u.route} -> ${u.permission}`),
+        `No built-in administrator role grants these, so the routes are ` +
+          `unreachable for real users — the opposite failure to asking for too much:`,
+      ).toEqual([]);
+    });
+
+    /** @scenario "Running a scenario suite does not require administering it" */
+    it("lets a read-and-write scenarios credential run a suite but not archive it", async () => {
+      await loadRouter();
+      // Exactly what the product issues for "may work with scenarios": the
+      // write grain, without the administration grain that carries delete.
+      const readAndWrite = [
+        "scenarios:view",
+        "scenarios:create",
+        "scenarios:update",
+      ];
+
+      const declared = new Map(
+        permissionRoutes().map((r) => [r.route, r.permission]),
+      );
+      const run = declared.get("POST /api/suites/:id/run");
+      const archive = declared.get("DELETE /api/suites/:id");
+      expect(run, "the suite run route must be registered").toBeDefined();
+      expect(archive, "the suite archive route must be registered").toBeDefined();
+
+      expect(hasPermissionWithHierarchy(readAndWrite, run!)).toBe(true);
+      expect(hasPermissionWithHierarchy(readAndWrite, archive!)).toBe(false);
     });
   });
 });

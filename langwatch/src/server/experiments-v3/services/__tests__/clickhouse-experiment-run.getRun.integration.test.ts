@@ -63,6 +63,54 @@ async function insertVersion(ch: ClickHouseClient, v: RunVersion) {
   });
 }
 
+/**
+ * Inserts one target experiment_run_items row with no cost (TargetCost NULL) so
+ * getRun's trace-cost enrichment path fires. OccurredAt is now64(3) so it falls
+ * inside the run's buffered OccurredAt window.
+ */
+async function insertTargetItem(
+  ch: ClickHouseClient,
+  v: { experimentId: string; runId: string; traceId: string; rowIndex?: number },
+) {
+  await ch.command({
+    query: `
+      INSERT INTO experiment_run_items
+        (ProjectionId, TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, DatasetEntry, TraceId, TargetCost, OccurredAt, CreatedAt)
+      VALUES
+        ({pid:String}, {tenant:String}, {experimentId:String}, {runId:String}, {rowIndex:UInt32}, 'default', 'target', '{}', {traceId:String}, NULL, now64(3), now64(3))
+    `,
+    query_params: {
+      pid: nanoid(),
+      tenant: tenantId,
+      experimentId: v.experimentId,
+      runId: v.runId,
+      rowIndex: v.rowIndex ?? 0,
+      traceId: v.traceId,
+    },
+  });
+}
+
+/** Inserts one trace_summaries row carrying a TotalCost for enrichment. */
+async function insertTraceCost(
+  ch: ClickHouseClient,
+  v: { traceId: string; totalCost: number },
+) {
+  await ch.command({
+    query: `
+      INSERT INTO trace_summaries
+        (ProjectionId, TenantId, TraceId, TotalCost, OccurredAt, CreatedAt, UpdatedAt)
+      VALUES
+        ({pid:String}, {tenant:String}, {traceId:String}, {totalCost:Float64}, now64(3), now64(3), now64(3))
+    `,
+    query_params: {
+      pid: nanoid(),
+      tenant: tenantId,
+      traceId: v.traceId,
+      totalCost: v.totalCost,
+    },
+  });
+}
+
 let ch: ClickHouseClient;
 let service: InstanceType<typeof ExperimentRunService>;
 
@@ -75,10 +123,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ch) {
-    await ch.exec({
-      query: `ALTER TABLE experiment_runs DELETE WHERE TenantId = {tenantId:String}`,
-      query_params: { tenantId },
-    });
+    for (const table of [
+      "experiment_runs",
+      "experiment_run_items",
+      "trace_summaries",
+    ]) {
+      await ch.exec({
+        query: `ALTER TABLE ${table} DELETE WHERE TenantId = {tenantId:String}`,
+        query_params: { tenantId },
+      });
+    }
   }
   await stopTestContainers();
 });
@@ -119,6 +173,34 @@ describe("ExperimentRunService.getRun (integration)", () => {
       expect(result).not.toBeNull();
       expect(result!.progress).toBe(9);
       expect(result!.targets).toEqual([{ id: "final" }]);
+    });
+  });
+
+  describe("when a target item has no cost but its trace has one", () => {
+    it("enriches the dataset entry with the trace cost (within the run's OccurredAt window)", async () => {
+      const experimentId = `exp-cost-${nanoid()}`;
+      const runId = `run-cost-${nanoid()}`;
+      const traceId = `trace-cost-${nanoid()}`;
+      await insertVersion(ch, {
+        experimentId,
+        runId,
+        progress: 1,
+        targets: '[{"id":"default"}]',
+        agoSec: 0,
+      });
+      await insertTargetItem(ch, { experimentId, runId, traceId });
+      await insertTraceCost(ch, { traceId, totalCost: 0.42 });
+
+      const result = await service.getRun({
+        projectId: tenantId,
+        experimentId,
+        runId,
+      });
+
+      expect(result).not.toBeNull();
+      const entry = result!.dataset.find((d) => d.traceId === traceId);
+      expect(entry).toBeDefined();
+      expect(entry!.cost).toBe(0.42);
     });
   });
 

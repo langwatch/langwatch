@@ -10,15 +10,10 @@ import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { env } from "~/env.mjs";
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
-} from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
-import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
-import { provisionLangyVirtualKey } from "~/server/services/langy/langyVirtualKey";
+import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -28,7 +23,6 @@ import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
-import { scheduleTopicClusteringForProject } from "../../topicClustering/topicClusteringQueue";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -41,47 +35,6 @@ import {
 import { getUserProtectionsForProject } from "../utils";
 
 export const projectRouter = createTRPCRouter({
-  publicGetById: publicProcedure
-    .input(z.object({ id: z.string(), shareId: z.string() }))
-    .use(skipPermissionCheck)
-    .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const publicShare = await prisma.publicShare.findUnique({
-        where: { id: input.shareId, projectId: input.id },
-      });
-
-      if (!publicShare) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Public share not found",
-        });
-      }
-
-      const project = await prisma.project.findUnique({
-        where: { id: input.id },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
-        });
-      }
-
-      return {
-        id: project.id,
-        name: project.name,
-        slug: project.slug,
-        language: project.language,
-        framework: project.framework,
-        firstMessage: true,
-        apiKey: "",
-        teamId: "",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Project;
-    }),
   create: protectedProcedure
     .input(
       z.object({
@@ -214,24 +167,9 @@ export const projectRouter = createTRPCRouter({
         },
       });
 
-      // Best-effort: mint Langy's dedicated, least-privilege service key so the
-      // assistant works the moment the project exists. A failure here must never
-      // block project creation — the backfill reconciler mints any that slip through.
-      try {
-        await provisionLangyApiKey({
-          prisma,
-          projectId: project.id,
-          organizationId: input.organizationId,
-          createdByUserId: userId,
-        });
-      } catch (error) {
-        captureException(toError(error), {
-          extra: {
-            projectId: project.id,
-            context: "provisionLangyApiKey:project.create",
-          },
-        });
-      }
+      // (The eager per-project Langy service key that used to be minted here is
+      // gone — Langy now mints a per-turn, per-user session key scoped to exactly
+      // what the caller holds; no long-lived project key is provisioned.)
 
       // Best-effort: mint Langy's gateway virtual key so it shows up in the
       // user's /virtual-keys list from day 1 (configurable model + fallback
@@ -256,9 +194,14 @@ export const projectRouter = createTRPCRouter({
 
       return { success: true, projectSlug: project.slug };
     }),
+  /**
+   * The base key is a project-level write credential, so reading it is gated
+   * with `project:update` to match the access it grants. Rotation stays at
+   * `project:manage`.
+   */
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("project:view"))
+    .use(checkProjectPermission("project:update"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -488,19 +431,40 @@ export const projectRouter = createTRPCRouter({
   triggerTopicClustering: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
-        await scheduleTopicClusteringForProject(input.projectId, true);
-        return {
-          success: true,
-          message: "Topic clustering job queued successfully",
-        };
+        const app = getApp();
+        // A request made while a run is already underway is declined by the
+        // scheduler, not queued behind it, so an unconditional success would
+        // tell the user a run started when nothing did. The read model is the
+        // only place that answer is visible before the scheduler makes it, so
+        // ask it first and report which of the two the click actually did.
+        // Best effort by nature: the scheduler, not this check, is what keeps
+        // two runs off one project.
+        if (await app.topicClustering.status.isRunInFlight(input)) {
+          return {
+            started: false as const,
+            reason: "already_running" as const,
+          };
+        }
+        await app.topicClustering.requestClustering({
+          tenantId: input.projectId,
+          occurredAt: Date.now(),
+          trigger: "manual",
+          requestedByUserId: ctx.session.user.id,
+        });
+        return { started: true as const };
       } catch (error) {
+        captureException(toError(error), {
+          extra: { projectId: input.projectId },
+        });
+        // The UI toasts this message verbatim, and the failures behind it are
+        // event-store/projection internals (Prisma detail, hostnames) — the
+        // same class of text the status read deliberately never exposes.
+        // Detail goes to the log above; the customer gets a fixed sentence.
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Failed to trigger topic clustering: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          message: "Failed to trigger topic clustering",
         });
       }
     }),

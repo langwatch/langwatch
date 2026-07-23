@@ -17,6 +17,8 @@
  * check (observed cancelling app-ci repeatedly). Extending the same accepted
  * mask to unit lets a wedged unit shard force-exit(0) and unblock the check.
  */
+import { shardSawFailure } from "./test-utils/shardFailureReporter";
+
 export async function setup(): Promise<void> {
   // Hard floor: a vitest finalize wedge can reproducibly hang a CI shard after
   // the last test of the last file passes. Every diagnostic the team has run
@@ -25,20 +27,27 @@ export async function setup(): Promise<void> {
   // handles open, then the vitest main process sits idle for the full job
   // timeout cap. The wedge appears to be in vitest's own shard / reporter
   // finalize path and we cannot fix it from inside a test. Schedule a hard
-  // process.exit(0) so the step at least completes and the rest of the
+  // process.exit so the step at least completes and the rest of the
   // langwatch-app-complete required check unblocks. Unref'd so a healthy
   // shard exits immediately on its own; the timer only fires on the wedge.
   // Mirrors the integration globalSetup hard-floor; unit shards otherwise lack
   // one. A healthy unit shard finishes in ~3 min, so a 4-min floor only fires
   // on a wedge and caps the wasted wall-clock at ~1 min of idle.
+  //
+  // The exit code preserves failures: the wedge also fires after a shard
+  // prints red results, and a bare exit(0) there stamps a green job over
+  // failing tests (a real unit failure shipped through exactly that way).
+  // ShardFailureReporter (wired via --reporter in the CI step) flags any
+  // failed result on globalThis as results stream, so the floor knows.
   if (process.env.CI) {
     const HARD_FLOOR_MS = 4 * 60 * 1000;
     const timer = setTimeout(() => {
+      const failed = shardSawFailure();
       // eslint-disable-next-line no-console
       console.log(
-        `[unit globalSetup] hard floor reached at ${HARD_FLOOR_MS / 60_000} min — forcing process.exit(0) to release the CI step from a vitest finalize wedge`,
+        `[unit globalSetup] hard floor reached at ${HARD_FLOOR_MS / 60_000} min — forcing process.exit(${failed ? 1 : 0}) to release the CI step from a vitest finalize wedge${failed ? " (failures were reported before the wedge)" : ""}`,
       );
-      process.exit(0);
+      process.exit(failed ? 1 : 0);
     }, HARD_FLOOR_MS);
     timer.unref();
   }

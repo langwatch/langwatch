@@ -107,11 +107,7 @@ function EvalHistoryRow({
         </Text>
       )}
       {time && (
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          flexShrink={0}
-        >
+        <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
           {time}
         </Text>
       )}
@@ -143,9 +139,7 @@ function EvalHistoryRow({
                 )}
               </VStack>
             ) : (
-              <Text textStyle="2xs">
-                {entry.spanId}
-              </Text>
+              <Text textStyle="2xs">{entry.spanId}</Text>
             )
           }
           positioning={{ placement: "top" }}
@@ -162,20 +156,11 @@ function EvalHistoryRow({
             transition="color 0.12s ease"
           >
             {entry.spanName && (
-              <Text
-                textStyle="2xs"
-                color="inherit"
-                truncate
-                maxWidth="160px"
-              >
+              <Text textStyle="2xs" color="inherit" truncate maxWidth="160px">
                 {entry.spanName}
               </Text>
             )}
-            <Text
-              textStyle="2xs"
-              color="fg.subtle"
-              flexShrink={0}
-            >
+            <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
               {truncateId(entry.spanId)}
             </Text>
             {canJump && <Icon as={LuArrowRight} boxSize={2.5} flexShrink={0} />}

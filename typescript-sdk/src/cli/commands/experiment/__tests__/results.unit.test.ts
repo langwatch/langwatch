@@ -137,13 +137,17 @@ describe("experimentResultsCommand()", () => {
     describe("when format is json", () => {
       it("applies filters and dumps the matching payload to stdout", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
-        await experimentResultsCommand({
+        const result = await experimentResultsCommand({
           experimentSlug: "doc-qa",
-          options: { format: "json", filter: "failed", limit: "1" },
+          options: { filter: "failed", limit: "1" },
         });
-        const payload = JSON.parse(String(logSpy.mock.calls[0]![0]));
+        const payload = result?.data as {
+          dataset: { entry: { input: string } }[];
+          evaluations: unknown[];
+          meta: Record<string, unknown>;
+        };
         expect(payload.dataset).toHaveLength(1);
-        expect(payload.dataset[0].entry.input).toBe("broken row");
+        expect(payload.dataset[0]!.entry.input).toBe("broken row");
         expect(payload.evaluations).toHaveLength(0);
         expect(payload.meta).toMatchObject({
           totalMatching: 2,
@@ -157,11 +161,19 @@ describe("experimentResultsCommand()", () => {
     describe("when filter is failed", () => {
       it("prints only failing rows", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
-        await experimentResultsCommand({
+        const result = await experimentResultsCommand({
           experimentSlug: "doc-qa",
           options: { filter: "failed" },
         });
-        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
+        result?.table();
+        // Strip ANSI colour codes: whether chalk colours here depends on the
+        // environment (vitest propagates FORCE_COLOR from a colour terminal),
+        // and `\b1\b` never matches when the digit sits inside an escape code.
+        const printed = logSpy.mock.calls
+          .map((c: unknown[]) => String(c[0]))
+          .join("\n")
+          // eslint-disable-next-line no-control-regex
+          .replace(/\[[0-9;]*m/g, "");
         expect(printed).toMatch(/\b1\b/);
         expect(printed).toMatch(/\b2\b/);
         expect(printed).not.toContain("hello world");
@@ -171,10 +183,11 @@ describe("experimentResultsCommand()", () => {
     describe("when an evaluator name is provided", () => {
       it("narrows the column set to that evaluator", async () => {
         mockGetRunResults.mockResolvedValue(sampleResults);
-        await experimentResultsCommand({
+        const result = await experimentResultsCommand({
           experimentSlug: "doc-qa",
           options: { evaluator: "quality" },
         });
+        result?.table();
         const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("quality");
         const headerLine = logSpy.mock.calls
@@ -195,10 +208,11 @@ describe("experimentResultsCommand()", () => {
           evaluations: [],
         };
         mockGetRunResults.mockResolvedValue(big);
-        await experimentResultsCommand({
+        const result = await experimentResultsCommand({
           experimentSlug: "doc-qa",
           options: { limit: "5" },
         });
+        result?.table();
         const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("Showing 5 of 50");
       });
@@ -217,7 +231,8 @@ describe("experimentResultsCommand()", () => {
             stoppedAt: null,
           },
         });
-        await experimentResultsCommand({ experimentSlug: "doc-qa" });
+        const result = await experimentResultsCommand({ experimentSlug: "doc-qa" });
+        result?.table();
         const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("Run status: running");
         expect(printed).toContain("partial results");
@@ -235,12 +250,10 @@ describe("experimentResultsCommand()", () => {
             stoppedAt: null,
           },
         });
-        await experimentResultsCommand({
+        const result = await experimentResultsCommand({
           experimentSlug: "doc-qa",
-          options: { format: "json" },
         });
-        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
-        expect(printed).not.toContain("Run status:");
+        expect(JSON.stringify(result?.data)).not.toContain("Run status:");
       });
     });
   });
@@ -259,10 +272,11 @@ describe("experimentResultsCommand()", () => {
             stoppedAt: null,
           },
         });
-        await experimentResultsCommand({
+        const result = await experimentResultsCommand({
           experimentSlug: "doc-qa",
           options: { runId: "interrupted" },
         });
+        result?.table();
         const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("interrupted");
         expect(printed).not.toContain("No rows matched the filter");

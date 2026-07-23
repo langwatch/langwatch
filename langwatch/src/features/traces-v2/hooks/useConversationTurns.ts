@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useIsReadOnlyTrace } from "../context/TraceViewerContext";
 
 const HOUR_MS = 60 * 60 * 1000;
 const WINDOW_DAYS = 90;
@@ -38,6 +39,7 @@ export function conversationTurnsWindow(nowMs: number): {
  */
 export function useConversationTurns(conversationId: string | null) {
   const { project } = useOrganizationTeamProject();
+  const isReadOnly = useIsReadOnlyTrace();
 
   const timeRange = useMemo(
     () => conversationTurnsWindow(Date.now()),
@@ -61,7 +63,10 @@ export function useConversationTurns(conversationId: string | null) {
         : "",
     },
     {
-      enabled: !!project?.id && !!conversationId,
+      // Backed by `tracesV2.list`, which stays project-protected (it is the
+      // traces-table query with arbitrary filters). A share grant must never
+      // open it, so read-only viewers skip conversation turns entirely.
+      enabled: !!project?.id && !!conversationId && !isReadOnly,
       staleTime: 30_000,
       keepPreviousData: true,
     },

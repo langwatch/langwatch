@@ -2,6 +2,7 @@ import chalk from "chalk";
 import * as readline from "readline";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
 
 const promptConfirmation = (tagName: string): Promise<string> => {
   const rl = readline.createInterface({
@@ -30,7 +31,7 @@ const promptConfirmation = (tagName: string): Promise<string> => {
 export const tagDeleteCommand = async (
   tagName: string,
   options?: { force?: boolean },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (!options?.force) {
@@ -43,5 +44,10 @@ export const tagDeleteCommand = async (
 
   const service = new PromptsApiService();
   await service.deleteTag(tagName);
-  console.log(chalk.green(`✓ Deleted tag: ${tagName}`));
+  return {
+    data: { name: tagName, deleted: true },
+    table: () => {
+      console.log(chalk.green(`✓ Deleted tag: ${tagName}`));
+    },
+  };
 };

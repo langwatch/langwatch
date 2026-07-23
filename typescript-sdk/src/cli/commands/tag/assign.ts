@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
 
 /**
  * Assigns a tag to a prompt version.
@@ -13,7 +14,7 @@ export const tagAssignCommand = async (
   promptHandle: string,
   tagName: string,
   options?: { version?: string },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   if (options?.version !== undefined && !/^[1-9]\d*$/.test(options.version)) {
     console.error(
       chalk.red("Error: --version must be a positive integer"),
@@ -39,9 +40,20 @@ export const tagAssignCommand = async (
   const versionId = prompt.versionId;
   await service.assignTag({ id: promptHandle, tag: tagName, versionId });
 
-  console.log(
-    chalk.green(
-      `✓ Assigned tag '${tagName}' to ${promptHandle}@${prompt.version} (versionId: ${versionId})`,
-    ),
-  );
+  return {
+    data: {
+      id: promptHandle,
+      tag: tagName,
+      version: prompt.version,
+      versionId,
+      assigned: true,
+    },
+    table: () => {
+      console.log(
+        chalk.green(
+          `✓ Assigned tag '${tagName}' to ${promptHandle}@${prompt.version} (versionId: ${versionId})`,
+        ),
+      );
+    },
+  };
 };

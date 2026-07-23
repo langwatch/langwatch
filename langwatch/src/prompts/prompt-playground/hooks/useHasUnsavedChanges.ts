@@ -3,7 +3,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import { api } from "~/utils/api";
-import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
+import { useTabById } from "../prompt-playground-store/useTabById";
 
 /**
  * Determines whether the prompt in the specified tab has unsaved changes.
@@ -18,9 +18,7 @@ import { useDraggableTabsBrowserStore } from "../prompt-playground-store/Draggab
  */
 export function useHasUnsavedChanges(tabId: string): boolean {
   const { project } = useOrganizationTeamProject();
-  const tab = useDraggableTabsBrowserStore((state) =>
-    state.windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
-  );
+  const tab = useTabById(tabId);
 
   // Cascade-resolved model for new-prompt defaults used when computing
   // baseline form values to compare against.

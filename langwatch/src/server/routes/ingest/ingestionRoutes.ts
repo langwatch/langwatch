@@ -38,9 +38,12 @@ import {
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { transformOttlPayload } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { createLogger } from "@langwatch/observability";
 import type {
   IExportLogsServiceRequest,
+  IExportMetricsServiceRequest,
   IExportTraceServiceRequest,
+  IKeyValue,
 } from "@opentelemetry/otlp-transformer";
 import type { IngestionSource } from "@prisma/client";
 import type { Context } from "hono";
@@ -61,7 +64,6 @@ import {
   parseOtlpTraces,
   readOtlpBody,
 } from "~/server/otel/parseOtlpBody";
-import { createLogger } from "~/utils/logger/server";
 
 import { checkIpRateLimit, extractClientIp } from "./rateLimit";
 
@@ -92,16 +94,38 @@ function buildOriginAttrs(source: IngestionSource) {
   ];
 }
 
+const RESERVED_ORIGIN_PREFIXES = [
+  "langwatch.origin.",
+  "langwatch.ingestion_source.",
+] as const;
+
+/**
+ * Receiver-authoritative origin attributes REPLACE any the payload supplied
+ * under a reserved key. Appending would leave two entries under one key and
+ * make governance attribution depend on which one a downstream flattener
+ * happens to keep — i.e. let a payload forge its own origin.
+ */
+function withOriginAttrs(
+  existing: IKeyValue[] | undefined,
+  source: IngestionSource,
+): IKeyValue[] {
+  const caller = (existing ?? []).filter(
+    (attribute) =>
+      !RESERVED_ORIGIN_PREFIXES.some((prefix) =>
+        attribute.key?.startsWith(prefix),
+      ),
+  );
+  return [...caller, ...buildOriginAttrs(source)];
+}
+
 function stampOriginAttrs(
   request: IExportTraceServiceRequest,
   source: IngestionSource,
 ): void {
-  const originAttrs = buildOriginAttrs(source);
   for (const rs of request.resourceSpans ?? []) {
     for (const ss of rs.scopeSpans ?? []) {
       for (const span of ss.spans ?? []) {
-        const existing = span.attributes ?? [];
-        span.attributes = [...existing, ...originAttrs];
+        span.attributes = withOriginAttrs(span.attributes, source);
       }
     }
   }
@@ -111,14 +135,29 @@ function stampLogOriginAttrs(
   request: IExportLogsServiceRequest,
   source: IngestionSource,
 ): void {
-  const originAttrs = buildOriginAttrs(source);
   for (const rl of request.resourceLogs ?? []) {
     for (const sl of rl.scopeLogs ?? []) {
       for (const record of sl.logRecords ?? []) {
-        const existing = record.attributes ?? [];
-        record.attributes = [...existing, ...originAttrs];
+        record.attributes = withOriginAttrs(record.attributes, source);
       }
     }
+  }
+}
+
+function stampMetricOriginAttrs({
+  request,
+  source,
+}: {
+  request: IExportMetricsServiceRequest;
+  source: IngestionSource;
+}): void {
+  for (const resourceMetrics of request.resourceMetrics ?? []) {
+    const resource = resourceMetrics.resource ?? {
+      attributes: [],
+      droppedAttributesCount: 0,
+    };
+    resource.attributes = withOriginAttrs(resource.attributes, source);
+    resourceMetrics.resource = resource;
   }
 }
 
@@ -513,6 +552,7 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: Context) => {
       const logRequest = buildWebhookLogRequest(raw, source);
       await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: govProject.id,
+        organizationId: source.organizationId,
         logRequest,
         piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
       });
@@ -618,6 +658,7 @@ secured
           try {
             await getApp().traces.logCollection.handleOtlpLogRequest({
               tenantId: govProject.id,
+              organizationId: source.organizationId,
               logRequest: parsed.request,
               piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
             });
@@ -830,13 +871,10 @@ secured
       return c.json({ error: "unauthorized" }, 401);
     }
 
-    // V0: ack + log only. Counter delta synthesis is a v2 add (only
-    // matters for sources that emit metrics-only without the per-request
-    // event path). Today every Claude Code call also emits a
-    // claude_code.api_request log record which the /v1/logs path turns
-    // into a ledger row; metrics here are redundant for cost.
     let bodyBytes = 0;
     let metricCount = 0;
+    let rejectedDataPoints = 0;
+    let acceptedDataPoints = 0;
     let parseHint: string | undefined;
     try {
       const body = await readOtlpBody(c.req.raw);
@@ -849,11 +887,70 @@ secured
           (acc, rm) =>
             acc +
             (rm.scopeMetrics ?? []).reduce(
-              (a, sm) => a + (sm.metrics?.length ?? 0),
+              (scopeAcc, sm) =>
+                scopeAcc +
+                (sm.metrics ?? []).reduce(
+                  (metricAcc, metric) =>
+                    metricAcc +
+                    (metric?.gauge?.dataPoints?.length ?? 0) +
+                    (metric?.sum?.dataPoints?.length ?? 0) +
+                    (metric?.histogram?.dataPoints?.length ?? 0) +
+                    (metric?.exponentialHistogram?.dataPoints?.length ?? 0) +
+                    (metric?.summary?.dataPoints?.length ?? 0),
+                  0,
+                ),
               0,
             ),
           0,
         );
+        // Gate on the payload carrying metrics at all, not on its datapoint
+        // arrays being well-formed: a request whose metrics all have malformed
+        // dataPoints has a zero pre-count, and skipping validation would ack it
+        // as fully accepted with nothing rejected.
+        const resourceMetrics = parsed.request.resourceMetrics;
+        const hasMetricPayload = Array.isArray(resourceMetrics)
+          ? resourceMetrics.length > 0
+          : resourceMetrics != null;
+        if (hasMetricPayload) {
+          // Scoped away from the outer catch, which turns anything it sees into
+          // a `parseHint` on a 202 `accepted: true`. Past parsing, a throw is no
+          // longer the sender's bad payload — it is ours, and acking it drops
+          // the batch for good. In both exits below the source event is
+          // deliberately not recorded: the collector re-sends this same
+          // request, so counting it now double-counts it.
+          try {
+            const govProject = await ensureHiddenGovernanceProject(
+              prisma,
+              source.organizationId,
+            );
+            stampMetricOriginAttrs({ request: parsed.request, source });
+            const result =
+              await getApp().traces.metricCollection.handleOtlpMetricRequest({
+                tenantId: govProject.id,
+                organizationId: source.organizationId,
+                metricRequest: parsed.request,
+                piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+              });
+            if (result.outcome === "unavailable") {
+              return c.json(
+                { accepted: false, error: result.errorMessage },
+                503,
+              );
+            }
+            rejectedDataPoints = result.rejectedDataPoints;
+            acceptedDataPoints = result.acceptedDataPoints;
+            parseHint = result.errorMessage;
+          } catch (error) {
+            logger.error(
+              { error, sourceId: source.id },
+              "otel metrics ingest failed after parsing; answering retryably",
+            );
+            return c.json(
+              { accepted: false, error: "failed to record data point" },
+              503,
+            );
+          }
+        }
       }
     } catch (err) {
       parseHint = String(err);
@@ -867,13 +964,18 @@ secured
         bytes: bodyBytes,
         metrics: metricCount,
       },
-      "otel metrics ingest landed (ack-only in v0)",
+      "otel metrics ingest landed",
     );
 
     const responseBody: Record<string, unknown> = {
       accepted: true,
       bytes: bodyBytes,
       metrics: metricCount,
+      acceptedDataPoints,
+      partialSuccess: {
+        rejectedDataPoints,
+        ...(parseHint ? { errorMessage: parseHint } : {}),
+      },
     };
     if (parseHint) responseBody.hint = parseHint;
     return c.json(responseBody, 202);

@@ -12,9 +12,19 @@ export const DEFAULT_THINKING_VERBS = [
   "Diving into",
 ];
 
+/** How long each verb holds before rotating. The original, unchanged, default. */
+const DEFAULT_INTERVAL_MS = 1800;
+
 export function useCyclingVerb(
   active: boolean,
   verbs: readonly string[],
+  /**
+   * Dwell time per verb. Surfaces that crossfade the swap (rather than cutting)
+   * want longer, so the text settles and is readable before it is replaced —
+   * otherwise the next verb arrives mid-animation. Defaults to the original
+   * 1800ms, so existing callers are unaffected.
+   */
+  intervalMs: number = DEFAULT_INTERVAL_MS,
 ): string {
   const reduceMotion = useReducedMotion();
   const [verb, setVerb] = useState(verbs[0] ?? "");
@@ -24,8 +34,8 @@ export function useCyclingVerb(
     const id = setInterval(() => {
       i = (i + 1) % verbs.length;
       setVerb(verbs[i] ?? "");
-    }, 1800);
+    }, intervalMs);
     return () => clearInterval(id);
-  }, [active, reduceMotion, verbs]);
+  }, [active, reduceMotion, verbs, intervalMs]);
   return verb;
 }

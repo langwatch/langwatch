@@ -1,18 +1,14 @@
 import { on } from "node:events";
-import { PublicShareResourceTypes } from "@prisma/client";
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
 import { z } from "zod";
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
-} from "~/server/api/trpc";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
+import type { Trace } from "~/server/tracer/types";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { createLogger } from "~/utils/logger/server";
 import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
 import {
   buildPreconditionTraceDataFromTrace,
@@ -20,16 +16,14 @@ import {
   evaluatePreconditions,
 } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types";
-import {
-  checkPermissionOrPubliclyShared,
-  checkProjectPermission,
-} from "../rbac";
+import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { getAllForProjectInput, tracesFilterInput } from "./traces.schemas";
 
 export { getAllForProjectInput };
 
 const logger = createLogger("langwatch:traces:sse-subscription");
+
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -46,14 +40,9 @@ export const tracesRouter = createTRPCRouter({
       });
     }),
 
-  getById: publicProcedure
+  getById: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(
-      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
-        resourceType: PublicShareResourceTypes.TRACE,
-        resourceParam: "traceId",
-      }),
-    )
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -77,14 +66,9 @@ export const tracesRouter = createTRPCRouter({
       return trace;
     }),
 
-  getEvaluations: publicProcedure
+  getEvaluations: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
-    .use(
-      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
-        resourceType: PublicShareResourceTypes.TRACE,
-        resourceParam: "traceId",
-      }),
-    )
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -152,11 +136,8 @@ export const tracesRouter = createTRPCRouter({
 
       const topicsMap = Object.fromEntries(
         (
-          await ctx.prisma.topic.findMany({
-            where: {
-              projectId: input.projectId,
-            },
-            select: { id: true, name: true, parentId: true },
+          await getApp().topicClustering.topics.getAll({
+            projectId: input.projectId,
           })
         ).map((topic) => [topic.id, topic]),
       );
@@ -203,20 +184,14 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getCustomersAndLabels(input);
     }),
 
-  getTracesByThreadId: publicProcedure
+  getTracesByThreadId: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         threadId: z.string(),
-        traceId: z.string(),
       }),
     )
-    .use(
-      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
-        resourceType: PublicShareResourceTypes.TRACE,
-        resourceParam: "traceId",
-      }),
-    )
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
 
@@ -224,34 +199,17 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
-      const tracesGrouped = await traceService.getTracesByThreadId(
-        projectId,
-        threadId,
-        protections,
+      // Thread-detail read consumes conversation content — resolve full IO
+      // (#4991), not the 64 KB preview. Anonymous shared reads go through the
+      // dedicated `sharedTrace.get` surface, never this endpoint. See ADR-057.
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
       );
 
-      if (!ctx.publiclyShared) {
-        return tracesGrouped;
-      }
-
-      const publicSharedTraces = await ctx.prisma.publicShare.findMany({
-        where: {
-          projectId: projectId,
-          resourceType: PublicShareResourceTypes.TRACE,
-          resourceId: {
-            in: tracesGrouped.map((trace) => trace.trace_id),
-          },
-        },
+      return traceService.getTracesByThreadId(projectId, threadId, protections, {
+        full: true,
       });
-
-      const filteredTraces = tracesGrouped.filter((trace) =>
-        publicSharedTraces.some(
-          (publicShare) => publicShare.resourceId === trace.trace_id,
-        ),
-      );
-
-      return filteredTraces;
     }),
 
   getTracesWithSpans: protectedProcedure
@@ -311,11 +269,16 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // Thread reads consume conversation content — resolve full IO (#4991).
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       return traceService.getTracesWithSpansByThreadIds(
         projectId,
         threadIds,
         protections,
+        { full: true },
       );
     }),
 
@@ -333,7 +296,13 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // Dataset builder persists trace content — resolve full IO (#4991) so
+      // truncated rows never corrupt the dataset. The ID-only list read above
+      // stays on the preview (it reads no content).
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const { groups } = await traceService.getAllTracesForProject(
         {
           ...input,
@@ -356,6 +325,7 @@ export const tracesRouter = createTRPCRouter({
         traceIds,
         protections,
         { from: input.startDate, to: input.endDate },
+        { full: true },
       );
     }),
 
@@ -395,7 +365,12 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // Sample builder feeds dataset/evaluator content — resolve full IO
+      // (#4991). The ID-only list read stays on the preview.
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const { groups } = await traceService.getAllTracesForProject(
         {
           ...input,
@@ -421,6 +396,7 @@ export const tracesRouter = createTRPCRouter({
         traceIds,
         protections,
         { from: input.startDate, to: input.endDate },
+        { full: true },
       );
 
       const passedPreconditions = traceWithSpans.filter((trace) => {
@@ -472,7 +448,16 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // A download consumes trace content, so it must never serve the 64 KB
+      // preview (#4991 AC1) — and that holds whether or not spans are included,
+      // because the returned traces carry trace-level `input`/`output` either
+      // way. Gating resolveBlobs on includeSpans (as this did) silently
+      // truncated any offloaded trace in a spans-less download, the same
+      // data-loss bug fixed in ExportService for summary-mode exports.
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       return traceService.getAllTracesForProject(
         {
           ...input,
@@ -483,6 +468,7 @@ export const tracesRouter = createTRPCRouter({
         {
           downloadMode: true,
           includeSpans: input.includeSpans,
+          resolveBlobs: true,
           scrollId: input.scrollId,
         },
       );

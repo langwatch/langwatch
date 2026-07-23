@@ -4,7 +4,7 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(),
 }));
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     error: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock("~/utils/logger/server", () => ({
 }));
 
 import { getApp } from "~/server/app-layer/app";
-import { InvalidUnsubscribeTokenError } from "~/server/app-layer/triggers/emailSuppression.service";
+import { InvalidUnsubscribeTokenError } from "~/server/app-layer/automations/emailSuppression.service";
 import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
 import { app } from "../unsubscribe";
 

@@ -139,10 +139,28 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            # Names this process in telemetry. It becomes the OTel resource
+            # `service.name` and the `service` field on every stdout log line,
+            # which log shipping promotes to the Loki `service_name` label.
+            # Set per role so app / workers / cronjobs stay distinguishable —
+            # unset, all three collapse onto the same code default.
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
+
             - name: NEXTAUTH_URL
               value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
             - name: NEXTAUTH_URL_INTERNAL
               value: "http://localhost:{{ .Values.app.service.port | default 5560 }}"
+
+            # Internal platform-API base URL that in-pod scenario/simulation
+            # runners call back to. Post-#3541 the app boot-validates it as a
+            # required URL. On the app pod the app IS local, so self-reference
+            # over localhost (like NEXTAUTH_URL_INTERNAL) — no Service/DNS hop.
+            # Workers/nlp are separate pods and use the app's service DNS
+            # instead. Override only if in-pod runners must reach the app
+            # through a different URL.
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
 
             # Cron API key
             {{- if .Values.app.cronApiKey.secretKeyRef.name }}
@@ -220,15 +238,15 @@ spec:
 
             # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
-            # against the same Secret. Hyphenated values key → index, not dot.
-            {{- if (index .Values "langy-agent").chartManaged }}
+            # against the same Secret. Subchart values key read via index (aliased subchart).
+            {{- if (index .Values "langyagent").chartManaged }}
             - name: OPENCODE_AGENT_URL
-              value: {{ (index .Values "langy-agent").controlPlane.agentUrl | default (printf "http://%s-langy-agent:80" .Release.Name) | quote }}
+              value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "langy-agent").secrets.existingSecretName | default "langwatch-langy-agent-auth" }}
-                  key: {{ (index .Values "langy-agent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default "langwatch-langyagent-auth" }}
+                  key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
             {{- end }}
 
             # LW_GATEWAY_PUBLIC_URL — the externally-reachable AI Gateway URL

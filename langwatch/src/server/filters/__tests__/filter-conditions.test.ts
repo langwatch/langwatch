@@ -49,6 +49,7 @@ describe("clickHouseFilterConditions", () => {
     const expectedSql =
       "if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) IN ({f0_values:Array(String)})";
 
+    /** @scenario 'ClickHouse origin aggregation labels empty values as "application"' */
     it("maps empty/NULL origins to 'application' via ifNull, matching the dropdown", () => {
       const builder = clickHouseFilterConditions["traces.origin"];
       expect(builder).not.toBeNull();

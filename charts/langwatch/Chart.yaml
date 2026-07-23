@@ -23,8 +23,8 @@ dependencies:
     version: '>= 0.0.0'
     repository: file://../gateway
     condition: gateway.chartManaged
-  - name: langwatch-langy-agent
-    alias: langy-agent
+  - name: langwatch-langyagent
+    alias: langyagent
     version: '>= 0.0.0'
-    repository: file://../langy-agent
-    condition: langy-agent.chartManaged
+    repository: file://../langyagent
+    condition: langyagent.chartManaged

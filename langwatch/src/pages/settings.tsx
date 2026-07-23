@@ -2,6 +2,7 @@ import {
   Badge,
   Button,
   Card,
+  createListCollection,
   Field,
   Heading,
   HStack,
@@ -11,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { OrganizationIntent, Project } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import { Lock } from "react-feather";
@@ -31,6 +32,8 @@ import { Select } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
+import { useDrawer } from "../hooks/useDrawer";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
@@ -43,15 +46,49 @@ type OrganizationFormData = {
   s3SecretAccessKey: string;
   s3Bucket: string;
   presenceEnabled: boolean;
+  traceSharingEnabled: boolean;
   supportContact: string;
+  primaryIntent: "" | OrganizationIntent;
 };
+
+/**
+ * ADR-038 "Primary use": decides where "/" lands for everyone in the org.
+ * "Not set" keeps the pre-fork behavior (legacy resolver).
+ */
+const primaryUseCollection = createListCollection({
+  items: [
+    { label: "Not set", value: "" },
+    { label: "Track AI coding agents", value: "AGENT_GOVERNANCE" },
+    { label: "Monitor & evaluate LLM apps", value: "LLM_OPS" },
+  ],
+});
+
+/** "Admin only" lock badge for settings a non-manager can see but not change. */
+function AdminOnlyBadge() {
+  return (
+    <Badge colorPalette="blue" variant="surface" size={"xs"}>
+      <Tooltip content="Contact your admin to change this setting">
+        <HStack>
+          <Lock size={10} />
+          <Text>Admin only</Text>
+        </HStack>
+      </Tooltip>
+    </Badge>
+  );
+}
 
 function Settings() {
   const { organization, project } = useOrganizationTeamProject();
 
-  if (!organization || !project) return null;
+  // Project is optional: a governance-intent org has none by design
+  // (ADR-038 v6) and still needs its organization settings. A personal
+  // workspace project counts as absent here — org settings must never
+  // surface (or offer to "set up") someone's personal workspace.
+  const sharedProject = project && !project.isPersonal ? project : undefined;
 
-  return <SettingsForm organization={organization} project={project} />;
+  if (!organization) return null;
+
+  return <SettingsForm organization={organization} project={sharedProject} />;
 }
 
 export default withPermissionGuard("organization:view", {
@@ -63,10 +100,17 @@ function SettingsForm({
   project,
 }: {
   organization: FullyLoadedOrganization;
-  project: Project;
+  project: Project | undefined;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
+  const { openDrawer } = useDrawer();
+  // ADR-038: the Primary use setting only exists where the governance
+  // surface it routes to is reachable (flag on, which is the default).
+  const { enabled: governanceEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { organizationId: organization.id },
+  );
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
@@ -74,20 +118,26 @@ function SettingsForm({
     s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
+    traceSharingEnabled: organization.traceSharingEnabled,
     supportContact:
       (organization as { supportContact?: string | null }).supportContact ?? "",
+    primaryIntent: organization.primaryIntent ?? "",
   });
   const { register, handleSubmit, getFieldState, control } = useForm({
     defaultValues,
   });
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
+  const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
+  const [showCreateProjectDialog, setShowCreateProjectDialog] =
+    useState(false);
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData,
   ) => {
     if (isEqual(data, defaultValues)) return;
 
+    const previousIntent = defaultValues.primaryIntent;
     setDefaultValues(data);
 
     updateOrganization.mutate(
@@ -99,11 +149,34 @@ function SettingsForm({
         s3SecretAccessKey: data.s3SecretAccessKey,
         s3Bucket: data.s3Bucket,
         presenceEnabled: data.presenceEnabled,
+        traceSharingEnabled: data.traceSharingEnabled,
         supportContact: data.supportContact.trim() || null,
+        primaryIntent: data.primaryIntent === "" ? null : data.primaryIntent,
       },
       {
         onSuccess: () => {
           void apiContext.organization.getAll.refetch();
+          void apiContext.governance.resolveHome.invalidate();
+          // ADR-038 F9/v6: switching to LLMOps points "/" at the project
+          // home, so the change is checked for what's missing — and the
+          // user is only interrupted when something actually is. The save
+          // itself always goes through first.
+          if (
+            data.primaryIntent === "LLM_OPS" &&
+            previousIntent !== "LLM_OPS"
+          ) {
+            if (!project) {
+              // No project at all (governance orgs skip it at signup):
+              // alert, then offer to create it.
+              setShowCreateProjectDialog(true);
+            } else if (
+              previousIntent === "AGENT_GOVERNANCE" &&
+              !project.firstMessage
+            ) {
+              // Project exists but never received data: offer its setup.
+              setShowLlmOpsSetupDialog(true);
+            }
+          }
           toaster.create({
             title: "Organization updated",
             description: "Your organization settings have been saved",
@@ -178,12 +251,19 @@ function SettingsForm({
                   <Text>{organization.slug}</Text>
                 )}
               </HorizontalFormControl>
-              <HorizontalFormControl
-                label="Project ID"
-                helper="Use this ID when authenticating with API Keys"
-              >
-                <Input width="full" disabled type="text" value={project.id} />
-              </HorizontalFormControl>
+              {project && (
+                <HorizontalFormControl
+                  label="Project ID"
+                  helper="Use this ID when authenticating with API Keys"
+                >
+                  <Input
+                    width="full"
+                    disabled
+                    type="text"
+                    value={project.id}
+                  />
+                </HorizontalFormControl>
+              )}
 
               <HorizontalFormControl
                 label="Support contact"
@@ -213,6 +293,71 @@ function SettingsForm({
                 )}
               </HorizontalFormControl>
 
+              {governanceEnabled && (
+              <HorizontalFormControl
+                label="Primary use"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      What this organization mainly uses LangWatch for. Decides
+                      where everyone lands when opening the app: coding-agent
+                      tracking opens the personal usage page, LLM apps open the
+                      project home. &quot;Not set&quot; keeps the current
+                      behavior.
+                    </Text>
+                    {!hasPermission("organization:manage") && (
+                      <AdminOnlyBadge />
+                    )}
+                  </VStack>
+                }
+              >
+                {hasPermission("organization:manage") ? (
+                  <Controller
+                    control={control}
+                    name="primaryIntent"
+                    render={({ field }) => (
+                      <Select.Root
+                        collection={primaryUseCollection}
+                        value={[field.value]}
+                        width="full"
+                        onValueChange={(d) =>
+                          field.onChange(
+                            (d.value[0] ?? "") as "" | OrganizationIntent,
+                          )
+                        }
+                      >
+                        <Select.Trigger
+                          background="bg"
+                          aria-label="Primary use"
+                        >
+                          <Select.ValueText />
+                        </Select.Trigger>
+                        <Select.Content>
+                          {primaryUseCollection.items.map((item) => (
+                            <Select.Item key={item.value} item={item}>
+                              {item.label}
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Root>
+                    )}
+                  />
+                ) : (
+                  <Text>
+                    {organization.primaryIntent ? (
+                      primaryUseCollection.items.find(
+                        (item) => item.value === organization.primaryIntent,
+                      )?.label
+                    ) : (
+                      <Text as="span" color="fg.subtle">
+                        Not set
+                      </Text>
+                    )}
+                  </Text>
+                )}
+              </HorizontalFormControl>
+              )}
+
               <HorizontalFormControl
                 label="Live presence"
                 helper={
@@ -224,14 +369,7 @@ function SettingsForm({
                       organization.
                     </Text>
                     {!hasPermission("organization:manage") && (
-                      <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                        <Tooltip content="Contact your admin to change this setting">
-                          <HStack>
-                            <Lock size={10} />
-                            <Text>Admin only</Text>
-                          </HStack>
-                        </Tooltip>
-                      </Badge>
+                      <AdminOnlyBadge />
                     )}
                   </VStack>
                 }
@@ -242,7 +380,37 @@ function SettingsForm({
                   render={({ field }) => (
                     <Switch
                       checked={field.value}
-                      onChange={(e) => field.onChange(e.target.checked)}
+                      onCheckedChange={({ checked }) => field.onChange(checked)}
+                      disabled={!hasPermission("organization:manage")}
+                    />
+                  )}
+                />
+              </HorizontalFormControl>
+
+              <HorizontalFormControl
+                label="Trace Sharing"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      Lets members create share links to traces. Disable to turn
+                      sharing off across every project in this organization and
+                      revoke all existing links.
+                    </Text>
+                    {!hasPermission("organization:manage") && (
+                      <AdminOnlyBadge />
+                    )}
+                  </VStack>
+                }
+              >
+                <Controller
+                  control={control}
+                  name="traceSharingEnabled"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={({ checked }) =>
+                        field.onChange(checked)
+                      }
                       disabled={!hasPermission("organization:manage")}
                     />
                   )}
@@ -305,10 +473,94 @@ function SettingsForm({
           </VStack>
         </form>
 
-        {hasPermission("project:update") && (
+        {project && hasPermission("project:update") && (
           <ProjectSettingsForm project={project} />
         )}
       </VStack>
+
+      {/* ADR-038 v6: governance -> LLMOps flip on a project-less org — the
+          user must know a project is required before the drawer opens */}
+      <Dialog.Root
+        open={showCreateProjectDialog}
+        onOpenChange={({ open }) => setShowCreateProjectDialog(open)}
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.Header>
+            <Dialog.Title>A project is needed</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <Text>
+              Your changes are saved. Monitoring LLM apps happens inside a
+              project, and this organization doesn&apos;t have one yet —
+              create your first project so everyone has somewhere to land.
+            </Text>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateProjectDialog(false)}
+              >
+                Later
+              </Button>
+              <Button
+                colorPalette="orange"
+                onClick={() => {
+                  setShowCreateProjectDialog(false);
+                  openDrawer("createProject", {
+                    navigateOnCreate: true,
+                    organizationId: organization.id,
+                    defaultTeamId: organization.teams.find(
+                      (t) => !t.isPersonal,
+                    )?.id,
+                  });
+                }}
+              >
+                Set up project
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* ADR-038 F9: governance -> LLMOps flip offers the project setup */}
+      <Dialog.Root
+        open={showLlmOpsSetupDialog && !!project}
+        onOpenChange={({ open }) => setShowLlmOpsSetupDialog(open)}
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.Header>
+            <Dialog.Title>Set up your project</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <Text>
+              Everyone in this organization will now land on the project home,
+              but the project hasn&apos;t received any data yet. Walk through
+              the project setup so there&apos;s something to see when they
+              arrive.
+            </Text>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="outline"
+                onClick={() => setShowLlmOpsSetupDialog(false)}
+              >
+                Later
+              </Button>
+              <Button
+                colorPalette="orange"
+                onClick={() => {
+                  // Dialog only opens when a project exists (see open guard).
+                  window.location.href = `/onboarding/product?projectSlug=${project?.slug ?? ""}`;
+                }}
+              >
+                Set up the project
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
     </SettingsLayout>
   );
 }
@@ -511,14 +763,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                     : "Disable to turn presence off for this project only."}
                 </Text>
                 {!userIsAdmin && (
-                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                    <Tooltip content="Contact your admin to change this setting">
-                      <HStack>
-                        <Lock size={10} />
-                        <Text>Admin only</Text>
-                      </HStack>
-                    </Tooltip>
-                  </Badge>
+                  <AdminOnlyBadge />
                 )}
               </VStack>
             }
@@ -532,7 +777,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   checked={
                     field.value && (organization?.presenceEnabled ?? true)
                   }
-                  onChange={(e) => field.onChange(e.target.checked)}
+                  onCheckedChange={({ checked }) => field.onChange(checked)}
                   disabled={
                     !userIsAdmin || !(organization?.presenceEnabled ?? true)
                   }
@@ -545,16 +790,14 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             label="Trace Sharing"
             helper={
               <VStack align="start" gap={1}>
-                <Text>Allow users to share traces with public links</Text>
+                <Text>
+                  Allow users to share traces with public links.{" "}
+                  {!organization?.traceSharingEnabled
+                    ? "Disabled at the organization level - turn it on there first."
+                    : "Disable to turn sharing off for this project only."}
+                </Text>
                 {!userIsAdmin && (
-                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                    <Tooltip content="Contact your admin to change this setting">
-                      <HStack>
-                        <Lock size={10} />
-                        <Text>Admin only</Text>
-                      </HStack>
-                    </Tooltip>
-                  </Badge>
+                  <AdminOnlyBadge />
                 )}
               </VStack>
             }
@@ -565,9 +808,15 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               name="traceSharingEnabled"
               render={({ field }) => (
                 <Switch
-                  checked={field.value}
-                  onChange={(e) => handleTraceSharingChange(e.target.checked)}
-                  disabled={!userIsAdmin}
+                  checked={
+                    field.value && (organization?.traceSharingEnabled ?? true)
+                  }
+                  onCheckedChange={({ checked }) =>
+                    handleTraceSharingChange(checked)
+                  }
+                  disabled={
+                    !userIsAdmin || !(organization?.traceSharingEnabled ?? true)
+                  }
                 />
               )}
             />

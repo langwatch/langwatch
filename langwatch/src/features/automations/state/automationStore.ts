@@ -12,16 +12,22 @@ export const MAX_TEST_HISTORY = 5;
  *  come from the outbox-backed health view (ADR-037, separate stack). */
 export interface TestFireAttempt {
   at: number;
-  channel: "email" | "slack";
+  channel: "email" | "slack" | "webhook";
   status: "success" | "failure";
   recipientCount?: number;
   usedDefault?: boolean;
   errorTitle?: string;
   errorDetail?: string;
+  /** Webhook only: the HTTP status the endpoint answered a successful test
+   *  with — shown inline next to the test button (ADR-040 §1). */
+  httpStatus?: number;
 }
 
-/** Which secondary drawer is currently open on top of the main view. */
-export type Section = null | "filters" | "configuration" | "cadence";
+/** Which secondary drawer is currently open on top of the main view.
+ *  Subject, Type, Cadence, and Severity are inlined on the main pane now
+ *  (ADR-043); only Delivery's guided template authoring still opens a
+ *  secondary, keyed `"configuration"`. */
+export type Section = null | "configuration";
 
 export interface AutomationStore {
   /** Pure-state portion. The whole drawer is a view onto this. */

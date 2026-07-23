@@ -1,10 +1,10 @@
 import { TupleParam } from "@clickhouse/client";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import { ExperimentService } from "~/server/experiments/experiment.service";
-import { createLogger } from "~/utils/logger/server";
 import {
   computeOccurredAtRangeForRuns,
   OCCURRED_AT_BUFFER_MS,
@@ -544,6 +544,7 @@ export class ExperimentRunService {
             clickHouseClient,
             projectId,
             itemRows,
+            occurredAtRange,
           );
 
           const result = mapClickHouseItemsToRunWithItems({
@@ -788,6 +789,7 @@ export class ExperimentRunService {
     clickHouseClient: ProjectClickHouseClient,
     projectId: string,
     items: ClickHouseExperimentRunItemRow[],
+    occurredAtRange: { minOccurredAt: string; maxOccurredAt: string },
   ): Promise<ClickHouseExperimentRunItemRow[]> {
     // Collect unique traceIds from target items that are missing costs
     const traceIds = [
@@ -805,6 +807,17 @@ export class ExperimentRunService {
 
     try {
       const traceCostResult = await clickHouseClient.query({
+        // Bound OccurredAt to the run's lifecycle window. trace_summaries is
+        // partitioned by toYearWeek(OccurredAt); a TraceId-only filter can't
+        // prune, so it opens every weekly partition (including cold storage)
+        // to read two light columns. A target's trace runs during its run, so
+        // its OccurredAt falls inside the buffered run window the caller
+        // already computed. The bound is applied on the outer read only, not
+        // inside the max(UpdatedAt) dedup subquery: OccurredAt can shift across
+        // ReplacingMergeTree versions (a late-arriving span can move a trace's
+        // min start time), so filtering versions by OccurredAt before resolving
+        // the latest could pick the wrong version. Filtering the already-deduped
+        // outer rows is always correct.
         query: `
           SELECT
             TraceId,
@@ -812,6 +825,8 @@ export class ExperimentRunService {
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
             AND TraceId IN ({traceIds:Array(String)})
+            AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+            AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
             AND (TenantId, TraceId, UpdatedAt) IN (
               SELECT TenantId, TraceId, max(UpdatedAt)
               FROM trace_summaries
@@ -820,7 +835,12 @@ export class ExperimentRunService {
               GROUP BY TenantId, TraceId
             )
         `,
-        query_params: { tenantId: projectId, traceIds },
+        query_params: {
+          tenantId: projectId,
+          traceIds,
+          minOccurredAt: occurredAtRange.minOccurredAt,
+          maxOccurredAt: occurredAtRange.maxOccurredAt,
+        },
         format: "JSONEachRow",
       });
 

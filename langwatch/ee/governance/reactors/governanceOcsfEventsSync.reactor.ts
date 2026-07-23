@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  type GovernanceOcsfEventInput,
   GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
-  type GovernanceOcsfEventInput,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import { createLogger } from "~/utils/logger/server";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { createLogger } from "@langwatch/observability";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type {
   ReactorContext,
   ReactorDefinition,
 } from "~/server/event-sourcing/reactors/reactor.types";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger(
   "langwatch:trace-processing:governance-ocsf-events-sync-reactor",

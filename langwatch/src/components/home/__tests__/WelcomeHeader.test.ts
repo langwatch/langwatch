@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getGreetingName,
-  getTimeOfDay,
-  getGreeting,
-} from "../WelcomeHeader";
+import { getGreetingName, getTimeOfDay, getGreeting } from "../WelcomeHeader";
 
 describe("WelcomeHeader", () => {
   describe("getGreetingName", () => {

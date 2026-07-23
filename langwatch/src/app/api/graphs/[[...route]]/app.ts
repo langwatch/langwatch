@@ -1,13 +1,15 @@
+import { createLogger } from "@langwatch/observability";
 import type { CustomGraph, Prisma } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
+import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
-import { createProjectApp, requires } from "~/server/api/security";
 import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -145,7 +147,8 @@ secured.access(requires("analytics:view")).get(
 );
 
 // ── Create Graph ───────────────────────────────────────────
-secured.access(requires("analytics:manage")).post(
+// Creating asks for `analytics:create`; `:manage` still implies it.
+secured.access(requires("analytics:create")).post(
   "/",
   resourceLimitMiddleware("customGraphs"),
   describeRoute({
@@ -167,6 +170,17 @@ secured.access(requires("analytics:manage")).post(
       const project = c.get("project");
       const body = c.req.valid("json");
       logger.info({ projectId: project.id }, "Creating graph");
+
+      if (
+        body.dashboardId &&
+        !(await dashboardBelongsToProject(
+          prisma,
+          body.dashboardId,
+          project.id,
+        ))
+      ) {
+        return c.json({ error: "Dashboard not found" }, 404);
+      }
 
       let gridRow = body.gridRow;
       if (gridRow === undefined && body.dashboardId) {
@@ -197,7 +211,7 @@ secured.access(requires("analytics:manage")).post(
 );
 
 // ── Update Graph ───────────────────────────────────────────
-secured.access(requires("analytics:manage")).patch(
+secured.access(requires("analytics:update")).patch(
   "/:id",
   describeRoute({
       description: "Update a custom graph's name, definition, or filters",
@@ -247,6 +261,7 @@ secured.access(requires("analytics:manage")).patch(
 );
 
 // ── Delete Graph ───────────────────────────────────────────
+// Destruction deliberately stays at `:manage`.
 secured.access(requires("analytics:manage")).delete(
   "/:id",
   describeRoute({

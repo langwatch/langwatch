@@ -1,6 +1,7 @@
 import type { ProcessRole } from "../../app-layer/config";
 import type { Event } from "../domain/types";
 import type { KillSwitchOptions } from "../pipeline/staticBuilder.types";
+import type { DeduplicationConfig } from "../queues/queue.types";
 
 /**
  * Context passed to a reactor's handle function.
@@ -10,12 +11,8 @@ export interface ReactorContext<FoldState = unknown> {
   aggregateId: string;
   foldState: FoldState;
   /**
-   * True when the event was produced by a stream replay rather than
-   * live ingestion. The framework `.withOutbox` wrapper short-circuits
-   * `match` on replay to avoid re-firing customer-visible side effects
-   * after outbox rows have aged out of retention — see ADR-030.
-   *
-   * `.withReactor` handlers receive the same flag and may inspect it
+   * True when the event was produced by a stream replay rather than live
+   * ingestion. `.withReactor` handlers receive the flag and may inspect it
    * directly if they need replay-specific behavior; most best-effort
    * reactors can ignore it. Optional today so existing handlers and
    * test mocks don't need updating; framework call sites always pass
@@ -36,6 +33,11 @@ export interface ReactorOptions {
   ttl?: number;
   /** Deduplication strategy — function that returns a unique job ID for the payload */
   makeJobId?: (payload: { event: Event; foldState: unknown }) => string;
+  /** Full GroupQueue dedup contract used by `withSubscriber`. */
+  deduplication?: DeduplicationConfig<{
+    event: Event;
+    foldState: unknown;
+  }>;
   /** Process roles where this reactor runs. Omit to run everywhere. */
   runIn?: ProcessRole[];
   /** Custom group key function for queue routing. Overrides the domain part of the hierarchical key. */

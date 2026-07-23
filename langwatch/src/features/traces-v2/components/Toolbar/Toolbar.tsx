@@ -6,6 +6,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useIsNewAccount } from "../../hooks/useIsNewAccount";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
 import { useTourEntryPoints } from "../../onboarding";
+import { useTraceExplorerTourPreference } from "../../onboarding/hooks/useTraceExplorerTourPreference";
 import { writeSpotlightFragment } from "../../onboarding/spotlights/SpotlightOverlay";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../onboarding/spotlights/spotlights";
 import { useOnboardingStore } from "../../onboarding/store/onboardingStore";
@@ -71,6 +72,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   // available during sample-data exploration.
   const { hasAnyTraces } = useProjectHasTraces();
   const isNewAccount = useIsNewAccount();
+  const { dismiss: persistTourDismissal } = useTraceExplorerTourPreference();
   const showSampleDataToggle = hasAnyTraces === false;
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
@@ -85,6 +87,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       // Sample data + spotlights ride together — switching samples off
       // dismisses any spotlight tour that was running over them so the
       // page returns to a clean state in one click.
+      if (spotlightsActive) persistTourDismissal();
       setSpotlightsActive(false);
       setCurrentSpotlightId(null);
       writeSpotlightFragment(null);
@@ -109,6 +112,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     }
   }, [
     showSamplePreview,
+    spotlightsActive,
+    persistTourDismissal,
     setShowSamplePreview,
     onEndTour,
     setSpotlightsActive,
@@ -119,6 +124,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const handleShowMeAround = useCallback(() => {
     if (spotlightsActive) {
       // Toggle off — dismiss the spotlight tour.
+      persistTourDismissal();
       setSpotlightsActive(false);
       setCurrentSpotlightId(null);
       writeSpotlightFragment(null);
@@ -130,7 +136,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       setSpotlightsActive(true);
       writeSpotlightFragment(firstId);
     }
-  }, [spotlightsActive, setSpotlightsActive, setCurrentSpotlightId]);
+  }, [
+    spotlightsActive,
+    persistTourDismissal,
+    setSpotlightsActive,
+    setCurrentSpotlightId,
+  ]);
 
   // "Save Lens" outline button only surfaces when the active lens has
   // pending local changes. Clicking it opens the shared

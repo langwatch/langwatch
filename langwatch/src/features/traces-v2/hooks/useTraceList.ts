@@ -1,3 +1,4 @@
+import type { TraceListCursor } from "../stores/filterStore";
 import type { TraceListItem } from "../types/trace";
 import { useNewlyArrivedTraceIds } from "./useNewlyArrivedTraceIds";
 import { useTraceListQuery } from "./useTraceListQuery";
@@ -6,6 +7,7 @@ import { useViewSwitchingDim } from "./useViewSwitchingDim";
 export interface TraceListResult {
   data: TraceListItem[];
   totalHits: number;
+  nextCursor: TraceListCursor | null;
   isLoading: boolean;
   isFetching: boolean;
   isPreviousData: boolean;
@@ -32,6 +34,7 @@ export function useTraceList(): TraceListResult {
   return {
     data: query.data,
     totalHits: query.totalHits,
+    nextCursor: query.nextCursor,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isPreviousData: query.isPreviousData,

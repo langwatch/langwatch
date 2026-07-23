@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "~/utils/auth-client";
 import { CommandBar } from "./CommandBar";
 import { CommandBarContext } from "./CommandBarContext";
@@ -33,12 +33,27 @@ export function CommandBarProvider({ children }: CommandBarProviderProps) {
     setQuery("");
   }, []);
 
+  // A page that already shows the palette in place registers itself here. The
+  // home does, which is why Cmd+K there lands in the field the reader is
+  // already looking at instead of covering it with an identical one.
+  const inlinePaletteRef = useRef<(() => void) | null>(null);
+  const registerInlinePalette = useCallback((focus: () => void) => {
+    inlinePaletteRef.current = focus;
+    return () => {
+      if (inlinePaletteRef.current === focus) inlinePaletteRef.current = null;
+    };
+  }, []);
+
   const toggle = useCallback(() => {
     if (isOpen) {
       close();
-    } else {
-      open();
+      return;
     }
+    if (inlinePaletteRef.current) {
+      inlinePaletteRef.current();
+      return;
+    }
+    open();
   }, [isOpen, open, close]);
 
   // Global keyboard shortcut listener
@@ -75,8 +90,9 @@ export function CommandBarProvider({ children }: CommandBarProviderProps) {
       toggle,
       query,
       setQuery,
+      registerInlinePalette,
     }),
-    [isOpen, open, close, toggle, query]
+    [isOpen, open, close, toggle, query, registerInlinePalette]
   );
 
   const pathname = usePathname();

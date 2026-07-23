@@ -1,6 +1,7 @@
 import chalk from "chalk";
-import ora from "ora";
+import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
 import { formatTable } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
@@ -18,8 +19,8 @@ const truncate = (value: string, maxLength: number): string => {
  */
 export const recordsListCommand = async (
   slugOrId: string,
-  options: { page?: string; limit?: string; format?: string },
-): Promise<void> => {
+  options: { page?: string; limit?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const page = options.page ? parseInt(options.page, 10) : 1;
@@ -35,7 +36,7 @@ export const recordsListCommand = async (
   }
 
   const service = createDatasetService();
-  const spinner = ora(`Fetching records from "${slugOrId}"...`).start();
+  const spinner = createSpinner(`Fetching records from "${slugOrId}"...`).start();
 
   try {
     const result = await service.listRecords(slugOrId, { page, limit });
@@ -45,48 +46,47 @@ export const recordsListCommand = async (
       `Found ${pagination.total} record${pagination.total !== 1 ? "s" : ""} in "${slugOrId}"`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify({ data: records, pagination }, null, 2));
-      return;
-    }
+    return {
+      data: { data: records, pagination },
+      table: () => {
+        if (records.length === 0) {
+          console.log();
+          console.log(chalk.gray("No records found."));
+          return;
+        }
 
-    if (records.length === 0) {
-      console.log();
-      console.log(chalk.gray("No records found."));
-      return;
-    }
+        const entryKeys = new Set<string>();
+        records.forEach((record) => {
+          Object.keys(record.entry).forEach((key) => entryKeys.add(key));
+        });
+        const headers = ["ID", ...Array.from(entryKeys)];
 
-    // Collect all keys from record entries
-    const entryKeys = new Set<string>();
-    records.forEach((record) => {
-      Object.keys(record.entry).forEach((key) => entryKeys.add(key));
-    });
-    const headers = ["ID", ...Array.from(entryKeys)];
+        const tableData = records.map((record) => {
+          const row: Record<string, string> = { ID: record.id };
+          entryKeys.forEach((key) => {
+            const value = record.entry[key];
+            const str =
+              value === null || value === undefined
+                ? ""
+                : typeof value === "string"
+                  ? value
+                  : JSON.stringify(value);
+            row[key] = truncate(str, 40);
+          });
+          return row;
+        });
 
-    const tableData = records.map((record) => {
-      const row: Record<string, string> = { ID: record.id };
-      entryKeys.forEach((key) => {
-        const value = record.entry[key];
-        const str =
-          value === null || value === undefined
-            ? ""
-            : typeof value === "string"
-              ? value
-              : JSON.stringify(value);
-        row[key] = truncate(str, 40);
-      });
-      return row;
-    });
+        console.log();
+        formatTable({ data: tableData, headers, colorMap: { ID: chalk.gray } });
 
-    console.log();
-    formatTable({ data: tableData, headers, colorMap: { ID: chalk.gray } });
-
-    console.log();
-    console.log(
-      chalk.gray(
-        `Page ${pagination.page} of ${pagination.totalPages} (${pagination.total} total records)`,
-      ),
-    );
+        console.log();
+        console.log(
+          chalk.gray(
+            `Page ${pagination.page} of ${pagination.totalPages} (${pagination.total} total records)`,
+          ),
+        );
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "list records" });
   }

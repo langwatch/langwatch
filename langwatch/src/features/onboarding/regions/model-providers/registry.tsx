@@ -232,6 +232,30 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
     },
   },
+  {
+    // Last in the array on purpose: settings lists providers in registry
+    // order, and Codex only serves the coding-assistant surfaces. The
+    // surfaces where it SHOULD lead (Langy setup, onboarding) pull it to
+    // the front through `recommendedOn` — see ModelProviderGrid.
+    key: "codex",
+    backendModelProviderKey: "openai_codex",
+    label: "Codex (OpenAI account)",
+    defaultModel: "gpt-5.6-terra",
+    // A distinct terminal-prompt glyph, NOT OpenAI's logo: it must not read as
+    // the plain OpenAI card sitting right next to it, and it mirrors the
+    // settings icon (src/components/icons/Codex.tsx).
+    icon: themedIcon(
+      "/images/external-icons/codex-lighttheme.svg",
+      "/images/external-icons/codex-darktheme.svg",
+      "Codex",
+    ),
+    externalDocsUrl: "https://chatgpt.com/codex",
+    authFlow: "oauth-device",
+    recommendedOn: ["langy", "onboarding"],
+    // Codex cannot run evaluations or prompt executions (subscription
+    // terms); offering it on those setup flows would strand them.
+    hiddenOn: ["evaluations", "prompts"],
+  },
 ];
 
 export function getModelProvider(

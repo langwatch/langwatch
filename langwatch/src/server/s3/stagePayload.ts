@@ -4,10 +4,9 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-
 import { createS3Client } from "../storage";
-import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch:s3:stagePayload");
 
@@ -38,8 +37,16 @@ export async function stagePayloadToS3(input: {
   keyPrefix: string;
   serialized: Buffer;
   ttlSeconds: number;
+  /**
+   * Optional deadline / cancellation for the upload itself. Callers whose
+   * whole exchange is deadline-bounded (topic clustering's lease-derived
+   * abort) must cover this leg too: the upload happens BEFORE the fetch the
+   * signal is usually attached to, so without it a stalled S3 put runs
+   * unbounded and the deadline only takes effect once the upload finishes.
+   */
+  signal?: AbortSignal;
 }): Promise<StagedObject> {
-  const { projectId, keyPrefix, serialized, ttlSeconds } = input;
+  const { projectId, keyPrefix, serialized, ttlSeconds, signal } = input;
 
   const { s3Client, s3Bucket } = await createS3Client(projectId);
   const key = `${keyPrefix}/${Date.now()}-${nanoid()}.json`;
@@ -51,6 +58,7 @@ export async function stagePayloadToS3(input: {
       Body: serialized,
       ContentType: "application/json",
     }),
+    signal ? { abortSignal: signal } : undefined,
   );
 
   logger.debug(

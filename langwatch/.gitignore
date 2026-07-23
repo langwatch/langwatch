@@ -46,13 +46,14 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+# tsgo / tsc incremental build cache (explicit tsBuildInfoFile targets)
+node_modules/.cache/tsbuildinfo/
 
 # Sentry Config File
 .sentryclirc
 
 *.generated.ts
 !src/server/evaluations/evaluators.generated.ts
-src/server/sdk-radar/sdk-versions.json
 
 quickwit
 quickwit-*
@@ -91,6 +92,7 @@ node_modules/
 licenses.json
 .pnpm-store/
 server.log
+server-qa.log
 server.*.log
 screenshot-*.png
 
@@ -99,3 +101,13 @@ screenshot-*.png
 
 # Langy scenario-test transcripts (regenerated per run; never commit)
 /src/tests/langy/scenario-logs/
+
+# thuishaven (portless local dev)
+.env.portless
+
+# haven AI-gated HMR marker
+.haven-hmr-gate
+
+.claude-qa/
+dev-*.log
+haven-boot*.log

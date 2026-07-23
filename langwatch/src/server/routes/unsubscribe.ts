@@ -13,28 +13,17 @@
  * malformed/missing token is a 400, non-POST methods get 405, and
  * rate-limited callers get 429.
  */
-import type { Context } from "hono";
+
+import { createLogger } from "@langwatch/observability";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import { InvalidUnsubscribeTokenError } from "~/server/app-layer/triggers/emailSuppression.service";
+import { InvalidUnsubscribeTokenError } from "~/server/app-layer/automations/emailSuppression.service";
 import { rateLimit } from "~/server/rateLimit";
-import type { NextApiRequest } from "~/types/next-stubs";
-import { getClientIp } from "~/utils/getClientIp";
-import { createLogger } from "~/utils/logger/server";
+import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 
 const logger = createLogger("langwatch:unsubscribe:one-click");
 
 const secured = createServiceApp({ basePath: "/api" });
-
-/**
- * Reuses getClientIp's header-priority logic against the Hono request by
- * adapting the Hono header record into the NextApiRequest shape it expects.
- */
-function clientIpFromContext(c: Context): string | undefined {
-  return getClientIp({
-    headers: c.req.header(),
-  } as unknown as NextApiRequest);
-}
 
 secured
   .access(
@@ -43,7 +32,7 @@ secured
     ),
   )
   .post("/unsubscribe", async (c) => {
-    const ip = clientIpFromContext(c);
+    const ip = getClientIpFromHonoContext(c);
     const limit = await rateLimit({
       key: `unsubscribe:one-click:${ip ?? "unknown"}`,
       windowSeconds: 60,

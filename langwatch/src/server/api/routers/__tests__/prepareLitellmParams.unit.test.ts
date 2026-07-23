@@ -144,6 +144,43 @@ describe("prepareLitellmParams", () => {
       expect(params.api_version).toBe("2024-09-01");
     });
 
+    it("direct-mode: emits the customer's AZURE_OPENAI_ENDPOINT as api_base (the contract the Go gateway reads — #5760)", async () => {
+      // The LangWatch UI stores the Azure resource endpoint under
+      // AZURE_OPENAI_ENDPOINT (registry.ts azure `endpointKey`). A correctly-
+      // configured direct-mode Azure provider MUST emit that endpoint as
+      // `api_base`, which becomes the `x-litellm-api_base` header that the Go
+      // /go/proxy credential builder resolves. If it did not, the endpoint
+      // would never reach Bifrost and every Azure call would 502 "endpoint not
+      // set" even though the customer set the endpoint correctly (#5760).
+      //
+      // No prior test asserted this direct-mode contract — the shared
+      // `baseAzureProvider` fixture uses the stale key names AZURE_API_KEY /
+      // AZURE_API_BASE, which `getModelOrDefaultEndpointKey` does NOT read, so
+      // it never exercised the endpoint→api_base path. Use the real registry
+      // keys here. Paired with the Go end-to-end guard
+      // (services/nlpgo/tests/integration/gateway_proxy_azure_e2e_test.go),
+      // this pins the full cross-language contract that #5760 hinged on.
+      const provider = {
+        provider: "azure" as const,
+        enabled: true,
+        customKeys: {
+          AZURE_OPENAI_API_KEY: "sk-azure-real",
+          AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+        },
+        extraHeaders: null,
+        deploymentMapping: null,
+      };
+
+      const params = await prepareLitellmParams({
+        model: "azure/gpt-5-mini",
+        modelProvider: provider,
+        projectId: "project-123",
+      });
+
+      expect(params.api_base).toBe("https://acme.openai.azure.com");
+      expect(params.api_key).toBe("sk-azure-real");
+    });
+
     describe("when no api-version is configured (direct mode)", () => {
       it("pins a modern default so newer deployments don't 404 'Resource not found'", async () => {
         // Regression: without an explicit api-version the downstream gateway

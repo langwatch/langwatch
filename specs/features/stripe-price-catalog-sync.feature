@@ -3,7 +3,7 @@ Feature: Stripe price catalog sync for SaaS billing
   I want billing price ids to be sourced from a synced Stripe catalog file
   So that plan key mapping is validated against Stripe without hardcoded ids in runtime code
 
-  # All 3 scenarios bound to stripePricesLoader.unit.test.ts.
+  # All 3 scenarios bound to ee/billing/__tests__/stripePricesLoader.unit.test.ts.
 
   @unit
   Scenario: Billing runtime resolves live price ids in production

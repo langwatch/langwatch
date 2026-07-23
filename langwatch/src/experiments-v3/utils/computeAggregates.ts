@@ -3,7 +3,12 @@ import {
   type MetricStats,
 } from "~/components/shared/MetricStatsTooltip";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
-import type { EvaluationResults, EvaluatorConfig } from "../types";
+import type {
+  EvaluationResults,
+  EvaluatorConfig,
+  TargetConfig,
+} from "../types";
+import { resolveVerdictLabel, toComparisonConfig } from "./normalizeComparison";
 
 export { computeMetricStats, type MetricStats };
 
@@ -224,55 +229,34 @@ export const computeTargetAggregates = (
 };
 
 /**
- * Pairwise verdict for a single row (#5100). Lives on
- * `results.evaluatorResults[variantA][evaluatorId][rowIndex]` — the
- * orchestrator stores the Phase-2 result against the variantA target id
- * because that's the synthetic target the workflow builder anchors on.
- */
-export type PairwiseVerdict = {
-  label: "A" | "B" | "tie";
-  reasoning?: string;
-  costAmount: number;
-};
-
-export type PairwiseAggregate = {
-  evaluatorId: string;
-  variantA: string;
-  variantB: string;
-  counts: { a: number; b: number; tie: number };
-  totalCost: number;
-  perRow: Array<PairwiseVerdict | null>;
-};
-
-/**
- * Compute a TargetAggregate-shaped object for a pairwise column-target so
+ * Compute a TargetAggregate-shaped object for a comparison column-target so
  * the workbench header can render the same Rows / Avg Latency / Total Cost /
  * Execution Time chip prompt/agent columns render (dogfood: "I already have
  * the scores on the results page — I want the same in the workbench").
  *
- * Pairwise column-target cells hit the orchestrator's `skipTarget: true`
+ * Comparison column-target cells hit the orchestrator's `skipTarget: true`
  * branch — no target execution → target_result fires with undefined
- * cost/duration → workbench `targetMetadata[pairwiseId]` carries no
+ * cost/duration → workbench `targetMetadata[comparisonId]` carries no
  * metrics. We reconstruct them the way the results page does:
- *   - cost per row = variantA cost + variantB cost + judge (evaluator) cost
- *   - duration per row = variantA duration + variantB duration (judge
- *     duration isn't persisted on evaluator results)
+ *   - cost per row = every variant's cost + judge (evaluator) cost
+ *   - duration per row = every variant's duration (judge duration isn't
+ *     persisted on evaluator results)
  *
- * A row counts as "complete" when either variant produced metadata for it —
+ * A row counts as "complete" when any variant produced metadata for it —
  * matching how the popover renders on the results page.
  */
-export const computePairwiseColumnTargetAggregate = (
+export const computeComparisonColumnTargetAggregate = (
   target: {
     id: string;
-    pairwise?: { variantA?: string; variantB?: string } | null;
+    comparison?: { variants?: string[] } | null;
   },
   results: EvaluationResults,
   rowCount: number,
 ): TargetAggregate => {
-  const variantAId = target.pairwise?.variantA;
-  const variantBId = target.pairwise?.variantB;
-  const metadataA = (variantAId && results.targetMetadata[variantAId]) || [];
-  const metadataB = (variantBId && results.targetMetadata[variantBId]) || [];
+  const variantIds = target.comparison?.variants ?? [];
+  const metadataByVariant = variantIds.map(
+    (id) => results.targetMetadata[id] ?? [],
+  );
   const verdicts = results.evaluatorResults[target.id]?.[target.id] ?? [];
 
   let completedRows = 0;
@@ -280,15 +264,14 @@ export const computePairwiseColumnTargetAggregate = (
   const latencyValues: number[] = [];
 
   for (let i = 0; i < rowCount; i++) {
-    const rowA = metadataA[i];
-    const rowB = metadataB[i];
+    const rowMetadata = metadataByVariant.map((m) => m[i]);
     const verdict = verdicts[i];
-    if (!rowA && !rowB && !verdict) continue;
+    if (!rowMetadata.some(Boolean) && !verdict) continue;
     completedRows++;
 
     let rowCost = 0;
     let sawCost = false;
-    for (const m of [rowA, rowB]) {
+    for (const m of rowMetadata) {
       if (m && typeof m.cost === "number" && Number.isFinite(m.cost)) {
         rowCost += m.cost;
         sawCost = true;
@@ -305,12 +288,8 @@ export const computePairwiseColumnTargetAggregate = (
 
     let rowLatency = 0;
     let sawLatency = false;
-    for (const m of [rowA, rowB]) {
-      if (
-        m &&
-        typeof m.duration === "number" &&
-        Number.isFinite(m.duration)
-      ) {
+    for (const m of rowMetadata) {
+      if (m && typeof m.duration === "number" && Number.isFinite(m.duration)) {
         rowLatency += m.duration;
         sawLatency = true;
       }
@@ -338,39 +317,6 @@ export const computePairwiseColumnTargetAggregate = (
   };
 };
 
-const isPairwiseLegacyLabel = (
-  value: unknown,
-): value is PairwiseVerdict["label"] =>
-  value === "A" || value === "B" || value === "tie";
-
-/**
- * Normalize a stored pairwise label to its slot ("A" / "B" / "tie").
- * langevals now stores the winner's candidate identifier (or "tie");
- * older runs still hold legacy "A"/"B"/"tie". We accept both. The
- * identifier may be either the variant's internal target id OR its
- * prompt handle (set in the orchestrator's `variantIdentifierFor`).
- *
- * Exported so UI surfaces (chip-tint resolver, per-row verdict strip)
- * share the same matcher — anything that compares a stored pairwise
- * label against slot-shape must route through this helper, or the new
- * winner-by-id contract silently fails for prompt-typed variants.
- */
-export const normalizePairwiseLabel = (
-  value: unknown,
-  variantA: string,
-  variantB: string,
-  variantAHandle?: string,
-  variantBHandle?: string,
-): PairwiseVerdict["label"] | undefined => {
-  if (isPairwiseLegacyLabel(value)) return value;
-  if (typeof value !== "string") return undefined;
-  if (value === variantA || (variantAHandle && value === variantAHandle))
-    return "A";
-  if (value === variantB || (variantBHandle && value === variantBHandle))
-    return "B";
-  return undefined;
-};
-
 const readCostAmount = (raw: unknown): number => {
   if (!raw || typeof raw !== "object") return 0;
   const cost = (raw as { cost?: unknown }).cost;
@@ -380,112 +326,111 @@ const readCostAmount = (raw: unknown): number => {
 };
 
 /**
- * Aggregates verdicts for a single pairwise evaluator across all rows.
- * Skips rows whose result is missing, errored, or has a non-A/B/tie label.
+ * A comparison's win tally across all rows, for any number of variants.
+ *
+ * Wins are keyed by the raw identifier the judge returned rather than by
+ * variant id, because resolving an identifier back to a variant needs that
+ * variant's prompt handle — and handles only come from `useTargetName`, a
+ * hook, which cannot be called once per variant from a loop. Each variant
+ * therefore looks up its own count (see `ComparisonScoreboard`), and the
+ * winner is derived from the counts alone: every non-tie identifier the
+ * judge emits belongs to some variant, so whichever holds `topCount` won.
  */
-/**
- * Optional resolved-handle hints from the caller. The orchestrator emits the
- * prompt's HANDLE (e.g. `"say-hi"`) as the verdict label — not its `promptId`
- * KSUID. Callers who can resolve a handle (via `useTargetName` or the trpc
- * prompt cache) should pass it here so the normalizer can match against it.
- */
-export type PairwiseAggregateHandles = {
-  variantAHandle?: string;
-  variantBHandle?: string;
+export type ComparisonAggregate = {
+  evaluatorId: string;
+  variants: string[];
+  /** Wins keyed by the winning candidate's identifier. Excludes ties. */
+  winsByLabel: Record<string, number>;
+  ties: number;
+  /** Rows that produced a usable verdict — wins plus ties. */
+  decidedRows: number;
+  /** The highest win count any single identifier holds; 0 when none won. */
+  topCount: number;
+  /** The sole identifier holding `topCount`; unset when two or more share it. */
+  topLabel?: string;
+  totalCost: number;
 };
 
-export const computePairwiseAggregate = (
-  evaluator: Pick<EvaluatorConfig, "id" | "pairwise">,
+export const computeComparisonAggregate = (
+  evaluator: Pick<EvaluatorConfig, "id" | "pairwise" | "comparison">,
   results: EvaluationResults,
   rowCount: number,
-  handles?: PairwiseAggregateHandles,
-): PairwiseAggregate | null => {
-  if (!evaluator.pairwise) return null;
-  return computePairwiseAggregateFromResults({
+): ComparisonAggregate | null => {
+  const comparison = toComparisonConfig(evaluator);
+  if (!comparison) return null;
+  return computeComparisonAggregateFromResults({
     id: evaluator.id,
-    pairwise: evaluator.pairwise,
+    variants: comparison.variants,
     results,
     rowCount,
-    resultTargetId: evaluator.pairwise.variantA,
-    handles,
+    // Chip-style comparison verdicts hang under the first variant's column.
+    resultTargetId: comparison.variants[0] ?? evaluator.id,
   });
 };
 
-export const computePairwiseTargetAggregate = (
-  target: { id: string; pairwise?: EvaluatorConfig["pairwise"] },
+export const computeComparisonTargetAggregate = (
+  target: Pick<TargetConfig, "id" | "pairwise" | "comparison">,
   results: EvaluationResults,
   rowCount: number,
-  handles?: PairwiseAggregateHandles,
-): PairwiseAggregate | null => {
-  if (!target.pairwise) return null;
-  return computePairwiseAggregateFromResults({
+): ComparisonAggregate | null => {
+  const comparison = toComparisonConfig(target);
+  if (!comparison) return null;
+  return computeComparisonAggregateFromResults({
     id: target.id,
-    pairwise: target.pairwise,
+    variants: comparison.variants,
     results,
     rowCount,
+    // Column-style comparison verdicts hang under the column-target itself.
     resultTargetId: target.id,
-    handles,
   });
 };
 
-const computePairwiseAggregateFromResults = ({
+const computeComparisonAggregateFromResults = ({
   id,
-  pairwise,
+  variants,
   results,
   rowCount,
   resultTargetId,
-  handles,
 }: {
   id: string;
-  pairwise: NonNullable<EvaluatorConfig["pairwise"]>;
+  variants: string[];
   results: EvaluationResults;
   rowCount: number;
   resultTargetId: string;
-  handles?: PairwiseAggregateHandles;
-}): PairwiseAggregate | null => {
-  const { variantA, variantB } = pairwise;
+}): ComparisonAggregate => {
   const evalResults = results.evaluatorResults[resultTargetId]?.[id] ?? [];
 
-  const variantAHandle = handles?.variantAHandle;
-  const variantBHandle = handles?.variantBHandle;
-
-  const counts = { a: 0, b: 0, tie: 0 };
+  const winsByLabel: Record<string, number> = {};
+  let ties = 0;
   let totalCost = 0;
-  const perRow: Array<PairwiseVerdict | null> = [];
 
   for (let i = 0; i < rowCount; i++) {
     const raw = evalResults[i];
     const parsed = parseEvaluationResult(raw);
-    const label = normalizePairwiseLabel(
-      parsed.label,
-      variantA,
-      variantB,
-      variantAHandle ?? undefined,
-      variantBHandle ?? undefined,
-    );
-    if (parsed.status !== "processed" || !label) {
-      perRow.push(null);
-      continue;
-    }
-    const costAmount = readCostAmount(raw);
-    if (label === "A") counts.a++;
-    else if (label === "B") counts.b++;
-    else counts.tie++;
-    totalCost += costAmount;
-    perRow.push({
-      label,
-      reasoning: parsed.details,
-      costAmount,
-    });
+    if (parsed.status !== "processed" || !parsed.label) continue;
+
+    // Runs stored before the merge label the winner by slot ("A" / "B")
+    // rather than by identifier. Map those onto the variant they name.
+    const label = resolveVerdictLabel({ label: parsed.label, variants });
+
+    totalCost += readCostAmount(raw);
+    if (label === "tie") ties++;
+    else winsByLabel[label] = (winsByLabel[label] ?? 0) + 1;
   }
+
+  const entries = Object.entries(winsByLabel);
+  const topCount = entries.reduce((max, [, count]) => Math.max(max, count), 0);
+  const leaders = entries.filter(([, count]) => count === topCount);
 
   return {
     evaluatorId: id,
-    variantA,
-    variantB,
-    counts,
+    variants,
+    winsByLabel,
+    ties,
+    decidedRows: entries.reduce((sum, [, count]) => sum + count, 0) + ties,
+    topCount,
+    topLabel: leaders.length === 1 ? leaders[0]![0] : undefined,
     totalCost,
-    perRow,
   };
 };
 

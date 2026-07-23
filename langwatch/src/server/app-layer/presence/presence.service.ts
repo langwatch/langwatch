@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "../broadcast/broadcast.service";
 import type { PresenceConfig } from "../projects/repositories/project.repository";
 import type { PresenceRepository } from "./repositories/presence.repository";

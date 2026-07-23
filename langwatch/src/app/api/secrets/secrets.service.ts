@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { SecretsRepository } from "./secrets.repository";
 import { encrypt } from "~/utils/encryption";
+import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
 
 const MAX_SECRETS_PER_PROJECT = 50;
 
@@ -48,7 +49,12 @@ export class SecretsService {
     projectId: string;
   }): Promise<SecretResponse | null> {
     const secret = await this.repo.findByIdInProject({ id, projectId });
-    return secret ? toResponse(secret) : null;
+    // Product-owned rows read as not-found, so a response never confirms the
+    // reserved row exists. Mirrors the tRPC secrets router.
+    if (!secret || RESERVED_PROJECT_SECRET_NAMES.includes(secret.name)) {
+      return null;
+    }
+    return toResponse(secret);
   }
 
   async create({
@@ -62,6 +68,13 @@ export class SecretsService {
     name: string;
     value: string;
   }): Promise<{ secret: SecretResponse } | { error: string; status: 409 | 422 }> {
+    // The uppercase-only name schema can never produce a reserved (lowercase)
+    // name today; this check pins the boundary rather than trusting that
+    // disjointness to hold forever.
+    if (RESERVED_PROJECT_SECRET_NAMES.includes(name)) {
+      return { error: `The name "${name}" is reserved`, status: 422 };
+    }
+
     const count = await this.repo.countByProject({ projectId });
     if (count >= MAX_SECRETS_PER_PROJECT) {
       return {
@@ -101,7 +114,11 @@ export class SecretsService {
     value: string;
   }): Promise<SecretResponse | null> {
     const existing = await this.repo.findByIdInProject({ id, projectId });
-    if (!existing) return null;
+    // Reserved rows read as not-found: overwriting the Langy VK secret would
+    // silently break the key the gateway authenticates against.
+    if (!existing || RESERVED_PROJECT_SECRET_NAMES.includes(existing.name)) {
+      return null;
+    }
 
     const encryptedValue = encrypt(value);
     const secret = await this.repo.update({ id, projectId, encryptedValue });
@@ -116,7 +133,12 @@ export class SecretsService {
     projectId: string;
   }): Promise<boolean> {
     const existing = await this.repo.findByIdInProject({ id, projectId });
-    if (!existing) return false;
+    // Reserved rows read as not-found: deleting the Langy VK secret breaks
+    // the live key AND makes the next chat mint a duplicate VK, because the
+    // row's presence is what marks the project as already provisioned.
+    if (!existing || RESERVED_PROJECT_SECRET_NAMES.includes(existing.name)) {
+      return false;
+    }
 
     await this.repo.delete({ id, projectId });
     return true;

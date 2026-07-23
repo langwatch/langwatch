@@ -1,18 +1,15 @@
+import { createLogger } from "@langwatch/observability";
 import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { createLogger } from "~/utils/logger";
 import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
-import { FIELD_VALUES, SEARCH_FIELDS } from "./query-language/metadata";
+import { buildFieldsBlock } from "./query-language/fieldCatalogue";
 import { isEmptyAST, parse } from "./query-language/parse";
 import { validateAst } from "./query-language/queries";
 
 const logger = createLogger("langwatch:ai-query");
 
 const MAX_ATTEMPTS = 3;
-const DYNAMIC_VALUES_LIMIT = 20;
-
 export interface AiQueryInput {
   projectId: string;
   prompt: string;
@@ -267,7 +264,9 @@ export async function generateTraceAction(
   if (lastFailure === "provider") {
     return {
       ok: false,
-      error: summarizeProviderError(lastProviderError),
+      error: summarizeProviderError(lastProviderError, {
+        model: model.modelId,
+      }),
     };
   }
   return {
@@ -283,16 +282,26 @@ export async function generateTraceAction(
 
 /**
  * Curate an SDK/provider exception into the operator-actionable fields
- * the UI renders in the AI-search composer. Strips stack traces and
+ * the UI renders in the AI-search composer. Prefers the structured
+ * fields the AI SDK's APICallError carries (statusCode, responseBody)
+ * and falls back to text extraction: strips stack traces and
  * `litellm.XYZException` prefixes; pulls out HTTP status, provider key,
  * referenced model id, and the human-readable `'message'` substring
  * embedded in the JSON-shaped body LiteLLM forwards from providers.
+ *
+ * `context.model` is the model the backend actually resolved for the
+ * call — provider errors like Azure's bare "Resource not found" carry
+ * no model of their own, and the operator can't act on the failure
+ * without knowing which configured model to go fix.
  *
  * Never throws — anything we can't parse falls through to a truncated
  * raw-cleaned text so we still produce *something* for the operator
  * instead of a vacant "Unknown error" badge.
  */
-function summarizeProviderError(err: unknown): AiActionError {
+export function summarizeProviderError(
+  err: unknown,
+  context?: { model?: string },
+): AiActionError {
   const raw = err instanceof Error ? err.message : String(err ?? "");
   const cleaned = raw
     .split("\n")
@@ -300,37 +309,54 @@ function summarizeProviderError(err: unknown): AiActionError {
     .join("\n")
     .trim();
 
+  const structured = err as
+    | { statusCode?: unknown; responseBody?: unknown }
+    | null
+    | undefined;
+  const structuredStatus =
+    typeof structured?.statusCode === "number"
+      ? structured.statusCode
+      : undefined;
+  const structuredBody =
+    typeof structured?.responseBody === "string" ? structured.responseBody : "";
+
   const statusMatch =
     cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ??
     cleaned.match(/\b(?:HTTP\s+)?(\d{3})\b/);
-  const httpStatus = statusMatch ? Number(statusMatch[1]) : undefined;
+  const httpStatus =
+    structuredStatus ?? (statusMatch ? Number(statusMatch[1]) : undefined);
 
   const providerMatch = cleaned.match(
     /(?:litellm\.|\b)(OpenAI|Azure|Anthropic|Gemini|Google|Cohere|Mistral|Groq|Together|Bedrock|Vertex)(?:Exception|Error|APIError)/i,
   );
-  const provider = providerMatch?.[1]?.toLowerCase();
+  const provider =
+    providerMatch?.[1]?.toLowerCase() ?? context?.model?.split("/")[0];
 
   const modelMatch =
     cleaned.match(
       /model\s+["']?([\w./:-]+)["']?\s+(?:does\s+not\s+exist|not\s+found|is\s+invalid)/i,
     ) ?? cleaned.match(/Unknown\s+model[:\s]+([\w./:-]+)/i);
-  const model = modelMatch ? modelMatch[1] : undefined;
+  const model = modelMatch ? modelMatch[1] : context?.model;
 
+  const searchable = `${cleaned}\n${structuredBody}`;
   const reasonMatch =
-    cleaned.match(/['"]message['"][:\s]+['"]([^'"]{1,300})['"]/) ??
-    cleaned.match(/['"]error['"][:\s]+['"]([^'"]{1,300})['"]/);
+    searchable.match(/['"]message['"][:\s]+['"]([^'"]{1,300})['"]/) ??
+    searchable.match(/['"]error['"][:\s]+['"]([^'"]{1,300})['"]/);
   const reason = reasonMatch?.[1];
 
   let message = "Couldn't reach the model provider";
+  const modelSuffix = model ? ` for ${model}` : "";
   if (httpStatus && reason) {
-    message = `Provider returned ${httpStatus}: ${reason}`;
+    message = `Provider returned ${httpStatus}${modelSuffix}: ${reason}`;
   } else if (httpStatus) {
-    message = `Provider returned ${httpStatus}`;
+    message = `Provider returned ${httpStatus}${modelSuffix}`;
   } else if (reason) {
-    message = reason;
+    message = model ? `${reason} (${model})` : reason;
   } else if (cleaned) {
     const firstLine = cleaned.split("\n")[0]?.trim() ?? "";
-    if (firstLine) message = firstLine.slice(0, 200);
+    if (firstLine) {
+      message = `${firstLine.slice(0, 200)}${modelSuffix}`;
+    }
   }
 
   return {
@@ -500,58 +526,3 @@ legitimate, polite "I couldn't translate that"; hallucinating a filter
 the operator didn't ask for is worse.`;
 }
 
-async function buildFieldsBlock(input: AiQueryInput): Promise<string> {
-  const dynamicValues = await fetchDynamicCategoricalValues(input);
-  const lines: string[] = [];
-  for (const [name, meta] of Object.entries(SEARCH_FIELDS)) {
-    const sample = pickSampleValues(name, meta.facetField, dynamicValues);
-    const sampleStr = sample.length > 0 ? ` — e.g. ${sample.join(", ")}` : "";
-    lines.push(`- ${name} (${meta.valueType}): ${meta.label}${sampleStr}`);
-  }
-  return lines.join("\n");
-}
-
-function pickSampleValues(
-  fieldName: string,
-  facetField: string | undefined,
-  dynamic: Map<string, string[]>,
-): string[] {
-  const fromDb = facetField ? (dynamic.get(facetField) ?? []) : [];
-  const fromStatic = FIELD_VALUES[fieldName] ?? [];
-  const merged = Array.from(new Set([...fromDb, ...fromStatic])).slice(0, 8);
-  return merged;
-}
-
-async function fetchDynamicCategoricalValues(
-  input: AiQueryInput,
-): Promise<Map<string, string[]>> {
-  const app = getApp();
-  const facetFields = Object.values(SEARCH_FIELDS)
-    .filter((meta) => meta.valueType === "categorical" && meta.facetField)
-    .map((meta) => meta.facetField as string);
-
-  const results = await Promise.allSettled(
-    facetFields.map((facetKey) =>
-      app.traces.list.getFacetValues({
-        tenantId: input.projectId,
-        timeRange: input.timeRange,
-        facetKey,
-        limit: DYNAMIC_VALUES_LIMIT,
-        offset: 0,
-      }),
-    ),
-  );
-
-  const map = new Map<string, string[]>();
-  results.forEach((result, idx) => {
-    const facetKey = facetFields[idx];
-    if (!facetKey) return;
-    if (result.status === "fulfilled") {
-      map.set(
-        facetKey,
-        result.value.values.map((v) => v.value),
-      );
-    }
-  });
-  return map;
-}

@@ -30,8 +30,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
-import type { EvalEntry } from "../utils";
 import { EvalCard } from "../EvalCard";
+import type { EvalEntry } from "../utils";
 
 function renderCard(eval_: EvalEntry) {
   return render(

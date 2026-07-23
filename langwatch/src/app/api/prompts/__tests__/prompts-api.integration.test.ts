@@ -422,7 +422,7 @@ describe("Prompts API", () => {
 
       const res = await helpers.api.post(`/api/prompts`, invalidData);
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
     });
 
     describe("when scoping by project (default)", () => {
@@ -849,7 +849,7 @@ describe("Prompts API", () => {
         body: JSON.stringify(invalidData),
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       const body = await res.json();
       expect(body).toHaveProperty("error");
     });
@@ -879,7 +879,7 @@ describe("Prompts API", () => {
       });
 
       const body = await res.json();
-      expect(res.status).toBe(400); // Changed from 400 to 422
+      expect(res.status).toBe(422);
       expect(body).toHaveProperty("error");
     });
 
@@ -898,18 +898,18 @@ describe("Prompts API", () => {
 
       const res = await helpers.api.put(`/api/prompts/${prompt.id}`, emptyData);
 
-      expect(res.status).toBe(400); // Validation error
+      expect(res.status).toBe(422);
       const body = await res.json();
       expect(body).toHaveProperty("error");
     });
 
-    it("should return 400 if no fields are provided", async () => {
+    it("returns 422 if no fields are provided", async () => {
       // Should fail validation (missing commitMessage)
       const res = await app.request(`/api/prompts/${mockConfig.id}`, {
         method: "PUT",
         headers: { "X-Auth-Token": testApiKey },
       });
-      expect(res.status).toBe(400); // Validation error
+      expect(res.status).toBe(422);
     });
   });
 

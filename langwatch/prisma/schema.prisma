@@ -76,8 +76,12 @@ model User {
   // auto-detection. When set, wins over auto-detected persona destination.
   // Spec: specs/ai-gateway/governance/persona-home-content.feature
   lastHomePath             String?
+  // User-level dismissal for automatic Traces Explorer tours. A single
+  // dismissal applies across projects, browsers, and devices.
+  // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
+  tracesExplorerTourDismissedAt DateTime?
   Annotation               Annotation[]
-  publicShares             PublicShare[]
+  shareLinks               ShareLink[]
   Workflow                 Workflow[]
   WorkflowVersion          WorkflowVersion[]
   annotationQueues         AnnotationQueueMembers[]
@@ -107,9 +111,6 @@ model User {
   ingestionSourcesCreated  IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated      AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   pinnedTraces             PinnedTrace[]
-  userGitHubCredentials    UserGitHubCredential[]
-  langyConversations       LangyConversation[]      @relation("LangyConversationUser")
-  sharedLangyConversations LangyConversation[]      @relation("LangyConversationSharedBy")
 }
 
 model VerificationToken {
@@ -246,12 +247,24 @@ model Organization {
   ssoDomain              String?              @unique
   ssoProvider            String?
   presenceEnabled        Boolean              @default(true)
+  /// Org-level trace-sharing kill switch. Off = trace share links cannot be
+  /// created in ANY project of this org, and existing links stop resolving —
+  /// the org toggle is the global switch, the per-project
+  /// `Project.traceSharingEnabled` scopes the kill to a single project (mirrors
+  /// `presenceEnabled`). Effective sharing = org AND project. ADR-039.
+  traceSharingEnabled    Boolean              @default(true)
   /// Org-configurable contact surfaced to users in CLI "contact your
   /// admin" messages and the in-app budget-exceeded banner. Free text:
   /// accepts an email, a URL (internal ticketing system), or any other
   /// instruction. When null, callers fall back to the first ADMIN
   /// member's email (`resolveSupportContact` helper).
   supportContact         String?
+  /// Signup intent, editable later as the org "Primary use" setting.
+  /// AGENT_GOVERNANCE lands "/" on /me, LLM_OPS on the project home.
+  /// NULL means intent unset (every pre-fork org and any org created
+  /// outside onboarding) — the home resolver keeps legacy behavior.
+  /// ADR-038.
+  primaryIntent          OrganizationIntent?
 
   promoCode              String?
   stripeCustomerId       String?                @unique
@@ -276,7 +289,7 @@ model Organization {
   anomalyAlerts          AnomalyAlert[]
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
-  userGitHubCredentials  UserGitHubCredential[]
+  langyGithubInstallations LangyGithubInstallation[]
 
   @@index([ssoProvider])
 }
@@ -312,6 +325,12 @@ enum PlanTypes {
 enum PricingModel {
   TIERED
   SEAT_EVENT
+}
+
+/// Organization signup intent (ADR-038): which product the org came for.
+enum OrganizationIntent {
+  AGENT_GOVERNANCE
+  LLM_OPS
 }
 
 enum SubscriptionStatus {
@@ -369,9 +388,9 @@ model Project {
   annotations              Annotation[]
   projectSecrets           ProjectSecret[]
   TriggerSent              TriggerSent[]
-  ReactorOutbox            ReactorOutbox[]
+  WebhookDelivery          WebhookDelivery[]
   annotationScores         AnnotationScore[]
-  publicShares             PublicShare[]
+  shareLinks               ShareLink[]
   workflows                Workflow[]
   WorkflowVersion          WorkflowVersion[]
   AnnotationQueue          AnnotationQueue[]
@@ -393,7 +412,6 @@ model Project {
   gatewayChangeEvents      GatewayChangeEvent[]
   pinnedTraces             PinnedTrace[]
   emailSuppressions        EmailSuppression[]
-  langyConversations       LangyConversation[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -417,6 +435,17 @@ model Project {
   /// Department assignment for spend attribution (the project / agent
   /// lens, used when a trace has no principal user). Accounting-only.
   departmentId String?
+
+  /// Per-project Langy egress allow-list (ADR-043). A nullable JSON array of
+  /// host patterns (`["registry.npmjs.org", "*.internal.acme.com"]`) that the
+  /// project's Langy workers may reach outbound. The *presence* of the list is
+  /// the enforcement mode: null/absent ⇒ monitor-only (watch, never block);
+  /// non-empty ⇒ the worker's egress adapter restricts outbound to
+  /// floor ∪ this list. Enforced in the agent pod's egress adapter — NOT the
+  /// gateway — so it lives on the project, not the VirtualKey. Resolved by
+  /// LangyCredentialService.getEgressAllowlist and threaded through the
+  /// per-request credentials envelope. See specs/langy/langy-egress-enforcement.feature.
+  langyEgressAllowlist Json?
 
   @@index([teamId])
   @@index([isPersonal])
@@ -557,6 +586,12 @@ model Cost {
   @@index([projectId, createdAt])
 }
 
+/// PROJECTION of the topic-clustering event stream (ADR-051): topics are
+/// `topics_recorded` events; this table is written ONLY by
+/// TopicModelFoldProjection (cursor: TopicModelProjection) and is
+/// rebuildable by replay. Kept named `Topic` because it is the domain
+/// entity every surface reads — the `*Projection` suffix is reserved for
+/// cursor/read-model tables.
 model Topic {
   id        String  @id @default(nanoid())
   projectId String
@@ -570,6 +605,12 @@ model Topic {
   centroid               Json
   p95Distance            Float
   automaticallyGenerated Boolean @default(true)
+
+  /// The `topics_recorded` event that recorded this topic (its id in the
+  /// event log). Null means the row predates event ownership and has not
+  /// been seeded onto the stream yet; the projection sets it on every row
+  /// it writes.
+  lastEventId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -726,6 +767,17 @@ enum TriggerAction {
   ADD_TO_DATASET
   ADD_TO_ANNOTATION_QUEUE
   SEND_SLACK_MESSAGE
+  SEND_WEBHOOK
+}
+
+// The three automation kinds, distinguished by WHAT FIRES them (ADR-042):
+// AUTOMATION = an event (a trace matches filters); ALERT = a condition (a
+// custom-graph metric crosses a threshold); REPORT = a schedule (a calendar
+// cron). Backfilled from the legacy `customGraphId != null` heuristic.
+enum TriggerKind {
+  AUTOMATION
+  ALERT
+  REPORT
 }
 
 enum AlertType {
@@ -740,8 +792,19 @@ model Trigger {
   projectId     String
   project       Project       @relation(fields: [projectId], references: [id])
   action        TriggerAction
+  // ADR-042: the automation kind. Backfilled AUTOMATION/ALERT from
+  // customGraphId; REPORT is set by the scheduled-report upsert path.
+  triggerKind   TriggerKind   @default(AUTOMATION)
   actionParams  Json
+  // Legacy structured filter object (FilterField -> values). Retained for
+  // back-compat; new trace-subject automations author `filterQuery` instead
+  // and persist `filters` as an empty `{}`.
   filters       Json
+  // ADR-043 Subject facet: the Traces-V2 liqe query string that defines which
+  // traces this automation is about. NULL = legacy `filters`-driven trigger.
+  // Evaluated in-memory against fold state at dispatch (never per-trace CH),
+  // fail-closed on any unevaluable field.
+  filterQuery   String?
   lastRunAt     Float         @default(0)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
@@ -769,10 +832,51 @@ model Trigger {
   // without a schema migration.
   traceDebounceMs      Int           @default(30000)
   TriggerSent   TriggerSent[]
+  webhookDeliveries WebhookDelivery[]
   customGraphId String?       @unique
   customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+// ADR-040 §6: per-ATTEMPT webhook delivery log — the drill-down behind a
+// webhook automation's "recent fires". One row per HTTP attempt; all attempts
+// of one logical fire share `dispatchId` (== the X-LangWatch-Event-Id). A slim
+// facts table: outcome, status, latency, a capped error message, plus a
+// truncated copy of a failure response for debugging. Our request content
+// (URL, headers, body) is never stored. Pruned after 30 days.
+model WebhookDelivery {
+  id             String                @id @default(nanoid())
+  projectId      String
+  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  triggerId      String
+  trigger        Trigger               @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  // Groups every attempt of one logical fire (== X-LangWatch-Event-Id).
+  dispatchId     String
+  // Null when no HTTP response arrived (transport/SSRF/timeout).
+  responseStatus Int?
+  latencyMs      Int?
+  // Capped, classified error message when the attempt failed (scrubbed of
+  // the configured header values).
+  error          String?
+  // The receiver's truncated failure response ({body, headers, retryAfterMs})
+  // — debugging context, industry-baseline plaintext (GitHub/Stripe style),
+  // scrubbed of our configured header values before storage; deleted with
+  // the row by the 30-day prune. Null on success and no-response failures.
+  response       Json?
+  outcome        WebhookDeliveryOutcome
+  firedAt        DateTime              @default(now())
+  createdAt      DateTime              @default(now())
+
+  @@index([projectId, triggerId, dispatchId])
+  @@index([projectId, triggerId, firedAt])
+}
+
+enum WebhookDeliveryOutcome {
+  success
+  retryable
+  terminal
+  pending
 }
 
 enum ExperimentType {
@@ -987,37 +1091,182 @@ model ModelDefaultConfigScope {
   @@index([configId])
 }
 
-/// Per-user GitHub App connection used by Langy to open pull requests
-/// attributed to the requesting user. Stores ONLY the encrypted refresh
-/// token (long-lived but rotating); access tokens (8h TTL) are minted on
-/// demand by langyGithubToken.ts and never persisted.
+/// A GitHub App installation mapped to a LangWatch organization. Langy mints
+/// short-lived (1h) installation access tokens against these rows to open
+/// bot-authored pull requests, scoped to the installation's repositories. No
+/// user token and no secret are stored here — the crown jewel is the App
+/// private key, held only in the control-plane env. Issue: #4747. Spec:
+/// specs/langy/langy-github-install.feature.
 ///
-/// Scoped (userId, organizationId): a user in two orgs connects twice so
-/// the installation context stays org-bounded. Issue: #4747. Spec:
-/// specs/assistant/langy-github-prs.feature.
-model UserGitHubCredential {
-  id                    String       @id @default(nanoid())
-  userId                String
-  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organizationId        String
-  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  /// GitHub login (e.g. "aryansharma28"). Surfaced in the "Acting as @login"
-  /// sidebar chip and used as the commit author name in the worker.
-  githubLogin           String
-  /// GitHub numeric user id. Stable across renames; used for the
-  /// noreply commit email (<id>+<login>@users.noreply.github.com).
-  githubUserId          String
-  /// AES-256-GCM encrypted refresh token. Encrypted via
-  /// langwatch/src/utils/encryption.ts (same scheme as ProjectSecret).
-  encryptedRefreshToken String
-  /// Space-separated OAuth scopes granted (informational; the App installation
-  /// is the real authority on what the token can do).
-  scopes                String?
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @default(now()) @updatedAt
+/// installationId is globally unique (one GitHub installation → one row); a
+/// single LangWatch organization may own MANY installations (different GitHub
+/// accounts), so the org↔installation relationship is one-to-many.
+model LangyGithubInstallation {
+  id                  String       @id @default(nanoid())
+  /// GitHub installation id (numeric; stored as string). Globally unique.
+  installationId      String       @unique
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// The GitHub account (organization or user) the App is installed on.
+  accountLogin        String
+  /// "Organization" or "User".
+  accountType         String
+  /// GitHub numeric account id (stable across renames).
+  accountId           String
+  /// "all" or "selected" — whether the App can see every repo on the account
+  /// or only a chosen subset.
+  repositorySelection String
+  /// Cached repository list [{ id, fullName }] when repositorySelection =
+  /// "selected". Null when "all" (the full set is resolved live at mint time).
+  repositories        Json?
+  /// Set when GitHub suspends the installation; cleared on unsuspend. A
+  /// suspended installation cannot mint tokens.
+  suspendedAt         DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @default(now()) @updatedAt
 
-  @@unique([userId, organizationId])
   @@index([organizationId])
+}
+
+/// Rebuildable operational state folded from Langy's canonical event stream.
+/// The source of truth remains the ClickHouse event log.
+model LangyConversationProjection {
+  id        String @id @default(nanoid())
+  projectId String
+
+  ConversationId       String                     @map("conversationId")
+  /// Owner; first-writer-wins from the first message's userId.
+  UserId               String                     @map("userId")
+  Title                String?                    @map("title")
+  /// derived | auto | user — governs auto-title precedence (user is sticky).
+  TitleSource          LangyProjectionTitleSource @map("titleSource")
+  Status               String                     @map("status")
+  IsShared             Boolean                    @default(false) @map("isShared")
+  SharedAt             Float?                     @map("sharedAt")
+  SharedById           String?                    @map("sharedById")
+  MessageCount         Int                        @default(0) @map("messageCount")
+  LastActivityAt       Float?                     @map("lastActivityAt")
+  /// The turn in flight, or null when idle (busy guard reads this).
+  CurrentTurnId        String?                    @map("currentTurnId")
+  LastError            String?                    @map("lastError")
+  /// ADR-048 shutdown-handoff resume token (opaque, worker-authored).
+  PendingHandoffToken  String?                    @map("pendingHandoffToken")
+  PendingHandoffTurnId String?                    @map("pendingHandoffTurnId")
+  /// Per-conversation HMAC key for worker stream frames; server-side only.
+  RunToken             String?                    @map("runToken")
+  ArchivedAt           Float?                     @map("archivedAt")
+  CreatedAt            Float                      @map("createdAt")
+  UpdatedAt            Float                      @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt           Float                      @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt           Float                      @map("acceptedAt")
+  LastEventId          String                     @map("lastEventId")
+  ProjectionVersion    String                     @map("projectionVersion")
+
+  @@unique([projectId, ConversationId])
+  @@index([projectId, UserId, ConversationId])
+  @@index([projectId, UserId, LastActivityAt])
+}
+
+/// Durable idempotency receipt for one logical Langy send. A transport retry
+/// reuses the same requestId and receives the original conversation/turn ids
+/// instead of minting a second message or turn.
+model LangyTurnRequest {
+  id             String   @id @default(nanoid())
+  projectId      String
+  userId         String
+  requestId      String
+  conversationId String
+  turnId         String
+  status         String
+  leaseOwner     String
+  leaseExpiresAt DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([projectId, userId, requestId])
+  @@index([projectId, conversationId])
+}
+
+/// Postgres-authoritative one-turn admission for a conversation. PREPARING
+/// claims are leased so a crash before the durable start event can recover;
+/// COMMITTED claims are released only by the matching terminal event.
+model LangyActiveTurn {
+  id             String   @id @default(nanoid())
+  projectId      String
+  conversationId String
+  turnId         String
+  requestId      String
+  userId         String
+  status         String
+  leaseOwner     String
+  leaseExpiresAt DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([projectId, conversationId])
+  @@index([projectId, userId])
+}
+
+/// Rebuildable per-turn operational render document.
+model LangyConversationTurnProjection {
+  id                String                    @id @default(nanoid())
+  projectId         String
+  ConversationId    String                    @map("conversationId")
+  TurnId            String                    @map("turnId")
+  /// LangyConversationTurnStatus. Deliberately TEXT, not a Postgres enum: this
+  /// is a PROJECTION — one writer (the fold), rebuildable from the event log,
+  /// and nothing queries or indexes on it. An enum bought no selectivity here,
+  /// only typo protection, and charged a migration for every new status that
+  /// Postgres then could not remove. The one definition lives in
+  /// `LANGY_CONVERSATION_TURN_STATUS`; the repository validates against it.
+  Status            String                    @map("status")
+  /// LangyMessagePart[] — the user question that opened the turn.
+  QuestionParts     Json                      @map("questionParts")
+  /// LangyMessagePart[] — the agent's whole final answer.
+  AnswerParts       Json                      @map("answerParts")
+  /// LangyTurnToolCall[] — tool-call lifecycle audit in initiation order.
+  ToolCalls         Json                      @map("toolCalls")
+  /// LangyPlanItemData[] | null — null means the turn never kept a plan.
+  Plan              Json?                     @map("plan")
+  Error             String?                   @map("error")
+  StartedAt         Float?                    @map("startedAt")
+  EndedAt           Float?                    @map("endedAt")
+  CreatedAt         Float                     @map("createdAt")
+  UpdatedAt         Float                     @map("updatedAt")
+  OccurredAt        Float                     @map("occurredAt")
+  AcceptedAt        Float                     @map("acceptedAt")
+  LastEventId       String                    @map("lastEventId")
+  ProjectionVersion String                    @map("projectionVersion")
+
+  @@unique([projectId, ConversationId, TurnId])
+  @@index([projectId, ConversationId, UpdatedAt])
+}
+
+/// Rebuildable operational message fact. One source event produces one row.
+model LangyMessageProjection {
+  id             String @id @default(nanoid())
+  projectId      String
+  ConversationId String @map("conversationId")
+  MessageId      String @map("messageId")
+  Role           String @map("role")
+  Parts          Json   @map("parts")
+  SourceEventId  String @map("sourceEventId")
+  OccurredAt     Float  @map("occurredAt")
+  AcceptedAt     Float  @map("acceptedAt")
+  CreatedAt      Float  @map("createdAt")
+  UpdatedAt      Float  @map("updatedAt")
+
+  @@unique([projectId, ConversationId, MessageId])
+  @@unique([projectId, SourceEventId])
+  @@index([projectId, ConversationId, CreatedAt])
+}
+
+enum LangyProjectionTitleSource {
+  derived
+  auto
+  user
 }
 
 model ProjectSecret {
@@ -1047,6 +1296,14 @@ model TriggerSent {
   project       Project      @relation(fields: [projectId], references: [id])
   trigger       Trigger      @relation(fields: [triggerId], references: [id])
   resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
+  // Identity of the open incident this row represents, set while firing and
+  // cleared (NULL) on resolve. A single-column unique on it means at most one
+  // OPEN incident can exist per identity — Postgres treats NULLs as distinct,
+  // so any number of resolved rows coexist. This is the atomic claim for a
+  // graph alert: `@@unique([triggerId, traceId])` can't guard it because
+  // `traceId` is NULL for graph alerts, so without this two evaluators could
+  // both open an incident and both dispatch.
+  openIncidentKey String? @unique
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @default(now()) @updatedAt
 
@@ -1105,9 +1362,15 @@ model AnnotationScore {
   @@index([projectId])
 }
 
-enum PublicShareResourceTypes {
+enum ShareResourceType {
   TRACE
   THREAD
+}
+
+enum ShareVisibility {
+  PUBLIC
+  ORGANIZATION
+  PROJECT
 }
 
 model AnnotationQueue {
@@ -1174,19 +1437,33 @@ model AnnotationQueueItem {
   @@index([annotationQueueId, doneAt])
 }
 
-model PublicShare {
-  id           String                   @id @default(nanoid())
-  resourceType PublicShareResourceTypes
+model ShareLink {
+  id           String            @id @default(nanoid())
+  // Secret capability. A bare 32-char high-entropy nanoid for new links —
+  // deliberately unprefixed, see ADR-039; legacy rows carry their old
+  // bare-nanoid id here (see migration backfill). The token — not the
+  // resource id — is what authorizes an anonymous read.
+  token        String            @unique
+  resourceType ShareResourceType
   resourceId   String
+  // Optional surrounding conversation to show alongside the trace.
+  threadId     String?
   projectId    String
-  project      Project                  @relation(fields: [projectId], references: [id])
+  project      Project           @relation(fields: [projectId], references: [id])
   userId       String?
-  user         User?                    @relation(fields: [userId], references: [id])
+  user         User?             @relation(fields: [userId], references: [id])
+
+  visibility ShareVisibility @default(PUBLIC)
+  // null = never expires.
+  expiresAt  DateTime?
+  // null = unlimited views; 1 = single view.
+  maxViews   Int?
+  viewCount  Int             @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  @@unique([projectId, resourceType, resourceId])
+  @@index([projectId, resourceType, resourceId])
   @@index([userId])
 }
 
@@ -1660,21 +1937,6 @@ model SimulationSuite {
 
   @@unique([projectId, slug])
   @@index([projectId])
-}
-
-model ProjectDailySdkUsage {
-  id                 String   @id
-  projectId          String
-  date               String // UTC date "YYYY-MM-DD"
-  sdkName            String   @default("")
-  sdkVersion         String   @default("")
-  sdkLanguage        String   @default("")
-  count              Int      @default(0)
-  lastEventTimestamp BigInt? // Unix ms from event.timestamp
-  updatedAt          DateTime @default(now()) @updatedAt
-
-  @@unique([projectId, date, sdkName, sdkVersion, sdkLanguage])
-  @@index([projectId, date])
 }
 
 model Subscription {
@@ -2849,120 +3111,245 @@ model FeatureFlag {
   updatedAt    DateTime @default(now()) @updatedAt
 }
 
-// Durable outbox for stake-sensitive reactor dispatch (ADR-025). Reactors
-// registered via `.withOutbox` enqueue rows here; a queue-side audit
-// adapter projects every queue lifecycle event into the row's status.
-// The unique (projectId, reactorName, dedupKey) is the claim primitive
-// that makes replays safe — `createMany skipDuplicates` is a no-op on
-// collision. projectId is part of the uniqueness contract so a caller
-// that forgets to project-scope `dedupKey` cannot silently suppress
-// another tenant's row for the same (reactorName, dedupKey) pair.
-enum ReactorOutboxStatus {
-    queued
-    dispatching
-    dispatched
-    failed_retryable
-    dead
+/// Durable state for a long-running event-sourced process.
+model ProcessManagerInstance {
+  id          String   @id @default(nanoid())
+  processName String
+  projectId   String
+  processKey  String
+  tenantId    String
+  userId      String?
+  state       Json
+  revision    Int
+  nextWakeAt  DateTime? @db.Timestamptz(3)
+  updatedAt   DateTime  @db.Timestamptz(3)
+
+  @@unique([processName, projectId, processKey])
+  @@index([nextWakeAt])
 }
 
-model ReactorOutbox {
-    id             String              @id @default(nanoid())
-    projectId      String
-    project        Project             @relation(fields: [projectId], references: [id])
-    // Stable identifier of the reactor that enqueued the row. Matches
-    // the reactor's `name` in the pipeline builder.
-    reactorName    String
-    // Deduplication key scoped to (projectId, reactorName, ...). Typically
-    // encodes the match identity, e.g. `${triggerId}:trace:${traceId}`.
-    // Collisions on (projectId, reactorName, dedupKey) are the claim
-    // primitive that makes replays safe.
-    dedupKey       String
-    // GroupQueue routing key. Drives per-group FIFO and fair scheduling
-    // across tenants. Always `${projectId}/`-prefixed.
-    groupKey       String
-    // Reactor-defined dispatch payload (trigger config, target ids,
-    // rendered template inputs, etc).
-    payload        Json
-    status         ReactorOutboxStatus @default(queued)
-    attempts       Int                 @default(0)
-    maxAttempts    Int                 @default(8)
-    // Set to a future timestamp by the drainer when the row enters
-    // `dispatching`. A wakeup that arrives after `leasedUntil` may
-    // re-lease the row (assumed crashed worker).
-    leasedUntil    DateTime?
-    // Nullable: cleared (NULL) when a row is promoted to `dead`, since a
-    // terminal row no longer schedules a next attempt.
-    nextAttemptAt  DateTime?           @default(now())
-    lastError      String?
-    lastErrorAt    DateTime?
-    // Template render-health diagnostics captured at dispatch time
-    // (ADR-036 / ADR-037). Currently `{ missingVariables: string[] }` —
-    // the variables a custom email/Slack template referenced but the
-    // render context did not supply. NULL on a clean render (no missing
-    // variables) and on dispatches that never rendered a custom template.
-    // Lets the operator surface show "N missing variables" per dispatch
-    // instead of dropping the signal `renderTriggerEmail`/`renderTriggerSlack`
-    // already compute.
-    renderDiagnostics Json?
-    dispatchedAt   DateTime?
-    createdAt      DateTime            @default(now())
-    updatedAt      DateTime            @default(now()) @updatedAt
+/// Idempotency marker for a source event consumed by a process definition.
+model ProcessManagerInbox {
+  id            String   @id @default(nanoid())
+  processName   String
+  projectId     String
+  processKey    String
+  tenantId      String
+  sourceEventId String
+  consumedAt    DateTime @db.Timestamptz(3)
 
-    @@unique([projectId, reactorName, dedupKey])
-    // Drainer hot path: pick the next claimable row for a (project,
-    // reactor) whose backoff has elapsed.
-    @@index([projectId, reactorName, status, nextAttemptAt])
-    // Wakeup-driven lease scopes by (projectId, reactorName, groupKey)
-    // so one group's wakeup can't drain another group's ready rows.
-    // `map:` pins the name to ≤63 chars (Postgres identifier limit) so the
-    // migration's hand-written index name matches what Prisma expects.
-    @@index([projectId, reactorName, groupKey, status, nextAttemptAt], map: "ReactorOutbox_projectId_reactorName_groupKey_status_nextAtt_idx")
-    // Operator surface: list stuck/dead dispatches per project.
-    @@index([projectId, status, updatedAt])
-    // Crash recovery scan: find leased rows whose worker never came back.
-    @@index([status, leasedUntil])
+  @@unique([processName, projectId, sourceEventId])
+  @@index([processName, projectId, processKey, consumedAt])
 }
+
+enum ProcessManagerOutboxStatus {
+  pending
+  dispatched
+  dead
+}
+
+/// Transactional intents emitted by a durable process transition.
+model ProcessManagerOutbox {
+  id            String                     @id @default(nanoid())
+  processName   String
+  projectId     String
+  processKey    String
+  tenantId      String
+  userId        String?
+  messageKey    String
+  intentType    String
+  payload       Json
+  traceCarrier  Json
+  sourceEventId String?
+  status        ProcessManagerOutboxStatus @default(pending)
+  attempts      Int                        @default(0)
+  nextAttemptAt DateTime                   @db.Timestamptz(3)
+  leasedUntil   DateTime?                  @db.Timestamptz(3)
+  leaseToken    String?                    @unique
+  dispatchedAt  DateTime?                  @db.Timestamptz(3)
+  createdAt     DateTime                   @db.Timestamptz(3)
+  updatedAt     DateTime                   @db.Timestamptz(3)
+
+  @@unique([processName, projectId, messageKey])
+  @@index([processName, projectId, processKey, createdAt])
+  @@index([status, nextAttemptAt, leasedUntil])
+}
+
+/// Per-project topic clustering run status (ADR-051): the rebuildable
+/// operational read model behind the settings page. One row per project;
+/// folded from run_completed/run_failed events, never written directly.
+model TopicClusteringRunProjection {
+  /// KSUID (`topicrun_…`), generated by the repository on first upsert.
+  id        String @id
+  projectId String
+
+  LastRequestedAt        Float?  @map("lastRequestedAt")
+  LastRequestTrigger     String? @map("lastRequestTrigger")
+  LastRunAt              Float?  @map("lastRunAt")
+  /// completed | skipped | failed
+  LastRunOutcome         String? @map("lastRunOutcome")
+  LastRunMode            String? @map("lastRunMode")
+  LastRunSkippedReason       String? @map("lastRunSkippedReason")
+  LastRunError               String? @map("lastRunError")
+  LastRunErrorCode           String? @map("lastRunErrorCode")
+  /// True when the customer can resolve the failure (credentials, quota).
+  LastRunErrorUserActionable Boolean @default(false) @map("lastRunErrorUserActionable")
+  LastRunTracesProcessed Int     @default(0) @map("lastRunTracesProcessed")
+  LastRunTopicsCount     Int     @default(0) @map("lastRunTopicsCount")
+  LastRunSubtopicsCount  Int     @default(0) @map("lastRunSubtopicsCount")
+  LastRunPages           Int     @default(0) @map("lastRunPages")
+  InProgressRunId        String? @map("inProgressRunId")
+  InProgressTraces       Int     @default(0) @map("inProgressTraces")
+  InProgressPages        Int     @default(0) @map("inProgressPages")
+  /// Business time the in-progress run opened; bounds how long the read
+  /// model may report it as running (mirrors the process's stale-run guard).
+  InProgressStartedAt    Float?  @map("inProgressStartedAt")
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt        Float  @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@unique([projectId])
+}
+
+/// Cursor row for the topic-model projection (ADR-051). The model itself is
+/// the `Topic` table, written through by the projection; this row only
+/// records how far the fold has applied the event log.
+model TopicModelProjection {
+  /// KSUID (`topicmodel_…`), generated by the repository on first upsert.
+  id        String @id
+  projectId String
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt        Float  @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@unique([projectId])
+}
+
+/// Per-project topic clustering run history (audit read model, ADR-051).
+/// One row per project; `runs` is the bounded newest-first entry list.
+/// Rebuildable by replaying the event log.
+model TopicClusteringRunHistoryProjection {
+  /// KSUID (`topicrunhist_…`), generated by the repository on first upsert.
+  id        String @id
+  projectId String
+
+  Runs Json @map("runs")
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  /// Business time of the latest applied event.
+  OccurredAt        Float  @map("occurredAt")
+  /// Event-log acceptance time. Together with lastEventId this is the cursor.
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@unique([projectId])
+}
+
+/// Rebuildable per-source pull checkpoint and operator-facing run status.
+model IngestionPullRunProjection {
+  id        String @id
+  sourceId  String @unique
+  projectId String
+
+  Enabled           Boolean @default(false) @map("enabled")
+  Cron              String? @map("cron")
+  Cursor            String? @map("cursor")
+  LastRunAt         Float?  @map("lastRunAt")
+  LastRunOutcome    String? @map("lastRunOutcome")
+  LastRunEventCount Int     @default(0) @map("lastRunEventCount")
+  LastRunError      String? @map("lastRunError")
+  LastRunErrorCode  String? @map("lastRunErrorCode")
+  ConsecutiveErrors Int     @default(0) @map("consecutiveErrors")
+
+  /// Identity of the run whose outcome this row reflects. Outcomes from a
+  /// superseded run arrive with a smaller value and are ignored, so a late
+  /// completion cannot regress Cursor or the status fields.
+  LastRunScheduledFor Float? @map("lastRunScheduledFor")
+
+  CreatedAt         Float  @map("createdAt")
+  UpdatedAt         Float  @map("updatedAt")
+  OccurredAt        Float  @map("occurredAt")
+  AcceptedAt        Float  @map("acceptedAt")
+  LastEventId       String @map("lastEventId")
+  ProjectionVersion String @map("projectionVersion")
+
+  @@index([projectId])
+}
+
 // ============================================================================
-// Langy assistant — see specs/assistant/memory-design.md §3
+// Langy assistant
 // ============================================================================
+// The Langy conversation SPINE moved off Postgres onto the event-sourcing
+// framework (ADR-046). The conversation is now a projection of an event stream:
+// its spine lives in the ClickHouse `langy_conversations` fold table and its
+// messages in `langy_messages`. The old `LangyConversation` Postgres model was
+// deleted; see migration `..._drop_langy_conversation`.
 
-model LangyConversation {
-  id              String    @id @default(cuid())
-  projectId       String
-  userId          String
-  title           String?
-  isShared        Boolean   @default(false)
-  sharedAt        DateTime?
-  sharedById      String?
-  lastActivityAt  DateTime?
-  messageCount    Int       @default(0)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+// ADR-042 Phase 1: the generic calendar-scheduling primitive. One row per
+// scheduled thing, `targetType`/`targetId` keep it consumer-agnostic (a
+// scheduled report writes `("reportTrigger", trigger.id)`; a future weekly
+// rollup writes its own type). The durable Postgres row is the SOURCE OF
+// TRUTH AND the only coordination layer — NO Redis. The in-process
+// SchedulerService loop (worker-only) reads `nextRunAt` to sleep until the
+// soonest due job, scans due rows, and atomically CLAIMS each via a
+// conditional `UPDATE ... WHERE id = <id> AND nextRunAt = <expected>` before
+// firing its registered handler. That conditional claim is the SOLE
+// exactly-once mechanism: exactly one of N racing workers wins each slot, so
+// every worker can run the loop and share firing load (no leader-lock). See
+// src/server/app-layer/scheduler/ and dev/docs/adr/044-scheduled-reports-automation-kind.md.
+model ScheduledJob {
+  id         String    @id @default(nanoid())
+  projectId  String // multitenancy + per-tenant fairness
+  targetType String // the consumer key, e.g. "reportTrigger"
+  targetId   String // what to fire, e.g. the Trigger.id
+  cron       String // e.g. "0 9 * * 1"
+  timezone   String // IANA, e.g. "America/New_York"
+  // Forward marker: the resolved UTC instant of the next fire. Indexed so
+  // the loop's due-scan and MIN(nextRunAt) sleep target are cheap.
+  nextRunAt  DateTime
+  // Last calendar instant fired (the "slot"). NULL until the first fire.
+  // Only advanced once a fire is DELIVERED, so a failed slot is retried, not
+  // silently skipped.
+  lastSlot   DateTime?
+  // The calendar instant of the slot currently in flight (claimed, retrying,
+  // or crash-recovering). Stamped by the FIRST claim of a slot and preserved
+  // across retry/lease re-claims, because `nextRunAt` mutates into a backoff
+  // or lease instant the moment a slot is worked — without this column a
+  // retried daily report would compute its window from the backoff instant
+  // (minutes) instead of the cron slot (a day). NULL when no slot is in
+  // flight (delivered / abandoned / released).
+  currentSlot DateTime?
+  // Retry bookkeeping. On claim the loop leases the slot by pushing
+  // `nextRunAt` a lease-window into the future without advancing to the next
+  // cron slot; a handler failure re-arms `nextRunAt` at a bounded backoff and
+  // bumps `attempts`, so the slot is retried instead of lost. Once `attempts`
+  // reaches the cap the slot is abandoned to the next cron instant with
+  // `lastError` kept for the operator. Reset to (0, NULL) on a delivered fire.
+  attempts   Int       @default(0)
+  lastError  String?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
 
-  // PII purge path: when a Project or User is deleted VIA THE PRISMA
-  // CLIENT, the conversation (and its messages via the LangyMessage
-  // cascade below) goes too. Postgres tables are outside the ClickHouse
-  // retention sweep, so without this the chat text would be retained
-  // indefinitely.
-  //
-  // IMPORTANT under relationMode="prisma": NO SQL FK constraint is
-  // emitted. The cascade runs at the Prisma-client layer ONLY — a raw
-  // `DELETE FROM "Project"` issued via psql or direct-SQL admin tooling
-  // will NOT cascade and will orphan chat content. For GDPR-correct
-  // purges, all Project/User deletes MUST route through the Prisma
-  // client (or a future SQL trigger we haven't built yet).
-  //
-  // The sharedBy relation uses SetNull so a shared conversation outlives
-  // the sharer's account (the recipient can still see it, attributed to
-  // no one).
-  project  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user     User           @relation("LangyConversationUser", fields: [userId], references: [id], onDelete: Cascade)
-  sharedBy User?          @relation("LangyConversationSharedBy", fields: [sharedById], references: [id], onDelete: SetNull)
-  @@index([projectId, userId, lastActivityAt])
-  @@index([projectId, isShared, updatedAt])
-  @@index([deletedAt])
-  @@index([userId])
-  @@index([sharedById])
+  // The due-scan: `WHERE active AND nextRunAt <= now` and MIN(nextRunAt).
+  @@index([active, nextRunAt])
+  // Per-project lookup.
+  @@index([projectId])
+  // One schedule per target — makes upsertForTarget / claim a clean
+  // conditional update keyed on the target identity.
+  @@unique([targetType, targetId])
 }
-

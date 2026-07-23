@@ -31,6 +31,7 @@ export function useVisibleTraceIds(): VisibleTraceIds {
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
   const page = useFilterStore((s) => s.page);
   const pageSize = useFilterStore((s) => s.pageSize);
+  const pageCursor = useFilterStore((s) => s.pageCursors[s.page]);
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const sort = useViewStore((s) => s.sort);
 
@@ -44,6 +45,7 @@ export function useVisibleTraceIds(): VisibleTraceIds {
     sort: { columnId: sort.columnId, direction: sort.direction },
     page,
     pageSize,
+    ...(page > 1 && pageCursor ? { cursor: pageCursor } : {}),
     query: queryText || undefined,
   });
 

@@ -1,0 +1,987 @@
+/*
+ * Langy's TEXTURE and MOTION layer.
+ *
+ * There is no colour in this file. Every value it composes comes from the Chakra
+ * theme — see `langyTheme.ts`, which declares the `_langy` / `_langyDark`
+ * conditions and hangs Langy's palette off the app's own semantic tokens. What
+ * lives here is the handful of things Chakra has no token for: an @font-face, a
+ * few @keyframes, and the painted textures (signal grid, wash, sheen) whose
+ * gradients are built from `var(--chakra-colors-langy-*)`.
+ *
+ * The split is the point. Colours belong to the design system, where they are
+ * typed, mergeable and shared. A masked fractal-noise overlay does not.
+ */
+
+/* Sentient — the display/heading voice, self-hosted (from the LangWatch site). */
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Extralight.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.langy-root {
+  /* The display face. Body stays on the app's sans — Sentient is for the one
+     big line on the empty state, never for chrome. */
+  --langy-font-serif:
+    "Sentient", "Charter", "Source Serif Pro", ui-serif, Georgia, serif;
+
+  /* Langy's identity gradient: the AI mark and the thinking shimmer, and
+     nothing else. Data (bars, progress) is deliberately NOT this — see
+     langyTheme.ts. Assembled here from theme tokens. */
+  --langy-ai-gradient: linear-gradient(
+    100deg,
+    var(--chakra-colors-langy-ai-blue) 0%,
+    var(--chakra-colors-langy-ai-purple) 52%,
+    var(--chakra-colors-langy-ai-orange) 100%
+  );
+
+  /* ── HDR / Display-P3 twins (task #25) ──────────────────────────────────
+     The identity gradient's stops + the bar fill, in wide gamut. These are
+     custom properties, so they hold the `color(display-p3 …)` value on every
+     browser; the invalidity only surfaces where a value is USED, which is
+     exactly where each consumer keeps an sRGB `background-image`/`stroke`
+     FIRST and layers the P3 one after it — a renderer that can't parse P3
+     drops the second declaration and keeps the first. Defining them as
+     theme-scoped vars (light here, dark below) lets the animated shimmer, the
+     glint on the composer, and the progress rail all reach the fuller blue /
+     purple / amber on an HDR screen while staying byte-for-byte the same on
+     sRGB, with no extra specificity on the rules that paint them. Light
+     stops (brand blue / purple / brand-500 orange). */
+  --langy-ai-blue-p3: color(display-p3 0.357 0.553 0.937);
+  --langy-ai-purple-p3: color(display-p3 0.659 0.333 0.969);
+  --langy-ai-orange-p3: color(display-p3 0.961 0.42 0.102);
+  --langy-bar-fill-p3: color(display-p3 0.961 0.42 0.102 / 0.75);
+  --langy-ai-gradient-p3: linear-gradient(
+    100deg,
+    var(--langy-ai-blue-p3) 0%,
+    var(--langy-ai-purple-p3) 52%,
+    var(--langy-ai-orange-p3) 100%
+  );
+}
+
+/* Dark: the brighter ink-ground twins (brand blue-400 / purple / brand-400
+   orange, and the brand-300 bar fill), matching langyTheme.ts's _langyDark. */
+.dark .langy-root,
+:root.dark .langy-root {
+  --langy-ai-blue-p3: color(display-p3 0.373 0.639 1);
+  --langy-ai-purple-p3: color(display-p3 0.659 0.333 0.969);
+  --langy-ai-orange-p3: color(display-p3 1 0.541 0.239);
+  --langy-bar-fill-p3: color(display-p3 1 0.702 0.502 / 0.7);
+}
+
+/* ── Texture: the ink ground's signal grid (dark only) ────────────────────
+   Light mode is the app's own surface and carries no texture at all, see
+   langyTheme.ts. The ink ground gets the signal grid, lifted from the
+   marketing site's `.dark-signal-grid` (72px cells, 1px lines, and a
+   `to right` mask that fades it out by 82%). It is the faint technical
+   texture under the homepage's dark sections, and it is what makes an ink
+   ground read as a wireframe rather than as a hole.
+
+   The site masks the grid on one axis only. In a 468px column that would leave
+   it running under the message text, so a second mask is intersected in: it also
+   fades out vertically before the composer. The grid ends up reading exactly
+   where it should — the empty upper-left field of the panel — and nowhere near
+   the thing you are trying to read. */
+.langy-signal-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+  opacity: 0.8;
+  background-image:
+    linear-gradient(var(--chakra-colors-langy-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--chakra-colors-langy-grid) 1px, transparent 1px);
+  background-size: 72px 72px;
+  -webkit-mask-image:
+    linear-gradient(to right, black, transparent 82%),
+    linear-gradient(to bottom, black 45%, transparent 88%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, black, transparent 82%),
+    linear-gradient(to bottom, black 45%, transparent 88%);
+  mask-composite: intersect;
+}
+
+.dark .langy-signal-grid,
+:root.dark .langy-signal-grid {
+  display: block;
+}
+
+/* The home banner borrows the grid for its INK view (LangyBannerSignalGrid).
+   The banner lives outside `.langy-root`, so the `--chakra-colors-langy-grid`
+   token never resolves there — the modifier supplies the line colour itself —
+   and it shows regardless of the app theme's `.dark` gate: the banner's tone
+   is INVERTED, so its ink ground appears in app-LIGHT mode. */
+.langy-signal-grid--banner {
+  --chakra-colors-langy-grid: rgba(255, 255, 255, 0.035);
+  display: block;
+}
+
+/* ── Composer "thinking" sheen ────────────────────────────────────────────
+   While a turn is in flight the composer grows a 1px gradient ring with a soft
+   highlight travelling along it.
+
+   An overlay sibling covers the composer card's border box, is filled with the
+   identity gradient, then MASKED down to just its 1px padding ring
+   (`mask-composite: exclude` subtracts the content box from the full box,
+   leaving the frame). Only the ring ever paints, so the moving
+   `background-position` repaints a hairline, not the card — no layout, no
+   compositing of the card's subtree, no jank. A rotating conic-gradient behind
+   the card would repaint a full card-sized layer every frame and needs
+   `@property` for the angle; this is cheaper and works everywhere.
+
+   Restraint is the point: the gradient is mostly TRANSPARENT — one soft band
+   crossing an otherwise invisible ring, once every 3.6s. A sheen, not a racing
+   stripe. */
+.langy-composer-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  padding: 1px;
+  opacity: 0.45;
+  background-image: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 34%,
+    var(--chakra-colors-langy-ai-blue) 43%,
+    var(--chakra-colors-langy-ai-purple) 50%,
+    var(--chakra-colors-langy-ai-orange) 57%,
+    transparent 66%,
+    transparent 100%
+  );
+  /* Wide-gamut twin — see the --langy-ai-*-p3 vars. Dropped whole on non-P3. */
+  background-image: linear-gradient(
+    100deg,
+    transparent 0%,
+    transparent 34%,
+    var(--langy-ai-blue-p3) 43%,
+    var(--langy-ai-purple-p3) 50%,
+    var(--langy-ai-orange-p3) 57%,
+    transparent 66%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-position: 200% 50%;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: langy-border-sheen 3.6s linear infinite;
+}
+
+/* ── Indeterminate bar (in-progress capability card) ──────────────────────
+   A travelling highlight on a 2px rail: it says "running" without claiming to
+   know how far along it is.
+
+   DATA IS NOT THE IDENTITY GRADIENT. The homepage's Langy section runs its
+   scenario bars as a `white/10` track with a `brand-300/70` fill — one warm
+   colour, no gradient, settling to moss or rust. Bars, progress and read-outs
+   speak that language; the blue→purple→orange gradient is reserved for the mark
+   and the thinking line. */
+.langy-pending-bar {
+  height: 2px;
+  border-radius: 999px;
+  background-color: var(--chakra-colors-langy-bar-track);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 30%,
+    var(--chakra-colors-langy-bar-fill) 45%,
+    var(--chakra-colors-langy-bar-fill) 55%,
+    transparent 70%,
+    transparent 100%
+  );
+  /* Wide-gamut twin — brand-300/500 amber at fuller saturation on an HDR rail. */
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 30%,
+    var(--langy-bar-fill-p3) 45%,
+    var(--langy-bar-fill-p3) 55%,
+    transparent 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-position: 200% 50%;
+  animation: langy-border-sheen 2.4s linear infinite;
+}
+
+/* ── Ambient wash ─────────────────────────────────────────────────────────
+   The site's `WarpAccent` shader, dialled down to an impression.
+
+   The homepage backs its dark sections with a WebGL mesh whose dark palette is
+   `[ink-950, #1e3a8a, #5b8def, #c97b3a, #b85240]`, anchored to the RIGHT and
+   masked so it fades out to the left, keeping the text side dark
+   (`linear-gradient(to left, black 0%, black 30%, rgba(0,0,0,0.5) 56%,
+   transparent 84%)`). We are not shipping a shader into a chat panel, so this
+   is the same recipe as static radial gradients: the same stops, the same
+   right-anchoring, the same left-fade — so the text column stays clean.
+
+   It is CONDITIONAL (see LangyPanel): present on the empty state and while a
+   turn is in flight, faded out once a conversation is under way. It lives
+   BEHIND the scroller and outside it, so it never scrolls and never repaints on
+   scroll. The user has rejected a loud wash twice; this one is deliberately at
+   the edge of perceptible.
+
+   DARK ONLY: the light panel is the app's own clean surface (see
+   langyTheme.ts), the mesh impression belongs to the ink ground it was
+   sampled from. */
+.langy-wash {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(
+      ellipse 70% 55% at 100% 22%,
+      rgba(91, 141, 239, 0.22) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 60% 45% at 100% 62%,
+      rgba(201, 123, 58, 0.18) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 92% 100%,
+      rgba(184, 82, 64, 0.14) 0%,
+      transparent 58%
+    );
+  filter: blur(50px);
+  -webkit-mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black 30%,
+    rgba(0, 0, 0, 0.5) 56%,
+    transparent 84%
+  );
+  mask-image: linear-gradient(
+    to left,
+    black 0%,
+    black 30%,
+    rgba(0, 0, 0, 0.5) 56%,
+    transparent 84%
+  );
+  animation: langy-mesh-drift 26s ease-in-out infinite;
+  background-size: 180% 180%;
+}
+.dark .langy-root .langy-wash,
+:root.dark .langy-root .langy-wash {
+  display: block;
+}
+
+/* ── Panel surface glow (dark only) ─────────────────────────
+   The ink ground on its own reads flat — a near-black rectangle behind a
+   white/10 hairline. The site's dark sections never sit flat: they carry the
+   WarpAccent mesh so the ground has a faint colour rising through it. This is
+   the same idea, static and dialled to a whisper: a soft brand glow that
+   climbs from the top of the panel — right where the mark and heading sit — so
+   the surface has depth and a hint of the identity without a moving wash.
+
+   Orange → purple, the mark's own two stops, so the glow reads as Langy rather
+   than a generic tint; plus a 3%-white top-lift so the upper third is a touch
+   brighter than the floor. Every stop is single-digit alpha — there when you
+   look for it, gone when you don't. Light mode keeps its clean paper (the user
+   likes it), so this is ink-only. It sits BEHIND the content (which stacks at
+   z-index 1) and is inert to the pointer. */
+.langy-panel-glow {
+  display: none;
+}
+.dark .langy-root .langy-panel-glow,
+:root.dark .langy-root .langy-panel-glow {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(
+      130% 46% at 50% -10%,
+      rgba(255, 179, 128, 0.09) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      100% 42% at 100% -2%,
+      rgba(168, 85, 247, 0.07) 0%,
+      transparent 60%
+    ),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 24%);
+}
+
+/* ── Motion ───────────────────────────────────────────────────────────────
+   `mesh-drift` slides an oversized gradient across a surface so a fill breathes
+   instead of sitting flat. `border-sheen` walks a highlight along a frame or a
+   rail, using the site's shimmer geometry (200%-wide, 200% → -200%). The text
+   shimmer's keyframes live with the shimmer, in langyShimmer.ts. */
+@keyframes langy-mesh-drift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes langy-border-sheen {
+  from {
+    background-position: 200% 50%;
+  }
+  to {
+    background-position: -200% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .langy-root .langy-mesh,
+  .langy-wash {
+    animation: none !important;
+  }
+  /* No travelling highlight — the ring and the rail settle into a flat, quiet
+     tint, so "working" still reads without anything moving. */
+  .langy-composer-sheen,
+  .langy-pending-bar {
+    animation: none !important;
+    background-image: var(--langy-ai-gradient);
+    /* Wide-gamut twin of the settled gradient, dropped whole on non-P3. */
+    background-image: var(--langy-ai-gradient-p3);
+    background-size: 100% 100%;
+    opacity: 0.28;
+  }
+}
+
+/* ── The "fold" wave (both layouts) ────────────────────────────────────────
+   A vertical rope splits the panel into two faint brand tones with a luminous
+   seam along the divide. The motion — driven by Langy's own activity, never
+   the cursor — lives in LangyWave.tsx, which restrokes the seam and re-clips
+   the warm layer every frame. Everything here is inert to the pointer and sits
+   BEHIND the content (z-index 0; the content column is z-index 1).
+
+   The tones reuse the SAME brand RGBs as `.langy-wash` (blue 91,141,239 →
+   orange 201,123,58 → rust 184,82,64), so the fold reads as Langy rather than a
+   generic tint. Deliberately low alpha: the message text sits straight over it
+   and must stay readable. This is a first pass — expect to tune the stops. */
+.langy-wave {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Concentrate the fold in the panel's BODY: it fades in below the header and
+     out above the composer, so the crease reads as a light-catch down the
+     middle of the panel rather than a full-height stripe running into the
+     chrome. (Split sets `display: contents` below, so this mask only shapes the
+     Fold layers — the intended target.) */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 15%,
+    #000 85%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 15%,
+    #000 85%,
+    transparent 100%
+  );
+}
+/* Fold sits behind the content. */
+.langy-wave--fold {
+  z-index: 0;
+}
+/* The narrow docked sidebar: the fold reads fully — same seam, same fibre — but
+   the broad TONE FILLS over-power the tall, near-empty column. Soften just the
+   fills here; the seam (and its fibre) keep full strength, so the fold stays
+   clearly visible, only calmer. (Dimming the whole layer instead read as "no
+   fold at all".) */
+.langy-wave--compact .langy-wave-base,
+.langy-wave--compact .langy-wave-light {
+  opacity: 0.68;
+}
+.langy-wave-base,
+.langy-wave-light {
+  position: absolute;
+  inset: 0;
+}
+/* Cool (blue) — the fold's LEFT face, in shadow. Deepens toward the crease and
+   fades to nothing at the left edge, so the tone hugs the fold rather than
+   washing the whole left half. Shows only left of the seam (the warm layer
+   clips away its right).
+
+   These DEFAULT values are tuned for the LIGHT (paper) panel, where a low alpha
+   washes out to nothing on cream — so the tones carry more colour here. The dark
+   panel overrides below dial them back down: on ink the same alpha reads far
+   louder, and dark wants the calmer whisper. */
+.langy-wave-base {
+  background-image: linear-gradient(
+    100deg,
+    transparent 6%,
+    rgba(91, 141, 239, 0.12) 34%,
+    rgba(91, 141, 239, 0.18) 50%
+  );
+}
+/* Warm (orange → rust) — the fold's RIGHT face, catching light. Brightest right
+   at the seam and fading out well before the right edge, so it reads as a crease
+   highlight, not a half-panel tint. The rAF loop clips this to the right of the
+   rope, so only the seam-hugging warm band ever paints. */
+.langy-wave-light {
+  will-change: clip-path;
+  background-image: linear-gradient(
+    100deg,
+    transparent 34%,
+    rgba(201, 123, 58, 0.2) 52%,
+    rgba(184, 82, 64, 0.12) 68%,
+    transparent 88%
+  );
+}
+/* Dark panel: the same crease tones, dialled back to a whisper on ink. */
+.dark .langy-root .langy-wave-base,
+:root.dark .langy-root .langy-wave-base {
+  background-image: linear-gradient(
+    100deg,
+    transparent 6%,
+    rgba(91, 141, 239, 0.06) 34%,
+    rgba(91, 141, 239, 0.09) 50%
+  );
+}
+.dark .langy-root .langy-wave-light,
+:root.dark .langy-root .langy-wave-light {
+  background-image: linear-gradient(
+    100deg,
+    transparent 34%,
+    rgba(201, 123, 58, 0.11) 52%,
+    rgba(184, 82, 64, 0.06) 68%,
+    transparent 88%
+  );
+}
+.langy-wave-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* No viewBox: user units are CSS px, matching the path coordinates. Overflow
+     visible so the seam's glow isn't clipped by the svg box (the panel's own
+     overflow:hidden still contains it). */
+  overflow: visible;
+  pointer-events: none;
+}
+/* The seam: a soft luminous edge catching light, with a darker drop to its left
+   so it reads as a raised fold rather than a drawn line. This is the light-panel
+   default; the dark panel gets a brighter, warmer rim below. */
+.langy-wave-seam {
+  fill: none;
+  stroke: rgba(120, 105, 150, 0.13);
+  stroke-width: 1.2;
+  filter: drop-shadow(0 0 4px rgba(255, 232, 205, 0.3))
+    drop-shadow(-5px 0 11px rgba(40, 28, 60, 0.09));
+}
+.dark .langy-root .langy-wave-seam,
+:root.dark .langy-root .langy-wave-seam {
+  stroke: rgba(255, 255, 255, 0.18);
+  filter: drop-shadow(0 0 5px rgba(255, 224, 190, 0.26))
+    drop-shadow(-7px 0 15px rgba(0, 0, 0, 0.28));
+}
+
+/* ── The fibre pulse ───────────────────────────────────────────────────────
+   The seam glitter: a second copy of the seam stroked bright and warm, showing
+   a single short dash that travels DOWN the line like light down a fibre. The
+   dash pattern + offset + opacity are all driven imperatively from LangyWave's
+   rAF loop (opacity 0 at rest); it lights only while a status label is up on the
+   conversation, in sympathy with the orange status orb. Round caps + a tight
+   glow give the pulse soft ends. Light panel: warm amber. */
+.langy-wave-fiber {
+  fill: none;
+  stroke: rgb(214, 140, 74);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  opacity: 0;
+  will-change: stroke-dashoffset, opacity;
+  filter: drop-shadow(0 0 3px rgba(255, 180, 110, 0.7));
+}
+/* Dark panel: a warmer, near-white core so the pulse reads as emitted light on
+   the ink. */
+.dark .langy-root .langy-wave-fiber,
+:root.dark .langy-root .langy-wave-fiber {
+  stroke: rgb(255, 206, 150);
+  filter: drop-shadow(0 0 4px rgba(255, 190, 120, 0.8));
+}
+/* Reduced motion: the fibre never lights. */
+@media (prefers-reduced-motion: reduce) {
+  .langy-wave-fiber {
+    display: none;
+  }
+}
+
+/* ── The mark is a MONOCHROME logo ──────────────────────────────────────────
+   The mark used to be painted in the orange→purple brand gradient, whose purple
+   end read as an off-brand "weird purple" on the panel (and which the Split
+   invert flipped to green). It now follows the surface's own foreground colour:
+   white on the ink panel, ink on paper, and always legible across the Split
+   invert. `currentColor` beats the inline `fill="url(#…)"` presentation
+   attribute, so the gradient paint server is simply left unused. */
+.langy-root .langy-mark path {
+  fill: currentColor;
+}
+
+/* ── The closed orb's proximity glow (flag-off launcher) ───────────────────
+   A soft warm field that bleeds out around the launcher orb and leans toward
+   the cursor as it approaches. `z-index: -1` tucks it behind the orb's opaque
+   body, so only the part reaching PAST the orb edge (toward the pointer) shows
+   — light spilling out, not a disc under the button. Opacity + transform are
+   driven imperatively by useLangyOrbProximity (0 at rest). Light panel: warm
+   amber; dark panel: a warm-white that screen-blends onto the page corner.
+   Retires with the orb once release_ui_langy_peek_dock_enabled ships. */
+.langy-root .langy-orb-glow {
+  position: absolute;
+  inset: -30px;
+  z-index: -1;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity, transform;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(214, 140, 74, 0.34) 0%,
+    rgba(201, 123, 58, 0.12) 48%,
+    transparent 70%
+  );
+  filter: blur(9px);
+}
+.dark .langy-root .langy-orb-glow,
+:root.dark .langy-root .langy-orb-glow {
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(255, 214, 165, 0.36) 0%,
+    rgba(255, 180, 120, 0.14) 48%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+@media (prefers-reduced-motion: reduce) {
+  .langy-root .langy-orb-glow {
+    display: none;
+  }
+}
+
+/* ── The orb click bloom (flag-off launcher) ───────────────────────────────
+   A quick warm bloom that expands and fades from the orb's centre on the click
+   that opens the panel — the "it heard you" beat. Spawned as a detached element
+   on <body> by useLangyOrbProximity (so it survives the orb unmounting) and
+   self-removes on animationend. Not under `.langy-root` — it lives on body — so
+   it carries its own theme rules. */
+.langy-orb-burst {
+  position: fixed;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1590;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(214, 140, 74, 0.5) 0%,
+    rgba(201, 123, 58, 0.26) 45%,
+    transparent 70%
+  );
+  animation: langy-orb-burst-anim 280ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.dark .langy-orb-burst,
+:root.dark .langy-orb-burst {
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(255, 214, 165, 0.5) 0%,
+    rgba(255, 180, 120, 0.24) 45%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+@keyframes langy-orb-burst-anim {
+  0% {
+    transform: translate(-50%, -50%) scale(0.65);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.9);
+    opacity: 0;
+  }
+}
+/* Reduced motion: no bloom (the hook also no-ops, this is belt-and-braces). */
+@media (prefers-reduced-motion: reduce) {
+  .langy-orb-burst {
+    display: none;
+  }
+}
+
+/* ── The minimised peek's brand seam ───────────────────────────────────────
+   Minimised, the panel slides down (floating) or right (sidebar) until only a
+   sliver of its OWN header shows — same element, same surface, just moved.
+   These rules ride on that element (`data-langy-peek` carries the phase), so
+   the seam is a property of the panel rather than of a stand-in.
+
+   The seam is a faint warm line along whichever edge is exposed, in the fold's
+   own tones, so the resting sliver reads as Langy rather than as stray chrome.
+   It brightens with the proximity rise, and BREATHES on the fold's pulse
+   period while a turn is still running underneath — the creature is minimised,
+   not gone. */
+.langy-root[data-langy-peek]::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 240ms ease;
+}
+.langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before {
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(214, 140, 74, 0.5) 30%,
+    rgba(201, 123, 58, 0.55) 70%,
+    transparent
+  );
+}
+.langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before {
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(214, 140, 74, 0.5) 30%,
+    rgba(201, 123, 58, 0.55) 70%,
+    transparent
+  );
+}
+.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before,
+:root.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 214, 165, 0.4) 30%,
+    rgba(255, 180, 120, 0.45) 70%,
+    transparent
+  );
+}
+.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before,
+:root.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before {
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(255, 214, 165, 0.4) 30%,
+    rgba(255, 180, 120, 0.45) 70%,
+    transparent
+  );
+}
+.langy-root[data-langy-peek="near"]::before {
+  opacity: 1;
+}
+
+/* ── The peeking panel's lift ───────────────────────────────────────────────
+   A hairline against a white page is not a findable edge. Resting, the sliver
+   had only the panel's ordinary shadow to separate it from the page, and that
+   shadow is tuned for a card floating in the middle of the screen — against
+   the viewport edge it read as nothing at all, so the one affordance for
+   getting Langy back was invisible unless you already knew it was there.
+
+   Depth alone would only have made it a grey edge, so the lift carries the
+   brand's warmth too: what is sitting at the bottom of the page reads as
+   Langy. Directional — the glow throws away from the edge the panel is
+   tucked against, since the other side is off-screen.
+
+   Higher specificity than Chakra's generated class, deliberately: this is the
+   peeking state overriding the panel's resting material, and it must win. */
+.langy-root[data-langy-peek] {
+  transition: box-shadow 240ms ease;
+}
+.langy-root[data-langy-peek][data-langy-peek-mode="floating"] {
+  box-shadow:
+    0 -1px 3px rgba(20, 20, 23, 0.1),
+    0 -12px 32px rgba(20, 20, 23, 0.2),
+    0 -3px 18px rgba(237, 137, 38, 0.3);
+}
+.langy-root[data-langy-peek][data-langy-peek-mode="sidebar"] {
+  box-shadow:
+    -1px 0 3px rgba(20, 20, 23, 0.1),
+    -12px 0 32px rgba(20, 20, 23, 0.2),
+    -3px 0 18px rgba(237, 137, 38, 0.3);
+}
+.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"],
+:root.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"] {
+  box-shadow:
+    0 -1px 2px rgba(0, 0, 0, 0.45),
+    0 -14px 34px rgba(0, 0, 0, 0.55),
+    0 -3px 20px rgba(237, 137, 38, 0.28);
+}
+.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"],
+:root.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"] {
+  box-shadow:
+    -1px 0 2px rgba(0, 0, 0, 0.45),
+    -14px 0 34px rgba(0, 0, 0, 0.55),
+    -3px 0 20px rgba(237, 137, 38, 0.28);
+}
+@media (prefers-reduced-motion: reduce) {
+  .langy-root[data-langy-peek] {
+    transition: none;
+  }
+}
+/* A turn is in flight under the minimised panel: the seam breathes on the
+   fold's own pulse period (WAVE_PULSE_PERIOD_S), the same clock the open
+   panel's tool pulse keeps. */
+.langy-root[data-langy-peek][data-langy-peek-working]::before {
+  animation: langy-peek-breathe 2.6s ease-in-out infinite;
+}
+@keyframes langy-peek-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .langy-root[data-langy-peek]::before {
+    transition: none;
+  }
+  .langy-root[data-langy-peek][data-langy-peek-working]::before {
+    animation: none;
+    opacity: 0.9;
+  }
+}
+
+/* ── Card accent material (asaplangy LangyCard: `ask` intent) ───────────────
+   The warm corner wash + a warm inset ring the `ask` card leans in with. Kept
+   in CSS (not a style prop) so the Display-P3 upgrade below can layer over the
+   exact same declaration. The sRGB values are byte-for-byte CARD.accentWash /
+   the panel surface's ring, so a card and the panel read as one material. */
+.langy-accent-wash {
+  background-image: radial-gradient(
+    130% 120% at 96% 0%,
+    color-mix(in srgb, var(--chakra-colors-orange-solid) 6%, transparent),
+    transparent 54%
+  );
+}
+.langy-accent-ring {
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--chakra-colors-orange-solid) 22%, transparent);
+}
+/* The panel hero leans a touch warmer than a card (30% vs 22%) — its own ring
+   so the card's calmer ring and the panel's stay independent. */
+.langy-panel-accent-ring {
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--chakra-colors-orange-solid) 30%, transparent);
+}
+
+/* ── HDR / Display-P3 accent (task #25) ─────────────────────────────────────
+   The amber accent is Langy's one warm colour. In sRGB it clips well short of
+   the amber the brand wants; on a wide-gamut screen `color(display-p3 …)` lets
+   it reach fuller. Every rule here RE-DECLARES an accent gradient/ring the file
+   already painted in sRGB above — same selector, same specificity, later in
+   source, so the P3 value wins WHEN it is supported and the sRGB fallback stands
+   untouched everywhere else. The P3 triples are the sRGB bytes carried into the
+   wider space (a gamut expansion), which is exactly the "richer accent on HDR"
+   the brief asks for. Nothing here changes layout, only the colour of a wash.
+
+   Guarded by `@supports (color: color(display-p3 1 1 1))` so a renderer that
+   cannot parse the function never sees these rules at all. */
+@supports (color: color(display-p3 1 1 1)) {
+  .langy-accent-wash {
+    background-image: radial-gradient(
+      130% 120% at 96% 0%,
+      color(display-p3 0.929 0.537 0.149 / 0.06),
+      transparent 54%
+    );
+  }
+  .langy-accent-ring {
+    box-shadow: inset 0 0 0 1px color(display-p3 0.929 0.537 0.149 / 0.24);
+  }
+  .langy-panel-accent-ring {
+    box-shadow: inset 0 0 0 1px color(display-p3 0.929 0.537 0.149 / 0.32);
+  }
+
+  /* The ambient wash: amber + rust stops (the blue stays cool, untouched). */
+  .langy-wash {
+    background-image:
+      radial-gradient(
+        ellipse 70% 55% at 100% 22%,
+        color(display-p3 0.357 0.553 0.937 / 0.22) 0%,
+        transparent 62%
+      ),
+      radial-gradient(
+        ellipse 60% 45% at 100% 62%,
+        color(display-p3 0.788 0.482 0.227 / 0.18) 0%,
+        transparent 60%
+      ),
+      radial-gradient(
+        ellipse 55% 40% at 92% 100%,
+        color(display-p3 0.722 0.322 0.251 / 0.14) 0%,
+        transparent 58%
+      );
+  }
+
+  /* The dark panel's top brand lift: the amber rises, the purple + white hold. */
+  .dark .langy-root .langy-panel-glow,
+  :root.dark .langy-root .langy-panel-glow {
+    background-image:
+      radial-gradient(
+        130% 46% at 50% -10%,
+        color(display-p3 1 0.702 0.502 / 0.09) 0%,
+        transparent 58%
+      ),
+      radial-gradient(
+        100% 42% at 100% -2%,
+        color(display-p3 0.659 0.333 0.969 / 0.07) 0%,
+        transparent 60%
+      ),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 24%);
+  }
+
+  /* The fold's warm face — the seam-hugging catch of light, light + dark panels. */
+  .langy-wave-light {
+    background-image: linear-gradient(
+      100deg,
+      transparent 34%,
+      color(display-p3 0.788 0.482 0.227 / 0.2) 52%,
+      color(display-p3 0.722 0.322 0.251 / 0.12) 68%,
+      transparent 88%
+    );
+  }
+  .dark .langy-root .langy-wave-light,
+  :root.dark .langy-root .langy-wave-light {
+    background-image: linear-gradient(
+      100deg,
+      transparent 34%,
+      color(display-p3 0.788 0.482 0.227 / 0.11) 52%,
+      color(display-p3 0.722 0.322 0.251 / 0.06) 68%,
+      transparent 88%
+    );
+  }
+
+  /* The fibre pulse: the seam glitter, warm amber on light / warm-white on ink. */
+  .langy-wave-fiber {
+    stroke: color(display-p3 0.839 0.549 0.29);
+  }
+  .dark .langy-root .langy-wave-fiber,
+  :root.dark .langy-root .langy-wave-fiber {
+    stroke: color(display-p3 1 0.808 0.588);
+  }
+
+  /* The closed orb's proximity glow — the warm field bleeding past the orb edge. */
+  .langy-root .langy-orb-glow {
+    background: radial-gradient(
+      50% 50% at 50% 50%,
+      color(display-p3 0.839 0.549 0.29 / 0.34) 0%,
+      color(display-p3 0.788 0.482 0.227 / 0.12) 48%,
+      transparent 70%
+    );
+  }
+  .dark .langy-root .langy-orb-glow,
+  :root.dark .langy-root .langy-orb-glow {
+    background: radial-gradient(
+      50% 50% at 50% 50%,
+      color(display-p3 1 0.839 0.647 / 0.36) 0%,
+      color(display-p3 1 0.706 0.471 / 0.14) 48%,
+      transparent 70%
+    );
+  }
+
+  /* The orb click bloom — the "it heard you" beat. */
+  .langy-orb-burst {
+    background: radial-gradient(
+      50% 50% at 50% 50%,
+      color(display-p3 0.839 0.549 0.29 / 0.5) 0%,
+      color(display-p3 0.788 0.482 0.227 / 0.26) 45%,
+      transparent 70%
+    );
+  }
+  .dark .langy-orb-burst,
+  :root.dark .langy-orb-burst {
+    background: radial-gradient(
+      50% 50% at 50% 50%,
+      color(display-p3 1 0.839 0.647 / 0.5) 0%,
+      color(display-p3 1 0.706 0.471 / 0.24) 45%,
+      transparent 70%
+    );
+  }
+
+  /* The minimised peek's brand seam — the fold's warm tones on wide gamuts. */
+  .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color(display-p3 0.839 0.549 0.29 / 0.5) 30%,
+      color(display-p3 0.788 0.482 0.227 / 0.55) 70%,
+      transparent
+    );
+  }
+  .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before {
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color(display-p3 0.839 0.549 0.29 / 0.5) 30%,
+      color(display-p3 0.788 0.482 0.227 / 0.55) 70%,
+      transparent
+    );
+  }
+  .dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before,
+  :root.dark .langy-root[data-langy-peek][data-langy-peek-mode="floating"]::before {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color(display-p3 1 0.839 0.647 / 0.4) 30%,
+      color(display-p3 1 0.706 0.471 / 0.45) 70%,
+      transparent
+    );
+  }
+  .dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before,
+  :root.dark .langy-root[data-langy-peek][data-langy-peek-mode="sidebar"]::before {
+    background: linear-gradient(
+      180deg,
+      transparent,
+      color(display-p3 1 0.839 0.647 / 0.4) 30%,
+      color(display-p3 1 0.706 0.471 / 0.45) 70%,
+      transparent
+    );
+  }
+}

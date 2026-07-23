@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Search, BookOpen } from "lucide-react";
+import { Search, BookOpen, Sparkles } from "lucide-react";
 import type { ListItem } from "../getIconInfo";
 import type { Command, RecentItem, SearchResult } from "../types";
 import type { FilteredCommands } from "./useFilteredCommands";
@@ -23,14 +23,37 @@ export function useCommandBarItems(
   idResult: SearchResult | null,
   groupedItems: GroupedRecentItems,
   projectSlug: string | undefined,
+  langyEnabled: boolean,
 ): {
   allItems: ListItem[];
   recentItemsLimited: RecentItem[];
   searchInTracesItem: ListItem | null;
   searchInDocsItem: ListItem | null;
   easterEggItem: ListItem | null;
+  askLangyItem: ListItem | null;
 } {
   const availableTopLevelNav = topLevelNavigationCommands;
+
+  // The "Ask Langy" activation — the command bar's door into Langy. Synthesized
+  // (not a static registry command) so it can carry the live query and only
+  // appears where Langy can actually open: a real project, and the user in the
+  // rollout (langyEnabled mirrors useShowLangy). Selecting it flips the bar into
+  // AI mode rather than navigating — see CommandBar.handleSelect.
+  const askLangyItem = useMemo<ListItem | null>(() => {
+    if (!langyEnabled || !projectSlug) return null;
+    const trimmed = query.trim();
+    return {
+      type: "command",
+      data: {
+        id: "action-ask-langy",
+        label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
+        description: "Hand this question to Langy",
+        icon: Sparkles,
+        category: "actions",
+        keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],
+      } as Command,
+    };
+  }, [langyEnabled, projectSlug, query]);
 
   // Get top recent items across all time groups
   const recentItemsLimited = useMemo(() => {
@@ -59,7 +82,7 @@ export function useCommandBarItems(
         label: `Search "${query.trim()}" in traces`,
         icon: Search,
         category: "navigation",
-        path: `/${projectSlug}/messages?query=${encodeURIComponent(query.trim())}`,
+        path: `/${projectSlug}/traces#all-traces?q=${encodeURIComponent(query.trim())}`,
       } as Command,
     };
   }, [query, projectSlug]);
@@ -101,6 +124,12 @@ export function useCommandBarItems(
     const items: ListItem[] = [];
 
     if (query === "") {
+      // On an empty bar Ask Langy LEADS — nothing competes for index 0, so
+      // "Cmd+K, Enter" is the fast path into the assistant.
+      if (askLangyItem) {
+        items.push(askLangyItem);
+      }
+
       // Add up to 5 recent items first
       for (const item of recentItemsLimited) {
         items.push({ type: "recent", data: item });
@@ -140,11 +169,23 @@ export function useCommandBarItems(
       for (const proj of filteredProjects) {
         items.push({ type: "project", data: proj });
       }
-      // Add "Search in traces" at the end
+      // Ask Langy sits under the real MATCHES and above the FALLBACKS.
+      //
+      // It used to trail everything, which sounds like the same rule but is
+      // not: "Search for X in traces" and "in docs" are offered for literally
+      // any string, so they are not matches at all — they are the two things
+      // we can always say. Ranking them above Langy meant typing a plain
+      // question and pressing Enter ran a substring search for that question,
+      // which is never what someone typing a question meant.
+      //
+      // Below genuine matches, though. A typed page name, a pasted id or a
+      // project still owns index 0, so Enter navigates the way it always did.
+      if (askLangyItem) {
+        items.push(askLangyItem);
+      }
       if (searchInTracesItem) {
         items.push(searchInTracesItem);
       }
-      // Add "Search in docs" after "Search in traces"
       if (searchInDocsItem) {
         items.push(searchInDocsItem);
       }
@@ -155,6 +196,7 @@ export function useCommandBarItems(
     query,
     recentItemsLimited,
     availableTopLevelNav,
+    askLangyItem,
     easterEggItem,
     idResult,
     filteredCommands,
@@ -170,5 +212,6 @@ export function useCommandBarItems(
     searchInTracesItem,
     searchInDocsItem,
     easterEggItem,
+    askLangyItem,
   };
 }

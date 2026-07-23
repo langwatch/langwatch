@@ -29,8 +29,11 @@ function parseEntityUrl(path: string, projectSlug: string): EntityMatch | null {
 
   const relativePath = cleanPath.slice(prefix.length);
 
-  // Trace page: /[project]/messages/[traceId]
-  const traceMatch = relativePath.match(/^\/messages\/([^/]+)$/);
+  // Trace deep link: /[project]/traces/[traceId] (current) or the legacy
+  // /[project]/messages/[traceId]
+  const traceMatch =
+    relativePath.match(/^\/traces\/([^/]+)$/) ??
+    relativePath.match(/^\/messages\/([^/]+)$/);
   if (traceMatch) {
     return {
       type: "trace",
@@ -128,8 +131,10 @@ function parseDrawerEntity(
       }
     }
 
-    // Evaluator viewer drawer
-    if (drawerOpen === "evaluatorViewer") {
+    // Evaluator editor drawer — the id that actually exists in drawerRegistry.
+    // (`evaluatorViewer` was a phantom id: no drawer answered to it, so links
+    // carrying it opened nothing and this branch never matched a real visit.)
+    if (drawerOpen === "evaluatorEditor") {
       const evaluatorId = url.searchParams.get("drawer.evaluatorId");
       if (evaluatorId) {
         return {

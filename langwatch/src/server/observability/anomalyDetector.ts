@@ -1,4 +1,4 @@
-import { createLogger } from "../../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../featureFlag/types";
 import type { Anomaly } from "./anomalyState";
@@ -30,7 +30,7 @@ const logger = createLogger("langwatch:observability:anomalyDetector");
  *
  * Cost-shape: the 7-day baseline is cached for 1h in Redis. Tick-time
  * cost for a stable tenant is one HGET; only on cold/stale cache do we
- * do the 10080-field HMGET to recompute p95. At 1000s of tenants this
+ * do the full-series HGETALL to recompute p95. At 1000s of tenants this
  * keeps the worker comfortably under the Redis ops budget.
  *
  * Kill switch: per-tenant PostHog flag (see
@@ -45,6 +45,15 @@ export const SURFACE_TIER_SUSTAIN_MINUTES = 5;
 export const HARD_TIER_SUSTAIN_MINUTES = 15;
 export const BASELINE_LOOKBACK_SECONDS = 7 * 24 * 60 * 60; // 7 days
 export const MIN_BASELINE_RATE = 5; // skip tenants with <5/min baseline (signal too noisy)
+/**
+ * How long the "not enough data for a baseline yet" verdict is cached.
+ * Deliberately much shorter than the 1h baseline TTL — a ramping tenant
+ * should get its first baseline within minutes of crossing the activity
+ * threshold — but long enough that the fleet's quiet tenants don't re-read
+ * their full minute series every 1-minute tick, which is what pinned prod
+ * Redis engine CPU before this cache existed (2026-07-09).
+ */
+export const INSUFFICIENT_DATA_RECHECK_SECONDS = 10 * 60;
 
 export interface AnomalyDetectorDeps {
   rateTracker: TenantRateTracker;
@@ -201,7 +210,7 @@ export class AnomalyDetector {
 
   /**
    * Return the p95 baseline for a tenant. Uses the 1h Redis cache when
-   * fresh; on cache miss does a single 10080-field HMGET, computes the
+   * fresh; on cache miss does a single full-series HGETALL, computes the
    * p95, persists it back, and returns it.
    *
    * Returns null when:
@@ -217,7 +226,7 @@ export class AnomalyDetector {
     const cached = await this.deps.rateTracker.getCachedBaseline(tenantId);
     if (cached !== null) {
       // Cached value below the floor still tells us "do not evaluate" —
-      // no need to re-scan 10080 fields just to confirm.
+      // no need to re-read the full series just to confirm.
       return cached < MIN_BASELINE_RATE ? null : cached;
     }
 
@@ -231,16 +240,23 @@ export class AnomalyDetector {
     // skip tenants who haven't actually produced traffic.
     const nonZero = series.filter((v) => v > 0);
     if (nonZero.length < 60) {
-      // Less than 1h of actual activity — baseline would be noise. Skip,
-      // but DON'T cache: we want to re-check soon, not pin "no data"
-      // for an hour.
+      // Less than 1h of actual activity — baseline would be noise. Cache the
+      // verdict briefly (0 reads back as below-floor = "do not evaluate"):
+      // long enough that a fleet of quiet tenants doesn't re-read its full
+      // minute series every 1-minute tick, short enough that a ramping
+      // tenant gets its first baseline within minutes.
+      await this.deps.rateTracker.setCachedBaseline({
+        tenantId,
+        baseline: 0,
+        ttlSeconds: INSUFFICIENT_DATA_RECHECK_SECONDS,
+      });
       return null;
     }
 
     const baseline = percentile({ values: nonZero, p: 95 });
     // Cache whatever we compute (including below-floor values) so the
-    // "too-quiet" tenants don't keep paying the HMGET cost every tick.
-    await this.deps.rateTracker.setCachedBaseline(tenantId, baseline);
+    // "too-quiet" tenants don't keep paying the series-read cost every tick.
+    await this.deps.rateTracker.setCachedBaseline({ tenantId, baseline });
     return baseline < MIN_BASELINE_RATE ? null : baseline;
   }
 }

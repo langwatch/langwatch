@@ -3,7 +3,6 @@ import { z } from "zod";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
 import { type FilterField, filterFieldsEnum } from "../filters/types";
-import type { TimeseriesInputType } from "./registry";
 
 export type AnalyticsMetric = {
   label: string;
@@ -173,10 +172,15 @@ export interface FeedbacksResult {
 }
 
 /**
- * Analytics backend interface for dependency injection
+ * Analytics backend interface for dependency injection. Covers the legacy
+ * non-timeseries reads (filter options, feedbacks, top documents).
+ * Timeseries reads are owned end-to-end by the app-layer service
+ * (`~/server/app-layer/analytics`) — routing, query building, and the
+ * shared row parser — so this interface deliberately has no
+ * `getTimeseries`: a second implementation would be a place for bucket
+ * semantics to drift.
  */
 export interface AnalyticsBackend {
-  getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult>;
   getDataForFilter(
     projectId: string,
     field: FilterField,

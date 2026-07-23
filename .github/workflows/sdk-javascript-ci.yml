@@ -18,7 +18,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  LANGWATCH_API_KEY: sk-lw-1234567890
   LANGWATCH_ENDPOINT: http://localhost:5560
 
 jobs:
@@ -60,7 +59,7 @@ jobs:
           install-dir: typescript-sdk
 
       - name: Install TypeScript Native Preview
-        run: pnpm install -D @typescript/native-preview
+        run: pnpm install -D -w @typescript/native-preview
 
       - name: Run lint check
         run: pnpm run lint
@@ -108,7 +107,7 @@ jobs:
 
     services:
       clickhouse:
-        image: clickhouse/clickhouse-server:latest
+        image: clickhouse/clickhouse-server:25.10.2.65
         ports:
           - 8123:8123
         env:
@@ -199,6 +198,10 @@ jobs:
 
       - name: Seed test project
         working-directory: langwatch
+        env:
+          # Seed the credential the SDK test process receives without putting
+          # LANGWATCH_API_KEY on the platform process itself.
+          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-1234567890
         run: pnpm prisma:seed
 
       - name: Install goose
@@ -220,6 +223,11 @@ jobs:
 
       - name: Start LangWatch server and worker
         working-directory: langwatch
+        env:
+          # The workflow-global LANGWATCH_API_KEY is for the SDK under test.
+          # Platform processes refuse to boot with it set (the self-referencing
+          # ingest guard in langwatchPlatformGuard.ts), so blank it here.
+          LANGWATCH_API_KEY: ""
         run: |
           NODE_ENV=production pnpm run start &
           # Start the worker process so the event-sourcing pipeline
@@ -245,6 +253,7 @@ jobs:
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
         env:
+          LANGWATCH_API_KEY: sk-lw-1234567890
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           E2E_TIMEOUT: 120000
           E2E_POLL_TIMEOUT: 120000

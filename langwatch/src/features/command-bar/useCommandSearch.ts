@@ -11,7 +11,6 @@ import {
   isSpanId,
   traceIcon,
 } from "./entityRegistry";
-import { getTracesV2Preferred } from "~/features/traces-v2/hooks/useTracesV2Preference";
 
 /**
  * Detect if the query is an entity ID and return navigation info.
@@ -45,16 +44,12 @@ export function detectEntityId({
   }
 
   if (isTraceId(trimmedQuery)) {
-    const prefersV2 = getTracesV2Preferred();
-    const path = prefersV2
-      ? `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${trimmedQuery}`
-      : `/${projectSlug}/messages?drawer.open=traceDetails&drawer.traceId=${trimmedQuery}`;
     return {
       id: `trace-${trimmedQuery}`,
       label: "Open trace",
       description: trimmedQuery,
       icon: traceIcon,
-      path,
+      path: `/${projectSlug}/traces?drawer.open=traceV2Details&drawer.traceId=${trimmedQuery}`,
       type: "trace",
     };
   }
@@ -198,7 +193,7 @@ export function useCommandSearch(query: string, isOpen: boolean) {
           label: e.name,
           description: "Evaluator",
           icon: Percent,
-          path: `/${projectSlug}/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=${e.id}`,
+          path: `/${projectSlug}/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${e.id}`,
           type: "evaluator",
         });
       });

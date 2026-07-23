@@ -33,7 +33,6 @@ export function Conversation({
     {
       projectId: project?.id ?? "",
       threadId: threadId ?? "",
-      traceId: traceId ?? "",
     },
     {
       enabled: !!project && !!threadId,

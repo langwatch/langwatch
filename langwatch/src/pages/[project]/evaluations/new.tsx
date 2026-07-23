@@ -1,9 +1,9 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Redirect page for /[project]/evaluations/new
- * Opens the evaluatorCategorySelector drawer on the evaluations page.
+ * Opens the evaluator category selector from the online evaluations page.
  */
 export default function NewEvaluationRedirect() {
   const router = useRouter();
@@ -13,7 +13,7 @@ export default function NewEvaluationRedirect() {
     if (!projectSlug || !router.isReady) return;
 
     void router.replace(
-      `/${projectSlug}/evaluations?drawer.open=evaluatorCategorySelector`,
+      `/${projectSlug}/online-evaluations?drawer.open=evaluatorCategorySelector`,
     );
   }, [projectSlug, router, router.isReady]);
 

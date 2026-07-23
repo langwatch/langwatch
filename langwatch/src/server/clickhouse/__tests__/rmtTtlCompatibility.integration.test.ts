@@ -82,6 +82,9 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
         },
       ],
       format: "JSONEachRow",
+      // JS Dates serialize to ISO-with-Z; basic date_time_input_format
+      // (the default on the pinned 25.10 server) rejects the Z suffix.
+      clickhouse_settings: { date_time_input_format: "best_effort" },
     });
 
     await client.command({
@@ -91,6 +94,9 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
     const result = await client.query({
       query: `SELECT TraceId, _retention_days, Data FROM ${database}.${TEST_TABLE} ORDER BY TraceId`,
       format: "JSONEachRow",
+      // JS Dates serialize to ISO-with-Z; basic date_time_input_format
+      // (the default on the pinned 25.10 server) rejects the Z suffix.
+      clickhouse_settings: { date_time_input_format: "best_effort" },
     });
 
     const rows = await result.json<{
@@ -168,6 +174,9 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
         },
       ],
       format: "JSONEachRow",
+      // JS Dates serialize to ISO-with-Z; basic date_time_input_format
+      // (the default on the pinned 25.10 server) rejects the Z suffix.
+      clickhouse_settings: { date_time_input_format: "best_effort" },
     });
 
     await client.command({
@@ -177,6 +186,9 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
     const result = await client.query({
       query: `SELECT TenantId, TraceId FROM ${database}.${TEST_TABLE} WHERE TraceId IN ('short-retention', 'long-retention')`,
       format: "JSONEachRow",
+      // JS Dates serialize to ISO-with-Z; basic date_time_input_format
+      // (the default on the pinned 25.10 server) rejects the Z suffix.
+      clickhouse_settings: { date_time_input_format: "best_effort" },
     });
 
     const rows = await result.json<{ TenantId: string; TraceId: string }>();

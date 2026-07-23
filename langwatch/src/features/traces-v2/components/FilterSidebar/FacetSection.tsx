@@ -14,11 +14,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useFacetLensStore } from "../../stores/facetLensStore";
 import { dedupeByValue } from "../../utils/dedupeByValue";
-import {
-  AUTO_EXPAND_THRESHOLD,
-  MAX_EXPANDED_FACETS,
-  MAX_VISIBLE_FACETS,
-} from "./constants";
+import { MAX_EXPANDED_FACETS, MAX_VISIBLE_FACETS } from "./constants";
 import { FacetRow } from "./FacetRow";
 import { NoneFacetRow } from "./NoneFacetRow";
 import { SidebarSection } from "./SidebarSection";
@@ -306,8 +302,12 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     ? { activeItems, facetWindow, maxCount }
     : (frozenLayout ?? { activeItems, facetWindow, maxCount });
 
-  const smartDefaultOpen =
-    items.length <= AUTO_EXPAND_THRESHOLD || activeCount > 0;
+  // Collapsed by default so the sidebar reads as a clean, scannable list of
+  // facet titles rather than a wall of values. The only exception is a facet
+  // that already has an active selection — that one opens so the applied
+  // filter is visible at a glance. A user's explicit open/close (lensOverride)
+  // always wins. See specs/traces-v2/filter-bar-interactions.feature.
+  const smartDefaultOpen = activeCount > 0;
   const effectiveOpen = lensOverride ?? smartDefaultOpen;
 
   return (

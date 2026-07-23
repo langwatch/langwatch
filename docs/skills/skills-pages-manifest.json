@@ -1,0 +1,122 @@
+{
+  "directory.mdx": {
+    "core": [
+      {
+        "title": "Instrument my code with LangWatch",
+        "skill": "langwatch/skills/tracing",
+        "slashCommand": "/tracing",
+        "promptFile": "tracing.docs.txt"
+      },
+      {
+        "title": "Run experiments for my agent",
+        "skill": "langwatch/skills/experiments",
+        "slashCommand": "/experiments",
+        "promptFile": "experiments.docs.txt"
+      },
+      {
+        "title": "Set up online evaluations and guardrails",
+        "skill": "langwatch/skills/online-evaluations",
+        "slashCommand": "/online-evaluations",
+        "promptFile": "online-evaluations.docs.txt"
+      },
+      {
+        "title": "Choose the right evaluation workflow",
+        "skill": "langwatch/skills/evaluations",
+        "slashCommand": "/evaluations",
+        "promptFile": "evaluations.docs.txt"
+      },
+      {
+        "title": "Add scenario tests for my agent",
+        "skill": "langwatch/skills/scenarios",
+        "slashCommand": "/scenarios",
+        "promptFile": "scenarios.docs.txt"
+      },
+      {
+        "title": "Version my prompts with LangWatch",
+        "skill": "langwatch/skills/prompts",
+        "slashCommand": "/prompts",
+        "promptFile": "prompts.docs.txt"
+      },
+      {
+        "title": "Generate a realistic evaluation dataset",
+        "skill": "langwatch/skills/datasets",
+        "slashCommand": "/datasets",
+        "promptFile": "datasets.docs.txt"
+      },
+      {
+        "boldPrefix": "⭐ All of the above:",
+        "title": "Take my agent to the next level",
+        "skill": "langwatch/skills/level-up",
+        "slashCommand": "/level-up",
+        "promptFile": "level-up.docs.txt"
+      }
+    ],
+    "recipes": [
+      {
+        "boldPrefix": "⭐",
+        "title": "What should I do next to improve my agent?",
+        "skill": "langwatch/skills/agent-improve",
+        "slashCommand": "/agent-improve",
+        "promptFile": "agent-improve.docs.txt"
+      },
+      {
+        "title": "How is my agent performing?",
+        "skill": "langwatch/skills/agent-performance",
+        "slashCommand": "/agent-performance",
+        "promptFile": "agent-performance.docs.txt"
+      },
+      {
+        "title": "Where can I improve our agent development best practices?",
+        "skill": "langwatch/skills/recipes/agent-best-practices",
+        "slashCommand": "/agent-best-practices",
+        "promptFile": "recipes-agent-best-practices.docs.txt"
+      },
+      {
+        "title": "Debug and improve my agent instrumentation",
+        "skill": "langwatch/skills/recipes/debug-instrumentation",
+        "slashCommand": "/debug-instrumentation",
+        "promptFile": "recipes-debug-instrumentation.docs.txt"
+      },
+      {
+        "title": "Evaluate my multimodal agent",
+        "skill": "langwatch/skills/recipes/evaluate-multimodal",
+        "slashCommand": "/evaluate-multimodal",
+        "promptFile": "recipes-evaluate-multimodal.docs.txt"
+      },
+      {
+        "title": "Generate an evaluation dataset from my RAG knowledge base",
+        "skill": "langwatch/skills/recipes/generate-rag-dataset",
+        "slashCommand": "/generate-rag-dataset",
+        "promptFile": "recipes-generate-rag-dataset.docs.txt"
+      },
+      {
+        "title": "Check my agent doesn't give prescriptive advice",
+        "skill": "langwatch/skills/recipes/test-compliance",
+        "slashCommand": "/test-compliance",
+        "promptFile": "recipes-test-compliance.docs.txt"
+      },
+      {
+        "title": "Test my CLI is well usable by AI agents",
+        "skill": "langwatch/skills/recipes/test-cli-usability",
+        "slashCommand": "/test-cli-usability",
+        "promptFile": "recipes-test-cli-usability.docs.txt"
+      }
+    ]
+  },
+  "pms-and-domain-experts.mdx": {
+    "platform": [
+      {
+        "title": "How is my agent performing?",
+        "promptFile": "agent-performance.platform.txt"
+      },
+      {
+        "title": "Create scenario tests for my agent",
+        "promptFile": "scenarios.platform.txt"
+      },
+      {
+        "title": "Set up evaluators for my agent",
+        "promptFile": "evaluations.platform.txt"
+      }
+    ]
+  }
+}

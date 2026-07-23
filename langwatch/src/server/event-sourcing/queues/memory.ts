@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
-import { createLogger } from "../../../utils/logger/server";
 import type {
 	DeduplicationConfig,
 	EventSourcedQueueDefinition,
@@ -53,7 +53,6 @@ export class EventSourcedQueueProcessorMemory<
     QueuedJob<Payload>
   >();
   private activeCount = 0;
-  private shutdownRequested = false;
 
   constructor(definition: EventSourcedQueueDefinition<Payload>) {
     const { name, process, spanAttributes, deduplication, delay, options } =
@@ -261,8 +260,6 @@ export class EventSourcedQueueProcessorMemory<
       { queueName: this.queueName },
       "Closing memory queue processor",
     );
-
-    this.shutdownRequested = true;
 
     // Wait for active jobs to complete (simple polling since we don't track promises)
     while (this.activeCount > 0) {

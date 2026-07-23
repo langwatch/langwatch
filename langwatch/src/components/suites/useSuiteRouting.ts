@@ -33,6 +33,58 @@ export function toExternalSetSelection(scenarioSetId: string): string {
   return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
 }
 
+/**
+ * The URL a simulations path should be sent to instead of rendered, or null to
+ * render it as it stands.
+ *
+ * Everything under /simulations that is not a known shape is read as an
+ * external SET slug, so a near-miss URL does not fail — it quietly renders the
+ * run history for a set that does not exist, which reads as "your thing isn't
+ * here". `/simulations/scenarios/<id>` is the near-miss that matters: the
+ * scenario library is a real page one segment away, and a link built by hand
+ * (or by an agent) lands on it constantly. Send those to the library with the
+ * scenario open rather than to an empty set.
+ *
+ * Pure and exported so the redirect rules are testable without a router.
+ */
+export function resolveSimulationsRedirect({
+  projectSlug,
+  segments,
+  query,
+}: {
+  projectSlug: string;
+  segments: string[];
+  query: Record<string, unknown>;
+}): string | null {
+  const base = `/${projectSlug}/simulations`;
+  const [first, second, third] = segments;
+
+  // The scenario LIBRARY, not a simulation set. `/simulations/scenarios` itself
+  // is a route of its own, so only the near-misses reach here.
+  if (first === "scenarios" || first === "scenario") {
+    return second
+      ? `${base}/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${encodeURIComponent(second)}`
+      : `${base}/scenarios`;
+  }
+
+  if (first === "suites") {
+    const suite = query.suite;
+    const externalSet = query.externalSet;
+    if (typeof suite === "string" && suite) return `${base}/run-plans/${suite}`;
+    if (typeof externalSet === "string" && externalSet) {
+      return `${base}/${externalSet}`;
+    }
+    return base;
+  }
+
+  // /setId/batchId/scenarioRunId → the set + batch, with the run's drawer open.
+  if (segments.length === 3 && first !== "run-plans") {
+    return `${base}/${first}/${second}?openRun=${third}`;
+  }
+
+  return null;
+}
+
 type SuiteRouting = {
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   navigateToSuite: (slug: string | typeof ALL_RUNS_ID) => void;

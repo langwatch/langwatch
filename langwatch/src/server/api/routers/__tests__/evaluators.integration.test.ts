@@ -22,6 +22,8 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 
 describe("Evaluators Endpoints", () => {
   const projectId = "test-project-id";
+  const scorerWorkflowId = "workflow_scorer_123";
+  const uniqueWorkflowId = "workflow_unique_test_456";
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   beforeAll(async () => {
@@ -30,6 +32,19 @@ describe("Evaluators Endpoints", () => {
     await prisma.evaluator.deleteMany({
       where: { projectId },
     });
+    for (const id of [scorerWorkflowId, uniqueWorkflowId]) {
+      await prisma.workflow.upsert({
+        where: { id },
+        create: {
+          id,
+          projectId,
+          name: id,
+          icon: "",
+          description: "",
+        },
+        update: { projectId, archivedAt: null },
+      });
+    }
 
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
@@ -64,6 +79,7 @@ describe("Evaluators Endpoints", () => {
       expect(result.archivedAt).toBeNull();
     });
 
+    /** @scenario "Generate slug from evaluator name on creation" */
     it("auto-generates slug from evaluator name", async () => {
       const result = await caller.evaluators.create({
         projectId,
@@ -76,6 +92,7 @@ describe("Evaluators Endpoints", () => {
       expect(result.slug).toMatch(/^my-custom-evaluator-[a-zA-Z0-9_-]{5}$/);
     });
 
+    /** @scenario "Slug uniqueness within project" */
     it("generates unique slugs for evaluators with same name", async () => {
       const result1 = await caller.evaluators.create({
         projectId,
@@ -103,10 +120,10 @@ describe("Evaluators Endpoints", () => {
         name: "Answer Correctness",
         type: "evaluator",
         config: {
-          evaluatorType: "langevals/llm_judge",
+          evaluatorType: "langevals/llm_boolean",
           settings: {
-            model: "openai/gpt-4o",
-            criteria: "Is the answer correct?",
+            model: "openai/gpt-5-mini",
+            prompt: "Is the answer correct?",
           },
         },
       });
@@ -122,15 +139,15 @@ describe("Evaluators Endpoints", () => {
         name: "Custom Scorer",
         type: "workflow",
         config: {},
-        workflowId: "workflow_scorer_123",
+        workflowId: scorerWorkflowId,
       });
 
       expect(result.type).toBe("workflow");
-      expect(result.workflowId).toBe("workflow_scorer_123");
+      expect(result.workflowId).toBe(scorerWorkflowId);
     });
 
     it("prevents creating duplicate evaluators for the same workflow", async () => {
-      const workflowId = "workflow_unique_test_456";
+      const workflowId = uniqueWorkflowId;
 
       // Create first evaluator for this workflow
       await caller.evaluators.create({

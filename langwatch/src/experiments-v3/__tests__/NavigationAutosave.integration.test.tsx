@@ -192,6 +192,7 @@ describe("Navigation and autosave interaction", () => {
               id: "my-target",
               type: "prompt",
               promptId: "prompt-123",
+              mappings: {},
             },
           ],
         },
@@ -300,8 +301,8 @@ describe("Navigation and autosave interaction", () => {
           activeDatasetId: null,
           evaluators: [],
           targets: [
-            { id: "target-1", type: "prompt" },
-            { id: "target-2", type: "agent" },
+            { id: "target-1", type: "prompt", mappings: {} },
+            { id: "target-2", type: "agent", mappings: {} },
           ],
         },
       };
@@ -408,7 +409,7 @@ describe("Navigation and autosave interaction", () => {
           datasets: [],
           activeDatasetId: null,
           evaluators: [],
-          targets: [{ id: "t1", type: "prompt" }],
+          targets: [{ id: "t1", type: "prompt", mappings: {} }],
         },
       };
 
@@ -473,7 +474,7 @@ describe("Navigation and autosave interaction", () => {
           datasets: [],
           activeDatasetId: null,
           evaluators: [],
-          targets: [{ id: "t1", type: "prompt" }],
+          targets: [{ id: "t1", type: "prompt", mappings: {} }],
         },
       };
 
@@ -576,7 +577,7 @@ describe("Navigation and autosave interaction", () => {
           datasets: [],
           activeDatasetId: null,
           evaluators: [],
-          targets: [{ id: "b-target", type: "prompt" }],
+          targets: [{ id: "b-target", type: "prompt", mappings: {} }],
         },
       };
 

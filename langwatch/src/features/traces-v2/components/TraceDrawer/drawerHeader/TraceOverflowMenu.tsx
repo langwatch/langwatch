@@ -1,9 +1,7 @@
 import { Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
-import posthog from "posthog-js";
 import { useCallback } from "react";
 import {
-  LuArrowLeft,
   LuBraces,
   LuCopy,
   LuDatabase,
@@ -17,14 +15,12 @@ import {
   LuScanSearch,
   LuShare2,
 } from "react-icons/lu";
-import { resetTracesV2PromoSnooze } from "~/components/messages/NewTracesPromo";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useConversationTurns } from "../../../hooks/useConversationTurns";
-import { setTracesV2Preferred } from "../../../hooks/useTracesV2Preference";
 
 interface TraceOverflowMenuProps {
   traceId: string;
@@ -34,6 +30,8 @@ interface TraceOverflowMenuProps {
   dejaViewHref: string | null;
   onOpenRawJson: () => void;
   onShowShortcuts: () => void;
+  /** Opens the share dialog. Rendered by the header so the menu returns no JSX. */
+  onShare: () => void;
   /** Current dock state. When true the drawer stays open on outside clicks. */
   pinned: boolean;
   onTogglePinned: () => void;
@@ -53,11 +51,13 @@ export function TraceOverflowMenu({
   dejaViewHref,
   onOpenRawJson,
   onShowShortcuts,
+  onShare,
   pinned,
   onTogglePinned,
 }: TraceOverflowMenuProps) {
   const { openDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const canShare = hasPermission("traces:share");
 
   const utils = api.useUtils();
   const pinQuery = api.pinnedTrace.getPin.useQuery(
@@ -129,30 +129,6 @@ export function TraceOverflowMenu({
     window.open(dejaViewHref, "_blank", "noopener,noreferrer");
   }, [dejaViewHref]);
 
-  const handleSwitchBackToV1 = useCallback(() => {
-    setTracesV2Preferred(false);
-    // Operator just opted out — clear the "Try the new one" snooze
-    // so the next legacy-drawer open re-surfaces the promo. Without
-    // this, the banner stays hidden for the full 7-day snooze window
-    // that the original opt-in click set.
-    resetTracesV2PromoSnooze();
-    posthog.capture("traces_v2_opt_out", {
-      surface: "drawer_overflow_menu",
-      traceId,
-    });
-    // Hard-nav to /messages where the v1 traceDetails drawer is
-    // registered. Previously this rewrote params on the current URL
-    // (/traces), but the v2 hydrator ignores traceDetails — so the
-    // drawer never opened.
-    if (typeof window !== "undefined" && project?.slug) {
-      const params = new URLSearchParams();
-      params.set("drawer.open", "traceDetails");
-      params.set("drawer.traceId", traceId);
-      params.set("drawer.selectedTab", "traceDetails");
-      window.location.href = `/${project.slug}/messages?${params.toString()}`;
-    }
-  }, [traceId, project?.slug]);
-
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
       <Menu.Trigger asChild>
@@ -218,13 +194,14 @@ export function TraceOverflowMenu({
           </Menu.Item>
         )}
 
-        <Menu.Item value="share" disabled>
-          <HStack gap={2} opacity={0.5}>
-            <Icon as={LuShare2} boxSize={3.5} />
-            <Text>Share</Text>
-          </HStack>
-          <Menu.ItemCommand>soon</Menu.ItemCommand>
-        </Menu.Item>
+        {canShare && (
+          <Menu.Item value="share" onClick={onShare}>
+            <HStack gap={2}>
+              <Icon as={LuShare2} boxSize={3.5} />
+              <Text>Share</Text>
+            </HStack>
+          </Menu.Item>
+        )}
 
         {project && (
           <Menu.Item
@@ -266,20 +243,6 @@ export function TraceOverflowMenu({
             <Text>Keyboard shortcuts</Text>
           </HStack>
           <Menu.ItemCommand>?</Menu.ItemCommand>
-        </Menu.Item>
-
-        <Menu.Separator />
-
-        {/* Escape hatch back to the v1 drawer for operators who
-            opted into v2 via the promo but want to fall back. Clears
-            the localStorage opt-in and re-opens the same trace in
-            the legacy drawer — next time they `View Trace` they'll
-            land on v1 again until they re-opt in. */}
-        <Menu.Item value="switch-back-to-v1" onClick={handleSwitchBackToV1}>
-          <HStack gap={2}>
-            <Icon as={LuArrowLeft} boxSize={3.5} />
-            <Text>Go back to old trace visualization</Text>
-          </HStack>
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>

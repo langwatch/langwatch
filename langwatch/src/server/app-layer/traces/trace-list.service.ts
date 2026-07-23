@@ -1,9 +1,19 @@
+import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
-import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { createLogger } from "~/utils/logger/server";
+import {
+  parseMediaRefs,
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+  type TraceMediaRef,
+} from "~/shared/traces/media-refs";
+import {
+  deriveTraceOrigin,
+  TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
+} from "./derive-trace-origin";
 import {
   deriveTraceStatus,
   TRACE_STATUS_CLICKHOUSE_EXPRESSION,
@@ -19,8 +29,10 @@ import type {
   BatchedFacetResult,
   CategoricalFacetResult,
   DiscreteFacetResult,
+  TraceListCursor,
   TraceListRepository,
   TraceListSort,
+  TraceListSortColumn,
 } from "./repositories/trace-list.repository";
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
@@ -74,6 +86,9 @@ export interface TraceListItem {
   sizeBytes: number;
   input: string | null;
   output: string | null;
+  /** Compact fold-derived media refs for the winning IO; absent when media-free. */
+  inputMediaRefs?: TraceMediaRef[];
+  outputMediaRefs?: TraceMediaRef[];
   error: string | null;
   conversationId: string | null;
   userId: string | null;
@@ -89,6 +104,7 @@ export interface TraceListPage {
   items: TraceListItem[];
   totalHits: number;
   evaluations: Record<string, EvalSummary[]>;
+  nextCursor: TraceListCursor | null;
 }
 
 interface FacetCounts {
@@ -107,8 +123,10 @@ interface ListParams {
   tenantId: string;
   timeRange: { from: number; to: number };
   sort: { columnId: string; direction: "asc" | "desc" };
-  page: number;
+  /** 1-based offset compatibility for non-cursor callers. */
+  page?: number;
   pageSize: number;
+  cursor?: TraceListCursor;
   filterWhere?: { sql: string; params: Record<string, unknown> };
   /**
    * Visibility gate: list items older than this cutoff get their
@@ -450,7 +468,7 @@ const SORT_COLUMN_MAP: Record<string, TraceListSort["column"]> = {
 };
 
 const FACET_EXPRESSIONS: Record<string, string> = {
-  origin: "Attributes['langwatch.origin']",
+  origin: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
   status: TRACE_STATUS_CLICKHOUSE_EXPRESSION,
   service: "Attributes['service.name']",
 };
@@ -461,7 +479,7 @@ const SUGGEST_COLUMN_MAP: Record<string, string> = {
   model: "arrayJoin(Models)",
   service: "Attributes['service.name']",
   user: "Attributes['langwatch.user_id']",
-  origin: "Attributes['langwatch.origin']",
+  origin: TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
 };
 
 export class TraceListService {
@@ -481,7 +499,7 @@ export class TraceListService {
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
     if (ids.length === 0) return result;
-    const names = await this.topicService.getNamesByIds(projectId, ids);
+    const names = await this.topicService.getNamesByIds({ projectId, ids });
     return {
       ...result,
       values: result.values.map((v) => {
@@ -498,12 +516,21 @@ export class TraceListService {
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: params.sort.direction },
-      limit: params.pageSize,
-      offset: (params.page - 1) * params.pageSize,
+      // Read one sentinel row so `nextCursor` is exact without guessing from
+      // totalHits (which may change under a live range between requests).
+      limit: params.pageSize + 1,
+      cursor: params.cursor,
+      offset: params.cursor
+        ? 0
+        : (Math.max(params.page ?? 1, 1) - 1) * params.pageSize,
       filterWhere: params.filterWhere,
     });
 
-    const items = result.rows.map((row) => mapToTraceListItem(row));
+    const hasMore = result.rows.length > params.pageSize;
+    const visibleRows = hasMore
+      ? result.rows.slice(0, params.pageSize)
+      : result.rows;
+    const items = visibleRows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
     const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
@@ -536,6 +563,10 @@ export class TraceListService {
       items: gatedItems,
       totalHits: result.totalHits,
       evaluations,
+      nextCursor:
+        hasMore && visibleRows.length > 0
+          ? cursorForTraceRow(visibleRows[visibleRows.length - 1]!, sortColumn)
+          : null,
     };
   }
 
@@ -1219,6 +1250,57 @@ export function parseLabels(raw: string | undefined): string[] {
   }
 }
 
+/** Keep this normalization in lockstep with `cursorSortExpression` in the CH repository. */
+function cursorForTraceRow(
+  row: TraceSummaryData,
+  sortColumn: TraceListSortColumn,
+): TraceListCursor {
+  let sortValue: number;
+  switch (sortColumn) {
+    case "OccurredAt":
+      sortValue = row.occurredAt;
+      break;
+    case "TotalDurationMs":
+      sortValue = row.totalDurationMs;
+      break;
+    case "TotalCost":
+      sortValue = row.totalCost ?? 0;
+      break;
+    case "SpanCount":
+      sortValue = row.spanCount;
+      break;
+    case "TotalTokens":
+      sortValue =
+        (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
+      break;
+    case "TimeToFirstTokenMs":
+      sortValue = row.timeToFirstTokenMs ?? 0;
+      break;
+    case "TotalPromptTokenCount":
+      sortValue = row.totalPromptTokenCount ?? 0;
+      break;
+    case "TotalCompletionTokenCount":
+      sortValue = row.totalCompletionTokenCount ?? 0;
+      break;
+    case "_size_bytes":
+      sortValue = row.sizeBytes ?? 0;
+      break;
+  }
+
+  return {
+    sortValue: Number.isFinite(sortValue) ? sortValue : 0,
+    traceId: row.traceId,
+  };
+}
+
+/** Parsed refs, or undefined so media-free rows serialize without the field. */
+function presentMediaRefs(
+  serialized: string | undefined,
+): TraceMediaRef[] | undefined {
+  const refs = parseMediaRefs(serialized);
+  return refs.length > 0 ? refs : undefined;
+}
+
 function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const status = deriveTraceStatus(row);
 
@@ -1262,10 +1344,14 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     sizeBytes: row.sizeBytes ?? 0,
     input: row.computedInput,
     output: row.computedOutput,
+    inputMediaRefs: presentMediaRefs(row.attributes[RESERVED_INPUT_MEDIA_REFS]),
+    outputMediaRefs: presentMediaRefs(
+      row.attributes[RESERVED_OUTPUT_MEDIA_REFS],
+    ),
     error: row.errorMessage,
     conversationId: row.attributes["gen_ai.conversation.id"] ?? null,
     userId: row.attributes["langwatch.user_id"] ?? null,
-    origin: row.attributes["langwatch.origin"] ?? "application",
+    origin: deriveTraceOrigin(row.attributes),
     tokensEstimated: row.tokensEstimated,
     ttft: row.timeToFirstTokenMs,
     traceName: row.traceName,

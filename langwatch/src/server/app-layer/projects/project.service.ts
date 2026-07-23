@@ -1,15 +1,16 @@
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import type {
   PaginatedResult,
   PresenceConfig,
+  TraceSharingConfig,
   ProjectRepository,
   ProjectWithTeam,
   SearchProjectsResult,
@@ -227,6 +228,12 @@ export class ProjectService {
 
   async getPresenceConfig(projectId: string): Promise<PresenceConfig | null> {
     return this.repo.getPresenceConfig(projectId);
+  }
+
+  async getTraceSharingConfig(
+    projectId: string,
+  ): Promise<TraceSharingConfig | null> {
+    return this.repo.getTraceSharingConfig(projectId);
   }
 
   /**

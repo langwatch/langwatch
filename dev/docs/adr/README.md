@@ -4,26 +4,44 @@ Document **important technical and architectural decisions** — context, trade-
 
 ## Decisions
 
-| # | Decision | Status |
-|---|----------|--------|
-| [001](./001-rbac.md) | RBAC with Org → Team → Project hierarchy | Accepted |
-| [002](./002-event-sourcing.md) | Event sourcing for traces/evaluations | Superseded by 007 |
-| [003](./003-logging.md) | Logging and tracing infrastructure | Accepted |
-| [004](./004-docker-dev-environment.md) | Docker dev environment with Make targets | Accepted |
-| [005](./005-feature-flags.md) | Feature flags via tRPC and PostHog | Accepted |
-| [006](./006-redis-cluster-bullmq-hash-tags.md) | Redis cluster hash tags for BullMQ | Accepted |
-| [007](./007-event-sourcing-architecture.md) | Event sourcing architecture (fold/map projections) | Accepted |
-| [018](./018-form-validation-and-save.md) | Form validation and Save button behavior | Accepted |
-| [021](./021-multi-scope-targeting-and-tenancy.md) | Multi-scope targeting and single-org tenancy enforcement | Accepted |
-| [022](./022-data-retention.md) | Per-tenant per-category data retention enforced by ClickHouse-native TTL | Accepted |
-| [023](./023-orphan-sweep-reactor-chain.md) | Reactor-seeded self-perpetuating chain for retention orphan sweep | Superseded by [025](./025-remove-orphan-sweep.md) |
-| [024](./024-cold-path-tiered-storage.md) | Cold-path tiered storage for retention-managed tables | Accepted |
-| [025](./025-remove-orphan-sweep.md) | Remove the PG orphan sweep entirely | Accepted |
-| [026](./026-per-trigger-dispatch-timing.md) | Per-trigger dispatch timing — cadence and trace-readiness debounce | Accepted |
-| [027](./027-typed-dispatcherror-contract.md) | Typed `DispatchError` contract for dispatch endpoints | Accepted |
-| [036](./036-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
-| [037](./037-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
-| [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
+| #                                                                 | Decision                                                                                    | Status                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| [001](./001-rbac.md)                                              | RBAC with Org → Team → Project hierarchy                                                    | Accepted                                          |
+| [002](./002-event-sourcing.md)                                    | Event sourcing for traces/evaluations                                                       | Superseded by 007                                 |
+| [003](./003-logging.md)                                           | Logging and tracing infrastructure                                                          | Accepted                                          |
+| [004](./004-docker-dev-environment.md)                            | Docker dev environment with Make targets                                                    | Accepted                                          |
+| [005](./005-feature-flags.md)                                     | Feature flags via tRPC and PostHog                                                          | Accepted                                          |
+| [006](./006-redis-cluster-bullmq-hash-tags.md)                    | Redis cluster hash tags for BullMQ                                                          | Accepted                                          |
+| [007](./007-event-sourcing-architecture.md)                       | Event sourcing architecture (fold/map projections)                                          | Accepted                                          |
+| [018](./018-form-validation-and-save.md)                          | Form validation and Save button behavior                                                    | Accepted                                          |
+| [021](./021-multi-scope-targeting-and-tenancy.md)                 | Multi-scope targeting and single-org tenancy enforcement                                    | Accepted                                          |
+| [022](./022-data-retention.md)                                    | Per-tenant per-category data retention enforced by ClickHouse-native TTL                    | Accepted                                          |
+| [023](./023-orphan-sweep-reactor-chain.md)                        | Reactor-seeded self-perpetuating chain for retention orphan sweep                           | Superseded by [025](./025-remove-orphan-sweep.md) |
+| [024](./024-cold-path-tiered-storage.md)                          | Cold-path tiered storage for retention-managed tables                                       | Accepted                                          |
+| [025](./025-remove-orphan-sweep.md)                               | Remove the PG orphan sweep entirely                                                         | Accepted                                          |
+| [026](./026-per-trigger-dispatch-timing.md)                       | Per-trigger dispatch timing — cadence and trace-readiness debounce                          | Accepted                                          |
+| [027](./027-typed-dispatcherror-contract.md)                      | Typed `DispatchError` contract for dispatch endpoints                                       | Accepted                                          |
+| [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch                                   | Accepted                                          |
+| [031](./031-trigger-email-abuse-protections.md)                   | Trigger email abuse protections — per-trigger cap, per-project daily cap, unsubscribe       | Accepted                                          |
+| [032](./032-datasets-s3-jsonl.md)                                 | Datasets stored as S3 JSONL chunks                                                          | Accepted                                          |
+| [033](./033-langy-worker-network-isolation-under-gvisor.md)       | Langy worker network isolation under gVisor                                                 | Draft                                             |
+| [034](./034-event-sourced-analytics-materialization.md)           | Event-sourced analytics materialization — slim + rollup ClickHouse tables                   | Accepted                                          |
+| [035](./035-persist-class-debounce.md)                            | Persist-class actions ride the settle → cadence outbox path                                 | Accepted                                          |
+| [036](./036-liquid-templates-for-trigger-notifications.md)        | Liquid templates for user-customizable trigger notifications                                | Accepted                                          |
+| [037](./037-automation-operator-surfaces.md)                      | Automation operator surfaces — authoring drawer & dispatch-health view                      | Accepted                                          |
+| [038](./038-intent-forked-onboarding-governance-vs-llmops.md)     | Onboarding forks on a first-class Organization intent                                       | Accepted                                          |
+| [039](./039-outbox-heartbeat.md)                                  | Outbox heartbeat primitive                                                                  | Accepted                                          |
+| [040](./040-webhook-http-request-automation-channel.md)           | Webhook (generic HTTP request) automation channel                                           | Proposed                                          |
+| [041](./041-modern-block-kit-notification-template-suite.md)      | Modern Block Kit notification template suite                                                | Proposed                                          |
+| [042](./042-local-observability-stack.md)                         | Local observability stack (logs, traces, metrics → Grafana)                                 | Accepted                                          |
+| [043](./043-automation-facet-model.md)                            | Automations as orthogonal facets (name / type / subject / cadence / severity / delivery)    | Proposed                                          |
+| [044](./044-scheduled-reports-automation-kind.md)                 | Scheduled reports — a schedule-triggered automation kind + generic event-sourcing scheduler | Proposed                                          |
+| [045](./045-domain-errors-handled-boundary.md)                    | Handled errors as the handled-error boundary (TS `HandledError` ⇔ Go `herr`)                | Accepted                                          |
+| [046](./046-event-sourced-langy-conversations.md)                 | Event-sourced Langy conversations                                                           | Superseded in part by 049                         |
+| [049](./049-langy-projection-independent-reactions.md)            | Langy pilots projection-independent reactions                                               | Accepted                                          |
+| [050](./050-langy-versioned-prompts-and-dogfood-evals.md)         | Langy's prompts in the versioned prompt registry + dogfood scenarios/evals                  | Proposed                                          |
+| [057](./057-token-gated-trace-sharing.md)                         | Token-gated trace sharing (ShareLink)                                                       | Accepted                                          |
+| [059](./059-card-selection-is-deterministic.md)                    | Card selection is deterministic — the model supplies data, never presentation               | Proposed                                          |
 
 ## When to Write an ADR
 

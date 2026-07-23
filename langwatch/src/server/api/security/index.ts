@@ -7,6 +7,7 @@ export {
   internalSecret,
   publicEndpoint,
   requires,
+  requiresOnProject,
 } from "./access-policy";
 export {
   allRegisteredRoutes,

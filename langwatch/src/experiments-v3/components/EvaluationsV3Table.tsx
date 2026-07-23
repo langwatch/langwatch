@@ -23,7 +23,13 @@ import type { ColumnType } from "~/components/datasets/editor/TableCell";
 import { useTableKeyboardNavigation } from "~/components/datasets/editor/useTableKeyboardNavigation";
 import { VirtualizedTableBody } from "~/components/datasets/editor/VirtualizedTableBody";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
+import {
+  getFlowCallbacks,
+  setComplexProps,
+  setFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   Field,
@@ -49,8 +55,10 @@ import {
 } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import type {
+  ComparisonEvaluatorConfig,
   DatasetColumn,
   DatasetReference,
+  EvaluationResults,
   EvaluatorConfig,
   FieldMapping,
   SavedRecord,
@@ -58,7 +66,11 @@ import type {
   TableRowData,
   TargetConfig,
 } from "../types";
-import { isGoldenFieldSatisfied } from "../types";
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  isGoldenFieldSatisfied,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
+} from "../types";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -72,11 +84,17 @@ import {
   convertHttpComponentConfig,
 } from "../utils/httpAgentUtils";
 import { evaluatorHasMissingMappings } from "../utils/mappingValidation";
+import {
+  toTargetOutputFields,
+  type PromptOutputField,
+} from "../utils/targetOutputFields";
+import { toComparisonConfig } from "../utils/normalizeComparison";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
-import { PairwiseCompareCell } from "./PairwiseCompareCell";
+import { ComparisonCell } from "./ComparisonCell";
+import { ComparisonColumnHeader } from "./ComparisonColumnHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -93,6 +111,22 @@ const MAX_ROWS_FOR_FIT_MODE = 100;
 const CHECKBOX_WIDTH_PX = 40; // Checkbox is fixed pixels
 const DATASET_COL_DEFAULT_PCT = 16;
 const TARGET_COL_DEFAULT_PCT = 20;
+/**
+ * A comparison column carries strictly more header content than a prompt/agent
+ * column — its name, the "<winner> wins" verdict, latency, cost AND the run
+ * button all share one row, where a prompt column has only name + summary + run.
+ * An equal 20% share starves it: measured at a 1440px viewport its own name
+ * truncated by 40px while every sibling still had slack.
+ *
+ * 24% was picked by measurement, not taste: it cuts that truncation to ~17px
+ * while leaving sibling columns at 0-3px (26% fixed the comparison almost
+ * entirely but started truncating the siblings — robbing Peter to pay Paul).
+ * This does not promise a name never truncates; a long enough name always will,
+ * and the column stays user-resizable. It just stops the column with the most
+ * to say from being the one given the least room to say it.
+ */
+const COMPARISON_COL_DEFAULT_PCT = 24;
+const COMPARISON_COL_MIN_PCT = 14;
 
 /**
  * Type for the config stored in DB Evaluator.config field.
@@ -104,16 +138,60 @@ type EvaluatorDbConfig = {
   settings?: Record<string, unknown>;
 };
 
-// A pairwise evaluator is ready to render its own result column once both
-// variants are picked and the golden-field requirement is satisfied (see
-// isGoldenFieldSatisfied). Exported so it can be unit-tested directly
-// instead of only through a full table render.
-export const isPairwiseConfigured = (e: EvaluatorConfig) =>
-  e.evaluatorType === "langevals/pairwise_compare" &&
-  !!e.pairwise?.variantA &&
-  !!e.pairwise?.variantB &&
-  !!e.pairwise &&
-  isGoldenFieldSatisfied(e.pairwise);
+// A comparison evaluator is ready to render its own result column once at
+// least two variants are picked and the golden-field requirement is satisfied
+// (see isGoldenFieldSatisfied). Legacy pairwise configs qualify too — they
+// normalize to exactly two variants, though a folded config keeps both
+// variantA/variantB positions even when one is unset (see fromPairwise in
+// normalizeComparison.ts), so an under-filled legacy config can still have
+// variants.length === 2 with one entry "" — filter empty slots, not just
+// array length. Exported so it can be unit-tested directly instead of only
+// through a full table render.
+export const isComparisonConfigured = (e: EvaluatorConfig) => {
+  const comparison = toComparisonConfig(e);
+  return (
+    !!comparison &&
+    comparison.variants.filter(Boolean).length >= 2 &&
+    isGoldenFieldSatisfied(comparison)
+  );
+};
+
+/**
+ * Per-row evaluator results for one target: every per-target evaluator's
+ * verdict, plus — for a column-target comparison (target.type === "evaluator"
+ * with an embedded comparison config) — the target's own row keyed by its own
+ * id, since the target IS the evaluator for this row-shaping purpose. Reads
+ * `toComparisonConfig(target)` rather than the raw `target.pairwise` field:
+ * normalizeTargets rewrites `pairwise` to `comparison` at load, so a check
+ * against the raw legacy field is always false post-normalization and would
+ * silently drop every column-target comparison's row data. Exported so it can
+ * be unit-tested directly instead of only through a full table render.
+ */
+export const buildTargetEvaluatorsForRow = (
+  target: TargetConfig,
+  evaluators: EvaluatorConfig[],
+  results: EvaluationResults,
+  rowIndex: number,
+): Record<string, unknown> =>
+  Object.fromEntries([
+    ...evaluators.map(
+      (evaluator) =>
+        [
+          evaluator.id,
+          results.evaluatorResults[target.id]?.[evaluator.id]?.[rowIndex] ??
+            null,
+        ] as [string, unknown],
+    ),
+    ...(toComparisonConfig(target)
+      ? [
+          [
+            target.id,
+            results.evaluatorResults[target.id]?.[target.id]?.[rowIndex] ??
+              null,
+          ] as [string, unknown],
+        ]
+      : []),
+  ]);
 
 // ============================================================================
 // Main Component
@@ -131,7 +209,12 @@ export function EvaluationsV3Table({
   isLoadingDatasets = false,
   disableVirtualization = false,
 }: EvaluationsV3TableProps) {
-  const { openDrawer, closeDrawer } = useDrawer();
+  const { openDrawer, closeDrawer, currentDrawer } = useDrawer();
+  // Serializable drawer URL params (evaluatorType, evaluatorId, …). Read here so
+  // the comparison-reload re-hydration effect can inspect the open drawer; the
+  // stable key keeps that effect from re-running on unrelated renders.
+  const drawerParams = useDrawerParams();
+  const drawerParamsKey = JSON.stringify(drawerParams);
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
 
@@ -159,16 +242,22 @@ export function EvaluationsV3Table({
     toggleColumnVisibility,
     addTarget,
     updateTarget,
+    updateTargetComparison,
     removeTarget,
     setTargetMapping,
     removeTargetMapping,
     addEvaluator,
+    experimentId,
   } = useEvaluationsV3Store(
     useShallow((state) => ({
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
       evaluators: state.evaluators,
       targets: state.targets,
+      // Hydration signal for the comparison-reload effect: loadState sets this
+      // atomically with targets/datasets, so a truthy value means getState() is
+      // safe to read.
+      experimentId: state.experimentId,
       results: state.results,
       // Only subscribe to specific UI properties we need (not the entire ui object)
       ui: {
@@ -194,6 +283,7 @@ export function EvaluationsV3Table({
       toggleColumnVisibility: state.toggleColumnVisibility,
       addTarget: state.addTarget,
       updateTarget: state.updateTarget,
+      updateTargetComparison: state.updateTargetComparison,
       removeTarget: state.removeTarget,
       setTargetMapping: state.setTargetMapping,
       removeTargetMapping: state.removeTargetMapping,
@@ -306,15 +396,14 @@ export function EvaluationsV3Table({
   // Track pending mappings for new prompts (before they become targets)
   const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
 
-  // Track pairwise variant selections made inside the creation evaluatorEditor
-  // so handleSelectEvaluatorAsTarget can apply them on save instead of empty defaults.
-  const pendingPairwiseRef = useRef<{
-    variantA: string;
-    variantB: string;
-    hasGoldenAnswer: boolean;
-    goldenField: string;
-    includeMetrics: ("cost" | "duration")[];
-  } | null>(null);
+  // Track variant selections made inside the creation evaluatorEditor so
+  // handleSelectEvaluatorAsTarget can apply them on save instead of empty
+  // defaults. Also acts as the signal that lifts `isComparison` to true in
+  // EvaluatorEditorShared: when the ref-setter is wired via
+  // createEvaluatorEditorCallbacks, the schema-driven `include_metrics`
+  // renderer is suppressed and the inline MetricsSection (with working cost +
+  // duration toggles) renders instead.
+  const pendingComparisonRef = useRef<ComparisonEvaluatorConfig | null>(null);
 
   // Track target being switched (null when adding new, target ID when switching)
   const switchingTargetIdRef = useRef<string | null>(null);
@@ -406,17 +495,38 @@ export function EvaluationsV3Table({
         type: field.type as Field["type"],
       }));
 
-      // Pairwise column-target (#5100): seed an empty pairwise config so the
-      // column owns its variantA/variantB/goldenField selections — this is the
-      // discriminator the Run flow and validation use to render the clean
-      // PairwiseConfigForm instead of the generic per-row mappings UI. Strictly
-      // additive: only set when the underlying evaluator is pairwise_compare,
-      // so every other evaluator-as-target keeps its current behavior.
+      // Comparison column-target: seed an empty comparison config so the column
+      // owns its variants/goldenField selections — this is the discriminator
+      // the Run flow and validation use to render the clean
+      // ComparisonConfigForm instead of the generic per-row mappings UI. Only
+      // set when the underlying evaluator is a comparison judge, so every other
+      // evaluator-as-target keeps its current behavior.
       const config = (evaluator.config ?? null) as {
         evaluatorType?: string;
+        settings?: { has_golden_answer?: boolean };
       } | null;
-      const isPairwiseEvaluator =
-        config?.evaluatorType === "langevals/pairwise_compare";
+      const isComparisonJudge =
+        config?.evaluatorType === COMPARISON_EVALUATOR_TYPE ||
+        config?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+
+      // An existing comparison evaluator's saved `has_golden_answer` setting
+      // is the source of truth for whether it needs a golden answer at all.
+      // Hardcoding a fixed value here regardless of what was actually saved
+      // left a "no golden answer" evaluator seeded with the wrong value: the
+      // column target got `hasGoldenAnswer: true, goldenField: ""`, which
+      // `isGoldenFieldSatisfied` reads as unsatisfied, silently skipping the
+      // column at execution (#5528). Only fall back to `false` when the
+      // evaluator has no saved setting at all (a genuinely new/
+      // never-configured comparison) — Golden field defaults to "None", same
+      // as `select_best_compare`'s own `has_golden_answer` schema default.
+      const savedHasGoldenAnswer = config?.settings?.has_golden_answer;
+      const comparison = pendingComparisonRef.current ?? {
+        variants: [],
+        hasGoldenAnswer: savedHasGoldenAnswer ?? false,
+        goldenField: "",
+        includeMetrics: [],
+        randomizeOrder: true,
+      };
 
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`,
@@ -425,22 +535,18 @@ export function EvaluationsV3Table({
         inputs,
         outputs,
         mappings: {},
-        ...(isPairwiseEvaluator && {
-          pairwise: pendingPairwiseRef.current ?? {
-            variantA: "",
-            variantB: "",
-            hasGoldenAnswer: true,
-            goldenField: "",
-            includeMetrics: [],
-          },
-        }),
+        ...(isComparisonJudge && { comparison }),
       };
-      pendingPairwiseRef.current = null;
+      pendingComparisonRef.current = null;
       addOrReplaceTarget(targetConfig);
-      // For pairwise-as-target, open the PairwiseConfigForm immediately so the
-      // user can configure Variant A / Variant B / Golden field without having
-      // to find and click the target chip again.
-      if (isPairwiseEvaluator) {
+
+      // A comparison needs two variants before it can judge anything. Picking
+      // one straight off the evaluator list leaves it unconfigured, so open the
+      // ComparisonConfigForm rather than dropping the user back on a column
+      // that cannot run. The Comparison card collects the variants up front, so
+      // that flow arrives here already configured and the drawer just closes.
+      const needsConfiguration = comparison.variants.length < 2;
+      if (isComparisonJudge && needsConfiguration) {
         // openTargetEditor reads fresh store state, so the target we just added
         // is visible when the drawer opens.
         void openTargetEditor(targetConfig);
@@ -460,7 +566,7 @@ export function EvaluationsV3Table({
       version?: number;
       versionId?: string;
       inputs?: Array<{ identifier: string; type: string }>;
-      outputs?: Array<{ identifier: string; type: string }>;
+      outputs?: PromptOutputField[];
     }) => {
       // Convert prompt to TargetConfig format (prompt type)
       // Use the actual inputs/outputs from the prompt data (already fetched in PromptListDrawer)
@@ -477,12 +583,9 @@ export function EvaluationsV3Table({
             type: i.type as Field["type"],
           }),
         ),
-        outputs: (
-          prompt.outputs ?? [{ identifier: "output", type: "str" }]
-        ).map((o) => ({
-          identifier: o.identifier,
-          type: o.type as Field["type"],
-        })),
+        outputs: toTargetOutputFields(
+          prompt.outputs ?? [{ identifier: "output", type: "str" }],
+        ),
         mappings: {},
       };
       // addOrReplaceTarget will auto-map based on the real inputs (and handle switch mode)
@@ -604,34 +707,6 @@ export function EvaluationsV3Table({
         return;
       }
 
-      // Pairwise evaluators always open their dedicated target-picker form
-      // (PairwiseConfigForm), regardless of whether targets exist yet.
-      // useOpenEvaluatorEditor routes pairwise_compare to PairwiseConfigForm
-      // and ignores the `target` / `targetName` params, so we pass a stub
-      // when no real target exists yet.
-      if (added.evaluatorType === "langevals/pairwise_compare") {
-        const stubTarget: TargetConfig = firstTarget ?? {
-          id: "",
-          type: "prompt",
-          inputs: [],
-          outputs: [],
-          mappings: {},
-        };
-        openEvaluatorEditor({
-          evaluator: added,
-          target: stubTarget,
-          targetName: firstTarget
-            ? (resolveTargetNameFromCache({
-                target: firstTarget,
-                utils: trpcUtils,
-                projectId: project?.id,
-              }) ?? "")
-            : "",
-          isCodeEvaluator: false,
-        });
-        return;
-      }
-
       if (
         firstTarget &&
         evaluatorHasMissingMappings(
@@ -729,6 +804,38 @@ export function EvaluationsV3Table({
     [addTarget, openTargetEditor],
   );
 
+  // Extracted so BOTH the Add→Comparison flow and the reload re-hydration
+  // effect register the exact same evaluatorEditor callbacks. onSave fetches the
+  // freshly-created evaluator and adds it as a target column; onComparisonChange
+  // mirrors the live draft into pendingComparisonRef (also lifts `isComparison`
+  // to true in EvaluatorEditorShared so ComparisonConfigForm renders).
+  const handleComparisonEvaluatorSave = useCallback(
+    async (savedEvaluator: { id: string; name: string }) => {
+      const evaluator = await trpcUtils.evaluators.getById.fetch({
+        id: savedEvaluator.id,
+        projectId: project?.id ?? "",
+      });
+      if (!evaluator) {
+        closeDrawer();
+        return true;
+      }
+      handleSelectEvaluatorAsTarget(evaluator);
+      return true;
+    },
+    [
+      trpcUtils.evaluators.getById,
+      project?.id,
+      closeDrawer,
+      handleSelectEvaluatorAsTarget,
+    ],
+  );
+  const handlePendingComparisonChange = useCallback(
+    (next: ComparisonEvaluatorConfig) => {
+      pendingComparisonRef.current = next;
+    },
+    [],
+  );
+
   // Handler for opening the add target flow (prompts/agents)
   // Memoized to prevent TargetSuperHeader re-renders
   const handleAddTarget = useCallback(() => {
@@ -808,12 +915,9 @@ export function EvaluationsV3Table({
             identifier: i.identifier,
             type: i.type as Field["type"],
           })),
-          outputs: (
-            savedPrompt.outputs ?? [{ identifier: "output", type: "str" }]
-          ).map((o) => ({
-            identifier: o.identifier,
-            type: o.type as Field["type"],
-          })),
+          outputs: toTargetOutputFields(
+            savedPrompt.outputs ?? [{ identifier: "output", type: "str" }],
+          ),
           mappings:
             Object.keys(storeMappings).length > 0
               ? { [currentActiveDatasetId]: storeMappings }
@@ -840,48 +944,40 @@ export function EvaluationsV3Table({
     setFlowCallbacks("evaluatorList", {
       onSelect: handleSelectEvaluatorAsTarget,
     });
-    // Build pairwiseContext so TargetTypeSelectorDrawer can pass it to
-    // evaluatorEditor when "Pairwise Compare" is selected — this makes the
-    // creation form show Variant A / Variant B / Golden field immediately,
-    // matching the edit-mode experience (see #5195).
-    pendingPairwiseRef.current = null;
+    // Build comparisonContext so the Comparison flow can pass it to
+    // evaluatorEditor — this makes the creation form show the variant picker
+    // and Golden field immediately, matching the edit-mode experience (#5195).
+    //
+    // No initialComparison: "New Comparison" means a blank one. Reaching an
+    // existing comparison is the list's job now (TargetTypeSelectorDrawer opens
+    // EvaluatorListDrawer filtered to comparison evaluators), and editing the
+    // one already on the table is the column header's job. Pre-filling from the
+    // first comparison in the workbench used to make a second one impossible to
+    // create and quietly turned "add" into "edit".
+    pendingComparisonRef.current = null;
     const state = useEvaluationsV3Store.getState();
     const variantOptions = state.targets.filter((t) => t.type !== "evaluator");
     const activeDs = state.datasets.find((d) => d.id === state.activeDatasetId);
-    const pairwiseContext = {
-      initialPairwise: undefined,
+    const datasetColumns =
+      activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [];
+    const comparisonContext = {
       targets: variantOptions,
-      datasetColumns:
-        activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [],
+      datasetColumns,
+      datasetName: activeDs?.name,
     };
 
     // Set up flow callback for when a NEW evaluator is created during the target flow
     // This handles: add comparison > evaluator > create new > category > fill form > create
+    // Same callbacks the reload re-hydration effect below registers — extracted
+    // to stable useCallbacks so both paths wire identical behavior.
     setFlowCallbacks(
       "evaluatorEditor",
       createEvaluatorEditorCallbacks({
-        onSave: async (savedEvaluator: { id: string; name: string }) => {
-          // Fetch the full evaluator data from DB to get computed fields
-          const evaluator = await trpcUtils.evaluators.getById.fetch({
-            id: savedEvaluator.id,
-            projectId: project?.id ?? "",
-          });
-
-          if (!evaluator) {
-            closeDrawer();
-            return true;
-          }
-
-          // Use handleSelectEvaluatorAsTarget to add the target with proper fields
-          handleSelectEvaluatorAsTarget(evaluator);
-          return true; // Indicate navigation was handled to prevent default back behavior
-        },
-        onPairwiseChange: (next) => {
-          pendingPairwiseRef.current = next;
-        },
+        onSave: handleComparisonEvaluatorSave,
+        onComparisonChange: handlePendingComparisonChange,
       }),
     );
-    openDrawer("targetTypeSelector", { pairwiseContext });
+    openDrawer("targetTypeSelector", { comparisonContext });
   }, [
     buildAvailableSources,
     openDrawer,
@@ -889,10 +985,105 @@ export function EvaluationsV3Table({
     handleSelectSavedAgent,
     handleSelectEvaluatorAsTarget,
     isDatasetSource,
-    closeDrawer,
-    trpcUtils.evaluators.getById,
-    project?.id,
-    addOrReplaceTarget,
+    handleComparisonEvaluatorSave,
+    handlePendingComparisonChange,
+  ]);
+
+  // Re-hydrate the comparison editor's flow context after a full page reload.
+  // The URL reopens the evaluatorEditor drawer, but its comparisonContext
+  // (complexProps) and flow callbacks are ephemeral module state wiped by the
+  // reload — so ComparisonConfigForm's `isComparison && comparisonContext &&
+  // onComparisonChange` guard fails and only the generic Name/Model/Prompt
+  // editor shows. Rebuild them from the workbench store and re-attach reactively
+  // via setFlowCallbacks + setComplexProps. Only setComplexProps notifies
+  // CurrentDrawer to re-render (setFlowCallbacks deliberately does not, see
+  // its own comment) — calling it second means that one re-render re-reads
+  // both getters together (no URL change, no flushSync, no flicker).
+  // Loop-safe: setting the callback flips the guard below, so a re-run
+  // bails; the effect's deps don't change from these calls, so it fires once.
+  useEffect(() => {
+    if (currentDrawer !== "evaluatorEditor") return;
+    const evaluatorType = drawerParams.evaluatorType;
+    const isComparisonType =
+      evaluatorType === COMPARISON_EVALUATOR_TYPE ||
+      evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+    if (!isComparisonType) return;
+    // Wait for the workbench store to finish hydrating (loadState sets
+    // experimentId atomically with targets/datasets); reading getState() before
+    // then would snapshot an empty picker and lock it in (the guard below blocks
+    // a later refresh).
+    if (!experimentId) return;
+    // Flow context already present → a live Add/edit flow (or an earlier run of
+    // this effect) wired it up. Also the loop guard.
+    const alreadyWired = (
+      getFlowCallbacks("evaluatorEditor") as
+        | { onComparisonChange?: unknown }
+        | undefined
+    )?.onComparisonChange;
+    if (alreadyWired) return;
+
+    const state = useEvaluationsV3Store.getState();
+    const variantOptions = state.targets.filter((t) => t.type !== "evaluator");
+    const activeDs = state.datasets.find((d) => d.id === state.activeDatasetId);
+    const datasetColumns =
+      activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [];
+    // Edit reload carries the DB evaluator id → re-derive its saved comparison
+    // config (matching the column-header edit flow). A fresh "New Comparison"
+    // (no evaluatorId) leaves initialComparison undefined — a blank form, since
+    // its unsaved in-progress draft was never persisted.
+    const evaluatorId = drawerParams.evaluatorId;
+    const evaluatorMatch = evaluatorId
+      ? state.evaluators.find((e) => e.dbEvaluatorId === evaluatorId)
+      : undefined;
+    const targetMatch = evaluatorId
+      ? state.targets.find((t) => t.targetEvaluatorId === evaluatorId)
+      : undefined;
+    const initialComparison = evaluatorMatch
+      ? toComparisonConfig(evaluatorMatch)
+      : targetMatch
+        ? toComparisonConfig(targetMatch)
+        : undefined;
+    const comparisonContext = {
+      ...(initialComparison ? { initialComparison } : {}),
+      targets: variantOptions,
+      datasetColumns,
+      datasetName: activeDs?.name,
+    };
+
+    // targetMatch means this reload resumed editing an EXISTING comparison
+    // column, not the New Comparison add flow. Wire the same target-bound
+    // callbacks openTargetEditor uses (targetId + updateTarget +
+    // updateTargetComparison) so a save updates that target in place. Without
+    // this branch, onSave fell through to handleComparisonEvaluatorSave —
+    // built for the add flow — which always creates a fresh target via
+    // handleSelectEvaluatorAsTarget, duplicating the column on every
+    // reload-then-save.
+    setFlowCallbacks(
+      "evaluatorEditor",
+      targetMatch
+        ? createEvaluatorEditorCallbacks({
+            targetId: targetMatch.id,
+            updateTarget,
+            onComparisonChange: (next) => {
+              updateTargetComparison(targetMatch.id, next);
+            },
+          })
+        : createEvaluatorEditorCallbacks({
+            onSave: handleComparisonEvaluatorSave,
+            onComparisonChange: handlePendingComparisonChange,
+          }),
+    );
+    setComplexProps({ comparisonContext });
+    // drawerParams read through the stable drawerParamsKey signature.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentDrawer,
+    drawerParamsKey,
+    experimentId,
+    handleComparisonEvaluatorSave,
+    handlePendingComparisonChange,
+    updateTarget,
+    updateTargetComparison,
   ]);
 
   // Handler for switching a target (replace with another prompt/agent/evaluator)
@@ -1096,6 +1287,18 @@ export function EvaluationsV3Table({
     getCellValue: state.getCellValue,
   }));
 
+  // Which target column's header cell should glow — set by clicking a
+  // variant name in a pairwise verdict (customer feedback, 2026-07-08).
+  // Applied to the whole `<th>` box, not just the component rendered
+  // inside it, so the highlight reads as "this column" rather than a
+  // border around one label.
+  const highlightedVariantTargetId = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantTargetId,
+  );
+  const highlightedVariantOutcome = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantOutcome,
+  );
+
   // Build row data from active dataset records (works for both inline and saved)
   // Note: We include activeDataset in dependencies to ensure re-render when cell values change
   const rowData = useMemo((): TableRowData[] => {
@@ -1122,24 +1325,12 @@ export function EvaluationsV3Table({
             {
               output: results.targetOutputs[target.id]?.[index] ?? null,
               // All evaluators apply to all targets
-              evaluators: Object.fromEntries([
-                ...evaluators.map((evaluator) => [
-                  evaluator.id,
-                  results.evaluatorResults[target.id]?.[evaluator.id]?.[
-                    index
-                  ] ?? null,
-                ]),
-                ...(target.pairwise
-                  ? [
-                      [
-                        target.id,
-                        results.evaluatorResults[target.id]?.[target.id]?.[
-                          index
-                        ] ?? null,
-                      ],
-                    ]
-                  : []),
-              ] as Array<[string, unknown]>),
+              evaluators: buildTargetEvaluatorsForRow(
+                target,
+                evaluators,
+                results,
+                index,
+              ),
               // Error for this target/row
               error: results.errors[target.id]?.[index] ?? null,
               // Loading if this specific cell is in the executing set AND has no output/error yet
@@ -1201,6 +1392,18 @@ export function EvaluationsV3Table({
     [targetIdsKey],
   );
 
+  // Which target columns are comparisons, so they can be given a wider default.
+  // Keyed on comparison-ness (not just the id list) so switching an evaluator
+  // column to/from a comparison re-sizes it instead of keeping the old width.
+  const comparisonTargetIdsKey = targets
+    .filter((t) => t.type === "evaluator" && !!toComparisonConfig(t))
+    .map((t) => t.id)
+    .join(",");
+  const comparisonTargetIds = useMemo(
+    () => new Set(comparisonTargetIdsKey.split(",").filter(Boolean)),
+    [comparisonTargetIdsKey],
+  );
+
   // Similarly stabilize dataset columns - include type in key so icon updates when type changes
   const datasetColumnsKey = datasetColumns
     .map((c) => `${c.id}:${c.type}`)
@@ -1210,17 +1413,17 @@ export function EvaluationsV3Table({
     [datasetColumnsKey],
   );
 
-  // Stabilize pairwise evaluators — only those considered configured (see
-  // isPairwiseConfigured above). Only recreate columns when the set of
-  // configured pairwise evaluators changes.
-  const pairwiseEvaluatorsKey = evaluators
-    .filter(isPairwiseConfigured)
-    .map((e) => `${e.id}:${e.pairwise?.variantA}:${e.pairwise?.variantB}`)
-    .join(",");
-  const stablePairwiseEvaluators = useMemo(
-    () => evaluators.filter(isPairwiseConfigured),
+  // Stabilize comparison evaluators — only those considered configured (see
+  // isComparisonConfigured above). Key on the ordered variants list so the
+  // column is only recreated when a variant is added, removed, or reordered.
+  const comparisonEvaluatorsKey = evaluators
+    .filter(isComparisonConfigured)
+    .map((e) => `${e.id}:${toComparisonConfig(e)?.variants.join(",")}`)
+    .join(";");
+  const stableComparisonEvaluators = useMemo(
+    () => evaluators.filter(isComparisonConfigured),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pairwiseEvaluatorsKey],
+    [comparisonEvaluatorsKey],
   );
 
   // Build table meta for passing dynamic data to headers/cells
@@ -1403,8 +1606,12 @@ export function EvaluationsV3Table({
               />
             );
           },
-          size: TARGET_COL_DEFAULT_PCT, // Percentage value
-          minSize: 10, // Minimum 10%
+          size: comparisonTargetIds.has(targetId)
+            ? COMPARISON_COL_DEFAULT_PCT
+            : TARGET_COL_DEFAULT_PCT,
+          minSize: comparisonTargetIds.has(targetId)
+            ? COMPARISON_COL_MIN_PCT
+            : 10,
           meta: {
             columnType: "target" as ColumnType,
             columnId: `target.${targetId}`,
@@ -1413,49 +1620,48 @@ export function EvaluationsV3Table({
       );
     }
 
-    // Dedicated pairwise result columns — one per fully-configured pairwise
-    // evaluator, rendered AFTER all target columns (Target A, Target B, Pairwise).
-    // The orchestrator anchors Phase-2 results on variantA's cell.
-    for (const pwEval of stablePairwiseEvaluators) {
-      const evaluatorId = pwEval.id;
-      const variantAId = pwEval.pairwise!.variantA;
-      const variantBId = pwEval.pairwise!.variantB;
+    // Dedicated comparison result columns — one per fully-configured
+    // comparison evaluator, rendered AFTER all target columns. The
+    // orchestrator anchors Phase-2 results on the first variant's cell.
+    for (const compEval of stableComparisonEvaluators) {
+      const evaluatorId = compEval.id;
+      const variantIds = toComparisonConfig(compEval)!.variants;
+      const anchorVariantId = variantIds[0]!;
       cols.push(
         columnHelper.accessor(
-          (row) => row.targets[variantAId]?.evaluators[evaluatorId],
+          (row) => row.targets[anchorVariantId]?.evaluators[evaluatorId],
           {
-            id: `pairwise.${evaluatorId}`,
+            id: `comparison.${evaluatorId}`,
             header: (context) => {
               const meta = context.table.options.meta as TableMeta | undefined;
               const evaluator = meta?.evaluatorsMap.get(evaluatorId);
               return (
-                <HStack gap={1}>
-                  <Text fontSize="13px" fontWeight="medium">
-                    🏆 {evaluator?.localEvaluatorConfig?.name ?? "Pairwise"}
-                  </Text>
-                </HStack>
+                <ComparisonColumnHeader
+                  evaluatorId={evaluatorId}
+                  name={evaluator?.localEvaluatorConfig?.name ?? "Comparison"}
+                />
               );
             },
             cell: (info) => {
               if (info.row.original.isEmpty) return null;
               const meta = info.table.options.meta as TableMeta | undefined;
-              const variantATarget = meta?.targetsMap.get(variantAId);
-              const variantBTarget = meta?.targetsMap.get(variantBId);
-              const rowData = info.row.original.targets[variantAId];
+              const variantTargets = variantIds.map((id) =>
+                meta?.targetsMap.get(id),
+              );
+              const rowData = info.row.original.targets[anchorVariantId];
               return (
-                <PairwiseCompareCell
+                <ComparisonCell
                   result={info.getValue()}
                   isLoading={rowData?.isLoading}
-                  variantATarget={variantATarget}
-                  variantBTarget={variantBTarget}
+                  variantTargets={variantTargets}
                 />
               );
             },
-            size: TARGET_COL_DEFAULT_PCT,
-            minSize: 10,
+            size: COMPARISON_COL_DEFAULT_PCT,
+            minSize: COMPARISON_COL_MIN_PCT,
             meta: {
-              columnType: "pairwise" as ColumnType,
-              columnId: `pairwise.${evaluatorId}`,
+              columnType: "comparison" as ColumnType,
+              columnId: `comparison.${evaluatorId}`,
             },
           },
         ) as ColumnDef<TableRowData>,
@@ -1467,8 +1673,9 @@ export function EvaluationsV3Table({
     // ONLY structural dependencies - columns should almost never change
     // All dynamic data goes through tableMeta
     targetIds,
+    comparisonTargetIds,
     stableDatasetColumns,
-    stablePairwiseEvaluators,
+    stableComparisonEvaluators,
     columnHelper,
   ]);
 
@@ -1505,6 +1712,42 @@ export function EvaluationsV3Table({
   const resizeStartXRef = useRef<number>(0);
   const resizeStartWidthRef = useRef<number>(0);
 
+  // Single source of truth for a column's default/minimum width, by id and
+  // type — every sizing path (drag start, drag clamp, double-click reset,
+  // total-width sum, rendered width) reads through this instead of each
+  // re-deriving "is this a comparison column" on its own, which is how the
+  // comparison 24%/14% sizing previously only applied to rendering while the
+  // other paths silently fell back to the ordinary target defaults.
+  const getDefaultPctForColumn = useCallback(
+    (columnId: string, columnType: string): number => {
+      if (columnType === "dataset") return DATASET_COL_DEFAULT_PCT;
+      if (columnType === "comparison") return COMPARISON_COL_DEFAULT_PCT;
+      if (columnType === "target") {
+        const targetId = columnId.replace(/^target\./, "");
+        return comparisonTargetIds.has(targetId)
+          ? COMPARISON_COL_DEFAULT_PCT
+          : TARGET_COL_DEFAULT_PCT;
+      }
+      return TARGET_COL_DEFAULT_PCT;
+    },
+    [comparisonTargetIds],
+  );
+
+  const getMinPctForColumn = useCallback(
+    (columnId: string, columnType: string): number => {
+      if (columnType === "dataset") return 8;
+      if (columnType === "comparison") return COMPARISON_COL_MIN_PCT;
+      if (columnType === "target") {
+        const targetId = columnId.replace(/^target\./, "");
+        return comparisonTargetIds.has(targetId)
+          ? COMPARISON_COL_MIN_PCT
+          : 10;
+      }
+      return 10;
+    },
+    [comparisonTargetIds],
+  );
+
   // Custom resize handler - converts pixel movements to percentage changes
   // This gives us fine-grained control over resize sensitivity
   const createResizeHandler = useCallback(
@@ -1518,9 +1761,7 @@ export function EvaluationsV3Table({
         // Get current width percentage
         const currentPct =
           columnSizing[columnId] ??
-          (columnType === "dataset"
-            ? DATASET_COL_DEFAULT_PCT
-            : TARGET_COL_DEFAULT_PCT);
+          getDefaultPctForColumn(columnId, columnType);
 
         resizingColumnRef.current = columnId;
         resizeStartXRef.current = startX;
@@ -1538,8 +1779,13 @@ export function EvaluationsV3Table({
           // This ensures consistent resize feel regardless of screen size
           const deltaPct = (deltaX / containerWidth) * 100;
 
-          // Calculate new width percentage
-          const newPct = Math.max(5, resizeStartWidthRef.current + deltaPct);
+          // Calculate new width percentage, clamped to this column's own
+          // minimum rather than a flat 5% every column shared regardless of
+          // its declared minSize.
+          const newPct = Math.max(
+            getMinPctForColumn(columnId, columnType),
+            resizeStartWidthRef.current + deltaPct,
+          );
 
           // Update column sizing state
           setColumnSizing((prev) => ({
@@ -1574,7 +1820,13 @@ export function EvaluationsV3Table({
         document.addEventListener("touchend", handleEnd);
       };
     },
-    [columnSizing, containerWidth, setColumnWidths],
+    [
+      columnSizing,
+      containerWidth,
+      setColumnWidths,
+      getDefaultPctForColumn,
+      getMinPctForColumn,
+    ],
   );
 
   // Check if a column is currently being resized
@@ -1586,10 +1838,7 @@ export function EvaluationsV3Table({
   // Double-click handler to reset column to default width
   const handleResizeDoubleClick = useCallback(
     (columnId: string, columnType: string) => {
-      const defaultPct =
-        columnType === "dataset"
-          ? DATASET_COL_DEFAULT_PCT
-          : TARGET_COL_DEFAULT_PCT;
+      const defaultPct = getDefaultPctForColumn(columnId, columnType);
 
       setColumnSizing((prev) => ({
         ...prev,
@@ -1607,7 +1856,7 @@ export function EvaluationsV3Table({
         });
       }, 100);
     },
-    [setColumnWidths],
+    [setColumnWidths, getDefaultPctForColumn],
   );
 
   const table = useReactTable({
@@ -1665,20 +1914,28 @@ export function EvaluationsV3Table({
 
     // Sum target column percentages
     for (const target of targets) {
-      total += columnSizing[`target.${target.id}`] ?? TARGET_COL_DEFAULT_PCT;
+      const colId = `target.${target.id}`;
+      total += columnSizing[colId] ?? getDefaultPctForColumn(colId, "target");
     }
 
-    // Sum dedicated pairwise result column percentages — omitting these
-    // left the table's overall width computed as if they didn't exist,
-    // so each pairwise column had to squeeze into whatever sliver of
-    // "auto" space was left over, rendering near-zero-width with its
-    // text wrapping one character per line.
-    for (const pwEval of stablePairwiseEvaluators) {
-      total += columnSizing[`pairwise.${pwEval.id}`] ?? TARGET_COL_DEFAULT_PCT;
+    // Sum dedicated comparison result column percentages — omitting these left
+    // the table's overall width computed as if they didn't exist, so each
+    // comparison column had to squeeze into whatever sliver of "auto" space
+    // was left over, rendering near-zero-width with its text wrapping one
+    // character per line.
+    for (const compEval of stableComparisonEvaluators) {
+      const colId = `comparison.${compEval.id}`;
+      total += columnSizing[colId] ?? getDefaultPctForColumn(colId, "comparison");
     }
 
     return total;
-  }, [datasetColumns, targets, stablePairwiseEvaluators, columnSizing]);
+  }, [
+    datasetColumns,
+    targets,
+    stableComparisonEvaluators,
+    columnSizing,
+    getDefaultPctForColumn,
+  ]);
 
   // Get column width as CSS string
   // Converts stored percentage values to CSS percentage strings
@@ -1695,16 +1952,22 @@ export function EvaluationsV3Table({
         return `${storedPct}%`;
       }
 
-      // Use default percentages based on column type
-      if (columnType === "dataset") return `${DATASET_COL_DEFAULT_PCT}%`;
-      if (columnType === "target") return `${TARGET_COL_DEFAULT_PCT}%`;
-      // Dedicated pairwise result columns need a real percentage too —
-      // falling through to "auto" here left them competing with the
-      // filler column for whatever sliver of space was left over.
-      if (columnType === "pairwise") return `${TARGET_COL_DEFAULT_PCT}%`;
+      // Use default percentages based on column type. A comparison reaches
+      // here as either a column-style TARGET ("target.<id>") or a dedicated
+      // comparison column; both carry the extra verdict + metrics in their
+      // header and need the wider share — getDefaultPctForColumn is the one
+      // place that knows this, so every sizing path (this render, drag
+      // start/clamp, double-click reset, total-width sum) agrees.
+      if (
+        columnType === "dataset" ||
+        columnType === "target" ||
+        columnType === "comparison"
+      ) {
+        return `${getDefaultPctForColumn(columnId, columnType)}%`;
+      }
       return "auto";
     },
-    [columnSizing],
+    [columnSizing, getDefaultPctForColumn],
   );
 
   return (
@@ -1728,6 +1991,14 @@ export function EvaluationsV3Table({
           top: 0,
           zIndex: 11,
           backgroundColor: "var(--chakra-colors-bg-panel)",
+          // Promotes the sticky cell to its own GPU compositing layer.
+          // Without it the browser can paint the sticky header a frame
+          // behind the scrolling body during fast/inertial scroll (each
+          // row's rich content — long generated text, evaluator chips —
+          // costs real paint time), so body content flashes through the
+          // header for a frame even though both are correctly positioned
+          // once scrolling settles. Standard fix for this class of bug.
+          willChange: "transform",
         },
         // Column header row (second row in thead)
         "& thead tr:nth-of-type(2) th": {
@@ -1735,6 +2006,7 @@ export function EvaluationsV3Table({
           top: `${superHeaderHeight}px`,
           zIndex: 10,
           backgroundColor: "var(--chakra-colors-bg-panel)",
+          willChange: "transform",
         },
         // Resize handle styles - wider hit area, narrow visible indicator
         "& .resizer": {
@@ -1823,6 +2095,13 @@ export function EvaluationsV3Table({
                 const columnType = meta?.columnType ?? "unknown";
                 const isFixedWidth = meta?.isFixedWidth ?? false;
 
+                const isHighlightedColumn =
+                  !!targetId && targetId === highlightedVariantTargetId;
+                // The winning column glows green so a verdict reads at a
+                // glance; tracing a loser (or a tie) keeps the neutral blue.
+                const highlightColor =
+                  highlightedVariantOutcome === "won" ? "green" : "blue";
+
                 return (
                   <th
                     key={header.id}
@@ -1832,6 +2111,24 @@ export function EvaluationsV3Table({
                         columnType,
                         isFixedWidth,
                       ),
+                      // The highlight is a brief auto-clearing flash (see
+                      // CLICK_HIGHLIGHT_DURATION_MS in ComparisonCell), so it
+                      // needs to fade smoothly rather than snapping off.
+                      // boxShadow always has a value (harmless — headers
+                      // don't normally use one) so it has a "from" and "to"
+                      // to interpolate. background is left unset when not
+                      // highlighted rather than forced to "transparent" —
+                      // this inline style would otherwise override the
+                      // header's own opaque background (needed so scrolled
+                      // rows don't show through the sticky header).
+                      transition:
+                        "box-shadow 300ms ease, background-color 300ms ease",
+                      boxShadow: isHighlightedColumn
+                        ? `inset 0 0 0 2px var(--chakra-colors-${highlightColor}-400)`
+                        : "inset 0 0 0 0 transparent",
+                      ...(isHighlightedColumn && {
+                        background: `var(--chakra-colors-${highlightColor}-subtle)`,
+                      }),
                     }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}

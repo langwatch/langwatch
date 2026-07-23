@@ -5,9 +5,11 @@
  *   - `claude` writes to `~/.claude/settings.json`'s top-level `env`
  *     block (native Claude Code env loader; doesn't leak vars into
  *     unrelated shell children)
- *   - `codex` (and any other tool without an app-scoped env block)
- *     falls back to appending a marker-bracketed export block to the
- *     detected shell rc file
+ *   - `codex` writes the Authorization header into its native `[otel]`
+ *     block in `~/.codex/config.toml` (same no-leak property)
+ *   - any other tool without an app-scoped target (cursor, gemini,
+ *     opencode) falls back to appending a marker-bracketed export block
+ *     to the detected shell rc file
  *
  * Drives the Y / n / never branches by mocking readline (the stdin
  * prompt) and saveConfig (the persistence).
@@ -252,9 +254,13 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
   });
 
-  describe("when the tool is `codex` (no app-scoped env block)", () => {
+  describe("when the tool is `codex` (native ~/.codex/config.toml target)", () => {
+    function codexConfigPath(): string {
+      return path.join(tmpHome, ".codex", "config.toml");
+    }
+
     describe("and the user answers 'y'", () => {
-      it("appends the marked OTEL block to ~/.zshrc", async () => {
+      it("writes the Authorization header into config.toml's [otel] block", async () => {
         answers.push("y");
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
@@ -264,18 +270,21 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           tool: "codex",
           vars: otelVars,
         });
-        const rc = fs.readFileSync(path.join(tmpHome, ".zshrc"), "utf8");
-        expect(rc).toContain("# >>> langwatch begin >>>");
-        expect(rc).toContain(
-          "export OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
+        const toml = fs.readFileSync(codexConfigPath(), "utf8");
+        expect(toml).toContain("[otel.trace_exporter.otlp-http]");
+        expect(toml).toContain(
+          `headers = { "Authorization" = "Bearer sk-lw-token" }`,
         );
-        expect(rc).toContain("# <<< langwatch end <<<");
-        // The Claude Code settings file must NOT be touched — codex has no
-        // reason to write there.
+        // codex does not append /v1/traces itself, so the block spells it out.
+        expect(toml).toContain(
+          `endpoint = "http://app.example.com/api/otel/v1/traces"`,
+        );
+        // Neither the shell rc nor the Claude Code settings file is touched.
+        expect(fs.existsSync(path.join(tmpHome, ".zshrc"))).toBe(false);
         expect(fs.existsSync(claudeSettingsPath())).toBe(false);
       });
 
-      it("names ~/.zshrc in the prompt", async () => {
+      it("names ~/.codex/config.toml in the prompt, not the shell rc", async () => {
         answers.push("y");
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
@@ -286,13 +295,13 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           vars: otelVars,
         });
         expect(lastPrompts).toHaveLength(1);
-        expect(lastPrompts[0]).toContain(".zshrc");
-        expect(lastPrompts[0]).not.toContain("~/.claude/settings.json");
+        expect(lastPrompts[0]).toContain("~/.codex/config.toml");
+        expect(lastPrompts[0]).not.toContain(".zshrc");
       });
     });
 
     describe("and the user answers 'never'", () => {
-      it("persists shell_rc_preference='skip' and leaves ~/.zshrc untouched", async () => {
+      it("persists shell_rc_preference='skip' and leaves config.toml untouched", async () => {
         answers.push("never");
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
@@ -305,17 +314,27 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         });
         expect(c.shell_rc_preference).toBe("skip");
         expect(saveConfigMock).toHaveBeenCalledTimes(1);
-        expect(fs.existsSync(path.join(tmpHome, ".zshrc"))).toBe(false);
+        expect(fs.existsSync(codexConfigPath())).toBe(false);
       });
     });
 
-    describe("and ~/.zshrc already carries this export set", () => {
-      it("stays quiet even if the current shell hasn't sourced it yet", async () => {
-        const rcFile = path.join(tmpHome, ".zshrc");
-        const installed = `# >>> langwatch begin >>>\n${Object.entries(otelVars)
-          .map(([k, v]) => `export ${k}=${v}`)
-          .join("\n")}\n# <<< langwatch end <<<\n`;
-        fs.writeFileSync(rcFile, installed);
+    describe("and config.toml already carries the Authorization header", () => {
+      it("stays quiet — no prompt, no rewrite", async () => {
+        const configFile = codexConfigPath();
+        fs.mkdirSync(path.dirname(configFile), { recursive: true });
+        const installed = [
+          "# >>> langwatch otel begin >>>",
+          "[otel]",
+          `environment = "langwatch"`,
+          "",
+          "[otel.trace_exporter.otlp-http]",
+          `endpoint = "http://app.example.com/api/otel/v1/traces"`,
+          `protocol = "json"`,
+          `headers = { "Authorization" = "Bearer sk-lw-token" }`,
+          "# <<< langwatch otel end <<<",
+          "",
+        ].join("\n");
+        fs.writeFileSync(configFile, installed);
         // No answer queued: a fired prompt would read "" → "yes" → rewrite.
         const { maybeOfferIngestionShellRcPersist } = await import(
           "../shell-rc.js"
@@ -325,17 +344,30 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           tool: "codex",
           vars: otelVars,
         });
+        expect(lastPrompts).toHaveLength(0);
         expect(saveConfigMock).not.toHaveBeenCalled();
-        expect(fs.readFileSync(rcFile, "utf8")).toBe(installed);
+        expect(fs.readFileSync(configFile, "utf8")).toBe(installed);
       });
     });
 
-    describe("and ~/.zshrc holds a stale block", () => {
-      it("still offers and rewrites the block with the current export set", async () => {
-        const rcFile = path.join(tmpHome, ".zshrc");
+    describe("and config.toml has the endpoint-only block (no header yet)", () => {
+      it("still offers and installs the header without doubling the block", async () => {
+        const configFile = codexConfigPath();
+        fs.mkdirSync(path.dirname(configFile), { recursive: true });
+        // The wrapper's unconditional setup write: endpoint, no header.
         fs.writeFileSync(
-          rcFile,
-          "# >>> langwatch begin >>>\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://old\n# <<< langwatch end <<<\n",
+          configFile,
+          [
+            "# >>> langwatch otel begin >>>",
+            "[otel]",
+            `environment = "langwatch"`,
+            "",
+            "[otel.trace_exporter.otlp-http]",
+            `endpoint = "http://app.example.com/api/otel/v1/traces"`,
+            `protocol = "json"`,
+            "# <<< langwatch otel end <<<",
+            "",
+          ].join("\n"),
         );
         answers.push("y");
         const { maybeOfferIngestionShellRcPersist } = await import(
@@ -346,15 +378,117 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           tool: "codex",
           vars: otelVars,
         });
-        const rc = fs.readFileSync(rcFile, "utf8");
-        expect(rc).toContain("export OTEL_TRACES_EXPORTER=otlp");
-        expect(rc).toContain(
-          "export OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
+        const toml = fs.readFileSync(configFile, "utf8");
+        expect(toml).toContain(
+          `headers = { "Authorization" = "Bearer sk-lw-token" }`,
         );
-        expect(rc).toContain("OTEL_EXPORTER_OTLP_HEADERS");
-        expect(rc).toContain("sk-lw-token");
-        expect(rc).not.toContain("http://old");
+        expect((toml.match(/langwatch otel begin/g) ?? []).length).toBe(1);
       });
+    });
+  });
+
+  describe("when the tool is `opencode` (scoped shell function, no global export)", () => {
+    describe("and the user answers 'y'", () => {
+      it("writes a scoped opencode() wrapper, not bare exports", async () => {
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "opencode",
+          vars: otelVars,
+        });
+        const rc = fs.readFileSync(path.join(tmpHome, ".zshrc"), "utf8");
+        expect(rc).toContain("# >>> langwatch opencode begin >>>");
+        expect(rc).toContain("opencode() {");
+        expect(rc).toContain('command opencode "$@"');
+        expect(rc).toContain(
+          "OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
+        );
+        // NOT a bare global export — that's the leak we're avoiding.
+        expect(rc).not.toContain("export OTEL_TRACES_EXPORTER");
+        // Claude Code settings file untouched.
+        expect(fs.existsSync(claudeSettingsPath())).toBe(false);
+      });
+
+      it("names the shell rc in the prompt", async () => {
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "opencode",
+          vars: otelVars,
+        });
+        expect(lastPrompts).toHaveLength(1);
+        expect(lastPrompts[0]).toContain(".zshrc");
+      });
+    });
+
+    describe("and ~/.zshrc already has an export block from another tool", () => {
+      it("adds the opencode wrapper under its own markers, leaving the export block", async () => {
+        const rcFile = path.join(tmpHome, ".zshrc");
+        const priorExport =
+          "# >>> langwatch begin >>>\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://gemini\n# <<< langwatch end <<<\n";
+        fs.writeFileSync(rcFile, priorExport);
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "opencode",
+          vars: otelVars,
+        });
+        const rc = fs.readFileSync(rcFile, "utf8");
+        // both blocks present, neither clobbered
+        expect(rc).toContain("# >>> langwatch begin >>>");
+        expect(rc).toContain("export OTEL_EXPORTER_OTLP_ENDPOINT=http://gemini");
+        expect(rc).toContain("# >>> langwatch opencode begin >>>");
+        expect(rc).toContain("opencode() {");
+      });
+    });
+
+    describe("and the opencode wrapper already targets this endpoint", () => {
+      it("stays quiet — no prompt, no rewrite", async () => {
+        const rcFile = path.join(tmpHome, ".zshrc");
+        const installed =
+          "# >>> langwatch opencode begin >>>\nopencode() {\n    OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel \\\n    command opencode \"$@\"\n}\n# <<< langwatch opencode end <<<\n";
+        fs.writeFileSync(rcFile, installed);
+        // No answer queued: a fired prompt would read "" → "yes" → rewrite.
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "opencode",
+          vars: otelVars,
+        });
+        expect(lastPrompts).toHaveLength(0);
+        expect(saveConfigMock).not.toHaveBeenCalled();
+        expect(fs.readFileSync(rcFile, "utf8")).toBe(installed);
+      });
+    });
+  });
+
+  describe("when the tool is `gemini` (same scoped-function pattern)", () => {
+    it("writes a scoped gemini() wrapper under its own markers, no global export", async () => {
+      answers.push("y");
+      const { maybeOfferIngestionShellRcPersist } = await import(
+        "../shell-rc.js"
+      );
+      await maybeOfferIngestionShellRcPersist({
+        cfg: cfg(),
+        tool: "gemini",
+        vars: otelVars,
+      });
+      const rc = fs.readFileSync(path.join(tmpHome, ".zshrc"), "utf8");
+      expect(rc).toContain("# >>> langwatch gemini begin >>>");
+      expect(rc).toContain("gemini() {");
+      expect(rc).toContain('command gemini "$@"');
+      expect(rc).not.toContain("export OTEL_TRACES_EXPORTER");
     });
   });
 

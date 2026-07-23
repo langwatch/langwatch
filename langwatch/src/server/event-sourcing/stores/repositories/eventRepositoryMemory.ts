@@ -1,4 +1,5 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
+import { compareOrdinal } from "../../utils/compareOrdinal";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
@@ -63,16 +64,74 @@ export class EventRepositoryMemory implements EventRepository {
       return false;
     });
 
-    // Sort by timestamp then eventId to ensure consistent ordering
+    // Sort by timestamp then eventId to ensure consistent ordering. The id
+    // tie-break is plain relational (byte-wise), never localeCompare: it must
+    // order exactly like ClickHouse's `ORDER BY EventTimestamp, EventId` and
+    // the shared cursor comparator, or a same-millisecond tie folds in a
+    // different order in tests than in prod.
     const sortedRecords = [...filteredRecords].sort((a, b) => {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }
-      return a.EventId.localeCompare(b.EventId);
+      return compareOrdinal(a.EventId, b.EventId);
     });
 
     // Return a copy to prevent mutation
     return sortedRecords.map((record) => ({ ...record }));
+  }
+
+  async getEventRecordsUpToPaged(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    upToTimestamp: number;
+    upToEventId: string;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<EventRecord[]> {
+    const {
+      tenantId,
+      aggregateType,
+      aggregateId,
+      upToTimestamp,
+      upToEventId,
+      after,
+      limit,
+    } = request;
+    const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
+    const records = this.eventsByKey.get(key) ?? [];
+
+    const withinUpperBound = (record: EventRecord): boolean =>
+      record.EventTimestamp < upToTimestamp ||
+      (record.EventTimestamp === upToTimestamp &&
+        record.EventId <= upToEventId);
+
+    // Strict cursor: only records ordered AFTER (after.timestamp, after.eventId).
+    const afterCursor = (record: EventRecord): boolean => {
+      if (!after) return true;
+      if (record.EventTimestamp > after.timestamp) return true;
+      return (
+        record.EventTimestamp === after.timestamp &&
+        record.EventId > after.eventId
+      );
+    };
+
+    const filtered = records.filter(
+      (record) => withinUpperBound(record) && afterCursor(record),
+    );
+
+    // Plain relational comparison, not localeCompare: withinUpperBound and
+    // afterCursor above already order EventId with `<=`/`>`, so the sort must
+    // use the same (locale-independent) comparison or the cursor's boundary
+    // can disagree with where a record lands in the sorted page.
+    const sorted = [...filtered].sort((a, b) => {
+      if (a.EventTimestamp !== b.EventTimestamp) {
+        return a.EventTimestamp - b.EventTimestamp;
+      }
+      return a.EventId < b.EventId ? -1 : a.EventId > b.EventId ? 1 : 0;
+    });
+
+    return sorted.slice(0, limit).map((record) => ({ ...record }));
   }
 
   async countEventRecords(

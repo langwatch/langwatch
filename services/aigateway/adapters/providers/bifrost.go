@@ -36,13 +36,30 @@ type BifrostRouter struct {
 	// Voyage request so connection pooling actually works. Building a
 	// new http.Client per request would defeat keep-alive and risk
 	// port exhaustion under embedding throughput.
-	voyageClient *http.Client
+	voyageClient   *http.Client
+	endpointPolicy customerEndpointPolicy
+	// codexClient streams against OpenAI's codex backend (no overall
+	// timeout — turns run for minutes; cancellation rides the context).
+	codexClient *http.Client
+	// codexRefresher is the control-plane road for refreshing a 401'd
+	// codex access token. Nil (e.g. in bare tests) degrades to reporting
+	// the session as expired instead of retrying.
+	codexRefresher  domain.CodexTokenRefresher
+	codexBackendURL string
 }
 
 // BifrostOptions configures the bifrost router.
 type BifrostOptions struct {
-	Logger          *zap.Logger
-	InitialPoolSize int
+	Logger                        *zap.Logger
+	InitialPoolSize               int
+	BlockLocalHTTPCalls           bool
+	RequireHTTPSCustomerEndpoints bool
+	AllowedEndpointHosts          []string
+	// CodexRefresher wires the control-plane token refresh for the codex
+	// provider (see adapters/providers/codex.go).
+	CodexRefresher domain.CodexTokenRefresher
+	// CodexBackendURL overrides the codex upstream (tests only).
+	CodexBackendURL string
 }
 
 // NewBifrostRouter creates a provider router backed by bifrost.
@@ -59,10 +76,22 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if err != nil {
 		return nil, fmt.Errorf("bifrost init: %w", err)
 	}
+	codexURL := opts.CodexBackendURL
+	if codexURL == "" {
+		codexURL = codexBackendDefaultURL
+	}
 	return &BifrostRouter{
 		bf:           bf,
 		logger:       opts.Logger,
 		voyageClient: newVoyageClient(),
+		endpointPolicy: newCustomerEndpointPolicy(
+			opts.BlockLocalHTTPCalls,
+			opts.RequireHTTPSCustomerEndpoints,
+			opts.AllowedEndpointHosts,
+		),
+		codexClient:     newCodexClient(),
+		codexRefresher:  opts.CodexRefresher,
+		codexBackendURL: codexURL,
 	}, nil
 }
 
@@ -83,6 +112,18 @@ func (r *BifrostRouter) Close() {
 	r.bf.Shutdown()
 }
 
+func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred domain.Credential) error {
+	err := validateCredentialEndpoints(ctx, cred, r.endpointPolicy)
+	if err != nil {
+		code := domain.ErrBadRequest
+		if isRetryableEndpointResolutionError(err) {
+			code = domain.ErrProviderError
+		}
+		return herr.NewLight(ctx, code, herr.M{"reason": err.Error()})
+	}
+	return nil
+}
+
 // Dispatch sends a non-streaming request through bifrost.
 //
 // For /v1/chat/completions (RequestTypeChat) the inbound body is
@@ -99,6 +140,9 @@ func (r *BifrostRouter) Close() {
 // to an Anthropic-family provider; sending it to OpenAI is a caller
 // error and Bifrost/OpenAI will reject accordingly.
 func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
+	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
+		return nil, err
+	}
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
@@ -111,6 +155,12 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// clean unsupported-type error.
 	if cred.ProviderID == domain.ProviderVoyage {
 		return r.dispatchVoyageDirect(ctx, req, model, cred)
+	}
+
+	// Codex streams upstream always (the backend is SSE-only); the
+	// non-streaming path aggregates to the completed Response. See codex.go.
+	if cred.ProviderID == domain.ProviderOpenAICodex {
+		return r.dispatchCodex(ctx, req, model, cred)
 	}
 
 	provider := mapProvider(cred)
@@ -391,11 +441,21 @@ func (r *BifrostRouter) dispatchVoyageDirect(
 //   - RequestTypePassthrough: dedicated dispatchPassthroughStream (Gemini
 //     /v1beta/...:streamGenerateContent).
 func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error) {
-	provider := mapProvider(cred)
+	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
+		return nil, err
+	}
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+
+	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
+	// backend with OAuth + one-shot token refresh. See codex.go.
+	if cred.ProviderID == domain.ProviderOpenAICodex {
+		return r.dispatchCodexStream(ctx, req, model, cred)
+	}
+
+	provider := mapProvider(cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponsesStream(ctx, req, provider, model, cred)
@@ -796,7 +856,14 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 	switch provider {
 	case bfschemas.Azure:
 		k.Value = envVar(cred.APIKey)
-		endpoint := cred.Extra["endpoint"]
+		// Accept both endpoint names: the control-plane/VK path
+		// (config.materialiser.ts / config_wire.go) sends "endpoint", but the
+		// /go/proxy path (gatewayproxy.ParseCredentialFromHeaders) carries the
+		// customer's Azure endpoint under the litellm-era "api_base" name. Reading
+		// only "endpoint" left every Azure scenario/playground call dispatching
+		// with an empty endpoint → Bifrost "endpoint not set" (#5760). Mirrors the
+		// dual-name tolerance credBaseURL already applies to vLLM.
+		endpoint := credExtra(cred, "endpoint", "api_base")
 		cfg := &bfschemas.AzureKeyConfig{
 			Endpoint:    envVar(endpoint),
 			Deployments: cred.DeploymentMap,

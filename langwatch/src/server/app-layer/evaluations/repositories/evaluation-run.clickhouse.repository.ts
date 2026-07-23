@@ -1,13 +1,17 @@
+import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { createLogger } from "~/utils/logger/server";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
+import { capSerializedInputs, capText } from "../evaluation-column-caps";
 import type { EvalSummary, EvaluationRunData } from "../types";
-import type { EvaluationRunRepository, GetByEvaluationIdParams } from "./evaluation-run.repository";
+import type {
+  EvaluationRunRepository,
+  GetByEvaluationIdParams,
+} from "./evaluation-run.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
 
@@ -47,7 +51,13 @@ interface ClickHouseEvaluationRunRecord {
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   ClickHouseEvaluationRunRecord,
-  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "LastEventOccurredAt"
+  | "CreatedAt"
+  | "UpdatedAt"
+  | "ArchivedAt"
+  | "ScheduledAt"
+  | "StartedAt"
+  | "CompletedAt"
+  | "LastEventOccurredAt"
 >;
 
 export class EvaluationRunClickHouseRepository
@@ -55,7 +65,11 @@ export class EvaluationRunClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async upsert(data: EvaluationRunData, tenantId: string, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
+  async upsert(
+    data: EvaluationRunData,
+    tenantId: string,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId },
       "EvaluationRunClickHouseRepository.upsert",
@@ -85,7 +99,6 @@ export class EvaluationRunClickHouseRepository
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
-
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -98,7 +111,11 @@ export class EvaluationRunClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ data: EvaluationRunData; tenantId: string; retentionDays?: number }>,
+    entries: Array<{
+      data: EvaluationRunData;
+      tenantId: string;
+      retentionDays?: number;
+    }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -109,22 +126,24 @@ export class EvaluationRunClickHouseRepository
 
     try {
       const client = await this.resolveClient(tenantId);
-      const records = entries.map(({ data, tenantId: tid, retentionDays: rd }) => {
-        const projectionId = data.scheduledAt
-          ? IdUtils.generateDeterministicEvaluationRunId(
-              tid,
-              data.evaluationId,
-              data.scheduledAt,
-            )
-          : data.evaluationId;
-        return this.toClickHouseRecord(
-          data,
-          tid,
-          projectionId,
-          EVALUATION_PROJECTION_VERSIONS.STATE,
-          rd,
-        );
-      });
+      const records = entries.map(
+        ({ data, tenantId: tid, retentionDays: rd }) => {
+          const projectionId = data.scheduledAt
+            ? IdUtils.generateDeterministicEvaluationRunId(
+                tid,
+                data.evaluationId,
+                data.scheduledAt,
+              )
+            : data.evaluationId;
+          return this.toClickHouseRecord(
+            data,
+            tid,
+            projectionId,
+            EVALUATION_PROJECTION_VERSIONS.STATE,
+            rd,
+          );
+        },
+      );
 
       await client.insert({
         table: TABLE_NAME,
@@ -229,12 +248,14 @@ export class EvaluationRunClickHouseRepository
       const scheduledAtMs =
         hints?.scheduledAt?.getTime() ??
         (await this.resolveScheduledAtMs(tenantId, evaluationId));
-      const partitionPredicate = scheduledAtMs !== undefined
-        ? "AND t.ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND t.ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
-        : "";
-      const innerPartitionPredicate = scheduledAtMs !== undefined
-        ? "AND ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
-        : "";
+      const partitionPredicate =
+        scheduledAtMs !== undefined
+          ? "AND t.ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND t.ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
+          : "";
+      const innerPartitionPredicate =
+        scheduledAtMs !== undefined
+          ? "AND ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
+          : "";
 
       const result = await client.query({
         query: `
@@ -279,14 +300,15 @@ export class EvaluationRunClickHouseRepository
             ${partitionPredicate}
           LIMIT 1
         `,
-        query_params: scheduledAtMs !== undefined
-          ? {
-              tenantId,
-              evaluationId,
-              scheduledAtFrom: scheduledAtMs - slackMs,
-              scheduledAtTo: scheduledAtMs + slackMs,
-            }
-          : { tenantId, evaluationId },
+        query_params:
+          scheduledAtMs !== undefined
+            ? {
+                tenantId,
+                evaluationId,
+                scheduledAtFrom: scheduledAtMs - slackMs,
+                scheduledAtTo: scheduledAtMs + slackMs,
+              }
+            : { tenantId, evaluationId },
         format: "JSONEachRow",
       });
 
@@ -520,6 +542,40 @@ export class EvaluationRunClickHouseRepository
     version: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): ClickHouseEvaluationRunWriteRecord {
+    // Belt-and-braces write caps (ADR-040): unconditional, flag-independent,
+    // last line of defence that keeps the part merge-safe even if the offload
+    // path is off, failed open, or a different writer inserted a fat payload.
+    // With offload on, `Inputs` is already a small marker object so these are
+    // no-ops.
+    const cappedInputs = capSerializedInputs(
+      data.inputs ? JSON.stringify(data.inputs) : null,
+    );
+    const cappedDetails = capText(data.details);
+    const cappedError = capText(data.error);
+    const cappedErrorDetails = capText(data.errorDetails);
+    if (
+      cappedInputs.truncated ||
+      cappedDetails.truncated ||
+      cappedError.truncated ||
+      cappedErrorDetails.truncated
+    ) {
+      logger.warn(
+        {
+          tenantId,
+          evaluationId: data.evaluationId,
+          inputsOriginalBytes: cappedInputs.originalBytes,
+          detailsOriginalBytes: cappedDetails.originalBytes,
+          errorOriginalBytes: cappedError.originalBytes,
+          errorDetailsOriginalBytes: cappedErrorDetails.originalBytes,
+          inputsTruncated: cappedInputs.truncated,
+          detailsTruncated: cappedDetails.truncated,
+          errorTruncated: cappedError.truncated,
+          errorDetailsTruncated: cappedErrorDetails.truncated,
+        },
+        "evaluation_runs row exceeded a column cap and was truncated at write to stay merge-safe",
+      );
+    }
+
     return {
       ProjectionId: projectionId,
       TenantId: tenantId,
@@ -534,13 +590,15 @@ export class EvaluationRunClickHouseRepository
       Score: data.score,
       Passed: data.passed === null ? null : data.passed ? 1 : 0,
       Label: data.label,
-      Details: data.details,
-      Inputs: data.inputs ? JSON.stringify(data.inputs) : null,
-      Error: data.error,
-      ErrorDetails: data.errorDetails,
+      Details: cappedDetails.value,
+      Inputs: cappedInputs.value,
+      Error: cappedError.value,
+      ErrorDetails: cappedErrorDetails.value,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
+      LastEventOccurredAt: data.LastEventOccurredAt
+        ? new Date(data.LastEventOccurredAt)
+        : new Date(0),
       ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
       ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
       StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,

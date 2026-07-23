@@ -3,7 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   checkOrganizationPermission,
-  checkPermissionOrPubliclyShared,
   checkProjectPermission,
   checkTeamPermission,
   EXTERNAL_MEMBER_PERMISSIONS,
@@ -41,9 +40,6 @@ const mockPrisma = {
   customRole: {
     findUnique: vi.fn(),
   },
-  publicShare: {
-    findFirst: vi.fn(),
-  },
   groupMembership: {
     findMany: vi.fn(),
   },
@@ -63,7 +59,14 @@ const mockSession = {
 describe("RBAC Integration Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: no group memberships, no role bindings, no team user (falls through to denied)
+    // Default: the caller IS a current member of the owning org — scoped
+    // resolution fails closed on membership, so every test that exercises a
+    // binding/group path needs one. Tests about non-members override this with
+    // null. Beyond that: no group memberships, no role bindings, no team user
+    // (falls through to denied).
+    mockPrisma.organizationUser.findFirst.mockResolvedValue({
+      role: OrganizationUserRole.MEMBER,
+    });
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
     mockPrisma.roleBinding.findMany.mockResolvedValue([]);
     mockPrisma.teamUser.findFirst.mockResolvedValue(null);
@@ -786,93 +789,6 @@ describe("RBAC Integration Tests", () => {
       });
     });
 
-    describe("checkPermissionOrPubliclyShared", () => {
-      it("should allow access when user has permission", async () => {
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-123",
-            organizationId: "org-1",
-            organization: {
-              members: [{ role: OrganizationUserRole.MEMBER }],
-            },
-          },
-        });
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: TeamUserRole.ADMIN, customRoleId: null },
-        ]);
-
-        const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("workflows:view" as Permission),
-          { resourceType: "TRACE", resourceParam: "traceId" },
-        );
-
-        const result = await middleware({
-          ctx: mockCtx,
-          input: { projectId: "project-123", traceId: "trace-123" },
-          next: mockNext,
-        });
-
-        expect(result).toBe("success");
-        expect(mockCtx.permissionChecked).toBe(true);
-        expect(mockCtx.publiclyShared).toBe(false);
-      });
-
-      it("should allow access when resource is publicly shared", async () => {
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-123",
-            members: [],
-            organization: { members: [] },
-          },
-        });
-
-        mockPrisma.publicShare.findFirst.mockResolvedValue({
-          id: "share-123",
-          resourceType: "TRACE",
-          resourceId: "trace-123",
-        });
-
-        const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("workflows:view" as Permission),
-          { resourceType: "TRACE", resourceParam: "traceId" },
-        );
-
-        const result = await middleware({
-          ctx: mockCtx,
-          input: { projectId: "project-123", traceId: "trace-123" },
-          next: mockNext,
-        });
-
-        expect(result).toBe("success");
-        expect(mockCtx.permissionChecked).toBe(true);
-        expect(mockCtx.publiclyShared).toBe(true);
-      });
-
-      it("should throw UNAUTHORIZED when no permission and not shared", async () => {
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-123",
-            members: [],
-            organization: { members: [] },
-          },
-        });
-
-        mockPrisma.publicShare.findFirst.mockResolvedValue(null);
-
-        const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("workflows:view" as Permission),
-          { resourceType: "TRACE", resourceParam: "traceId" },
-        );
-
-        await expect(
-          middleware({
-            ctx: mockCtx,
-            input: { projectId: "project-123", traceId: "trace-123" },
-            next: mockNext,
-          }),
-        ).rejects.toThrow(TRPCError);
-      });
-    });
   });
 
   // ==========================================================================
@@ -890,14 +806,12 @@ describe("RBAC Integration Tests", () => {
       hasTeamMember?: boolean;
     }) {
       mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-1",
-          organizationId: "org-1",
-          organization: {
-            members: orgRole ? [{ role: orgRole }] : [],
-          },
-        },
+        team: { id: "team-1", organizationId: "org-1" },
       });
+      // No orgRole => no OrganizationUser row => not a current member.
+      mockPrisma.organizationUser.findFirst.mockResolvedValue(
+        orgRole ? { role: orgRole } : null,
+      );
       if (hasTeamMember && teamRole) {
         mockPrisma.roleBinding.findMany.mockResolvedValue([
           { role: teamRole, customRoleId: null },
@@ -1496,45 +1410,6 @@ describe("RBAC Integration Tests", () => {
       });
     });
 
-    describe("when public share fallback middleware runs for a permitted user", () => {
-      it("passes org role via checkProjectPermission", async () => {
-        const ctx = {
-          prisma: mockPrisma,
-          session: mockSession,
-          permissionChecked: false,
-          publiclyShared: false,
-          organizationRole: undefined as OrganizationUserRole | null | undefined,
-        };
-
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-1",
-            organizationId: "org-1",
-            organization: {
-              members: [{ role: OrganizationUserRole.MEMBER }],
-            },
-          },
-        });
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: TeamUserRole.MEMBER, customRoleId: null },
-        ]);
-
-        const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("analytics:view" as Permission),
-          { resourceType: "TRACE", resourceParam: "traceId" },
-        );
-
-        await middleware({
-          ctx,
-          input: { projectId: "project-1", traceId: "trace-1" },
-          next: mockNext,
-        });
-
-        expect(ctx.organizationRole).toBe(OrganizationUserRole.MEMBER);
-        expect(ctx.permissionChecked).toBe(true);
-      });
-    });
   });
 
   // ==========================================================================
@@ -1549,13 +1424,13 @@ describe("RBAC Integration Tests", () => {
       teamRole?: TeamUserRole;
       assignedRoleId?: string;
     } = {}) {
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: OrganizationUserRole.EXTERNAL,
+      });
       mockPrisma.project.findUnique.mockResolvedValue({
         team: {
           id: "team-1",
           organizationId: "org-1",
-          organization: {
-            members: [{ role: OrganizationUserRole.EXTERNAL }],
-          },
         },
       });
       mockPrisma.roleBinding.findMany.mockResolvedValue([
@@ -1787,14 +1662,11 @@ describe("RBAC Integration Tests", () => {
 
     describe("when non-EXTERNAL user (ADMIN org role) accesses resources", () => {
       it("grants full team-role-based access", async () => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.ADMIN,
+        });
         mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-1",
-            organizationId: "org-1",
-            organization: {
-              members: [{ role: OrganizationUserRole.ADMIN }],
-            },
-          },
+          team: { id: "team-1", organizationId: "org-1" },
         });
         mockPrisma.groupMembership.findMany.mockResolvedValue([]);
         mockPrisma.roleBinding.findMany.mockResolvedValue([
