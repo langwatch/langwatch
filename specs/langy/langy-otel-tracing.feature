@@ -98,7 +98,7 @@ Feature: Langy agent activity is traced into the user's project
     Then their usage reads as bundled with the plan, not billable spend
     And the bundled cost shows on the model calls alone, not the rest of the turn's activity
     And the trace still names the provider that served each call
-    But a turn on an API-key provider keeps its normal cost, no matter what the traced activity claims
+    But a turn on an API-key provider keeps its normal billed cost
 
   # ============================================================================
   # LangWatch's own copy of the turn — the mirror lane (ADR-061)

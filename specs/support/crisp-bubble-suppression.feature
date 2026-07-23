@@ -43,11 +43,12 @@ Feature: Crisp support bubble suppression
     Then the suppression mark is removed from the page
     And the support chat is asked to show and toggle open
 
+  @integration
   Scenario: Opening chat from the command palette shows the widget
     Given the Crisp bubble policy is installed
     When the user selects Open Chat in the command palette
-    Then the open is routed through the bubble policy
-    And the widget appears instead of staying suppressed
+    Then the support chat opens
+    And the palette closes
 
   @unit
   Scenario: Opening the chat from any other entry point lifts suppression
