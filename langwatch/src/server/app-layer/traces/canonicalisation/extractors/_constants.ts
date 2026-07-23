@@ -115,6 +115,12 @@ export const ATTR_KEYS = {
 
   // LangWatch cost and estimation attributes
   LANGWATCH_SPAN_COST: "langwatch.span.cost",
+  // Marks LLM usage covered by a flat subscription rather than billed per
+  // token. The receiver stamps it at resource level for coding-agent tools
+  // on a bundled plan; an extractor (or instrumentation) sets it at span
+  // level when a single call is known to be bundled (e.g. the codex account
+  // provider). The span-level value wins over the resource-level default.
+  LANGWATCH_COST_NON_BILLABLE: "langwatch.cost.non_billable",
   LANGWATCH_TOKENS_ESTIMATED: "langwatch.tokens.estimated",
   LANGWATCH_METRICS: "langwatch.metrics",
   // SDK span timing blob: { started_at, first_token_at, finished_at }

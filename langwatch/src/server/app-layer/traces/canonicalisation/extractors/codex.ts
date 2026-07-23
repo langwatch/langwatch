@@ -2,7 +2,10 @@
  * Codex Extractor
  *
  * Handles: OpenAI Codex's native OpenTelemetry log records AND its
- * Rust-CLI native spans (scope `codex_cli_rs`).
+ * Rust-CLI native spans (scope `codex_cli_rs`), plus the bundled-cost
+ * classification of codex account-provider spans from any emitter (the
+ * gateway's `gen_ai.provider.name = openai_codex` spans, or spans whose
+ * model id carries the `openai_codex/` vendor prefix).
  *
  * On the LOG side, Codex emits three event types this extractor claims:
  *
@@ -51,6 +54,10 @@
  * - langwatch.input (from codex.user_prompt prompt)
  */
 
+import {
+  CODEX_PROVIDER_KEY,
+  isCodexModel,
+} from "~/server/modelProviders/codexRestrictions";
 import { ATTR_KEYS } from "./_constants";
 import type {
   CanonicalAttributesExtractor,
@@ -74,11 +81,7 @@ const CODEX_REDUNDANT_USAGE_SPAN_NAMES = new Set(["handle_responses"]);
 const asNumber = (raw: unknown): number | null => {
   if (raw === undefined || raw === null || raw === "") return null;
   const n =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Number(raw)
-        : NaN;
+    typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
   return Number.isFinite(n) ? n : null;
 };
 
@@ -89,6 +92,8 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
   readonly id = "codex";
 
   apply(ctx: ExtractorContext): void {
+    this.markCodexProviderBundled(ctx);
+
     // Path A codex traffic flows through the gateway as gen_ai.*
     // spans; GenAIExtractor handles that side and emits canonical
     // attributes. This branch covers Path B native spans from the
@@ -210,6 +215,38 @@ export class CodexExtractor implements CanonicalAttributesExtractor {
     if (!CODEX_REDUNDANT_USAGE_SPAN_NAMES.has(ctx.span.name)) return;
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
     ctx.recordRule("codex/skip-redundant-usage");
+  }
+
+  /**
+   * Codex account-provider traffic ("sign in with OpenAI") bills the user's
+   * ChatGPT plan, never per token, so its computed cost is bundled. Stamps
+   * the same span-level non-billable marker the receiver stamps at resource
+   * level for coding-agent tools on a flat subscription; the trace-summary
+   * fold and the per-span cost derivation then classify the cost as
+   * NonBilledCost and the explorer renders it as "Bundled".
+   *
+   * A codex span is recognized by the provider name the gateway reports
+   * (`gen_ai.provider.name = openai_codex`) or by the codex vendor prefix on
+   * the request/response model id. Earlier extractors may already have moved
+   * these keys into `out`, so both `out` and the unconsumed bag are read. An
+   * explicit wire-level marker (either value) stays authoritative.
+   */
+  private markCodexProviderBundled(ctx: ExtractorContext): void {
+    const read = (key: string): unknown =>
+      ctx.out[key] ?? ctx.bag.attrs.get(key);
+
+    if (read(ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE) !== undefined) return;
+
+    const isCodex =
+      read(ATTR_KEYS.GEN_AI_PROVIDER_NAME) === CODEX_PROVIDER_KEY ||
+      [
+        read(ATTR_KEYS.GEN_AI_REQUEST_MODEL),
+        read(ATTR_KEYS.GEN_AI_RESPONSE_MODEL),
+      ].some((model) => typeof model === "string" && isCodexModel(model));
+    if (!isCodex) return;
+
+    ctx.setAttr(ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE, "true");
+    ctx.recordRule("codex/bundled-cost");
   }
 
   applyLog(ctx: LogExtractorContext): void {
