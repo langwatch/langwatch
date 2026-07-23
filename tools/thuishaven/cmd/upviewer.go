@@ -24,9 +24,12 @@ const viewerRingCap = 2000
 // viewerAllGroup is the combined launcher stream's tab label.
 const viewerAllGroup = "all"
 
-// runUpViewer opens the viewer on a stack's log files until quit or ctx cancel.
-func runUpViewer(ctx context.Context, slug string) error {
+// runUpViewer opens the viewer on a stack's log files until quit or ctx
+// cancel. preferred, when non-empty, names the group to land on as soon as it
+// appears — `haven up +langy` should open looking at langy.
+func runUpViewer(ctx context.Context, slug, preferred string) error {
 	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
+	m.preferred = preferred
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx))
 	_, err := p.Run()
 	if err != nil && ctx.Err() != nil { // Ctrl-C via the signal context is a clean detach
@@ -42,10 +45,14 @@ type viewerModel struct {
 	combined string // the launcher's combined log file (provisioning + all lanes)
 	capDir   string // per-service capture dir (logs/<slug>/)
 
-	groups   []string            // tab order: "all" + captured services (CLI names)
-	selected int                 // index into groups
-	lines    map[string][]string // rendered lines per group, ring-capped
-	offsets  map[string]int64    // read offset per file key ("all" or file service name)
+	groups   []string // tab order: "all" + captured services (CLI names)
+	selected int      // index into groups
+	// preferred is the group to auto-select the moment it appears (the service a
+	// `+svc` delta just added); cleared once applied or once the user picks a
+	// tab themselves.
+	preferred string
+	lines     map[string][]string // rendered lines per group, ring-capped
+	offsets   map[string]int64    // read offset per file key ("all" or file service name)
 
 	width, height int
 }
@@ -80,12 +87,15 @@ func (m *viewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "esc", "ctrl+c":
 			return m, tea.Quit
 		case "right", "l", "tab":
+			m.preferred = ""
 			m.selected = (m.selected + 1) % len(m.groups)
 		case "left", "h", "shift+tab":
+			m.preferred = ""
 			m.selected = (m.selected - 1 + len(m.groups)) % len(m.groups)
 		default:
 			// A digit jumps straight to that tab (1 = all).
 			if n := digitKey(msg.String()); n > 0 && n <= len(m.groups) {
+				m.preferred = ""
 				m.selected = n - 1
 			}
 		}
@@ -110,6 +120,10 @@ func (m *viewerModel) ingest() {
 		cli := fileToCLIService(svc)
 		if !m.hasGroup(cli) {
 			m.groups = append(m.groups, cli)
+			if cli == m.preferred {
+				m.selected = len(m.groups) - 1
+				m.preferred = ""
+			}
 		}
 		m.ingestCapture(svc, cli)
 	}

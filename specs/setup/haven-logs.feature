@@ -23,10 +23,10 @@ Feature: haven logs
     Then only nlp's lines appear
     And "haven logs nlp gateway" combines the two
 
-  Scenario: Following is -f and only -f
-    When the developer runs "haven logs -f"
+  Scenario: Tailing is -t and only -t
+    When the developer runs "haven logs -t"
     Then output streams live until interrupted
-    And "-f" means follow nowhere else and nothing else in the CLI
+    And "-t" means tail nowhere else and nothing else in the CLI
 
   Scenario: A time window is one flag
     When the developer runs "haven logs --since 10m"

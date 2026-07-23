@@ -15,6 +15,13 @@ Feature: haven lifecycle usability
     And the stack's ClickHouse and Postgres databases still exist
     And no flag on down can drop them — fresh data is "haven db reset"
 
+  @unit
+  Scenario: Down -f kills hard
+    Given the stack's launcher is running
+    When the developer runs "haven down -f"
+    Then the launcher's process group is SIGKILLed with no graceful wait
+    And the databases still exist
+
   Scenario: The daemon prunes databases idle past the TTL
     Given a slug whose databases were last used longer ago than the idle TTL
     And no stack is registered for that slug
@@ -28,7 +35,8 @@ Feature: haven lifecycle usability
     When the developer runs "haven up" in the same worktree
     Then a matching selection is a friendly no-op and the stack is left in place
     And a changed selection replaces the stack in place with the new one
-    And there is no refusal and no force flag
+    And "haven up -f" restarts even a matching stack
+    And there is never a refusal
 
   Scenario: Restarting one service bounces only that service
     Given the stack's launcher is running
@@ -61,7 +69,7 @@ Feature: haven lifecycle usability
   Scenario: A detached up logs the same as an attached one
     When the developer runs "haven up --detach"
     Then the stack starts in the background
-    And "haven logs -f" follows it exactly as it would an attached stack
+    And "haven logs -t" follows it exactly as it would an attached stack
     And "haven down" stops it
 
   Scenario: Switching to a worktree by name

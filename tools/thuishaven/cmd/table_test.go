@@ -80,18 +80,33 @@ func TestUnknownCommandSuggestsNearMisses(t *testing.T) {
 	}
 }
 
-// The --force half of the constitution: it does not exist anywhere; --yes is
-// the one confirmation.
+// The --force half of the constitution: -f/--force means exactly one thing —
+// force the lifecycle action — and only up and down carry it. Destructive
+// data operations confirm with --yes, never --force.
 // @scenario "A flag shorthand means one thing across the whole CLI"
-func TestNoForceFlagExists(t *testing.T) {
+func TestForceIsLifecycleOnly(t *testing.T) {
+	allowed := map[string]bool{"up": true, "down": true}
 	for _, spec := range table {
 		for _, f := range spec.flags {
-			if f.long == "--force" {
-				t.Errorf("haven %s declares --force — it was removed CLI-wide (ADR-064)", spec.name)
+			if f.long == "--force" && !allowed[spec.name] {
+				t.Errorf("haven %s declares --force — only up/down force their lifecycle (ADR-064)", spec.name)
 			}
 		}
 	}
+	for name := range allowed {
+		found := false
+		for _, f := range specByNameNoFatal(name).flags {
+			if f.long == "--force" && f.short == "-f" {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("haven %s should carry -f/--force", name)
+		}
+	}
 }
+
+func specByNameNoFatal(name string) commandSpec { return tableByName[name] }
 
 func TestParseRejectsUndeclaredFlags(t *testing.T) {
 	if _, err := parse(specByName(t, "logs"), []string{"--nope"}); err == nil {
@@ -137,12 +152,12 @@ func TestParseValueFlags(t *testing.T) {
 }
 
 func TestParseShortFlagExpandsToLong(t *testing.T) {
-	inv, err := parse(specByName(t, "logs"), []string{"-f"})
+	inv, err := parse(specByName(t, "logs"), []string{"-t"})
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if !inv.has("--follow") {
-		t.Error("-f did not register as --follow")
+	if !inv.has("--tail") {
+		t.Error("-t did not register as --tail")
 	}
 }
 

@@ -27,7 +27,8 @@ Feature: haven service selection
     Given the stack is running without langy
     When the developer runs "haven up +langy"
     Then the running stack is replaced in place with langy included
-    And there is no refusal and no force flag
+    And the attached log view opens on langy's group
+    And there is never a refusal
     And a plain "haven up" on a stack that matches its selection changes nothing
 
   Scenario: Up recovers a half-dead stack without a force flag

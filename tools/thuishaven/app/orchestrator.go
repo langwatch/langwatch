@@ -376,12 +376,16 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		o.store.RemoveStack(slug)
 		return true, nil
 	}
-	if domain.SelectionFromStack(st) == opts.Selection && st.LangyImage == opts.langyImageTag {
+	if !opts.ShouldForce && domain.SelectionFromStack(st) == opts.Selection && st.LangyImage == opts.langyImageTag {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
-		fmt.Printf("  bounce a service: haven restart [service] · stop: haven down · logs: haven logs\n")
+		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up -f · stop: haven down\n")
 		return false, nil
 	}
-	fmt.Printf("stack %q is running with a different selection — restarting it here with the new one\n", slug)
+	if opts.ShouldForce {
+		fmt.Printf("stack %q is running — replacing it (-f)\n", slug)
+	} else {
+		fmt.Printf("stack %q is running with a different selection — restarting it here with the new one\n", slug)
+	}
 	o.sys.Terminate(st.LauncherPID)
 	o.waitForProcessesDead([]int{st.LauncherPID})
 	return true, nil
@@ -393,15 +397,22 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 // on down can discard data; fresh data is `haven db reset`, and long-unused
 // databases are pruned in the background by the daemon (DBIdleTTL) or via
 // `haven clean`.
-func (o *Orchestrator) Down(ctx context.Context, p UpParams) error {
+func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
 	}
 	if st, ok := o.stackBySlug(slug); ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
-		o.sys.Terminate(st.LauncherPID)
-		o.waitForProcessesDead([]int{st.LauncherPID})
-		fmt.Printf("stopped launcher (pid %d)\n", st.LauncherPID)
+		if force {
+			// -f: no grace — SIGKILL the launcher's whole process group at once,
+			// for the stack that is wedged or just needs to be gone NOW.
+			o.sys.KillGroup(st.LauncherPID)
+			fmt.Printf("killed launcher group (pid %d) — -f skips graceful shutdown\n", st.LauncherPID)
+		} else {
+			o.sys.Terminate(st.LauncherPID)
+			o.waitForProcessesDead([]int{st.LauncherPID})
+			fmt.Printf("stopped launcher (pid %d)\n", st.LauncherPID)
+		}
 	}
 	for _, r := range domain.PerWorktreeServices {
 		o.proxy.Remove(r.Name, slug)

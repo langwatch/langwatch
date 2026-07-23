@@ -40,7 +40,7 @@ pnpm dev:haven          # == make haven up (bootstraps portless itself on first 
 make haven install      # optional: go install so plain `haven ...` works everywhere
 make haven status       # every stack, service health, shared servers — one shot
 haven up +langy         # add a service to this worktree's stack, sticky
-haven logs nlp -f       # follow one service's logs from any terminal
+haven logs nlp -t       # tail one service's logs from any terminal
 ```
 
 Open `https://langwatch.localhost` for the cross-worktree dashboard;

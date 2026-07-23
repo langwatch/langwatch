@@ -71,7 +71,7 @@ haven restart    bounce one supervised service (or all) in place; `restart obs`
                  bounces the observability stack; `restart langy --rebuild`
                  re-images first
 haven logs       captured service logs from any terminal, attached or detached:
-                 all interleaved, `haven logs nlp` filters, -f follows,
+                 all interleaved, `haven logs nlp` filters, -t tails,
                  --since 10m windows, --level warn filters severity,
                  --stack <slug> reads another worktree, `logs obs` streams LGTM
 haven status     one-shot report: selection, per-service health, shared servers,

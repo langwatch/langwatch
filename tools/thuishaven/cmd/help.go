@@ -124,10 +124,10 @@ EXAMPLES
     haven status                 # every stack + shared-server health, one shot
     haven status --json          # the same, machine-readable
     haven up --watch             # air hot-reload for gateway + nlp
-    haven up --detach            # background the stack; haven logs -f to follow
+    haven up --detach            # background with no view; haven logs -t to tail
     haven restart nlp            # bounce one Go service without hot reload
     haven logs                   # recent output from every service, interleaved
-    haven logs nlp -f            # follow one service live
+    haven logs nlp -t            # tail one service live
     haven logs --level warn --since 10m   # only recent warnings and errors
     haven down                   # stop the stack, keep the databases
     haven down --all             # stop everything haven runs on this machine

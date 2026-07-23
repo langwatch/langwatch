@@ -46,7 +46,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	// The observability stack is a container, not a supervised child — its logs
 	// come from docker, but through the same one command.
 	if len(inv.args) == 1 && inv.args[0] == "obs" {
-		return d.orch.ObservabilityLogs(ctx, inv.has("--follow"))
+		return d.orch.ObservabilityLogs(ctx, inv.has("--tail"))
 	}
 
 	slug := inv.value("--stack")
@@ -85,7 +85,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 	for _, l := range lines {
 		printLogLine(l, d.isAgent)
 	}
-	if !inv.has("--follow") {
+	if !inv.has("--tail") {
 		if len(lines) == 0 {
 			fmt.Println("(no matching log lines yet)")
 		}

@@ -470,7 +470,7 @@ func runUpDetached(d deps, rest []string) error {
 		return err
 	}
 	fmt.Printf("stack %q starting detached (pid %d)\n", st.slug, st.pid)
-	fmt.Printf("  logs:   haven logs -f    (%s)\n", st.logPath)
+	fmt.Printf("  logs:   haven logs -t    (%s)\n", st.logPath)
 	fmt.Printf("  stop:   haven down\n")
 	return nil
 }
@@ -484,12 +484,24 @@ func runUpAttached(ctx context.Context, d deps, rest []string) error {
 	if err != nil {
 		return err
 	}
-	if err := runUpViewer(ctx, st.slug); err != nil {
+	if err := runUpViewer(ctx, st.slug, preferredGroup(rest)); err != nil {
 		return err
 	}
 	fmt.Printf("detached — stack %q keeps running in the background\n", st.slug)
-	fmt.Printf("  logs:   haven logs -f   ·   attach again: haven up   ·   stop: haven down\n")
+	fmt.Printf("  logs:   haven logs -t   ·   attach again: haven up   ·   stop: haven down\n")
 	return nil
+}
+
+// preferredGroup picks the log group `up` should open on: the service the last
+// `+svc` delta just added — you asked for it, you want to watch it come up.
+func preferredGroup(rest []string) string {
+	preferred := ""
+	for _, a := range rest {
+		if len(a) > 1 && a[0] == '+' {
+			preferred = a[1:]
+		}
+	}
+	return preferred
 }
 
 // stdoutIsTTY reports whether a human terminal is on the other end — what
