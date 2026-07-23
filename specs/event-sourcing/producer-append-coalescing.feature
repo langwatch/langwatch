@@ -19,6 +19,18 @@ Feature: High-fan-in producers coalesce their event-log appends
     Then every item's event is durably recorded
     And a retry of the batch neither duplicates nor drops events
 
+  Scenario: a batch is bounded by size as well as count
+    Given a burst whose combined size would exceed the batch's byte budget before its count limit
+    When the producer coalesces the burst
+    Then the batch stops at the byte budget
+    And the remaining items form the next batch
+
+  Scenario: a single oversized item is appended on its own
+    Given one item larger than the batch's byte budget
+    When it is the next item to process
+    Then it is appended by itself
+    And it does not wait for a batch it can never fill
+
   Scenario: a low-fan-in producer is left alone
     Given a command that appends one event per human action
     When it records an action
