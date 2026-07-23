@@ -51,7 +51,7 @@ beforeEach(() => {
 
 describe("LangyHomeHero", () => {
   describe("when the project has no traces yet", () => {
-    /** @scenario The home carries only the field — asks live in the command bar */
+    /** @scenario The home no longer carries the setup control */
     it("renders no chip row and no onboarding pill", () => {
       reachMock.mockReturnValue({
         isLoading: false,
