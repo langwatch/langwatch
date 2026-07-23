@@ -10,7 +10,14 @@ import {
   observeBackendTurn as reduceObserveBackendTurn,
   requestStop as reduceRequestStop,
   settleTurn as reduceSettleTurn,
-} from "./langyTurnPhase";
+  applyLangyTurnEvents,
+  initialLangyTurnProjection,
+  isLangyTurnProjectionTerminal,
+  seedLangyTurnProjection,
+  type LangyConversationTurnWireEvent,
+  type LangyEventCursor,
+  type LangyTurnProjectionState,
+} from "@langwatch/langy";
 
 /**
  * Single client/UI-state store for the Langy panel (ADR-046 frontend).
@@ -182,7 +189,15 @@ export interface LangyProgressSample {
 }
 
 interface LangyState extends TurnPhaseState {
-  // Panel visibility
+  // Panel visibility. `false` is MINIMISED, not gone: the panel sinks to its
+  // edge peek (the panel itself slides down — a sliver of its header at the bottom in
+  // floating mode, of the dock's spine on the right edge in sidebar mode)
+  // with the conversation, draft and layout choice untouched underneath.
+  // `openPanel` — the peek's click/Enter, the Cmd/Ctrl+I toggle, an askLangy
+  // handoff — brings the same surface back. Exactly ONE minimised affordance
+  // renders at a time: the peek behind release_ui_langy_peek_dock_enabled,
+  // the classic launcher orb while that flag is off (see LangySidecar).
+  // Spec: specs/langy/langy-peek-dock.feature
   isOpen: boolean;
   openPanel: () => void;
   closePanel: () => void;
@@ -243,6 +258,19 @@ interface LangyState extends TurnPhaseState {
   dockShifted: boolean;
   setDockShifted: (shifted: boolean) => void;
 
+  /**
+   * The home page's ask field is in use right now.
+   *
+   * The field and Langy's panel are two ways to say the same thing, so a
+   * minimised Langy stands down while someone is typing into the field rather
+   * than peeking out from under its results. Never persisted: it mirrors what
+   * the reader is doing this second, and a page that reloaded into "the field
+   * is focused" when it is not would leave Langy hidden with nothing to
+   * un-hide it.
+   */
+  homeAskOpen: boolean;
+  setHomeAskOpen: (open: boolean) => void;
+
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
   /**
@@ -261,6 +289,17 @@ interface LangyState extends TurnPhaseState {
    * it WITHOUT reloading history (the stream already holds the messages).
    */
   adoptConversation: (id: string) => void;
+  /**
+   * Conversations THIS tab created whose read-side projection has not yet
+   * been seen. The create command is accepted before the projection lands, so
+   * a not-found from the history read is "not yet", never an error, until a
+   * durable confirmation arrives — a successful read, or a freshness signal
+   * naming the conversation. Session-scoped on purpose: never persisted (a
+   * refreshed tab reads before it writes, so the window doesn't exist there).
+   */
+  unconfirmedConversations: Record<string, true>;
+  /** A durable read or signal proved the conversation's projection exists. */
+  confirmConversation: (id: string) => void;
   /** Start a fresh, empty conversation. */
   startNewConversation: () => void;
   /** Mark the pending history load as applied. */
@@ -357,7 +396,7 @@ interface LangyState extends TurnPhaseState {
   //
   // The phase STATE fields (turnPhase, activeTurnId, settledTurnId,
   // backendSawTurnInFlight) come from `TurnPhaseState`; the machine's pure
-  // transitions live in langyTurnPhase.ts. The store exposes them as events:
+  // transitions live in @langwatch/langy's turnPhase.ts. The store exposes them as events:
   /** A turn was dispatched (transport adopted its ids): adopt it, go `active`. */
   beginTurn: (args: { conversationId: string; turnId: string }) => void;
   /** The user hit Stop: `active` → `stopping` (a no-op in any other phase). */
@@ -379,6 +418,26 @@ interface LangyState extends TurnPhaseState {
   observeBackendTurn: (inFlight: boolean) => void;
   /** A genuine end-of-turn frame settled the turn: go `idle` immediately. */
   settleTurn: (turnId: string | null) => void;
+  /**
+   * The LOCAL turn projection (ADR-059): the durable event tail folded through
+   * the same reducer the server projection runs. Seeded from the conversation
+   * snapshot, advanced by `applyTurnEvents`, and composed with the phase
+   * machine — a folded terminal settles the phase, a folded running turn
+   * confirms it, both replayable from the recorded events.
+   */
+  turnProjection: LangyTurnProjectionState;
+  /**
+   * Adopt a conversation snapshot's position (cursor + in-flight turn id).
+   * When the snapshot names a turn in flight and this tab tracks none, the tab
+   * adopts it — which is what makes Stop (and the live stream) work after a
+   * refresh. Never rewinds a fresher local fold.
+   */
+  seedTurnProjection: (snapshot: {
+    cursor: LangyEventCursor | null;
+    currentTurnId?: string | null;
+  }) => void;
+  /** Fold a fetched durable tail; idempotent under re-delivery and overlap. */
+  applyTurnEvents: (events: readonly LangyConversationTurnWireEvent[]) => void;
   /** Latest coarse status line for the turn (e.g. "Searching traces…"). */
   turnStatus: string | null;
   /** Latest progress fraction/percentage for the turn (0..1 or 0..100). */
@@ -429,6 +488,21 @@ interface LangyState extends TurnPhaseState {
   activeConversationScope: LangyScope | null;
 
   /**
+   * True once `resetForScope` has run in THIS page load. Never persisted.
+   *
+   * It is what tells the two kinds of same-scope announcement apart: the FIRST
+   * one after a load is the refresh-restore (rehydrated conversation, arm the
+   * history load, sweep the previous session's ephemera), and every one after
+   * it is a heartbeat — `useOrganizationTeamProject` momentarily reports no
+   * project while it refetches, so its effect re-fires with the same three ids
+   * every time the window regains focus. Without this flag each of those
+   * re-announcements re-ran the sweep, and the user's grabbed context chips,
+   * draft and live turn signals vanished mid-conversation for no visible
+   * reason.
+   */
+  scopeAnnounced: boolean;
+
+  /**
    * Bumped whenever the panel starts over: a new chat, an `askLangy` handoff, or
    * a scope change. It is the one signal the sibling stores follow, so "what
    * else has to be forgotten" is answered in one place instead of every store
@@ -460,6 +534,7 @@ const emptyConversationState = () => ({
   dismissedFeedbackMessageIds: new Set<string>(),
   pinnedFeedbackMessageId: null as string | null,
   ...initialTurnPhaseState,
+  turnProjection: initialLangyTurnProjection,
   turnStatus: null as string | null,
   turnProgress: null as number | null,
   turnProgressSample: null as LangyProgressSample | null,
@@ -547,16 +622,22 @@ export const useLangyStore = create<LangyState>()(
 
       pendingPrompt: null,
       askLangy: (prompt) =>
-        set((state) => ({
+        set(() => ({
           isOpen: true,
           // A fresh ask starts a clean conversation, mirroring
           // startNewConversation (the chat engine is reset panel-side when the
-          // queued prompt is consumed).
+          // queued prompt is consumed) — with ONE deliberate difference: the
+          // context the user just grabbed RIDES ALONG. `chosenChipIds` is kept
+          // and the epoch is NOT bumped (the bump is what tells the target
+          // store to drop its picks), because pointing at a thing on the page
+          // and then asking about it is the ordinary order of the gesture —
+          // arm, absorb, ask. Wiping the picks here made the whole grabbing
+          // flow look dead: the chip appeared, the ask opened the panel, and
+          // the turn went out knowing nothing. The chips stay visible in the
+          // composer, so what rides along is still exactly what the user sees.
           activeConversationId: null,
           historyLoadConversationId: null,
           draft: "",
-          chosenChipIds: new Set<string>(),
-          conversationEpoch: state.conversationEpoch + 1,
           ...emptyConversationState(),
           // AFTER the spread: emptyConversationState() nulls `pendingPrompt`, so
           // the queued question is written last or it would be wiped out.
@@ -591,8 +672,12 @@ export const useLangyStore = create<LangyState>()(
       dockShifted: false,
       setDockShifted: (dockShifted) => set({ dockShifted }),
 
+      homeAskOpen: false,
+      setHomeAskOpen: (homeAskOpen) => set({ homeAskOpen }),
+
       activeConversationId: null,
       activeConversationScope: null,
+      scopeAnnounced: false,
       conversationEpoch: 0,
       historyLoadConversationId: null,
       selectConversation: (id) =>
@@ -748,7 +833,7 @@ export const useLangyStore = create<LangyState>()(
           };
         }),
 
-      // The turn phase machine (langyTurnPhase.ts) — pure transitions wired in a
+      // The turn phase machine (@langwatch/langy turnPhase.ts) — pure transitions wired in a
       // few lines. Every phase change goes through these four events.
       ...initialTurnPhaseState,
       beginTurn: ({ conversationId, turnId }) =>
@@ -758,17 +843,112 @@ export const useLangyStore = create<LangyState>()(
           // adopting the conversation and clearing the previous turn's live
           // signals (status / progress / reasoning / plan).
           activeConversationId: conversationId,
+          // A conversation this dispatch just MINTED (the tab pointed at
+          // nothing, or at another conversation) starts unconfirmed: its
+          // projection may lag the accepted command, and a not-found read in
+          // that window must present as pending, not as an error.
+          unconfirmedConversations:
+            s.activeConversationId === conversationId
+              ? s.unconfirmedConversations
+              : { ...s.unconfirmedConversations, [conversationId]: true },
           turnStatus: null,
           turnProgress: null,
           turnProgressSample: null,
           turnReasoning: null,
           turnPlan: null,
         })),
+      unconfirmedConversations: {},
+      confirmConversation: (id) =>
+        set((s) => {
+          if (!s.unconfirmedConversations[id]) return s;
+          const { [id]: _confirmed, ...rest } = s.unconfirmedConversations;
+          return { unconfirmedConversations: rest };
+        }),
       requestStop: () => set((s) => reduceRequestStop(s)),
       abandonStop: () => set((s) => reduceAbandonStop(s)),
       observeBackendTurn: (inFlight) =>
         set((s) => reduceObserveBackendTurn(s, inFlight)),
       settleTurn: (turnId) => set((s) => reduceSettleTurn(s, turnId)),
+
+      // The local turn projection (ADR-059) — pure reducers from
+      // @langwatch/langy, composed with the phase machine in the two places
+      // durable truth arrives: the snapshot seed and the folded tail.
+      turnProjection: initialLangyTurnProjection,
+      seedTurnProjection: (snapshot) =>
+        set((s) => {
+          const turnProjection = seedLangyTurnProjection(
+            s.turnProjection,
+            snapshot,
+          );
+          // Refresh-resume: the durable record names a turn in flight and this
+          // tab tracks none — adopt it so Stop targets it and live signals
+          // route to it. `activeTurnId === null` keeps a mid-send tab from
+          // being clobbered; requiring the seed to have ADVANCED the fold
+          // (the reducer returns the same reference for a stale snapshot)
+          // keeps a lagging refetch from resurrecting a finished turn. Never
+          // guard on the phase: the observeBackendTurn effect flips it to
+          // `active` in this same commit, before this reducer runs.
+          const adoptTurnId =
+            snapshot.currentTurnId &&
+            s.activeTurnId === null &&
+            turnProjection !== s.turnProjection
+              ? snapshot.currentTurnId
+              : null;
+          // The phase reducers return the WHOLE state (`{...state, ...}`), so
+          // the fresh projection must be spread AFTER them or the old one
+          // rides back in — same override-after-spread shape as beginTurn.
+          return {
+            ...(adoptTurnId
+              ? {
+                  ...reduceObserveBackendTurn(s, true),
+                  activeTurnId: adoptTurnId,
+                }
+              : {}),
+            turnProjection,
+          };
+        }),
+      applyTurnEvents: (events) =>
+        set((s) => {
+          const turnProjection = applyLangyTurnEvents(s.turnProjection, events);
+          if (turnProjection === s.turnProjection) return {};
+          if (isLangyTurnProjectionTerminal(turnProjection)) {
+            // The recorded terminal settles the machine — same effect as the
+            // stream's end frame, but driven by the durable record, so it
+            // lands even when this tab never had the stream.
+            return {
+              ...reduceSettleTurn(s, turnProjection.turnId),
+              turnProjection,
+            };
+          }
+          if (turnProjection.turn?.Status === "running") {
+            // The settle marker exists to gag the fold RE-ASSERTING the turn
+            // whose end frame already landed (its projection lags). A running
+            // turn with a DIFFERENT id is not that — it is a genuinely new
+            // turn (another tab's send, a re-driven turn), and the stale
+            // marker must not demote it to idle. Clear it, and drop the
+            // settled turn's id with it so the new turn is adopted.
+            const base =
+              s.settledTurnId !== null &&
+              turnProjection.turnId !== s.settledTurnId
+                ? {
+                    ...s,
+                    settledTurnId: null,
+                    activeTurnId:
+                      s.activeTurnId === s.settledTurnId
+                        ? null
+                        : s.activeTurnId,
+                  }
+                : s;
+            return {
+              ...reduceObserveBackendTurn(base, true),
+              // Adopt a running turn this tab doesn't track (another tab's
+              // send, a re-driven turn) so Stop and live signals target it.
+              activeTurnId: base.activeTurnId ?? turnProjection.turnId,
+              turnProjection,
+            };
+          }
+          return { turnProjection };
+        }),
       turnStatus: null,
       turnProgress: null,
       turnProgressSample: null,
@@ -827,6 +1007,13 @@ export const useLangyStore = create<LangyState>()(
           const current = state.activeConversationScope;
           const merged = mergeScope(current, scope);
           const unchanged = !!current && isSameScope(current, merged);
+          // A re-announcement of the scope we are already in is a heartbeat,
+          // not a move — the org/project hook re-fires on every refetch (window
+          // focus included) with the same three ids. Only the FIRST unchanged
+          // announcement per page load does the refresh-restore below; after
+          // that, sweeping again would wipe the user's grabbed context chips,
+          // draft and live turn state mid-conversation. See `scopeAnnounced`.
+          if (unchanged && state.scopeAnnounced) return state;
           // Keep the SAME object when nothing moved. Two callers announce the
           // scope — the layout, which knows all three ids, and the panel, which
           // knows the project — and the sibling stores follow this reference.
@@ -834,6 +1021,8 @@ export const useLangyStore = create<LangyState>()(
           // registry out from under the rows that had just registered in it.
           return {
             ...scopedInitialState(),
+            // AFTER the spread: the sweep resets it, announcing sets it.
+            scopeAnnounced: true,
             activeConversationScope: unchanged ? current : merged,
             activeConversationId: unchanged ? state.activeConversationId : null,
             historyLoadConversationId: unchanged

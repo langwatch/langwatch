@@ -217,6 +217,19 @@ function expectationOf(issue: ZodIssue): Record<string, unknown> {
   if (issue.code === UNRECOGNIZED_KEYS) {
     return { unrecognized: issue.keys };
   }
+  // A refinement is zod's escape hatch, so its issues know nothing about what
+  // the schema wanted — but the schema often does (a catalog lookup no plain
+  // enum can express). A `superRefine` that adds its issue with
+  // `params: { expected, received }` gets the same structured channel enum
+  // failures get for free, so a caller reads ONE shape whichever kind of
+  // schema rejected the field.
+  if (issue.code === "custom" && issue.params) {
+    const params = issue.params as Record<string, unknown>;
+    return {
+      ...(params.expected !== undefined ? { expected: params.expected } : {}),
+      ...(params.received !== undefined ? { received: params.received } : {}),
+    };
+  }
   return {};
 }
 

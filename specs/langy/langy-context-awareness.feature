@@ -262,11 +262,28 @@ Feature: Langy lights up what it can use as context ("glow and go")
     When I reload the page on that same project, as that same person
     Then the conversation I was in opens again, with its history
 
+  Scenario: The same place announced twice is not somewhere else
+    # The scope is re-announced on every refetch — regaining window focus is
+    # enough. That is a heartbeat, not a move, and it must not sweep anything.
+    Given I absorbed a trace into Langy on a project
+    When I switch to another window and come back to that same project
+    Then the trace is still attached as context
+    And my half-typed question is still in the composer
+
   Scenario: Starting a new chat starts on nothing
     Given I absorbed a trace into Langy
     When I start a new chat
     Then Langy no longer offers that trace as context
     But the things on the page can still be pointed at and absorbed
+
+  Scenario: What I grabbed rides into the question I ask from elsewhere
+    # Arm, absorb, ask is the ordinary order of the gesture — the ask field on
+    # the home page and the command bar both start a fresh conversation, but
+    # the context the user JUST assembled is for that very question.
+    Given I absorbed a trace into Langy
+    When I ask Langy a question from the home field or the command bar
+    Then the trace rides along as context on that question
+    And the composer shows its chip, where I can still remove it
 
   Scenario: How I like the panel is not something I gathered
     Given I have set the panel's layout and dismissed the context hint

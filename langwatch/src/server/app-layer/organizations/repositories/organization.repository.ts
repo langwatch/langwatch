@@ -175,6 +175,9 @@ export interface UpdateOrganizationInput {
   s3SecretAccessKey?: string | null;
   s3Bucket?: string | null;
   presenceEnabled?: boolean;
+  /** Org-level trace-sharing kill switch (ADR-057). Off disables sharing for
+   *  every project in the org. */
+  traceSharingEnabled?: boolean;
   supportContact?: string | null;
   /** ADR-038 "Primary use" setting; null clears back to legacy behavior. */
   primaryIntent?: OrganizationIntent | null;

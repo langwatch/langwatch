@@ -68,6 +68,7 @@ import { scenarioRouter } from "./routers/scenarios";
 import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "./routers/secrets";
 import { shareRouter } from "./routers/share";
+import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
@@ -118,6 +119,7 @@ const coreRouters = {
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,
+  sharedTrace: sharedTraceRouter,
   pinnedTrace: pinnedTraceRouter,
   dataRetention: dataRetentionRouter,
   emailSuppression: emailSuppressionRouter,

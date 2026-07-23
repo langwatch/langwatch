@@ -62,18 +62,23 @@ import {
   redactHiddenAttributesCompiled,
 } from "~/server/traces/mappers/redactAttributes";
 import {
+  applyDerivedTraceEventProtections,
   applySpanProtections,
   extractRedactionsFromAllSpanInputs,
   extractRedactionsFromAllSpanOutputs,
   redactObject,
 } from "~/server/traces/mappers/redaction";
-import type { CategoryVisibility } from "~/server/traces/protections";
+import type {
+  CategoryVisibility,
+  Protections,
+} from "~/server/traces/protections";
 import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
 } from "~/shared/traces/media-refs";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
+import { gateHeaderCost, gateResources, gateTreeCost } from "./tracesV2.gates";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   ContentPrivacy,
@@ -138,7 +143,9 @@ function buildFilterWhere(input: {
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
 
-function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
+export function mapTraceSummaryToHeader(
+  summary: TraceSummaryData,
+): TraceHeader {
   const totalTokens =
     (summary.totalPromptTokenCount ?? 0) +
     (summary.totalCompletionTokenCount ?? 0);
@@ -219,7 +226,40 @@ export function mapSpanSummaryPage(page: SpanSummaryPage): {
   };
 }
 
-function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
+/**
+ * Trace-level DROP banner. A `drop` disposition strips the category at
+ * ingestion, so the computed content was never stored and is empty. The check
+ * uses the ORIGINAL computed content (the pre-redaction header), not the
+ * redacted one: an old pre-rule trace still has its content, so the banner
+ * won't show even though the now-`drop` policy hides it; restricted content
+ * has disposition "restrict" (not "drop") so it can't be mislabeled here.
+ * Resolution failures must not break the header — the derivation just yields
+ * no banner. Shared by the internal `tracesV2.header` read and the anonymous
+ * share payload (`sharedTrace.get`). See ADR-057.
+ */
+export async function deriveTraceDropPrivacy(
+  rawHeader: Pick<TraceHeader, "input" | "output">,
+  projectId: string,
+): Promise<TraceHeader["privacy"]> {
+  try {
+    const policy = await getDataPrivacyPolicyService().getResolvedForProject({
+      projectId,
+    });
+    const droppedCategories: string[] = [];
+    if (policy.categories.input.disposition === "drop" && !rawHeader.input) {
+      droppedCategories.push("input");
+    }
+    if (policy.categories.output.disposition === "drop" && !rawHeader.output) {
+      droppedCategories.push("output");
+    }
+    return droppedCategories.length > 0 ? { droppedCategories } : null;
+  } catch {
+    // Skip the drop derivation on resolver/cache/db failure.
+    return null;
+  }
+}
+
+export function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
   let status: SpanTreeNode["status"] = "unset";
   if (row.statusCode === 2) status = "error";
   else if (row.statusCode === 1) status = "ok";
@@ -460,6 +500,43 @@ function buildSpanContentRedactions(
       ? extractRedactionsFromAllSpanOutputs(spans)
       : []),
   ]);
+}
+
+/**
+ * The full per-span redaction pipeline behind bulk span reads: span-level
+ * protections (category visibility, restricted custom attributes, hidden
+ * content scrubbed out of params), the DTO mapping, the content redaction
+ * pass, and the privacy annotations. The single implementation is shared by
+ * the internal `tracesV2.spansFull` read and the anonymous share payload
+ * (`sharedTrace.get`) — the two surfaces must never drift apart, because a
+ * redaction added to one and forgotten in the other silently leaks to share
+ * viewers. See ADR-057.
+ *
+ * Per-span events are deliberately absent (the `[]` below): only the
+ * single-span `tracesV2.spanDetail` read fetches them. The trace-level events
+ * timeline covers the shared view; per-span events in the share payload are an
+ * ADR-057 follow-up.
+ */
+export function mapSpansToDetailDtos(
+  spans: Span[],
+  protections: Protections,
+): SpanDetail[] {
+  const redactions = buildSpanContentRedactions(spans, protections);
+  return spans.map((span) => {
+    const detail = mapSpanToDetail(
+      applySpanProtections(span, protections, redactions),
+      [],
+    );
+    const redacted = redactV2Content(detail, protections);
+    const detailParams = detail.params as Record<string, unknown> | null;
+    redacted.contentPrivacy = buildContentPrivacy(
+      protections,
+      readDroppedFromParams(detailParams),
+    );
+    redacted.piiAnalysisIncomplete = readPiiIncompleteFromParams(detailParams);
+    redacted.restrictedAttributes = protections.restrictedAttributes ?? null;
+    return redacted;
+  });
 }
 
 type V2RedactionFlags = {
@@ -1203,9 +1280,9 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
-          // Single-trace read (the drawer opening) — resolve any offloaded
-          // (ADR-022) input/output in full, matching legacy traces.getById's
-          // unconditional { full: true }. Never set this for a list/page read.
+          // Single-trace header read: resolve offloaded (ADR-022) IO back to
+          // the full value, exactly like legacy traces.getById. The list read
+          // never passes this.
           full: true,
         },
       );
@@ -1213,38 +1290,14 @@ export const tracesV2Router = createTRPCRouter({
         throw new TraceNotFoundError(input.traceId);
       }
       const rawHeader = mapTraceSummaryToHeader(summary);
-      const header = redactV2Content(rawHeader, protections);
-
-      // Trace-level DROP banner. A `drop` disposition strips the category at
-      // ingestion, so the computed content was never stored and is empty. The
-      // check uses the ORIGINAL computed content (rawHeader), not the redacted
-      // one: an old pre-rule trace still has its content, so the banner won't
-      // show even though the now-`drop` policy hides it; restricted content has
-      // disposition "restrict" (not "drop") so it can't be mislabeled here.
-      // Resolution failures must not break the header — skip the derivation.
-      try {
-        const policy =
-          await getDataPrivacyPolicyService().getResolvedForProject({
-            projectId: input.projectId,
-          });
-        const droppedCategories: string[] = [];
-        if (
-          policy.categories.input.disposition === "drop" &&
-          !rawHeader.input
-        ) {
-          droppedCategories.push("input");
-        }
-        if (
-          policy.categories.output.disposition === "drop" &&
-          !rawHeader.output
-        ) {
-          droppedCategories.push("output");
-        }
-        header.privacy =
-          droppedCategories.length > 0 ? { droppedCategories } : null;
-      } catch {
-        // Skip the drop derivation on resolver/cache/db failure.
-      }
+      // Cost is gated by the viewer's own `cost:view` (via `protections`), the
+      // same rule the detail-pane spans apply through `applySpanProtections` —
+      // a `traces:view`-only viewer must not see spend in the header either.
+      const header = gateHeaderCost({
+        header: redactV2Content(rawHeader, protections),
+        protections,
+      });
+      header.privacy = await deriveTraceDropPrivacy(rawHeader, input.projectId);
 
       return header;
     }),
@@ -1400,11 +1453,15 @@ export const tracesV2Router = createTRPCRouter({
     .query(
       async ({
         input,
+        ctx,
       }): Promise<{
         nodes: SpanTreeNode[];
         nextCursor: SpanTreeCursor | null;
       }> => {
         const app = getApp();
+        const protections = await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+        });
         const page = await app.traces.spans.getSpanSummariesPage({
           tenantId: input.projectId,
           traceId: input.traceId,
@@ -1412,7 +1469,8 @@ export const tracesV2Router = createTRPCRouter({
           cursor: input.cursor,
           ...occurredAtFromInput(input),
         });
-        return mapSpanSummaryPage(page);
+        const { nodes, nextCursor } = mapSpanSummaryPage(page);
+        return { nodes: gateTreeCost({ nodes, protections }), nextCursor };
       },
     ),
 
@@ -1433,15 +1491,21 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<SpanTreeNode[]> => {
+    .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const rows = await app.traces.spans.getSpanSummariesSince({
         tenantId: input.projectId,
         traceId: input.traceId,
         sinceUpdatedAtMs: input.sinceUpdatedAtMs,
         ...occurredAtFromInput(input),
       });
-      return rows.map(mapSpanSummaryToTreeNode);
+      return gateTreeCost({
+        nodes: rows.map(mapSpanSummaryToTreeNode),
+        protections,
+      });
     }),
 
   /**
@@ -1461,14 +1525,20 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<SpanTreeNode[]> => {
+    .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const rows = await app.traces.spans.getSpanSummaryByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
-      return rows.map(mapSpanSummaryToTreeNode);
+      return gateTreeCost({
+        nodes: rows.map(mapSpanSummaryToTreeNode),
+        protections,
+      });
     }),
 
   /**
@@ -1678,8 +1748,11 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<TraceResourceInfoDto> => {
+    .query(async ({ input, ctx }): Promise<TraceResourceInfoDto> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const rows = await app.traces.spans.getSpanResourcesByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
@@ -1696,16 +1769,23 @@ export const tracesV2Router = createTRPCRouter({
       // Pick the root span (no parent) if present; fall back to earliest.
       const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
 
-      return {
-        rootSpanId: root?.spanId ?? null,
-        resourceAttributes: withoutHiddenResourceAttrs(
-          root?.resourceAttributes ?? {},
-        ),
-        scope: root
-          ? { name: root.scopeName ?? "", version: root.scopeVersion }
-          : null,
-        spans,
-      };
+      // `withoutHiddenResourceAttrs` drops the fixed non-billable set; layer the
+      // viewer's data-privacy restrict rules on top via `gateResources` so the
+      // authenticated read honours the same hidden-attribute policy as the share
+      // surface.
+      return gateResources({
+        resources: {
+          rootSpanId: root?.spanId ?? null,
+          resourceAttributes: withoutHiddenResourceAttrs(
+            root?.resourceAttributes ?? {},
+          ),
+          scope: root
+            ? { name: root.scopeName ?? "", version: root.scopeVersion }
+            : null,
+          spans,
+        },
+        protections,
+      });
     }),
 
   /**
@@ -1723,13 +1803,19 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<DerivedTraceEvent[]> => {
+    .query(async ({ input, ctx }): Promise<DerivedTraceEvent[]> => {
       const app = getApp();
-      return app.traces.spans.getTraceEventsByTraceId({
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const events = await app.traces.spans.getTraceEventsByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
+      // Event/exception attributes are captured content — same gating as the
+      // shared-trace payload, so the two surfaces cannot drift apart.
+      return applyDerivedTraceEventProtections(events, protections);
     }),
 
   evals: protectedProcedure

@@ -29,7 +29,7 @@ import {
 import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-} from "../pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 import {
   LOG_PROCESSING_COMMAND_TYPES,
   LOG_PROCESSING_EVENT_TYPES,

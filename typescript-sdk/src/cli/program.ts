@@ -1036,9 +1036,29 @@ export function buildProgram(): Command {
 
   emitsResult(
     evaluatorCmd
+      .command("types")
+      .description("List every evaluator type that `evaluator create --type` accepts")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      try {
+        const { listEvaluatorTypesCommand: impl } = await import("./commands/evaluators/types.js");
+        return impl();
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    evaluatorCmd
       .command("create <name>")
       .description("Create a new evaluator")
-      .requiredOption("--type <evaluatorType>", "Evaluator type (e.g. langevals/llm_judge)")
+      .requiredOption(
+        "--type <evaluatorType>",
+        "Evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (name: string, options: { type: string }) => {
       try {

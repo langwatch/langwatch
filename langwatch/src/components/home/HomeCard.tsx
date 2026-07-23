@@ -11,9 +11,10 @@ import type { ComponentProps } from "react";
 export function HomeCard(props: ComponentProps<typeof Card.Root>) {
   return (
     <Card.Root
-      bg="bg.surface"
+      bg="bg.surface/50"
+      backdropBlur={"md"}
       borderWidth="1px"
-      borderColor="border.muted"
+      borderColor="border"
       borderRadius="14px"
       boxShadow="none"
       _hover={{

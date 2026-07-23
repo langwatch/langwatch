@@ -74,6 +74,16 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secrets.existingSecretName }}
                   key: {{ .Values.secrets.internalSecretKey }}
+            {{- with .Values.mirror.existingSecretName }}
+            # Mirror lane (ADR-061): the mirror project's API key, paired with
+            # LANGY_MIRROR_TRACE_ENDPOINT from the ConfigMap. The manager
+            # fails fast at boot if only one of the pair is set.
+            - name: LANGY_MIRROR_TRACE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: {{ $.Values.mirror.traceKeyKey }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /health

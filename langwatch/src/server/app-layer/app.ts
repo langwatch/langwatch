@@ -48,6 +48,7 @@ export class App {
   readonly retentionPolicyCache: AppDependencies["retentionPolicyCache"];
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
+  readonly sharedTraceCache: AppDependencies["sharedTraceCache"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -99,6 +100,7 @@ export class App {
     this.retentionPolicyCache = deps.retentionPolicyCache;
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;
+    this.sharedTraceCache = deps.sharedTraceCache;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }

@@ -5,7 +5,8 @@
  * same attributes, and event-id cursor ties would sort differently from
  * ClickHouse, which orders String columns by bytes. ICU collation also
  * inverts base62 KSUIDs at the `Z` -> `a` step ("Z".localeCompare("a") > 0),
- * scrambling same-instant event order.
+ * scrambling same-instant event order. Pinned against the shared
+ * @langwatch/langy comparator by cursorContract.unit.test.ts.
  */
 export function compareOrdinal(left: string, right: string): number {
   if (left === right) return 0;

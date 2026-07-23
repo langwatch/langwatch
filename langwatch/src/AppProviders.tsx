@@ -11,7 +11,9 @@ import { ColorModeProvider } from "./components/ui/color-mode";
 import { Toaster } from "./components/ui/toaster";
 import { CommandBarProvider } from "./features/command-bar";
 import { useAttributionCapture } from "./hooks/useAttributionCapture";
+import { useBrowserTracing } from "./hooks/useBrowserTracing";
 import { useIsGtagReady } from "./hooks/useIsGtagReady";
+import { useNavigationTracing } from "./hooks/useNavigationTracing";
 import { usePostHog } from "./hooks/usePostHog";
 import { system } from "./theme";
 import { TRPCProvider } from "./utils/api";
@@ -45,6 +47,10 @@ export function InnerProviders({ children }: { children: ReactNode }) {
   const postHog = usePostHog();
   const publicEnv = usePublicEnv();
   const isGtagReady = useIsGtagReady();
+  useBrowserTracing();
+  // Router context is available here — InnerProviders renders inside
+  // RouterProvider — which is what a navigation span needs.
+  useNavigationTracing();
 
   return (
     <>

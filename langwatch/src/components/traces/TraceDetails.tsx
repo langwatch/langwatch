@@ -7,7 +7,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { PublicShare } from "@prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
@@ -35,14 +34,12 @@ import {
 import { Events } from "./Events";
 import { SequenceDiagramContainer } from "./SequenceDiagram";
 import { PinButton } from "./PinButton";
-import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
 
 export function TraceDetails(props: {
   traceId: string;
   selectedTab?: string;
-  publicShare?: PublicShare;
   traceView?: "span" | "full";
   showMessages?: boolean;
   onToggleView?: () => void;
@@ -312,9 +309,6 @@ export function TraceDetails(props: {
               )}
               {project && (
                 <PinButton projectId={project.id} traceId={props.traceId} />
-              )}
-              {project && (
-                <ShareButton project={project} traceId={props.traceId} />
               )}
               {dejaView.href && (
                 <Link href={dejaView.href}>

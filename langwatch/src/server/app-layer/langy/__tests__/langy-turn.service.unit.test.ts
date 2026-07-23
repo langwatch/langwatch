@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import {
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
@@ -79,6 +79,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const credentials = {
     getOrProvision: vi.fn(async () => ({ organizationId: "org-1" })),
     getEgressAllowlist: vi.fn(async () => null),
+    resolveMirrorTier: vi.fn(async () => "content" as const),
     getModelsAllowed: vi.fn(async () => null),
   };
 

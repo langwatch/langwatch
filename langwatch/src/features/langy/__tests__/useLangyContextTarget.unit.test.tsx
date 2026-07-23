@@ -56,20 +56,27 @@ function reset() {
 describe("useLangyContextTarget", () => {
   beforeEach(reset);
 
+  // Registration does NOT wait for the panel to open.
+  //
+  // It used to, and that made the arming gesture a lie: the page armed, told
+  // the reader to "click anything highlighted", and registered nothing — so
+  // there was nothing to highlight and nothing to click. Pointing at something
+  // before opening Langy is the ordinary way to use this, and with the peek
+  // shipped a closed panel is how Langy sits most of the time.
   describe("given the Langy panel is closed", () => {
-    describe("when a target renders", () => {
-      it("puts nothing on the element — no class, no data attribute, no style", () => {
+    describe("when a target renders unarmed", () => {
+      it("registers itself, so the page knows what it has", () => {
         render(<HostRow onOpen={() => undefined} />);
 
-        expect(row().className).toBe("");
-        expect(row().getAttribute("data-langy-target")).toBeNull();
-        expect(row().getAttribute("style")).toBeNull();
+        expect(targets().targets["trace:abc123"]).toEqual(traceTarget);
       });
 
-      it("registers nothing, so the store stays empty", () => {
+      it("stays invisible on the element — only the locating id", () => {
         render(<HostRow onOpen={() => undefined} />);
 
-        expect(targets().targets).toEqual({});
+        expect(row().getAttribute("data-langy-target")).toBe("trace:abc123");
+        expect(row().className).toBe("");
+        expect(row().getAttribute("style")).toBeNull();
       });
 
       it("leaves the surface's own click behaviour intact", () => {
@@ -79,6 +86,15 @@ describe("useLangyContextTarget", () => {
         fireEvent.click(row());
 
         expect(opened).toBe(1);
+      });
+    });
+
+    describe("when the page is armed with the panel still closed", () => {
+      it("offers the target — the ring and the intercepted click", () => {
+        render(<HostRow onOpen={() => undefined} />);
+        act(() => targets().arm("hold"));
+
+        expect(row().className).toContain("langy-target");
       });
     });
   });

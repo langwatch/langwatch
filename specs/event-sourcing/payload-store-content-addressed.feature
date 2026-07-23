@@ -333,6 +333,80 @@ Feature: GroupQueue content-addressed tiered payload store
     And the object remains for the durable-store lifecycle sweep
 
   # ===========================================================================
+  # Track 6 — active blob reclaim (2026-07-22)
+  # ===========================================================================
+  # Track 5 shortened the deadline on a blob whose LAST lease retired, but it can
+  # only act at the moment of a release. Two things escape it. A holder killed
+  # mid-flight never releases at all, so its blob keeps the full backstop and is
+  # re-armed again on every redelivery. And that holder's mirrored token stays in
+  # the holder set forever, so the next clean release reads the set as "someone I
+  # cannot measure still holds this" and withholds the window from the blob and
+  # every sibling sharing its content. Under fleet-wide worker restarts both
+  # happen constantly, which is how retention kept growing with the grace window
+  # deployed and firing.
+  #
+  # The reclaim runner closes that gap from outside the release path. It walks the
+  # blob keyspace on a schedule and judges each blob on its own lease state rather
+  # than on whether a release happened to run. Two passes, deliberately asymmetric
+  # in what they are allowed to do:
+  #
+  #   - Repair only ever SHORTENS a deadline, so it is safe on the same argument
+  #     Track 5 rests on: the bytes stay readable and any take re-arms them.
+  #     That is what lets it bypass the holder-set guard a release must respect.
+  #   - Reclaim is the only pass that destroys bytes, so it demands proof the
+  #     grace window has already been running for a margin — which a blob written
+  #     but not yet staged can never show.
+  #
+  # Bound by blobSweeper.integration.test.ts.
+
+  @integration @track6
+  Scenario: An unreferenced blob is put on the grace window even though a stale holder token withheld it
+    Given a Redis-tier blob with no live lease
+    And a holder token left behind by a worker that died before releasing
+    When the reclaim runner runs
+    Then the blob is still readable
+    And its expiry is shortened to the release grace window
+
+  @integration @track6
+  Scenario: A blob a live lease still references is left alone
+    Given a Redis-tier blob a staged job still leases
+    When the reclaim runner runs
+    Then the blob keeps its four-day backstop
+    And the runner reports it as still referenced
+
+  @integration @track6
+  # The put-before-stage window is why reclaim demands a margin. A producer writes
+  # content-addressed bytes and stages them a round trip later; for that moment the
+  # blob has no lease and no holder, and it must not be mistaken for abandoned.
+  Scenario: A blob still within its put-before-stage window is not reclaimed
+    Given a Redis-tier blob just written by a producer that has not staged yet
+    When the reclaim runner runs
+    Then the blob is still readable
+    And a producer that stages it later still finds it
+
+  @integration @track6
+  Scenario: A blob whose grace window has been running past the safety margin is destroyed
+    Given a Redis-tier blob with no live lease
+    And its grace window has been running longer than the reclaim safety margin
+    When the reclaim runner runs
+    Then the blob is deleted
+    And it leaves no trace behind
+
+  @integration @track6
+  Scenario: A dry run reports what it would reclaim without deleting anything
+    Given a Redis-tier blob eligible for reclaim
+    When the reclaim runner sweeps in dry-run mode
+    Then the blob is still readable
+    And the runner reports it as eligible for reclaim
+
+  @scheduled @track6
+  Scenario: The runner is driven by the schedule, not by a request
+    Given the reclaim runner is on its cleanup schedule
+    When a cleanup interval comes due
+    Then the sweep runs once for that interval
+    And it does not run again for the same interval
+
+  # ===========================================================================
   # --- AC Coverage Map (ADR-029) ---
   # Track 1 — content-addressed tiers
   #   AC1.1 "Size picks the tier; inline stays inline"
@@ -393,7 +467,21 @@ Feature: GroupQueue content-addressed tiered payload store
   #     -> A dedup squash that retires the last lease puts the displaced blob on the grace window
   #   AC5.6 "The S3 tier is untouched; the durable sweep still owns it"
   #     -> An S3-tier release leaves the object to the durable-store sweep
+  # Track 6 — active blob reclaim (2026-07-22)
+  #   AC6.1 "Repair grants the window a stale holder token withheld"
+  #     -> An unreferenced blob is put on the grace window even though a stale holder token withheld it
+  #   AC6.2 "A live lease is never touched"
+  #     -> A blob a live lease still references is left alone
+  #   AC6.3 "The put-before-stage window is never destroyed"
+  #     -> A blob written but not yet staged is never destroyed
+  #   AC6.4 "Reclaim destroys only past the safety margin"
+  #     -> A blob whose grace window has been running past the safety margin is destroyed
+  #   AC6.5 "Dry run reports without destroying"
+  #     -> A dry run reports what it would reclaim without deleting anything
+  #   AC6.6 "The sweep is scheduled and singly-executed"
+  #     -> The runner is driven by the schedule, not by a request
   #
   # Count: 21 ADR-029 ACs -> 21 scenarios (@unimplemented pending the Outside-In
-  # TDD pass), plus 6 Track 5 amendment ACs -> 6 scenarios, all bound.
+  # TDD pass), plus 6 Track 5 amendment ACs and 6 Track 6 reclaim ACs -> 12
+  # scenarios, all bound.
   # ===========================================================================

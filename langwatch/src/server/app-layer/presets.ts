@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -115,7 +116,10 @@ import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-tur
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import { PrismaProcessStore } from "../event-sourcing/process-manager";
+import {
+  InMemoryProcessStore,
+  PrismaProcessStore,
+} from "../event-sourcing/process-manager";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
 import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
@@ -189,9 +193,13 @@ import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
+import { ManagerExplorerService } from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import { BlobStoreService } from "./ops/blob-store.service";
+import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
+import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -209,6 +217,8 @@ import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
+import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
+import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
@@ -334,17 +344,17 @@ export function initializeDefaultApp(options?: {
   );
   const spanDedup = createSpanDedupeService(redis);
 
-  // ADR-022: construct blob/IO deps and the shared span-storage repository
-  // before TraceSummaryService and SpanStorageService, so both can resolve
-  // offloaded eventref pointers (the v2 header's full=true read, and the v2
-  // spans read) from the same instances. #4888: the same factory backs the
-  // customer-facing full=true read path; the composition root passes its own
-  // ClickHouse decision/resolver so the eval-path deps stay byte-identical to
-  // the pre-#4888 inline wiring.
+  // ADR-022: construct blob/IO deps before the summary + span services so
+  // both v2 read paths (header full:true, spansFull / spanDetail) can resolve
+  // offloaded eventref pointers.
+  // #4888: the same factory backs the customer-facing full=true read path; the
+  // composition root passes its own ClickHouse decision/resolver so the
+  // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
   const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
     clickhouseEnabled,
     resolveClickHouseClient,
   });
+  // Shared between SpanStorageService and TraceSummaryService's full read.
   const spanStorageRepository = clickhouseEnabled
     ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
     : new NullSpanStorageRepository();
@@ -593,12 +603,11 @@ export function initializeDefaultApp(options?: {
   const pinnedTraceService = new PinnedTraceService(
     pinnedTraceRepo,
     async ({ projectId, traceId }) => {
-      const share = await shareRepo.findByResource({
+      return shareRepo.hasActiveShareForResource({
         projectId,
         resourceType: "TRACE",
         resourceId: traceId,
       });
-      return share !== null;
     },
   );
   const retroactiveUpdateService = new RetroactiveUpdateService(
@@ -615,9 +624,20 @@ export function initializeDefaultApp(options?: {
   };
 
   const share = traced(
-    new ShareService(shareRepo, pinnedTraceService),
+    new ShareService(shareRepo, pinnedTraceService, {
+      // Effective sharing = org AND project. Off at either level blocks new
+      // links; existing links stop resolving via resolveForViewer. ADR-057.
+      isTraceSharingEnabled: async (projectId) => {
+        const config = await projects.getTraceSharingConfig(projectId);
+        return !!config && config.orgEnabled && config.projectEnabled;
+      },
+      // Makes `maxViews` count viewings rather than requests, so a recipient
+      // refreshing a single-view link doesn't lock themselves out. ADR-057.
+      viewDedupe: createShareViewDedupeService(redis),
+    }),
     "ShareService",
   );
+  const sharedTraceCache = createSharedTracePayloadCache(redis);
 
   const langyConversationRepository = new PrismaLangyConversationRepository(
     prisma,
@@ -975,11 +995,14 @@ export function initializeDefaultApp(options?: {
   }
 
   // Langy operational reads come from the Postgres projections; writes remain
-  // commands against the canonical ClickHouse event log.
+  // commands against the canonical ClickHouse event log. The event READER feeds
+  // only the tail read (conversationEventsAfter, ADR-059) — null when event
+  // sourcing is disabled, in which case the tail is honestly empty.
   const langyConversations = LangyConversationService.create(
     commands.langy,
     langyConversationRepository,
     langyMessageRepository,
+    es.getEventStore<LangyConversationProcessingEvent>() ?? null,
   );
   const langyMessages = new LangyMessageService(
     langyMessageRepository,
@@ -1203,7 +1226,13 @@ export function initializeDefaultApp(options?: {
       new PrismaScheduledJobRepository(prisma),
     ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
+    managerExplorer: new ManagerExplorerService(repositories.processStore),
     replay: new ReplayService(replayRepo),
+    blobStore: new BlobStoreService(
+      redis
+        ? new BlobStoreRedisRepository(redis)
+        : new NullBlobStoreRepository(),
+    ),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, queueRepo })
       : null,
@@ -1272,6 +1301,7 @@ export function initializeDefaultApp(options?: {
     retentionPolicyCache,
     dataRetention,
     share,
+    sharedTraceCache,
     commands,
     ops,
     _eventSourcing: es,
@@ -1519,7 +1549,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
+      managerExplorer: new ManagerExplorerService(new InMemoryProcessStore()),
       replay: new ReplayService(new NullReplayRepository()),
+      blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
     },
     commands: {
@@ -1633,7 +1665,31 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     share: new ShareService(
       new PrismaShareRepository(testPrisma),
       testPinnedTraceService,
+      {
+        isTraceSharingEnabled: async (projectId) => {
+          // Effective sharing = org AND project (ADR-057).
+          const project = await testPrisma.project.findUnique({
+            where: { id: projectId },
+            select: {
+              traceSharingEnabled: true,
+              team: {
+                select: {
+                  organization: { select: { traceSharingEnabled: true } },
+                },
+              },
+            },
+          });
+          return (
+            !!project &&
+            project.team.organization.traceSharingEnabled &&
+            project.traceSharingEnabled
+          );
+        },
+      },
     ),
+    // No Redis in the test preset: every open counts as a viewing and nothing
+    // is cached, which is the stricter behaviour of both.
+    sharedTraceCache: createSharedTracePayloadCache(null),
     ...overrides,
   });
 }

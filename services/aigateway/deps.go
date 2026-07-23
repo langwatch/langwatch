@@ -82,6 +82,14 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 				attribute.String(otelsetup.AttrLangWatchOrigin, gatewaytracer.OriginGateway),
 			},
 		},
+		// ADR-061 mirror leg: when configured, a Langy VK's gen_ai span is
+		// duplicated into the mirror project at the bundle's tier. Unset leaves
+		// the leg dormant.
+		Mirror: customertracebridge.MirrorConfig{
+			Endpoint:  cfg.LangyMirror.TraceEndpoint,
+			Key:       cfg.LangyMirror.TraceKey,
+			ProjectID: cfg.LangyMirror.ProjectID,
+		},
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("customer trace bridge init: %w", err)

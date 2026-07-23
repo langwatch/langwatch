@@ -34,6 +34,7 @@ const metricNames = [
   "gq_group_attempt_read_failures_total",
   // 2026-07-22 blob-retention fix
   "gq_blob_release_grace_total",
+  "gq_blob_sweep_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -306,4 +307,27 @@ export const gqBlobReleaseGraceTotal = new Counter({
   name: "gq_blob_release_grace_total",
   help: "Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total)",
   labelNames: ["queue_name", "tier"] as const,
+});
+
+/**
+ * Every blob the reclaim runner examined, by what it decided.
+ *
+ * Unlike `gq_blob_release_grace_total` this accounts for the WHOLE keyspace: the
+ * outcomes partition it, so `sum by (outcome)` is the full picture rather than a
+ * floor. That is what makes it the signal to read when retention climbs anyway.
+ *
+ * How to read it:
+ * - `repaired` rising steadily means blobs are reaching the runner unreferenced
+ *   but NOT on the grace window — i.e. releases are being missed or withheld
+ *   (holders dying mid-flight, orphaned holder tokens). Healthy at first; a
+ *   persistently high rate means the release path is not doing its job.
+ * - `reclaimed` is the only outcome that frees bytes. Flat while `repaired`
+ *   climbs means the margin is never being reached — look for something
+ *   re-arming blobs between sweeps.
+ * - `leased` dominating is normal and healthy: most blobs are in use.
+ */
+export const gqBlobSweepTotal = new Counter({
+  name: "gq_blob_sweep_total",
+  help: "Blobs examined by the reclaim runner, by outcome (leased, repaired, reclaimed, bookkeeping, pending) — outcomes partition the keyspace, so this is a total, not a floor",
+  labelNames: ["queue_name", "outcome"] as const,
 });

@@ -1,9 +1,12 @@
 import {
+  mapLangyMessageEvent,
+  type LangyMessageProjectionRecord,
+} from "@langwatch/langy";
+import {
   AbstractMapProjection,
   type MapEventHandlers,
 } from "../../../projections/abstractMapProjection";
 import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { LangyMessageRole } from "../schemas/shared";
 import {
   type LangyAgentRespondedEvent,
   type LangyMessageRecordedEvent,
@@ -12,19 +15,6 @@ import {
   LangyMessageRecordedEventSchema,
   LangyMessageImportedEventSchema,
 } from "../schemas/events";
-import type { LangyMessagePart } from "../schemas/shared";
-
-export interface LangyMessageProjectionRecord {
-  ConversationId: string;
-  MessageId: string;
-  Role: LangyMessageRole;
-  Parts: LangyMessagePart[];
-  SourceEventId: string;
-  OccurredAt: number;
-  AcceptedAt: number;
-  CreatedAt: number;
-  UpdatedAt: number;
-}
 
 const messageEvents = [
   LangyMessageRecordedEventSchema,
@@ -32,7 +22,12 @@ const messageEvents = [
   LangyMessageImportedEventSchema,
 ] as const;
 
-/** Type-aware event-to-row projection for Postgres operational messages. */
+/**
+ * Type-aware event-to-row projection for Postgres operational messages. The
+ * mapping itself is `@langwatch/langy`'s `mapLangyMessageEvent` (ADR-059) —
+ * shared with the browser's local message list; this class is only the server
+ * rig (schema routing, store, per-message grouping).
+ */
 export class LangyMessageOperationalMapProjection
   extends AbstractMapProjection<
     LangyMessageProjectionRecord,
@@ -59,37 +54,18 @@ export class LangyMessageOperationalMapProjection
   mapLangyConversationMessageRecorded(
     event: LangyMessageRecordedEvent,
   ): LangyMessageProjectionRecord {
-    return this.record(event);
+    return mapLangyMessageEvent(event);
   }
 
   mapLangyConversationAgentResponded(
     event: LangyAgentRespondedEvent,
   ): LangyMessageProjectionRecord {
-    return this.record(event);
+    return mapLangyMessageEvent(event);
   }
 
   mapLangyConversationMessageImported(
     event: LangyMessageImportedEvent,
   ): LangyMessageProjectionRecord {
-    return this.record(event);
-  }
-
-  private record(
-    event:
-      | LangyMessageRecordedEvent
-      | LangyAgentRespondedEvent
-      | LangyMessageImportedEvent,
-  ): LangyMessageProjectionRecord {
-    return {
-      ConversationId: event.data.conversationId,
-      MessageId: event.data.messageId,
-      Role: event.data.role,
-      Parts: event.data.parts,
-      SourceEventId: event.id,
-      OccurredAt: event.occurredAt,
-      AcceptedAt: event.createdAt,
-      CreatedAt: event.occurredAt,
-      UpdatedAt: event.occurredAt,
-    };
+    return mapLangyMessageEvent(event);
   }
 }

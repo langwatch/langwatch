@@ -79,9 +79,7 @@ export function LangyThinkingLine({
   }, []);
 
   const line = langyThinkingLine({
-    messages: messages as unknown as Parameters<
-      typeof langyThinkingLine
-    >[0]["messages"],
+    messages,
     elapsedMs,
     hasLiveReasoning,
   });

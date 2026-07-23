@@ -15,13 +15,12 @@ import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscrib
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
-import {
-  projectionCursorHasReachedEvent,
-  projectionNotReadyError,
-} from "./projection-cursor";
+import { cursorHasReachedEvent } from "@langwatch/langy";
+
+import { projectionNotReadyError } from "./projection-cursor";
 
 const logger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
 const MAX_STALL_MS = LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3;
@@ -102,7 +101,7 @@ export function createAgentTurnLivenessSubscriber(
       });
       if (
         !conversation ||
-        !projectionCursorHasReachedEvent(conversation.cursor, event)
+        !cursorHasReachedEvent(conversation.cursor, event)
       ) {
         throw projectionNotReadyError({
           projectionName: "langyConversation",

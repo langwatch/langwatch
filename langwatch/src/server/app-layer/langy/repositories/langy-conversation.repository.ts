@@ -19,6 +19,11 @@ export interface LangyConversationRow {
   /** Raw nullable sort value; unlike lastActivityAtMs, this never falls back. */
   cursorActivityAtMs?: number | null;
   createdAtMs: number;
+  /**
+   * The projection's event cursor (ADR-059): the snapshot position the client
+   * folds its durable tail from. Optional so list reads may omit it.
+   */
+  eventCursor?: { acceptedAt: number; eventId: string } | null;
 }
 
 /** Stable keyset cursor for the recent-conversations ordering. */

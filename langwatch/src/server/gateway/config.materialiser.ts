@@ -18,6 +18,10 @@ import type {
 } from "@prisma/client";
 
 import { decrypt } from "../../utils/encryption";
+import {
+  resolveLangyMirrorTier,
+  type LangyMirrorTier,
+} from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
 import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { GatewayCacheRuleService } from "./cacheRule.service";
@@ -139,6 +143,13 @@ export type GatewayConfigPayload = {
       salt?: string;
     };
   }>;
+  /**
+   * ADR-061 mirror tier. Present and non-skip ONLY for Langy virtual keys, so
+   * the gateway never mirrors ordinary customer traffic. The gateway reads this
+   * (never a client header) to decide whether to duplicate the gen_ai span into
+   * the mirror project.
+   */
+  langy_mirror_tier: LangyMirrorTier;
   metadata: Record<string, unknown>;
 };
 
@@ -172,6 +183,14 @@ export class GatewayConfigMaterialiser {
       project_otlp_token: traceProject?.apiKey ?? null,
       team_id: traceProject?.teamId ?? null,
       principal_id: vk.principalUserId,
+      // ADR-061: only a Langy VK's calls are mirrored — the gen_ai span is the
+      // one part of a Langy turn's trace the manager's relay never sees. Every
+      // other VK resolves to skip, so ordinary customer traffic is never
+      // duplicated into LangWatch's mirror project.
+      langy_mirror_tier:
+        vk.purpose === "LANGY" && traceProject?.id
+          ? resolveLangyMirrorTier({ projectId: traceProject.id })
+          : "skip",
       providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
       fallback: {
         on: config.fallback.on,

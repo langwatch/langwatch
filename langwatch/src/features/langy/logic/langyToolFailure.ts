@@ -31,7 +31,7 @@ import {
   readCliErrorDocument,
   isTerminalFailure,
   type CliHandledError,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy";
 import { LIMIT_TYPE_LABELS } from "~/server/license-enforcement/constants";
 
 /** The plan allowance a failure ran into, in the customer's own words. */

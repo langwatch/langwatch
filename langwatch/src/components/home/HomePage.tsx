@@ -4,6 +4,7 @@ import {
   Container,
   Grid,
   HStack,
+  Skeleton,
   Spacer,
   VStack,
 } from "@chakra-ui/react";
@@ -26,15 +27,14 @@ import { chartVariantFor, useHomeDevState } from "./dev/homeDevState";
 import { DocsGuides } from "./DocsGuides";
 import { HomeFortune } from "./HomeFortune";
 import { HomePageBanners } from "./HomePageBanners";
-import { LangyHomeLantern } from "./LangyHomeLantern";
+import { LangyHomeHero } from "./LangyHomeHero";
 import { LearningResources } from "./LearningResources";
 import { OnboardingProgress } from "./OnboardingProgress";
 import { RecentItemsSection } from "./RecentItemsSection";
-import { TimeOfDayAura } from "./TimeOfDayAura";
 import { TracesOverview } from "./TracesOverview";
 import { useHomeComposition } from "./useHomeComposition";
 import { useProjectReach } from "./useProjectReach";
-import { useTimeOfDay, WelcomeHeader } from "./WelcomeHeader";
+import { WelcomeHeader } from "./WelcomeHeader";
 
 /**
  * The project home: a briefing for the returning user, not a lobby. Live
@@ -61,23 +61,27 @@ import { useTimeOfDay, WelcomeHeader } from "./WelcomeHeader";
  */
 export function HomePage() {
   const composition = useHomeComposition();
-  const timeOfDay = useTimeOfDay();
 
   return (
     <DashboardLayout>
-      {/* No overflow clipping here — it breaks the page scroll; the aura
-          canvas is inset within this box and cannot bleed anyway. */}
-      <Box width="full" position="relative">
-        {/* The day's light, leaking in from the panel's top-left corner and
-            backlighting the greeting. Canvas-drawn in Display-P3 where the
-            screen supports it. The sidebar never wears it. */}
-        <TimeOfDayAura timeOfDay={timeOfDay} />
+      {/* `clip`, not `hidden`. The lit block's bloom bleeds sideways past its
+          own box on purpose, and on a viewport narrower than the container
+          that bleed landed outside the page and gave the home a horizontal
+          scrollbar. `overflow: hidden` is what cannot be used here — it makes
+          this a scroll container and forces the cross axis to `auto`, which is
+          what broke the page scroll before. `overflow-x: clip` clips the one
+          axis without creating a scroll container, so the block still bleeds
+          DOWN into the page and nothing scrolls sideways. */}
+      <Box width="full" position="relative" overflowX="clip">
         {/* A reading measure, not a dashboard sprawl: the briefing sheet is
             the page, so the column narrows to keep its lines composed. */}
         <Container maxW="7xl" padding={5} position="relative" zIndex={1}>
           <VStack gap={4} width="full" align="start">
             <HStack width="full" align="center" gap={2}>
-              <WelcomeHeader />
+              {/* The Langy home greets from the centre of its own hero, where
+                  the question is being asked. Rendering the greeting here as
+                  well would put it on the page twice. */}
+              {composition === "langy" ? null : <WelcomeHeader />}
               <Spacer />
               {/* The one sales-y ask: the friendly line, small and quiet, with
                   the demo link as a compact pill beside it. Shown to people who
@@ -89,7 +93,9 @@ export function HomePage() {
               <ConsideringLangWatch />
             </HStack>
 
-            {composition === "signal-focused" ? (
+            {composition === "undecided" ? (
+              <HomeCompositionSkeleton />
+            ) : composition === "signal-focused" ? (
               <>
                 <HomeBriefingSection />
                 {/* The chrome grid: two equal-height columns whose interior
@@ -223,6 +229,40 @@ function ConsideringLangWatch() {
 }
 
 /**
+ * What the page shows before it knows which home it is.
+ *
+ * The three compositions hang off feature flags, and every gate reports
+ * "off" while its flag is in the air — so the page used to resolve to the
+ * classic home, paint it, and swap to the real one a beat later. The reader
+ * watched their home page change shape under them on every cold load, which
+ * reads as a bug in the product rather than as loading.
+ *
+ * So it commits to nothing. This is deliberately NOT a mock of any one
+ * composition — the three lead with different things and guessing wrong just
+ * moves the flicker into the skeleton. It is the shape they share: a lead
+ * block, then a wide row, then the spine. Neutral, unlabelled, and gone by
+ * the time the answer lands.
+ */
+function HomeCompositionSkeleton() {
+  return (
+    <VStack
+      gap={4}
+      width="full"
+      align="stretch"
+      aria-busy="true"
+      aria-label="Loading your home"
+    >
+      <Skeleton height="180px" borderRadius="xl" />
+      <Skeleton height="96px" borderRadius="lg" />
+      <Grid templateColumns={{ base: "1fr", lg: "1fr 1fr" }} gap={4}>
+        <Skeleton height="120px" borderRadius="lg" />
+        <Skeleton height="120px" borderRadius="lg" />
+      </Grid>
+    </VStack>
+  );
+}
+
+/**
  * The Langy home's spine.
  *
  * The lit block leads, then the page continues in the order it already has.
@@ -243,7 +283,7 @@ function LangyHome() {
   return (
     <>
       <HomePageBanners variant="lantern">
-        <LangyHomeLantern />
+        <LangyHomeHero />
       </HomePageBanners>
       {empty ? (
         <OnboardingProgress />

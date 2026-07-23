@@ -18,7 +18,7 @@ import {
   CapabilityRowSkeletons,
   LangyCapabilityCard,
 } from "./LangyCapabilityCard";
-import { asJsonDocument } from "@langwatch/cli-cards";
+import { asJsonDocument } from "@langwatch/langy";
 import { collectionOf, totalOf } from "./cliResultDocument";
 
 function parseDataset(output: unknown): {
