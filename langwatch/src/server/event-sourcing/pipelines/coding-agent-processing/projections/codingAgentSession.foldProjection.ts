@@ -85,13 +85,20 @@ export class CodingAgentSessionFoldProjection
   protected readonly events = codingAgentSessionEvents;
 
   /**
-   * The row is an aggregate, not a copy, so it cannot be read back into state
-   * (the counters are there, but the step ordering and the "first seen" identity
-   * rules are not reconstructable from it). On a cache miss the executor must
-   * rebuild from the event log, or a partial batch would overwrite a complete
-   * session with only the events in that batch.
+   * The derivation is ORDER-INSENSITIVE: `appendStep` inserts each step by its
+   * own `startedAtMs` (not arrival order), the bounded sets are first-seen and
+   * idempotent, the counters are additive, and every metric unit converges by
+   * its series id. The fold therefore reaches the same state whichever order it
+   * sees events in, so an out-of-order delivery needs no replay (ADR-066).
+   *
+   * A cache miss needs no replay either: the store now reads its OWN last
+   * committed state back from the lossless `State` blob (ADR-066), so it returns
+   * the real prior state instead of null — the executor applies the delivered
+   * events on top of it. The old `refoldOnStoreMiss` refold from event_log (a
+   * 20-100 MB S3 walk on a large session) is what took the platform down on
+   * 2026-07-23; the read-back replaces it with a bounded one-row read.
    */
-  override options: FoldProjectionOptions = { refoldOnStoreMiss: true };
+  override options: FoldProjectionOptions = { refoldOnOutOfOrder: false };
 
   constructor(deps: { store: FoldProjectionStore<CodingAgentSessionState> }) {
     super({
@@ -214,6 +221,15 @@ export interface CodingAgentSessionRow {
   sessionKeySource: string;
   version: string;
   startedAtMs: number;
+  /**
+   * The full JSON-serialized fold state — the LOSSLESS resume blob (ADR-066).
+   * Distinct from the analytics columns below, which are a lossy aggregate: this
+   * carries the whole `CodingAgentSessionState`, including the three bookkeeping
+   * fields the columns drop (`subAgentIds`, `previousCallContextTokens`,
+   * `metricSeries`), so the store can read its own state back exactly instead of
+   * refolding the aggregate's event_log history on a cache miss.
+   */
+  state: string;
 
   agent: string;
   agentVersion: string;
@@ -321,6 +337,9 @@ export function projectCodingAgentSessionToRow({
     sessionKeySource: state.sessionKeySource,
     version,
     startedAtMs: state.startedAtMs,
+    // The lossless resume blob: the whole state, including the fields the
+    // analytics columns drop. Read back verbatim by the store on a cache miss.
+    state: JSON.stringify(state),
 
     agent: state.agent ?? "",
     agentVersion: state.agentVersion ?? "",

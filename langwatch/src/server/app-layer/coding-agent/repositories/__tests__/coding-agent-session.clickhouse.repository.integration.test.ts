@@ -39,6 +39,7 @@ function sessionRow(
     sessionKeySource: "provider",
     version: "2026-07-21",
     startedAtMs: baseMs,
+    state: "{}",
     agent: "claude_code",
     agentVersion: "2.0.0",
     traceIds: [`${tag}-t1`],
@@ -168,6 +169,39 @@ describe("coding_agent_sessions round-trip (migration 00051)", () => {
     expect(read!.sessionKeySource).toBe("provider");
     expect(read!.costUsd).toBeCloseTo(1.25);
     expect(read!.commits).toBe(2);
+  });
+
+  it("round-trips the lossless State resume blob (migration 00053)", async () => {
+    // The blob carries the fields the analytics columns drop — the read-back
+    // path (ADR-066) depends on it surviving verbatim.
+    const state = JSON.stringify({
+      sessionId: `${tag}-blob`,
+      subAgentIds: ["sub-1", "sub-2"],
+      previousCallContextTokens: 7_000,
+      metricSeries: {
+        "removed-1": { metricName: "claude_code.lines_of_code.count", value: 10 },
+      },
+    });
+    const row = sessionRow({ sessionId: `${tag}-blob`, state });
+    await sessions.upsert(row, 30);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-blob`,
+      startedAtMs: baseMs,
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.state).toBe(state);
+    // And it parses back into the bookkeeping the read-back store relies on.
+    const parsed = JSON.parse(read!.state) as {
+      subAgentIds: string[];
+      previousCallContextTokens: number;
+      metricSeries: Record<string, unknown>;
+    };
+    expect(parsed.subAgentIds).toEqual(["sub-1", "sub-2"]);
+    expect(parsed.previousCallContextTokens).toBe(7_000);
+    expect(Object.keys(parsed.metricSeries)).toEqual(["removed-1"]);
   });
 
   it("dedups a re-folded session to one row (ReplacingMergeTree, no FINAL)", async () => {

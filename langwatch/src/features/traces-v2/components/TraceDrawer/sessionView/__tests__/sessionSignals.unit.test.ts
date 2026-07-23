@@ -15,6 +15,7 @@ function session(
     traceIds: ["trace-1"],
     version: "2026-07-11",
     startedAtMs: 1_700_000_000_000,
+    state: "{}",
     agent: "claude-code",
     agentVersion: "2.0.0",
     sessionId: "session-1",

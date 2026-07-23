@@ -46,3 +46,12 @@ Feature: Coding-agent sessions
   Scenario: a session without a session id is not lost
     When a coding-agent trace arrives whose telemetry carries no session id
     Then it appears as a single-trace session of its own
+
+  Scenario: a session resumes from its own stored state after its cache is lost
+    Given a session that has already recorded its work, including its sub-agents,
+      its converged metrics and its per-call context bookkeeping
+    And the in-memory copy of that session has been dropped
+    When more telemetry arrives for the session
+    Then the session resumes from its last stored state without re-reading its history
+    And the new telemetry adds to the totals already recorded, not to an empty session
+    And re-delivered telemetry the session had already counted does not inflate its totals

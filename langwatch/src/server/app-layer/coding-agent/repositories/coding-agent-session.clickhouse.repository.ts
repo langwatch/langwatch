@@ -29,6 +29,8 @@ interface ClickHouseWriteRecord {
   StartedAt: Date;
   CreatedAt: Date;
   UpdatedAt: Date;
+  /** The lossless JSON fold-state blob — the read-back path (ADR-066). */
+  State: string;
 
   Agent: string;
   AgentVersion: string;
@@ -129,6 +131,7 @@ function toRecord(
     StartedAt: new Date(row.startedAtMs),
     CreatedAt: now,
     UpdatedAt: now,
+    State: row.state ?? "",
 
     Agent: row.agent,
     AgentVersion: row.agentVersion,
@@ -258,6 +261,12 @@ export class CodingAgentSessionClickHouseRepository
    * hours, and a late signal can move StartedAt backwards, so the hint is
    * widened ±7 days rather than pinned to the exact ms — the window keeps
    * this a partition-pruned point read instead of a full-table scan.
+   *
+   * `startedAtMs` is ABSENT on the fold read-back path (ADR-066): the store's
+   * `get()` knows only tenantId + sessionId, so that read is unpruned. It is
+   * still bounded — one small row per session, keyed on (TenantId, SessionId) —
+   * and it is fronted by the Redis cache, so it runs only on a cache miss. Far
+   * cheaper than the event_log replay it replaces.
    */
   async findBySessionId({
     tenantId,
@@ -448,6 +457,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     sessionKeySource: String(record.SessionKeySource ?? ""),
     version: String(record.Version ?? ""),
     startedAtMs: new Date(String(record.StartedAt)).getTime(),
+    state: typeof record.State === "string" ? record.State : "",
 
     agent: String(record.Agent ?? ""),
     agentVersion: String(record.AgentVersion ?? ""),
