@@ -36,6 +36,7 @@ trace pipeline                         evaluation pipeline
                     recordTriggerMatch
                          │
                  trigger_match_recorded ─────► automationAudit map (ClickHouse)
+                         │                     (removed — see Amendment 2026-07)
                          │ GroupQueue, FIFO per trigger
                          ▼
                   triggerSettlement PM
@@ -85,9 +86,10 @@ key. Activity in a later window records a new event and re-arms the process.
 ### Dedicated automations pipeline
 
 The pipeline has aggregate type `trigger`, the `recordTriggerMatch` command,
-an ID-only `automationAudit` ClickHouse map projection, and both automation
-process managers. GroupQueue serializes commands and committed-event
-consumption by trigger, preserving FIFO end to end.
+an ID-only `automationAudit` ClickHouse map projection (since removed — see
+Amendment 2026-07), and both automation process managers. GroupQueue
+serializes commands and committed-event consumption by trigger, preserving
+FIFO end to end.
 
 Process managers subscribe by declaring `.on(EVENT_TYPE, handler)`. There is
 no feed, fact port, `.trigger()`, or cross-pipeline PM mount. The runtime
@@ -225,8 +227,9 @@ event-history dedup scan on every flush.
 
 The projection, its append store, and `AutomationAuditRepository` are removed.
 The `automation_audit` table and migration 00048 stay in place for one release
-(expand/contract — the same cutover shape ADR-061 used for `suite_runs`); the
-drop migration follows separately.
+(expand/contract — the same cutover shape the run-aggregates ADR
+(`061-run-aggregates-are-queries.md`, in flight on PR #6051) uses for
+`suite_runs`); the drop migration follows separately.
 
 ## References
 
