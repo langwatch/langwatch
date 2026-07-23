@@ -275,7 +275,7 @@ describe("given a settled turn with nothing visible to say", () => {
     expect(placeholder).toBeInTheDocument();
   });
 
-  it("stays silent while the turn is still streaming", () => {
+  it("renders no box at all while the turn is still streaming", () => {
     const { container } = render(
       <ChakraProvider value={defaultSystem}>
         <MessageContent
@@ -291,7 +291,10 @@ describe("given a settled turn with nothing visible to say", () => {
         />
       </ChakraProvider>,
     );
-    expect(container.textContent).not.toContain("No content");
+    // An empty element would still claim a slot in the transcript column's
+    // gap and push the working lines down; the empty streaming shell must
+    // contribute nothing to layout.
+    expect(container.firstChild).toBeNull();
   });
 });
 

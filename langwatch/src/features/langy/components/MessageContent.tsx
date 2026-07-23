@@ -265,13 +265,18 @@ function MessageContentImpl({
       showsActivity ||
       plan,
   );
-  if (!hasContent && !isStreaming) {
+  if (!hasContent) {
+    if (isUser) return null;
+    // Streaming with nothing visible yet: render no box at all. The message
+    // shell arrives before its first content, and an empty row would still
+    // claim a slot in the column's gap, pushing the status line down mid
+    // startup. The working lines below own the live edge until content lands.
+    if (isStreaming) return null;
     // A settled assistant turn with nothing visible to say, either the model
     // spent the whole turn reasoning or the user stopped it before any text
     // arrived. Name the emptiness quietly rather than rendering a reply that
     // is not there (a failed turn never appends an assistant message, the
     // error card owns that surface).
-    if (isUser) return null;
     return (
       <Text
         fontSize="langyAnswer"
