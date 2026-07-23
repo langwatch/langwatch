@@ -263,15 +263,16 @@ describe("given a settled turn whose process record is a plan", () => {
   });
 });
 
-describe("given a completed turn whose only output was reasoning", () => {
-  it("renders a thumbs-up instead of an empty reply", () => {
+describe("given a settled turn with nothing visible to say", () => {
+  it("names the emptiness quietly instead of rendering a reply", () => {
     renderMessage(
       assistantMessage([
         { type: "reasoning", text: "Considering the thanks" },
         { type: "text", text: "", role: "assistant" },
       ]),
     );
-    expect(screen.getByRole("img", { name: "Thumbs up" })).toBeInTheDocument();
+    const placeholder = screen.getByText("No content");
+    expect(placeholder).toBeInTheDocument();
   });
 
   it("stays silent while the turn is still streaming", () => {
@@ -290,12 +291,12 @@ describe("given a completed turn whose only output was reasoning", () => {
         />
       </ChakraProvider>,
     );
-    expect(container.textContent).not.toContain("👍");
+    expect(container.textContent).not.toContain("No content");
   });
 });
 
 describe("given an empty turn that ended in a tool failure", () => {
-  it("shows the error card and never the thumbs-up", () => {
+  it("shows the error card and never the empty placeholder", () => {
     const { container } = renderMessage(
       assistantMessage([
         {
@@ -307,8 +308,7 @@ describe("given an empty turn that ended in a tool failure", () => {
         },
       ]),
     );
-    expect(container.textContent).not.toContain("👍");
-    expect(screen.queryByRole("img", { name: "Thumbs up" })).toBeNull();
+    expect(container.textContent).not.toContain("No content");
   });
 });
 

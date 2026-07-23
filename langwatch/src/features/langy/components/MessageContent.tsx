@@ -266,24 +266,22 @@ function MessageContentImpl({
       plan,
   );
   if (!hasContent && !isStreaming) {
-    // A settled assistant turn with nothing visible to say — the model spent
-    // the whole turn reasoning and produced zero text. A failed turn never
-    // appends an assistant message (the error card owns that surface), so an
-    // empty settled message can only be a completed turn: acknowledge it with
-    // a thumbs-up rather than rendering a reply that isn't there.
+    // A settled assistant turn with nothing visible to say, either the model
+    // spent the whole turn reasoning or the user stopped it before any text
+    // arrived. Name the emptiness quietly rather than rendering a reply that
+    // is not there (a failed turn never appends an assistant message, the
+    // error card owns that surface).
     if (isUser) return null;
     return (
-      <HStack gap={2} align="flex-start" width="full">
-        <Text
-          role="img"
-          aria-label="Thumbs up"
-          fontSize="langyAnswer"
-          lineHeight="1.5"
-          paddingX="2px"
-        >
-          👍
-        </Text>
-      </HStack>
+      <Text
+        fontSize="langyAnswer"
+        lineHeight="1.5"
+        paddingX="2px"
+        fontStyle="italic"
+        color="fg.muted"
+      >
+        No content
+      </Text>
     );
   }
 
