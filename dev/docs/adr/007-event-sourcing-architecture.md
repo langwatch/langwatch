@@ -6,6 +6,8 @@
 
 **Supersedes:** [ADR-002](./002-event-sourcing.md)
 
+**Hardened by:** [ADR-062](./062-projection-clickhouse-cached-store.md) — projection storage (the ClickHouse-cached read-back store) makes this ADR's "fold state = stored data" and "`store.get()` loads last state" the mandatory, non-optional contract, and retires the `refoldOnStoreMiss` / `refoldOnOutOfOrder` accretions that had drifted from it.
+
 ## Context
 
 LangWatch uses event sourcing for traces, evaluations, experiment runs, and simulations. ADR-002 established the core principle — immutable events, derived projections, branded TenantId. This ADR documents the full architecture after the fold/map projection refactoring, which replaced the earlier handler/checkpoint system with a simpler model.

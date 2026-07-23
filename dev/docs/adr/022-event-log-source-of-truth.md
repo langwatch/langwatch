@@ -4,9 +4,9 @@
 
 **Status:** Proposed (issue [#4215](https://github.com/langwatch/langwatch/issues/4215))
 
-**Supersedes:** [ADR-021](./021-lean-fold-cache.md) §"Decision" §1's *"edge offload to permanent S3"* mechanism. ADR-021's other rules survive — see [What survives from ADR-021](#what-survives-from-adr-021).
+**Supersedes:** [ADR-021](./021-lean-fold-cache.md) (jointly with [ADR-062](./062-projection-clickhouse-cached-store.md)). This ADR owns the heavy-content decisions; the rules still in force are restated below, so ADR-021 is not required reading.
 
-**Relates to:** [ADR-007](./007-event-sourcing-architecture.md) (event sourcing), [ADR-015](./015-projection-replay-coordination.md) (replay), [ADR-017](./017-gateway-trace-payload-capture.md) (gateway payload capture).
+**Relates to:** [ADR-007](./007-event-sourcing-architecture.md) (event sourcing), [ADR-015](./015-projection-replay-coordination.md) (replay), [ADR-017](./017-gateway-trace-payload-capture.md) (gateway payload capture), [ADR-062](./062-projection-clickhouse-cached-store.md) (projection store — the fold-cache mechanics that used to live in ADR-021).
 
 ## Context
 
@@ -113,7 +113,9 @@ LEAN BOUNDARIES  (what stays small at each hop)
   stored_spans / trace_summaries (CH)   ≤ ~64 KB per IO attr  (downstream of lean step)
 ```
 
-## What survives from ADR-021
+## Rules in force
+
+*(These were first written in ADR-021 and remain the rules; restated here so this ADR is self-contained.)*
 
 - **Reserved-namespace edge strip** (already at command worker via `RecordSpanCommand.stripReservedAttributes`, with `langwatch.reserved.causality_depth` passthrough).
 - **Reserved-namespace exclusion from user-visible facet enumeration** (`buildSpanAttributeKeysFacetQuery` filters `langwatch.reserved.*`).
@@ -121,7 +123,9 @@ LEAN BOUNDARIES  (what stays small at each hop)
 - **`RedisCachedFoldStore.toCacheable`** as secondary defence for non-IO ephemera (`events[]`, `spanCosts`).
 - **`BlobStore`** as the swap-seam interface. Backend changes; surface stays.
 
-## What is rejected from ADR-021
+## Approaches not used (and why)
+
+*(Earlier shapes we deliberately do not use — recorded so they are not re-proposed.)*
 
 - **Edge offload of every over-threshold field to permanent S3.** Replaced by edge oversize-spool + dispatch-time lean.
 - **Manifest-shaped storage** (one S3 object per span carrying multiple fields). Replaced by `event_log` row, which is naturally the per-span manifest.
