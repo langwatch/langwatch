@@ -37,6 +37,23 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And Langy uses the concrete id from the prior turn rather than re-listing
 
   @integration
+  Scenario: A greeting gets a friendly hello, never a refusal
+    Given a Langy dogfood scenario where the user opens with "hi"
+    When the scenario runs against Langy
+    Then Langy replies with one short friendly line that introduces it as Langy
+    And the reply names a few things Langy can help with
+    And the judge confirms Langy did not reply "Can't do that yet." to the greeting
+    And a follow-up "who are you?" gets the same friendly treatment, not a refusal
+
+  @integration
+  Scenario: An open "what has my agent been up to?" is answered from traces, not a dead end
+    Given a Langy dogfood scenario on a project with traces but no evaluation runs
+    When the user asks what their agent has been up to
+    Then Langy describes the actual trace activity with concrete observations
+    And Langy does not stop at an empty evaluation metric
+    And the reply ends by inviting the user to name what to dig into more deeply
+
+  @integration
   Scenario: An ambiguous "make me an eval" is asked about before anything is created
     Given a Langy dogfood scenario where the user says only "make me an eval"
     When the scenario runs against Langy

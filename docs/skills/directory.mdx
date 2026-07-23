@@ -4197,14 +4197,18 @@ langwatch analytics query --metric p95-latency --group-by metadata.model --forma
 
 Widen with `--start-date` (ISO) to 30 days when trends look suspicious: a gradual drift only shows on longer windows. Run `langwatch analytics query --help` for every preset and flag.
 
+An empty metric is a coverage note, never the end of the road. An empty `eval-pass-rate` means the project has no evaluator runs yet; it says nothing about the traffic itself, which `trace-count`, `total-cost`, and the latency metrics still describe. For an open "what has my agent been up to?", answer from whichever sources HAVE data, production traces first, then simulation runs: share a few concrete observations (volume, the kinds of requests coming in, errors, cost or latency movements, one or two example traces), then end with one short line inviting the user to name what to dig into more deeply ("Say which of these to dig into and I'll go deeper.", or a choices card when the options are concrete entities). Never end the conversation on "no evaluation data" alone when the project has traces.
+
 ## Step 3: Export the Evidence and Mine It
 
 Aggregates say WHAT changed; only the traces say WHY. Export a large sample and analyze it locally:
 
 ```bash
-langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
-langwatch trace export --format jsonl --limit 1000 --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
+langwatch trace export --format jsonl --limit 1000 --origin application -o traces.jsonl
+langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
+
+`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -4216,7 +4220,7 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search -q "<keyword from a pattern>" --limit 10 --format json   # Chase a specific pattern
+langwatch trace search -q "<keyword from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
@@ -4247,6 +4251,8 @@ Diagnosis without treatment is just bad news. If the `agent-improve` skill is in
 - Do NOT rely on aggregates alone; always read at least a handful of full traces per finding, the surprise is always in the details
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
+- Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
+- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
 - If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text — an activity card already shows the underlying failure
 ````
 

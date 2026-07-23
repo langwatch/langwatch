@@ -407,7 +407,9 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 	}
 	// No "plugin" key: the external OTel plugin was removed from the worker config
 	// because evaluating its ~2 MB bundle at first-message bootstrap cost 15-25s and
-	// killed turns. Worker telemetry is host-mediated now, so nothing loads here.
+	// killed turns. Worker telemetry is host-mediated now. The one plugin a worker
+	// runs, the zero-dependency identity file below, loads via opencode's plugin-dir
+	// auto-discovery precisely so the config keeps carrying no plugin specs.
 	if _, present := cfg["plugin"]; present {
 		t.Errorf("config.json must not carry a %q key — the OTel plugin was removed from the worker (got %v)", "plugin", cfg["plugin"])
 	}
@@ -446,6 +448,61 @@ func TestProvision_WritesCLIOnlyConfig(t *testing.T) {
 	}
 	if want := filepath.Join(workspace, "skills"); target != want {
 		t.Errorf("skills link target = %q, want %q", target, want)
+	}
+}
+
+// Provision must drop the Langy identity plugin into the config dir's plugin/
+// folder, where opencode's plugin auto-discovery picks it up with no config
+// entry. The plugin's system-prompt hook is what renames "You are OpenCode"
+// to "You are Langy" in opencode's stock system prompt; without the file the
+// worker introduces itself under the engine's name. The hook must mutate
+// output.system in place — opencode keeps using the array instance it passed
+// in, so a plugin that reassigns the property changes nothing.
+func TestProvision_WritesLangyIdentityPlugin(t *testing.T) {
+	home := t.TempDir()
+	workspace := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(workspace, "skills"), 0o755); err != nil {
+		t.Fatalf("mkdir shared skills: %v", err)
+	}
+
+	err := NewAgent(0).Provision(ProvisionInput{
+		Home:          home,
+		WorkspaceRoot: workspace,
+		Creds: domain.Credentials{
+			LangwatchAPIKey:   "sk-lw-test-key",
+			LLMVirtualKey:     "vk-test",
+			GatewayBaseURL:    "https://gateway.test",
+			LangwatchEndpoint: "https://app.test",
+		},
+		UID:            0,
+		AgentsTemplate: "# AGENTS\n",
+		Runner:         localunsafe.Runner{},
+	})
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+
+	pluginPath := filepath.Join(home, ".config", "opencode", "plugin", "langy-identity.js")
+	raw, err := os.ReadFile(pluginPath)
+	if err != nil {
+		t.Fatalf("identity plugin missing — the worker would introduce itself as OpenCode: %v", err)
+	}
+	src := string(raw)
+	if !strings.Contains(src, `"experimental.chat.system.transform"`) {
+		t.Errorf("identity plugin must register the system-prompt transform hook; got\n%s", src)
+	}
+	if !strings.Contains(src, `replaceAll("OpenCode", "Langy")`) {
+		t.Errorf("identity plugin must rewrite OpenCode to Langy; got\n%s", src)
+	}
+	if strings.Contains(src, "output.system =") {
+		t.Errorf("identity plugin must mutate output.system in place, never reassign it (opencode keeps the original array); got\n%s", src)
+	}
+	info, err := os.Stat(pluginPath)
+	if err != nil {
+		t.Fatalf("stat identity plugin: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Errorf("identity plugin mode = %o, want 0600 (same UID-gated posture as config.json)", got)
 	}
 }
 

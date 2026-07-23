@@ -235,6 +235,23 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		return fmt.Errorf("chown config: %w", err)
 	}
 
+	// The identity plugin (see langyIdentityPluginJS) rides the same config
+	// dir. opencode scans plugin/*.js there at boot, so dropping the file is
+	// the whole wiring.
+	pluginPath := filepath.Join(configDir, langyIdentityPluginFilename)
+	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o700); err != nil {
+		return fmt.Errorf("mkdir plugin dir: %w", err)
+	}
+	if err := in.Runner.Chown(filepath.Dir(pluginPath), in.UID); err != nil {
+		return fmt.Errorf("chown plugin dir: %w", err)
+	}
+	if err := os.WriteFile(pluginPath, []byte(langyIdentityPluginJS), 0o600); err != nil {
+		return fmt.Errorf("write identity plugin: %w", err)
+	}
+	if err := in.Runner.Chown(pluginPath, in.UID); err != nil {
+		return fmt.Errorf("chown identity plugin: %w", err)
+	}
+
 	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted. The embedded
 	// AGENTS.md keeps the literal placeholder; we resolve it here so each worker
 	// emits concrete URLs in its replies. The template bytes are read once at
@@ -345,6 +362,37 @@ func workerBaseEnv() []string {
 // header with the real virtual key on the forward. It exists only because the
 // OpenAI SDK refuses an empty key.
 const mediatedLLMPlaceholderKey = "langy-mediated"
+
+// langyIdentityPluginFilename is where Provision writes the identity plugin,
+// relative to the worker's opencode config dir. opencode auto-discovers every
+// plugin/*.js file under its config directories, so no "plugin" entry is
+// needed in config.json (which stays free of plugin specs; see
+// TestProvision_WritesCLIOnlyConfig).
+const langyIdentityPluginFilename = "plugin/langy-identity.js"
+
+// langyIdentityPluginJS renames the agent's identity in opencode's stock
+// system prompt. opencode selects a per-model default prompt that opens with
+// "You are OpenCode, ..." and offers no config field to rename the agent, but
+// its plugin hook `experimental.chat.system.transform` receives the assembled
+// system prompt before the LLM call. The hook rewrites "OpenCode" to "Langy"
+// IN PLACE (the caller keeps using the same array instance, so reassigning
+// output.system would be lost) and leaves every other byte of whichever
+// default prompt opencode picked untouched. The file has zero imports and no
+// build step, so loading it costs nothing at worker bootstrap, unlike the
+// removed 2 MB external OTel plugin bundle.
+const langyIdentityPluginJS = `// Introduce the agent as Langy in opencode's default system prompt while
+// keeping the rest of the prompt exactly as opencode ships it.
+export default async () => ({
+  "experimental.chat.system.transform": async (_input, output) => {
+    if (!output || !Array.isArray(output.system)) return;
+    for (let i = 0; i < output.system.length; i++) {
+      if (typeof output.system[i] === "string") {
+        output.system[i] = output.system[i].replaceAll("OpenCode", "Langy");
+      }
+    }
+  },
+});
+`
 
 // buildWorkerEnv assembles the environment for a worker's opencode subprocess:
 // the allowlisted inherited env plus per-worker credentials and the per-worker
