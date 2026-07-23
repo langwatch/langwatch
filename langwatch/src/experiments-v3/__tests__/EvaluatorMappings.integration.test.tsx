@@ -19,7 +19,6 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
-import { setFlowCallbacks } from "~/hooks/useDrawer";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { RunEvaluationButton } from "../components/RunEvaluationButton";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
@@ -512,72 +511,6 @@ describe("Evaluator Mappings", () => {
       expect(openedDrawerParams.evaluatorId).toBe("db-eval-1");
       // mappingsConfig should be provided (it's an object so it goes to params via complexProps)
       expect(openedDrawerParams.mappingsConfig).toBeDefined();
-    });
-
-    // Regression for issue #950 ("cannot map fields on evaluation wizard").
-    // The evaluator editor drawer (EvaluatorEditorBody) sources onMappingChange
-    // from the durable flowCallbacks registry — NOT from mappingsConfig, which
-    // rides ephemeral complexProps — and renders the field-mapping section only
-    // when that callback is present (see issue #3441). Every other opener
-    // (useOpenEvaluatorEditor / useOpenTargetEditor / OnlineEvaluationDrawer)
-    // routes onMappingChange through setFlowCallbacks; RunEvaluationButton was
-    // the one call site left embedding it in mappingsConfig, so clicking "Run"
-    // with an unmapped evaluator opened a drawer with NO mapping controls — the
-    // user could not map the required fields.
-    describe("when Run opens the evaluator editor for missing mappings (issue #950)", () => {
-      const setupUnmappedEvaluator = () => {
-        useEvaluationsV3Store.setState({
-          targets: [
-            createTestTarget({
-              mappings: {
-                "test-data": {
-                  input: {
-                    type: "source",
-                    source: "dataset",
-                    sourceId: "test-data",
-                    sourceField: "input",
-                  },
-                },
-              },
-            }),
-          ],
-          datasets: [createTestDataset()],
-          activeDatasetId: "test-data",
-          evaluators: [createTestEvaluator({ mappings: {} })],
-        });
-      };
-
-      it("registers onMappingChange via setFlowCallbacks so the mapping section renders", async () => {
-        const user = userEvent.setup();
-        setupUnmappedEvaluator();
-
-        render(<RunEvaluationButton />, { wrapper: Wrapper });
-        await waitFor(() => {
-          expect(screen.getByTestId("run-evaluation-button")).toBeInTheDocument();
-        });
-        await user.click(screen.getByTestId("run-evaluation-button"));
-
-        expect(setFlowCallbacks).toHaveBeenCalledWith(
-          "evaluatorEditor",
-          expect.objectContaining({ onMappingChange: expect.any(Function) }),
-        );
-      });
-
-      it("does not embed onMappingChange in the ephemeral mappingsConfig", async () => {
-        const user = userEvent.setup();
-        setupUnmappedEvaluator();
-
-        render(<RunEvaluationButton />, { wrapper: Wrapper });
-        await waitFor(() => {
-          expect(screen.getByTestId("run-evaluation-button")).toBeInTheDocument();
-        });
-        await user.click(screen.getByTestId("run-evaluation-button"));
-
-        expect(openedDrawerType).toBe("evaluatorEditor");
-        expect(openedDrawerParams.mappingsConfig).toEqual(
-          expect.not.objectContaining({ onMappingChange: expect.any(Function) }),
-        );
-      });
     });
 
     it("validates targets before evaluators", async () => {

@@ -19,7 +19,7 @@ import { BlockStack } from "~/features/traces-v2/components/TraceDrawer/transcri
 import { parseContentBlocks } from "~/features/traces-v2/components/TraceDrawer/transcript/parsing";
 import { RenderInputOutput } from "../RenderInputOutput";
 
-// TraceAudioPart resolves the owning project from context; MediaPart needs a
+// TraceMediaPart resolves the owning project from context; MediaPart needs a
 // real id for its stored-object existence probe.
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),

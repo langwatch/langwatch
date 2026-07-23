@@ -160,7 +160,9 @@ describe("canonical log preparation", () => {
       wireSpanId: "",
       correlationSource: "claude_synthesized",
       providerKind: "claude_code",
-      providerEventKind: "model",
+      // The generic log pipeline no longer classifies claude span-kinds
+      // (ADR-056 §7) — providerEventKind is empty for every record now.
+      providerEventKind: "",
     });
     expect(record.correlationTraceId).toMatch(/^[a-f0-9]{32}$/);
     expect(record.correlationSpanId).toMatch(/^[a-f0-9]{16}$/);

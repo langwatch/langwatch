@@ -51,8 +51,9 @@ prompts/**
 # Chainlit
 .chainlit
 
-# Claude Code personal settings
-**/.claude/settings.local.json
+# Claude Code personal settings (the wildcard also catches editor/tool backup
+# copies like settings.local.json.bak-*, which carry the same secrets)
+**/.claude/settings.local.json*
 **/.claude/agent-memory/
 **/.claude/projects/
 .claude/scheduled_tasks.lock

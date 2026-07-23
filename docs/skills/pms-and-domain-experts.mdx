@@ -32,7 +32,7 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Diagnose Your Agent's Production Behavior
@@ -67,7 +67,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 ## Step 2: Baseline the Vital Signs
 
@@ -134,12 +134,7 @@ Open the report path for the user and also summarize the top findings directly i
 
 ## Step 5: Hand Off to Improvement
 
-Diagnosis without treatment is just bad news. Close by proposing the next step:
-
-- If the `agent-improve` skill is installed, offer to run `/agent-improve` on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes.
-- If it is not installed, tell the user to install it: `npx skills add langwatch/skills/agent-improve`
-
-Pass along the report: agent-improve uses these findings and trace examples as its evidence base.
+Diagnosis without treatment is just bad news. If the `agent-improve` skill is installed, run it on the findings right away: it turns each finding into tested hypotheses, scenario tests, evaluators, and PR-ready changes. Pass along the report — agent-improve uses these findings and trace examples as its evidence base.
 
 ## Common Mistakes
 
@@ -148,7 +143,7 @@ Pass along the report: agent-improve uses these findings and trace examples as i
 - Do NOT rely on aggregates alone; always read at least a handful of full traces per finding, the surprise is always in the details
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
-- If the CLI returns an error, surface the exact message in your reply rather than paraphrasing; the user often needs the raw error to debug API key, project, or date-range issues
+- If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text — an activity card already shows the underlying failure
 ````
 
         </div>
@@ -178,7 +173,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -230,10 +225,8 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and direct the user to upgrade at https://app.langwatch.ai/settings/subscription.
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it — point to the subscription settings on the platform (license settings instead, if `LANGWATCH_ENDPOINT` is set — self-hosted).
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
-
-If `LANGWATCH_ENDPOINT` is set in `.env`, the user is self-hosted. Direct them to `{LANGWATCH_ENDPOINT}/settings/license` instead.
 
 ---
 
@@ -267,7 +260,7 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env` — most environments already have this provisioned. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then read the Scenario-specific pages:
 
@@ -375,7 +368,8 @@ There are two distinct things to wire:
 **1. Scenario-run tracing** — call `setupScenarioTracing()` once at the top of the test file so the simulator, judge, and adapter spans are captured:
 
 ```typescript
-// TypeScript — add at the very top of the test file, before any imports or setup
+// TypeScript — the import and call go at the very top of the test file,
+// before any other imports or setup that might create spans of their own
 import { setupScenarioTracing } from "@langwatch/scenario";
 setupScenarioTracing();
 ```
@@ -734,7 +728,7 @@ describe("Voice agent — angry billing", () => {
         scenario.openAIRealtimeAgent({
           voice: "alloy",
           instructions: AGENT_INSTRUCTIONS,
-          // tools: AGENT_TOOLS,
+          tools: AGENT_TOOLS,
         }),
         scenario.userSimulatorAgent({
           voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
@@ -1106,12 +1100,12 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
         </span>
         <div className="lw-prompt-source">
 
-````text
+`````text
 Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it. They can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file — most environments already have this provisioned. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Route an Evaluation Request
@@ -1125,7 +1119,27 @@ Classify the user's intent:
 | Batch test a dataset, compare prompts or models, benchmark, create a CI quality gate | `experiments`        |
 | Score live traces or threads, monitor production quality, create a guardrail         | `online-evaluations` |
 
-If the request remains ambiguous after inspecting context, briefly explain the distinction and route to `experiments` as the safer pre-deployment default.
+If the request remains ambiguous after inspecting context — a bare "make me an eval" that names neither a dataset nor live traffic — do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
+
+Where `langy-card` blocks render, ask it as a `choices` block — the only sanctioned question format — last in the reply:
+
+````markdown
+```langy-card
+{
+  "kind": "choices",
+  "blockId": "eval-kind",
+  "question": "What should this evaluate?",
+  "options": [
+    { "id": "experiment", "label": "A dataset, before deployment" },
+    { "id": "online", "label": "Live production traffic" }
+  ]
+}
+```
+````
+
+Neither option names an existing entity, so neither carries a `ref`. Without that channel, ask the same question as one short line of prose.
+
+A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once — never turn a fixable slug into a question for the user.
 
 Then hand off:
 
@@ -1144,7 +1158,7 @@ Then hand off:
    ```
 
 Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.
-````
+`````
 
         </div>
       </div>

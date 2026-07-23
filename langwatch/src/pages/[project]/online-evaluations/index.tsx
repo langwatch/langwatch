@@ -11,6 +11,7 @@ import {
 } from "~/components/evaluations/OnlineEvaluationsTable";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { FullWidthListPageContent } from "~/components/ui/layouts/FullWidthListPageContent";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -184,6 +185,7 @@ function OnlineEvaluationsPage() {
             >
               <HStack marginTop={4}>
                 <OnlineEvaluationHeaderActions />
+                <SetupWithAgentButton surface="onlineEvaluations" />
               </HStack>
             </NoDataInfoBlock>
           </PageLayout.Content>

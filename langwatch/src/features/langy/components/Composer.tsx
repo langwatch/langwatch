@@ -9,7 +9,6 @@ import {
   Filter,
   FlaskConical,
   FolderKanban,
-  Gauge,
   LayoutDashboard,
   ListChecks,
   type LucideIcon,
@@ -90,19 +89,16 @@ const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 /**
  * The composer rail — affordances that sit beside the model picker.
  *
- * The one entry left here is a PLACEHOLDER: reasoning effort has no backend
- * behind it, so it renders disabled rather than faked. This is the seam: when it
- * gets wiring it grows an `onClick` and drops out of the placeholder path, and
- * the layout does not change to accommodate it.
- *
- * Two buttons used to sit here and are gone, for the same reason in two
- * directions. "Skills" went because they became REAL — a catalogue, a chip, and
- * a `/` to summon them — and a dead button beside a live feature teaches people
- * that the buttons are decoration. "Attach a file" went because it is NOT
- * coming: there is no upload path at any layer (no write endpoint, no field on
- * the turn, no way to get bytes to the worker), so a greyed paperclip was
- * advertising a feature with nothing behind it and no plan to build it. A
- * placeholder is a promise; an indefinite one is a lie.
+ * The rail carries only REAL controls. Three buttons used to sit here and are
+ * gone, for the same reason in three directions. "Skills" went because they
+ * became REAL — a catalogue, a chip, and a `/` to summon them — and a dead
+ * button beside a live feature teaches people that the buttons are decoration.
+ * "Attach a file" went because it is NOT coming: there is no upload path at any
+ * layer (no write endpoint, no field on the turn, no way to get bytes to the
+ * worker), so a greyed paperclip was advertising a feature with nothing behind
+ * it and no plan to build it. "Reasoning effort" went last: it sat as a greyed
+ * "coming soon" placeholder with no backend behind it, and a placeholder is a
+ * promise; an indefinite one is a lie.
  */
 function ComposerImpl({
   model,
@@ -257,12 +253,16 @@ function ComposerImpl({
   const onTextareaKeyDown = (
     event: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
-    if (event.key === "#" && atWordBoundary()) {
+    // The sigils follow their buttons: while a turn is in flight there is
+    // nothing for a palette to attach to, so `#` and `/` type as the ordinary
+    // characters they are rather than opening a picker that cannot take.
+    const palettesOpen = !disabled && !turnActive;
+    if (palettesOpen && event.key === "#" && atWordBoundary()) {
       event.preventDefault();
       openPalette("context");
       return;
     }
-    if (event.key === "/" && atWordBoundary()) {
+    if (palettesOpen && event.key === "/" && atWordBoundary()) {
       event.preventDefault();
       openPalette("skills");
       return;
@@ -506,19 +506,16 @@ function ComposerImpl({
                     color={canSend ? "white" : "fg.muted"}
                     cursor={canSend ? "pointer" : "default"}
                   >
-                    {/* OPTICAL centring, not geometric. Lucide's paper plane is
-                        very nearly centred in its own box (ink centre is within
-                        0.15 of the 24-grid centre), so `place-items: center`
-                        already puts it dead centre — and it still reads low and
-                        left, because the glyph's visual mass is the wide tail
-                        while the tip runs off to the top right. Nudging it a
-                        pixel along its own axis is what makes it LOOK centred in
-                        a circle. Sub-pixel values don't survive rasterisation,
-                        hence a whole pixel each way. */}
+                    {/* Centred, with nothing to interfere. Lucide's paper plane
+                        is very nearly centred in its own box (ink centre within
+                        0.15 of the 24-grid centre), so `place-items: center` is
+                        the whole job — once the wrapper stops inheriting a line
+                        box it has no use for, whose stray half-leading was what
+                        pushed the glyph off centre in the first place. */}
                     <Box
                       display="grid"
                       placeItems="center"
-                      transform="translate(1px, -1px)"
+                      lineHeight={0}
                     >
                       <Send size={14} />
                     </Box>
@@ -532,14 +529,24 @@ function ComposerImpl({
               affordances. Send is NOT here any more — it sits beside the input
               above, where the thing it acts on is.
 
-              The rail is built to GROW — one primitive, one array — but it only
-              ever shows what is real. Reasoning effort has no wiring behind it
-              today, so it renders as an explicitly disabled placeholder rather
-              than a button that lies: a greyed glyph with a "Coming soon"
-              tooltip. Page context is NOT here — it already has a better home
-              as the chips above the input, where you can see what's attached. */}
+              The rail only ever shows what is real — see COMPOSER_RAIL above.
+              Page context is NOT here — it already has a better home as the
+              chips above the input, where you can see what's attached. */}
           <HStack
             gap={1}
+            // ONE row, centers on one line: the model pill (28px control) and
+            // the sigil buttons share the rail, so the sigils carry the same
+            // control height (see SigilButton) and the row centers explicitly
+            // rather than by luck.
+            align="center"
+            // ...and it STAYS one row. In a narrow panel the rail was breaking
+            // onto a second line, which put the model control on its own row
+            // above two left-stranded sigils and made the footer look like a
+            // stack of unrelated chrome. Nothing here may wrap; if the rail
+            // runs out of room the model pill gives up its width first (it
+            // collapses to a glyph by design), never the row's shape.
+            flexWrap="nowrap"
+            minWidth={0}
             paddingLeft={2.5}
             paddingRight={2}
             paddingBottom={2}
@@ -547,36 +554,53 @@ function ComposerImpl({
             // See the note on the context summary above: the hero stays bare.
             display={hero ? "none" : undefined}
           >
-            <LangyModelPill
-              model={model}
-              options={modelOptions}
-              langyDefaultModel={langyDefaultModel}
-              onChange={onModelChange}
-              // The model is locked in the moment a turn starts — it rode with
-              // the send and can't change mid-flight — so the picker greys out
-              // until the turn settles rather than offering a choice that
-              // wouldn't take.
-              disabled={disabled || turnActive}
-            />
-            <RailButton icon={Gauge} label="Reasoning effort" />
-            <Box flex={1} />
+            {/* The pill goes in a shrinkable wrapper rather than straight into
+                the row. Ark's combobox root is a layout box of its own, and
+                left as the flex item it can claim the rail's whole width —
+                which squeezed the spacer to nothing and pushed the sigils onto
+                a line of their own. The wrapper is the flex item now: it may
+                shrink to nothing and it may not grow, so the row's shape can
+                never depend on how wide the selected model's name happens to
+                be. */}
+            <Box minWidth={0} flexShrink={1} flexGrow={0} overflow="hidden">
+              
+            </Box>
+            <Box flex={1} minWidth={0} />
             {/* The two keys, said out loud. A palette you can only reach by
                 guessing a keystroke is a palette most people never see, so the
                 sigils sit on the rail as real buttons: they name what each key
                 opens AND open it, which means the shortcut teaches itself the
-                first time someone clicks one. */}
-            <SigilButton
-              sigil="#"
-              label="Context"
-              hint="Add something from this page. Press #"
-              onClick={() => openPalette("context")}
-            />
-            <SigilButton
-              sigil="/"
-              label="Skills"
-              hint="Pick what Langy should do. Press /"
-              onClick={() => openPalette("skills")}
-            />
+                first time someone clicks one.
+
+                They keep a gap between them: at the rail's 4px they read as one
+                four-word control rather than as two things you can press. */}
+            <HStack gap={2} flexShrink={0} align="center">
+              <LangyModelPill
+                model={model}
+                options={modelOptions}
+                langyDefaultModel={langyDefaultModel}
+                onChange={onModelChange}
+                // The model is locked in the moment a turn starts — it rode
+                // with the send and can't change mid-flight — so the picker
+                // greys out until the turn settles rather than offering a
+                // choice that wouldn't take.
+                disabled={disabled || turnActive}
+              />
+              <SigilButton
+                sigil="#"
+                label="Context"
+                hint="Add something from this page. Press #"
+                onClick={() => openPalette("context")}
+                disabled={disabled || turnActive}
+              />
+              <SigilButton
+                sigil="/"
+                label="Skills"
+                hint="Pick what Langy should do. Press /"
+                onClick={() => openPalette("skills")}
+                disabled={disabled || turnActive}
+              />
+            </HStack>
           </HStack>
         </Box>
       </Box>
@@ -614,11 +638,19 @@ function SigilButton({
   label,
   hint,
   onClick,
+  disabled = false,
 }: {
   sigil: string;
   label: string;
   hint: string;
   onClick: () => void;
+  /**
+   * Greyed while a turn is in flight, alongside the model picker. Both change
+   * what the NEXT send carries, and the send has already gone — a palette that
+   * opened here would let someone attach context to a turn that cannot take
+   * it, and then look like it had done nothing.
+   */
+  disabled?: boolean;
 }) {
   return (
     <Tooltip content={hint} openDelay={300} showArrow>
@@ -626,10 +658,15 @@ function SigilButton({
         type="button"
         aria-label={hint}
         onClick={onClick}
+        disabled={disabled}
+        aria-disabled={disabled}
+        _disabled={{ opacity: 0.45, cursor: "not-allowed", background: "transparent" }}
         display="inline-flex"
         alignItems="center"
         gap={1}
-        height="22px"
+        // The model pill's control height, so the rail's controls share one
+        // vertical center instead of a 22px button hanging beside a 28px pill.
+        height="28px"
         paddingLeft={1}
         paddingRight={1.5}
         borderRadius="md"
@@ -708,44 +745,6 @@ function ContextGestureHint({ onDismiss }: { onDismiss: () => void }) {
         <X size={12} />
       </chakra.button>
     </HStack>
-  );
-}
-
-/**
- * One rail affordance. Disabled on purpose — see COMPOSER_RAIL. It keeps the
- * button semantics (and stays in the tab order via `aria-disabled` rather than
- * `disabled`, so it is discoverable and its tooltip is reachable) but does
- * nothing, and it says so.
- */
-function RailButton({
-  icon: Icon,
-  label,
-}: {
-  icon: LucideIcon;
-  label: string;
-}) {
-  return (
-    <Tooltip content={`${label} — coming soon`} openDelay={300} showArrow>
-      <chakra.button
-        type="button"
-        aria-label={`${label} (coming soon)`}
-        aria-disabled
-        onClick={(event) => event.preventDefault()}
-        display="grid"
-        placeItems="center"
-        width="26px"
-        height="26px"
-        borderRadius="full"
-        borderWidth={0}
-        background="transparent"
-        color="fg.subtle"
-        opacity={0.45}
-        cursor="not-allowed"
-        flexShrink={0}
-      >
-        <Icon size={14} />
-      </chakra.button>
-    </Tooltip>
   );
 }
 

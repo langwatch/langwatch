@@ -9,18 +9,18 @@ import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
-import {
-  projectionCursorHasReachedEvent,
-  projectionNotReadyError,
-} from "./projection-cursor";
+import { cursorHasReachedEvent } from "@langwatch/langy";
+
+import { projectionNotReadyError } from "./projection-cursor";
 
 const logger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
 const MAX_STALL_MS = LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3;
@@ -101,7 +101,7 @@ export function createAgentTurnLivenessSubscriber(
       });
       if (
         !conversation ||
-        !projectionCursorHasReachedEvent(conversation.cursor, event)
+        !cursorHasReachedEvent(conversation.cursor, event)
       ) {
         throw projectionNotReadyError({
           projectionName: "langyConversation",
@@ -125,7 +125,31 @@ export function createAgentTurnLivenessSubscriber(
         now,
         graceMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
       });
-      if (!liveness.stale) return;
+      if (!liveness.stale) {
+        // Only the FOUR event types above ever re-arm this delayed check, and
+        // each is deduped to at most one pending check per turn. A turn whose
+        // last qualifying event lands early (e.g. its final tool call) then
+        // spends its tail in pure response generation gets exactly one check
+        // here — if the worker is still healthy at that instant, returning
+        // silently means NO further check is ever scheduled, so a crash a
+        // moment later is never caught and the turn stays RUNNING forever
+        // (observed as a `langy_turn_in_progress` 409 that no client-side
+        // retry ever resolves, because the server-side projection is
+        // genuinely stuck, not racing). Re-throwing a retryable DispatchError
+        // makes the group queue re-deliver this same check on its own
+        // schedule instead, floored at HEARTBEAT_GRACE_MS so healthy turns
+        // aren't repolled on the queue's fast initial exponential steps. This
+        // self-perpetuates until the turn leaves RUNNING (the guard above
+        // returns cleanly) or genuinely goes stale (the branch below fires) —
+        // bounded by the queue's own max attempts, which at a ~30s-and-
+        // growing cadence covers well over an hour, comfortably past any
+        // real turn duration.
+        throw new DispatchError({
+          message: `langy turn ${turnId} still live; re-checking liveness`,
+          retryable: true,
+          retryAfterMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
+        });
+      }
 
       const stalledMs =
         conversation.lastActivityAtMs === null

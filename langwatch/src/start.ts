@@ -1,5 +1,5 @@
 import promBundle from "express-prom-bundle";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from "fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
@@ -340,6 +340,15 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   const wsHandle = setupTRPCWebSocket(server as ReturnType<typeof createServer>);
 
   server.once("error", (err) => {
+    // Write synchronously to stderr BEFORE the structured log: pino's
+    // transports are async worker threads that never flush past the
+    // process.exit(1) below, so without this a bind failure (e.g.
+    // EADDRINUSE when two dev processes race for the same port) is an
+    // exit(1) with zero output anywhere — stdout, Loki, or otherwise.
+    writeSync(
+      2,
+      `[langwatch:start] server error, exiting: ${err.stack ?? String(err)}\n`,
+    );
     logger.error({ error: err }, "error occurred on server");
     process.exit(1);
   });
@@ -475,13 +484,24 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
  *     no body and are left alone (a 304 revision-poll or 204 long-poll no-diff
  *     must stay empty).
  *
+ * Forwards every argument `getRequestListener` passes to `honoApp.fetch` —
+ * notably the second (`{ incoming, outgoing }`, Hono's `env`) — rather than
+ * declaring only `request`. Node's calling convention silently drops extra
+ * arguments a function doesn't declare, so a one-parameter wrapper here means
+ * `c.env` is `undefined` in every route handler despite `getRequestListener`
+ * always supplying it; that in turn makes `@hono/node-server/conninfo`'s
+ * `getConnInfo(c)` throw for every request in production (it reads
+ * `c.env.incoming.socket`). No existing handler reads `c.env` today, so this
+ * is additive — it only starts mattering for code that begins relying on it
+ * (see `~/utils/getClientIp.ts`'s `getConnInfo` fallback).
+ *
  * Exported for the langwatch#5219 + streaming-bridge regression tests.
  */
 export function honoFetchForNode(
   honoApp: Pick<Hono, "fetch">,
-): (request: Request) => Promise<Response> {
-  return async (request) => {
-    const response = await honoApp.fetch(request);
+): (...args: Parameters<Hono["fetch"]>) => Promise<Response> {
+  return async (request, ...rest) => {
+    const response = await honoApp.fetch(request, ...rest);
 
     if (response.status === 404) {
       const text = await response.clone().text();

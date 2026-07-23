@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 
 import { definePipeline } from "../../pipeline/staticBuilder";
 import { toSafeFailureDiagnostic } from "../../process-manager/failureDiagnostic";
-import type { AppendStore } from "../../projections/mapProjection.types";
 import { RecordTriggerMatchCommand } from "./commands/recordTriggerMatch.command";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
@@ -41,10 +40,6 @@ import {
   pruneSchema,
   webhookDeliveryPruneWake,
 } from "./process-manager/webhookDeliveryPrune.process";
-import {
-  createAutomationAuditMapProjection,
-  type AutomationAuditRecord,
-} from "./projections/automationAudit.mapProjection";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "./schemas/constants";
 import type { AutomationEvent } from "./schemas/events";
 
@@ -86,7 +81,6 @@ function runWebhookDeliveryPruneWithTriggerSettlementRetention(
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
  *  is defined inline below, ADR-052 "Approved builder API". */
 export interface AutomationsPipelineDeps {
-  automationAuditStore: AppendStore<AutomationAuditRecord>;
   dispatch: TriggerSettlementDispatchDeps;
   sweep: GraphAlertSweepDeps;
   prune: WebhookDeliveryPruneDeps;
@@ -96,10 +90,6 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
   return definePipeline<AutomationEvent>()
     .withName("automations")
     .withAggregateType("trigger")
-    .withMapProjection(
-      "automationAudit",
-      createAutomationAuditMapProjection({ store: deps.automationAuditStore }),
-    )
     .withCommand("recordTriggerMatch", RecordTriggerMatchCommand, {
       serializeByAggregate: true,
     })

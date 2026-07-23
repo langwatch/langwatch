@@ -1,18 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  type ClaudeCodeLogRecordInput,
-  convertClaudeCodeLogsToSpans,
-} from "../../claude-code-log-to-span";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
 import type {
   NormalizedAttributes,
   NormalizedEvent,
 } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { OtlpKeyValue } from "../../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import type { ExtractorContext } from "../extractors/_types";
 
-import claudeBLogs from "./fixtures/claude-B.logs.json";
 import codexBSpan from "./fixtures/codex-B.session_task_turn.json";
 import geminiBSpan from "./fixtures/gemini-B.llm_call.json";
 import opencodeBSpan from "./fixtures/opencode-B.doStream.json";
@@ -21,11 +15,10 @@ import opencodeBSpan from "./fixtures/opencode-B.doStream.json";
  * Per-element canonicalization coverage, fed by the REAL Path B OTLP each coding
  * assistant sent on the wire (captured during the 2026-06-06 dogfood, dumps in
  * langwatch/.claude/dogfood-evidence/8cell-2026-06-06/<tool>-B/). Each tool's
- * raw span (or, for claude-code, its raw log triplet run through the
- * log-to-span converter) is pushed through the production
- * CanonicalizeSpanAttributesService, and every one of the nine telemetry
- * elements is asserted PRESENT (a real value was captured) or WIRE-ABSENT (the
- * tool genuinely does not emit it — cited per tool below).
+ * raw span is pushed through the production CanonicalizeSpanAttributesService,
+ * and every one of the nine telemetry elements is asserted PRESENT (a real
+ * value was captured) or WIRE-ABSENT (the tool genuinely does not emit it —
+ * cited per tool below).
  *
  * To validate a NEW element in future: add it to ELEMENTS plus each tool's
  * `expected` map here, and add the matching gateway-level row (Path A) — if a
@@ -56,55 +49,6 @@ const canonicalizeSpan = (fixture: {
     [] as NormalizedEvent[],
     SPAN_CTX(fixture.scopeName, fixture.spanName),
   ).attributes;
-
-/** Flatten a synthesized span's OTLP attribute list to a key/value bag. */
-const otlpKvToAttrs = (kvs: OtlpKeyValue[]): NormalizedAttributes => {
-  const out: NormalizedAttributes = {};
-  for (const kv of kvs) {
-    const v = kv.value as Record<string, unknown>;
-    out[kv.key] = (v.stringValue ??
-      v.intValue ??
-      v.doubleValue ??
-      v.boolValue) as NormalizedAttributes[string];
-  }
-  return out;
-};
-
-/**
- * claude-code Path B: raw `com.anthropic.claude_code.events` LOG triplet
- * (api_request + truncated api_request_body + api_response_body) joined into a
- * gen_ai span by the converter, with the co-batched user_prompt text supplied so
- * the truncated-body input is replaced by the real user turn, then canonicalized.
- */
-const canonicalizeClaudeB = (): NormalizedAttributes => {
-  const records: ClaudeCodeLogRecordInput[] = claudeBLogs.records.map(
-    (r, i) => ({
-      traceId: "trace_claude_b",
-      spanId: `span_${i}`,
-      timeUnixMs: 1_700_000_000_000 + i,
-      eventName: r.eventName,
-      // The JSON fixture infers a union of per-event-shape literals whose
-      // optional keys are typed `undefined`; route through `unknown` to land
-      // on the converter's string bag.
-      attrs: r.attrs as unknown as Record<string, string>,
-      resource: null,
-      instrumentationScope: null,
-    }),
-  );
-  const promptTextById = new Map<string, string>([
-    [claudeBLogs.promptId, claudeBLogs.userPromptText],
-  ]);
-  const spans = convertClaudeCodeLogsToSpans(records, promptTextById);
-  const collapsed = spans.find(
-    (s) => !s.span.attributes.some((a) => a.key === "claude_code.orphan"),
-  );
-  expect(collapsed, "converter should emit one collapsed gen_ai span").toBeDefined();
-  return svc.canonicalize(
-    otlpKvToAttrs(collapsed!.span.attributes),
-    [],
-    SPAN_CTX("com.anthropic.claude_code.events", collapsed!.span.name),
-  ).attributes;
-};
 
 // ── element extractors over the canonical attribute bag ─────────────────────
 const str = (v: unknown): string | undefined =>
@@ -163,22 +107,6 @@ const TOOLS: {
   absentReason: Record<string, string>;
   expected: Record<string, Status>;
 }[] = [
-  {
-    name: "claude-B (claude_code logs -> synthesized gen_ai span)",
-    attrs: canonicalizeClaudeB,
-    absentReason: {},
-    expected: {
-      model: "present",
-      "input tokens": "present",
-      "output tokens": "present",
-      cost: "present",
-      "cache read": "present",
-      "cache write": "present",
-      "session id": "present",
-      "input content": "present",
-      "output content": "present",
-    },
-  },
   {
     name: "codex-B (codex_cli_rs session_task.turn span)",
     attrs: () => canonicalizeSpan(codexBSpan),

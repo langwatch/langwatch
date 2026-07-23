@@ -38,7 +38,7 @@ import {
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
 } from "../schemas/events";
-import { LANGY_CONVERSATION_EVENT_TYPES } from "../schemas/constants";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 
 export interface LangyAnalyticsEventProjectionRecord {
   eventId: string;

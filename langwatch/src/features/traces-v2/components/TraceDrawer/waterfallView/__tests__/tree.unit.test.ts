@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { buildTree, countDescendants } from "../tree";
+import { buildTree, countDescendants, shouldShowTimeline } from "../tree";
+import { COLLAPSE_TIMELINE_BELOW_PX } from "../types";
 
 function makeSpan(
   spanId: string,
@@ -63,6 +64,28 @@ describe("countDescendants", () => {
       ]);
       const a = tree[0]!.children.find((n) => n.span.spanId === "a")!;
       expect(countDescendants(a)).toBe(1);
+    });
+  });
+});
+
+describe("shouldShowTimeline", () => {
+  describe("given a drawer narrower than the breakpoint", () => {
+    it("hides the timeline panel", () => {
+      expect(shouldShowTimeline(COLLAPSE_TIMELINE_BELOW_PX - 1)).toBe(false);
+      expect(shouldShowTimeline(300)).toBe(false);
+    });
+  });
+
+  describe("given a drawer at or above the breakpoint", () => {
+    it("shows the timeline panel", () => {
+      expect(shouldShowTimeline(COLLAPSE_TIMELINE_BELOW_PX)).toBe(true);
+      expect(shouldShowTimeline(1200)).toBe(true);
+    });
+  });
+
+  describe("given the container hasn't been measured yet (width 0)", () => {
+    it("defaults to showing the timeline, so a wide drawer doesn't flash collapsed on mount", () => {
+      expect(shouldShowTimeline(0)).toBe(true);
     });
   });
 });

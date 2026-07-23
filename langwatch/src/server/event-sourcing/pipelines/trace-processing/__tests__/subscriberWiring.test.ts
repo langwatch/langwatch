@@ -44,7 +44,6 @@ function buildTraceDeps(
       graphActivityHandler: vi.fn().mockResolvedValue(undefined),
     },
     spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
-    claudeCodeSpanSyncReactor: reactorStub("claudeCodeSpanSync"),
     ...overrides,
   };
 }

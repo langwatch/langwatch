@@ -54,6 +54,38 @@ export const BLOB_LEASE_SET_TTL_SECONDS = BLOB_LEASE_TTL_SECONDS + 24 * 60 * 60;
  */
 export const BLOB_RELEASE_GRACE_TTL_SECONDS = 60 * 60;
 
+/**
+ * How long a blob must already have been counting down on the release grace
+ * window before the reclaim runner is allowed to DELETE its bytes.
+ *
+ * `TieredBlobStore.put` writes a blob BEFORE the value that references it is
+ * staged, so between those two round trips the bytes carry no lease and no
+ * holder. That is indistinguishable, by lease state alone, from a blob nothing
+ * will ever reference again — which is exactly the read that made eager reclaim
+ * unsafe. The margin is the proof: only the runner's own repair pass puts a blob
+ * on the grace window, so a TTL that has fallen this far below it establishes
+ * the blob has been unreferenced for at least this long. A just-written blob
+ * still carries the full backstop and can never satisfy it.
+ */
+export const BLOB_RECLAIM_SAFETY_MARGIN_SECONDS = 10 * 60;
+
+/**
+ * TTL at or below which the reclaim runner may destroy an unleased blob.
+ * Derived so the margin above is the single number to reason about.
+ */
+export const BLOB_RECLAIM_TTL_THRESHOLD_SECONDS =
+  BLOB_RELEASE_GRACE_TTL_SECONDS - BLOB_RECLAIM_SAFETY_MARGIN_SECONDS;
+
+/**
+ * How often the reclaim runner sweeps the blob keyspace.
+ *
+ * Sized against the grace window rather than against traffic: a sweep that lands
+ * well inside the window means an unreferenced blob is found, graced, and then
+ * destroyed within roughly the window itself, so the practical retention bound
+ * for anything nothing references becomes ~1 hour instead of the 4-day backstop.
+ */
+export const BLOB_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+
 /** Sentinel that prevents previous-release code from observing a last holder. */
 export const LEGACY_HOLDER_LEASE_GUARD = "__gq2_lease_guard__";
 

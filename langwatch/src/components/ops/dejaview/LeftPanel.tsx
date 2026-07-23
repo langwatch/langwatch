@@ -3,7 +3,7 @@ import { Circle } from "lucide-react";
 
 export function LeftPanel({
   projections,
-  reactors,
+  eventSubscribers,
   selectedProjection,
   onSelectProjection,
   currentEventType,
@@ -13,11 +13,11 @@ export function LeftPanel({
     pipelineName: string;
     aggregateType: string;
   }>;
-  reactors: Array<{
-    reactorName: string;
+  eventSubscribers: Array<{
+    subscriberName: string;
     pipelineName: string;
     aggregateType: string;
-    afterProjection: string;
+    eventTypes: readonly string[];
   }>;
   selectedProjection: string | null;
   onSelectProjection: (name: string | null) => void;
@@ -92,19 +92,19 @@ export function LeftPanel({
           marginTop={2}
         >
           <Text textStyle="xs" fontWeight="semibold" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
-            Reactors
+            Event Subscribers
           </Text>
         </Box>
-        {reactors.length === 0 ? (
+        {eventSubscribers.length === 0 ? (
           <Box paddingX={3} paddingY={4}>
             <Text textStyle="xs" color="fg.muted">
-              No reactors for this aggregate type.
+              No event subscribers for this aggregate type.
             </Text>
           </Box>
         ) : (
-          reactors.map((reactor) => (
+          eventSubscribers.map((subscriber) => (
             <Box
-              key={reactor.reactorName}
+              key={subscriber.subscriberName}
               paddingX={3}
               paddingY={2}
               borderBottom="1px solid"
@@ -114,14 +114,16 @@ export function LeftPanel({
                 <Circle
                   size={8}
                   fill="currentColor"
-                  color="purple.500"
+                  color="cyan.500"
                 />
-                <VStack align="start" gap={0}>
+                <VStack align="start" gap={0} minW={0}>
                   <Text textStyle="xs" fontWeight="medium">
-                    {reactor.reactorName}
+                    {subscriber.subscriberName}
                   </Text>
-                  <Text textStyle="xs" color="fg.muted">
-                    after {reactor.afterProjection}
+                  <Text textStyle="xs" color="fg.muted" truncate>
+                    {subscriber.eventTypes.length > 0
+                      ? `on ${subscriber.eventTypes.join(", ")}`
+                      : subscriber.pipelineName}
                   </Text>
                 </VStack>
               </HStack>

@@ -172,6 +172,8 @@ export function applySpanToSummary({
     outputSource: io.outputSource,
     inputIsFallback: io.inputIsFallback,
     outputIsFallback: io.outputIsFallback,
+    inputMediaRefs: io.inputMediaRefs,
+    outputMediaRefs: io.outputMediaRefs,
   });
 
   // Roll the per-span cache / reasoning token counts into trace-level sums.

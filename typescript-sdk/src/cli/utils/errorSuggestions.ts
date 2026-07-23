@@ -11,7 +11,7 @@
  * Keys are EXACT codes, never prefix matches: an unknown code gets no invented
  * advice, and a new backend code lands nowhere rather than in the wrong bucket.
  */
-import type { CliHandledError } from "@langwatch/cli-cards/handled-error";
+import type { CliHandledError } from "@langwatch/langy/cards/handled-error";
 
 /** The fallback advice for one code. */
 export interface ErrorExplanation {

@@ -125,21 +125,6 @@ describe("deserializeAttributes", () => {
     });
   });
 
-  describe("when given a langwatch.reserved.eventref.* pointer", () => {
-    it("keeps the JSON-object-shaped value as a raw string instead of parsing it", () => {
-      const key = `${EVENTREF_ATTR_PREFIX}langwatch.input`;
-      const rawPointer = JSON.stringify({
-        field: "langwatch.input",
-        eventId: "evt-001",
-      });
-
-      const result = deserializeAttributes({ [key]: rawPointer });
-
-      expect(result).toEqual({ [key]: rawPointer });
-      expect(typeof result[key]).toBe("string");
-    });
-  });
-
   describe("when given plain strings", () => {
     it("keeps non-special strings unchanged", () => {
       const result = deserializeAttributes({ name: "hello world" });

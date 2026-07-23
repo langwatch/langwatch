@@ -63,6 +63,19 @@ func (s *signallingIngest) await(t *testing.T) []byte {
 	}
 }
 
+// assertSilent fails if any export arrives within the grace window. Used to pin
+// the skip tier: nothing about the turn may reach the mirror. Call it AFTER a
+// sibling lane (the customer forward) has been observed, so the batch is known
+// to have been processed and this is a true negative, not a race.
+func (s *signallingIngest) assertSilent(t *testing.T, grace time.Duration) {
+	t.Helper()
+	select {
+	case <-s.got:
+		t.Fatal("an export arrived on a lane that must have stayed silent")
+	case <-time.After(grace):
+	}
+}
+
 // contentBatch is a worker batch whose spans carry prompt/completion bodies.
 func contentBatch(t *testing.T) []byte {
 	t.Helper()
@@ -173,6 +186,134 @@ func TestDualExport(t *testing.T) {
 				t.Fatalf("internal path = %q", got)
 			}
 		})
+	})
+
+	t.Run("when a mirror destination is configured (ADR-061)", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		internal := startSignallingIngest(t)
+		mirror := startSignallingIngest(t)
+		relay := relayWithOptions(t, Options{
+			InternalOTLPEndpoint: internal.srv.URL,
+			MirrorEndpoint:       mirror.srv.URL,
+			MirrorKey:            "sk-mirror-static",
+		})
+
+		token, err := relay.Register(WorkerInfo{
+			ConversationID:    "conv-mirror",
+			LangwatchEndpoint: customer.srv.URL,
+			LangwatchAPIKey:   "sk-session",
+			Model:             "gpt-5-mini",
+			MirrorTier:        "content",
+		})
+		require.NoError(t, err)
+
+		resp, err := http.Post(
+			relay.OTLPEndpointFor(token)+"/v1/traces",
+			"application/x-protobuf",
+			bytes.NewReader(contentBatch(t)),
+		)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		t.Run("the mirror ingests like an ordinary LangWatch project", func(t *testing.T) {
+			body := mirror.await(t)
+			assert.Contains(t, string(body), "gpt-5-mini",
+				"operational metadata must reach the mirror")
+			assert.Equal(t, "Bearer sk-mirror-static", <-mirror.authz,
+				"the mirror authenticates with the static mirror key")
+			assert.Equal(t, "/api/otel/v1/traces", <-mirror.path,
+				"the mirror is a LangWatch project ingest, not a bare collector")
+		})
+
+		t.Run("the customer forward never carries the mirror key", func(t *testing.T) {
+			customer.await(t)
+			assert.Equal(t, "Bearer sk-session", <-customer.authz)
+		})
+
+		t.Run("the collector copy still arrives alongside the mirror", func(t *testing.T) {
+			internal.await(t)
+			assert.Equal(t, "/v1/traces", <-internal.path)
+		})
+	})
+
+	t.Run("when the mirror ingest is failing", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+		}))
+		t.Cleanup(mirror.Close)
+		relay := relayWithOptions(t, Options{
+			MirrorEndpoint: mirror.URL,
+			MirrorKey:      "sk-mirror-static",
+		})
+
+		token, err := relay.Register(WorkerInfo{
+			ConversationID:    "conv-mirror-down",
+			LangwatchEndpoint: customer.srv.URL,
+			LangwatchAPIKey:   "sk-session",
+			Model:             "gpt-5-mini",
+			MirrorTier:        "content",
+		})
+		require.NoError(t, err)
+
+		resp, err := http.Post(
+			relay.OTLPEndpointFor(token)+"/v1/traces",
+			"application/x-protobuf",
+			bytes.NewReader(contentBatch(t)),
+		)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		assert.Equal(t, http.StatusOK, resp.StatusCode,
+			"a mirror 5xx must never surface on the worker's export response")
+		assert.True(t, bytes.Contains(customer.await(t), []byte(workerPrompt)),
+			"the customer lane must be untouched by a mirror outage")
+	})
+
+	t.Run("when the mirror ingest hangs", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		release := make(chan struct{})
+		mirror := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			// Drain the body first: with it unread, the HTTP/1 server never
+			// arms the background read, so a client-side abort would not fire
+			// req.Context().Done() and Close would wait on this handler.
+			_, _ = io.Copy(io.Discard, req.Body)
+			select {
+			case <-release:
+			case <-req.Context().Done():
+			}
+		}))
+		t.Cleanup(mirror.Close)
+		// Registered AFTER mirror.Close so it runs FIRST (LIFO): the handler
+		// must be released before the server's Close waits on it.
+		t.Cleanup(func() { close(release) })
+		relay := relayWithOptions(t, Options{
+			MirrorEndpoint: mirror.URL,
+			MirrorKey:      "sk-mirror-static",
+		})
+
+		token, err := relay.Register(WorkerInfo{
+			ConversationID:    "conv-mirror-hang",
+			LangwatchEndpoint: customer.srv.URL,
+			LangwatchAPIKey:   "sk-session",
+			Model:             "gpt-5-mini",
+			MirrorTier:        "content",
+		})
+		require.NoError(t, err)
+
+		start := time.Now()
+		resp, err := http.Post(
+			relay.OTLPEndpointFor(token)+"/v1/traces",
+			"application/x-protobuf",
+			bytes.NewReader(contentBatch(t)),
+		)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Less(t, time.Since(start), 2*time.Second,
+			"a hung mirror must not delay the worker's export response")
+		assert.True(t, bytes.Contains(customer.await(t), []byte(workerPrompt)),
+			"the customer forward must not wait on the mirror")
 	})
 
 	t.Run("when no internal collector is configured", func(t *testing.T) {
@@ -466,4 +607,80 @@ func TestCustomerForwardFiltersPlumbingSpans(t *testing.T) {
 	assert.Equal(t, "ai.streamText", span.Name())
 	assert.Equal(t, pcommon.SpanID(turn.SpanID()), span.ParentSpanID(),
 		"with its plumbing ancestor filtered, the span must attach to the turn")
+}
+
+// The ADR-061 tier decides what of the turn reaches the mirror, end to end
+// through the relay: content carries the bodies, structural strips them, skip
+// mirrors nothing — and the SOURCE tenant is stamped on the mirror but never on
+// the customer forward.
+func TestMirrorTiersEndToEnd(t *testing.T) {
+	register := func(relay *Relay, customerURL, tier string) string {
+		t.Helper()
+		token, err := relay.Register(WorkerInfo{
+			ConversationID:       "conv-tier",
+			LangwatchEndpoint:    customerURL,
+			LangwatchAPIKey:      "sk-session",
+			Model:                "gpt-5-mini",
+			MirrorTier:           tier,
+			SourceOrganizationID: "org-acme",
+			SourceProjectID:      "proj-acme",
+		})
+		require.NoError(t, err)
+		return token
+	}
+	post := func(relay *Relay, token string) {
+		t.Helper()
+		resp, err := http.Post(
+			relay.OTLPEndpointFor(token)+"/v1/traces",
+			"application/x-protobuf",
+			bytes.NewReader(contentBatch(t)),
+		)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+
+	t.Run("content tier mirrors the bodies and the source tenant", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		mirror := startSignallingIngest(t)
+		relay := relayWithOptions(t, Options{MirrorEndpoint: mirror.srv.URL, MirrorKey: "sk-mirror"})
+		post(relay, register(relay, customer.srv.URL, "content"))
+
+		body := string(mirror.await(t))
+		for _, want := range []string{workerPrompt, workerCompletion, workerToolOutput, "org-acme", "proj-acme"} {
+			assert.Contains(t, body, want, "content tier + attribution must reach the mirror")
+		}
+
+		customerBody := string(customer.await(t))
+		assert.NotContains(t, customerBody, "org-acme",
+			"the source org must never ride the customer's own forward")
+		assert.NotContains(t, customerBody, "proj-acme",
+			"the source project must never ride the customer's own forward")
+	})
+
+	t.Run("structural tier mirrors the shape and tenant but no content", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		mirror := startSignallingIngest(t)
+		relay := relayWithOptions(t, Options{MirrorEndpoint: mirror.srv.URL, MirrorKey: "sk-mirror"})
+		post(relay, register(relay, customer.srv.URL, "structural"))
+
+		body := string(mirror.await(t))
+		for _, absent := range []string{workerPrompt, workerCompletion, workerToolOutput} {
+			assert.NotContains(t, body, absent, "structural tier must carry no content")
+		}
+		assert.Contains(t, body, "org-acme", "structural still attributes the source tenant")
+		assert.Contains(t, body, "gpt-5-mini", "structural still carries the operational model")
+	})
+
+	t.Run("skip tier mirrors nothing while the customer forward is unaffected", func(t *testing.T) {
+		customer := startSignallingIngest(t)
+		mirror := startSignallingIngest(t)
+		relay := relayWithOptions(t, Options{MirrorEndpoint: mirror.srv.URL, MirrorKey: "sk-mirror"})
+		post(relay, register(relay, customer.srv.URL, "skip"))
+
+		// The customer forward proves the batch was processed; the mirror must
+		// then be provably silent.
+		assert.Contains(t, string(customer.await(t)), workerPrompt)
+		mirror.assertSilent(t, 300*time.Millisecond)
+	})
 }

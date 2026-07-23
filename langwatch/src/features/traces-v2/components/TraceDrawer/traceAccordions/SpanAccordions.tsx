@@ -17,6 +17,7 @@ import {
 import { RedactedField } from "~/components/ui/RedactedField";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
+import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { AttributeTable } from "../AttributeTable";
 import { IOViewer } from "../IOViewer";
@@ -25,6 +26,7 @@ import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
 import { EmptyEventsState, EmptyHint } from "./EmptyStates";
 import { EventCard } from "./EventCard";
+import { logEventTone, summarizeLogEvent } from "./logSummary";
 import { SectionFocusGlow } from "./SectionFocusGlow";
 import { useAutoOpenSections } from "./sectionPresence";
 import { UnmappedCostSuggestion } from "./UnmappedCostSuggestion";
@@ -45,6 +47,8 @@ export function SpanAccordions({
   const resources = useTraceResources(traceId);
   const spanResource = resources.bySpanId[span.spanId] ?? null;
   const spanScope = spanResource?.scope ?? null;
+  const { logsBySpanId, isLoading: logsLoading } = useSpanLogs();
+  const spanLogs = logsBySpanId.get(span.spanId) ?? [];
 
   const hasIO = !!(detail?.input || detail?.output);
   // Any content category that is dropped, restricted, or restricted-but-visible
@@ -74,12 +78,18 @@ export function SpanAccordions({
   const hasPrompt = !!detail && hasPromptMetadata(detail.params);
   const hasError = span.status === "error" || !!detail?.error;
   const hasEvents = !!detail?.events && detail.events.length > 0;
+  const hasLogs = spanLogs.length > 0;
 
   const sections = useMemo(() => {
     const list: string[] = [];
     if (hasError && !hasIO) list.push("exceptions");
     list.push("io");
     if (hasError && hasIO) list.push("exceptions");
+    // A tool the user DENIED, an API retry, a mid-session compaction — none
+    // of those produce a span of their own, so this is the only place they
+    // show up at all. Placed right after I/O: when a span has logs, that is
+    // usually the most interesting thing about it.
+    if (hasLogs) list.push("logs");
     if (hasPrompt) list.push("prompt");
     list.push("attributes");
     // Instrumentation scope used to be a chip pinned to the right of
@@ -91,7 +101,7 @@ export function SpanAccordions({
     if (hasScope) list.push("scope");
     list.push("events");
     return list;
-  }, [hasError, hasIO, hasPrompt, hasScope]);
+  }, [hasError, hasIO, hasLogs, hasPrompt, hasScope]);
 
   // Same rule as the trace summary view: only auto-expand Attributes when
   // the span itself has attributes (resource-only is rarely interesting
@@ -100,6 +110,7 @@ export function SpanAccordions({
   const [openSections, setOpenSections] = useAutoOpenSections(span.spanId, {
     exceptions: hasError,
     io: hasIO || hasPrivacyMarkers,
+    logs: hasLogs,
     prompt: hasPrompt,
     attributes: hasSpanAttrs || !!detail?.costSuggestion || contentIncomplete,
     scope: hasScope,
@@ -217,6 +228,62 @@ export function SpanAccordions({
                           />
                         ) : null}
                       </RedactedField>
+                    </VStack>
+                  )}
+                </Section>
+              );
+            }
+            if (id === "logs") {
+              return (
+                <Section
+                  key="logs"
+                  value="logs"
+                  title="Logs"
+                  count={spanLogs.length}
+                  empty={!logsLoading && spanLogs.length === 0}
+                  isFirst={isFirst}
+                  open={isOpen}
+                >
+                  {logsLoading ? (
+                    <EmptyHint>Loading…</EmptyHint>
+                  ) : (
+                    <VStack align="stretch" gap={2}>
+                      {spanLogs.map((log, i) => {
+                        const summary = summarizeLogEvent(log);
+                        const attributes: Record<string, unknown> = {
+                          ...log.attributes,
+                        };
+                        // The raw event name is redundant once it's been
+                        // turned into a human summary — dropping it keeps the
+                        // nested attribute table from repeating the headline.
+                        const eventName = log.attributes["event.name"];
+                        if (summary !== null) delete attributes["event.name"];
+                        if (log.bodyRedacted) {
+                          attributes.body = log.bodyVisibleTo
+                            ? `[redacted — visible to ${log.bodyVisibleTo}]`
+                            : "[redacted]";
+                        } else if (log.body && log.body !== eventName) {
+                          // Same discrimination the redaction layer applies:
+                          // claude stamps the event-name MARKER into the
+                          // top-level body, and copying that would both add a
+                          // redundant row and overwrite the real content the
+                          // raw api_*_body records carry under the `body`
+                          // attribute.
+                          attributes.body = log.body;
+                        }
+                        return (
+                          <EventCard
+                            key={`${log.timeUnixMs}-${i}`}
+                            name={
+                              summary ?? log.attributes["event.name"] ?? "log"
+                            }
+                            timestampMs={log.timeUnixMs}
+                            anchorMs={span.startTimeMs}
+                            attributes={attributes}
+                            tone={logEventTone(log)}
+                          />
+                        );
+                      })}
                     </VStack>
                   )}
                 </Section>

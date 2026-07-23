@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Evaluation } from "~/server/tracer/types";
 import { api } from "~/utils/api";
+import { useSharedTrace } from "../context/SharedTraceContext";
 import { isPreviewTraceId } from "../onboarding/data/samplePreviewTraces";
 import { useDrawerStore } from "../stores/drawerStore";
 import type { EvalSummary } from "../types/trace";
@@ -44,6 +45,22 @@ export interface TraceEvaluationsResult {
   isError: boolean;
 }
 
+/**
+ * Evaluator inputs, when the source carries them. The in-app read returns them;
+ * the shared-trace payload deliberately omits the field entirely, because they
+ * are captured trace content that is never shared at any visibility (ADR-057).
+ * Narrowing on the property rather than its value keeps that distinction
+ * visible instead of letting an absent field look like an empty one.
+ */
+function readEvaluationInputs(
+  ev: Evaluation | Omit<Evaluation, "inputs">,
+): Record<string, unknown> | undefined {
+  if (!("inputs" in ev)) return undefined;
+  return ev.inputs && typeof ev.inputs === "object"
+    ? (ev.inputs as Record<string, unknown>)
+    : undefined;
+}
+
 function mapStatus(ev: Evaluation): EvalSummary["status"] {
   // Preserve the distinction between "evaluator failed to run" and
   // "evaluator ran and the verdict was fail". Earlier this collapsed
@@ -73,8 +90,10 @@ function mapScore(ev: Evaluation): number | boolean {
 }
 
 export function useTraceEvaluations(): TraceEvaluationsResult {
+  const shared = useSharedTrace();
   const { project } = useOrganizationTeamProject();
-  const traceId = useDrawerStore((s) => s.traceId);
+  const storeTraceId = useDrawerStore((s) => s.traceId);
+  const traceId = shared?.header.traceId ?? storeTraceId;
 
   // TODO(traces-v2): migrate to `tracesV2.evals` once the v2 schema carries
   // `spanId`, `errorStacktrace`, and `retries` — the rich evaluations panel
@@ -92,15 +111,17 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
   const query = api.traces.getEvaluations.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },
     {
-      enabled: !!project?.id && !!traceId && !isPreview,
+      enabled: !!project?.id && !!traceId && !isPreview && !shared,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       trpc: { context: { skipBatch: true } },
     },
   );
 
+  const rawEvaluations = shared?.evaluations ?? query.data;
+
   return useMemo(() => {
-    const all = query.data ?? [];
+    const all = rawEvaluations ?? [];
     const pendingCount = all.filter(
       (e) => e.status === "scheduled" || e.status === "in_progress",
     ).length;
@@ -132,10 +153,11 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
           reasoning: e.details ?? undefined,
           label: e.label ?? undefined,
           passed: e.passed ?? undefined,
-          inputs:
-            e.inputs && typeof e.inputs === "object"
-              ? (e.inputs as Record<string, unknown>)
-              : undefined,
+          // Evaluator inputs are captured trace content, so the share payload
+          // does not carry the field at all — only the in-app read does. The
+          // `in` check is what makes that asymmetry explicit rather than
+          // relying on the value happening to be undefined. See ADR-057.
+          inputs: readEvaluationInputs(e),
           errorMessage: e.error?.message ?? undefined,
           errorStacktrace: e.error?.stacktrace ?? undefined,
           retries: e.retries ?? undefined,
@@ -147,8 +169,8 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
     return {
       rich,
       pendingCount,
-      isLoading: query.isLoading,
-      isError: query.isError,
+      isLoading: shared ? false : query.isLoading,
+      isError: shared ? false : query.isError,
     };
-  }, [query.data, query.isLoading, query.isError]);
+  }, [rawEvaluations, query.isLoading, query.isError, shared]);
 }

@@ -28,7 +28,7 @@ Before suggesting anything, read EVERYTHING:
 7. `langwatch evaluator list --format json` to see what evaluators are configured
 8. `langwatch monitor list --format json` to check for online evaluation monitors
 9. `langwatch prompt list --format json` to check whether prompts are versioned (or all hardcoded in code)
-10. `langwatch analytics query --metric trace-count` and `--metric total-cost`, `--metric avg-latency`, `--metric eval-pass-rate` for the current cost, latency, and error/pass rate baseline
+10. `langwatch analytics query --metric trace-count --format json` and `--metric total-cost`, `--metric avg-latency`, `--metric eval-pass-rate` (each with `--format json`) for the current cost, latency, and error/pass rate baseline
 
 ### Gap Analysis
 Score the setup against the best-practices checklist:

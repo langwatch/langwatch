@@ -2,7 +2,7 @@ import {
   parseHandledError,
   type CliHandledError,
   type CliHandledErrorReason,
-} from "@langwatch/cli-cards/handled-error";
+} from "@langwatch/langy/cards/handled-error";
 
 /**
  * A failure the platform NAMED.

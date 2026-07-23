@@ -152,6 +152,11 @@ export default defineConfig(async (): Promise<UserConfig> => {
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
       "@ee": path.resolve(__dirname, "./ee"),
     },
+    // ONE zod instance for the app AND linked workspace packages
+    // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
+    // z.record's key/value overload detection), so a second physical copy
+    // resolved from a package's own node_modules silently mis-parses.
+    dedupe: ["zod"],
   },
   define: {
     // Literal replacements for process.env references in browser code.
@@ -209,7 +214,10 @@ export default defineConfig(async (): Promise<UserConfig> => {
         "**/dist/**",
         "**/.next/**",
         "**/coverage/**",
-        "**/server.log",
+        // Any dev-server tee target (server.log, server-qa.log, ...): the
+        // server appends on every request, so watching one turns each page
+        // load into a full-reload loop.
+        "**/server*.log",
       ],
       // Docker-on-macOS bind mounts don't surface inotify events reliably,
       // so Vite's default fs.watch sits silent on edits made from the host.
@@ -268,7 +276,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
         // No-op when API is on plain HTTP.
         secure: false,
       },
-      "/mcp": {
+      // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
+      // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
+      // sending it to the API server, which has no dev-mode page fallback.
+      // server.proxy regexes test against the full req.url (path + query),
+      // so the optional "(?:\?.*)?" is required or a query-bearing request
+      // like "/mcp?sessionId=..." falls through to the frontend instead.
+      "^/mcp(?:\\?.*)?$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      "^/mcp/health(?:\\?.*)?$": {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,

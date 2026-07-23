@@ -206,6 +206,31 @@ const edgeSpoolFailOpenCounter = new Counter({
 export const getEdgeSpoolFailOpenCounter = (reason: "flag_store" | "spool") =>
   edgeSpoolFailOpenCounter.labels(reason);
 
+// Trace media extraction fail-open counter. The edge media extraction falls
+// back to the unmodified command data when the flag store, the data-privacy
+// policy probe, or the object store errors — ingestion is never blocked. A
+// healthy fleet emits this at ~zero rate; sustained increments (esp.
+// reason="storage") indicate an object-store outage worth alerting on.
+register.removeSingleMetric("langwatch_edge_media_extract_fail_open_total");
+const edgeMediaExtractFailOpenCounter = new Counter({
+  name: "langwatch_edge_media_extract_fail_open_total",
+  help: "Count of edge media-extraction fail-open events by failing stage",
+  labelNames: ["reason"] as const,
+});
+
+export const getEdgeMediaExtractFailOpenCounter = (
+  reason:
+    | "flag_store"
+    | "privacy_probe"
+    | "storage"
+    // Budget drops: parts left inline because the per-span cap or the
+    // extraction deadline was hit, or because one part's store failed while
+    // the rest of the span proceeded. Not errors of the hook itself.
+    | "part_cap"
+    | "deadline"
+    | "part_store",
+) => edgeMediaExtractFailOpenCounter.labels(reason);
+
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
 // fleet emits this at ~zero rate. Sustained increments indicate either
 // causality_depth propagation is broken on the evaluator side or a customer
@@ -1004,6 +1029,20 @@ const langyRateLimitTotal = new Counter({
 });
 export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
   langyRateLimitTotal.labels(outcome);
+
+// Model-emitted ```langy-card blocks at the relay stamp (ADR-060 §8). The
+// failure outcomes are the drift alarm for prompt regressions in block
+// emission — a rising unsalvageable/invalid rate means the agent's emission
+// quality slipped, exactly like ADR-059's probe-miss counter for cards.
+register.removeSingleMetric("langwatch_langy_blocks_total");
+const langyBlocksTotal = new Counter({
+  name: "langwatch_langy_blocks_total",
+  help: "Model-emitted langy-card blocks stamped by the relay, by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyBlocksCounter = (
+  outcome: "stamped" | "unsalvageable" | "invalid",
+) => langyBlocksTotal.labels(outcome);
 
 // ============================================================================
 // Fold redelivery

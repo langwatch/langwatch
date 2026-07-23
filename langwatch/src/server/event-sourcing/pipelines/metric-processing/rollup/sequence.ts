@@ -1,4 +1,4 @@
-import { compareOrdinal } from "../canonical/serialization";
+import { compareOrdinal } from "../../../utils/compareOrdinal";
 import { METRIC_ROLLUP_INTERVAL_MS } from "../schemas/constants";
 import type { CanonicalMetricDataPoint } from "../schemas/metricDataPoint";
 

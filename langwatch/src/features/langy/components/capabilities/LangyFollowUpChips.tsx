@@ -5,8 +5,9 @@
  * A capability card answers "what did Langy find"; these chips answer "what is
  * that result worth doing next". WHICH offers to make is `cliFollowUps.ts`'s job
  * (driven by the feature map's produces/consumes relation); WHERE each offer
- * lands is `logic/traceQueryIntent.ts`'s (it recompiles the search into a
- * destination URL). `LangyCapabilityRenderer` joins the two and hands the
+ * lands is `followUpChips.ts`'s (via the shared `traceExplorerLink` reader, so
+ * a carried chip means the destination really holds the search).
+ * `LangyCapabilityRenderer` joins the two and hands the
  * already-resolved chips here — this component only draws them.
  *
  * Two rules it holds to, both from the spec:

@@ -3,7 +3,7 @@
  * that advice the platform sent always beats advice the CLI shipped with.
  */
 import { describe, expect, it } from "vitest";
-import type { CliHandledError } from "@langwatch/cli-cards/handled-error";
+import type { CliHandledError } from "@langwatch/langy/cards/handled-error";
 import {
   fallbackSuggestionsFor,
   withFallbackSuggestions,

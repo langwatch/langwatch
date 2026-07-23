@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -77,6 +78,7 @@ import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyTurnService } from "./langy/langy-turn.service";
 import { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
+import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import {
   mintLangySessionApiKey,
@@ -115,7 +117,10 @@ import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-tur
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import { PrismaProcessStore } from "../event-sourcing/process-manager";
+import {
+  InMemoryProcessStore,
+  PrismaProcessStore,
+} from "../event-sourcing/process-manager";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
 import { PrismaTopicClusteringRunProjectionRepository } from "./topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
 import { PrismaTopicModelProjectionRepository } from "./topic-clustering/repositories/topic-model-projection.prisma.repository";
@@ -173,14 +178,29 @@ import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/rep
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
+import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
+import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
+import {
+  CodingAgentTraceSessionClickHouseRepository,
+  NullCodingAgentTraceSessionRepository,
+} from "./coding-agent/repositories/coding-agent-trace-session.repository";
+import {
+  NullSessionMetricSeriesRepository,
+  SessionMetricSeriesClickHouseRepository,
+} from "./coding-agent/repositories/session-metric-series.repository";
 import { CanonicalLogRecordClickHouseRepository } from "./logs/repositories/canonical-log-record.clickhouse.repository";
 import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-log-record.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
+import { ManagerExplorerService } from "./ops/manager-explorer.service";
 import { getOpsMetricsCollector } from "./ops/metrics-collector";
 import { QueueService } from "./ops/queue.service";
 import { SchedulerOpsService } from "./ops/scheduler-ops.service";
+import { BlobStoreService } from "./ops/blob-store.service";
+import { BlobStoreRedisRepository } from "./ops/repositories/blob-store.redis.repository";
+import { NullBlobStoreRepository } from "./ops/repositories/blob-store.repository";
 import { ReplayService } from "./ops/replay.service";
 import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
 import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
@@ -198,6 +218,8 @@ import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
+import { createShareViewDedupeService } from "./share/share-view-dedupe.service";
+import { createSharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
@@ -207,6 +229,7 @@ import { SuiteRunService } from "./suites/suite-run.service";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
 import { PrismaTopicRepository } from "./topic-clustering/repositories/topic.prisma.repository";
 import { TopicService } from "./topic-clustering/topic.service";
+import { maybeExtractSpanMedia } from "./traces/edge-media-extraction";
 import { maybeSpool } from "./traces/edge-spool";
 import { LogRecordStorageService } from "./traces/log-record-storage.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
@@ -237,8 +260,6 @@ import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
-import { ClickHouseAutomationAuditRepository } from "./automations/repositories/automation-audit.clickhouse.repository";
-import { NullAutomationAuditRepository } from "./automations/repositories/automation-audit.repository";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
@@ -589,12 +610,11 @@ export function initializeDefaultApp(options?: {
   const pinnedTraceService = new PinnedTraceService(
     pinnedTraceRepo,
     async ({ projectId, traceId }) => {
-      const share = await shareRepo.findByResource({
+      return shareRepo.hasActiveShareForResource({
         projectId,
         resourceType: "TRACE",
         resourceId: traceId,
       });
-      return share !== null;
     },
   );
   const retroactiveUpdateService = new RetroactiveUpdateService(
@@ -611,9 +631,20 @@ export function initializeDefaultApp(options?: {
   };
 
   const share = traced(
-    new ShareService(shareRepo, pinnedTraceService),
+    new ShareService(shareRepo, pinnedTraceService, {
+      // Effective sharing = org AND project. Off at either level blocks new
+      // links; existing links stop resolving via resolveForViewer. ADR-057.
+      isTraceSharingEnabled: async (projectId) => {
+        const config = await projects.getTraceSharingConfig(projectId);
+        return !!config && config.orgEnabled && config.projectEnabled;
+      },
+      // Makes `maxViews` count viewings rather than requests, so a recipient
+      // refreshing a single-view link doesn't lock themselves out. ADR-057.
+      viewDedupe: createShareViewDedupeService(redis),
+    }),
     "ShareService",
   );
+  const sharedTraceCache = createSharedTracePayloadCache(redis);
 
   const langyConversationRepository = new PrismaLangyConversationRepository(
     prisma,
@@ -652,6 +683,15 @@ export function initializeDefaultApp(options?: {
     canonicalLogStorage: clickhouseEnabled
       ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
       : new NullCanonicalLogRecordRepository(),
+    codingAgentSession: clickhouseEnabled
+      ? new CodingAgentSessionClickHouseRepository(resolveClickHouseClient)
+      : new NullCodingAgentSessionRepository(),
+    codingAgentTraceSession: clickhouseEnabled
+      ? new CodingAgentTraceSessionClickHouseRepository(resolveClickHouseClient)
+      : new NullCodingAgentTraceSessionRepository(),
+    sessionMetricSeries: clickhouseEnabled
+      ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
+      : new NullSessionMetricSeriesRepository(),
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
           resolveClient: resolveClickHouseClient,
@@ -672,9 +712,6 @@ export function initializeDefaultApp(options?: {
     evaluationAnalytics: clickhouseEnabled
       ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
       : new NullEvaluationAnalyticsRepository(),
-    automationAudit: clickhouseEnabled
-      ? new ClickHouseAutomationAuditRepository(resolveClickHouseClient)
-      : new NullAutomationAuditRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
@@ -962,11 +999,14 @@ export function initializeDefaultApp(options?: {
   }
 
   // Langy operational reads come from the Postgres projections; writes remain
-  // commands against the canonical ClickHouse event log.
+  // commands against the canonical ClickHouse event log. The event READER feeds
+  // only the tail read (conversationEventsAfter, ADR-059) — null when event
+  // sourcing is disabled, in which case the tail is honestly empty.
   const langyConversations = LangyConversationService.create(
     commands.langy,
     langyConversationRepository,
     langyMessageRepository,
+    es.getEventStore<LangyConversationProcessingEvent>() ?? null,
   );
   const langyMessages = new LangyMessageService(
     langyMessageRepository,
@@ -999,7 +1039,11 @@ export function initializeDefaultApp(options?: {
   const langyTurns = LangyTurnService.create({
     conversations: langyConversations,
     credentials: LangyCredentialService.create(prisma),
-    resolveModel: getVercelAIModel,
+    // Langy resolves through its own feature key (falling back to the
+    // original prompt.create_default gate inside the resolver), so a codex
+    // default set for Langy never leaks into new-prompt creation.
+    resolveModel: ({ projectId }) =>
+      getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
     // The durable buffer backs a user Stop: reconstruct the partial answer and
     // end the live stream (ADR-058). Null without Redis, like the stores below.
@@ -1042,6 +1086,17 @@ export function initializeDefaultApp(options?: {
       // We log at warn level and return the original commandData unchanged so
       // that ingestion is never blocked by the spool path. ADR-022.
       processCommandData: async (data) => {
+        // Media extraction runs FIRST: externalizing inline media parts to
+        // the content-addressed stored-objects store usually brings the
+        // payload back under COMMAND_INLINE_THRESHOLD, so the transient
+        // whole-payload spool below rarely needs to fire. Internally
+        // fail-open (marker-gated, flag-gated, privacy-interlocked) — on any
+        // error it returns `data` unchanged and the spool proceeds as today.
+        data = await maybeExtractSpanMedia({
+          data,
+          logger: createLogger("langwatch:traces:edge-media-extraction"),
+        });
+
         // Track which stage failed so the fail-open counter carries a useful
         // reason label (flag_store vs spool/S3) for alerting (GtVrL).
         let stage: "flag_store" | "spool" = "flag_store";
@@ -1179,7 +1234,13 @@ export function initializeDefaultApp(options?: {
       new PrismaScheduledJobRepository(prisma),
     ),
     eventExplorer: new EventExplorerService(eventExplorerRepo),
+    managerExplorer: new ManagerExplorerService(repositories.processStore),
     replay: new ReplayService(replayRepo),
+    blobStore: new BlobStoreService(
+      redis
+        ? new BlobStoreRedisRepository(redis)
+        : new NullBlobStoreRepository(),
+    ),
     metricsCollector: redis
       ? getOpsMetricsCollector({ redis, queueRepo })
       : null,
@@ -1203,6 +1264,16 @@ export function initializeDefaultApp(options?: {
         new PrismaTopicClusteringStatusRepository(prisma),
       ),
       topics,
+    },
+    codingAgents: {
+      sessions: traced(
+        new CodingAgentSessionService(
+          repositories.codingAgentSession,
+          repositories.codingAgentTraceSession,
+          repositories.sessionMetricSeries,
+        ),
+        "CodingAgentSessionService",
+      ),
     },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
@@ -1238,6 +1309,7 @@ export function initializeDefaultApp(options?: {
     retentionPolicyCache,
     dataRetention,
     share,
+    sharedTraceCache,
     commands,
     ops,
     _eventSourcing: es,
@@ -1397,6 +1469,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
     },
+    codingAgents: {
+      sessions: new CodingAgentSessionService(
+        new NullCodingAgentSessionRepository(),
+        new NullCodingAgentTraceSessionRepository(),
+        new NullSessionMetricSeriesRepository(),
+      ),
+    },
     langy: {
       conversations: LangyConversationService.create(
         {
@@ -1478,7 +1557,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),
+      managerExplorer: new ManagerExplorerService(new InMemoryProcessStore()),
       replay: new ReplayService(new NullReplayRepository()),
+      blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
     },
     commands: {
@@ -1500,6 +1581,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       logs: {
         recordLogRecord: noop,
       } satisfies AppCommands["logs"],
+      codingAgents: {
+        contributeSpanFacts: noop,
+        contributeLogFacts: noop,
+        contributeMetricFacts: noop,
+      } satisfies AppCommands["codingAgents"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
@@ -1587,7 +1673,31 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     share: new ShareService(
       new PrismaShareRepository(testPrisma),
       testPinnedTraceService,
+      {
+        isTraceSharingEnabled: async (projectId) => {
+          // Effective sharing = org AND project (ADR-057).
+          const project = await testPrisma.project.findUnique({
+            where: { id: projectId },
+            select: {
+              traceSharingEnabled: true,
+              team: {
+                select: {
+                  organization: { select: { traceSharingEnabled: true } },
+                },
+              },
+            },
+          });
+          return (
+            !!project &&
+            project.team.organization.traceSharingEnabled &&
+            project.traceSharingEnabled
+          );
+        },
+      },
     ),
+    // No Redis in the test preset: every open counts as a viewing and nothing
+    // is cached, which is the stricter behaviour of both.
+    sharedTraceCache: createSharedTracePayloadCache(null),
     ...overrides,
   });
 }

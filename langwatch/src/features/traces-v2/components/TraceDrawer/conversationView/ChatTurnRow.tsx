@@ -32,7 +32,9 @@ import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { getRolePalette, ReasoningBlock } from "../transcript";
 import { useConversationExpand } from "./expandContext";
 import { MessageExpandToggle } from "./MessageExpandToggle";
+import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
+import { TurnSteps } from "./TurnSteps";
 import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
 
@@ -185,6 +187,26 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         incomplete={turn.inputTruncated}
         redacted={turn.inputRedacted}
       />
+
+      {/*
+        The loop that ran between the prompt and the reply. A coding-agent turn
+        can call the model five times and run a dozen tools, and the two bubbles
+        either side of this show none of it — so the steps sit where they
+        happened. Collapsed by default; the spans are only fetched on open.
+      */}
+      {isTerminalOrigin({
+        serviceName: turn.serviceName,
+        origin: turn.origin,
+      }) &&
+        // TurnSteps parses Claude Code's span names only — for any other
+        // agent the strip would announce steps and then find none.
+        (turn.serviceName ?? "").toLowerCase().includes("claude") && (
+        <TurnSteps
+          traceId={turn.traceId}
+          occurredAtMs={turn.timestamp}
+          spanCount={turn.spanCount}
+        />
+      )}
 
       {assistantText ? (
         <TurnMessage

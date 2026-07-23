@@ -24165,7 +24165,7 @@
                           },
                           "type": {
                             "type": "string",
-                            "example": "ragas/answer_relevancy"
+                            "example": "ragas/response_relevancy"
                           },
                           "trace_id": {
                             "type": "string",

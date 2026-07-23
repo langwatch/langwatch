@@ -79,14 +79,26 @@ Feature: Langy agent activity is traced into the user's project
     Then the manager rejects it and forwards nothing
 
   # ============================================================================
-  # LangWatch's own copy of worker telemetry
+  # LangWatch's own copy of the turn — the mirror lane (ADR-061)
   #
-  # The customer's project gets the worker's spans verbatim — their agent, their
-  # prompts. LangWatch also needs to see how its own workers behave, but must
-  # not receive the content, so a SECOND, content-stripped copy goes to
-  # LangWatch's collector. Worker logs and metrics are already dropped outright
-  # for the same reason; spans are filtered per attribute instead, because their
-  # shape and cost data is the operational signal.
+  # The customer's project gets the turn verbatim — their agent, their prompts.
+  # A SECOND copy of the turn goes to LangWatch's own mirror project, so
+  # LangWatch can watch Langy work with the same tools customers use. Where the
+  # customer's own forward keeps their content and scrubs the platform detail
+  # around it, the mirror is the inverse: it scrubs nothing operational — span
+  # names, hierarchy, timings, worker identity all survive — and gates only the
+  # CONTENT on the customer's tier:
+  #   content    — the whole turn including prompts, completions and tool
+  #                payloads. The default.
+  #   structural — the same operational shape with the content removed. The
+  #                prior "LangWatch cannot see content" promise lives on as
+  #                THIS tier's guarantee.
+  #   skip       — no copy at all.
+  # (The separate content-stripped OPS copy that feeds LangWatch's own
+  # collector is unchanged, and keeps its fail-closed allowlist.)
+  # The tier rides the turn's credentials envelope, resolved per organization
+  # by the control plane. A mirror failure is never the customer's problem,
+  # and a turn run inside the prod Langy project itself never mirrors.
   # ============================================================================
 
   Scenario: Worker telemetry remains complete for the customer
@@ -95,11 +107,36 @@ Feature: Langy agent activity is traced into the user's project
     Then the customer's trace contains the worker's complete activity
     And the worker's prompts, completions and tool output remain visible there
 
-  Scenario: Operators retain useful worker health signals without customer content
-    Given the worker reports model usage and an upstream failure
-    When LangWatch records operational worker telemetry
+  Scenario: The mirror receives the turn at the customer's tier
+    Given a customer organization at the default content tier
+    When the worker reports its activity
+    Then the mirror project receives the turn with its content
+    And the mirrored turn keeps the shape the customer sees
+    And the mirrored turn names the customer it came from
+
+  Scenario: A restricted customer's mirror carries structure and never content
+    Given a customer organization restricted to the structural tier
+    When LangWatch records its mirror copy of the turn
     Then operators can see the model, token usage and failure outcome
     And LangWatch cannot see the customer's prompts, completions or tool output
+
+  Scenario: A skipped customer produces no mirror at all
+    Given a customer organization at the skip tier
+    When the worker reports its activity
+    Then the customer's trace is complete
+    And nothing about the turn reaches the prod Langy project
+
+  Scenario: A turn in the prod Langy project never mirrors into itself
+    Given a conversation whose own project is the prod Langy project
+    When the worker reports its activity
+    Then exactly one copy of the turn exists
+    And no mirror export is attempted
+
+  Scenario: The model-call content follows the same tier on every leg
+    Given a customer organization restricted to the structural tier
+    When the gateway records the turn's model calls
+    Then the customer's trace carries the calls with their content
+    And the mirror copy of those calls carries no content
 
   Scenario: Newly introduced worker metadata cannot expose customer content
     Given the worker reports an unrecognised metadata value

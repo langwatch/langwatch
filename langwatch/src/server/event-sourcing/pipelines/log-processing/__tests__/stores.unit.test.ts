@@ -12,8 +12,7 @@ describe("CanonicalLogAppendStore", () => {
     const repository = {
       ensureLogRecord,
       ensureLogRecords,
-      getMarkedClaudeCodeLogsByTrace: async () => [],
-      countMarkedClaudeCodeLogsByTrace: async () => 0,
+      getLogsByTraceId: async () => [],
     } satisfies CanonicalLogRecordRepository;
     const records = [
       { recordId: "a".repeat(64) },

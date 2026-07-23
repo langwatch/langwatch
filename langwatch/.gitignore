@@ -92,6 +92,7 @@ node_modules/
 licenses.json
 .pnpm-store/
 server.log
+server-qa.log
 server.*.log
 screenshot-*.png
 
@@ -106,3 +107,7 @@ screenshot-*.png
 
 # haven AI-gated HMR marker
 .haven-hmr-gate
+
+.claude-qa/
+dev-*.log
+haven-boot*.log

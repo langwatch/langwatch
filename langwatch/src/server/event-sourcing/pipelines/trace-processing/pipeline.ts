@@ -6,6 +6,7 @@ import type { TriggerContext } from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,
@@ -107,7 +108,6 @@ export interface TraceProcessingPipelineDeps {
     ) => Promise<void>;
   };
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -151,6 +151,8 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
+  /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
+  subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
 }
 
 /**
@@ -249,11 +251,6 @@ export function createTraceProcessingPipeline(
       "spanStorage",
       "spanStorageBroadcast",
       deps.spanStorageBroadcastReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "claudeCodeSpanSync",
-      deps.claudeCodeSpanSyncReactor,
     );
 
   if (deps.customerIoTraceSyncReactor) {
@@ -294,6 +291,10 @@ export function createTraceProcessingPipeline(
       "retentionOrphanSweep",
       deps.retentionOrphanSweepReactor,
     );
+  }
+
+  for (const subscriber of deps.subscribers ?? []) {
+    builder = builder.withEventSubscriber(subscriber.name, subscriber);
   }
 
   // Span-command sharding: when the shard count is > 1, install a getGroupKey

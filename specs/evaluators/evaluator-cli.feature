@@ -31,8 +31,11 @@ Feature: Evaluator CLI Commands
     Then I see an error that the evaluator was not found
 
   Scenario: Create an evaluator
-    When I run "langwatch evaluator create 'My Evaluator' --type langevals/llm_judge"
+    When I run "langwatch evaluator create 'My Evaluator' --type langevals/llm_boolean"
     Then a new evaluator is created and I see confirmation with its name and slug
+
+  # Rejecting unknown types before the network, and listing the valid ones,
+  # is specified in evaluator-create-validation.feature.
 
   Scenario: Create an evaluator without required type
     When I run "langwatch evaluator create 'My Evaluator'"

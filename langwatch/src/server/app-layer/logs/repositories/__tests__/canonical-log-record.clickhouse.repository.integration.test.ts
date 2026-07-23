@@ -5,10 +5,10 @@
  * Runs the canonical log repository's real INSERT/SELECT SQL against
  * ClickHouse (migration 00050). Everything else in the canonical log pipeline
  * is unit-tested with a mocked client, so this file is what proves:
- * - ensureLogRecords lands rows the marked-Claude-Code read path can find,
- *   filtered to ProviderKind='claude_code' and ordered by time;
- * - re-ensuring the same records does not inflate the marked-record count
- *   (uniqExact(RecordId) is the repository's dedup contract, merge or no merge);
+ * - ensureLogRecords lands rows the by-trace read path can find, keyed on
+ *   CorrelationTraceId and ordered by time;
+ * - re-ensuring the same records does not inflate the trace's row count
+ *   (dedup by RecordId is the repository's contract, merge or no merge);
  * - `_size_bytes` stores the record's canonicalSizeBytes (the canonical
  *   payload's UTF-8 byte count), NOT the stored row's byte size — the
  *   deliberate metering deviation;
@@ -43,9 +43,9 @@ const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
 // Valid wire ids so correlation resolves from the wire, giving every record
 // the same CorrelationTraceId the read path queries by.
 const traceId = "a1b2c3d4e5f60718a1b2c3d4e5f60718";
-const markedSpanA = "1111aaaa2222bbbb";
-const markedSpanB = "3333cccc4444dddd";
-const unmarkedSpanC = "5555eeee6666ffff";
+const spanA = "1111aaaa2222bbbb";
+const spanB = "3333cccc4444dddd";
+const spanC = "5555eeee6666ffff";
 
 const noRedaction: LogRedactionService = {
   redactLog: async () => undefined,
@@ -76,10 +76,9 @@ function otlpLogRecord({
 }
 
 /**
- * Two marked Claude Code turn events (the receiver marks `user_prompt` with
- * langwatch.claude_code.kind via claudeCodeLogKind) plus one generic-scope log
- * on the same trace that must never surface from the marked read path.
- * Recent timestamps keep the rows inside the 1-day Claude Code retention TTL.
+ * Two Claude Code turn events plus one generic-scope log on the same trace.
+ * All three share the trace's CorrelationTraceId, so the by-trace read
+ * returns them together in time order.
  */
 async function buildRecords(baseMs: number): Promise<CanonicalLogRecord[]> {
   const result = await prepareCanonicalLogRecords({
@@ -101,13 +100,13 @@ async function buildRecords(baseMs: number): Promise<CanonicalLogRecord[]> {
               scope: { name: CLAUDE_CODE_EVENT_SCOPE, version: "1.0.0" },
               logRecords: [
                 otlpLogRecord({
-                  spanId: markedSpanA,
+                  spanId: spanA,
                   timeMs: baseMs - 10_000,
                   eventName: "user_prompt",
                   body: "first turn",
                 }),
                 otlpLogRecord({
-                  spanId: markedSpanB,
+                  spanId: spanB,
                   timeMs: baseMs - 5_000,
                   eventName: "user_prompt",
                   body: "second turn",
@@ -118,7 +117,7 @@ async function buildRecords(baseMs: number): Promise<CanonicalLogRecord[]> {
               scope: { name: `${tag}-generic-app` },
               logRecords: [
                 otlpLogRecord({
-                  spanId: unmarkedSpanC,
+                  spanId: spanC,
                   timeMs: baseMs - 7_500,
                   body: "plain application log",
                 }),
@@ -164,49 +163,39 @@ describe("given canonical log records ensured for one trace", () => {
     await repo.ensureLogRecords(records);
   }, 30_000);
 
-  describe("when reading marked Claude Code logs by trace", () => {
-    it("returns exactly the marked records in time order", async () => {
-      const rows = await repo.getMarkedClaudeCodeLogsByTrace({
+  describe("when reading the trace's logs by trace id", () => {
+    it("returns every record on the trace in time order", async () => {
+      const rows = await repo.getLogsByTraceId({
         tenantId,
         traceId,
         occurredAtMs: baseMs,
       });
 
-      expect(rows.map((row) => row.spanId)).toEqual([markedSpanA, markedSpanB]);
-      expect(rows.map((row) => row.traceId)).toEqual([traceId, traceId]);
+      // All three share the trace; time order is A (-10s), C (-7.5s), B (-5s).
+      expect(rows.map((row) => row.spanId)).toEqual([spanA, spanC, spanB]);
+      expect(rows.map((row) => row.traceId)).toEqual([traceId, traceId, traceId]);
       expect(rows[0]!.scopeName).toBe(CLAUDE_CODE_EVENT_SCOPE);
-      expect(rows[0]!.attributes["langwatch.claude_code.kind"]).toBe("turn");
-    });
-
-    it("counts the same marked records", async () => {
-      const count = await repo.countMarkedClaudeCodeLogsByTrace({
-        tenantId,
-        traceId,
-        occurredAtMs: baseMs,
-      });
-
-      expect(count).toBe(2);
     });
   });
 
   describe("when the same records are ensured a second time", () => {
-    it("does not inflate the marked-record count", async () => {
+    it("does not inflate the trace's row count", async () => {
       await repo.ensureLogRecords(records);
 
-      const count = await repo.countMarkedClaudeCodeLogsByTrace({
+      const rows = await repo.getLogsByTraceId({
         tenantId,
         traceId,
         occurredAtMs: baseMs,
       });
 
-      expect(count).toBe(2);
+      expect(rows).toHaveLength(3);
     });
   });
 
   describe("when reading back billing metadata", () => {
     it("stores the canonical payload byte size in _size_bytes, not the row size", async () => {
       const marked = records.find(
-        (record) => record.correlationSpanId === markedSpanA,
+        (record) => record.correlationSpanId === spanA,
       )!;
 
       const result = await ch.query({

@@ -1,9 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  type AnnotationQueueItem,
-  type PrismaClient,
-  PublicShareResourceTypes,
-} from "@prisma/client";
+import type { AnnotationQueueItem, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -14,11 +10,8 @@ import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
 import type { Protections } from "../../traces/protections";
-import {
-  checkPermissionOrPubliclyShared,
-  checkProjectPermission,
-} from "../rbac";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
 const logger = createLogger("langwatch:api:annotation");
@@ -220,22 +213,14 @@ export const annotationRouter = createTRPCRouter({
         expectedOutput: input.expectedOutput ?? null,
       });
     }),
-  getByTraceId: publicProcedure
+  getByTraceId: protectedProcedure
     .input(
       z.object({
         traceId: z.string(),
         projectId: z.string(),
       }),
     )
-    .use(
-      checkPermissionOrPubliclyShared(
-        checkProjectPermission("annotations:view"),
-        {
-          resourceType: PublicShareResourceTypes.TRACE,
-          resourceParam: "traceId",
-        },
-      ),
-    )
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {

@@ -54,8 +54,8 @@ vi.mock("~/utils/api", () => ({
     },
   },
 }));
-vi.mock("./LangyHomeLantern", () => ({
-  LangyHomeLantern: () => <div data-testid="lantern" />,
+vi.mock("./LangyHomeHero", () => ({
+  LangyHomeHero: () => <div data-testid="lantern" />,
 }));
 
 vi.mock("../DashboardLayout", () => ({
@@ -92,7 +92,6 @@ vi.mock("./OnboardingProgress", () => ({
 vi.mock("./RecentItemsSection", () => ({
   RecentItemsSection: () => <div data-testid="recent-items" />,
 }));
-vi.mock("./TimeOfDayAura", () => ({ TimeOfDayAura: () => null }));
 vi.mock("./TracesOverview", () => ({
   TracesOverview: ({ variant }: { variant?: string }) => (
     <div data-testid="traces-overview" data-variant={variant ?? "full"} />
@@ -136,7 +135,9 @@ describe("HomePage composition", () => {
   });
 
   describe("given Langy access without either home rollout", () => {
-    /** @scenario Langy alone does not switch the home */
+    // Unbound on purpose: the spec scenario this pinned was removed when
+    // "having Langy is having the Langy home" landed (langy-home.feature).
+    // The test stays while the code still has this state; reconcile in #3338.
     it("keeps the classic home, with Langy feeding only its affordances", () => {
       gates.langy = true;
       renderHome();

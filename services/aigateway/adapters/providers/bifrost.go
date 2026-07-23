@@ -38,6 +38,14 @@ type BifrostRouter struct {
 	// port exhaustion under embedding throughput.
 	voyageClient   *http.Client
 	endpointPolicy customerEndpointPolicy
+	// codexClient streams against OpenAI's codex backend (no overall
+	// timeout — turns run for minutes; cancellation rides the context).
+	codexClient *http.Client
+	// codexRefresher is the control-plane road for refreshing a 401'd
+	// codex access token. Nil (e.g. in bare tests) degrades to reporting
+	// the session as expired instead of retrying.
+	codexRefresher  domain.CodexTokenRefresher
+	codexBackendURL string
 }
 
 // BifrostOptions configures the bifrost router.
@@ -47,6 +55,11 @@ type BifrostOptions struct {
 	BlockLocalHTTPCalls           bool
 	RequireHTTPSCustomerEndpoints bool
 	AllowedEndpointHosts          []string
+	// CodexRefresher wires the control-plane token refresh for the codex
+	// provider (see adapters/providers/codex.go).
+	CodexRefresher domain.CodexTokenRefresher
+	// CodexBackendURL overrides the codex upstream (tests only).
+	CodexBackendURL string
 }
 
 // NewBifrostRouter creates a provider router backed by bifrost.
@@ -63,6 +76,10 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if err != nil {
 		return nil, fmt.Errorf("bifrost init: %w", err)
 	}
+	codexURL := opts.CodexBackendURL
+	if codexURL == "" {
+		codexURL = codexBackendDefaultURL
+	}
 	return &BifrostRouter{
 		bf:           bf,
 		logger:       opts.Logger,
@@ -72,6 +89,9 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 			opts.RequireHTTPSCustomerEndpoints,
 			opts.AllowedEndpointHosts,
 		),
+		codexClient:     newCodexClient(),
+		codexRefresher:  opts.CodexRefresher,
+		codexBackendURL: codexURL,
 	}, nil
 }
 
@@ -135,6 +155,12 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// clean unsupported-type error.
 	if cred.ProviderID == domain.ProviderVoyage {
 		return r.dispatchVoyageDirect(ctx, req, model, cred)
+	}
+
+	// Codex streams upstream always (the backend is SSE-only); the
+	// non-streaming path aggregates to the completed Response. See codex.go.
+	if cred.ProviderID == domain.ProviderOpenAICodex {
+		return r.dispatchCodex(ctx, req, model, cred)
 	}
 
 	provider := mapProvider(cred)
@@ -418,11 +444,18 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
 	}
-	provider := mapProvider(cred)
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+
+	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
+	// backend with OAuth + one-shot token refresh. See codex.go.
+	if cred.ProviderID == domain.ProviderOpenAICodex {
+		return r.dispatchCodexStream(ctx, req, model, cred)
+	}
+
+	provider := mapProvider(cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponsesStream(ctx, req, provider, model, cred)
