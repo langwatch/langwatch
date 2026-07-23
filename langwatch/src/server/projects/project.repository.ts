@@ -22,17 +22,24 @@ export class ProjectRepository {
     return project?.team?.organizationId ?? null;
   }
 
-  async findForLangyCredentials(
-    projectId: string,
-  ): Promise<{ apiKey: string; organizationId: string } | null> {
+  async findForLangyCredentials(projectId: string): Promise<{
+    apiKey: string;
+    organizationId: string;
+    repositoryFullName: string | null;
+  } | null> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { apiKey: true, team: { select: { organizationId: true } } },
+      select: {
+        apiKey: true,
+        repositoryFullName: true,
+        team: { select: { organizationId: true } },
+      },
     });
     if (!project?.team) return null;
     return {
       apiKey: project.apiKey,
       organizationId: project.team.organizationId,
+      repositoryFullName: project.repositoryFullName,
     };
   }
 }

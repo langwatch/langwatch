@@ -447,6 +447,13 @@ model Project {
   /// per-request credentials envelope. See specs/langy/langy-egress-enforcement.feature.
   langyEgressAllowlist Json?
 
+  /// The GitHub repository (owner/repo) this project is bound to, used to scope
+  /// Langy's minted GitHub installation tokens to just this repo instead of the
+  /// whole installation. Null means no repo is bound yet, so tokens fall back to
+  /// full-installation scope. See LangyGithubInstallationsService.mintTurnToken
+  /// and issue #790.
+  repositoryFullName String?
+
   @@index([teamId])
   @@index([isPersonal])
   @@index([ownerUserId])

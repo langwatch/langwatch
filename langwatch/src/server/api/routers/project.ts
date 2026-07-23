@@ -286,6 +286,7 @@ export const projectRouter = createTRPCRouter({
           traceSharingEnabled: z.boolean().optional(),
           presenceEnabled: z.boolean().optional(),
           userLinkTemplate: z.string().optional(),
+          repositoryFullName: z.string().nullable().optional(),
           s3Endpoint: z.string().optional(),
           s3AccessKeyId: z.string().optional(),
           s3SecretAccessKey: z.string().optional(),
@@ -345,6 +346,9 @@ export const projectRouter = createTRPCRouter({
           ...(input.framework !== undefined && { framework: input.framework }),
           ...(input.userLinkTemplate !== undefined && {
             userLinkTemplate: input.userLinkTemplate,
+          }),
+          ...(input.repositoryFullName !== undefined && {
+            repositoryFullName: input.repositoryFullName,
           }),
           ...(input.teamId && { teamId: input.teamId }),
           traceSharingEnabled:

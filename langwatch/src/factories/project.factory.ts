@@ -24,6 +24,7 @@ export const projectFactory = Factory.define<
     createdAt: new Date(),
     updatedAt: new Date(),
     userLinkTemplate: null,
+    repositoryFullName: null,
     traceSharingEnabled: true,
     s3Endpoint: null,
     s3AccessKeyId: null,
