@@ -97,8 +97,11 @@ haven status [--json] one-shot: selection, service health, shared-server health,
 Data and cleanup (the only destructive nouns):
 
 ```
-haven db reset [--demo] [--yes]   fresh migrated+seeded databases for this stack
+haven db reset [preset] [--yes]   fresh migrated+seeded databases for this stack
+haven db seed [preset]            reseed in place — idempotent, drops nothing
 haven db url [postgres|clickhouse|redis]   connection strings
+  presets (shared): demo · traces · onboarding · post-onboarding · bare
+  (`mass` — months of backdated data via event-log seed + projection replay — is the designed follow-up)
 haven clean [--yes]   one interactive cleanup: worktrees, artifacts, idle DBs, orphan processes
 ```
 
@@ -209,7 +212,7 @@ view in attached mode is just a live rendering of the same tap. Consequently:
 | `down --drop-db` / `--keep-db` | `down` keeps data, always; fresh data is `haven db reset` |
 | `clickhouse` / `ch`, `postgres` / `pg` subtrees | `haven db url`, `haven db reset`; server lifecycle is automatic |
 | `observability` / `obs` subtree | managed automatically; `restart obs`, `logs obs`, `status` |
-| `seed [--preset demo]` | `haven db reset [--demo]` |
+| `seed [--preset demo]` | `haven db seed [preset]` (in place) / `haven db reset [preset]` (fresh) |
 | `prune`, `prune --artifacts`, `cleanup` / `oc` | `haven clean` (one interactive picker, categories: worktrees, artifacts, idle DBs, orphan processes) |
 | `pr --trusted` / `--allow-scripts`, `pr --force` | `--allow-scripts` only; `--allow-closed` |
 | `hmr pause` / `resume` | `hmr on` / `off` only |

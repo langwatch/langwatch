@@ -120,7 +120,9 @@ EXAMPLES
     haven pr 4913                # try PR #4913 locally in a fresh worktree
     haven                        # the hub: every stack + actions (git/down/destroy)
     haven git                    # git TUI for this worktree (haven git <slug> for another)
-    haven db reset --demo        # fresh databases, seeded past onboarding with sample data
+    haven db seed demo           # reseed in place: past onboarding + sample data (drops nothing)
+    haven db reset demo          # the same from a fresh database (confirmed)
+    haven db seed onboarding     # land on the onboarding journey again
     haven status                 # every stack + shared-server health, one shot
     haven status --json          # the same, machine-readable
     haven up --watch             # air hot-reload for gateway + nlp
