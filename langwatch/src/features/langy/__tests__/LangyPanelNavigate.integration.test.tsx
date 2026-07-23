@@ -47,6 +47,12 @@ vi.mock("~/utils/trpcError", () => ({
   isHandledByGlobalHandler: () => false,
 }));
 
+// LangySidecar reads a feature flag (peek-dock) at mount. Mock the hook
+// directly, matching the sibling panel tests.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("~/components/Markdown", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
@@ -180,6 +186,20 @@ vi.mock("~/utils/api", () => ({
       },
     },
     virtualKeys: { list: { useQuery: () => ({ data: undefined, isLoading: false }) } },
+    // useProjectReach (mounted by LangySidecar) reads the onboarding checks.
+    integrationsChecks: {
+      getCheckStatus: {
+        useQuery: () => ({
+          data: {
+            firstMessage: true,
+            onlineEvaluations: 1,
+            simulations: 1,
+            datasets: 1,
+          },
+          isLoading: false,
+        }),
+      },
+    },
     ops: {
       getScope: {
         useQuery: () => ({ data: { scope: { kind: "none" } }, isLoading: false }),

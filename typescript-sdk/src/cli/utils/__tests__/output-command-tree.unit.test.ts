@@ -118,6 +118,9 @@ describe("the real command tree", () => {
       ...(
         ["claude", "codex", "cursor", "gemini", "opencode", "open"] as const
       ).map((n) => [n, "launches another tool and owns its stdio"] as const),
+      // Agent-only signal: prints the resource id for the relay to intercept;
+      // it has no -o json data mode because it returns no platform result.
+      ["navigate open", "signal command: prints the resource id, no data payload"],
       ["docs", "prints fetched markdown verbatim"],
       ["scenario-docs", "prints fetched markdown verbatim"],
       ["init-shell", "emits shell script for eval"],
