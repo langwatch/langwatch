@@ -113,6 +113,13 @@ const REAL_SESSION: CodingAgentSessionRow = {
   atMentions: 0,
   stopReason: "tool_use",
   truncated: false,
+  subAgentIds: [],
+  stepStartedAt: [],
+  previousCallContextTokens: 0,
+  metricSeries: [],
+  createdAt: 1_700_000_000_000,
+  updatedAt: 1_700_000_000_000,
+  lastEventOccurredAt: 0,
 };
 
 function renderSession(
