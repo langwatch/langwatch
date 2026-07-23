@@ -1,7 +1,7 @@
 Feature: Langy agent activity is traced into the user's project
   As a LangWatch user running Langy
   I want Langy's agent activity (LLM calls, tool calls) captured as traces
-  So that I can observe and debug what Langy did, in my own project, tagged "langy"
+  So that I can observe and debug what Langy did, in my own project, attributed to Langy
 
   # Part of epic #4528 (issue #4536), reworked for host-mediated telemetry.
   #
@@ -60,14 +60,14 @@ Feature: Langy agent activity is traced into the user's project
     When the manager forwards a worker span batch
     Then it POSTs OTLP protobuf to "<LANGWATCH_ENDPOINT>/api/otel/v1/traces"
     And it authenticates with the conversation's session key as a Bearer token
-    And the resource attributes include "tag.tags=langy"
     And the resource attributes include "langwatch.thread.id=<conversationId>"
+    And the trace's origin resolves to Langy without a "langy" label repeating it
 
   Scenario: A span batch with no turn in flight still reaches the project
     Given no turn trace context has been recorded for the conversation yet
     When the worker exports a span batch
     Then the batch is forwarded without re-parenting
-    And the resource attributes still tag it "langy" with the conversation's thread id
+    And the resource attributes still group it under the conversation's thread id
 
   Scenario: An unknown routing token is rejected
     When a span batch is posted to the loopback endpoint with an unknown token
@@ -77,6 +77,28 @@ Feature: Langy agent activity is traced into the user's project
     Given a worker is killed or exits
     When a span batch is posted with that worker's token
     Then the manager rejects it and forwards nothing
+
+  # A failed turn should not need the chat panel to explain itself: the turn's
+  # trace in the user's project tells the same story, including the provider's
+  # own words when a model call was rejected.
+  Scenario: A failed turn's trace shows what went wrong
+    Given a turn ends in a terminal error
+    When the user opens the turn's trace in their project
+    Then the trace shows the turn failed and names the failure
+    And when the failure was a rejected model call, the trace shows the provider's own error message
+    And a completed turn's trace shows no failure
+
+  # Usage on a ChatGPT plan is paid for by the subscription, not per token, so
+  # it must not read as billable API spend. Whether a turn was bundled is
+  # decided from the account the turn actually ran on, never from what the
+  # traced activity claims about itself, so it cannot be forged.
+  Scenario: Codex-plan usage appears as bundled cost
+    Given a turn runs on the user's ChatGPT plan through Codex
+    When the turn's model calls appear in the user's project
+    Then their usage reads as bundled with the plan, not billable spend
+    And the bundled cost shows on the model calls alone, not the rest of the turn's activity
+    And the trace still names the provider that served each call
+    But a turn on an API-key provider keeps its normal billed cost
 
   # ============================================================================
   # LangWatch's own copy of the turn — the mirror lane (ADR-061)
@@ -215,7 +237,42 @@ Feature: Langy agent activity is traced into the user's project
   Scenario: A Langy chat produces a trace in the user's project
     When I send a message to Langy in my project
     Then a trace appears in that same project
-    And the trace's labels contain "langy"
+    And the trace shows Langy as its origin
+    And the trace carries no "langy" label repeating the origin
+
+  Scenario: A Langy turn is one trace with the model call inside it
+    When I send a message to Langy in my project
+    Then the turn appears as a single trace in my project
+    And the model call the gateway served for the turn appears inside that trace
+    And no separate gateway-origin trace duplicates the turn's model call
+
+  Scenario: Gateway traffic outside a Langy turn keeps its own trace
+    Given I call the AI gateway directly with my own key, outside any Langy turn
+    When the call completes
+    Then the call appears as its own trace with origin "Gateway"
+
+  Scenario: A turn stays one trace even when the manager runs without its own telemetry
+    Given the manager runs with its own telemetry export disabled
+    When I send a message to Langy in my project
+    Then the turn still appears as a single trace with the model call inside it
+
+  Scenario: A turn's usage is counted once across the worker and gateway views
+    Given a turn whose model call is served through the gateway
+    When the turn's trace appears in my project
+    Then the trace's token and cost totals count the model call once
+    And the agent's activity and the gateway's metered call both remain visible as spans
+
+  Scenario: The gateway's model call nests under the agent's own call span
+    Given a turn whose model call is served through the gateway
+    When the turn's trace appears in my project
+    Then the gateway's model-call span sits under the agent span that made the call
+    And not beside the agent's whole call tree
+
+  Scenario: Every span of a turn names the model the same way
+    Given a turn running on a provider-prefixed model
+    When the turn's trace appears in my project
+    Then the agent's span and the gateway's span report the same provider-prefixed model id
+    And the trace's model filter lists the model once
 
   Scenario: Turns of one conversation are grouped together
     Given a Langy conversation with id "conv-123"
@@ -228,9 +285,9 @@ Feature: Langy agent activity is traced into the user's project
   # ============================================================================
 
   Scenario: tag.tags in resource attributes becomes trace labels
-    Given an OTLP trace whose resource attributes include "tag.tags=langy"
+    Given an OTLP trace whose resource attributes include "tag.tags=checkout-flow"
     When the trace is ingested at /api/otel/v1/traces
-    Then the stored trace's labels contain "langy"
+    Then the stored trace's labels contain "checkout-flow"
 
   Scenario: langwatch.thread.id in resource attributes becomes thread_id
     Given an OTLP trace whose resource attributes include "langwatch.thread.id=conv-123"

@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
@@ -10,11 +10,11 @@ import {
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,
+  langyTurnIdentity,
   type StartConversationTurnInput,
 } from "../langy-turn.service";
-import { langyTurnIdentity } from "../langy-turn.service";
-import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
 import type { LangyMessageRow } from "../repositories/langy-message.repository";
+import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
 
 const REQUEST_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION = {
@@ -89,7 +89,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     conversations:
       conversations as unknown as LangyTurnServiceDeps["conversations"],
     credentials: credentials as unknown as LangyTurnServiceDeps["credentials"],
-    resolveModel: vi.fn(async () => ({})),
+    resolveModel: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })),
     worker: { probe, dispatch },
     reservePermit,
     releasePermit,
@@ -329,6 +329,34 @@ describe("LangyTurnService.startConversationTurn", () => {
     expect(mocks.reservePermit).not.toHaveBeenCalled();
   });
 
+  // The engine is provider-blind: any model on the project's Langy allowlist
+  // is dispatched with its full provider-prefixed id — dots, colons, and all
+  // — and the gateway's own prefix routing picks the provider. Nothing here
+  // may branch per provider name.
+  /** @scenario Any allowed provider's model is dispatched with its full id */
+  it.each([
+    "anthropic/claude-sonnet-4-5",
+    "gemini/gemini-2.5-pro",
+    "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0",
+  ])("accepts and forwards the allowed model %s verbatim", async (model) => {
+    (
+      deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([model]);
+
+    const result = await LangyTurnService.create(deps).startConversationTurn(
+      input({ modelOverride: model }),
+    );
+
+    expect(result.conversationId).toBe("conv-1");
+    expect(mocks.probe).toHaveBeenCalledWith(
+      expect.objectContaining({ model }),
+    );
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ modelOverride: model }),
+    );
+  });
+
+  /** @scenario A per-send override still wins over the configured Langy model */
   it("does not resolve an unused default model when an override is allowed", async () => {
     (
       deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
@@ -339,6 +367,46 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
 
     expect(deps.resolveModel).not.toHaveBeenCalled();
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ modelOverride: "openai/gpt-5-mini" }),
+    );
+  });
+
+  /** @scenario The configured Langy model is forwarded to the worker */
+  it("forwards the resolved default model to the worker when nothing overrides it", async () => {
+    (deps.resolveModel as ReturnType<typeof vi.fn>).mockResolvedValue({
+      modelId: "anthropic/claude-opus-4-8",
+    });
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    // Probe, handoff stash, and dispatch all carry the resolved model, so the
+    // worker signature keys on it and the worker never runs its own default.
+    expect(mocks.probe).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "anthropic/claude-opus-4-8" }),
+    );
+    expect(mocks.stash).toHaveBeenCalledWith(
+      expect.objectContaining({ modelOverride: "anthropic/claude-opus-4-8" }),
+    );
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ modelOverride: "anthropic/claude-opus-4-8" }),
+    );
+  });
+
+  it("rejects a resolved default that is not on the allowlist before dispatch", async () => {
+    (deps.resolveModel as ReturnType<typeof vi.fn>).mockResolvedValue({
+      modelId: "anthropic/claude-opus-4-8",
+    });
+    (
+      deps.credentials.getModelsAllowed as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(["openai/gpt-5-mini"]);
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(input()),
+    ).rejects.toBeInstanceOf(LangyModelNotAllowedError);
+
+    expect(mocks.abort).toHaveBeenCalledOnce();
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 
   it("fails before admission when no default model is configured", async () => {
@@ -451,8 +519,13 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     createdAt: new Date(),
   };
 
-  const systemOf = (dispatch: ReturnType<typeof vi.fn>): string =>
-    (dispatch.mock.calls[0]![0] as { system: string }).system;
+  interface DispatchedTurn {
+    system: string;
+    prompt: string;
+    historySeed?: string;
+  }
+  const dispatchedOf = (dispatch: ReturnType<typeof vi.fn>): DispatchedTurn =>
+    dispatch.mock.calls[0]![0] as DispatchedTurn;
 
   /** @scenario A follow-up turn carries what earlier turns created */
   /** @scenario The memory survives the agent forgetting */
@@ -460,7 +533,8 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     const { deps, mocks } = makeDeps();
     mocks.findAllByConversation.mockResolvedValue([scenarioCreated]);
     // A warm worker would still hold the session — the point is that this does
-    // not depend on it.
+    // not depend on it: the seed rides the dispatch either way, and the
+    // manager folds it in whenever the session turns out to be fresh.
     mocks.probe.mockResolvedValue(true);
 
     await LangyTurnService.create(deps).startConversationTurn(
@@ -469,9 +543,9 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       }),
     );
 
-    const system = systemOf(mocks.dispatch);
-    expect(system).toContain("scenario_0002E069Y90C5aaw1h325gUZ7TE0W");
-    expect(system).toContain("Customer support agent");
+    const { historySeed } = dispatchedOf(mocks.dispatch);
+    expect(historySeed).toContain("scenario_0002E069Y90C5aaw1h325gUZ7TE0W");
+    expect(historySeed).toContain("Customer support agent");
     expect(mocks.findAllByConversation).toHaveBeenCalledWith({
       conversationId: "conv-1",
       projectId: "p1",
@@ -479,8 +553,8 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
   });
 
   /** @scenario Every turn carries the rule for resolving a bare reference */
-  /** @scenario The rule is read after everything it talks about */
-  it("carries the rule for resolving a bare reference, after the things it resolves against", async () => {
+  /** @scenario The data blocks arrive ahead of the message they explain */
+  it("keeps the resolution rule in the stable instructions and the data ahead of the ask", async () => {
     const { deps, mocks } = makeDeps();
     mocks.findAllByConversation.mockResolvedValue([scenarioCreated]);
 
@@ -494,15 +568,111 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
       }),
     );
 
-    const system = systemOf(mocks.dispatch);
+    const { system, prompt } = dispatchedOf(mocks.dispatch);
     expect(system).toContain("RESOLVING WHAT THE USER MEANS");
-    // The policy says "described above", so both data blocks must precede it.
-    expect(
-      system.indexOf("WHAT THIS CONVERSATION HAS ALREADY DONE"),
-    ).toBeLessThan(system.indexOf("RESOLVING WHAT THE USER MEANS"));
-    expect(system.indexOf("WHAT THE USER IS LOOKING AT")).toBeLessThan(
-      system.indexOf("RESOLVING WHAT THE USER MEANS"),
+    // The screen-context DATA precedes the labelled ask inside the message,
+    // so the model reads what "this trace" could mean before the words that
+    // may say it.
+    expect(prompt.indexOf("WHAT THE USER IS LOOKING AT")).toBeLessThan(
+      prompt.indexOf("THE USER'S MESSAGE:"),
     );
+    expect(prompt.trimEnd().endsWith("hi")).toBe(true);
+  });
+
+  /** @scenario A follow-up turn carries the conversation so far */
+  /** @scenario What was said survives the worker being replaced */
+  /** @scenario Switching models mid-conversation keeps the conversation */
+  it("carries the transcript seed so a fresh worker on another model continues the conversation", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.findAllByConversation.mockResolvedValue([
+      {
+        id: "t1",
+        role: "user",
+        parts: [
+          { type: "text", text: "my name is rogerio" },
+        ] as LangyMessageRow["parts"],
+        createdAt: new Date(),
+      },
+      {
+        id: "t2",
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Nice to meet you, Rogerio!" },
+        ] as LangyMessageRow["parts"],
+        createdAt: new Date(),
+      },
+    ]);
+    // The model switch recycled the worker: the probe misses and this turn
+    // will run on a fresh session that has never seen the conversation.
+    mocks.probe.mockResolvedValue(false);
+
+    await LangyTurnService.create(deps).startConversationTurn(
+      input({
+        modelOverride: "anthropic/claude-haiku-4-5",
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "what is my name?" }] },
+        ],
+      }),
+    );
+
+    const { system, prompt, historySeed } = dispatchedOf(mocks.dispatch);
+    expect(historySeed).toContain("THE CONVERSATION SO FAR");
+    expect(historySeed).toContain("User: my name is rogerio");
+    expect(historySeed).toContain("Langy: Nice to meet you, Rogerio!");
+    // The volatile transcript must NOT ride the system lane: a per-turn
+    // system re-writes the provider's cached prefix every turn.
+    expect(system).not.toContain("THE CONVERSATION SO FAR");
+    // The ask is labelled so the manager-folded seed can never blur into the
+    // user's own words.
+    expect(prompt).toContain("THE USER'S MESSAGE:\nwhat is my name?");
+    // The stash carries the same seed: an outbox or liveness re-dispatch to a
+    // fresh worker continues the conversation too.
+    const stashed = (
+      mocks.stash.mock.calls[0] as unknown as [
+        { system: string; historySeed?: string },
+      ]
+    )[0];
+    expect(stashed.historySeed).toBe(historySeed);
+    expect(stashed.system).toBe(system);
+  });
+
+  /** @scenario Carrying the conversation does not defeat prompt caching */
+  it("sends byte-identical instructions on consecutive turns of one conversation", async () => {
+    const first = makeDeps();
+    first.mocks.findAllByConversation.mockResolvedValue([scenarioCreated]);
+    await LangyTurnService.create(first.deps).startConversationTurn(
+      input({
+        messages: [{ role: "user", parts: [{ type: "text", text: "run it" }] }],
+      }),
+    );
+
+    const second = makeDeps();
+    second.mocks.findAllByConversation.mockResolvedValue([
+      scenarioCreated,
+      {
+        id: "m2",
+        role: "assistant",
+        parts: [
+          { type: "text", text: "Ran it: all passed." },
+        ] as LangyMessageRow["parts"],
+        createdAt: new Date(),
+      },
+    ]);
+    await LangyTurnService.create(second.deps).startConversationTurn(
+      input({
+        idempotencyKey: "00000000-0000-4000-8000-000000000002",
+        messages: [
+          { role: "user", parts: [{ type: "text", text: "and again" }] },
+        ],
+      }),
+    );
+
+    const turn1 = dispatchedOf(first.mocks.dispatch);
+    const turn2 = dispatchedOf(second.mocks.dispatch);
+    // The instructions lane is what providers cache as the request prefix:
+    // it must not vary a byte while the conversation grows.
+    expect(turn2.system).toBe(turn1.system);
+    expect(turn2.historySeed).not.toBe(turn1.historySeed);
   });
 
   /** @scenario A brand-new conversation carries no memory */
@@ -513,9 +683,10 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     await LangyTurnService.create(deps).startConversationTurn(input());
 
     expect(mocks.findAllByConversation).not.toHaveBeenCalled();
-    expect(systemOf(mocks.dispatch)).not.toContain(
-      "WHAT THIS CONVERSATION HAS ALREADY DONE",
-    );
+    const { prompt, historySeed } = dispatchedOf(mocks.dispatch);
+    expect(historySeed).toBeUndefined();
+    // Nothing to prepend, nothing to set apart: the bare ask stays bare.
+    expect(prompt).toBe("hi");
   });
 
   /** @scenario A conversation whose record cannot be read still answers */
@@ -523,14 +694,13 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     const { deps, mocks } = makeDeps();
     mocks.findAllByConversation.mockRejectedValue(new Error("projection down"));
 
-    const result =
-      await LangyTurnService.create(deps).startConversationTurn(input());
+    const result = await LangyTurnService.create(deps).startConversationTurn(
+      input(),
+    );
 
     expect(result).toMatchObject({ conversationId: "conv-1" });
     expect(mocks.dispatch).toHaveBeenCalledOnce();
-    expect(systemOf(mocks.dispatch)).not.toContain(
-      "WHAT THIS CONVERSATION HAS ALREADY DONE",
-    );
+    expect(dispatchedOf(mocks.dispatch).historySeed).toBeUndefined();
   });
 });
 
@@ -559,7 +729,10 @@ describe("langyTurnIdentity", () => {
   });
 
   it("treats a model override change as different content", () => {
-    const other = langyTurnIdentity({ ...base, modelOverride: "openai/gpt-5-mini" });
+    const other = langyTurnIdentity({
+      ...base,
+      modelOverride: "openai/gpt-5-mini",
+    });
     expect(other.turnId).not.toBe(langyTurnIdentity(base).turnId);
   });
 });
@@ -568,7 +741,9 @@ describe("when the idempotency key is reused with different content", () => {
   it("rejects with the mismatch error instead of replaying the original send", async () => {
     const { deps } = makeDeps({
       admission: {
-        claim: vi.fn(async () => ({ kind: "mismatch" }) as LangyTurnAdmissionClaim),
+        claim: vi.fn(
+          async () => ({ kind: "mismatch" }) as LangyTurnAdmissionClaim,
+        ),
         commit: vi.fn(async () => {}),
         abort: vi.fn(async () => {}),
         release: vi.fn(async () => {}),
@@ -611,9 +786,9 @@ describe("LangyTurnService.stopTurn", () => {
     // Declared with its argument even though the body ignores it: a zero-arg
     // `vi.fn` types `mock.calls` as an empty tuple, so reading `calls[0][0]` —
     // which is the whole point of the assertions below — cannot typecheck.
-    const finalizeTurn = vi.fn(
-      async (_args: Record<string, unknown>) => ({ messageId: "a1" }),
-    );
+    const finalizeTurn = vi.fn(async (_args: Record<string, unknown>) => ({
+      messageId: "a1",
+    }));
     const findByIdVisible = vi.fn(async () => ({
       isOwn: over.isOwn ?? true,
       currentTurnId:
@@ -641,7 +816,10 @@ describe("LangyTurnService.stopTurn", () => {
       worker: { cancel } as unknown as LangyTurnServiceDeps["worker"],
       tokenBuffer: over.noBuffer
         ? null
-        : ({ readTail, markEnd } as unknown as LangyTurnServiceDeps["tokenBuffer"]),
+        : ({
+            readTail,
+            markEnd,
+          } as unknown as LangyTurnServiceDeps["tokenBuffer"]),
       reservePermit: vi.fn(),
       releasePermit: vi.fn(),
       perDayPrCap: 0,
@@ -657,7 +835,14 @@ describe("LangyTurnService.stopTurn", () => {
     } as LangyTurnServiceDeps;
     return {
       deps,
-      mocks: { finalizeTurn, findByIdVisible, isTurnActor, markEnd, cancel, readTail },
+      mocks: {
+        finalizeTurn,
+        findByIdVisible,
+        isTurnActor,
+        markEnd,
+        cancel,
+        readTail,
+      },
     };
   }
 
@@ -683,7 +868,9 @@ describe("LangyTurnService.stopTurn", () => {
       };
       expect(call.outcome).toBe("stopped");
       // The partial answer is the joined durable delta tail, preserved verbatim.
-      expect(call.parts.map((p) => p.text ?? "").join("")).toBe("half an answer");
+      expect(call.parts.map((p) => p.text ?? "").join("")).toBe(
+        "half an answer",
+      );
       expect(mocks.markEnd).toHaveBeenCalledTimes(1);
       expect(mocks.cancel).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: "conv-1", turnId: "turn-1" }),
@@ -696,7 +883,10 @@ describe("LangyTurnService.stopTurn", () => {
   describe("given the caller is neither the actor nor the owner", () => {
     /** @scenario Only someone who can control the conversation may stop its turn */
     it("refuses with a handled not-owned error and records no terminal", async () => {
-      const { deps, mocks } = makeStopDeps({ isTurnActor: false, isOwn: false });
+      const { deps, mocks } = makeStopDeps({
+        isTurnActor: false,
+        isOwn: false,
+      });
 
       await expect(
         LangyTurnService.create(deps).stopTurn(stopArgs),

@@ -66,6 +66,7 @@ func (f refresherFunc) RefreshCodexToken(ctx context.Context, rowID string) (str
 	return f(ctx, rowID)
 }
 
+// @scenario "A codex-lane response's cached prompt share is captured"
 func TestCodexStream_ProxiesSSEAndParsesUsage(t *testing.T) {
 	var gotBody map[string]any
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +89,7 @@ func TestCodexStream_ProxiesSSEAndParsesUsage(t *testing.T) {
 			"event: response.output_text.delta\n"+
 				`data: {"type":"response.output_text.delta","delta":"hi"}`+"\n\n"+
 				"event: response.completed\n"+
-				`data: {"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":5}}}`+"\n\n")
+				`data: {"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":5,"input_tokens_details":{"cached_tokens":8}}}}`+"\n\n")
 	}))
 	defer backend.Close()
 
@@ -119,6 +120,12 @@ func TestCodexStream_ProxiesSSEAndParsesUsage(t *testing.T) {
 	usage := iter.Usage()
 	if usage.PromptTokens != 12 || usage.CompletionTokens != 5 || usage.TotalTokens != 17 {
 		t.Errorf("usage not parsed: %+v", usage)
+	}
+	// The Responses-style cached prefix count must survive: input_tokens is
+	// the full prompt total, the cached share rides separately so the trace
+	// can report fresh vs cached and the cost can price the cache read.
+	if usage.CacheReadTokens != 8 {
+		t.Errorf("cached tokens not parsed: %+v", usage)
 	}
 }
 

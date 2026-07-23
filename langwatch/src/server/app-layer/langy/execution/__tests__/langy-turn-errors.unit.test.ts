@@ -115,6 +115,8 @@ describe("langyAgentErrorFromFrame", () => {
             traceId: "0af7651916cd43dd8448eb211c80319c",
             meta: {
               http_status: 400,
+              message:
+                "no model provider configured for this organization — add a provider API key in Settings → Model Providers",
             },
           },
         ]);
@@ -139,7 +141,12 @@ describe("langyAgentErrorFromFrame", () => {
           serializeLangyTurnError(error),
         ) as Record<string, unknown>;
         expect(serialized.reasons).toEqual([
-          { code: "rate_limited", kind: "rate_limited", fault: "customer" },
+          {
+            code: "rate_limited",
+            kind: "rate_limited",
+            fault: "customer",
+            meta: { message: "rate limited" },
+          },
         ]);
       });
 

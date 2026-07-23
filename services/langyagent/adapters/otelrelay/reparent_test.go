@@ -76,8 +76,8 @@ func TestReparentTraces(t *testing.T) {
 		if v, _ := attrs.Get("langwatch.thread.id"); v.AsString() != "conv-123" {
 			t.Errorf("langwatch.thread.id = %q, want conv-123", v.AsString())
 		}
-		if v, _ := attrs.Get("tag.tags"); v.AsString() != "langy" {
-			t.Errorf("tag.tags = %q, want langy", v.AsString())
+		if _, ok := attrs.Get("tag.tags"); ok {
+			t.Errorf("tag.tags must not be stamped by the relay; origin is the Langy signal")
 		}
 		// The OTel GenAI semconv twins ride alongside the reserved keys, so
 		// the trace speaks the standard names to any consumer.
@@ -134,7 +134,7 @@ func TestReparentTraces(t *testing.T) {
 		if spans.At(1).ParentSpanID() != rootID {
 			t.Errorf("child parent must be untouched")
 		}
-		// Resource stamping still applies: the batch must land labeled + grouped.
+		// Resource stamping still applies: the batch must land grouped.
 		attrs := td.ResourceSpans().At(0).Resource().Attributes()
 		if v, _ := attrs.Get("langwatch.thread.id"); v.AsString() != "conv-123" {
 			t.Errorf("thread id stamp must apply regardless of turn context")
@@ -148,8 +148,8 @@ func TestReparentTraces(t *testing.T) {
 		ReparentTraces(td, "conv-123", "user-1", turnContext())
 
 		attrs := td.ResourceSpans().At(0).Resource().Attributes()
-		if v, _ := attrs.Get("tag.tags"); v.AsString() != "custom,langy" {
-			t.Errorf("tag.tags = %q, want the langy tag appended to the existing one", v.AsString())
+		if v, _ := attrs.Get("tag.tags"); v.AsString() != "custom" {
+			t.Errorf("tag.tags = %q, want the worker's own tag preserved untouched", v.AsString())
 		}
 	})
 }

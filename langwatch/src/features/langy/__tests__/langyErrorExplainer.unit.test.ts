@@ -130,6 +130,93 @@ describe("explainLangyError", () => {
     });
   });
 
+  describe("given a model outside the project's Langy allowlist", () => {
+    describe("when the refusal is explained", () => {
+      it("keeps the allowlist refusal on the settings action", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_model_not_allowed",
+            meta: { model: "evil/model" },
+          }),
+        );
+
+        expect(presentation.title).toBe("That model isn't available here");
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+    });
+  });
+
+  describe("given an agent failure whose reason chain carries the provider's message", () => {
+    describe("when the failure is explained", () => {
+      /** @scenario A rejected model call shows the provider's own message on the card */
+      it("shows the provider's own message on the card, inside the friendly framing", () => {
+        // The langyagent LLM proxy captures the model provider's error body
+        // (an out-of-credits Anthropic account, the codex backend rejecting a
+        // model) with the prose in meta.message — the one channel the card is
+        // allowed to read (ADR-045). The same text the playground shows.
+        const providerMessage =
+          "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.";
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { message: providerMessage, http_status: 400 },
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("langy_agent_errored");
+        expect(presentation.title).toBe("Langy's reply failed");
+        expect(presentation.description).toBe(
+          `The model provider rejected this reply: ${providerMessage} Your message is safe. Try again, or pick a different model from the composer.`,
+        );
+        expect(presentation.action).toEqual({
+          label: "Try again",
+          kind: "retry",
+        });
+      });
+
+      it("reads the message from a NESTED reason too", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "provider_error",
+                reasons: [
+                  {
+                    kind: "llm_upstream_error",
+                    meta: { message: "model overloaded" },
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+        expect(presentation.description).toContain("model overloaded");
+      });
+    });
+  });
+
+  describe("given an agent failure with no captured cause", () => {
+    describe("when the failure is explained", () => {
+      it("keeps the stock reply-failed copy", () => {
+        const presentation = explainLangyError(
+          domain({ code: "langy_agent_errored" }),
+        );
+        expect(presentation.description).toBe(
+          "Langy hit an error while writing this reply. Your message is safe — try again.",
+        );
+      });
+    });
+  });
+
   describe("given the turn stopped because GitHub is not connected", () => {
     it("suppresses the red card and offers the connect-github action", () => {
       // The panel keys on exactly this shape (render suppress + connect-github)

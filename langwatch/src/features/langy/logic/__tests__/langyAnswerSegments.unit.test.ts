@@ -50,13 +50,13 @@ describe("langyAnswerSegments", () => {
   });
 
   describe("given consecutive text parts", () => {
-    it("merges them, exactly as the joined path renders them", () => {
+    it("joins them with a paragraph break so a headline can never glue to the reply", () => {
       const segments = langyAnswerSegments([
         text("one "),
         text("two"),
         cardPart,
       ]);
-      expect(segments[0]).toEqual({ type: "text", text: "one two" });
+      expect(segments[0]).toEqual({ type: "text", text: "one \n\ntwo" });
     });
   });
 
@@ -100,7 +100,11 @@ describe("langyAnswerSegments", () => {
 
   describe("given whitespace-only prose between blocks", () => {
     it("drops the empty segment", () => {
-      const segments = langyAnswerSegments([cardPart, text("\n\n"), failedPart]);
+      const segments = langyAnswerSegments([
+        cardPart,
+        text("\n\n"),
+        failedPart,
+      ]);
       expect(segments.map((s) => s.type)).toEqual(["card", "failed"]);
     });
   });

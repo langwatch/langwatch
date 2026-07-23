@@ -31,6 +31,8 @@ import {
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
+import { toaster } from "../ui/toaster";
+import { useCodexCodingDefaultsAskStore } from "./CodexCodingDefaultsAsk";
 import { CodexSignIn } from "./CodexSignIn";
 import {
   draftFromProvider,
@@ -444,6 +446,25 @@ export const EditModelProviderForm = ({
             projectId={project?.id ?? ""}
             scopes={state.scopes}
             setAsCodingDefaults={false}
+            onConnected={(account) => {
+              // The sign-in poll already persisted the provider row
+              // server-side, so the drawer's Save has nothing left to do:
+              // close it over the refreshed list. The coding-defaults ask
+              // is queued to the page-level host (a dialog mounted in this
+              // drawer would be unmounted right here, mid-question).
+              useCodexCodingDefaultsAskStore.getState().request({
+                projectId: project?.id ?? "",
+                scopes: state.scopes,
+              });
+              toaster.create({
+                title: "Codex connected",
+                description: account.email
+                  ? `Signed in as ${account.email}`
+                  : undefined,
+                type: "success",
+              });
+              closeDrawer();
+            }}
           />
         ) : (
           <CredentialsSection

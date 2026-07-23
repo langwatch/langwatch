@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { useCyclingVerb } from "~/features/traces-v2/components/ai/useCyclingVerb";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { langyThinkingLine } from "../logic/langyThinkingLine";
-import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
+import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
+import { STATUS_LINE_ROW, StatusOrb } from "./StreamingStatusLine";
 
 const MotionText = motion.create(Box);
 
@@ -105,14 +106,23 @@ export function LangyThinkingLine({
     // verb's intrinsic nowrap width, so `maxWidth: 100%` on the verb would
     // resolve against that overgrown width and never clamp. Full width + a
     // shrinkable child is what lets the clip below engage.
+    //
+    // The row wears the SHARED status-line frame (STATUS_LINE_ROW, see
+    // StreamingStatusLine): same gap, same padding, and the same leading orb
+    // slot as the status rows this line alternates with — so "Starting up…" →
+    // "Waking Langy up…" → "Thinking…" reads as one line changing its words,
+    // never a line hopping between layouts.
     <HStack
-      gap={2.5}
+      gap={STATUS_LINE_ROW.gap}
       alignSelf="stretch"
       width="full"
       minWidth={0}
-      paddingY={0.5}
-      paddingLeft={0.5}
+      paddingY={STATUS_LINE_ROW.paddingY}
+      paddingLeft={STATUS_LINE_ROW.paddingLeft}
     >
+      {/* A stuck turn keeps the slot but not the glow: the orb claims
+          "alive", and by then that is the one thing we cannot claim. */}
+      <StatusOrb active={line.tone !== "stuck"} />
       <Box
         position="relative"
         minHeight="1.5em"
@@ -120,18 +130,14 @@ export function LangyThinkingLine({
         alignItems="center"
         // The verb is a single nowrap line (the crossfade can't reflow mid-swap),
         // so a long tool line — "Using the GitHub skill — <the skill's whole
-        // summary>" — used to run straight off the panel's right edge. Clamp it to
-        // the available width and fade the cut.
+        // summary>" — used to run straight off the panel's right edge. Clamp it
+        // to the available width and mark the cut with an ellipsis. NO fade
+        // mask: it applied to short lines too, so "Thinking…" dissolved to
+        // near-invisible at its tail and read as broken text, not chrome.
         flexShrink={1}
         minWidth={0}
         maxWidth="100%"
         overflow="hidden"
-        css={{
-          maskImage:
-            "linear-gradient(to right, black 0, black calc(100% - 1.5em), transparent 100%)",
-          WebkitMaskImage:
-            "linear-gradient(to right, black 0, black calc(100% - 1.5em), transparent 100%)",
-        }}
       >
         <AnimatePresence mode="wait" initial={false}>
           <MotionText
@@ -143,6 +149,10 @@ export function LangyThinkingLine({
             letterSpacing="-0.005em"
             lineHeight="1.5"
             whiteSpace="nowrap"
+            minWidth={0}
+            maxWidth="100%"
+            overflow="hidden"
+            textOverflow="ellipsis"
             // The stuck line is a statement of fact, not ambient chrome: it drops
             // the gradient and reads as plain muted text.
             {...(line.tone === "stuck"

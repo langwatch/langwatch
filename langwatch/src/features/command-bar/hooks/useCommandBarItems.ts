@@ -1,16 +1,16 @@
+import { BookOpen, Search, Sparkles } from "lucide-react";
 import { useMemo } from "react";
-import { Search, BookOpen, Sparkles } from "lucide-react";
-import type { ListItem } from "../getIconInfo";
-import type { Command, RecentItem, SearchResult } from "../types";
-import type { FilteredCommands } from "./useFilteredCommands";
-import type { FilteredProject } from "./useFilteredProjects";
 import { topLevelNavigationCommands } from "../command-registry";
 import {
   MIN_SEARCH_QUERY_LENGTH,
   RECENT_ITEMS_DISPLAY_LIMIT,
 } from "../constants";
-import type { GroupedRecentItems } from "../useRecentItems";
 import { findEasterEgg } from "../easterEggs";
+import type { ListItem } from "../getIconInfo";
+import type { Command, RecentItem, SearchResult } from "../types";
+import type { GroupedRecentItems } from "../useRecentItems";
+import type { FilteredCommands } from "./useFilteredCommands";
+import type { FilteredProject } from "./useFilteredProjects";
 
 /**
  * Hook that builds the flat list of all items for keyboard navigation and display.
@@ -37,8 +37,11 @@ export function useCommandBarItems(
   // The "Ask Langy" activation — the command bar's door into Langy. Synthesized
   // (not a static registry command) so it can carry the live query and only
   // appears where Langy can actually open: a real project, and the user in the
-  // rollout (langyEnabled mirrors useShowLangy). Selecting it flips the bar into
-  // AI mode rather than navigating — see CommandBar.handleSelect.
+  // rollout (langyEnabled mirrors useShowLangy). With a typed question,
+  // selecting it hands the question straight to the panel in one Enter; on an
+  // empty bar it flips the field into Langy's composer instead — see
+  // CommandPalette.handleSelect. The hint tells each apart, so the row promises
+  // exactly what selecting it does.
   const askLangyItem = useMemo<ListItem | null>(() => {
     if (!langyEnabled || !projectSlug) return null;
     const trimmed = query.trim();
@@ -47,7 +50,9 @@ export function useCommandBarItems(
       data: {
         id: "action-ask-langy",
         label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
-        description: "Hand this question to Langy",
+        description: trimmed
+          ? "Hand this question to Langy"
+          : "Ask about the project in plain language",
         icon: Sparkles,
         category: "actions",
         keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],

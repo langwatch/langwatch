@@ -11,6 +11,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useSession } from "~/utils/auth-client";
 import type { NextRouter } from "~/utils/compat/next-router";
 import { useRouter } from "~/utils/compat/next-router";
+import { toggleSupportChat } from "~/utils/crispBubblePolicy";
 import { CommandBarFooter } from "./components/CommandBarFooter";
 import { CommandBarInput } from "./components/CommandBarInput";
 import { CommandBarLangyMode } from "./components/CommandBarLangyMode";
@@ -47,9 +48,13 @@ function handleTracesPageCommand(
 ) {
   switch (commandId) {
     case "page-traces-view-list":
-      void router.push({ query: { ...router.query, view: "list" } }, undefined, {
-        shallow: true,
-      });
+      void router.push(
+        { query: { ...router.query, view: "list" } },
+        undefined,
+        {
+          shallow: true,
+        },
+      );
       close();
       break;
     case "page-traces-view-table":
@@ -336,18 +341,45 @@ export function CommandPalette({
     setLangyMode(true);
   }, [langyEnabled]);
 
+  // Hand the typed question to Langy: the panel opens FIRST and auto-sends,
+  // then this surface dissolves over its entrance. Reduced motion keeps the
+  // same state ordering but closes synchronously, with no decorative overlap.
+  // Shared by Enter in Langy mode and by selecting a non-empty "Ask Langy"
+  // result — the same single gesture from two doors.
+  const handOffToLangy = useCallback(() => {
+    if (handoffInFlightRef.current) return;
+    handoffInFlightRef.current = true;
+    handoffTimerRef.current = beginLangyHandoff({
+      prompt: query,
+      askLangy,
+      closeCommandBar: onDone,
+      reducedMotion: reduceMotion,
+      setExiting: setLangyExiting,
+    });
+  }, [query, askLangy, onDone, reduceMotion]);
+
   const handleSelect = useCallback(
     (item: ListItem, newTab = false) => {
+      // The surface is already dissolving into Langy; nothing else may fire.
+      if (handoffInFlightRef.current) return;
+
       const projectSlug = project?.slug ?? "";
       const ctx = { router, newTab, close: onDone };
 
       if (item.type === "command") {
         const cmd = item.data;
 
-        // Ask Langy doesn't navigate — it turns the field into Langy's own
-        // input. Enter from there performs the panel handoff.
+        // Ask Langy doesn't navigate. A typed question is already the
+        // message, so selecting the row hands it straight to the panel — one
+        // Enter, no compose stop in between. Only an empty bar turns the
+        // field into Langy's own input first, because there is nothing to
+        // send yet.
         if (cmd.id === "action-ask-langy") {
-          enterLangyMode();
+          if (query.trim()) {
+            handOffToLangy();
+          } else {
+            enterLangyMode();
+          }
           return;
         }
 
@@ -358,13 +390,9 @@ export function CommandPalette({
         }
 
         if (cmd.id === "action-open-chat") {
-          const crisp = (
-            window as unknown as {
-              $crisp?: { push: (args: unknown[]) => void };
-            }
-          ).$crisp;
-          crisp?.push(["do", "chat:show"]);
-          crisp?.push(["do", "chat:toggle"]);
+          // Deliberate open: must go through the policy so the suppression
+          // backstop lifts before the widget is asked to show.
+          toggleSupportChat();
           onDone();
           return;
         }
@@ -426,24 +454,31 @@ export function CommandPalette({
       query,
       triggerEffect,
       enterLangyMode,
+      handOffToLangy,
     ],
   );
 
   // Reset Langy mode whenever the palette stands down, so it never resumes
   // mid-transition and the next visit lands on the normal command view. A
-  // pending handoff is cancelled too; otherwise a fast Escape could close a
-  // later surface.
+  // pending handoff timer never outlives the stand-down either — a timer left
+  // running could close a later surface — but its close still RUNS, now: the
+  // panel's composer takes focus during the handoff overlap, which blurs an
+  // inline field and deactivates it before the timer fires, and skipping the
+  // close there would leave the field holding the question it already sent.
+  // `onDone` is idempotent on every surface, so the dialog path (already
+  // closed when this runs) is unaffected.
   useEffect(() => {
     if (!active) {
       if (handoffTimerRef.current !== null) {
         window.clearTimeout(handoffTimerRef.current);
         handoffTimerRef.current = null;
+        if (handoffInFlightRef.current) onDone();
       }
       handoffInFlightRef.current = false;
       setLangyMode(false);
       setLangyExiting(false);
     }
-  }, [active]);
+  }, [active, onDone]);
 
   useEffect(
     () => () => {
@@ -461,21 +496,6 @@ export function CommandPalette({
     setLangyExiting(false);
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }, [inputRef]);
-
-  // Enter in Langy mode — open the panel FIRST, then let this surface dissolve
-  // over the panel's entrance. Reduced motion keeps the same state ordering but
-  // closes synchronously, with no decorative overlap.
-  const submitLangyMode = useCallback(() => {
-    if (handoffInFlightRef.current) return;
-    handoffInFlightRef.current = true;
-    handoffTimerRef.current = beginLangyHandoff({
-      prompt: query,
-      askLangy,
-      closeCommandBar: onDone,
-      reducedMotion: reduceMotion,
-      setExiting: setLangyExiting,
-    });
-  }, [query, askLangy, onDone, reduceMotion]);
 
   const handleCopyLink = useCallback(() => {
     const item = allItems[selectedIndex];
@@ -519,7 +539,7 @@ export function CommandPalette({
       <CommandBarLangyMode
         query={query}
         onQueryChange={setQuery}
-        onSubmit={submitLangyMode}
+        onSubmit={handOffToLangy}
         onExit={exitLangyMode}
         exiting={langyExiting}
       />

@@ -1,9 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import type { LangyTitleGenerator } from "~/server/app-layer/langy/langy-title-generation.service";
 import { LangyDispatchRejectedError } from "~/server/app-layer/langy/errors";
 import { serializeLangyTurnError } from "~/server/app-layer/langy/execution/langy-turn-errors";
+import type { LangyTitleGenerator } from "~/server/app-layer/langy/langy-title-generation.service";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
-import type { LangyFailTurnCommandPort } from "~/server/app-layer/langy/subscribers/agent-turn-liveness.subscriber";
 import {
   AGENT_DISPATCH_TIMEOUT_MS,
   type LangyWorkerPort,
@@ -12,14 +11,15 @@ import type {
   LangyTurnHandoff,
   LangyTurnHandoffStore,
 } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import type { LangyFailTurnCommandPort } from "~/server/app-layer/langy/subscribers/agent-turn-liveness.subscriber";
 import type { IntentHandler } from "~/server/event-sourcing/process-manager";
 
 import {
   LANGY_PROCESS_INTENT_TYPES,
-  langyGenerateTitleIntentSchema,
-  langyWorkerDispatchIntentSchema,
   type LangyGenerateTitleIntent,
   type LangyWorkerDispatchIntent,
+  langyGenerateTitleIntentSchema,
+  langyWorkerDispatchIntentSchema,
 } from "./langyConversationProcess.types";
 
 const logger = createLogger("langwatch:langy:process-effects");
@@ -172,6 +172,12 @@ export function createLangyEffectPorts(
             runToken: candidate.runToken,
             prompt: candidate.prompt,
             system: candidate.system,
+            // The seed rides the re-drive too: this is exactly the path where
+            // a probe-hit turn lands on a worker that has since died, and the
+            // fresh session it spawns must still get the conversation so far.
+            ...(candidate.historySeed
+              ? { historySeed: candidate.historySeed }
+              : {}),
             credentials: candidate.credentials,
             ...(candidate.modelOverride
               ? { modelOverride: candidate.modelOverride }
@@ -234,7 +240,9 @@ export function createLangyEffectPorts(
             { projectId, conversationId, turnId },
             "langy dispatch permanently rejected; terminalizing the turn",
           );
-          const error = serializeLangyTurnError(new LangyDispatchRejectedError());
+          const error = serializeLangyTurnError(
+            new LangyDispatchRejectedError(),
+          );
           await deps
             .markError({ conversationId, turnId, error })
             .catch(() => undefined);

@@ -24,17 +24,17 @@ import {
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { memo, useRef, useState } from "react";
 import type React from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangySkill } from "~/shared/langy/langySkills";
+import { describeChipContext } from "../logic/langyChipContext";
 import {
   type LangyRevealableKind,
   useLangyContextTargetStore,
 } from "../stores/langyContextTargetStore";
-import { describeChipContext } from "../logic/langyChipContext";
 import { type LangyContextChip, useLangyStore } from "../stores/langyStore";
 import { LangyComposerPalette, type PaletteMode } from "./LangyComposerPalette";
 import { LangyModelPill } from "./LangyModelPill";
@@ -186,6 +186,23 @@ function ComposerImpl({
   );
   const showGestureHint = !contextHintDismissed && pageHasTargets;
   const canSend = turnPhase === "idle" && !!input.trim() && !disabled;
+
+  // An `askLangy` handoff asks the panel's composer to take focus so the
+  // reader can keep typing. Honored on mount (the panel usually opens WITH the
+  // handoff) or on change (panel already open), then consumed so it fires
+  // once. The hero variant never takes it: it is the origin of a handoff,
+  // never the destination. Focus before consume, inside one frame — consuming
+  // first would re-run this effect and cancel the frame that focuses.
+  const composerFocusRequested = useLangyStore((s) => s.composerFocusRequested);
+  const consumeComposerFocus = useLangyStore((s) => s.consumeComposerFocus);
+  useEffect(() => {
+    if (!composerFocusRequested || hero) return;
+    const frame = requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      consumeComposerFocus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [composerFocusRequested, hero, consumeComposerFocus]);
 
   // The rainbow sheen is an ACTIVITY signal, not an invitation. It used to ride
   // the border only while the composer was blank and idle ("start here") and
@@ -512,11 +529,7 @@ function ComposerImpl({
                         the whole job — once the wrapper stops inheriting a line
                         box it has no use for, whose stray half-leading was what
                         pushed the glyph off centre in the first place. */}
-                    <Box
-                      display="grid"
-                      placeItems="center"
-                      lineHeight={0}
-                    >
+                    <Box display="grid" placeItems="center" lineHeight={0}>
                       <Send size={14} />
                     </Box>
                   </SendButton>
@@ -554,17 +567,6 @@ function ComposerImpl({
             // See the note on the context summary above: the hero stays bare.
             display={hero ? "none" : undefined}
           >
-            {/* The pill goes in a shrinkable wrapper rather than straight into
-                the row. Ark's combobox root is a layout box of its own, and
-                left as the flex item it can claim the rail's whole width —
-                which squeezed the spacer to nothing and pushed the sigils onto
-                a line of their own. The wrapper is the flex item now: it may
-                shrink to nothing and it may not grow, so the row's shape can
-                never depend on how wide the selected model's name happens to
-                be. */}
-            <Box minWidth={0} flexShrink={1} flexGrow={0} overflow="hidden">
-              
-            </Box>
             <Box flex={1} minWidth={0} />
             {/* The two keys, said out loud. A palette you can only reach by
                 guessing a keystroke is a palette most people never see, so the
@@ -660,7 +662,11 @@ function SigilButton({
         onClick={onClick}
         disabled={disabled}
         aria-disabled={disabled}
-        _disabled={{ opacity: 0.45, cursor: "not-allowed", background: "transparent" }}
+        _disabled={{
+          opacity: 0.45,
+          cursor: "not-allowed",
+          background: "transparent",
+        }}
         display="inline-flex"
         alignItems="center"
         gap={1}
@@ -725,9 +731,8 @@ function ContextGestureHint({ onDismiss }: { onDismiss: () => void }) {
         <Sparkles size={12} />
       </Box>
       <Text textStyle="2xs" color="fg.muted" flex={1} minWidth={0}>
-        Anything on this page can come along. Press{" "}
-        <chakra.kbd fontFamily="mono">#</chakra.kbd> to light it up, then click
-        it. Dragging it onto Langy works too.
+        Type <chakra.kbd fontFamily="mono">#</chakra.kbd> to add anything on
+        this page to Langy context
       </Text>
       <chakra.button
         type="button"

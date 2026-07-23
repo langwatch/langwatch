@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation/canonicalizeSpanAttributesService";
 import type { NormalizedSpan } from "../../../schemas/spans";
 import { createTestSpan } from "../../__tests__/fixtures/trace-summary-test.fixtures";
 import { deriveSpanCost } from "../span-cost.derivation";
@@ -94,6 +95,81 @@ describe("deriveSpanCost", () => {
       expect(deriveSpanCost({ span, spanCostService })).toEqual({
         cost: null,
         nonBilledCost: null,
+      });
+    });
+  });
+
+  describe("given a codex account-provider span", () => {
+    // Builds the span through the real canonicalisation chain, so the test
+    // exercises the CodexExtractor's non-billable stamp and the registry
+    // lookup exactly as ingestion does.
+    const canonicalizedCodexSpan = (
+      wireAttributes: Record<string, unknown>,
+    ): NormalizedSpan => {
+      const base = createTestSpan({ name: "gen_ai.responses" });
+      const { attributes } =
+        new CanonicalizeSpanAttributesService().canonicalize(
+          wireAttributes as NormalizedSpan["spanAttributes"],
+          [],
+          {
+            name: base.name,
+            kind: base.kind,
+            instrumentationScope: {
+              name: "langwatch-service-aigateway",
+              version: null,
+            },
+            statusMessage: base.statusMessage,
+            statusCode: base.statusCode,
+            parentSpanId: base.parentSpanId,
+          },
+        );
+      return createTestSpan({
+        name: base.name,
+        spanAttributes: attributes,
+      });
+    };
+
+    describe("when its per-span cost is derived", () => {
+      /** @scenario A codex span's computed cost is classified as bundled */
+      it("computes a positive cost from the underlying OpenAI pricing and reports it all as bundled", () => {
+        // The gateway's wire shape: codex provider name, the bare underlying
+        // model id, and a zero usage cost (the plan is billed, not tokens).
+        const span = canonicalizedCodexSpan({
+          "gen_ai.provider.name": "openai_codex",
+          "gen_ai.operation.name": "responses",
+          "gen_ai.request.model": "gpt-5.6-terra",
+          "gen_ai.usage.input_tokens": 37749,
+          "gen_ai.usage.output_tokens": 181,
+          "gen_ai.usage.cost": 0,
+          "langwatch.span.type": "llm",
+        });
+
+        const { cost, nonBilledCost } = deriveSpanCost({
+          span,
+          spanCostService,
+        });
+
+        expect(cost).not.toBeNull();
+        expect(cost).toBeGreaterThan(0);
+        expect(nonBilledCost).toBe(cost);
+      });
+
+      it("prices a codex-prefixed model id from the same OpenAI entry and keeps it bundled", () => {
+        const span = canonicalizedCodexSpan({
+          "gen_ai.request.model": "openai_codex/gpt-5.6-terra",
+          "gen_ai.usage.input_tokens": 1000,
+          "gen_ai.usage.output_tokens": 500,
+          "langwatch.span.type": "llm",
+        });
+
+        const { cost, nonBilledCost } = deriveSpanCost({
+          span,
+          spanCostService,
+        });
+
+        expect(cost).not.toBeNull();
+        expect(cost).toBeGreaterThan(0);
+        expect(nonBilledCost).toBe(cost);
       });
     });
   });

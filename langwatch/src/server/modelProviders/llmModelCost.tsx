@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import { prisma } from "../db";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { ScopeTier } from "../scopes/scope.types";
+import { isCodexModel } from "./codexRestrictions";
 import { llmModels } from "./loadModelCatalog";
 
 // Inlined from escape-string-regexp to preserve the previous escaping behavior.
@@ -25,6 +26,14 @@ const getImportedModelCosts = () => {
   > = {};
 
   for (const [modelId, model] of Object.entries(models)) {
+    // Codex models bill the user's ChatGPT plan, so the catalog prices them
+    // at zero. A zero-rate entry can never price a span; all it would do is
+    // shadow the identically named `openai/<model>` entry (the generated
+    // regexes make the vendor prefix optional, so both the bare and the
+    // codex-prefixed spellings hit it first). Keeping codex out of the cost
+    // registry lets codex usage price from the underlying OpenAI entry,
+    // which is what the bundled-cost presentation shows.
+    if (isCodexModel(modelId)) continue;
     if (
       model.pricing?.inputCostPerToken != null ||
       model.pricing?.outputCostPerToken != null
@@ -32,7 +41,9 @@ const getImportedModelCosts = () => {
       // Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
       const hasVendorPrefix = modelId.includes("/");
       const vendorPrefix = hasVendorPrefix ? modelId.split("/")[0] : null;
-      const modelName = hasVendorPrefix ? modelId.split("/").slice(1).join("/") : modelId;
+      const modelName = hasVendorPrefix
+        ? modelId.split("/").slice(1).join("/")
+        : modelId;
 
       const escapedModelName = escapeStringRegexp(modelName)
         // Convert hex-escaped hyphens (\x2d) and escaped hyphens (\-) to literal hyphens
@@ -204,8 +215,8 @@ export const getCustomLLMModelCosts = async ({
     projectId,
   });
 
-  const llmModelCostsCustomData = await prismaClient.customLLMModelCost.findMany(
-    {
+  const llmModelCostsCustomData =
+    await prismaClient.customLLMModelCost.findMany({
       where: {
         organizationId,
         OR: chain.map((scope) => ({
@@ -213,8 +224,7 @@ export const getCustomLLMModelCosts = async ({
           scopeId: scope.scopeId,
         })),
       },
-    },
-  );
+    });
 
   return llmModelCostsCustomData
     .map(

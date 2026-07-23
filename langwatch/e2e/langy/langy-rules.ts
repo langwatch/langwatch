@@ -21,6 +21,34 @@ export const LANGY_CORE_RULE_CRITERIA = [
   "Langy is terse (roughly 1–3 short bullets), with no filler openers like 'Sure!' or 'Assumed:'.",
 ];
 
+/**
+ * Criteria for the greeting / smalltalk flow. A bare "hi" or "who are you?"
+ * requests nothing out of scope, so the "Can't do that yet." refusal is the
+ * one wrong answer; the right one is a short friendly hello that says what
+ * Langy can help with. The core rules about acting immediately do not apply
+ * here (there is nothing to act on), so this rubric stands alone.
+ */
+export const LANGY_GREETING_CRITERIA = [
+  "Langy answers the greeting with a short, friendly reply that introduces itself as Langy or the LangWatch assistant.",
+  "The greeting reply names at least one concrete thing Langy can help with (for example traces, evaluations, prompts, or scenarios).",
+  "Langy does NOT answer the greeting or the \"who are you?\" question with a refusal such as \"Can't do that yet.\"",
+  "Langy does not dump internal tool mechanics, CLI commands, or its own rule list in response to a plain greeting.",
+];
+
+/**
+ * Criteria for the "what has my agent been up to?" overview flow on a project
+ * that has traces but no evaluation data. An empty evaluation metric is not an
+ * answer; the reply must describe what the traces show and invite the user to
+ * pick what to dig into.
+ */
+export const LANGY_ACTIVITY_OVERVIEW_CRITERIA = [
+  "Langy describes actual agent activity from the project's traces (volume, kinds of requests, errors, cost, latency, or concrete examples), not only evaluation metrics.",
+  "Langy does NOT stop at an empty evaluation result: a reply that amounts to 'no evaluation data in the last 24h' with nothing else is a failure.",
+  "The reply includes at least one concrete observation from the traffic (a number, a pattern, or a named example).",
+  "The reply ends by inviting the user to say what to dig into more deeply (a short plain line or a choices card, not a menu of unsolicited offers).",
+  "Langy does NOT narrate or echo the CLI commands it ran.",
+];
+
 /** Criteria specific to a failed-trace investigation flow. */
 export const LANGY_FAILING_TRACES_CRITERIA = [
   "Langy reports on failed/errored traces (a count, the failing traces, or a clear 'no failures' result).",

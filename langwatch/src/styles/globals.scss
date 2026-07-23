@@ -191,6 +191,16 @@ div input[type="number"] {
     position: absolute;
 }
 
+/* The Crisp bubble policy (src/utils/crispBubblePolicy.ts) owns this
+   attribute: present by default from index.html, removed only while the
+   support chat is deliberately open. !important beats Crisp's inline
+   styles, so the bubble stays hidden even when Crisp's own script re-shows
+   it (session restore, tab switches, container re-mounts). */
+html[data-crisp-suppressed] #crisp-chatbox,
+html[data-crisp-suppressed] .crisp-client {
+    display: none !important;
+}
+
 .chakra-radio-group__itemText {
     cursor: pointer;
 }

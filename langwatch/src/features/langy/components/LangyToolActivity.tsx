@@ -36,30 +36,33 @@ import {
 import { keyframes } from "@emotion/react";
 import type { UIMessage } from "ai";
 import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
-import { useLangyStore } from "../stores/langyStore";
-import { langyThinkingShimmerStyles } from "./langyShimmer";
+import {
+  type CapabilityCommand,
+  commandOfToolCall,
+} from "../logic/langyCapabilityDigest";
 import { isPlanToolPart } from "../logic/langyPlan";
 import {
   isQuestionToolPart,
   questionToolCardParts,
 } from "../logic/langyQuestionTool";
-import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
 import {
-  commandOfToolCall,
-  type CapabilityCommand,
-} from "../logic/langyCapabilityDigest";
+  type LangyToolErrorPresentation,
+  presentLangyToolError,
+} from "../logic/langyToolFailure";
+import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
+import { useLangyStore } from "../stores/langyStore";
 import {
   type CapabilityProgress,
   isProposalOutput,
   resolveCapability,
   resolveCapabilityProgress,
 } from "./capabilities/capabilityRegistry";
-import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { collectionOf } from "./capabilities/cliResultDocument";
+import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import {
   type CapabilityToolCall,
   hasCapabilityCard,
@@ -68,10 +71,7 @@ import {
 } from "./capabilities/LangyCapabilityRenderer";
 import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyToolErrorCard } from "./LangyToolErrorCard";
-import {
-  presentLangyToolError,
-  type LangyToolErrorPresentation,
-} from "../logic/langyToolFailure";
+import { langyThinkingShimmerStyles } from "./langyShimmer";
 
 const dotPulse = keyframes`
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -244,7 +244,8 @@ function renderedToolFailure(part: ToolPartLike): boolean {
 export function toCapabilityCalls(
   message: PartsView,
 ): Array<{ id: string; call: CapabilityToolCall } & Sequenced> {
-  const result: Array<{ id: string; call: CapabilityToolCall } & Sequenced> = [];
+  const result: Array<{ id: string; call: CapabilityToolCall } & Sequenced> =
+    [];
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
     const name = partToolName(part);
@@ -487,8 +488,25 @@ export function toActivityGroups(message: PartsView): ActivityGroup[] {
   return order.map((key) => byKey.get(key)!);
 }
 
-export function LangyToolActivity({ message }: { message: UIMessage }) {
-  return <LangyActivityParts parts={message.parts} />;
+export function LangyToolActivity({
+  message,
+  reasoningTitles,
+}: {
+  message: UIMessage;
+  /**
+   * The turn's folded reasoning-summary headlines (logic/langyReasoningTitles):
+   * the model's thinking steps between tool calls. They ride the completed
+   * receipt — never the transcript — so a settled turn's process record is one
+   * collapsed card, not a stack of loose bold lines above the answer.
+   */
+  reasoningTitles?: string[];
+}) {
+  return (
+    <LangyActivityParts
+      parts={message.parts}
+      reasoningTitles={reasoningTitles}
+    />
+  );
 }
 
 /**
@@ -497,7 +515,10 @@ export function LangyToolActivity({ message }: { message: UIMessage }) {
  * (LangyPlanCard). Renders nothing when the parts carry no activity, so a bucket
  * with only prose collapses to nothing.
  */
-export function LangyActivityParts({ parts }: PartsView) {
+export function LangyActivityParts({
+  parts,
+  reasoningTitles = [],
+}: PartsView & { reasoningTitles?: string[] }) {
   const [devMode] = useLangyDevMode();
   const turnProgress = useLangyStore((state) => state.turnProgress);
   const turnProgressSample = useLangyStore((state) => state.turnProgressSample);
@@ -559,6 +580,7 @@ export function LangyActivityParts({ parts }: PartsView) {
             node: (
               <CompletedActivityBatch
                 groups={completedGroups}
+                reasoningTitles={reasoningTitles}
                 devMode={devMode}
               />
             ),
@@ -604,9 +626,12 @@ export function LangyActivityParts({ parts }: PartsView) {
  */
 function CompletedActivityBatch({
   groups,
+  reasoningTitles = [],
   devMode,
 }: {
   groups: ActivityGroup[];
+  /** The turn's folded thinking steps — rows of the receipt, expanded only. */
+  reasoningTitles?: string[];
   devMode: boolean;
 }) {
   // The receipt is an index, not a hover-only disclosure. Keep every action
@@ -688,6 +713,23 @@ function CompletedActivityBatch({
               group={group}
               devMode={devMode}
             />
+          ))}
+          {/* The thinking steps the model narrated between calls — part of the
+              turn's process record, so they live in the same receipt as the
+              actions they punctuated, quieter (they claim thought, not work). */}
+          {reasoningTitles.map((title, index) => (
+            <Text
+              key={`thought-${index}`}
+              role="listitem"
+              textStyle="xs"
+              color="fg.subtle"
+              fontStyle="italic"
+              paddingY={1.5}
+              truncate
+              title={title}
+            >
+              {title}
+            </Text>
           ))}
         </VStack>
       ) : null}

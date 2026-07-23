@@ -270,7 +270,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
-		semconv.GenAIRequestModelKey.String(params.Model),
+		semconv.GenAIRequestModelKey.String(canonicalModelID(params.ProviderID, params.Model)),
 		semconv.GenAIUsageInputTokensKey.Int(freshInput),
 		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
 		attrTotalUsage.Int(params.Usage.TotalTokens),
@@ -342,7 +342,40 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
+	// A Langy turn's model call belongs INSIDE the turn's trace. When the call
+	// arrived WITHOUT the turn's traceparent (a relay gap, or a call outside
+	// any turn), this span rooted a standalone trace that duplicates the turn
+	// in the customer's trace explorer; the worker's own spans already show
+	// the call, so the copy adds nothing but a second row with the same cost.
+	// Drop it, errors included: the turn span carries the failure. A Langy
+	// call is recognized by its mirror tier, which the control plane resolves
+	// to non-skip ONLY for Langy virtual keys, so ordinary gateway traffic
+	// (playground, customer API keys) never carries one, so its standalone
+	// root, the only trace such traffic has, is untouched. attrDrop sits
+	// outermost in the export chain, so the unjoinable span's mirror copy is
+	// suppressed with it.
+	if tier := params.MirrorTier; (tier == mirrorTierContent || tier == mirrorTierStructural) &&
+		TraceParent(ctx) == "" {
+		span.SetAttributes(attrDrop.Bool(true))
+	}
+
 	span.End()
+}
+
+// canonicalModelID reports the model under the platform's provider-prefixed
+// spelling ("anthropic/claude-haiku-4-5"): the id the selectors, the cost
+// registry, the playground and the NLP executions all carry. Model resolution
+// strips the prefix for provider routing, and stamping the stripped name made
+// the gateway the one surface reporting bare wire-names: a Langy turn's
+// Models filter listed the SAME model twice, once bare (this span), once
+// prefixed (the worker's own span). A model whose provider is unknown
+// (implicit resolution never fills it) or that already carries a path
+// segment is reported as requested.
+func canonicalModelID(provider domain.ProviderID, model string) string {
+	if provider == "" || model == "" || strings.Contains(model, "/") {
+		return model
+	}
+	return string(provider) + "/" + model
 }
 
 // Shutdown flushes pending spans to customer endpoints.

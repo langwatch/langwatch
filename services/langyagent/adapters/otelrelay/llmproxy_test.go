@@ -2,6 +2,7 @@ package otelrelay
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/langwatch/langwatch/pkg/herr"
 )
 
 func TestLLMProxy(t *testing.T) {
@@ -80,6 +83,77 @@ func TestLLMProxy(t *testing.T) {
 		if sawTraceparent == nil || *sawTraceparent != "" {
 			t.Errorf("with no turn context the forward must carry NO traceparent (gateway roots its own trace); got %v", sawTraceparent)
 		}
+	})
+
+	// The worker's AI SDK injects a traceparent on the outbound LLM fetch. The
+	// relay translates it through the SAME remap the span re-parenting applies
+	// (worker trace ids collapse onto the turn's trace, span ids survive), so
+	// the gateway's gen_ai span nests under the exported copy of the worker
+	// span that made the call rather than landing as a sibling of the call tree.
+	//
+	// @scenario "The gateway's model call nests under the agent's own call span"
+	t.Run("when the worker injects its own traceparent", func(t *testing.T) {
+		requestWithWorkerTP := func(t *testing.T, workerTraceparent string) string {
+			t.Helper()
+			var gotTraceparent string
+			gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				gotTraceparent = req.Header.Get("traceparent")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer gateway.Close()
+
+			relay := startRelay(t)
+			token, _ := relay.Register(WorkerInfo{
+				ConversationID: "conv-remap",
+				GatewayBaseURL: gateway.URL,
+				LLMVirtualKey:  "vk-real",
+			})
+			relay.SetTurnContext(token, turnContext())
+
+			req, _ := http.NewRequest(http.MethodPost, relay.LLMBaseURLFor(token)+"/chat/completions", strings.NewReader(`{}`))
+			if workerTraceparent != "" {
+				req.Header.Set("traceparent", workerTraceparent)
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("proxied LLM call: %v", err)
+			}
+			resp.Body.Close()
+			return gotTraceparent
+		}
+
+		t.Run("the forward carries the turn's trace id with the worker's span id", func(t *testing.T) {
+			workerSpan := "aabbccdd11223344"
+			got := requestWithWorkerTP(t, "00-9f86d081884c7d659a2feaa0c55ad015-"+workerSpan+"-01")
+			want := fmt.Sprintf("00-%s-%s-01", turnTraceID, workerSpan)
+			if got != want {
+				t.Errorf("forwarded traceparent = %q, want the remapped %q", got, want)
+			}
+		})
+
+		t.Run("the worker's own trace id never reaches the gateway", func(t *testing.T) {
+			got := requestWithWorkerTP(t, "00-9f86d081884c7d659a2feaa0c55ad015-aabbccdd11223344-01")
+			if strings.Contains(got, "9f86d081884c7d659a2feaa0c55ad015") {
+				t.Errorf("worker-chosen trace id leaked to the gateway: %q", got)
+			}
+		})
+
+		t.Run("a malformed worker traceparent falls back to the turn span", func(t *testing.T) {
+			got := requestWithWorkerTP(t, "not-a-traceparent")
+			want := fmt.Sprintf("00-%s-%s-01", turnTraceID, turnSpanID)
+			if got != want {
+				t.Errorf("forwarded traceparent = %q, want the turn fallback %q", got, want)
+			}
+		})
+
+		t.Run("an all-zero worker span id falls back to the turn span", func(t *testing.T) {
+			got := requestWithWorkerTP(t, "00-9f86d081884c7d659a2feaa0c55ad015-0000000000000000-01")
+			want := fmt.Sprintf("00-%s-%s-01", turnTraceID, turnSpanID)
+			if got != want {
+				t.Errorf("forwarded traceparent = %q, want the turn fallback %q", got, want)
+			}
+		})
 	})
 
 	t.Run("when the response is a server-sent event stream", func(t *testing.T) {
@@ -162,12 +236,15 @@ func TestLLMTargetURL(t *testing.T) {
 }
 
 // The proxy's error capture is the wire that lets a turn's terminal frame name
-// the gateway's REAL typed cause (herr) instead of opencode's laundered prose.
-// Contract: a herr envelope on a >=400 answer is captured for LastLLMError; a
-// later success — or a new turn — clears it; the body always reaches the
-// worker's SDK byte-for-byte, even past the 64KB capture cap.
+// the REAL cause instead of opencode's laundered prose. Contract: EVERY >=400
+// answer leaves a capture for LastLLMError — a herr envelope losslessly, a
+// provider-native body best-effort with its message; a later success — or a
+// new turn — clears it; the body always reaches the worker's SDK
+// byte-for-byte, even past the 64KB capture cap.
 func TestLLMProxy_ErrorCapture(t *testing.T) {
-	herrBody := `{"error":{"type":"no_provider_configured","message":"no model provider configured","reasons":[{"type":"unknown","message":"unknown"}]}}`
+	// The gateway's real wire shape (pkg/herr toErrorBody): `type` and `code`
+	// carry the same value, `message` is always present.
+	herrBody := `{"error":{"type":"no_provider_configured","code":"no_provider_configured","message":"no model provider configured","reasons":[{"type":"unknown","message":"unknown"}]}}`
 
 	newGateway := func(status *int, body *string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -247,6 +324,41 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 		}
 	})
 
+	// The gateway authors this envelope itself (codexSessionExpiredError):
+	// `type` and `code` matched plus a message, no reasons. It must round-trip
+	// typed, or the control plane loses the exact-code classification that
+	// renders the re-authenticate card.
+	t.Run("when the gateway answers the codex session-expired envelope", func(t *testing.T) {
+		status := http.StatusUnauthorized
+		body := `{"error":{"type":"codex_session_expired","code":"codex_session_expired","message":"Your OpenAI session expired. Sign in to Codex again to keep using it."}}`
+		gateway := newGateway(&status, &body)
+		defer gateway.Close()
+
+		relay := startRelay(t)
+		token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+		relay.SetTurnContext(token, turnContext())
+
+		resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatalf("proxied LLM call: %v", err)
+		}
+		resp.Body.Close()
+
+		e, ok := relay.LastLLMError(token)
+		if !ok {
+			t.Fatal("LastLLMError must expose the captured herr")
+		}
+		if string(e.Code) != "codex_session_expired" {
+			t.Errorf("captured code = %q, want the gateway's typed code preserved", e.Code)
+		}
+		if e.Meta["message"] != "Your OpenAI session expired. Sign in to Codex again to keep using it." {
+			t.Errorf("captured message = %v, want the envelope's message in meta", e.Meta["message"])
+		}
+		if e.Meta["http_status"] != http.StatusUnauthorized {
+			t.Errorf("captured http_status = %v, want 401", e.Meta["http_status"])
+		}
+	})
+
 	t.Run("when the error body exceeds the capture cap", func(t *testing.T) {
 		huge := `{"pad":"` + strings.Repeat("x", maxErrorBodyBytes) + `"}`
 		status := http.StatusInternalServerError
@@ -267,9 +379,118 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 		if string(got) != huge {
 			t.Errorf("worker saw %d bytes, want the full %d untruncated", len(got), len(huge))
 		}
-		// Not a herr envelope, so nothing is captured — but never corrupted.
-		if _, ok := relay.LastLLMError(token); ok {
-			t.Error("a non-herr body must not be captured as a typed cause")
+		// Not a herr envelope and no readable message inside: captured
+		// best-effort as an upstream error with the status, never corrupted.
+		e, ok := relay.LastLLMError(token)
+		if !ok {
+			t.Fatal("a failed call must always leave a captured cause")
+		}
+		if string(e.Code) != string(llmUpstreamErrorCode) {
+			t.Errorf("captured code = %q, want %q", e.Code, llmUpstreamErrorCode)
+		}
+		if _, hasMessage := e.Meta["message"]; hasMessage {
+			t.Error("an unreadable body must not fabricate a message")
+		}
+	})
+
+	// Provider-native error bodies the gateway forwards byte-for-byte are NOT
+	// herr envelopes, even when they reuse `error.type` (Anthropic) or carry an
+	// unmatched `error.code` (OpenAI), but they hold the only actionable prose
+	// there is: the provider's own message. Every one of them must land as an
+	// `llm_upstream_error` with that prose in meta, so the turn's error frame
+	// (and the turn span) name the real failure. A body that names its own
+	// error type keeps that discriminant as a typed reason, so exact-code
+	// consumers (the codex plan-limit promotion) still classify it.
+	t.Run("when the gateway forwards a provider-native error body", func(t *testing.T) {
+		cases := []struct {
+			name string
+			body string
+			want string
+			// The provider's own error discriminant, expected as the captured
+			// cause's single typed reason. Empty means no reason is captured.
+			wantCauseType string
+		}{
+			{
+				name:          "anthropic real credit-balance body",
+				body:          `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}`,
+				want:          "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+				wantCauseType: "invalid_request_error",
+			},
+			{
+				name:          "codex backend usage limit",
+				body:          `{"error":{"type":"usage_limit_reached","message":"You've hit your usage limit."}}`,
+				want:          "You've hit your usage limit.",
+				wantCauseType: "usage_limit_reached",
+			},
+			{
+				name:          "openai unmatched type and code pair",
+				body:          `{"error":{"type":"invalid_request_error","code":"invalid_api_key","message":"Incorrect API key provided."}}`,
+				want:          "Incorrect API key provided.",
+				wantCauseType: "invalid_request_error",
+			},
+			{
+				name: "codex backend detail",
+				body: `{"detail":"The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account."}`,
+				want: "The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account.",
+			},
+			{
+				name: "bare message field",
+				body: `{"message":"model overloaded"}`,
+				want: "model overloaded",
+			},
+			{
+				name: "plain text body",
+				body: `upstream exploded`,
+				want: "upstream exploded",
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				status, body := http.StatusBadRequest, tc.body
+				gateway := newGateway(&status, &body)
+				defer gateway.Close()
+
+				relay := startRelay(t)
+				token, _ := relay.Register(WorkerInfo{ConversationID: "c", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+				relay.SetTurnContext(token, turnContext())
+
+				resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+				if err != nil {
+					t.Fatalf("proxied LLM call: %v", err)
+				}
+				got, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if string(got) != tc.body {
+					t.Errorf("worker saw body %q, want the provider's untouched", got)
+				}
+
+				e, ok := relay.LastLLMError(token)
+				if !ok {
+					t.Fatal("a failed call must always leave a captured cause")
+				}
+				if string(e.Code) != string(llmUpstreamErrorCode) {
+					t.Errorf("captured code = %q, want %q", e.Code, llmUpstreamErrorCode)
+				}
+				if e.Meta["message"] != tc.want {
+					t.Errorf("captured message = %q, want %q", e.Meta["message"], tc.want)
+				}
+				if e.Meta["http_status"] != http.StatusBadRequest {
+					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])
+				}
+				if tc.wantCauseType == "" {
+					if len(e.Reasons) != 0 {
+						t.Errorf("captured reasons = %v, want none for a body without an error type", e.Reasons)
+					}
+					return
+				}
+				if len(e.Reasons) != 1 {
+					t.Fatalf("captured reasons = %d, want exactly the provider's discriminant", len(e.Reasons))
+				}
+				var cause herr.E
+				if !errors.As(e.Reasons[0], &cause) || string(cause.Code) != tc.wantCauseType {
+					t.Errorf("captured cause = %v, want code %q", e.Reasons[0], tc.wantCauseType)
+				}
+			})
 		}
 	})
 }

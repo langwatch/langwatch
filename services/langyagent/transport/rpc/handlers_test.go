@@ -30,14 +30,17 @@ func (w *stubWorker) ClaimTurn(string) app.ClaimOutcome {
 	}
 	return app.ClaimBusy
 }
-func (w *stubWorker) Release()                                              {}
-func (w *stubWorker) Touch()                                                {}
-func (w *stubWorker) HasServedTurn() bool                                   { return false }
-func (*stubWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time) {}
+func (w *stubWorker) Release()            {}
+func (w *stubWorker) Touch()              {}
+func (w *stubWorker) HasServedTurn() bool { return false }
+func (*stubWorker) ForwardTurnSpan(trace.SpanContext, time.Time, time.Time, *domain.TurnFailure) {
+}
 
-func (w *stubWorker) SetTurnTraceContext(trace.SpanContext)                     {}
-func (w *stubWorker) LastLLMError() (herr.E, bool)                              { return herr.E{}, false }
-func (w *stubWorker) PostMessage(context.Context, string, string, string) error { return nil }
+func (w *stubWorker) SetTurnTraceContext(trace.SpanContext) {}
+func (w *stubWorker) LastLLMError() (herr.E, bool)          { return herr.E{}, false }
+func (w *stubWorker) PostMessage(context.Context, string, string, string, string) error {
+	return nil
+}
 func (w *stubWorker) StreamEvents(_ context.Context, sink app.ChatSink) error {
 	f, _ := frames.Delta("hi")
 	_ = sink.Emit(f)

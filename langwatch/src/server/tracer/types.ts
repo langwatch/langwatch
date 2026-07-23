@@ -10,6 +10,14 @@ import { z } from "zod";
 
 const chatRoleSchema = z.union([
   z.literal("system"),
+  /**
+   * OpenAI Responses-dialect spelling of the system role. Accepted wherever
+   * chat messages are parsed and treated as a system-role message everywhere
+   * it matters (system-instruction extraction, transcript rendering) — a
+   * developer message must never fail schema validation into a raw-JSON
+   * fallback, and never render as a user bubble.
+   */
+  z.literal("developer"),
   z.literal("user"),
   z.literal("assistant"),
   z.literal("function"),

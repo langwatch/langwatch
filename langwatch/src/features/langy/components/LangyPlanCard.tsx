@@ -36,9 +36,17 @@ const dotPulse = keyframes`
 
 export function LangyPlanCard({
   plan,
+  reasoningTitles = [],
   isStreaming = false,
 }: {
   plan: LangyPlan;
+  /**
+   * The turn's folded reasoning-summary headlines (logic/langyReasoningTitles).
+   * When a plan ran, this card IS the settled turn's process record, so the
+   * headlines ride its expanded checklist the same way they ride the
+   * completed-actions receipt: quiet rows that claim thought, not work.
+   */
+  reasoningTitles?: string[];
   /** The live, in-flight turn — only then does the current step pulse. */
   isStreaming?: boolean;
 }) {
@@ -80,6 +88,27 @@ export function LangyPlanCard({
               />
             ))}
           </VStack>
+          {reasoningTitles.length > 0 ? (
+            // The thinking steps the model narrated between calls: part of
+            // the turn's process record, so they live in the same expanded
+            // area as the steps, quieter (they claim thought, not work).
+            <VStack align="stretch" gap={0} role="list">
+              {reasoningTitles.map((title, index) => (
+                <Text
+                  key={`thought-${index}`}
+                  role="listitem"
+                  textStyle="xs"
+                  color="fg.subtle"
+                  fontStyle="italic"
+                  paddingY={1.5}
+                  truncate
+                  title={title}
+                >
+                  {title}
+                </Text>
+              ))}
+            </VStack>
+          ) : null}
         </>
       ) : currentItem ? (
         <PlanStep

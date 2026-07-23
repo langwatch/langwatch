@@ -20,7 +20,7 @@ import {
  *
  * HOW IT BEHAVES, and every clause here is a correction of an earlier cut:
  *
- *   Nothing happens until the page is ARMED — `#`, or a held Shift; see
+ *   Nothing happens until the page is ARMED — `#`; see
  *   `useLangyContextArming`. That gate is the correction. The first version
  *   swallowed clicks in the capture phase whenever the panel was open, and that
  *   made every row on the page un-openable the moment you asked Langy a

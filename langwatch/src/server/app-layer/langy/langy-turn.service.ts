@@ -19,46 +19,48 @@
  * Errors are thrown as DomainErrors (each carries its httpStatus); the route
  * renders them. Infrastructure failures throw and surface generically.
  */
-import type { Session } from "~/server/auth";
-import { createHash } from "node:crypto";
 
+import { createHash } from "node:crypto";
+import type { LangyMessagePart } from "@langwatch/langy";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
-import { getLangyTurnsCounter } from "~/server/metrics";
-import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
-import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
-import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
-import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
-import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import {
   extractLangyConversationMemory,
-  renderLangyConversationMemory,
   LANGY_REFERENT_POLICY,
+  renderLangyConversationMemory,
+  renderLangyConversationTranscript,
 } from "~/server/app-layer/langy/langyConversationMemory";
+import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
+import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
+import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import type {
   LangyMessageRepository,
   LangyMessageRow,
 } from "~/server/app-layer/langy/repositories/langy-message.repository";
-import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
-import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
+import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import type { Session } from "~/server/auth";
+import { getLangyTurnsCounter } from "~/server/metrics";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
-  LangyInsufficientScopeError,
-  LangyModelNotAllowedError,
   LangyEmptyMessageError,
   LangyIdempotencyMismatchError,
+  LangyInsufficientScopeError,
+  LangyModelNotAllowedError,
+  LangyModelNotConfiguredError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
 } from "./errors";
 import type { LangyConversationService } from "./langy-conversation.service";
 import { buildFinalAssistantParts } from "./langy-final-parts";
 import { extractTextFromParts } from "./langy-message.service";
-import type { LangyMessagePart } from "@langwatch/langy";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
 import { resolveLangyTurnBaseDependencies } from "./langy-turn-base-dependencies";
 import type { LangyTurnAdmissionRepository } from "./repositories/langy-turn-admission.repository";
@@ -107,6 +109,49 @@ export function langyTurnIdentity(input: {
   return { turnId: `langyturn_${digest}`, messageId: `langymsg_${digest}` };
 }
 
+/**
+ * The label that marks where the user's own words start inside a composed
+ * prompt. Everything before it is control-plane-authored DATA (screen context,
+ * the turn-scoped cap note) or, on a fresh session's first post, the
+ * manager-folded history seed; everything after it is the user speaking.
+ */
+export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
+
+/**
+ * Compose the turn's user-message prompt.
+ *
+ * A bare ask stays a bare ask: when nothing is (or could be) prepended, the
+ * prompt is exactly the user's text, as it always was. The moment anything
+ * rides ahead of it (the screen-context block, the cap note, or a history
+ * seed the manager may fold in), the ask is set apart under
+ * {@link LANGY_USER_MESSAGE_LABEL} so no prepended DATA can blur into the
+ * user's own words. `hasHistorySeed` exists because the SEED is prepended by
+ * the worker manager, not here: the label must already be in place on the
+ * wire for the composition the manager may produce.
+ *
+ * Volatile content lives HERE, in the message, and never in the system
+ * parameter: the system lane must stay byte-identical across a conversation's
+ * turns for provider prompt caching to read the prefix instead of re-writing
+ * it (see the composition site in `startConversationTurn`).
+ */
+export function composeLangyTurnPrompt({
+  contextBlock,
+  capNote,
+  hasHistorySeed,
+  userText,
+}: {
+  contextBlock: string | null;
+  capNote: string;
+  hasHistorySeed: boolean;
+  userText: string;
+}): string {
+  const preamble = [contextBlock, capNote]
+    .map((block) => (block ?? "").trim())
+    .filter((block) => block.length > 0);
+  if (preamble.length === 0 && !hasHistorySeed) return userText;
+  return [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join("\n\n");
+}
+
 export interface LangyChatMessageInput {
   role: "user" | "assistant" | "system";
   parts: LangyMessagePart[];
@@ -130,8 +175,13 @@ export interface StartConversationTurnInput {
 export interface LangyTurnServiceDeps {
   conversations: LangyConversationService;
   credentials: LangyCredentialService;
-  /** Resolve the project's default model; rejects when none is configured. */
-  resolveModel: (args: { projectId: string }) => Promise<unknown>;
+  /**
+   * Resolve the project's configured Langy model; rejects when none is
+   * configured. The returned `modelId` is the full provider-prefixed id and
+   * is FORWARDED to the worker (ADR-065) — with no per-send override, the
+   * turn runs on this model, never on the worker's own built-in default.
+   */
+  resolveModel: (args: { projectId: string }) => Promise<{ modelId: string }>;
   /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
    * is the best-effort worker abort behind a user Stop (ADR-058). */
   worker: Pick<LangyWorkerPort, "probe" | "dispatch" | "cancel"> | null;
@@ -254,7 +304,7 @@ export class LangyTurnService {
         projectId,
         userId,
       });
-      if (!conv || !conv.isOwn) {
+      if (!conv?.isOwn) {
         throw new LangyConversationNotOwnedError(conversationId);
       }
       // The turn id is client input, and a stop is the one place it buys a
@@ -289,7 +339,8 @@ export class LangyTurnService {
     // mutation, and a wedged worker must not delay the stop the user already got.
     await Promise.allSettled([
       tokenBuffer?.markEnd({ conversationId, turnId }) ?? Promise.resolve(),
-      worker?.cancel({ conversationId, turnId, projectId }) ?? Promise.resolve(),
+      worker?.cancel({ conversationId, turnId, projectId }) ??
+        Promise.resolve(),
     ]);
   }
 
@@ -344,7 +395,7 @@ export class LangyTurnService {
     const conversationService = this.deps.conversations;
     const credentialService = this.deps.credentials;
 
-    const { speculativeConversation, credentials } =
+    const { speculativeConversation, credentials, resolvedModel } =
       await resolveLangyTurnBaseDependencies({
         deps: this.deps,
         projectId,
@@ -353,6 +404,15 @@ export class LangyTurnService {
         requestedConversationId,
         ...(modelOverride ? { modelOverride } : {}),
       });
+
+    // The model this turn runs on: the per-send override when the user picked
+    // one, the project's configured Langy model otherwise. Forwarded to the
+    // worker on every path (probe, handoff, dispatch) so the worker never
+    // falls back to its own built-in default (ADR-065).
+    const turnModel = modelOverride ?? resolvedModel;
+    if (!turnModel) {
+      throw new LangyModelNotConfiguredError();
+    }
 
     // The receipt and active-turn row are the authoritative admission boundary.
     // Stable ids make every sibling write and every later request replay collapse
@@ -432,7 +492,10 @@ export class LangyTurnService {
           projectId,
           actorUserId: userId,
           conversationId: conversation.id,
-          ...(modelOverride ? { model: modelOverride } : {}),
+          // The model is part of the worker signature, so a model change —
+          // override or configured default — is a probe MISS and the worker
+          // re-provisions rather than running on the model it booted with.
+          model: turnModel,
           hasGithubAuth: !!credentials.githubToken,
           ...(credentials.githubRepoScopeKey
             ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
@@ -473,12 +536,10 @@ export class LangyTurnService {
               projectId,
               conversationId: conversation.id,
             }),
-        modelOverride
-          ? credentialService.getModelsAllowed({
-              projectId,
-              organizationId: credentials.organizationId,
-            })
-          : Promise.resolve(null),
+        credentialService.getModelsAllowed({
+          projectId,
+          organizationId: credentials.organizationId,
+        }),
         // The conversation's own history. Overlapped with the reads above so
         // remembering costs no extra latency window. A fresh conversation has
         // nothing to read, so it does not pay for the round trip either. The
@@ -497,18 +558,23 @@ export class LangyTurnService {
           ? (runTokenResult.value ?? "")
           : "";
 
-      if (modelOverride) {
-        if (modelsAllowedResult.status === "rejected") {
-          throw modelsAllowedResult.reason;
-        }
-        const modelsAllowed = modelsAllowedResult.value;
-        if (modelsAllowed && !modelsAllowed.includes(modelOverride)) {
-          logger.warn(
-            { projectId, modelOverride, allowedCount: modelsAllowed.length },
-            "modelOverride not in VK allowlist — rejecting",
-          );
-          throw new LangyModelNotAllowedError(modelOverride);
-        }
+      // The project's Langy allowlist is the ONLY runnable-set gate, and it
+      // covers the effective model on BOTH paths — a per-send override and
+      // the configured default alike — so a disallowed model is a clean card
+      // at turn start, never a mid-turn gateway rejection. The engine itself
+      // is provider-blind: whatever passes here is dispatched with its full
+      // provider-prefixed id and the gateway's prefix routing picks the
+      // provider.
+      if (modelsAllowedResult.status === "rejected") {
+        throw modelsAllowedResult.reason;
+      }
+      const modelsAllowed = modelsAllowedResult.value;
+      if (modelsAllowed && !modelsAllowed.includes(turnModel)) {
+        logger.warn(
+          { projectId, turnModel, allowedCount: modelsAllowed.length },
+          "turn model not in VK allowlist — rejecting",
+        );
+        throw new LangyModelNotAllowedError(turnModel);
       }
 
       // Projection read is only a rollout/back-compat hint. The Postgres
@@ -569,25 +635,46 @@ export class LangyTurnService {
           "failed to read langy conversation memory — the turn runs without it",
         );
       }
+      const durableMessages =
+        memoryResult.status === "fulfilled" ? memoryResult.value : [];
+      const conversationTranscript = renderLangyConversationTranscript({
+        messages: durableMessages,
+        currentPrompt: userText,
+      });
       const conversationMemory = renderLangyConversationMemory(
-        extractLangyConversationMemory({
-          messages:
-            memoryResult.status === "fulfilled" ? memoryResult.value : [],
-        }),
+        extractLangyConversationMemory({ messages: durableMessages }),
       );
 
-      // ORDER IS THE POINT. The two DATA blocks describe what "it" could mean —
-      // this conversation's own history, then the user's screen — and the
-      // referent policy comes last so "described above" names both of them.
-      const system = [
-        LANGY_OVERRIDE,
-        conversationMemory,
-        renderLangyTurnContext(turnContext),
-        LANGY_REFERENT_POLICY,
-        capReachedNote,
-      ]
+      // THE SPLIT IS THE POINT (provider prompt caching). The system lane
+      // carries only the two constants, byte-identical across a conversation's
+      // turns: anything varying per turn inside it would shift the provider's
+      // cache breakpoint and re-write the whole prefix at the write premium
+      // every turn instead of reading it. Everything volatile rides the turn's
+      // USER message instead: the history seed below, and the per-turn context
+      // inside the composed prompt.
+      const system = [LANGY_OVERRIDE, LANGY_REFERENT_POLICY].join("\n\n");
+
+      // The history seed rides EVERY dispatch, not just the one after a probe
+      // miss, because the worker serving the turn is disposable at any point
+      // between here and the model call: recycled by a model switch, reaped on
+      // idle, dead by the time the outbox or liveness re-dispatches this same
+      // stashed payload to a fresh one. The manager holds the ground truth of
+      // session freshness and folds the seed into the session's FIRST message
+      // only; once in, it persists in the session's own transcript (and in the
+      // provider's cached prefix) for every later turn.
+      const historySeed = [conversationTranscript, conversationMemory]
         .filter((block): block is string => !!block && block.trim().length > 0)
         .join("\n\n");
+
+      // The per-turn user-message lane: what the user is looking at and the
+      // turn-scoped cap note precede a clearly labelled ask, so the model
+      // reads the DATA before the message that may refer to it.
+      const prompt = composeLangyTurnPrompt({
+        contextBlock: renderLangyTurnContext(turnContext),
+        capNote: capReachedNote,
+        hasHistorySeed: historySeed.length > 0,
+        userText,
+      });
 
       if (handoffResult.status === "rejected") {
         logger.warn(
@@ -614,9 +701,10 @@ export class LangyTurnService {
             conversationId: conversation.id,
             turnId,
             actorUserId: userId,
-            prompt: userText,
+            prompt,
             system,
-            ...(modelOverride ? { modelOverride } : {}),
+            ...(historySeed ? { historySeed } : {}),
+            modelOverride: turnModel,
             credentials,
             runToken,
             permitReserved: permit.reserved,
@@ -689,11 +777,12 @@ export class LangyTurnService {
             userId,
             runToken,
             turnId,
-            prompt: userText,
+            prompt,
             system,
+            ...(historySeed ? { historySeed } : {}),
             conversationId: conversation.id,
             credentials,
-            ...(modelOverride ? { modelOverride } : {}),
+            modelOverride: turnModel,
             ...(pendingHandoff ? { resumeToken: pendingHandoff.token } : {}),
           })
           .then((outcome) => {

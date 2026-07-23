@@ -38,9 +38,15 @@ export function isCodexAllowedFeature(featureKey: string): boolean {
   return CODEX_ALLOWED_FEATURE_KEYS.includes(featureKey);
 }
 
+/**
+ * The codex provider's registry key. Also the `gen_ai.provider.name` the AI
+ * gateway reports on codex spans, and the vendor prefix on codex model ids.
+ */
+export const CODEX_PROVIDER_KEY = "openai_codex";
+
 /** Model ids belonging to the codex provider ("openai_codex/..."). */
 export function isCodexModel(modelId: string): boolean {
-  return modelId.startsWith("openai_codex/");
+  return modelId.startsWith(`${CODEX_PROVIDER_KEY}/`);
 }
 
 /** The model a fresh Codex connection defaults the allowed surfaces to. */

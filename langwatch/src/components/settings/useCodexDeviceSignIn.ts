@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { syncLangyAfterCodingDefaultsWrite } from "~/features/langy/logic/codingDefaultSync";
 import { CODEX_SIGN_IN_TTL_MS } from "~/server/modelProviders/codexAccount.schema";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { api } from "~/utils/api";
@@ -92,7 +93,14 @@ export function useCodexDeviceSignIn({
                 email: result.email,
                 plan: result.plan,
               });
-              await utils.modelProvider.invalidate();
+              if (setAsCodingDefaults) {
+                // The poll just wrote the LANGY and FAST role defaults too:
+                // refresh the default-model caches and snap Langy's model
+                // pill to the new default (see codingDefaultSync).
+                await syncLangyAfterCodingDefaultsWrite({ utils, projectId });
+              } else {
+                await utils.modelProvider.invalidate();
+              }
               onConnected?.({ email: result.email, plan: result.plan });
               return;
             }

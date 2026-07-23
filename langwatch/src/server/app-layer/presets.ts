@@ -1036,7 +1036,9 @@ export function initializeDefaultApp(options?: {
     credentials: LangyCredentialService.create(prisma),
     // Langy resolves through its own feature key (falling back to the
     // original prompt.create_default gate inside the resolver), so a codex
-    // default set for Langy never leaks into new-prompt creation.
+    // default set for Langy never leaks into new-prompt creation. The
+    // handle's modelId (the full provider-prefixed id) is what the turn
+    // service forwards to the worker (ADR-065).
     resolveModel: ({ projectId }) =>
       getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,

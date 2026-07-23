@@ -30,13 +30,6 @@ const variantDescriptions: Record<ModelProviderSurface, string> = {
 };
 
 /**
- * The recommendation line, shown on surfaces where a provider leads with the
- * badge (Codex on Langy setup and onboarding today).
- */
-const RECOMMENDED_COPY =
-  "Codex is recommended if you have a paid OpenAI account: sign in and it runs on your plan, no API key. Otherwise pick another provider and paste its key.";
-
-/**
  * The providers this surface offers, in the order this surface wants:
  * providers the surface recommends lead (badged), the rest keep registry
  * order, and providers the surface must not offer are gone entirely.
@@ -64,9 +57,6 @@ export function ModelProviderGrid({
   // and compact cards so the grid doesn't dwarf the panel.
   const isCompact = variant === "langy";
   const providers = useMemo(() => providersForSurface(variant), [variant]);
-  const hasRecommended = providers.some((mp) =>
-    mp.recommendedOn?.includes(variant),
-  );
 
   return (
     <VStack align="stretch" gap={3}>
@@ -79,7 +69,6 @@ export function ModelProviderGrid({
         )}
         <Text fontSize="xs" color="fg.muted">
           {variantDescriptions[variant]}
-          {hasRecommended ? ` ${RECOMMENDED_COPY}` : null}
         </Text>
       </VStack>
       <HStack gap={isCompact ? 2 : 3} wrap="wrap">

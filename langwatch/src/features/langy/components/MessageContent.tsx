@@ -1,43 +1,47 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {
-  LangyDerivedChoicesCard,
   LangyChoiceSelection,
-  LangyDerivedCard,
   LangyChoicesTimelineEntry,
+  LangyDerivedCard,
+  LangyDerivedChoicesCard,
 } from "@langwatch/langy";
 import { deriveLangyChoicesLockState } from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
-import { memo, useMemo } from "react";
 import type React from "react";
+import { memo, useMemo } from "react";
 import { isInternalHref, Markdown } from "~/components/Markdown";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRouter } from "~/utils/compat/next-router";
-import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
-import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
 import { githubProgressFromToolParts } from "~/server/app-layer/langy/execution/githubCommand";
-import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
-import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
+import { useRouter } from "~/utils/compat/next-router";
+import {
+  hasLangyBlockParts,
+  type LangyAnswerSegment,
+  langyAnswerSegments,
+} from "../logic/langyAnswerSegments";
 import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
 } from "../logic/langyFeedbackDirective";
-import {
-  hasLangyBlockParts,
-  langyAnswerSegments,
-  type LangyAnswerSegment,
-} from "../logic/langyAnswerSegments";
-import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
-import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
-import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
-import { LangyCardBoundary } from "./LangyCardBoundary";
-import { LangyFeedback } from "./LangyFeedback";
-import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
-import { LangyPlanCard } from "./LangyPlanCard";
 import { langyPlan } from "../logic/langyPlan";
 import { questionToolCardParts } from "../logic/langyQuestionTool";
+import {
+  foldReasoningTitles,
+  stripReasoningTitles,
+} from "../logic/langyReasoningTitles";
 import { stripToolNarration } from "../logic/langyToolNarration";
 import { useLangyStore } from "../stores/langyStore";
+import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
+import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
+import { StreamingAnswerWithCards } from "./derived-cards/StreamingAnswerWithCards";
+import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
+import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { LangyCardBoundary } from "./LangyCardBoundary";
+import { LangyFeedback } from "./LangyFeedback";
+import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
+import { LangyPlanCard } from "./LangyPlanCard";
+import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
 import { StreamingText } from "./StreamingText";
 
 export interface LangyProposal {
@@ -117,12 +121,18 @@ function MessageContentImpl({
 }) {
   const isUser = message.role === "user";
   const { project } = useOrganizationTeamProject();
+  // Distinct text parts are distinct blocks of the reply, so they join with a
+  // paragraph break — joined bare, a part boundary glued the last word of one
+  // block onto the first word of the next. `reasoning` parts never join this
+  // flow at all: the model's thinking is not the answer (their headlines fold
+  // into the completed receipt below).
   const rawText = message.parts
     .filter(
       (part): part is { type: "text"; text: string } => part.type === "text",
     )
     .map((part) => part.text)
-    .join("");
+    .filter((text) => text.length > 0)
+    .join("\n\n");
 
   // The block channel (ADR-060): a settled assistant message whose parts
   // carry stamped `langy-card` / `langy-card-failed` parts renders as an
@@ -219,6 +229,21 @@ function MessageContentImpl({
   const plan = isUser
     ? null
     : langyPlan(message, isStreaming ? { overrideItems: livePlan } : undefined);
+  const hasActivityRecord = showsActivity || Boolean(plan);
+  // Reasoning-summary headlines ("Planning task execution strategy") are the
+  // model's thinking, not its answer — on a settled turn they fold into the
+  // completed-actions receipt instead of standing as loose bold paragraphs
+  // above the reply (and the last one no longer glues onto the reply's first
+  // word). Live turns keep streaming untouched; the fold happens at settle,
+  // the same moment the rest of the process record collapses.
+  const reasoningFold =
+    isUser || isStreaming
+      ? { titles: [], text }
+      : foldReasoningTitles({
+          parts: message.parts,
+          text,
+          hasActivity: hasActivityRecord,
+        });
   // The cards above already say which skill ran and what it does, so an opening
   // line that says it again is the same fact three times before the answer.
   // Dropped here, at the point of display — see logic/langyToolNarration.ts for
@@ -226,31 +251,44 @@ function MessageContentImpl({
   const displayText = isUser
     ? text
     : stripToolNarration({
-        text,
-        hasActivity: showsActivity || Boolean(plan),
+        text: reasoningFold.text,
+        hasActivity: hasActivityRecord,
       });
   const hasBlocks = blockSegments !== null && blockSegments.length > 0;
-  const hasContent =
+  const hasContent = Boolean(
     displayText ||
-    hasBlocks ||
-    proposals.length > 0 ||
-    prs.length > 0 ||
-    progressEvents.length > 0 ||
-    questionCards.length > 0 ||
-    showsActivity ||
-    Boolean(plan);
-  if (
-    !displayText &&
-    !hasBlocks &&
-    proposals.length === 0 &&
-    prs.length === 0 &&
-    progressEvents.length === 0 &&
-    questionCards.length === 0 &&
-    !showsActivity &&
-    !plan &&
-    !isStreaming
-  )
-    return null;
+      hasBlocks ||
+      proposals.length > 0 ||
+      prs.length > 0 ||
+      progressEvents.length > 0 ||
+      questionCards.length > 0 ||
+      showsActivity ||
+      plan,
+  );
+  if (!hasContent) {
+    if (isUser) return null;
+    // Streaming with nothing visible yet: render no box at all. The message
+    // shell arrives before its first content, and an empty row would still
+    // claim a slot in the column's gap, pushing the status line down mid
+    // startup. The working lines below own the live edge until content lands.
+    if (isStreaming) return null;
+    // A settled assistant turn with nothing visible to say, either the model
+    // spent the whole turn reasoning or the user stopped it before any text
+    // arrived. Name the emptiness quietly rather than rendering a reply that
+    // is not there (a failed turn never appends an assistant message, the
+    // error card owns that surface).
+    return (
+      <Text
+        fontSize="langyAnswer"
+        lineHeight="1.5"
+        paddingX="2px"
+        fontStyle="italic"
+        color="fg.muted"
+      >
+        No content
+      </Text>
+    );
+  }
 
   if (isUser) {
     return (
@@ -291,11 +329,18 @@ function MessageContentImpl({
             point; all mapping lives in LangyToolActivity. */}
         {plan ? (
           <LangyCardBoundary scope="the plan">
-            <LangyPlanCard plan={plan} isStreaming={isStreaming} />
+            <LangyPlanCard
+              plan={plan}
+              reasoningTitles={reasoningFold.titles}
+              isStreaming={isStreaming}
+            />
           </LangyCardBoundary>
         ) : (
           <LangyCardBoundary scope="the tool activity">
-            <LangyToolActivity message={message} />
+            <LangyToolActivity
+              message={message}
+              reasoningTitles={reasoningFold.titles}
+            />
           </LangyCardBoundary>
         )}
         {progressEvents.length > 0 && (
@@ -346,12 +391,18 @@ function MessageContentImpl({
             // ```langy-card fence previews through the SAME validation the
             // relay stamps with at settle (ADR-060 §7). Fence-less streams
             // take the plain path inside, unchanged.
-            <StreamingAnswerWithCards
-              text={displayText}
-              projectSlug={project?.slug ?? null}
-            />
+            <Box paddingX="2px">
+              <StreamingAnswerWithCards
+                text={displayText}
+                projectSlug={project?.slug ?? null}
+              />
+            </Box>
           ) : (
             <Box
+              // The cards above have a border plus their own inner padding, so
+              // a flush-left paragraph sat a hair OUTSIDE their text edge. Two
+              // pixels tucks the prose onto the same optical column.
+              paddingX="2px"
               css={{
                 "& > div > :first-child": { marginTop: 0 },
                 "& > div > :last-child": { marginBottom: 0 },
@@ -536,18 +587,32 @@ function ProseSegment({
 }) {
   const cleaned = parseLangyFeedbackDirective(text).cleanedText;
   const display = isFirst
-    ? stripToolNarration({ text: cleaned, hasActivity })
+    ? stripToolNarration({
+        // The reply's leading reasoning headlines fold into the receipt (the
+        // message-level fold already collected them from the full text); the
+        // first prose segment starts with the same leading edge, so it peels
+        // the same headlines before rendering.
+        text: stripReasoningTitles({ text: cleaned, hasActivity }),
+        hasActivity,
+      })
     : cleaned;
   if (!display) return null;
   return (
     <Box
+      // Same 2px optical alignment as the joined path: prose lines up with
+      // the inner text of the bordered cards above it.
+      paddingX="2px"
       css={{
         "& > div > :first-child": { marginTop: 0 },
         "& > div > :last-child": { marginBottom: 0 },
         "& table": { display: "block", overflowX: "auto" },
       }}
     >
-      <Markdown fontSize="langyAnswer" linkVariant="langy" color="langy.answerFg">
+      <Markdown
+        fontSize="langyAnswer"
+        linkVariant="langy"
+        color="langy.answerFg"
+      >
         {display}
       </Markdown>
     </Box>

@@ -5,7 +5,7 @@ Feature: Model provider step in product onboarding
 
   # The step renders the shared model provider screen on its "onboarding"
   # surface. specs/model-providers/codex-account-provider.feature pins the
-  # Codex-first placement and copy for that surface; this file pins where
+  # Codex-first placement for that surface; this file pins where
   # the step sits in the flow and that it never blocks anyone: every path
   # through it can be skipped, and the coding-agent flavours do not pass
   # through it at all.
@@ -25,9 +25,9 @@ Feature: Model provider step in product onboarding
 
   @integration
   Scenario: Codex leads the step with a recommendation
+    # The badge carries the recommendation; the step description stays short.
     When the model provider step renders
     Then Codex is the first provider, marked "Recommended"
-    And the copy says Codex suits paid OpenAI accounts and the other providers take an API key
 
   @integration
   Scenario: Completing provider setup advances the flow

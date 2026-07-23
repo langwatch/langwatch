@@ -96,6 +96,13 @@ Feature: Langy panel layout modes
     And the drawer's entrance is held back briefly so the panel clears out first
     And the panel keeps its own Close, the two cards being far apart
 
+  @unit
+  Scenario: The floating panel returns to the right only after the drawer has left
+    Given the floating panel is dodging an open drawer on the left
+    When the drawer closes
+    Then the drawer leaves the right edge first while the panel holds its corner
+    And the panel glides back to the right only after a beat
+
   Scenario: Closing the drawer sends the docked companion back to its dock
     Given the Langy panel is riding beside an open drawer
     When the drawer closes
@@ -119,3 +126,12 @@ Feature: Langy panel layout modes
   Scenario: The minimised peek dodges the drawer
     Given the Langy panel is minimised in floating mode and a right-anchored drawer is open
     Then the peek sliver rests along the bottom-LEFT edge, clear of the drawer and the table pager
+
+  # The conversation column dissolves into the panel edges with a soft mask so
+  # scrolled-off content never hard-clips against the header or composer seams.
+  Scenario: The conversation fades at the top only once messages are scrolled off above
+    Given the Langy panel is open on a conversation taller than its viewport
+    When the conversation sits at the very top
+    Then the first message is fully opaque with no fade above it
+    When part of the conversation is scrolled off above
+    Then the column dissolves under the header with a soft fade

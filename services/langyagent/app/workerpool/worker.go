@@ -99,6 +99,14 @@ type Worker struct {
 	handled     map[string]struct{}
 	handledRing [recentTurnsCap]string
 	handledNext int
+	// promptDelivered flips when a PostMessage has SUCCEEDED on this worker's
+	// session. It gates the history seed: the seed is folded into the session's
+	// first delivered message only, because from then on the session's own
+	// transcript carries it (and re-sending it would both bloat every later
+	// message and churn the provider's cached prefix). Distinct from
+	// HasServedTurn, which flips at Release even for a turn whose post FAILED:
+	// a failed post delivered nothing, so the next attempt must seed again.
+	promptDelivered bool
 }
 
 // recentTurnsCap bounds the per-worker recently-completed turnId set. Comfortably
@@ -204,9 +212,9 @@ func (w *Worker) SetTurnTraceContext(sc trace.SpanContext) {
 
 // ForwardTurnSpan emits the turn's customer-facing root span via the relay.
 // No relay (mediation off) is a no-op, like SetTurnTraceContext.
-func (w *Worker) ForwardTurnSpan(sc trace.SpanContext, start, end time.Time) {
+func (w *Worker) ForwardTurnSpan(sc trace.SpanContext, start, end time.Time, failure *domain.TurnFailure) {
 	if w.otelRelay != nil {
-		w.otelRelay.ForwardTurnSpan(w.otelToken, sc, start, end)
+		w.otelRelay.ForwardTurnSpan(w.otelToken, sc, start, end, failure)
 	}
 }
 
@@ -221,16 +229,36 @@ func (w *Worker) LastLLMError() (herr.E, bool) {
 	return w.otelRelay.LastLLMError(w.otelToken)
 }
 
-// PostMessage queues a turn on the worker's opencode session. resumeToken
-// (ADR-048) is the opaque checkpoint from a prior turn that handed off on
-// shutdown; empty on a normal cold start. It is forwarded verbatim to opencode,
-// never parsed by the manager.
-func (w *Worker) PostMessage(ctx context.Context, system, prompt, resumeToken string) error {
-	return w.agent.Post(ctx, w.endpoint, w.openCodeSessionID, app.Turn{
+// PostMessage queues a turn on the worker's opencode session.
+//
+// historySeed is the control plane's conversation-so-far block. It is folded in
+// AHEAD of the prompt on the session's first delivered message only
+// (promptDelivered gates it): a fresh session must be told what the durable
+// record already holds, and from that first message on the session's own
+// transcript carries it, so later messages stay lean and the request prefix the
+// provider caches stays byte-stable turn over turn. The flag flips only on a
+// SUCCESSFUL post, so a failed first delivery seeds again on the retry.
+//
+// resumeToken (ADR-048) is the opaque checkpoint from a prior turn that handed
+// off on shutdown; empty on a normal cold start. It is forwarded verbatim to
+// opencode, never parsed by the manager.
+func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error {
+	w.mu.Lock()
+	if !w.promptDelivered && historySeed != "" {
+		prompt = historySeed + "\n\n" + prompt
+	}
+	w.mu.Unlock()
+	err := w.agent.Post(ctx, w.endpoint, w.openCodeSessionID, app.Turn{
 		System:      system,
 		Prompt:      prompt,
 		ResumeToken: resumeToken,
 	})
+	if err == nil {
+		w.mu.Lock()
+		w.promptDelivered = true
+		w.mu.Unlock()
+	}
+	return err
 }
 
 // NotifyShutdownImminent posts a shutdown-imminent notice to this worker's

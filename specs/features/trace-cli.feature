@@ -23,6 +23,20 @@ Feature: Trace CLI Commands
     When I run "langwatch trace search -f json"
     Then I see raw JSON output with traces and pagination
 
+  Scenario: Search traces filtered by origin
+    Given my project has traces from application traffic and from platform activity like evaluations and Langy conversations
+    When I run "langwatch trace search --origin application"
+    Then I see only traces from my application traffic
+    And that includes all my production traffic, even traces ingested before origins existed or sent by SDKs that do not report one
+
+  Scenario: Search traces filtered by multiple origins
+    When I run "langwatch trace search --origin application,evaluation"
+    Then I see only traces from application traffic and evaluation runs
+
+  Scenario: Export traces filtered by origin
+    When I run "langwatch trace export --origin application"
+    Then the export contains only traces from my application traffic
+
   Scenario: Get trace details by ID
     Given my project has a trace with ID "trace_abc123"
     When I run "langwatch trace get trace_abc123"

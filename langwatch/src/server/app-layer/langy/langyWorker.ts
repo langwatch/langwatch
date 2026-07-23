@@ -10,9 +10,10 @@
  * if cold" (the pre-optimisation cost, never a broken turn); a failed warm means
  * a cold start (the status quo). Neither can start or duplicate a turn.
  */
+
+import { createLogger } from "@langwatch/observability";
 import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "@langwatch/observability";
 import { getLangyDispatchCounter } from "~/server/metrics";
 
 const logger = createLogger("langwatch:langy:worker");
@@ -116,6 +117,9 @@ export interface LangyWorkerPort {
     runToken: string;
     prompt: string;
     system: string;
+    /** Conversation-so-far seed the manager folds into a fresh session's
+     * first message only; a warm session ignores it. */
+    historySeed?: string;
     credentials: unknown;
     modelOverride?: string;
     resumeToken?: string;
@@ -187,9 +191,7 @@ export function createLangyWorkerPort(config: {
         if (!response.ok) return false;
         const body = (await response.json()) as { alive?: unknown };
         const alive = body.alive === true;
-        trace
-          .getActiveSpan()
-          ?.setAttribute("langy.probe.hit", alive);
+        trace.getActiveSpan()?.setAttribute("langy.probe.hit", alive);
         return alive;
       } catch (error) {
         logger.debug(
@@ -261,6 +263,7 @@ export function createLangyWorkerPort(config: {
       runToken,
       prompt,
       system,
+      historySeed,
       credentials,
       modelOverride,
       resumeToken,
@@ -298,6 +301,10 @@ export function createLangyWorkerPort(config: {
                 runToken,
                 prompt,
                 system,
+                // The seed a fresh session's first message is folded from; a
+                // warm session ignores it (the manager decides, it owns the
+                // session-freshness ground truth).
+                ...(historySeed ? { historySeed } : {}),
                 credentials,
                 ...(modelOverride ? { modelOverride } : {}),
                 // ADR-048: resume from a prior turn's checkpoint if one is pending.
@@ -325,7 +332,9 @@ export function createLangyWorkerPort(config: {
                       : "unavailable";
             span.setAttribute("langy.dispatch.outcome", outcome);
             getLangyDispatchCounter(
-              outcome === "credentialsRequired" ? "credentials_required" : outcome,
+              outcome === "credentialsRequired"
+                ? "credentials_required"
+                : outcome,
             ).inc();
             return outcome;
           } catch (error) {

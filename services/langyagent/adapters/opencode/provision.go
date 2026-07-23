@@ -139,6 +139,15 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		model = "openai/" + bare
 		isCodex = true
 	}
+	// Which dialect serves the model. openai/ models (codex included, mapped
+	// above) run opencode's native openai provider against the gateway's
+	// Responses surface. EVERY other model runs the generic chat-completions
+	// lane: a config-declared OpenAI-compatible provider pointed at the same
+	// base URL, carrying the FULL provider-prefixed id verbatim so the
+	// gateway's own prefix routing is the single source of provider fan-out.
+	// No provider is named here — anthropic, gemini, azure, bedrock, and
+	// whatever ships next all take the same lane unmodified.
+	nativeOpenAI := strings.HasPrefix(model, "openai/")
 
 	// No "plugin" block. The worker previously loaded an external OpenTelemetry
 	// plugin (@devtheops/opencode-plugin-otel), but evaluating that ~2 MB bundle
@@ -196,7 +205,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 	// thinking glimpse has nothing to show — a verified 4-5s per LLM call of
 	// dead silence on gpt-5-mini. With it, opencode streams reasoning deltas
 	// that ride the existing frames → relay → glimpse pipe end to end.
-	if providerID, modelID, ok := strings.Cut(model, "/"); ok && providerID == "openai" {
+	if _, modelID, ok := strings.Cut(model, "/"); ok && nativeOpenAI {
 		options := map[string]any{"reasoningSummary": "auto"}
 		if isCodex {
 			// Codex's backend is stateless: store:false, no server-side
@@ -219,6 +228,33 @@ func (a *Agent) Provision(in ProvisionInput) error {
 			},
 		}
 	}
+	if !nativeOpenAI {
+		// The generic chat-completions lane. `@ai-sdk/openai-compatible` is
+		// compiled into the opencode binary's bundled-provider map, so this
+		// entry instantiates with ZERO runtime package installs — nothing new
+		// lands on the turn's critical path. The provider id is split off the
+		// config model at the FIRST slash, so the model id keeps its full
+		// provider-prefixed form (dots, colons, and further slashes included)
+		// and rides the request body verbatim to the gateway's
+		// /chat/completions, exactly as the prompt playground reaches it. The
+		// {env:...} placeholders resolve at opencode's config load from the
+		// worker env, so mediated and unmediated wiring both keep working and
+		// no base URL or key is baked into the file at provision time.
+		config["model"] = gatewayProviderID + "/" + model
+		config["provider"] = map[string]any{
+			gatewayProviderID: map[string]any{
+				"npm":  "@ai-sdk/openai-compatible",
+				"name": "LangWatch Gateway",
+				"options": map[string]any{
+					"baseURL": "{env:OPENAI_BASE_URL}",
+					"apiKey":  "{env:OPENAI_API_KEY}",
+				},
+				"models": map[string]any{
+					model: map[string]any{"name": model},
+				},
+			},
+		}
+	}
 
 	configPath := filepath.Join(configDir, "config.json")
 	configBytes, err := json.MarshalIndent(config, "", "  ")
@@ -233,6 +269,28 @@ func (a *Agent) Provision(in ProvisionInput) error {
 	// could still read the plaintext API key.
 	if err := in.Runner.Chown(configPath, in.UID); err != nil {
 		return fmt.Errorf("chown config: %w", err)
+	}
+
+	// The identity plugin (see langyIdentityPluginJS) rides the same config
+	// dir. opencode scans plugin/*.js there at boot, so dropping the file is
+	// the whole wiring.
+	pluginPath := filepath.Join(configDir, langyIdentityPluginFilename)
+	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o700); err != nil {
+		return fmt.Errorf("mkdir plugin dir: %w", err)
+	}
+	if err := in.Runner.Chown(filepath.Dir(pluginPath), in.UID); err != nil {
+		return fmt.Errorf("chown plugin dir: %w", err)
+	}
+	if err := os.WriteFile(pluginPath, []byte(langyIdentityPluginJS), 0o600); err != nil {
+		return fmt.Errorf("write identity plugin: %w", err)
+	}
+	// WriteFile's mode applies only on create; a plugin file surviving from an
+	// earlier provision keeps whatever mode it had, so tighten it explicitly.
+	if err := os.Chmod(pluginPath, 0o600); err != nil {
+		return fmt.Errorf("chmod identity plugin: %w", err)
+	}
+	if err := in.Runner.Chown(pluginPath, in.UID); err != nil {
+		return fmt.Errorf("chown identity plugin: %w", err)
 	}
 
 	// Per-worker AGENTS.md with ${LANGWATCH_ENDPOINT} substituted. The embedded
@@ -345,6 +403,45 @@ func workerBaseEnv() []string {
 // header with the real virtual key on the forward. It exists only because the
 // OpenAI SDK refuses an empty key.
 const mediatedLLMPlaceholderKey = "langy-mediated"
+
+// gatewayProviderID is the opencode provider id of the generic
+// chat-completions lane (see Provision). opencode resolves a model reference
+// by splitting at the FIRST slash, so a config model of
+// "langwatch/anthropic/claude-…" targets this provider with the full
+// "anthropic/claude-…" id as the model — the id the gateway routes by prefix.
+// The name has no models.dev catalog entry, so nothing merges over it.
+const gatewayProviderID = "langwatch"
+
+// langyIdentityPluginFilename is where Provision writes the identity plugin,
+// relative to the worker's opencode config dir. opencode auto-discovers every
+// plugin/*.js file under its config directories, so no "plugin" entry is
+// needed in config.json (which stays free of plugin specs; see
+// TestProvision_WritesCLIOnlyConfig).
+const langyIdentityPluginFilename = "plugin/langy-identity.js"
+
+// langyIdentityPluginJS renames the agent's identity in opencode's stock
+// system prompt. opencode selects a per-model default prompt that opens with
+// "You are OpenCode, ..." and offers no config field to rename the agent, but
+// its plugin hook `experimental.chat.system.transform` receives the assembled
+// system prompt before the LLM call. The hook rewrites "OpenCode" to "Langy"
+// IN PLACE (the caller keeps using the same array instance, so reassigning
+// output.system would be lost) and leaves every other byte of whichever
+// default prompt opencode picked untouched. The file has zero imports and no
+// build step, so loading it costs nothing at worker bootstrap, unlike the
+// removed 2 MB external OTel plugin bundle.
+const langyIdentityPluginJS = `// Introduce the agent as Langy in opencode's default system prompt while
+// keeping the rest of the prompt exactly as opencode ships it.
+export default async () => ({
+  "experimental.chat.system.transform": async (_input, output) => {
+    if (!output || !Array.isArray(output.system)) return;
+    for (let i = 0; i < output.system.length; i++) {
+      if (typeof output.system[i] === "string") {
+        output.system[i] = output.system[i].replaceAll("OpenCode", "Langy");
+      }
+    }
+  },
+});
+`
 
 // buildWorkerEnv assembles the environment for a worker's opencode subprocess:
 // the allowlisted inherited env plus per-worker credentials and the per-worker

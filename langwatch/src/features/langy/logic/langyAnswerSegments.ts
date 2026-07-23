@@ -16,12 +16,12 @@
  * malformed stamp must never vanish quieter than a failed block would.
  */
 import {
-  parseLangyCardFailedPart,
-  parseLangyCardPart,
   LANGY_CARD_FAILED_PART_TYPE,
   LANGY_CARD_PART_TYPE,
   type LangyCardFailedPart,
   type LangyCardPart,
+  parseLangyCardFailedPart,
+  parseLangyCardPart,
 } from "@langwatch/langy";
 
 export type LangyAnswerSegment =
@@ -38,14 +38,17 @@ interface PartLike {
 export function hasLangyBlockParts(parts: readonly unknown[]): boolean {
   return parts.some((part) => {
     const type = (part as PartLike).type;
-    return type === LANGY_CARD_PART_TYPE || type === LANGY_CARD_FAILED_PART_TYPE;
+    return (
+      type === LANGY_CARD_PART_TYPE || type === LANGY_CARD_FAILED_PART_TYPE
+    );
   });
 }
 
 /**
- * The ordered segments. Consecutive text parts merge (the pre-blocks
- * rendering joined them all, and within a run nothing separates them);
- * empty text segments are dropped.
+ * The ordered segments. Consecutive text parts merge into one prose run with
+ * a paragraph break at each part boundary — distinct parts are distinct
+ * blocks, and a bare join glued the last word of one part onto the first
+ * word of the next. Empty text segments are dropped.
  */
 export function langyAnswerSegments(
   parts: readonly unknown[],
@@ -55,7 +58,7 @@ export function langyAnswerSegments(
 
   const flushText = (): void => {
     if (textBuffer.length === 0) return;
-    const text = textBuffer.join("");
+    const text = textBuffer.join("\n\n");
     textBuffer = [];
     if (text.trim().length === 0) return;
     segments.push({ type: "text", text });
@@ -64,7 +67,7 @@ export function langyAnswerSegments(
   for (const rawPart of parts) {
     const part = rawPart as PartLike;
     if (part.type === "text") {
-      textBuffer.push(part.text ?? "");
+      if ((part.text ?? "").length > 0) textBuffer.push(part.text ?? "");
       continue;
     }
     if (part.type === LANGY_CARD_PART_TYPE) {

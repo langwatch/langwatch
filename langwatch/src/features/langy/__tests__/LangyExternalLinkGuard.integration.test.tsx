@@ -26,7 +26,10 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 import { Markdown } from "~/components/Markdown";
 import { LangyExternalLinkDialog } from "../components/LangyExternalLinkDialog";
-import { useLangyExternalLinkGuard } from "../hooks/useLangyExternalLinkGuard";
+import {
+  langyFirstPartyLinkProps,
+  useLangyExternalLinkGuard,
+} from "../hooks/useLangyExternalLinkGuard";
 
 /** What the browser would have done with the clicks the guard let through. */
 const navigation = { attempts: 0 };
@@ -212,6 +215,14 @@ describe("given an answer linking somewhere that is not LangWatch", () => {
       whenClicked("Pricing");
 
       await theDialog();
+      // Escape only counts once the dialog is ready to hear it. Focus landing
+      // on "Stay here" is the dialog's own "I am wired up" signal; pressing
+      // before that races the dismissable layer's listener under load.
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          screen.getByRole("button", { name: "Stay here" }),
+        ),
+      );
       await userEvent.keyboard("{Escape}");
 
       await waitFor(() => expect(noDialog()).toBeNull());
@@ -226,7 +237,9 @@ describe("given an answer linking somewhere that is not LangWatch", () => {
       whenClicked("Pricing");
 
       await theDialog();
-      fireEvent.click(screen.getByRole("button", { name: /Open example\.com/ }));
+      fireEvent.click(
+        screen.getByRole("button", { name: /Open example\.com/ }),
+      );
 
       expect(window.open).toHaveBeenCalledWith(
         "https://example.com/pricing",
@@ -348,5 +361,69 @@ describe("given a link that is not a place to go", () => {
     expect(noDialog()).toBeNull();
     expect(window.open).not.toHaveBeenCalled();
     expect(navigation.attempts).toBe(0);
+  });
+});
+
+/**
+ * The panel's own chrome beside an answer linking to the very same address:
+ * the codex sign-in's "Open openai.com" button, in miniature. The chrome link
+ * carries the first-party marker a LangWatch component spells out; the answer
+ * cannot (the markdown pipeline emits no data attributes on anchors).
+ */
+function ChromeAndAnswerHarness() {
+  const guard = useLangyExternalLinkGuard();
+  return (
+    <ChakraProvider value={defaultSystem}>
+      <div
+        data-testid="panel-root"
+        {...guard.guardProps}
+        onClick={(event) => {
+          if (!event.defaultPrevented) navigation.attempts += 1;
+          event.preventDefault();
+        }}
+      >
+        <a
+          href="https://auth.openai.com/device"
+          target="_blank"
+          rel="noopener noreferrer"
+          {...langyFirstPartyLinkProps}
+        >
+          Open openai.com
+        </a>
+        <Markdown linkVariant="langy">
+          {"[the device page](https://auth.openai.com/device)"}
+        </Markdown>
+      </div>
+      <LangyExternalLinkDialog {...guard.dialogProps} />
+    </ChakraProvider>
+  );
+}
+
+describe("given the panel's own chrome links off-site", () => {
+  beforeEach(() => {
+    render(<ChromeAndAnswerHarness />);
+  });
+
+  describe("when the first-party button is clicked", () => {
+    /** @scenario A button of LangWatch's own that leaves the app opens straight away */
+    it("opens with no dialog in between", async () => {
+      whenClicked("Open openai.com");
+
+      await settle();
+      expect(noDialog()).toBeNull();
+      expect(navigation.attempts).toBe(1);
+    });
+  });
+
+  describe("when an answer links to the same address", () => {
+    /** @scenario An answer linking to the same address is still checked */
+    it("is still stopped and read out first", async () => {
+      whenClicked("the device page");
+
+      await theDialog();
+      expect(destination().textContent).toBe("auth.openai.com");
+      expect(window.open).not.toHaveBeenCalled();
+      expect(navigation.attempts).toBe(0);
+    });
   });
 });
