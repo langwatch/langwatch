@@ -44,7 +44,12 @@ export type CreateLlmConfigParams = Omit<
  */
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   latestVersion: LatestConfigVersionSchema & {
-    author?: { name: string } | null;
+    author?: {
+      id: string;
+      name: string | null;
+      email?: string | null;
+      image?: string | null;
+    } | null;
     runtimeParameters: Record<string, unknown>;
   };
   _count?: {
