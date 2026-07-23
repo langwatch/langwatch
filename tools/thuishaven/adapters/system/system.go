@@ -58,6 +58,14 @@ func (System) Terminate(pid int) {
 	}
 }
 
+// KillGroup SIGKILLs pid's whole process group — the no-grace hard stop
+// behind `haven down -f`.
+func (s System) KillGroup(pid int) {
+	if pgid, err := syscall.Getpgid(pid); err == nil {
+		_ = syscall.Kill(-pgid, syscall.SIGKILL)
+	}
+}
+
 // TerminateGroup SIGTERMs pid's whole process group — the shape every
 // supervised child has (Setpgid), so one signal takes the child and its tree.
 // Falls back to signalling just the pid when the group can't be resolved.

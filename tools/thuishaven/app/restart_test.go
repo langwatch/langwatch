@@ -219,6 +219,23 @@ func TestUpReconcilesRunningStack(t *testing.T) {
 		})
 	})
 
+	t.Run("given a matching live stack and -f", func(t *testing.T) {
+		t.Run("when up runs with force, the stack is replaced anyway", func(t *testing.T) {
+			store, sys, o := newFixture(true)
+			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0]), ShouldStartWorkers: true, ShouldForce: true}
+			proceed, err := o.reconcileRunningStack(params, opts)
+			if err != nil {
+				t.Fatalf("reconcile: %v", err)
+			}
+			if !proceed {
+				t.Error("-f must re-provision even a matching stack")
+			}
+			if len(sys.terminated) != 1 {
+				t.Errorf("-f must terminate the old launcher, got %v", sys.terminated)
+			}
+		})
+	})
+
 	t.Run("given the registered stack's launcher already exited", func(t *testing.T) {
 		t.Run("when up runs, the stale entry is cleaned and provisioning proceeds", func(t *testing.T) {
 			store, sys, o := newFixture(false)
@@ -256,7 +273,7 @@ func TestDownKeepsDatabases(t *testing.T) {
 	}
 
 	t.Run("when downing, databases are kept and the launcher is stopped", func(t *testing.T) {
-		if err := o.Down(ctx, params); err != nil {
+		if err := o.Down(ctx, params, false); err != nil {
 			t.Fatalf("Down: %v", err)
 		}
 		if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
@@ -267,6 +284,33 @@ func TestDownKeepsDatabases(t *testing.T) {
 		}
 		if len(store.stacks) != 0 {
 			t.Errorf("the registry entry must be removed, got %v", store.stacks)
+		}
+	})
+}
+
+// @scenario "Down -f kills hard"
+func TestDownForceKillsHard(t *testing.T) {
+	ctx := context.Background()
+	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
+	store := &fakeStore{
+		stacks:    []domain.Stack{restartStack()},
+		slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+	}
+	sys := &fakeSystem{alive: map[int]bool{42: true}}
+	o := &Orchestrator{
+		cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
+		store: store, sys: sys, proxy: &fakeProxy{}, ch: &fakeDBServer{}, pg: &fakeDBServer{}, log: zap.NewNop(),
+	}
+
+	t.Run("when downing with force, the launcher group is SIGKILLed with no graceful wait", func(t *testing.T) {
+		if err := o.Down(ctx, params, true); err != nil {
+			t.Fatalf("Down: %v", err)
+		}
+		if len(sys.groupKilled) != 1 || sys.groupKilled[0] != 42 {
+			t.Errorf("force must kill the launcher group, got killed=%v", sys.groupKilled)
+		}
+		if len(sys.terminated) != 0 {
+			t.Errorf("force must not bother with SIGTERM, got %v", sys.terminated)
 		}
 	})
 }

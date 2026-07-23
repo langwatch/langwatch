@@ -84,6 +84,7 @@ type fakeSystem struct {
 	alive           map[int]bool
 	terminated      []int
 	groupTerminated []int
+	groupKilled     []int
 	pidsByPort      map[int][]int
 	now             time.Time
 }
@@ -99,7 +100,13 @@ func (f *fakeSystem) Terminate(pid int) {
 		f.alive[pid] = false
 	}
 }
-func (f *fakeSystem) TerminateGroup(pid int)                       { f.groupTerminated = append(f.groupTerminated, pid) }
+func (f *fakeSystem) TerminateGroup(pid int) { f.groupTerminated = append(f.groupTerminated, pid) }
+func (f *fakeSystem) KillGroup(pid int) {
+	f.groupKilled = append(f.groupKilled, pid)
+	if f.alive != nil {
+		f.alive[pid] = false
+	}
+}
 func (f *fakeSystem) PIDsOnPort(port int) []int                    { return f.pidsByPort[port] }
 func (f *fakeSystem) SpawnDetached([]string, string, string) error { return nil }
 func (f *fakeSystem) Now() time.Time                               { return f.now }

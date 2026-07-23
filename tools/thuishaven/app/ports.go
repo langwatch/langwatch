@@ -115,6 +115,9 @@ type System interface {
 	// TerminateGroup SIGTERMs pid's whole process group — how `haven restart`
 	// bounces one supervised child (its supervisor restarts it on exit).
 	TerminateGroup(pid int)
+	// KillGroup SIGKILLs pid's whole process group — `down -f`'s hard stop for
+	// a stack that must die now (or won't die gracefully).
+	KillGroup(pid int)
 	PIDsOnPort(port int) []int
 	SpawnDetached(argv []string, dir, logPath string) error
 	Now() time.Time

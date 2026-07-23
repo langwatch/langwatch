@@ -10,9 +10,9 @@ Feature: haven CLI surface
     And the same holds for every removed alias: ls, active, rs, sw, ch, pg, obs, tc, oc, moron
 
   Scenario: A flag shorthand means one thing across the whole CLI
-    Then "-f" is accepted only where it means "--follow"
-    And no command accepts a "--force" flag
-    And non-interactive confirmation of a destructive action is always "--yes"
+    Then "-t" is accepted only where it means "--tail"
+    And "-f" is accepted only where it means "--force" — forcing the lifecycle on up and down
+    And non-interactive confirmation of a destructive DATA action is always "--yes", never "--force"
 
   Scenario: Status is one word with one meaning
     When the developer runs "haven status"
@@ -35,6 +35,7 @@ Feature: haven CLI surface
     Given a running stack
     When the developer runs "haven down"
     Then the stack stops and its databases still exist
+    And "haven down -f" kills hard instead of waiting on graceful shutdown
     And no flag on down can drop data
 
   Scenario: Down --all returns the machine

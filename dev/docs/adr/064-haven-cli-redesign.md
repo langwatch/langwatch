@@ -59,10 +59,12 @@ they never keep working silently.
 1. **One name per command, one command per job.** No aliases, ever. Anyone
    who wants `haven ps` can alias it in their own shell.
 2. **One meaning per flag, everywhere.** A shorthand letter or long flag
-   means the same thing on every command that accepts it. `-f` is `--follow`
-   and nothing else. `--force` does not exist; non-interactive confirmation
-   of a destructive action is always `--yes`. `--json` and `--agent` are
-   global. `--rebuild` means "rebuild the image" wherever it appears.
+   means the same thing on every command that accepts it. `-t` is `--tail`
+   and nothing else. `-f` is `--force` — forcing the *lifecycle* action, and
+   only on `up` (restart even a matching stack) and `down` (kill hard, no
+   graceful shutdown); destructive *data* actions confirm with `--yes`,
+   never `--force`. `--json` and `--agent` are global. `--rebuild` means
+   "rebuild the image" wherever it appears.
 3. **`up` is declarative and idempotent.** `haven up` means "make this
    worktree's stack match its service selection". Not running → start.
    Already running and matching → a friendly no-op. Selection changed →
@@ -85,10 +87,10 @@ Daily driver:
 
 ```
 haven                 the hub: every stack, health, RAM, actions (agents/pipes get plain status)
-haven up [+svc|-svc]  start or reconcile this worktree's stack; selection deltas stick
-haven down [--all]    stop this stack, keep all data; --all stops every stack + shared servers
+haven up [+svc|-svc] [-f]  start or reconcile this worktree's stack; deltas stick; -f restarts
+haven down [-f] [--all]    stop this stack, keep all data; -f kills hard; --all stops everything
 haven restart [svc] [--rebuild]   bounce one service or all; --rebuild re-images container services
-haven logs [svc…] [-f] [--since 10m] [--level warn] [--stack slug]
+haven logs [svc…] [-t] [--since 10m] [--level warn] [--stack slug]
 haven status [--json] one-shot: selection, service health, shared-server health, RAM (absorbs list+doctor)
 ```
 
@@ -202,7 +204,7 @@ view in attached mode is just a live rendering of the same tap. Consequently:
 | `setup` | automatic preflight of `up` |
 | `list` / `ls` / `status`-alias, `doctor`, `watch` | `haven status` (one-shot) and the bare-`haven` hub |
 | `hub` / `ps` / `active` | bare `haven` only |
-| `up -f/--force` | `up` reconciles; the dance is gone |
+| `up -f/--force` | `up` reconciles; `-f` now means "restart even a matching stack" |
 | `up -w/--watch` | unchanged flag, only meaning of `--watch` |
 | `down --drop-db` / `--keep-db` | `down` keeps data, always; fresh data is `haven db reset` |
 | `clickhouse` / `ch`, `postgres` / `pg` subtrees | `haven db url`, `haven db reset`; server lifecycle is automatic |

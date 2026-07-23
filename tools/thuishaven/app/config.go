@@ -51,6 +51,9 @@ type PlanOptions struct {
 	// ShouldRebuildImages (--rebuild) forces container images to be rebuilt even
 	// when their content hash says nothing changed.
 	ShouldRebuildImages bool
+	// ShouldForce (-f) replaces the running stack even when it already matches
+	// the selection — the "restart everything now" up.
+	ShouldForce bool
 	// langyImageTag is the content-addressed image tag Up resolves before
 	// provisioning (internal — derived, never set by the composition root).
 	langyImageTag string

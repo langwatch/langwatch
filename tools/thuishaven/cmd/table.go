@@ -190,7 +190,8 @@ var table = []commandSpec{
 		minusArgs: true,
 		flags: []flagSpec{
 			{long: "--watch", short: "-w", summary: "air hot-reload for the Go services"},
-			{long: "--detach", short: "-d", summary: "run in the background; follow with haven logs -f"},
+			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
+			{long: "--force", short: "-f", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
@@ -203,6 +204,7 @@ var table = []commandSpec{
 				d.opts.ShouldGoWatch = true
 			}
 			d.opts.ShouldRebuildImages = inv.has("--rebuild")
+			d.opts.ShouldForce = inv.has("--force")
 			if d.opts.IsStub {
 				return d.orch.UpStub(ctx, d.params, dashboard.StartEcho)
 			}
@@ -223,12 +225,13 @@ var table = []commandSpec{
 		summary: "stop this worktree's stack; data is always kept",
 		flags: []flagSpec{
 			{long: "--all", summary: "stop every stack, the shared servers, the daemon, and the proxy"},
+			{long: "--force", short: "-f", summary: "kill hard — no graceful shutdown"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
 			if inv.has("--all") {
 				return d.orch.DownAll(ctx)
 			}
-			return d.orch.Down(ctx, d.params)
+			return d.orch.Down(ctx, d.params, inv.has("--force"))
 		},
 	},
 	{
@@ -253,7 +256,7 @@ var table = []commandSpec{
 		args:    "[service…]",
 		maxArgs: -1,
 		flags: []flagSpec{
-			{long: "--follow", short: "-f", summary: "stream live"},
+			{long: "--tail", short: "-t", summary: "stream live"},
 			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
 			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
