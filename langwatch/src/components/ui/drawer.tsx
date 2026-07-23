@@ -3,7 +3,7 @@ import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import {
   LANGY_DOCK_GAP,
-  LANGY_DODGE_ENTER_DELAY_MS,
+  LANGY_DODGE_STAGGER_MS,
   LANGY_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
 } from "~/features/langy/logic/langyPanelLayout";
@@ -84,7 +84,7 @@ export const DrawerContent = React.forwardRef<
   );
   const langyStaggerEnter = staggerBehindFloatingLangy
     ? {
-        animationDelay: `${LANGY_DODGE_ENTER_DELAY_MS}ms`,
+        animationDelay: `${LANGY_DODGE_STAGGER_MS}ms`,
         animationFillMode: "backwards" as const,
       }
     : undefined;

@@ -32,19 +32,18 @@ export const APP_HEADER_HEIGHT = 56;
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
 /**
- * The drawer-vs-floating-Langy choreography, both directions sequenced so the
- * two cards never fight over the right edge:
+ * The drawer-vs-floating-Langy choreography, both directions sequenced on the
+ * same stagger so the two cards never fight over the right edge:
  *
  * OPENING, Langy goes first. The floating panel starts its dodge to the left
  * immediately; the drawer's entrance is held back this long so the panel has
  * fully cleared out (its 240ms move plus a beat) before the drawer slides in.
  *
  * CLOSING, the drawer goes first. The dodge releases only this long after the
- * drawer state clears, covering the drawer's exit animation plus a beat, so
- * the panel glides back to its right corner over an already-empty edge.
+ * drawer state clears, covering the drawer's exit animation, so the panel
+ * glides back to its right corner over an already-empty edge.
  */
-export const LANGY_DODGE_ENTER_DELAY_MS = 450;
-export const LANGY_DODGE_RELEASE_DELAY_MS = 1000;
+export const LANGY_DODGE_STAGGER_MS = 450;
 
 /**
  * The spring a Langy surface moves on when it is being PLACED somewhere new,

@@ -108,7 +108,7 @@ import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
-  LANGY_DODGE_RELEASE_DELAY_MS,
+  LANGY_DODGE_STAGGER_MS,
   LANGY_TRANSITION,
   langyRestingFloorPx,
   PANEL_LAYOUT_TRANSITION,
@@ -349,7 +349,7 @@ function LangyLauncher({
   const { currentDrawer } = useDrawer();
   const dodgeLeft = useLingeringDodge({
     active: !!currentDrawer,
-    releaseDelayMs: LANGY_DODGE_RELEASE_DELAY_MS,
+    releaseDelayMs: LANGY_DODGE_STAGGER_MS,
     immediate: reduceMotion,
   });
   // The orb leans + glows toward the cursor as it approaches (the one place a
@@ -578,7 +578,7 @@ function LangyPanel({
   // companion ride releases with the drawer itself.
   const drawerEdgeHeld = useLingeringDodge({
     active: !!currentDrawer,
-    releaseDelayMs: LANGY_DODGE_RELEASE_DELAY_MS,
+    releaseDelayMs: LANGY_DODGE_STAGGER_MS,
     immediate: reduceMotion,
   });
   const floatingDodgesDrawer = isOpen && drawerEdgeHeld && floating;
