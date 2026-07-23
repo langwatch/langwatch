@@ -23,6 +23,8 @@ func applyCacheControl(body []byte, action domain.CacheAction, reqType domain.Re
 			return injectEphemeral(body)
 		case domain.RequestTypeChat:
 			return injectTopLevelEphemeral(body)
+		default:
+			return body
 		}
 	}
 	return body
