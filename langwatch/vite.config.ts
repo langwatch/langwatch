@@ -279,12 +279,15 @@ export default defineConfig(async (): Promise<UserConfig> => {
       // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
       // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
       // sending it to the API server, which has no dev-mode page fallback.
-      "^/mcp$": {
+      // server.proxy regexes test against the full req.url (path + query),
+      // so the optional "(?:\?.*)?" is required or a query-bearing request
+      // like "/mcp?sessionId=..." falls through to the frontend instead.
+      "^/mcp(?:\\?.*)?$": {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
-      "^/mcp/health$": {
+      "^/mcp/health(?:\\?.*)?$": {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,
