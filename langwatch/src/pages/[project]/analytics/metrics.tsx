@@ -4,6 +4,7 @@ import {
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { ChartCard } from "~/components/analytics/ChartCard";
+import { ModelCostComparisonCard } from "~/components/analytics/ModelCostComparisonCard";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
@@ -263,6 +264,11 @@ function MetricsContent() {
           <ChartCard title="Average Completion Time" colSpan={2}>
             <CustomGraph input={completionTime} />
           </ChartCard>
+          {canViewCost && (
+            <ChartCard title="Cost Comparison" colSpan={4}>
+              <ModelCostComparisonCard />
+            </ChartCard>
+          )}
           {canViewCost && (
             <ChartCard title="Average Cost Per Message" colSpan={2}>
               <CustomGraph input={totalCostPerModel} />

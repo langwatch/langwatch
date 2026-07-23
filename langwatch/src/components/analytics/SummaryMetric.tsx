@@ -22,6 +22,7 @@ export function SummaryMetric({
   increaseIs,
   noDataUrl,
   titleProps,
+  zeroMeansNoData,
 }: {
   label: string;
   current?: number | string;
@@ -36,6 +37,15 @@ export function SummaryMetric({
     color?: SystemStyleObject["color"];
     fontWeight?: SystemStyleObject["fontWeight"];
   };
+  /**
+   * Whether a `current` of exactly 0 (with no `previous` to compare
+   * against) should render as "No data yet". Defaults to true: most
+   * callers never pass `previous` and a bare zero there has historically
+   * meant "nothing recorded". Callers that can tell the two apart (e.g. a
+   * loaded value that is genuinely zero) pass `false` to show the real
+   * $0.00/0 instead.
+   */
+  zeroMeansNoData?: boolean;
 }) {
   return (
     <VStack
@@ -79,6 +89,7 @@ export function SummaryMetric({
         format={format}
         increaseIs={increaseIs}
         noDataUrl={noDataUrl}
+        zeroMeansNoData={zeroMeansNoData}
       />
     </VStack>
   );
@@ -90,14 +101,17 @@ export function SummaryMetricValue({
   format,
   increaseIs = "good",
   noDataUrl,
+  zeroMeansNoData = true,
 }: {
   current?: number | string;
   previous?: number;
   format?: ((value: number) => string) | ((value: string) => string) | string;
   increaseIs?: "good" | "bad" | "neutral";
   noDataUrl?: string;
+  zeroMeansNoData?: boolean;
 }) {
   const isZeroZero =
+    zeroMeansNoData &&
     current !== undefined &&
     (current === 0 || current === "0") &&
     (previous === undefined || previous === 0);
