@@ -39,7 +39,6 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
 import { TraceService } from "~/server/traces/trace.service";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
-import type { AutomationAuditRepository } from "../app-layer/automations/repositories/automation-audit.repository";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
@@ -97,7 +96,6 @@ import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { createAutomationsPipeline } from "./pipelines/automations/pipeline";
-import { AutomationAuditAppendStore } from "./pipelines/automations/projections/automationAudit.store";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
@@ -276,7 +274,6 @@ export interface PipelineRepositories {
   evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
-  automationAudit: AutomationAuditRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
   /** Direct Postgres operational projection; deliberately bypasses Redis. */
   langyConversationState: StateProjectionStore<LangyConversationStateData>;
@@ -396,9 +393,6 @@ export class PipelineRegistry {
     });
     const automationPipeline = this.deps.eventSourcing.register(
       createAutomationsPipeline({
-        automationAuditStore: new AutomationAuditAppendStore(
-          this.deps.repositories.automationAudit,
-        ),
         dispatch: automationPorts.settlementDeps,
         sweep: {
           decideSweepCandidates: automationPorts.decideSweepCandidates,

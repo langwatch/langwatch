@@ -19,9 +19,6 @@ const tenantId = createTenantId("project-1");
 // intent executors never run in these tests (no wake worker), so the
 // dispatch surface can stay empty.
 const pipelineDeps = (): AutomationsPipelineDeps => ({
-  automationAuditStore: {
-    append: vi.fn().mockResolvedValue(undefined),
-  } as unknown as AutomationsPipelineDeps["automationAuditStore"],
   dispatch: {} as TriggerSettlementDispatchDeps,
   sweep: {
     decideSweepCandidates: vi.fn().mockResolvedValue([]),
