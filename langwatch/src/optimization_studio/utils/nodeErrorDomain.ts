@@ -1,6 +1,6 @@
 import {
-  handledErrorFromHerr,
   type HandledErrorFault,
+  handledErrorFromHerr,
   type SerializedHandledError,
 } from "@langwatch/handled-error";
 

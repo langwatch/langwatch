@@ -14,60 +14,30 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
-import { GuardrailAttachForbiddenError } from "~/server/gateway/errors";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import type { PrismaClient } from "@prisma/client";
-
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import type { Session } from "~/server/auth";
-
-import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
-import { GatewayUsageService } from "~/server/gateway/usage.service";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
-import {
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-  type GuardrailAttachment,
-} from "~/server/gateway/virtualKey.config";
-import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
-import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-
-import { authorizeInResolver, hasProjectPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { chRepoOrUndefined, spendRepoOrUndefined } from "./gatewayUsage";
+import { GuardrailAttachForbiddenError } from "~/server/gateway/errors";
 import {
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
   isVisibleToMembership,
   loadMembershipSet,
 } from "~/server/gateway/virtualKey.authz";
+import {
+  type GuardrailAttachment,
+  parseVirtualKeyConfig,
+  virtualKeyConfigSchema,
+} from "~/server/gateway/virtualKey.config";
+import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import { authorizeInResolver, hasProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInputSchema = scopeAssignmentSchema;
-
-const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
-
-/**
- * The cap a key carries on itself. Only the calendar windows a person
- * reasons about in a drawer: a per-minute cap on one key is an ops knob,
- * not a spending decision, and belongs on the budgets page.
- */
-const budgetInputSchema = z.object({
-  // A whole decimal number of dollars, strictly positive. String rather
-  // than number to survive JSON round-trips without float drift; the
-  // regex rejects partial parses ("10abs"), signs, and bare dots.
-  limitUsd: z
-    .string()
-    .trim()
-    .regex(/^\d+(\.\d+)?$/, "limitUsd must be a decimal number")
-    .refine((v) => Number.parseFloat(v) > 0, {
-      message: "limitUsd must be greater than zero",
-    }),
-  window: z.enum(["DAY", "WEEK", "MONTH"]),
-  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
-  name: z.string().min(1).max(128).optional(),
-});
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
 
@@ -82,50 +52,17 @@ async function resolveVkProjectId(
   organizationId: string,
   vkId: string | null,
   inputScopes: { scopeType: string; scopeId: string }[] | undefined,
-  traceProjectId?: string | null,
 ): Promise<string | null> {
   let scopes = inputScopes;
-  let storedTraceProjectId: string | null = null;
   if (!scopes && vkId) {
     const vk = await prisma.virtualKey.findFirst({
       where: { id: vkId, organizationId },
-      select: {
-        traceProjectId: true,
-        scopes: { select: { scopeType: true, scopeId: true } },
-      },
+      select: { scopes: { select: { scopeType: true, scopeId: true } } },
     });
     scopes = vk?.scopes;
-    storedTraceProjectId = vk?.traceProjectId ?? null;
   }
   const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
-  if (projectScopes.length === 1) return projectScopes[0]!.scopeId;
-  // Guardrails are project-scoped and enforce where traces land, so an
-  // org- or team-owned key's guardrail surface is its explicit trace
-  // destination.
-  return traceProjectId ?? storedTraceProjectId;
-}
-
-/**
- * The explicit trace destination must be a project of the key's own
- * organization: it decides where traces (and therefore budget debits)
- * land, and a stray id would route another tenant's costs.
- */
-async function assertTraceProjectBelongsToOrg(
-  prisma: PrismaClient,
-  organizationId: string,
-  traceProjectId: string | null | undefined,
-): Promise<void> {
-  if (!traceProjectId) return;
-  const project = await prisma.project.findFirst({
-    where: { id: traceProjectId, team: { organizationId } },
-    select: { id: true },
-  });
-  if (!project) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `scope_org_mismatch: trace project ${traceProjectId} is not in organization ${organizationId}`,
-    });
-  }
+  return projectScopes.length === 1 ? projectScopes[0]!.scopeId : null;
 }
 
 /**
@@ -294,182 +231,6 @@ export const virtualKeysRouter = createTRPCRouter({
       return toVirtualKeyCamelDto(vk);
     }),
 
-  /**
-   * Spend per key for the current calendar month, for the keys the caller
-   * can see. Reads the cost path (`trace_summaries`), the same source the
-   * Usage tab reads, so the number in the table matches the page a click
-   * on it lands on.
-   */
-  spendThisMonth: protectedProcedure
-    .input(z.object({ organizationId: z.string() }))
-    .use(authorizeInResolver)
-    .query(async ({ ctx, input }) => {
-      // Without the ClickHouse spend source there is no number to report.
-      // Failing loudly lets the column render "unavailable" instead of a
-      // confident $0.00 that cannot be told apart from a zero-spend key.
-      const spendRepo = spendRepoOrUndefined();
-      if (!spendRepo) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "spend_source_unavailable",
-        });
-      }
-      const membership = await loadMembershipSet(
-        ctx.prisma,
-        input.organizationId,
-        ctx.session.user.id,
-      );
-      const service = VirtualKeyService.create(ctx.prisma);
-      const keys = (await service.getAll(input.organizationId)).filter((vk) =>
-        isVisibleToMembership(membership, vk.scopes),
-      );
-      const now = new Date();
-      const usage = GatewayUsageService.create({
-        prisma: ctx.prisma,
-        chRepo: undefined,
-        spendRepo,
-      });
-      const spend = await usage.spendByVirtualKey({
-        organizationId: input.organizationId,
-        virtualKeyIds: keys.map((k) => k.id),
-        window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
-      });
-      // Every visible key gets a row. With the spend source present, a
-      // missing entry means the key genuinely spent nothing, so zero is
-      // the honest render rather than an ambiguous blank.
-      return keys.map((k) => ({
-        virtualKeyId: k.id,
-        spentUsd: spend.get(k.id)?.spentUsd ?? "0",
-        requests: spend.get(k.id)?.requests ?? 0,
-      }));
-    }),
-
-  /**
-   * Every budget that would constrain this key: the "already applies"
-   * list under the budget field in the create / edit drawer. Takes a draft
-   * (the scopes the creator has picked, no key row yet) so the list is
-   * answerable before the key exists.
-   */
-  applicableBudgets: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string(),
-        virtualKeyId: z.string().nullable().optional(),
-        scopes: z.array(scopeInputSchema).min(1),
-        traceProjectId: z.string().nullable().optional(),
-        principalUserId: z.string().nullable().optional(),
-      }),
-    )
-    .use(authorizeInResolver)
-    .query(async ({ ctx, input }) => {
-      // Authorization first, before any budget data is touched. This
-      // resolver answers with budget names, limits, live spend and (for
-      // a principal) their name, so knowing an organization id must not
-      // be enough to call it.
-      //
-      // For an existing key (edit drawer): the caller must be able to
-      // SEE the key (the list/get visibility rule), and resolution binds
-      // to the key's STORED ownership. The caller-supplied scopes,
-      // destination and principal are ignored: honoring them would let
-      // anyone who can see an org-wide key read a sibling team's budget
-      // names and spend by injecting that team's scope into the input.
-      if (input.virtualKeyId) {
-        const vk = await ctx.prisma.virtualKey.findFirst({
-          where: {
-            id: input.virtualKeyId,
-            organizationId: input.organizationId,
-          },
-          select: {
-            id: true,
-            traceProjectId: true,
-            principalUserId: true,
-            scopes: { select: { scopeType: true, scopeId: true } },
-          },
-        });
-        if (!vk) {
-          throw new TRPCError({ code: "NOT_FOUND" });
-        }
-        const membership = await loadMembershipSet(
-          ctx.prisma,
-          input.organizationId,
-          ctx.session.user.id,
-        );
-        if (
-          !isVisibleToMembership(
-            membership,
-            vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
-          )
-        ) {
-          throw new TRPCError({ code: "NOT_FOUND" });
-        }
-        return resolveApplicableBudgetsForDraftKey(
-          ctx.prisma,
-          {
-            organizationId: input.organizationId,
-            virtualKeyId: vk.id,
-            scopes: vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
-            traceProjectId: vk.traceProjectId,
-            principalUserId: vk.principalUserId,
-          },
-          chRepoOrUndefined(),
-        );
-      }
-      // For a draft (create drawer): the caller must hold
-      // virtualKeys:manage on every draft scope AND on the chosen trace
-      // destination, the exact boundary `create` will hold them to when
-      // they submit; previewing a target's budgets must not be cheaper
-      // than creating a key against it.
-      await assertCanManageAllScopes(
-        { prisma: ctx.prisma, session: ctx.session },
-        input.scopes,
-      );
-      await assertScopesBelongToOrg(
-        ctx.prisma,
-        input.organizationId,
-        input.scopes,
-      );
-      await assertTraceProjectBelongsToOrg(
-        ctx.prisma,
-        input.organizationId,
-        input.traceProjectId,
-      );
-      if (input.traceProjectId) {
-        await assertCanManageAllScopes(
-          { prisma: ctx.prisma, session: ctx.session },
-          [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
-        );
-      }
-      // The principal id is still pinned to the organization: even an
-      // authorized caller must not resolve another tenant's rows.
-      if (input.principalUserId) {
-        const membership = await ctx.prisma.organizationUser.findFirst({
-          where: {
-            organizationId: input.organizationId,
-            userId: input.principalUserId,
-          },
-          select: { userId: true },
-        });
-        if (!membership) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message:
-              "principalUserId is not a member of this organization.",
-          });
-        }
-      }
-      return resolveApplicableBudgetsForDraftKey(
-        ctx.prisma,
-        {
-          organizationId: input.organizationId,
-          virtualKeyId: null,
-          scopes: input.scopes,
-          traceProjectId: input.traceProjectId ?? null,
-          principalUserId: input.principalUserId ?? null,
-        },
-        chRepoOrUndefined(),
-      );
-    }),
-
   create: protectedProcedure
     .input(
       z.object({
@@ -478,10 +239,7 @@ export const virtualKeysRouter = createTRPCRouter({
         description: z.string().optional(),
         principalUserId: z.string().nullable().optional(),
         scopes: z.array(scopeInputSchema).min(1),
-        traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
-        routingMode: routingModeSchema.optional(),
-        budget: budgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
@@ -500,27 +258,11 @@ export const virtualKeysRouter = createTRPCRouter({
         input.organizationId,
         input.scopes,
       );
-      await assertTraceProjectBelongsToOrg(
-        ctx.prisma,
-        input.organizationId,
-        input.traceProjectId,
-      );
-      // The destination routes traces AND budget debits into that
-      // project, so choosing it needs the same manage grant the old
-      // PROJECT scope enforced; tenancy alone would let a team manager
-      // point a key at a sibling team's project and consume its budget.
-      if (input.traceProjectId) {
-        await assertCanManageAllScopes(
-          { prisma: ctx.prisma, session: ctx.session },
-          [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
-        );
-      }
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
         null,
         input.scopes,
-        input.traceProjectId ?? null,
       );
       await assertGuardrailAttachmentsAllowed(
         ctx,
@@ -534,10 +276,7 @@ export const virtualKeysRouter = createTRPCRouter({
         description: input.description ?? null,
         principalUserId: input.principalUserId ?? null,
         scopes: input.scopes,
-        traceProjectId: input.traceProjectId ?? null,
         routingPolicyId: input.routingPolicyId ?? null,
-        routingMode: input.routingMode,
-        budget: input.budget ?? null,
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
@@ -552,10 +291,7 @@ export const virtualKeysRouter = createTRPCRouter({
         name: z.string().min(1).max(128).optional(),
         description: z.string().nullable().optional(),
         scopes: z.array(scopeInputSchema).min(1).optional(),
-        traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
-        routingMode: routingModeSchema.optional(),
-        budget: budgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
@@ -586,29 +322,11 @@ export const virtualKeysRouter = createTRPCRouter({
           input.scopes,
         );
       }
-      if (input.traceProjectId !== undefined) {
-        await assertTraceProjectBelongsToOrg(
-          ctx.prisma,
-          input.organizationId,
-          input.traceProjectId,
-        );
-        // Re-pointing the destination is the same decision as choosing
-        // it at create: it needs manage on the target project.
-        if (input.traceProjectId) {
-          await assertCanManageAllScopes(
-            { prisma: ctx.prisma, session: ctx.session },
-            [{ scopeType: "PROJECT", scopeId: input.traceProjectId }],
-          );
-        }
-      }
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
         input.id,
         input.scopes,
-        input.traceProjectId !== undefined
-          ? input.traceProjectId
-          : existing.traceProjectId,
       );
       // Newly-submitted attachments are always validated. When the caller
       // is ALSO changing scopes (a possible project move) but did not
@@ -633,10 +351,7 @@ export const virtualKeysRouter = createTRPCRouter({
         name: input.name,
         description: input.description,
         scopes: input.scopes,
-        traceProjectId: input.traceProjectId,
         routingPolicyId: input.routingPolicyId,
-        routingMode: input.routingMode,
-        budget: input.budget,
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
