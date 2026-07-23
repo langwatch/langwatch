@@ -120,7 +120,11 @@ func codexFrameData(frame []byte) ([]byte, bool) {
 
 // parseCodexUsage reads token usage from a `response.completed` frame's data
 // payload. The codex backend reports usage the Responses-API way:
-// `response.usage.{input_tokens,output_tokens}`.
+// `response.usage.{input_tokens,output_tokens}`, with the prompt-cache hit
+// count nested in `input_tokens_details.cached_tokens`. Per the Responses
+// convention, input_tokens INCLUDES the cached prefix — matching the
+// domain.Usage contract (PromptTokens is the full prompt total; the trace
+// bridge derives the fresh remainder from the cache breakdown).
 func parseCodexUsage(frame []byte) (domain.Usage, bool) {
 	payload, ok := codexFrameData(frame)
 	if !ok {
@@ -140,5 +144,6 @@ func parseCodexUsage(frame []byte) (domain.Usage, bool) {
 		PromptTokens:     in,
 		CompletionTokens: out,
 		TotalTokens:      in + out,
+		CacheReadTokens:  int(usage.Get("input_tokens_details.cached_tokens").Int()),
 	}, true
 }

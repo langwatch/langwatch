@@ -87,6 +87,11 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       attrs.has(ATTR_KEYS.AI_RESPONSE) ||
       attrs.has(ATTR_KEYS.AI_RESPONSE_TEXT) ||
       attrs.has(ATTR_KEYS.AI_USAGE) ||
+      // AI SDK v5 emits usage as flat-dotted attributes rather than the
+      // ai.usage object, and embedders (opencode) re-export under their own
+      // scope — so the flat usage keys are the only reliable signal there.
+      attrs.has(ATTR_KEYS.AI_USAGE_INPUT_TOKENS) ||
+      attrs.has(ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS) ||
       attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME);
     if (!scopeMatches && !attrsMatch) return;
 
@@ -137,30 +142,79 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
       `${this.id}:ai.usage->gen_ai.usage`,
     );
 
-    // Cache token details. The AI SDK reports cached input as flat-dotted
-    // attributes (ai.usage.inputTokenDetails.cache{Read,Write}Tokens, with
-    // ai.usage.cachedInputTokens as the older read alias) rather than the
-    // gen_ai.usage.cache_* convention, so map them here. Without this an
-    // opencode Path B cache-creation turn (12k+ tokens) goes uncounted.
-    const cacheRead =
-      asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS)) ??
-      asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS));
-    const cacheWrite = asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS));
-    if (cacheRead !== null && cacheRead > 0) {
-      ctx.setAttrIfAbsent(
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-        cacheRead,
+    // Cache + reasoning token details. The AI SDK reports these as
+    // flat-dotted attributes (ai.usage.inputTokenDetails.cache{Read,Write}
+    // Tokens with ai.usage.cachedInputTokens as the older read alias,
+    // ai.usage.reasoningTokens) rather than the gen_ai.usage.* convention,
+    // so map them here. Without this an opencode cache-creation turn (12k+
+    // tokens) goes uncounted. Only the span that already carries the
+    // canonical input count gets the mapping: the AI SDK stamps the same
+    // ai.usage.* rollup on the parent span (ai.streamText) AND the provider
+    // call (ai.streamText.doStream), but only the provider call carries
+    // gen_ai.usage.input_tokens — mapping cache onto both spans would count
+    // the cached share twice in the trace fold.
+    const canonicalInput =
+      asNumber(ctx.out[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]) ??
+      asNumber(attrs.get(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS));
+    if (canonicalInput !== null) {
+      const cacheRead =
+        asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHE_READ_TOKENS)) ??
+        asNumber(attrs.take(ATTR_KEYS.AI_USAGE_CACHED_INPUT_TOKENS));
+      const cacheWrite = asNumber(
+        attrs.take(ATTR_KEYS.AI_USAGE_CACHE_WRITE_TOKENS),
       );
-      ctx.recordRule(`${this.id}:ai.usage.cacheRead->gen_ai.usage.cache_read`);
-    }
-    if (cacheWrite !== null && cacheWrite > 0) {
-      ctx.setAttrIfAbsent(
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-        cacheWrite,
+      const noCacheTokens = asNumber(
+        attrs.take(ATTR_KEYS.AI_USAGE_NO_CACHE_TOKENS),
       );
-      ctx.recordRule(
-        `${this.id}:ai.usage.cacheWrite->gen_ai.usage.cache_creation`,
+      if (cacheRead !== null && cacheRead > 0) {
+        ctx.setAttrIfAbsent(
+          ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+          cacheRead,
+        );
+        ctx.recordRule(
+          `${this.id}:ai.usage.cacheRead->gen_ai.usage.cache_read`,
+        );
+      }
+      if (cacheWrite !== null && cacheWrite > 0) {
+        ctx.setAttrIfAbsent(
+          ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+          cacheWrite,
+        );
+        ctx.recordRule(
+          `${this.id}:ai.usage.cacheWrite->gen_ai.usage.cache_creation`,
+        );
+      }
+
+      // The AI SDK's input count is the FULL prompt total, cache included.
+      // The canonical convention is the opposite: gen_ai.usage.input_tokens
+      // is the fresh, non-cached remainder, with cache read/write counted
+      // separately — so totals and cost sum the buckets without counting
+      // the cached share twice. Rewrite to the fresh remainder: the SDK's
+      // own noCacheTokens when present, else total minus the cache buckets.
+      if ((cacheRead ?? 0) > 0 || (cacheWrite ?? 0) > 0) {
+        const freshInput =
+          noCacheTokens ??
+          Math.max(0, canonicalInput - (cacheRead ?? 0) - (cacheWrite ?? 0));
+        if (freshInput !== canonicalInput) {
+          ctx.setAttr(ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, freshInput);
+          ctx.recordRule(
+            `${this.id}:ai.usage.inputTokens->gen_ai.usage.input_tokens(fresh)`,
+          );
+        }
+      }
+
+      const reasoningTokens = asNumber(
+        attrs.take(ATTR_KEYS.AI_USAGE_REASONING_TOKENS),
       );
+      if (reasoningTokens !== null && reasoningTokens > 0) {
+        ctx.setAttrIfAbsent(
+          ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS,
+          reasoningTokens,
+        );
+        ctx.recordRule(
+          `${this.id}:ai.usage.reasoningTokens->gen_ai.usage.reasoning_tokens`,
+        );
+      }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -86,10 +86,16 @@ export const ATTR_KEYS = {
   // Vercel AI SDK cache token details (flat-dotted; opencode and other AI-SDK
   // embedders emit these instead of gen_ai.usage.cache_*). cacheReadTokens and
   // cacheWriteTokens live under inputTokenDetails; cachedInputTokens is the
-  // older flat alias for the read count.
+  // older flat alias for the read count. inputTokens is the FULL prompt total
+  // (cache included, per AI SDK semantics); noCacheTokens is the fresh
+  // remainder the canonical gen_ai.usage.input_tokens must carry so cache
+  // buckets add on top rather than overlap.
+  AI_USAGE_INPUT_TOKENS: "ai.usage.inputTokens",
   AI_USAGE_CACHED_INPUT_TOKENS: "ai.usage.cachedInputTokens",
   AI_USAGE_CACHE_READ_TOKENS: "ai.usage.inputTokenDetails.cacheReadTokens",
   AI_USAGE_CACHE_WRITE_TOKENS: "ai.usage.inputTokenDetails.cacheWriteTokens",
+  AI_USAGE_NO_CACHE_TOKENS: "ai.usage.inputTokenDetails.noCacheTokens",
+  AI_USAGE_REASONING_TOKENS: "ai.usage.reasoningTokens",
   AI_TOOL_CALL: "ai.toolCall",
   AI_TOOL_CALL_NAME: "ai.toolCall.name",
   AI_TOOL_CALL_ARGS: "ai.toolCall.args",
