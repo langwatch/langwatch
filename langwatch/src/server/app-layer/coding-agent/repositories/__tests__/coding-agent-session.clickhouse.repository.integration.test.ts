@@ -112,6 +112,30 @@ function sessionRow(
     atMentions: 0,
     stopReason: "end_turn",
     truncated: false,
+    subAgentIds: [`${tag}-sub-a`, `${tag}-sub-b`],
+    stepStartedAt: [baseMs + 10, baseMs + 20],
+    previousCallContextTokens: 9_000_000_000,
+    metricSeries: [
+      {
+        seriesId: `${tag}-loc-added`,
+        metricName: "lines_of_code.count",
+        type: "added",
+        decision: "",
+        language: "",
+        value: 120,
+      },
+      {
+        seriesId: `${tag}-edits`,
+        metricName: "code_edit_tool.decision",
+        type: "",
+        decision: "accept",
+        language: "typescript",
+        value: 4,
+      },
+    ],
+    createdAt: baseMs,
+    updatedAt: baseMs,
+    lastEventOccurredAt: baseMs + 20,
     ...over,
   };
 }
@@ -168,6 +192,33 @@ describe("coding_agent_sessions round-trip (migration 00051)", () => {
     expect(read!.sessionKeySource).toBe("provider");
     expect(read!.costUsd).toBeCloseTo(1.25);
     expect(read!.commits).toBe(2);
+
+    // Read-back columns (migration 00053, ADR-066) survive the trip so
+    // store.get() can reconstruct working state without touching event_log.
+    expect(read!.subAgentIds).toEqual([`${tag}-sub-a`, `${tag}-sub-b`]);
+    expect(read!.stepStartedAt).toEqual([baseMs + 10, baseMs + 20]);
+    expect(read!.previousCallContextTokens).toBe(9_000_000_000);
+    expect(read!.metricSeries).toEqual([
+      {
+        seriesId: `${tag}-loc-added`,
+        metricName: "lines_of_code.count",
+        type: "added",
+        decision: "",
+        language: "",
+        value: 120,
+      },
+      {
+        seriesId: `${tag}-edits`,
+        metricName: "code_edit_tool.decision",
+        type: "",
+        decision: "accept",
+        language: "typescript",
+        value: 4,
+      },
+    ]);
+    // DateTime64 columns come back without a timezone, so exact-equality is
+    // machine-dependent; assert the column is populated and roughly right.
+    expect(read!.lastEventOccurredAt).toBeGreaterThan(0);
   });
 
   it("dedups a re-folded session to one row (ReplacingMergeTree, no FINAL)", async () => {

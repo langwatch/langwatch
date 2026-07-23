@@ -6,6 +6,7 @@ import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   type CodingAgentSessionState,
   projectCodingAgentSessionToRow,
+  rebuildCodingAgentSessionStateFromRow,
 } from "./codingAgentSession.foldProjection";
 
 /**
@@ -73,18 +74,25 @@ export class CodingAgentSessionStore
   }
 
   /**
-   * No read-back: the row is an AGGREGATE, not a copy. The counters survive a
-   * round-trip but the fold's ordering rules and first-seen identity semantics
-   * do not, so rebuilding state from the row would quietly produce a different
-   * session than replaying the events does.
+   * Read the session's last committed state back (ADR-066). The row round-trips
+   * the full working state — counters, ordered steps (with their start times),
+   * the sub-agent dedup set, the previous-call context size, and the converged
+   * metric units — so a cache miss reconstructs state from ONE point read
+   * instead of replaying the aggregate's history from `event_log`.
    *
-   * State continuity therefore comes from the two layers above this store: the
-   * Redis cache it is wrapped in at registration, and the fold's
-   * `refoldOnStoreMiss` option, which rebuilds from the event log on a miss.
-   * Without BOTH, a delivery would fold only its own batch and a partial row
-   * would overwrite a complete one.
+   * `context.occurredAtMs` prunes the read to a window of partitions around the
+   * event being folded; absent, the repository scans (still keyed, still
+   * correct — just not partition-pruned).
    */
-  async get(): Promise<CodingAgentSessionState | null> {
-    return null;
+  async get(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<CodingAgentSessionState | null> {
+    const row = await this.repo.findBySessionId({
+      tenantId: String(context.tenantId),
+      sessionId: aggregateId,
+      startedAtMs: context.occurredAtMs,
+    });
+    return row ? rebuildCodingAgentSessionStateFromRow(row) : null;
   }
 }
