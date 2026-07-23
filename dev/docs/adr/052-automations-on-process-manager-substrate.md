@@ -228,7 +228,7 @@ event-history dedup scan on every flush.
 The projection, its append store, and `AutomationAuditRepository` are removed.
 The `automation_audit` table and migration 00048 stay in place for one release
 (expand/contract — the same cutover shape the run-aggregates ADR
-(`061-run-aggregates-are-queries.md`, in flight on PR #6051) uses for
+(`061-run-aggregates-are-queries.md`, proposed on PR #6051) uses for
 `suite_runs`); the drop migration follows separately.
 
 ## References
