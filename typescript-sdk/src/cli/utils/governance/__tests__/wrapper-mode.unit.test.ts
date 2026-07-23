@@ -248,9 +248,10 @@ describe("resolveWrapperMode", () => {
      *                             file paths) onto tool_decision +
      *                             tool_result so the trace shows
      *                             WHAT the tool did
-     *   OTEL_LOG_TOOL_CONTENT=1   traces-only + beta tracing —
-     *                             no-op for claude 2.x logs path
-     *                             today, set as forward-compat
+     *   OTEL_LOG_TOOL_CONTENT=1   lifts tool input/output content
+     *                             onto the tool.output span event;
+     *                             active now that we set the
+     *                             ENHANCED_TELEMETRY_BETA flag
      *   OTEL_LOG_RAW_API_BODIES=1 emits api_request_body +
      *                             api_response_body events
      *                             carrying the FULL JSON of every
@@ -281,6 +282,11 @@ describe("resolveWrapperMode", () => {
         "claude_code",
       );
       expect(out.vars.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("1");
+      // Enhanced-telemetry beta: unlocks the real claude_code.tracing spans
+      // (agent_id + parent_agent_id) that make sub-agent attribution
+      // possible; without it OTEL_TRACES_EXPORTER is a no-op. Pinned so a
+      // refactor can't silently drop it and regress back to logs-only.
+      expect(out.vars.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA).toBe("1");
       expect(out.vars.OTEL_LOG_USER_PROMPTS).toBe("1");
       expect(out.vars.OTEL_LOG_TOOL_DETAILS).toBe("1");
       expect(out.vars.OTEL_LOG_TOOL_CONTENT).toBe("1");

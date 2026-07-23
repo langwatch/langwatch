@@ -54,6 +54,7 @@ import {
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
 } from "../../../utils/formatters";
+import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { TooltipRow } from "../../shared/TooltipRow";
@@ -63,7 +64,6 @@ import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
-import { ShareTraceDialog } from "./ShareTraceDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
 import { EditableTraceName } from "./EditableTraceName";
 import { MetricPill } from "./MetricPill";
@@ -72,6 +72,8 @@ import {
   type PinCategory,
   renderPinPills,
 } from "./PinStrip";
+import { ShareTraceDialog } from "./ShareTraceDialog";
+import { SyntheticTraceBadge } from "./SyntheticTraceBadge";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
 import {
@@ -969,6 +971,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             />
           )}
           <StatusChip trace={trace} statusColor={statusColor} />
+          <SyntheticTraceBadge attributes={trace.attributes} />
         </HStack>
 
         {/* Negative marginRight cancels the header's paddingX so the
@@ -985,113 +988,113 @@ export const DrawerHeader = memo(function DrawerHeader({
             unmounted, not hidden — `display:none` would still run the menu's
             queries. */}
         {!readOnly && (
-        <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
-                <Kbd>R</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={() => void handleRefresh()}
-              disabled={isRefreshing}
-              aria-label="Refresh trace"
-              css={
-                isRefreshing
-                  ? {
-                      "& svg": {
-                        animation:
-                          "tracesV2DrawerRefreshSpin 0.9s linear infinite",
-                      },
-                      "@keyframes tracesV2DrawerRefreshSpin": {
-                        from: { transform: "rotate(0deg)" },
-                        to: { transform: "rotate(360deg)" },
-                      },
-                    }
-                  : undefined
+          <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
+            <Tooltip
+              content={
+                <HStack gap={1}>
+                  <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
+                  <Kbd>R</Kbd>
+                </HStack>
               }
+              positioning={{ placement: "bottom" }}
             >
-              <Icon as={LuRefreshCw} boxSize={3.5} />
-            </Button>
-          </Tooltip>
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
-                <Kbd>M</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={handleMaximizeClick}
-              aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing}
+                aria-label="Refresh trace"
+                css={
+                  isRefreshing
+                    ? {
+                        "& svg": {
+                          animation:
+                            "tracesV2DrawerRefreshSpin 0.9s linear infinite",
+                        },
+                        "@keyframes tracesV2DrawerRefreshSpin": {
+                          from: { transform: "rotate(0deg)" },
+                          to: { transform: "rotate(360deg)" },
+                        },
+                      }
+                    : undefined
+                }
+              >
+                <Icon as={LuRefreshCw} boxSize={3.5} />
+              </Button>
+            </Tooltip>
+            <Tooltip
+              content={
+                <HStack gap={1}>
+                  <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
+                  <Kbd>M</Kbd>
+                </HStack>
+              }
+              positioning={{ placement: "bottom" }}
             >
-              <Icon
-                as={isMaximized ? LuMinimize2 : LuMaximize2}
-                boxSize={3.5}
-              />
-            </Button>
-          </Tooltip>
-          <TraceOverflowMenu
-            traceId={trace.traceId}
-            conversationId={trace.conversationId}
-            onCopyTraceId={handleCopyTraceId}
-            onFindSimilar={findSimilarQuery ? handleFindSimilar : null}
-            dejaViewHref={dejaView.href ?? null}
-            onOpenRawJson={() => setRawOpen(true)}
-            onShowShortcuts={() => setShortcutsOpen(true)}
-            onShare={() => setShareOpen(true)}
-            pinned={pinned}
-            onTogglePinned={togglePinned}
-          />
-          <Box
-            width="1px"
-            height="16px"
-            bg="border.muted"
-            marginX={0.5}
-            flexShrink={0}
-          />
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>Close</Text>
-                <Kbd>Esc</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            {/* Plain ghost Button — the standard Chakra `CloseButton`
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={handleMaximizeClick}
+                aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
+              >
+                <Icon
+                  as={isMaximized ? LuMinimize2 : LuMaximize2}
+                  boxSize={3.5}
+                />
+              </Button>
+            </Tooltip>
+            <TraceOverflowMenu
+              traceId={trace.traceId}
+              conversationId={trace.conversationId}
+              onCopyTraceId={handleCopyTraceId}
+              onFindSimilar={findSimilarQuery ? handleFindSimilar : null}
+              dejaViewHref={dejaView.href ?? null}
+              onOpenRawJson={() => setRawOpen(true)}
+              onShowShortcuts={() => setShortcutsOpen(true)}
+              onShare={() => setShareOpen(true)}
+              pinned={pinned}
+              onTogglePinned={togglePinned}
+            />
+            <Box
+              width="1px"
+              height="16px"
+              bg="border.muted"
+              marginX={0.5}
+              flexShrink={0}
+            />
+            <Tooltip
+              content={
+                <HStack gap={1}>
+                  <Text>Close</Text>
+                  <Kbd>Esc</Kbd>
+                </HStack>
+              }
+              positioning={{ placement: "bottom" }}
+            >
+              {/* Plain ghost Button — the standard Chakra `CloseButton`
                 (IconButton wrapper) intermittently swallowed the click
                 under our Drawer.Root setup: the URL stripped fine but
                 the drawer didn't unmount, leaving the operator stuck.
                 A bare Button calling `onClose` directly is the same
                 pattern this drawer used pre-revamp and behaves
                 reliably across Chakra's Drawer focus management. */}
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={onClose}
-              aria-label="Close drawer"
-              paddingX={1.5}
-              paddingY={1.5}
-              height="auto"
-              minWidth="auto"
-              color="fg.muted"
-              _hover={{ bg: "bg.muted", color: "fg" }}
-              _active={{ bg: "bg.emphasized" }}
-            >
-              <Icon as={LuX} boxSize={4} strokeWidth={2.25} />
-            </Button>
-          </Tooltip>
-        </HStack>
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={onClose}
+                aria-label="Close drawer"
+                paddingX={1.5}
+                paddingY={1.5}
+                height="auto"
+                minWidth="auto"
+                color="fg.muted"
+                _hover={{ bg: "bg.muted", color: "fg" }}
+                _active={{ bg: "bg.emphasized" }}
+              >
+                <Icon as={LuX} boxSize={4} strokeWidth={2.25} />
+              </Button>
+            </Tooltip>
+          </HStack>
         )}
       </HStack>
 
@@ -1256,6 +1259,15 @@ export const DrawerHeader = memo(function DrawerHeader({
             conversationContext.turns.length === 0
           }
           traceId={trace.traceId}
+          // Usage/Terminal ride the session-backed tracesV2 reads, which are
+          // protected — share viewers don't get those tabs either.
+          showTerminal={
+            !readOnly &&
+            isTerminalOrigin({
+              serviceName: trace.serviceName,
+              origin: trace.origin,
+            })
+          }
           endSlot={
             <HStack gap={2}>
               {/* Presence avatars sit at the trailing edge of the mode-tab

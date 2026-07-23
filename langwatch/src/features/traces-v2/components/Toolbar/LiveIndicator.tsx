@@ -43,7 +43,11 @@ export const LiveIndicator: React.FC = () => {
   const lastEventAt = useSseStatusStore((s) => s.lastEventAt);
   const liveUpdatesMode = useSseStatusStore((s) => s.liveUpdatesMode);
   const toggleLiveUpdates = useSseStatusStore((s) => s.toggleLiveUpdates);
-  const { refresh, isRefreshing } = useTraceListRefresh();
+  // `shouldSpin` (not the broader `isRefreshing`) drives the button: an
+  // explicit refresh in flight, or a genuinely new trace landing — never a
+  // background discover/newCount refetch from a routine span update to a
+  // trace already on screen. See useTraceListRefresh for why those differ.
+  const { refresh, shouldSpin: isRefreshing } = useTraceListRefresh();
   // Sample-preview rows are a hardcoded fixture — they don't change
   // server-side, so a click on Refresh wouldn't fetch anything new and
   // would just flash the spin icon (and trigger the no-op aurora flash

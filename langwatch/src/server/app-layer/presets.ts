@@ -177,6 +177,17 @@ import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/rep
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
+import { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
+import { CodingAgentSessionClickHouseRepository } from "./coding-agent/repositories/coding-agent-session.clickhouse.repository";
+import { NullCodingAgentSessionRepository } from "./coding-agent/repositories/coding-agent-session.repository";
+import {
+  CodingAgentTraceSessionClickHouseRepository,
+  NullCodingAgentTraceSessionRepository,
+} from "./coding-agent/repositories/coding-agent-trace-session.repository";
+import {
+  NullSessionMetricSeriesRepository,
+  SessionMetricSeriesClickHouseRepository,
+} from "./coding-agent/repositories/session-metric-series.repository";
 import { CanonicalLogRecordClickHouseRepository } from "./logs/repositories/canonical-log-record.clickhouse.repository";
 import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-log-record.repository";
 import { MonitorService } from "./monitors/monitor.service";
@@ -665,6 +676,15 @@ export function initializeDefaultApp(options?: {
     canonicalLogStorage: clickhouseEnabled
       ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
       : new NullCanonicalLogRecordRepository(),
+    codingAgentSession: clickhouseEnabled
+      ? new CodingAgentSessionClickHouseRepository(resolveClickHouseClient)
+      : new NullCodingAgentSessionRepository(),
+    codingAgentTraceSession: clickhouseEnabled
+      ? new CodingAgentTraceSessionClickHouseRepository(resolveClickHouseClient)
+      : new NullCodingAgentTraceSessionRepository(),
+    sessionMetricSeries: clickhouseEnabled
+      ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
+      : new NullSessionMetricSeriesRepository(),
     metricDataPointStorage: clickhouseEnabled
       ? new MetricDataPointClickHouseRepository({
           resolveClient: resolveClickHouseClient,
@@ -1237,6 +1257,16 @@ export function initializeDefaultApp(options?: {
       ),
       topics,
     },
+    codingAgents: {
+      sessions: traced(
+        new CodingAgentSessionService(
+          repositories.codingAgentSession,
+          repositories.codingAgentTraceSession,
+          repositories.sessionMetricSeries,
+        ),
+        "CodingAgentSessionService",
+      ),
+    },
     // traced() gives every service call a `ClassName.method` span, same as
     // the rest of the app bag. Per-method, not per-frame: the streaming hot
     // paths (token buffer, relay frames) stay span-free by design.
@@ -1431,6 +1461,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       topics: new TopicService(new PrismaTopicRepository(testPrisma)),
     },
+    codingAgents: {
+      sessions: new CodingAgentSessionService(
+        new NullCodingAgentSessionRepository(),
+        new NullCodingAgentTraceSessionRepository(),
+        new NullSessionMetricSeriesRepository(),
+      ),
+    },
     langy: {
       conversations: LangyConversationService.create(
         {
@@ -1536,6 +1573,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       logs: {
         recordLogRecord: noop,
       } satisfies AppCommands["logs"],
+      codingAgents: {
+        contributeSpanFacts: noop,
+        contributeLogFacts: noop,
+        contributeMetricFacts: noop,
+      } satisfies AppCommands["codingAgents"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,

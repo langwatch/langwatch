@@ -5,6 +5,7 @@ import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { useLangyContextTarget } from "~/features/langy/hooks/useLangyContextTarget";
 import { traceContextChip } from "~/features/langy/logic/langyContextChips";
 import { PeerCursorOverlay } from "~/features/presence/components/PeerCursorOverlay";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   SpanTreeNode,
   TraceHeader,
@@ -18,7 +19,9 @@ import { useShikiAdapter } from "./markdownView/shikiAdapter";
 import { PaneLayout } from "./panes/PaneLayout";
 import { usePaneLayout } from "./panes/usePaneLayout";
 import { ScenarioRoleProvider } from "./scenarioRoles";
+import { SessionTab } from "./sessionView";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
+import { TerminalTab } from "./terminalView";
 import { TraceAccordions } from "./traceAccordions";
 import { useTraceSwitchOverlay } from "./useTraceSwitchOverlay";
 
@@ -169,9 +172,17 @@ export function TraceDrawerContent({
                     fire protected annotation reads that 401. The gate also
                     covers a `viewMode` persisted as "conversation" from an
                     earlier in-app session. See ADR-057. */}
-                {viewMode === "conversation" &&
-                trace.conversationId &&
-                !readOnly ? (
+                {/* Usage/Terminal are coding-agent surfaces backed by the
+                    protected tracesV2 session reads, so share viewers fall
+                    through to the trace panes — same reasoning (and same
+                    persisted-viewMode hole) as the conversation gate below. */}
+                {viewMode === "session" && !readOnly ? (
+                  <SessionModePane trace={trace} />
+                ) : viewMode === "terminal" && !readOnly ? (
+                  <TerminalModePane trace={trace} />
+                ) : viewMode === "conversation" &&
+                  trace.conversationId &&
+                  !readOnly ? (
                   <ConversationModePane
                     conversationId={trace.conversationId}
                     traceId={trace.traceId}
@@ -311,6 +322,53 @@ function SummaryModePane({
           selectedSpan={null}
           activeTab="summary"
           onSelectSpan={openSpanInTrace}
+        />
+      </Box>
+    </IsolatedErrorBoundary>
+  );
+}
+
+/**
+ * Session-usage branch (coding-agent traces): counters, cost, and outcome for
+ * the agent session this trace belongs to. In-app only — the caller gates it
+ * behind `!readOnly`, and the project hook lives here so the share page never
+ * mounts it.
+ */
+function SessionModePane({ trace }: { trace: TraceHeader }) {
+  const { project } = useOrganizationTeamProject();
+  return (
+    <IsolatedErrorBoundary
+      scope="Couldn't render session overview"
+      resetKeys={[trace.traceId]}
+    >
+      <Box flex={1} minHeight={0}>
+        <SessionTab
+          projectId={project?.id ?? ""}
+          traceId={trace.traceId}
+          occurredAtMs={trace.timestamp}
+        />
+      </Box>
+    </IsolatedErrorBoundary>
+  );
+}
+
+/**
+ * Terminal-replay branch (coding-agent traces): the turn as the CLI drew it.
+ * In-app only, same gating as SessionModePane.
+ */
+function TerminalModePane({ trace }: { trace: TraceHeader }) {
+  const { project } = useOrganizationTeamProject();
+  return (
+    <IsolatedErrorBoundary
+      scope="Couldn't render terminal session"
+      resetKeys={[trace.traceId]}
+    >
+      <Box flex={1} minHeight={0}>
+        <TerminalTab
+          projectId={project?.id ?? ""}
+          traceId={trace.traceId}
+          occurredAtMs={trace.timestamp}
+          sessionName={trace.traceName?.trim() || trace.name?.trim() || null}
         />
       </Box>
     </IsolatedErrorBoundary>

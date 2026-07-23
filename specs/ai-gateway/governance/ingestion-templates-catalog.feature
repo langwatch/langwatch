@@ -18,9 +18,9 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   Templates are NOT for the platform's coding assistants:
     The coding assistants the platform manages directly (claude_code, codex,
     cursor, gemini, opencode) are set up by the `langwatch <tool>` command and
-    LangWatch converts their OTLP model-call logs into canonical gen_ai spans
-    at ingest (see claude-code-log-conversion.feature). The platform owns their
-    whole setup + canonicalisation, so they are simply NOT seeded as ingestion
+    LangWatch canonicalises their telemetry at ingest (see
+    specs/trace-processing/coding-agent-session.feature). The platform owns
+    their whole setup + canonicalisation, so they are simply NOT seeded as ingestion
     templates — they are coding-assistant tiles on the AiToolsPortal. There is
     no feature flag and no filter: the platform-template seed just does not
     include coding assistants, so they never exist as template rows to begin

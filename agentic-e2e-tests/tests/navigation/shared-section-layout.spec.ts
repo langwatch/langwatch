@@ -111,13 +111,19 @@ test("complex product areas share one local navigation layout", async ({
     .click();
   await expect(page).toHaveURL("/settings/governance/ingestion-sources");
 
-  const overviewBackground = await governanceNavigation
-    .getByRole("link", { name: "Overview", exact: true })
-    .evaluate((element) => getComputedStyle(element).backgroundColor);
-  const activeBackground = await governanceNavigation
-    .getByRole("link", { name: "Ingestion Sources", exact: true })
-    .evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(overviewBackground).not.toBe(activeBackground);
+  // The URL flips synchronously on pushState, but the router only commits the
+  // new location once the lazily-loaded route resolves; until then the nav
+  // still renders the previous page's active state. Poll instead of sampling
+  // once so the assertion waits for that commit like every other matcher here.
+  await expect(async () => {
+    const overviewBackground = await governanceNavigation
+      .getByRole("link", { name: "Overview", exact: true })
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+    const activeBackground = await governanceNavigation
+      .getByRole("link", { name: "Ingestion Sources", exact: true })
+      .evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(overviewBackground).not.toBe(activeBackground);
+  }).toPass({ timeout: 15_000 });
 
   await page.goto(sections[0]!.path(projectSlug));
   await page.getByRole("radio", { name: "Set theme to dark" }).click();
