@@ -21,21 +21,26 @@ import (
 // positional (`haven db seed demo`), validated against this registry, and the
 // same set works on reset (`haven db reset demo`).
 type seedPreset struct {
-	env      []string
-	traces   bool // ingest the deterministic sample traces (stack must be up)
-	platform bool // ingest realistic platform lifecycles (stack must be up)
-	summary  string
+	env []string
+	// ingest is the ordered list of live-stack pnpm scripts to run after the
+	// base seed — they go through the running stack's real collector and
+	// event-sourcing commands, so the stack must be up.
+	ingest  []string
+	summary string
 }
 
-// seedPresets is the registry of variants. `mass` (months of backdated data
-// across every product, seeded through the event log and replayed) is the
-// designed follow-up — see specs/setup/haven-seed-presets.feature.
+// seedPresets is the registry of variants, shared by `db seed` and `db reset`.
 var seedPresets = map[string]seedPreset{
-	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, traces: true, platform: true, summary: "past onboarding + sample traces + realistic platform data"},
-	"traces":          {traces: true, summary: "the deterministic sample traces on top of the stable identity"},
+	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{"seed:sample-traces", "seed:realistic-platform"}, summary: "past onboarding + sample traces + realistic platform data"},
+	"traces":          {ingest: []string{"seed:sample-traces"}, summary: "the deterministic sample traces on top of the stable identity"},
 	"onboarding":      {env: []string{"HAVEN_SEED_FIRST_MESSAGE=0"}, summary: "a fresh onboarding journey (first-trace flag cleared)"},
 	"post-onboarding": {env: []string{"HAVEN_SEED_FIRST_MESSAGE=1"}, summary: "past onboarding, no demo content"},
 	"bare":            {env: []string{"HAVEN_SEED_MODEL_PROVIDERS=0", "HAVEN_SEED_FEATURE_FLAGS=0"}, summary: "identity only — no env-derived providers, stock feature flags"},
+	// mass: months of coherent, backdated activity across every product —
+	// event-sourced products are seeded through their event logs (replayed by
+	// the projection workers), traces backdate through the collector.
+	// HAVEN_SEED_MONTHS tunes the window (default 3).
+	"mass": {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{"seed:sample-traces", "seed:mass"}, summary: "months of backdated activity across every product (HAVEN_SEED_MONTHS, default 3)"},
 }
 
 // SeedPresetNames lists the registry for errors and help, sorted.
@@ -112,16 +117,13 @@ func (o *Orchestrator) DBReset(ctx context.Context, p UpParams, preset string) e
 	return o.runSeedIngest(ctx, p, pre, "haven db reset "+preset)
 }
 
-// runSeedIngest runs a preset's live-stack ingest steps (sample traces,
-// realistic platform lifecycles) after the base seed landed.
+// runSeedIngest runs a preset's live-stack ingest scripts in order after the
+// base seed landed.
 func (o *Orchestrator) runSeedIngest(ctx context.Context, p UpParams, pre seedPreset, retryCmd string) error {
-	if pre.traces {
-		if err := o.seedSampleTraces(ctx, p, retryCmd); err != nil {
+	for _, script := range pre.ingest {
+		if err := o.runIngestScript(ctx, p, retryCmd, script); err != nil {
 			return err
 		}
-	}
-	if pre.platform {
-		return o.seedRealisticPlatformData(ctx, p, retryCmd)
 	}
 	return nil
 }

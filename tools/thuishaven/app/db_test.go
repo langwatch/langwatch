@@ -184,7 +184,7 @@ func TestDBReset(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), "not running") {
 				t.Fatalf("expected a stack-not-running error, got %v", err)
 			}
-			if !strings.Contains(err.Error(), "haven db reset --demo") {
+			if !strings.Contains(err.Error(), "haven db reset demo") {
 				t.Errorf("err = %v, want the retry command", err)
 			}
 			if len(sup.shells) != 2 {

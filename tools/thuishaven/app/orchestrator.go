@@ -563,28 +563,20 @@ func hasEnvKey(env []string, key string) bool {
 	return false
 }
 
-// seedSampleTraces ingests the deterministic demo traces through the running
-// stack's collector — the real pipeline, not a ClickHouse side door — so the
-// stack must be up. It talks to the app's loopback port over plain HTTP
-// (portless terminates TLS in front of it; Node does not trust the proxy's CA).
-func (o *Orchestrator) seedSampleTraces(ctx context.Context, p UpParams, retryCmd string) error {
+// runIngestScript runs one live-stack seed script (seed:sample-traces,
+// seed:realistic-platform, seed:mass) through the running stack's collector —
+// the real pipeline, not a ClickHouse side door — so the stack must be up. It
+// talks to the app's loopback port over plain HTTP (portless terminates TLS in
+// front of it; Node does not trust the proxy's CA). The scripts deliberately
+// use the collector + event-sourcing commands rather than inserting read
+// models, so a seed exercises the event log and projection workers customers
+// run.
+func (o *Orchestrator) runIngestScript(ctx context.Context, p UpParams, retryCmd, script string) error {
 	env, err := o.liveSeedEnv(p, retryCmd)
 	if err != nil {
 		return err
 	}
-	return o.sup.RunOnce(ctx, "seed-traces", p.LwDir, "pnpm run seed:sample-traces", env)
-}
-
-// seedRealisticPlatformData adds coherent scenario, evaluation, and experiment
-// lifecycles after the lightweight sample traces. It deliberately uses the
-// collector + event-sourcing commands rather than inserting read models, so a
-// demo seed exercises the event log and projection workers customers run.
-func (o *Orchestrator) seedRealisticPlatformData(ctx context.Context, p UpParams, retryCmd string) error {
-	env, err := o.liveSeedEnv(p, retryCmd)
-	if err != nil {
-		return err
-	}
-	return o.sup.RunOnce(ctx, "seed-platform", p.LwDir, "pnpm run seed:realistic-platform", env)
+	return o.sup.RunOnce(ctx, script, p.LwDir, "pnpm run "+script, env)
 }
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a
