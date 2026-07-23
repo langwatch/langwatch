@@ -213,6 +213,21 @@ observability are outside this decision.
 - Wake polling can deliver a boundary a few seconds late, but cannot silently
   lose a committed promise.
 
+## Amendment: automationAudit projection removed (2026-07)
+
+The ID-only `automationAudit` ClickHouse map projection is gone. It stored
+nothing the substrate does not already persist — every trigger match is a
+committed `trigger_match_recorded` event in the event log, and its settlement
+lifecycle lives in the `triggerSettlement` process-manager state in Postgres —
+and no code path ever read the `automation_audit` table. Maintaining it was
+pure write overhead: as a `dedupeByIdempotencyKey` projection it also paid an
+event-history dedup scan on every flush.
+
+The projection, its append store, and `AutomationAuditRepository` are removed.
+The `automation_audit` table and migration 00048 stay in place for one release
+(expand/contract — the same cutover shape ADR-061 used for `suite_runs`); the
+drop migration follows separately.
+
 ## References
 
 - [`specs/automations/process-manager-dispatch.feature`](../../../specs/automations/process-manager-dispatch.feature)

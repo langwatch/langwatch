@@ -260,8 +260,6 @@ import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
-import { ClickHouseAutomationAuditRepository } from "./automations/repositories/automation-audit.clickhouse.repository";
-import { NullAutomationAuditRepository } from "./automations/repositories/automation-audit.repository";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
@@ -706,9 +704,6 @@ export function initializeDefaultApp(options?: {
     evaluationAnalytics: clickhouseEnabled
       ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
       : new NullEvaluationAnalyticsRepository(),
-    automationAudit: clickhouseEnabled
-      ? new ClickHouseAutomationAuditRepository(resolveClickHouseClient)
-      : new NullAutomationAuditRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
