@@ -810,7 +810,7 @@ function LangyPanel({
     api.modelProvider.setFeatureOverrideForScope.useMutation();
   const langyRoleUtils = api.useContext();
   const setLangyFeatureModel = useCallback(
-    (featureKey: "langy.chat_default" | "langy.conversation_title") =>
+    (featureKey: typeof LANGY_GATE_FEATURE_KEY | "langy.conversation_title") =>
       (nextModel: string) => {
         if (!projectId) return;
         void (async () => {
@@ -830,8 +830,12 @@ function LangyPanel({
       },
     [projectId, setLangyRoleModel, langyRoleUtils],
   );
+  // Write the SAME key the marker reads and the resolver recognises
+  // (LANGY_GATE_FEATURE_KEY, "langy.chat"). There is no separate
+  // "langy.chat_default" key — writing one would land somewhere nothing reads,
+  // so the marker wouldn't move and Langy wouldn't pick it up.
   const onSetLangyDefault = useMemo(
-    () => setLangyFeatureModel("langy.chat_default"),
+    () => setLangyFeatureModel(LANGY_GATE_FEATURE_KEY),
     [setLangyFeatureModel],
   );
   const onSetLangyTitle = useMemo(
