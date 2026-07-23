@@ -6,7 +6,7 @@
 
 **Supersedes:** [ADR-002](./002-event-sourcing.md)
 
-**Hardened by:** [ADR-062](./062-projection-clickhouse-cached-store.md) — projection storage (the ClickHouse-cached read-back store) makes this ADR's "fold state = stored data" and "`store.get()` loads last state" the mandatory, non-optional contract, and retires the `refoldOnStoreMiss` / `refoldOnOutOfOrder` accretions that had drifted from it.
+**Hardened by:** [ADR-066](./066-projection-clickhouse-cached-store.md) — projection storage (the ClickHouse-cached read-back store) makes this ADR's "fold state = stored data" and "`store.get()` loads last state" the mandatory, non-optional contract, and retires the `refoldOnStoreMiss` / `refoldOnOutOfOrder` accretions that had drifted from it.
 
 ## Context
 

@@ -4,7 +4,7 @@
 
 **Status:** Proposed
 
-**Store corrected by:** [ADR-062](./062-projection-clickhouse-cached-store.md) — the session-aggregate store must read its full state back from ClickHouse. The no-read-back store (`get()` returns null, forcing an `event_log` refold on every cache miss and out-of-order delivery) caused a production outage and is forbidden. The pipeline shape and session-key decisions in this ADR stand.
+**Store corrected by:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the session-aggregate store must read its full state back from ClickHouse. The no-read-back store (`get()` returns null, forcing an `event_log` refold on every cache miss and out-of-order delivery) caused a production outage and is forbidden. The pipeline shape and session-key decisions in this ADR stand.
 
 ## Context
 

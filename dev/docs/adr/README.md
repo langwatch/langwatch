@@ -15,7 +15,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [007](./007-event-sourcing-architecture.md)                       | Event sourcing architecture (fold/map projections)                                          | Accepted                                          |
 | [018](./018-form-validation-and-save.md)                          | Form validation and Save button behavior                                                    | Accepted                                          |
 | [021](./021-multi-scope-targeting-and-tenancy.md)                 | Multi-scope targeting and single-org tenancy enforcement                                    | Accepted                                          |
-| [021](./021-lean-fold-cache.md)                                   | Lean fold cache                                                                             | Superseded by [062](./062-projection-clickhouse-cached-store.md) / [022](./022-event-log-source-of-truth.md) |
+| [021](./021-lean-fold-cache.md)                                   | Lean fold cache                                                                             | Superseded by [066](./066-projection-clickhouse-cached-store.md) / [022](./022-event-log-source-of-truth.md) |
 | [022](./022-data-retention.md)                                    | Per-tenant per-category data retention enforced by ClickHouse-native TTL                    | Accepted                                          |
 | [023](./023-orphan-sweep-reactor-chain.md)                        | Reactor-seeded self-perpetuating chain for retention orphan sweep                           | Superseded by [025](./025-remove-orphan-sweep.md) |
 | [024](./024-cold-path-tiered-storage.md)                          | Cold-path tiered storage for retention-managed tables                                       | Accepted                                          |
@@ -43,7 +43,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [050](./050-langy-versioned-prompts-and-dogfood-evals.md)         | Langy's prompts in the versioned prompt registry + dogfood scenarios/evals                  | Proposed                                          |
 | [057](./057-token-gated-trace-sharing.md)                         | Token-gated trace sharing (ShareLink)                                                       | Accepted                                          |
 | [059](./059-card-selection-is-deterministic.md)                    | Card selection is deterministic — the model supplies data, never presentation               | Proposed                                          |
-| [062](./062-projection-clickhouse-cached-store.md)                | Projection state storage — the ClickHouse-cached read-back store                            | Proposed                                          |
+| [066](./066-projection-clickhouse-cached-store.md)                | Projection state storage — the ClickHouse-cached read-back store                            | Proposed                                          |
 
 ## When to Write an ADR
 

@@ -1,4 +1,4 @@
-# ADR-062: Projection state storage — the ClickHouse-cached store
+# ADR-066: Projection state storage — the ClickHouse-cached store
 
 **Date:** 2026-07-23
 

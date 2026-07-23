@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Related to:** [ADR-062](./062-projection-clickhouse-cached-store.md) — the replay protocol defined here is unchanged, but it is now **off the projection hot path**. Projections read back their own committed state and never refold from `event_log` on delivery, so this protocol runs only for projection-version migration and disaster recovery.
+**Related to:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the replay protocol defined here is unchanged, but it is now **off the projection hot path**. Projections read back their own committed state and never refold from `event_log` on delivery, so this protocol runs only for projection-version migration and disaster recovery.
 
 ## Context
 

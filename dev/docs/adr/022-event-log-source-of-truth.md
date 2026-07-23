@@ -4,9 +4,9 @@
 
 **Status:** Proposed (issue [#4215](https://github.com/langwatch/langwatch/issues/4215))
 
-**Supersedes:** [ADR-021](./021-lean-fold-cache.md) (jointly with [ADR-062](./062-projection-clickhouse-cached-store.md)). This ADR owns the heavy-content decisions; the rules still in force are restated below, so ADR-021 is not required reading.
+**Supersedes:** [ADR-021](./021-lean-fold-cache.md) (jointly with [ADR-066](./066-projection-clickhouse-cached-store.md)). This ADR owns the heavy-content decisions; the rules still in force are restated below, so ADR-021 is not required reading.
 
-**Relates to:** [ADR-007](./007-event-sourcing-architecture.md) (event sourcing), [ADR-015](./015-projection-replay-coordination.md) (replay), [ADR-017](./017-gateway-trace-payload-capture.md) (gateway payload capture), [ADR-062](./062-projection-clickhouse-cached-store.md) (projection store — the fold-cache mechanics that used to live in ADR-021).
+**Relates to:** [ADR-007](./007-event-sourcing-architecture.md) (event sourcing), [ADR-015](./015-projection-replay-coordination.md) (replay), [ADR-017](./017-gateway-trace-payload-capture.md) (gateway payload capture), [ADR-066](./066-projection-clickhouse-cached-store.md) (projection store — the fold-cache mechanics that used to live in ADR-021).
 
 ## Context
 
