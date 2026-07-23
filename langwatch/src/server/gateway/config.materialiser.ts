@@ -505,16 +505,18 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const credentials = buildCredentials(mp);
   const customKeys = decryptCustomKeys(mp.customKeys);
-  // Only "custom" and "openai" route a base-URL override to Bifrost's VLLM
-  // adapter (see mapProvider in bifrost.go), the sole consumer of the
-  // per-slot base_url. Other providers with an endpointKey resolve their
-  // endpoint elsewhere (Azure/Vertex via credentials.endpoint, Anthropic via
-  // Bifrost's provider-level network_config), so emitting a per-slot base_url
-  // for them would be a dead field. Scope the override to what's consumed;
-  // this is what lets an "openai" provider with OPENAI_BASE_URL reach a
-  // self-hosted proxy instead of api.openai.com.
+  // Providers whose base-URL override the gateway consumes (see mapProvider
+  // in bifrost.go): "custom" and "openai" route it to Bifrost's VLLM
+  // (OpenAI-compat) adapter; "anthropic" derives a per-endpoint custom
+  // provider so /v1/messages reaches self-hosted Anthropic-compatible
+  // servers (vLLM >= 0.24) instead of api.anthropic.com. Other providers
+  // with an endpointKey resolve their endpoint elsewhere (Azure/Vertex via
+  // credentials.endpoint), so emitting a per-slot base_url for them would
+  // be a dead field. Scope the override to what's consumed.
   const supportsBaseURLOverride =
-    mp.provider === "custom" || mp.provider === "openai";
+    mp.provider === "custom" ||
+    mp.provider === "openai" ||
+    mp.provider === "anthropic";
   const endpointKey = supportsBaseURLOverride
     ? modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey
     : undefined;

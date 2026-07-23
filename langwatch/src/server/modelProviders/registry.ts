@@ -273,10 +273,27 @@ export const modelProviders = {
     type: "llm",
     apiKey: "ANTHROPIC_API_KEY",
     endpointKey: "ANTHROPIC_BASE_URL",
-    keysSchema: z.object({
-      ANTHROPIC_API_KEY: z.string().min(1),
-      ANTHROPIC_BASE_URL: z.string().nullable().optional(),
-    }),
+    keysSchema: z
+      .object({
+        ANTHROPIC_API_KEY: z.string().nullable().optional(),
+        ANTHROPIC_BASE_URL: z.string().nullable().optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (
+          (!data.ANTHROPIC_API_KEY || data.ANTHROPIC_API_KEY.trim() === "") &&
+          (!data.ANTHROPIC_BASE_URL || data.ANTHROPIC_BASE_URL.trim() === "")
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "Either ANTHROPIC_API_KEY or ANTHROPIC_BASE_URL must be provided with a non-empty value",
+          });
+        }
+      }),
+    // The base URL points at an Anthropic-compatible self-hosted server
+    // (vLLM >= 0.24). Such servers commonly run unauthenticated, so the
+    // API key may be empty when a base URL is set — mirroring openai
+    // above. api.anthropic.com itself always requires the key.
     optionalKeys: ["ANTHROPIC_BASE_URL"],
     enabledSince: new Date("2023-01-01"),
     // Anthropic API limits temperature to 0-1 range
