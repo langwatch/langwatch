@@ -22,10 +22,8 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useLocalStorage } from "usehooks-ts";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import {
-  LANGY_DOCK_GAP,
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
-  SHELL_CARD_INSET,
 } from "~/features/langy/logic/langyPanelLayout";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import Head from "~/utils/compat/next-head";
@@ -471,12 +469,12 @@ export const DashboardLayout = ({
     planType: usage.data?.activePlan?.type,
   });
 
-  // Langy's docked panel joins this shell as a second content card. Claim the
-  // dock while the shell is mounted so the page-level wrapper stands down
-  // (LangyShiftedRoot), then reserve the panel's room inside the content row
-  // only, the header keeps the full viewport width above both cards. The
-  // reservation truth (`dockShifted`) is computed by the wrapper, which owns
-  // Langy's visibility gate. Spec: specs/langy/langy-panel-layout.feature
+  // Langy's docked panel is a flush pane on the viewport's right edge. Claim
+  // the dock while the shell is mounted so the page-level wrapper stands down
+  // (LangyShiftedRoot), then reserve the panel's width inside the content
+  // column only — the rail is untouched. The reservation truth
+  // (`dockShifted`) is computed by the wrapper, which owns Langy's
+  // visibility gate. Spec: specs/langy/langy-panel-layout.feature
   const langyDockShifted = useLangyStore((s) => s.dockShifted);
   const claimDockShell = useLangyStore((s) => s.claimDockShell);
   const releaseDockShell = useLangyStore((s) => s.releaseDockShell);
@@ -484,9 +482,7 @@ export const DashboardLayout = ({
     claimDockShell();
     return releaseDockShell;
   }, [claimDockShell, releaseDockShell]);
-  const langyDockInset = langyDockShifted
-    ? LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP
-    : 0;
+  const langyDockInset = langyDockShifted ? LANGY_DOCKED_OFFSET : 0;
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <NotFoundScene />;
@@ -612,7 +608,7 @@ export const DashboardLayout = ({
     <Box
       width="full"
       minHeight="100vh"
-      background="bg.page"
+      background="bg.surface"
       overflowX={["auto", "auto", "hidden"]}
     >
       <Head>
@@ -628,19 +624,22 @@ export const DashboardLayout = ({
         </title>
       </Head>
 
-      {/* The shell is one frame: a full-height sidebar column on the page
-          ground, and the application floating next to it as a raised card
-          that carries its own header row. Cards begin SHELL_CARD_INSET from
-          the ground on every side — the docked Langy card derives its edges
-          from the same constant, so the two cannot drift apart.
+      {/* The shell is a console: a full-height warm-ink rail on the left
+          that keeps the same ink in both themes, and a flat, edge-to-edge
+          workspace beside it. The `dark` scope makes everything inside the
+          rail resolve its dark-theme form regardless of the app theme —
+          the chrome is the constant; the workspace is the variable.
           Spec: specs/navigation/shell-visual-language.feature */}
       <HStack width="full" alignItems="stretch" gap={0} height="100vh">
-        {/* Sidebar column: logo/collapse control up top, nav below, on the
-            page ground for the full viewport height. */}
+        {/* Console rail: logo/collapse control up top, nav below, gauge at
+            the bottom, ink for the full viewport height. */}
         <Box
+          className="dark"
+          data-theme="dark"
           width={menuWidth}
           minWidth={menuWidth}
           height="100vh"
+          background="nav.bg"
           display="flex"
           flexDirection="column"
         >
@@ -667,168 +666,151 @@ export const DashboardLayout = ({
           </Box>
         </Box>
 
-        {/* Content column: the card floats on the ground with a symmetric
-            inset; while Langy is docked its reserved strip replaces the
-            right gutter (the docked panel wears the same inset). */}
+        {/* Workspace column: flat and edge-to-edge; while Langy is docked,
+            its flush pane reserves this width at the viewport's right edge. */}
         <Box
           flex={1}
           minWidth={0}
           height="100vh"
-          background="bg.page"
+          background="bg.surface"
           maxWidth={`calc(100vw - ${menuWidth})`}
-          paddingTop={`${SHELL_CARD_INSET}px`}
-          paddingBottom={`${SHELL_CARD_INSET}px`}
-          paddingRight={`${langyDockInset + SHELL_CARD_INSET}px`}
+          paddingRight={`${langyDockInset}px`}
           transition={`padding-right ${LANGY_TRANSITION}`}
+          overflow="hidden"
+          display="flex"
+          flexDirection="column"
+          position="relative"
         >
-          <Box
-            width="full"
-            height="full"
-            background="bg.surface"
-            borderRadius="xl"
-            border="1px solid"
-            borderColor="border.muted"
-            _light={{
-              boxShadow:
-                "0 1px 2px rgba(16,24,40,0.04), 0 8px 24px -12px rgba(16,24,40,0.10)",
-            }}
-            _dark={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" }}
-            overflow="hidden"
-            display="flex"
-            flexDirection="column"
+          {/* Header: context on the left, session controls on the right.
+                A flat row at the top of the workspace, under a hairline. */}
+          <HStack
             position="relative"
+            width="full"
+            height="52px"
+            flexShrink={0}
+            paddingX={4}
+            borderBottom="1px solid"
+            borderColor="border.subtle"
+            justifyContent="space-between"
+            gap={4}
+            overflow="hidden"
           >
-            {/* Card header: context on the left, session controls on the
-                right. Lives inside the card so the frame outside stays pure
-                ground. */}
-            <HStack
-              position="relative"
-              width="full"
-              height="52px"
-              flexShrink={0}
-              paddingX={4}
-              borderBottom="1px solid"
-              borderColor="border.subtle"
-              justifyContent="space-between"
-              gap={4}
-              overflow="hidden"
-            >
-              {(user?.impersonator ||
-                publicEnv.data?.NODE_ENV === "development") && (
-                <Box
-                  position="absolute"
-                  top={-5}
-                  right="-100px"
-                  bottom={0}
-                  w="400px"
-                  background={user?.impersonator ? "blue.300" : "orange.300"}
-                  filter="blur(40px)"
-                  pointerEvents="none"
-                ></Box>
+            {(user?.impersonator ||
+              publicEnv.data?.NODE_ENV === "development") && (
+              <Box
+                position="absolute"
+                top={-5}
+                right="-100px"
+                bottom={0}
+                w="400px"
+                background={user?.impersonator ? "blue.300" : "orange.300"}
+                filter="blur(40px)"
+                pointerEvents="none"
+              ></Box>
+            )}
+
+            {/* Left side: context chip + breadcrumbs */}
+            <HStack gap={0} flex={1} alignItems="center" minWidth={0}>
+              {router.pathname.startsWith("/ops") ? (
+                <HStack gap={3} alignItems="center" paddingLeft={2}>
+                  <HStack
+                    gap={1.5}
+                    paddingX={2.5}
+                    height="28px"
+                    borderRadius="md"
+                    bg="bg.emphasized"
+                  >
+                    <Activity size={14} />
+                    <Text fontSize="sm" fontWeight="medium">
+                      Ops
+                    </Text>
+                  </HStack>
+                  <HStack
+                    gap={1.5}
+                    paddingX={2.5}
+                    height="28px"
+                    borderRadius="md"
+                    bg="orange.500/8"
+                    border="1px solid"
+                    borderColor="orange.500/15"
+                  >
+                    <Info size={12} color="var(--chakra-colors-orange-400)" />
+                    <Text fontSize="xs" color="orange.400">
+                      Platform-wide - not scoped to a project
+                    </Text>
+                  </HStack>
+                </HStack>
+              ) : isOrgScopeRoute && organization ? (
+                <HStack gap={0} alignItems="center" paddingLeft={2}>
+                  <OrganizationScopeHeaderSwitcher />
+                </HStack>
+              ) : isPersonalScopeRoute && organizations ? (
+                <HStack gap={0} alignItems="center" paddingLeft={2}>
+                  <PersonalScopeHeaderSwitcher />
+                </HStack>
+              ) : organizations && project ? (
+                <HStack gap={2} alignItems="center">
+                  <ProjectScopeHeaderSwitcher />
+                  <Box display={["none", "none", "flex"]}>
+                    <Breadcrumbs currentRoute={currentRoute} />
+                  </Box>
+                </HStack>
+              ) : organization ? (
+                // Project-less org (governance intent, ADR-038 v6): org-scoped
+                // switcher instead of falling through to the sign-in link.
+                <HStack gap={0} alignItems="center" paddingLeft={2}>
+                  <OrganizationScopeHeaderSwitcher />
+                </HStack>
+              ) : (
+                <Text paddingLeft={2}>
+                  <Link href="/auth/signin" color="orange.600" fontWeight="600">
+                    Sign in
+                  </Link>{" "}
+                  to LangWatch to monitor your projects
+                </Text>
               )}
+            </HStack>
 
-              {/* Left side: context chip + breadcrumbs */}
-              <HStack gap={0} flex={1} alignItems="center" minWidth={0}>
-                {router.pathname.startsWith("/ops") ? (
-            <HStack gap={3} alignItems="center" paddingLeft={2}>
-              <HStack
-                gap={1.5}
-                paddingX={2.5}
-                height="28px"
-                borderRadius="md"
-                bg="bg.emphasized"
-              >
-                <Activity size={14} />
-                <Text fontSize="sm" fontWeight="medium">
-                  Ops
-                </Text>
-              </HStack>
-              <HStack
-                gap={1.5}
-                paddingX={2.5}
-                height="28px"
-                borderRadius="md"
-                bg="orange.500/8"
-                border="1px solid"
-                borderColor="orange.500/15"
-              >
-                <Info size={12} color="var(--chakra-colors-orange-400)" />
-                <Text fontSize="xs" color="orange.400">
-                  Platform-wide - not scoped to a project
-                </Text>
-              </HStack>
-            </HStack>
-          ) : isOrgScopeRoute && organization ? (
-            <HStack gap={0} alignItems="center" paddingLeft={2}>
-              <OrganizationScopeHeaderSwitcher />
-            </HStack>
-          ) : isPersonalScopeRoute && organizations ? (
-            <HStack gap={0} alignItems="center" paddingLeft={2}>
-              <PersonalScopeHeaderSwitcher />
-            </HStack>
-          ) : organizations && project ? (
-            <HStack gap={2} alignItems="center">
-              <ProjectScopeHeaderSwitcher />
-              <Box display={["none", "none", "flex"]}>
-                <Breadcrumbs currentRoute={currentRoute} />
-              </Box>
-            </HStack>
-          ) : organization ? (
-            // Project-less org (governance intent, ADR-038 v6): org-scoped
-            // switcher instead of falling through to the sign-in link.
-            <HStack gap={0} alignItems="center" paddingLeft={2}>
-              <OrganizationScopeHeaderSwitcher />
-            </HStack>
-          ) : (
-            <Text paddingLeft={2}>
-              <Link href="/auth/signin" color="orange.600" fontWeight="600">
-                Sign in
-              </Link>{" "}
-              to LangWatch to monitor your projects
-            </Text>
-          )}
-              </HStack>
-
-              {/* Right side: search, environment, account */}
-              <HStack
-                gap={2}
-                justifyContent="flex-end"
-                overflow="hidden"
-                flexShrink={0}
-              >
-          {publicEnv.data?.NODE_ENV === "development" && (
-            <Text
-              fontSize="10px"
-              fontWeight="600"
-              color="orange.fg"
-              backgroundColor="orange.solid/10"
-              border="1px solid"
-              borderColor="orange.solid/30"
-              borderRadius="md"
-              height="24px"
-              paddingX={2}
-              display="flex"
-              alignItems="center"
-              letterSpacing="0.1em"
+            {/* Right side: search, environment, account */}
+            <HStack
+              gap={2}
+              justifyContent="flex-end"
+              overflow="hidden"
+              flexShrink={0}
             >
-              DEV
-            </Text>
-          )}
-          {user && <ImpersonationBanner user={user} />}
+              {publicEnv.data?.NODE_ENV === "development" && (
+                <Text
+                  fontSize="10px"
+                  fontWeight="600"
+                  color="orange.fg"
+                  backgroundColor="orange.solid/10"
+                  border="1px solid"
+                  borderColor="orange.solid/30"
+                  borderRadius="md"
+                  height="24px"
+                  paddingX={2}
+                  display="flex"
+                  alignItems="center"
+                  letterSpacing="0.1em"
+                >
+                  DEV
+                </Text>
+              )}
+              {user && <ImpersonationBanner user={user} />}
 
-          {/* Command bar trigger */}
-          {project && <CommandBarTrigger />}
+              {/* Command bar trigger */}
+              {project && <CommandBarTrigger />}
 
-                <AccountMenu
-                  publicPage={publicPage}
-                  showPresenceMenuItem={showPresenceMenuItem}
-                />
-              </HStack>
+              <AccountMenu
+                publicPage={publicPage}
+                showPresenceMenuItem={showPresenceMenuItem}
+              />
             </HStack>
+          </HStack>
 
-            {/* Scrollable page region below the card header */}
-            <Box flex={1} minHeight={0} overflow="auto" display="flex">
-              <VStack width="full" gap={0} {...props}>
+          {/* Scrollable page region below the card header */}
+          <Box flex={1} minHeight={0} overflow="auto" display="flex">
+            <VStack width="full" gap={0} {...props}>
               {/* Alert banners */}
               {publicEnv.data &&
                 (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
@@ -838,7 +820,6 @@ export const DashboardLayout = ({
                     width="full"
                     borderBottom="1px solid"
                     borderBottomColor="yellow.300"
-                    borderTopLeftRadius="2xl"
                   >
                     <Alert.Indicator />
                     <Alert.Content>
@@ -1069,8 +1050,7 @@ export const DashboardLayout = ({
                   </Alert.Content>
                 </Alert.Root>
               )}
-              </VStack>
-            </Box>
+            </VStack>
           </Box>
         </Box>
       </HStack>

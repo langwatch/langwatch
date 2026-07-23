@@ -103,15 +103,12 @@ export function LangyDevDrawer({
   open,
   onClose,
   floating,
-  dockShellClaimed,
   panelHeightPx,
 }: {
   open: boolean;
   onClose: () => void;
   /** Mirror the panel's layout, so the two always share an edge. */
   floating: boolean;
-  /** Sidebar mode: an app shell holds the dock below its header. */
-  dockShellClaimed: boolean;
   /**
    * The panel's measured height (floating mode) — what makes the drawer's
    * silhouette EXACTLY the panel's rather than a fixed card of its own.
@@ -157,11 +154,10 @@ export function LangyDevDrawer({
 
   // ONE derivation for both layouts (langyPanelLayout.resolveInspectorFrame):
   // the drawer's top and bottom edges are the PANEL's — the measured card
-  // height on the shared inset when floating, the dock's header-to-floor span
+  // height on the shared inset when floating, the dock's full viewport span
   // when docked — so the pair reads as one surface in either mode.
   const frame = resolveInspectorFrame({
     floating,
-    dockShellClaimed,
     panelHeightPx,
   });
 
@@ -588,7 +584,11 @@ const LANE_LEGEND: {
 }[] = [
   { lane: "outbound", label: "outbound", detail: "what this client asked" },
   { lane: "stream", label: "stream", detail: "tokens, signals, tool frames" },
-  { lane: "durable", label: "durable", detail: "the event log the fold replays" },
+  {
+    lane: "durable",
+    label: "durable",
+    detail: "the event log the fold replays",
+  },
   { lane: "signal", label: "signal", detail: "freshness pokes, with cursors" },
 ];
 

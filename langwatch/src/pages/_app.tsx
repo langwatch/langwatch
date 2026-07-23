@@ -389,27 +389,24 @@ const appConfig = defineConfig({
           },
         },
 
-        // Navigation semantic tokens - for sidebar menu items
+        // Navigation semantic tokens - for the console rail. The rail is a
+        // fixed instrument: warm ink in BOTH themes (deliberately warmer
+        // than the dark theme's indigo-tinted zinc, keyed to the orange
+        // brand), so these are single values, not _light/_dark pairs.
+        // Spec: specs/navigation/shell-visual-language.feature
         nav: {
-          fg: {
-            value: { _light: "{colors.gray.700}", _dark: "{colors.gray.300}" },
-          },
-          // Active rows brighten to full foreground so the current page pops
+          // The rail's ground.
+          bg: { value: "#1C1917" },
+          fg: { value: "rgba(250,250,249,0.72)" },
+          // Active rows brighten to full contrast so the current page pops
           // from its neighbours instead of relying on background alone.
-          fgActive: {
-            value: { _light: "{colors.gray.900}", _dark: "{colors.gray.100}" },
-          },
-          fgMuted: {
-            value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
-          },
-          // Light: the active row lifts as a white card on the gray.100 rail
-          // (hover stays gray.200, so hover and active read differently).
-          bgActive: {
-            value: { _light: "white", _dark: "{colors.zinc.700}" },
-          },
-          bgHover: {
-            value: { _light: "{colors.gray.200}", _dark: "{colors.zinc.800}" },
-          },
+          fgActive: { value: "#FAFAF9" },
+          fgMuted: { value: "rgba(250,250,249,0.55)" },
+          // Engraved console labels (section headers).
+          sectionFg: { value: "rgba(250,250,249,0.40)" },
+          // Ink lifts: active sits one clear step above hover.
+          bgActive: { value: "rgba(255,255,255,0.10)" },
+          bgHover: { value: "rgba(255,255,255,0.055)" },
         },
 
         // Label semantic tokens - for form labels, section headers

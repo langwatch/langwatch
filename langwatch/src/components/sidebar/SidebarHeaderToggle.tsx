@@ -67,7 +67,7 @@ export const SidebarHeaderToggle = ({
               variant="ghost"
               position="absolute"
               inset={0}
-              color="fg.muted"
+              color="nav.fgMuted"
               opacity={0}
               transition="opacity 0.1s ease-in-out"
               _groupHover={{ opacity: 1 }}
@@ -95,7 +95,9 @@ export const SidebarHeaderToggle = ({
       justifyContent="space-between"
     >
       <Link href="/" display="flex" alignItems="center">
-        <FullLogo width={155 * 0.7} height={38 * 0.7} />
+        {/* The rail is ink in both themes, so the logo always wears its
+            dark-surface form. */}
+        <FullLogo width={155 * 0.7} height={38 * 0.7} forceColorMode="dark" />
       </Link>
       {canToggle && (
         <Tooltip
@@ -106,12 +108,12 @@ export const SidebarHeaderToggle = ({
             aria-label="Collapse sidebar"
             size="xs"
             variant="ghost"
-            color="fg.subtle"
+            color="nav.fgMuted"
             opacity={0}
             transition="opacity 0.1s ease-in-out"
             _groupHover={{ opacity: 1 }}
             _focusVisible={{ opacity: 1 }}
-            _hover={{ backgroundColor: "nav.bgHover", color: "fg.muted" }}
+            _hover={{ backgroundColor: "nav.bgHover", color: "nav.fg" }}
             onClick={() => onToggle(true)}
           >
             <PanelLeftClose size={16} />

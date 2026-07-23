@@ -92,7 +92,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
 
   return (
     <Box
-      background="bg.page"
+      background="nav.bg"
       width={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
       minWidth={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
       height="100%"
@@ -107,9 +107,14 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
         left={0}
         width={currentWidth}
         height="100%"
-        background="bg.page"
+        background="nav.bg"
         transition="width 0.15s ease-in-out"
         overflow="hidden"
+        // Hover-expanded over the workspace, the ink overlay needs a cast
+        // shadow to read as a layer; at rest the rail is flat.
+        boxShadow={
+          isCompact && isHovered ? "0 12px 32px rgba(0,0,0,0.45)" : "none"
+        }
       >
         <VStack
           paddingX={2}

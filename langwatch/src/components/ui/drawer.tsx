@@ -2,7 +2,7 @@
 import { Drawer as ChakraDrawer, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import {
-  LANGY_DOCK_GAP,
+  LANGY_COMPANION_GAP,
   LANGY_TRANSITION,
   SIDEBAR_PANEL_WIDTH,
 } from "~/features/langy/logic/langyPanelLayout";
@@ -66,7 +66,7 @@ export const DrawerContent = React.forwardRef<
     (s) => s.isOpen && s.panelMode === "sidebar",
   );
   const langyYieldMarginEnd = isLangyDockedCompanion
-    ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
+    ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_COMPANION_GAP}px`
     : undefined;
 
   // Floating Langy dodges to the left when a drawer opens. Hold the drawer's

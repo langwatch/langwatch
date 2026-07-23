@@ -102,7 +102,6 @@ import {
 } from "../logic/langyErrorExplainer";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import {
-  SHELL_CARD_INSET,
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   LANGY_TRANSITION,
@@ -484,9 +483,6 @@ function LangyPanel({
   const detachContext = useLangyStore((s) => s.detachContext);
   const panelMode = useLangyStore((s) => s.panelMode);
   const floating = panelMode === "floating";
-  // An app shell (DashboardLayout) is mounted and places the dock as a second
-  // content card; zero claims means a full-screen page and the flush dock.
-  const dockShellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
   const panelEffect = useLangyStore((s) => s.panelEffect);
   const reduceMotion = useReducedMotion();
   // The panel's own DOM node. The "fold" wave (<LangyWave>) reads its size off
@@ -1214,7 +1210,8 @@ function LangyPanel({
   // A conversation still loading is a document arriving, not an empty surface:
   // lighting the wash under the placeholder only to drop it as the messages
   // land is one more thing changing on open.
-  const showWash = (isEmpty && !isRestoringConversation) || isBusy || turnActive;
+  const showWash =
+    (isEmpty && !isRestoringConversation) || isBusy || turnActive;
 
   // The developer-mode card gallery takes over the message column entirely —
   // it is a lens onto the card kit, not something to interleave with a real
@@ -1339,10 +1336,14 @@ function LangyPanel({
       // send time, so both a fresh send AND regenerate() carry the full context.
       useLangyDevLog
         .getState()
-        .recordOutbound("send", text.length > 60 ? `${text.slice(0, 60)}…` : text, {
-          text,
-          conversationId: useLangyStore.getState().activeConversationId,
-        });
+        .recordOutbound(
+          "send",
+          text.length > 60 ? `${text.slice(0, 60)}…` : text,
+          {
+            text,
+            conversationId: useLangyStore.getState().activeConversationId,
+          },
+        );
       await sendMessage({ role: "user", parts: [{ type: "text", text }] });
     } catch {
       // Belt to the effect's braces, for the paths that DO reject.
@@ -1874,7 +1875,6 @@ function LangyPanel({
         open={devDrawerVisible}
         onClose={() => setDevDrawerOpen(false)}
         floating={floating}
-        dockShellClaimed={dockShellClaimed}
         panelHeightPx={panelHeightPx}
       />
       <LangyExternalLinkDialog {...externalLinkGuard.dialogProps} />
@@ -1937,9 +1937,7 @@ function LangyPanel({
         // But invisible must also mean untouchable: a peek faded to zero
         // (dismissed) still covers its corner, and a click landing on nothing
         // visible is worse than a peek that stayed.
-        pointerEvents={
-          (isOpen || peeking) && !peekDismissed ? "auto" : "none"
-        }
+        pointerEvents={(isOpen || peeking) && !peekDismissed ? "auto" : "none"}
         // ...and therefore must NOT be hidden from assistive tech; its body is
         // made inert instead (see the content wrapper below), so the only
         // thing reachable behind the edge is the open control.
@@ -2079,36 +2077,21 @@ function LangyPanel({
                     "0 1px 2px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.5), 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12)",
                 },
               }
-            : dockShellClaimed
-              ? {
-                  // An app shell is mounted: the dock joins it as a SECOND
-                  // floating card, wearing the shell's shared card inset on
-                  // its top, right, and bottom edges so the pair sit level on
-                  // the page ground. Same card language as the content card:
-                  // full rounding, muted hairline, and (dark) the same faint
-                  // lit top rim. The strip of page ground between the two
-                  // cards is reserved by the shell, see DashboardLayout.
-                  // Spec: specs/langy/langy-panel-layout.feature
-                  top: `${SHELL_CARD_INSET}px`,
-                  right: `${SHELL_CARD_INSET}px`,
-                  bottom: `${SHELL_CARD_INSET}px`,
-                  borderWidth: "1px",
-                  borderColor: "border.muted",
-                  borderRadius: "xl",
-                  boxShadow: "none",
-                  _dark: { boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)" },
-                }
-              : {
-                  // No shell on this page (a full-screen tool like the studio):
-                  // the dock stays a flush full-height pane on the viewport edge.
-                  top: 0,
-                  right: 0,
-                  bottom: 0,
-                  borderLeftWidth: "1px",
-                  borderTopLeftRadius: 0,
-                  borderBottomLeftRadius: 0,
-                  boxShadow: "none",
-                })}
+            : {
+                // Docked: a flush full-height pane on the viewport edge,
+                // separated from the page by a hairline. The same geometry on
+                // app-shell pages and full-screen tools — the flat console
+                // shell has no cards for the dock to pair with, so the dock
+                // never changes shape as the user moves between pages.
+                // Spec: specs/langy/langy-panel-layout.feature
+                top: 0,
+                right: 0,
+                bottom: 0,
+                borderLeftWidth: "1px",
+                borderTopLeftRadius: 0,
+                borderBottomLeftRadius: 0,
+                boxShadow: "none",
+              })}
       >
         {/* Texture, under the content (which stacks at zIndex 1) and inert to
           the pointer. Two gates on purpose: the JSX renders it in the FLOATING
@@ -2201,45 +2184,45 @@ function LangyPanel({
             scope="Langy hit a snag"
             resetKeys={[activeConversationId]}
           >
-          <PanelHeader
-            conversationTitle={conversationTitle}
-            onNewChat={handleNewChat}
-            onClose={closePanel}
-            // Riding beside a drawer, the drawer owns the only close affordance
-            // on screen; a second X on the companion read as "close the drawer"
-            // and kept dismissing Langy instead. Closing the drawer returns
-            // Langy to its dock, where its own Minimise is back.
-            hideClose={isDrawerCompanion}
-            historyOpen={historyOpen}
-            onToggleHistory={() => setHistoryOpen((open) => !open)}
-            devMode={devMode}
-            devDrawerOpen={devDrawerOpen}
-            onToggleDevDrawer={() => setDevDrawerOpen((open) => !open)}
-          />
-          {/* HISTORY IS A PLACE. When the recents list is open it takes the
+            <PanelHeader
+              conversationTitle={conversationTitle}
+              onNewChat={handleNewChat}
+              onClose={closePanel}
+              // Riding beside a drawer, the drawer owns the only close affordance
+              // on screen; a second X on the companion read as "close the drawer"
+              // and kept dismissing Langy instead. Closing the drawer returns
+              // Langy to its dock, where its own Minimise is back.
+              hideClose={isDrawerCompanion}
+              historyOpen={historyOpen}
+              onToggleHistory={() => setHistoryOpen((open) => !open)}
+              devMode={devMode}
+              devDrawerOpen={devDrawerOpen}
+              onToggleDevDrawer={() => setDevDrawerOpen((open) => !open)}
+            />
+            {/* HISTORY IS A PLACE. When the recents list is open it takes the
             whole panel body — the message column AND the composer — rather
             than floating over the conversation as a popover. You are browsing,
             not composing, so a live composer under the list would only invite
             you to type into a conversation you cannot see. Picking a chat (or
             Back / Escape) hands the panel straight back. */}
-          {historyOpen ? (
-            <RecentChatsView
-              conversations={conversations}
-              isLoading={isLoadingConversations}
-              hasError={hasListError}
-              activeConversationId={activeConversationId}
-              onSelect={handleSelectConversation}
-              onDelete={(id) => void handleDeleteConversation(id)}
-              onRename={handleRenameConversation}
-              onBack={() => setHistoryOpen(false)}
-              compact={!floating}
-            />
-          ) : (
-            <>
-              {/* The context Langy is holding lives in ONE place, the composer's
+            {historyOpen ? (
+              <RecentChatsView
+                conversations={conversations}
+                isLoading={isLoadingConversations}
+                hasError={hasListError}
+                activeConversationId={activeConversationId}
+                onSelect={handleSelectConversation}
+                onDelete={(id) => void handleDeleteConversation(id)}
+                onRename={handleRenameConversation}
+                onBack={() => setHistoryOpen(false)}
+                compact={!floating}
+              />
+            ) : (
+              <>
+                {/* The context Langy is holding lives in ONE place, the composer's
             own summary row (both layouts). A second banner above the
             conversation restated the same chips and read as duplication. */}
-              {/* The message column and, BEHIND it, the ambient wash. The wash is a
+                {/* The message column and, BEHIND it, the ambient wash. The wash is a
             sibling of the scroller (not a child) so it never scrolls, never
             repaints on scroll, and never reaches the composer below.
 
@@ -2247,7 +2230,7 @@ function LangyPanel({
             nothing else on the surface, and while a turn is in flight, where a
             slow drift signals life. A settled conversation gets a plain
             surface; the wash fades out rather than popping. */}
-              {/* A flex COLUMN, so the scroller below gets a flex-resolved height.
+                {/* A flex COLUMN, so the scroller below gets a flex-resolved height.
             It used to be a plain block while the scroller asked for
             `height:100%` — a percentage against a parent whose own `height` is
             `auto` (its size comes from `flex:1`). Percentage-of-auto resolves to
@@ -2255,60 +2238,60 @@ function LangyPanel({
             never engaged `overflow-y:auto`, and the panel's `overflow:hidden`
             simply clipped the conversation. That was "it just goes off screen".
             No percentage heights survive in this column. */}
-              <Box
-                position="relative"
-                flex={1}
-                minHeight={0}
-                display="flex"
-                flexDirection="column"
-              >
-                {/* The wrapper carries the FADE (0 -> 1); the wash itself carries its
-              own near-nothing opacity in CSS. Animating the wash's opacity
-              directly would have let motion's inline `opacity: 1` overwrite the
-              0.05 that makes it subtle at all. */}
-                <MotionBox
-                  position="absolute"
-                  inset={0}
-                  overflow="hidden"
-                  pointerEvents="none"
-                  aria-hidden
-                  initial={false}
-                  animate={{ opacity: showWash ? 1 : 0 }}
-                  transition={{
-                    duration: reduceMotion ? 0 : 0.8,
-                    ease: "easeInOut",
-                  }}
-                >
-                  <Box className="langy-wash" />
-                </MotionBox>
                 <Box
-                  ref={scrollRef}
                   position="relative"
                   flex={1}
                   minHeight={0}
-                  overflowY="auto"
-                  overscrollBehaviorY="none"
-                  aria-live="polite"
-                  // Focusable, so the column answers PageUp/PageDown/Home/End. Without
-                  // a tabindex it is not a keyboard scroll target at all.
-                  tabIndex={0}
-                  role="log"
-                  aria-label="Langy conversation"
-                  // Content dissolves at the column's edges instead of
-                  // hard-clipping against the header and composer seams — the
-                  // same mask-fade the thinking line uses for its overflow.
-                  // A mask (not an overlay strip) because the floating card is
-                  // translucent glass; painting a surface-coloured gradient
-                  // over it would read as a smear on the blur.
-                  css={{
-                    "&:focus-visible": { outline: "none" },
-                    maskImage:
-                      "linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 18px), transparent 100%)",
-                    WebkitMaskImage:
-                      "linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 18px), transparent 100%)",
-                  }}
+                  display="flex"
+                  flexDirection="column"
                 >
-                  {/* The ResizeObserver's subject: one stable element whose height IS
+                  {/* The wrapper carries the FADE (0 -> 1); the wash itself carries its
+              own near-nothing opacity in CSS. Animating the wash's opacity
+              directly would have let motion's inline `opacity: 1` overwrite the
+              0.05 that makes it subtle at all. */}
+                  <MotionBox
+                    position="absolute"
+                    inset={0}
+                    overflow="hidden"
+                    pointerEvents="none"
+                    aria-hidden
+                    initial={false}
+                    animate={{ opacity: showWash ? 1 : 0 }}
+                    transition={{
+                      duration: reduceMotion ? 0 : 0.8,
+                      ease: "easeInOut",
+                    }}
+                  >
+                    <Box className="langy-wash" />
+                  </MotionBox>
+                  <Box
+                    ref={scrollRef}
+                    position="relative"
+                    flex={1}
+                    minHeight={0}
+                    overflowY="auto"
+                    overscrollBehaviorY="none"
+                    aria-live="polite"
+                    // Focusable, so the column answers PageUp/PageDown/Home/End. Without
+                    // a tabindex it is not a keyboard scroll target at all.
+                    tabIndex={0}
+                    role="log"
+                    aria-label="Langy conversation"
+                    // Content dissolves at the column's edges instead of
+                    // hard-clipping against the header and composer seams — the
+                    // same mask-fade the thinking line uses for its overflow.
+                    // A mask (not an overlay strip) because the floating card is
+                    // translucent glass; painting a surface-coloured gradient
+                    // over it would read as a smear on the blur.
+                    css={{
+                      "&:focus-visible": { outline: "none" },
+                      maskImage:
+                        "linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 18px), transparent 100%)",
+                      WebkitMaskImage:
+                        "linear-gradient(to bottom, transparent 0, black 28px, black calc(100% - 18px), transparent 100%)",
+                    }}
+                  >
+                    {/* The ResizeObserver's subject: one stable element whose height IS
                 the content height, whatever happens to be rendering inside.
                 Floating uses `display: flow-root` so a child's margin can't
                 collapse through it and shorten the observed box. The docked
@@ -2319,184 +2302,186 @@ function LangyPanel({
                 items don't margin-collapse either, so the flow-root guarantee is
                 preserved. (`measure()` reads the scroller, not this box, so
                 filling it never fakes an overflow — see useLangyStickToBottom.) */}
-                  <Box
-                    ref={contentRef}
-                    display={floating ? "flow-root" : "flex"}
-                    flexDirection="column"
-                    minHeight={floating ? undefined : "100%"}
-                  >
-                    {/* The recents list failed while the panel was open: one calm,
+                    <Box
+                      ref={contentRef}
+                      display={floating ? "flow-root" : "flex"}
+                      flexDirection="column"
+                      minHeight={floating ? undefined : "100%"}
+                    >
+                      {/* The recents list failed while the panel was open: one calm,
                   dismissable domain-error card at the top of the surface. */}
-                    {listErrorPresentation ? (
-                      <Box
-                        position="relative"
-                        paddingX={floating ? "19px" : "14px"}
-                        paddingTop={floating ? "19px" : "14px"}
-                      >
-                        <LangyError
-                          presentation={listErrorPresentation}
-                          onAction={(kind) => {
-                            if (kind === "retry") void refetchConversations();
-                          }}
-                        />
-                        <IconButton
-                          aria-label="Dismiss"
-                          size="2xs"
-                          variant="ghost"
-                          color="fg.muted"
-                          position="absolute"
-                          top={floating ? "25px" : "20px"}
-                          right={floating ? "25px" : "20px"}
-                          onClick={() => setListErrorDismissed(true)}
+                      {listErrorPresentation ? (
+                        <Box
+                          position="relative"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
                         >
-                          <X size={13} />
-                        </IconButton>
-                      </Box>
-                    ) : null}
-                    {showCardGallery ? (
-                      <LangyCardGallery />
-                    ) : langyNeedsModel ? (
-                      <VStack
-                        align="stretch"
-                        gap={2}
-                        paddingX="18px"
-                        paddingTop="18px"
-                      >
-                        <Text fontSize="sm" fontWeight="semibold">
-                          Langy needs a model to get started
-                        </Text>
-                        {/* The one subtitle under this heading is the provider
+                          <LangyError
+                            presentation={listErrorPresentation}
+                            onAction={(kind) => {
+                              if (kind === "retry") void refetchConversations();
+                            }}
+                          />
+                          <IconButton
+                            aria-label="Dismiss"
+                            size="2xs"
+                            variant="ghost"
+                            color="fg.muted"
+                            position="absolute"
+                            top={floating ? "25px" : "20px"}
+                            right={floating ? "25px" : "20px"}
+                            onClick={() => setListErrorDismissed(true)}
+                          >
+                            <X size={13} />
+                          </IconButton>
+                        </Box>
+                      ) : null}
+                      {showCardGallery ? (
+                        <LangyCardGallery />
+                      ) : langyNeedsModel ? (
+                        <VStack
+                          align="stretch"
+                          gap={2}
+                          paddingX="18px"
+                          paddingTop="18px"
+                        >
+                          <Text fontSize="sm" fontWeight="semibold">
+                            Langy needs a model to get started
+                          </Text>
+                          {/* The one subtitle under this heading is the provider
                         grid's own description; a second line here read as a
                         double title. */}
-                        <ModelProviderScreen
-                          variant="langy"
-                          onComplete={() => void resolvedDefaultQuery.refetch()}
-                        />
-                      </VStack>
-                    ) : historyErrorPresentation ? (
-                      // Ahead of the empty state deliberately: a conversation we
-                      // could not READ is not a conversation with nothing in it,
-                      // and "How can I help?" over a failed load tells the reader
-                      // their messages are gone.
-                      <VStack
-                        align="stretch"
-                        paddingX={floating ? "19px" : "14px"}
-                        paddingTop={floating ? "19px" : "14px"}
-                      >
-                        <LangyError
-                          presentation={historyErrorPresentation}
-                          onAction={onHistoryErrorAction}
-                        />
-                      </VStack>
-                    ) : isRestoringConversation ? (
-                      // Coming back to a conversation whose messages have not
-                      // arrived. Its shape, not an invitation to start one.
-                      <VStack
-                        align="stretch"
-                        paddingX={floating ? "19px" : "14px"}
-                        paddingTop={floating ? "19px" : "14px"}
-                      >
-                        <ConversationSkeleton
-                          count={skeletonMessageCount(restoringMessageCount)}
-                          dense={!floating}
-                        />
-                      </VStack>
-                    ) : isEmpty && !pendingPrompt ? (
-                      // A queued question counts as content: showing the empty
-                      // state's "How can I help?" over a question the reader
-                      // has already asked reads as the panel losing it.
-                      <EmptyState
-                        variant={floating ? "floating" : "sidebar"}
-                        panelWidth={
-                          floating ? floatingPanelWidth : SIDEBAR_PANEL_WIDTH
-                        }
-                        suggestions={emptySuggestions}
-                        onPick={(prompt) => void send(prompt)}
-                      />
-                    ) : (
-                      <VStack
-                        // The slimmer dock also runs denser: at 416px the floating
-                        // card's air turns into two-word lines, so the column trades
-                        // padding for measure.
-                        gap={floating ? "16px" : "12px"}
-                        align="stretch"
-                        paddingX={floating ? "19px" : "14px"}
-                        paddingTop={floating ? "19px" : "14px"}
-                        paddingBottom="12px"
-                        // Conversations always read top-to-bottom. The old sidebar
-                        // `marginTop:auto` made every short chat rise out of the
-                        // composer, which looked like messages were entering from the
-                        // bottom and made history jump as it grew.
-                      >
-                        {displayMessages.map((message, index) => (
-                          // One message's render crash stays that message's:
-                          // a malformed tool part or card payload draws an
-                          // inline error where the message would have been,
-                          // and the rest of the conversation stands.
-                          <IsolatedErrorBoundary
-                            key={message.id}
-                            scope="This message failed to render"
-                            resetKeys={[message.id]}
-                          >
-                          <MessageContent
-                            message={message}
-                            organizationId={organizationId}
-                            appliedOutcomes={appliedOutcomes}
-                            discardedProposals={discardedProposalIds}
-                            applyingProposals={applyingProposalIds}
-                            onApply={applyProposal}
-                            onDiscard={discardProposalInStore}
-                            conversationId={activeConversationId}
-                            isStreaming={
-                              displayBusy &&
-                              index === displayMessages.length - 1 &&
-                              message.role === "assistant"
+                          <ModelProviderScreen
+                            variant="langy"
+                            onComplete={() =>
+                              void resolvedDefaultQuery.refetch()
                             }
-                            // Only ever on a turn that COMPLETED. We were asking
-                            // "How did Langy do?" above a timeout card — rating an
-                            // answer that never arrived. The failure IS the feedback;
-                            // asking the user to score it as well is insulting, and
-                            // whatever they clicked would be noise in the data.
-                            //
-                            // `!turnError` covers the failure; `!recovery.isRecovering`
-                            // covers the turn that is still being re-driven and might
-                            // yet succeed. This is only the position + settled gate:
-                            // whether a card actually shows is `shouldAskFeedback` (the
-                            // backend cadence), the directive, or the pin.
-                            showFeedback={
-                              !isBusy &&
-                              // The durable phase too — never ask "How did Langy
-                              // do?" while a turn is still in flight. And never
-                              // while time-travelling: you cannot rate the past.
-                              !timeTravel &&
-                              !turnActive &&
-                              !turnError &&
-                              !recovery.isRecovering &&
-                              message.role === "assistant" &&
-                              index === displayMessages.length - 1
-                            }
-                            shouldAskFeedback={shouldAskFeedback}
-                            isFeedbackPinned={
-                              pinnedFeedbackMessageId === message.id
-                            }
-                            // The block channel (ADR-060). Interaction is
-                            // live-only: while time-travelling the cards
-                            // render read-only from the replayed record.
-                            choicesTimeline={choicesTimeline}
-                            onChoiceSelect={
-                              timeTravel ? undefined : selectChoice
-                            }
-                            onVerifyDerivedCard={
-                              timeTravel ? undefined : verifyDerivedCard
-                            }
-                            // (No connect-card prop: MessageContent no longer sniffs
-                            // the prose for `[langy:connect-github]`. The connect card
-                            // is driven by the structured `langy_github_not_connected`
-                            // error below — one road, not two.)
                           />
-                          </IsolatedErrorBoundary>
-                        ))}
-                        {/* The question the reader has already asked but which
+                        </VStack>
+                      ) : historyErrorPresentation ? (
+                        // Ahead of the empty state deliberately: a conversation we
+                        // could not READ is not a conversation with nothing in it,
+                        // and "How can I help?" over a failed load tells the reader
+                        // their messages are gone.
+                        <VStack
+                          align="stretch"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
+                        >
+                          <LangyError
+                            presentation={historyErrorPresentation}
+                            onAction={onHistoryErrorAction}
+                          />
+                        </VStack>
+                      ) : isRestoringConversation ? (
+                        // Coming back to a conversation whose messages have not
+                        // arrived. Its shape, not an invitation to start one.
+                        <VStack
+                          align="stretch"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
+                        >
+                          <ConversationSkeleton
+                            count={skeletonMessageCount(restoringMessageCount)}
+                            dense={!floating}
+                          />
+                        </VStack>
+                      ) : isEmpty && !pendingPrompt ? (
+                        // A queued question counts as content: showing the empty
+                        // state's "How can I help?" over a question the reader
+                        // has already asked reads as the panel losing it.
+                        <EmptyState
+                          variant={floating ? "floating" : "sidebar"}
+                          panelWidth={
+                            floating ? floatingPanelWidth : SIDEBAR_PANEL_WIDTH
+                          }
+                          suggestions={emptySuggestions}
+                          onPick={(prompt) => void send(prompt)}
+                        />
+                      ) : (
+                        <VStack
+                          // The slimmer dock also runs denser: at 416px the floating
+                          // card's air turns into two-word lines, so the column trades
+                          // padding for measure.
+                          gap={floating ? "16px" : "12px"}
+                          align="stretch"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
+                          paddingBottom="12px"
+                          // Conversations always read top-to-bottom. The old sidebar
+                          // `marginTop:auto` made every short chat rise out of the
+                          // composer, which looked like messages were entering from the
+                          // bottom and made history jump as it grew.
+                        >
+                          {displayMessages.map((message, index) => (
+                            // One message's render crash stays that message's:
+                            // a malformed tool part or card payload draws an
+                            // inline error where the message would have been,
+                            // and the rest of the conversation stands.
+                            <IsolatedErrorBoundary
+                              key={message.id}
+                              scope="This message failed to render"
+                              resetKeys={[message.id]}
+                            >
+                              <MessageContent
+                                message={message}
+                                organizationId={organizationId}
+                                appliedOutcomes={appliedOutcomes}
+                                discardedProposals={discardedProposalIds}
+                                applyingProposals={applyingProposalIds}
+                                onApply={applyProposal}
+                                onDiscard={discardProposalInStore}
+                                conversationId={activeConversationId}
+                                isStreaming={
+                                  displayBusy &&
+                                  index === displayMessages.length - 1 &&
+                                  message.role === "assistant"
+                                }
+                                // Only ever on a turn that COMPLETED. We were asking
+                                // "How did Langy do?" above a timeout card — rating an
+                                // answer that never arrived. The failure IS the feedback;
+                                // asking the user to score it as well is insulting, and
+                                // whatever they clicked would be noise in the data.
+                                //
+                                // `!turnError` covers the failure; `!recovery.isRecovering`
+                                // covers the turn that is still being re-driven and might
+                                // yet succeed. This is only the position + settled gate:
+                                // whether a card actually shows is `shouldAskFeedback` (the
+                                // backend cadence), the directive, or the pin.
+                                showFeedback={
+                                  !isBusy &&
+                                  // The durable phase too — never ask "How did Langy
+                                  // do?" while a turn is still in flight. And never
+                                  // while time-travelling: you cannot rate the past.
+                                  !timeTravel &&
+                                  !turnActive &&
+                                  !turnError &&
+                                  !recovery.isRecovering &&
+                                  message.role === "assistant" &&
+                                  index === displayMessages.length - 1
+                                }
+                                shouldAskFeedback={shouldAskFeedback}
+                                isFeedbackPinned={
+                                  pinnedFeedbackMessageId === message.id
+                                }
+                                // The block channel (ADR-060). Interaction is
+                                // live-only: while time-travelling the cards
+                                // render read-only from the replayed record.
+                                choicesTimeline={choicesTimeline}
+                                onChoiceSelect={
+                                  timeTravel ? undefined : selectChoice
+                                }
+                                onVerifyDerivedCard={
+                                  timeTravel ? undefined : verifyDerivedCard
+                                }
+                                // (No connect-card prop: MessageContent no longer sniffs
+                                // the prose for `[langy:connect-github]`. The connect card
+                                // is driven by the structured `langy_github_not_connected`
+                                // error below — one road, not two.)
+                              />
+                            </IsolatedErrorBoundary>
+                          ))}
+                          {/* The question the reader has already asked but which
                             has not become a message yet.
 
                             `askLangy` blanks the draft the moment it queues the
@@ -2509,52 +2494,54 @@ function LangyPanel({
                             That is not a polish gap, it is input that looks
                             lost. Drawn as the real bubble, in the place the
                             real bubble will appear, so the swap is invisible. */}
-                        {!timeTravel && pendingPrompt ? (
-                          <QueuedPrompt
-                            prompt={pendingPrompt}
-                            reduceMotion={reduceMotion}
-                          />
-                        ) : null}
-                        {turnInFlight ? (
-                          // Extra air above the working lines: the column's gap
-                          // alone left them hugging the cards of the streaming
-                          // answer, which read as part of the message rather than
-                          // the live edge below it.
-                          <VStack align="stretch" gap={2.5} marginTop={1.5}>
-                            {/* Reasoning is a SIGNAL, never a surface: the model's
+                          {!timeTravel && pendingPrompt ? (
+                            <QueuedPrompt
+                              prompt={pendingPrompt}
+                              reduceMotion={reduceMotion}
+                            />
+                          ) : null}
+                          {turnInFlight ? (
+                            // Extra air above the working lines: the column's gap
+                            // alone left them hugging the cards of the streaming
+                            // answer, which read as part of the message rather than
+                            // the live edge below it.
+                            <VStack align="stretch" gap={2.5} marginTop={1.5}>
+                              {/* Reasoning is a SIGNAL, never a surface: the model's
                           thinking is not shown to the user, so it reaches the
                           line as a boolean that only changes its words
                           ("Thinking…" instead of a false escalation toward
                           "stuck"). The store still accumulates the text — the
                           fold's `thinking` motion is derived from it. */}
-                            {hasTurnDetail &&
-                            activityOwnership.showStandaloneSignals ? (
-                              <StreamingStatusLine
-                                status={activityOwnership.standaloneStatus}
-                                progress={activityOwnership.standaloneProgress}
-                                progressSample={
-                                  activityOwnership.standaloneProgressSample
-                                }
-                                metrics={displaySignals.metrics}
-                                segment={displaySignals.segment}
-                              />
-                            ) : !hasInlineProgressOwner ? (
-                              <LangyThinkingLine
-                                messages={displayMessages}
-                                hasLiveReasoning={!!displaySignals.reasoning}
-                              />
-                            ) : null}
-                          </VStack>
-                        ) : null}
-                        {/* Recovering beats failing. While the policy has a retry
+                              {hasTurnDetail &&
+                              activityOwnership.showStandaloneSignals ? (
+                                <StreamingStatusLine
+                                  status={activityOwnership.standaloneStatus}
+                                  progress={
+                                    activityOwnership.standaloneProgress
+                                  }
+                                  progressSample={
+                                    activityOwnership.standaloneProgressSample
+                                  }
+                                  metrics={displaySignals.metrics}
+                                  segment={displaySignals.segment}
+                                />
+                              ) : !hasInlineProgressOwner ? (
+                                <LangyThinkingLine
+                                  messages={displayMessages}
+                                  hasLiveReasoning={!!displaySignals.reasoning}
+                                />
+                              ) : null}
+                            </VStack>
+                          ) : null}
+                          {/* Recovering beats failing. While the policy has a retry
                     pending, the turn is — as far as the user is concerned —
                     still in flight, so it reads as a quiet status line, not a
                     red card asking them to do something they need not do. The
                     card appears only once the policy has given up, or never had
                     a retry to give (a lost session, an unknown error). */}
-                      </VStack>
-                    )}
-                    {/* FAILURE RENDERS WHETHER OR NOT THE THREAD HAS MESSAGES.
+                        </VStack>
+                      )}
+                      {/* FAILURE RENDERS WHETHER OR NOT THE THREAD HAS MESSAGES.
                       This block used to live INSIDE the non-empty branch above,
                       which meant a turn that failed before any message reached
                       the engine — the first send of a fresh chat, the exact case
@@ -2563,133 +2550,133 @@ function LangyPanel({
                       must never be quieter than a success. Suppressed while the
                       inspector scrubs the past: a live failure is not part of
                       the moment being replayed. */}
-                    {/* Padded to the message column's own measure. This block
+                      {/* Padded to the message column's own measure. This block
                         sits OUTSIDE the column (it has to — a failure renders
                         whether or not the thread has messages), and outside it
                         there is no padding at all, so the card ran edge to edge
                         against the panel while every message beside it was
                         inset. */}
-                    {!timeTravel && failureSurface ? (
-                      <Box
-                        paddingX={floating ? "19px" : "14px"}
-                        paddingBottom="12px"
-                      >
-                        {failureSurface}
-                      </Box>
-                    ) : null}
-                    {/* The live edge. A smooth `scrollIntoView` on this sentinel is
+                      {!timeTravel && failureSurface ? (
+                        <Box
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingBottom="12px"
+                        >
+                          {failureSurface}
+                        </Box>
+                      ) : null}
+                      {/* The live edge. A smooth `scrollIntoView` on this sentinel is
                   what follows the stream — see useLangyStickToBottom. */}
-                    <Box ref={endRef} height="1px" aria-hidden />
+                      <Box ref={endRef} height="1px" aria-hidden />
+                    </Box>
                   </Box>
-                </Box>
-                {/* Released the pin, and content is still arriving below the fold?
+                  {/* Released the pin, and content is still arriving below the fold?
               Offer the way back. Absolutely positioned inside the wrapper — a
               SIBLING of the scroller — so it neither scrolls nor repaints on
               scroll, the same reason the wash lives there. */}
-                <JumpToLatest
-                  visible={!isPinned && canScroll}
-                  onClick={jumpToLatest}
-                />
-              </Box>
-              {/* "One turn at a time" is a WAIT, not a failure: it rides here, a
+                  <JumpToLatest
+                    visible={!isPinned && canScroll}
+                    onClick={jumpToLatest}
+                  />
+                </Box>
+                {/* "One turn at a time" is a WAIT, not a failure: it rides here, a
             dismissable notice attached above the composer, and the draft the user
             just tried to send stays in the field (restored in `send`) rather than
             being lost to a history card. Dismiss clears the useChat error. It
             slides up out of the composer (height + fade) instead of snapping. */}
-              <AnimatePresence initial={false}>
-                {turnError?.render === "composer-notice" ? (
-                  <MotionNotice
-                    key="composer-notice"
-                    position="relative"
-                    overflow="hidden"
-                    paddingX={floating ? "19px" : "14px"}
-                    paddingBottom="6px"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.18, ease: "easeOut" }}
-                  >
-                    <LangyError
-                      presentation={turnError}
-                      onAction={() => undefined}
-                    />
-                    <IconButton
-                      aria-label="Dismiss"
-                      size="2xs"
-                      variant="ghost"
-                      color="fg.muted"
-                      position="absolute"
-                      top="6px"
-                      right={floating ? "25px" : "20px"}
-                      onClick={() => clearError()}
+                <AnimatePresence initial={false}>
+                  {turnError?.render === "composer-notice" ? (
+                    <MotionNotice
+                      key="composer-notice"
+                      position="relative"
+                      overflow="hidden"
+                      paddingX={floating ? "19px" : "14px"}
+                      paddingBottom="6px"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
                     >
-                      <X size={13} />
-                    </IconButton>
-                  </MotionNotice>
-                ) : null}
-              </AnimatePresence>
-              {/* TIME TRAVEL veil. While the inspector's scrubber is off LIVE,
+                      <LangyError
+                        presentation={turnError}
+                        onAction={() => undefined}
+                      />
+                      <IconButton
+                        aria-label="Dismiss"
+                        size="2xs"
+                        variant="ghost"
+                        color="fg.muted"
+                        position="absolute"
+                        top="6px"
+                        right={floating ? "25px" : "20px"}
+                        onClick={() => clearError()}
+                      >
+                        <X size={13} />
+                      </IconButton>
+                    </MotionNotice>
+                  ) : null}
+                </AnimatePresence>
+                {/* TIME TRAVEL veil. While the inspector's scrubber is off LIVE,
                 the composer is visible but inert — you cannot send into, or
                 stop, the past. The strip names the viewed moment and is the way
                 back. */}
-              {timeTravel ? (
-                <HStack
-                  paddingX={floating ? "19px" : "14px"}
-                  paddingBottom="4px"
-                  gap={2}
-                >
-                  <Text textStyle="2xs" color="orange.fg" fontWeight="600">
-                    Viewing tape @{" "}
-                    {timeTravel.atMs
-                      ? new Date(timeTravel.atMs).toLocaleTimeString()
-                      : "start"}
-                  </Text>
-                  <chakra.button
-                    type="button"
-                    onClick={() => useLangyDevLog.getState().setScrub(null)}
-                    borderWidth={0}
-                    borderRadius="sm"
-                    paddingX={1.5}
-                    paddingY={0.5}
-                    cursor="pointer"
-                    textStyle="2xs"
-                    fontWeight="600"
-                    background="orange.subtle"
-                    color="orange.fg"
+                {timeTravel ? (
+                  <HStack
+                    paddingX={floating ? "19px" : "14px"}
+                    paddingBottom="4px"
+                    gap={2}
                   >
-                    back to live
-                  </chakra.button>
-                </HStack>
-              ) : null}
-              {/* The composer reads the turn phase straight from the store (ADR-058):
+                    <Text textStyle="2xs" color="orange.fg" fontWeight="600">
+                      Viewing tape @{" "}
+                      {timeTravel.atMs
+                        ? new Date(timeTravel.atMs).toLocaleTimeString()
+                        : "start"}
+                    </Text>
+                    <chakra.button
+                      type="button"
+                      onClick={() => useLangyDevLog.getState().setScrub(null)}
+                      borderWidth={0}
+                      borderRadius="sm"
+                      paddingX={1.5}
+                      paddingY={0.5}
+                      cursor="pointer"
+                      textStyle="2xs"
+                      fontWeight="600"
+                      background="orange.subtle"
+                      color="orange.fg"
+                    >
+                      back to live
+                    </chakra.button>
+                  </HStack>
+                ) : null}
+                {/* The composer reads the turn phase straight from the store (ADR-058):
             it shows Send when idle and Stop while a turn is in flight or
             stopping — no isBusy / serverTurnInFlight / isStopping / queue props. */}
-              <Box
-                pointerEvents={timeTravel ? "none" : undefined}
-                opacity={timeTravel ? 0.55 : undefined}
-                aria-hidden={timeTravel ? true : undefined}
-              >
-                <Composer
-                  model={modelOverride}
-                  modelOptions={modelOptions}
-                  langyDefaultModel={langyDefaultModel}
-                  onModelChange={setModelOverride}
-                  onSend={send}
-                  onStop={handleStop}
-                  variant={floating ? "floating" : "sidebar"}
-                  disabled={!projectId}
-                  // ALL chips — page-derived AND explicitly attached (home-briefing
-                  // investigate/attach) — so the `#` palette can reference everything
-                  // the conversation will actually be given.
-                  contextChips={allContextChips}
-                  onRemoveChip={removeContextChip}
-                  addableChips={addableChips}
-                  onAddChip={chooseChip}
-                  onKindIntent={onKindIntent}
-                />
-              </Box>
-            </>
-          )}
+                <Box
+                  pointerEvents={timeTravel ? "none" : undefined}
+                  opacity={timeTravel ? 0.55 : undefined}
+                  aria-hidden={timeTravel ? true : undefined}
+                >
+                  <Composer
+                    model={modelOverride}
+                    modelOptions={modelOptions}
+                    langyDefaultModel={langyDefaultModel}
+                    onModelChange={setModelOverride}
+                    onSend={send}
+                    onStop={handleStop}
+                    variant={floating ? "floating" : "sidebar"}
+                    disabled={!projectId}
+                    // ALL chips — page-derived AND explicitly attached (home-briefing
+                    // investigate/attach) — so the `#` palette can reference everything
+                    // the conversation will actually be given.
+                    contextChips={allContextChips}
+                    onRemoveChip={removeContextChip}
+                    addableChips={addableChips}
+                    onAddChip={chooseChip}
+                    onKindIntent={onKindIntent}
+                  />
+                </Box>
+              </>
+            )}
           </IsolatedErrorBoundary>
         </VStack>
       </MotionBox>

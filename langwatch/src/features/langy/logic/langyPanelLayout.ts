@@ -11,25 +11,22 @@
  */
 export const SIDEBAR_PANEL_WIDTH = 392;
 
-/** What the page reserves for the flush full-height dock (no-shell pages). */
+/**
+ * What the page reserves for the flush full-height dock. The dock is the
+ * same geometry everywhere — app-shell pages and full-screen tools alike —
+ * so this is the whole story: a pane of this width on the viewport's right
+ * edge. Spec: specs/langy/langy-panel-layout.feature
+ */
 export const LANGY_DOCKED_OFFSET = SIDEBAR_PANEL_WIDTH;
 
 /**
- * The strip of page ground between the content card and the docked panel when
- * an app shell claims the dock, the gray breathing room that makes the panel
- * read as a second card rather than a pane glued to the first.
+ * The strip of space between an open drawer and the docked panel's floating
+ * COMPANION while the two ride together (the dock morphs into a floating
+ * card when a drawer opens — see LangyPanel). Companion-mode only: the
+ * resting dock is a flush pane with no gaps.
+ * Spec: specs/langy/langy-panel-layout.feature
  */
-export const LANGY_DOCK_GAP = 12;
-
-/**
- * The app shell's card inset: the strip of page ground between the viewport
- * edge and every shell card — the content card and the docked panel, which
- * joins it as a second card wearing the same inset. DashboardLayout derives
- * its viewport math from this same constant, so the two cannot drift apart.
- * (The shell has no full-width header bar anymore; context lives inside the
- * content card's own header row.)
- */
-export const SHELL_CARD_INSET = 10;
+export const LANGY_COMPANION_GAP = 12;
 
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
@@ -111,8 +108,9 @@ export const INSPECTOR_TUCK = 10;
  *
  * ONE derivation for both modes, so the drawer always mirrors the panel it
  * hangs off: same top and bottom edges (floating: the measured panel height,
- * bottom-anchored on the same inset; docked: the same header-to-floor span the
- * dock claims), and the seam edge landing exactly under the panel's left edge.
+ * bottom-anchored on the same inset; docked: the full viewport height the
+ * flush pane claims), and the seam edge landing exactly under the panel's
+ * left edge.
  */
 export interface LangyInspectorFrame {
   /** Offset from the viewport's right edge to the drawer's right edge. */
@@ -131,12 +129,9 @@ export interface LangyInspectorFrame {
 
 export function resolveInspectorFrame({
   floating,
-  dockShellClaimed,
   panelHeightPx,
 }: {
   floating: boolean;
-  /** An app shell holds the dock below its header (sidebar mode only). */
-  dockShellClaimed: boolean;
   /**
    * The panel's real rendered height (floating mode), measured by the panel
    * itself. Null before the first measurement — the frame falls back to the
@@ -159,19 +154,15 @@ export function resolveInspectorFrame({
     };
   }
   return {
-    // Exactly the dock's own span: the floating-card inset when a shell
-    // claims the dock, the full viewport edge on a no-shell page.
-    right: `${
-      SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK + (dockShellClaimed ? SHELL_CARD_INSET : 0)
-    }px`,
-    top: `${dockShellClaimed ? SHELL_CARD_INSET : 0}px`,
-    bottom: `${dockShellClaimed ? SHELL_CARD_INSET : 0}px`,
+    // Exactly the dock's own span: the flush pane's full viewport edge.
+    right: `${SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK}px`,
+    top: "0px",
+    bottom: "0px",
     height: null,
     maxHeight: null,
-    // The dock card's own rounding (Chakra `xl`), so the pair reads as one
-    // widening card; the flush no-shell pane stays square.
-    borderTopLeftRadius: dockShellClaimed ? "12px" : "0px",
-    borderBottomLeftRadius: dockShellClaimed ? "12px" : "0px",
+    // Square, like the pane it hangs off.
+    borderTopLeftRadius: "0px",
+    borderBottomLeftRadius: "0px",
   };
 }
 

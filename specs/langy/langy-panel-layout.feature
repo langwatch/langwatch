@@ -7,17 +7,13 @@ Feature: Langy panel layout modes
   as long as it is open, so it runs narrower and denser, on a laptop screen
   the page must keep enough room to work in.
 
-  The app shell draws its content as a rounded card floating on the gray
-  page ground: a full-height sidebar column sits on the ground, and the
-  content card next to it carries its own header row inside, inset from the
-  ground by the shell's shared card inset on its top, right, and bottom
-  edges. When Langy docks inside that shell it joins the same language:
-  Langy becomes a SECOND floating card, same surface, same radius, same
-  hairline, wearing the same inset, separated from the first by a strip of
-  the page ground. Both cards derive their edges from one shared constant,
-  so they cannot mis-align. Pages that do not use the app shell
-  (full-screen tools like the studio) keep the flush full-height dock: they
-  have no gray ground or rounded card for Langy to pair with.
+  The app shell is a flat console frame: a full-height navigation rail on
+  the left and an edge-to-edge workspace beside it. When Langy docks it
+  joins that language as a flush full-height pane on the viewport's right
+  edge, separated from the page by a hairline — the same geometry on shell
+  pages and on full-screen tools without the shell, so the dock never
+  changes shape as the user moves between them. Only the floating card
+  overlays and rounds; the dock is always a pane.
 
   Background:
     Given I am signed in with access to a project that has Langy
@@ -32,36 +28,23 @@ Feature: Langy panel layout modes
     Given the Langy panel is open in sidebar mode
     Then the conversation column uses tighter padding and message spacing than floating mode
 
-  Scenario: Docking inside the app shell makes Langy a second content card
-    Given a page that uses the app shell
+  Scenario: The dock is a flush full-height pane on every page
     When the Langy panel opens in sidebar mode
-    Then the panel wears the shell's shared card inset, level with the content card's top edge
-    And its corners are rounded with the same radius as the content card
-    And its edges carry the same muted hairline as the content card
-
-  Scenario: The reserved strip replaces the content card's right gutter while Langy is docked
-    Given a page that uses the app shell
-    When the Langy panel opens in sidebar mode
-    Then the content card keeps its rounded corners and hairline on every edge
-    And a strip of the page ground separates the two cards
-
-  Scenario: The sidebar column is untouched while Langy is docked
-    Given a page that uses the app shell
-    When the Langy panel opens in sidebar mode
-    Then the navigation sidebar keeps its full height and width
-    And only the content column reserves room for the docked panel
-
-  Scenario: Pages without the app shell keep the flush dock
-    Given a full-screen page that does not use the app shell
-    When the Langy panel opens in sidebar mode
-    Then the panel docks flush to the viewport edge at full height
+    Then the panel docks flush to the viewport's right edge at full height
+    And a hairline separates it from the page
     And the page reserves the panel's width so content is not covered
+    And the geometry is the same on app-shell pages and full-screen tools
+
+  Scenario: The navigation rail is untouched while Langy is docked
+    Given a page that uses the app shell
+    When the Langy panel opens in sidebar mode
+    Then the navigation rail keeps its full height and width
+    And only the content column reserves room for the docked panel
 
   Scenario: Closing the dock returns the page to full width
     Given the Langy panel is open in sidebar mode
     When I close the panel
     Then page content reclaims the full viewport width
-    And the content card extends back to the viewport edge without right rounding
 
   # The morph idiom is not only panel-to-panel. The home page's lit block is
   # an ORIGIN for it: its composer is the same object as the panel's, so

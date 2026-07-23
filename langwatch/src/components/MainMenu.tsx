@@ -56,7 +56,7 @@ export const MainMenu = React.memo(function MainMenu({
 
   return (
     <Box
-      background="bg.page"
+      background="nav.bg"
       width={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
       minWidth={isCompact ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED}
       height="100%"
@@ -71,9 +71,14 @@ export const MainMenu = React.memo(function MainMenu({
         left={0}
         width={currentWidth}
         height="100%"
-        background="bg.page"
+        background="nav.bg"
         transition="width 0.15s ease-in-out"
         overflow="hidden"
+        // Hover-expanded over the workspace, the ink overlay needs a cast
+        // shadow to read as a layer; at rest the rail is flat.
+        boxShadow={
+          isCompact && isHovered ? "0 12px 32px rgba(0,0,0,0.45)" : "none"
+        }
       >
         <VStack
           paddingX={2}
@@ -97,7 +102,7 @@ export const MainMenu = React.memo(function MainMenu({
               scrollbarWidth: "thin",
               "&::-webkit-scrollbar": { width: "4px" },
               "&::-webkit-scrollbar-thumb": {
-                background: "var(--chakra-colors-border-emphasized)",
+                background: "rgba(255,255,255,0.14)",
                 borderRadius: "2px",
               },
               "&::-webkit-scrollbar-track": { background: "transparent" },

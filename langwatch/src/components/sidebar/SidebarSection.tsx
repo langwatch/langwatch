@@ -76,14 +76,17 @@ const SidebarSectionToggle = ({
         gap={showExpanded ? 1 : 0}
         justifyContent={showExpanded ? "flex-start" : "center"}
         borderRadius="md"
-        color="label.fgMuted"
+        color="nav.sectionFg"
         _hover={{ color: "nav.fg" }}
       >
         {showExpanded && (
+          /* Engraved console label: the utility mono face, small, uppercase,
+             widely tracked. Spec: specs/navigation/shell-visual-language.feature */
           <Text
-            fontSize="11px"
+            fontFamily="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace"
+            fontSize="10px"
             fontWeight="medium"
-            letterSpacing="0.08em"
+            letterSpacing="0.14em"
             textTransform="uppercase"
             whiteSpace="nowrap"
           >

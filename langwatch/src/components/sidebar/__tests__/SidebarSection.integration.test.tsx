@@ -65,7 +65,7 @@ describe("<SidebarSection />", () => {
   });
 
   /** @scenario Collapse primary navigation sections */
-  it("shows a dim caret beside the label only while collapsed", async () => {
+  it("keeps the caret invisible while expanded and shows it dim while collapsed", async () => {
     const user = userEvent.setup();
     renderSection();
 
@@ -74,16 +74,19 @@ describe("<SidebarSection />", () => {
 
     expect(heading).not.toBeNull();
     expect(heading).toHaveStyle({ justifyContent: "flex-start" });
-    // Expanded headings stay decluttered — no caret. Pinned end-to-end by
-    // documentation-link-style.spec.ts ("section carets stay dim").
-    expect(heading?.querySelector("svg")).toBeNull();
+    // Quiet affordance: the caret is rendered but invisible until the
+    // pointer hovers the heading.
+    // Spec: specs/navigation/shell-visual-language.feature
+    const expandedCaret = label.nextElementSibling;
+    expect(expandedCaret?.querySelector("svg")).not.toBeNull();
+    expect(expandedCaret).toHaveStyle({ opacity: "0" });
 
     await user.click(screen.getByRole("button", { name: "Collapse Observe" }));
 
     const collapsedLabel = screen.getByText("Observe");
     const caretWrapper = collapsedLabel.nextElementSibling;
     expect(caretWrapper?.querySelector("svg")).not.toBeNull();
-    expect(caretWrapper).toHaveStyle({ opacity: "0.5" });
+    expect(caretWrapper).toHaveStyle({ opacity: "0.6" });
   });
 
   /** @scenario Collapse primary navigation sections */

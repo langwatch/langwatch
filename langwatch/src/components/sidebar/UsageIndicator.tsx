@@ -124,9 +124,9 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
                   <Text fontSize="12px" color="nav.fgMuted">
                     Usage
                   </Text>
-                  <Info size={12} color="var(--chakra-colors-fg-muted)" />
+                  <Info size={12} color="var(--chakra-colors-nav-fg-muted)" />
                 </HStack>
-                <Text fontSize="12px" color="fg.muted">
+                <Text fontSize="12px" color="nav.fgMuted">
                   {Math.round(percentage)}%
                 </Text>
               </HStack>
@@ -142,7 +142,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
               >
                 <Progress.Track
                   borderRadius="full"
-                  backgroundColor="bg.muted"
+                  backgroundColor="rgba(255,255,255,0.12)"
                   height="8px"
                 >
                   <Progress.Range />
@@ -158,7 +158,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
               width="16px"
               height="16px"
             >
-              <Info size={16} color="var(--chakra-colors-fg-muted)" />
+              <Info size={16} color="var(--chakra-colors-nav-fg-muted)" />
             </Box>
           )}
         </HStack>

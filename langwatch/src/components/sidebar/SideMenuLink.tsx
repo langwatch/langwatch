@@ -105,31 +105,27 @@ export const SideMenuItem = ({
       paddingX={2.5}
       borderRadius="md"
       backgroundColor={isActive ? "nav.bgActive" : "transparent"}
-      // In light mode the active row is a white card on the gray rail — a
-      // whisper of shadow sells the lift; hover keeps the flat gray fill.
-      _light={{
-        boxShadow: isActive
-          ? "0 1px 2px rgba(16,24,40,0.06), 0 0 0 1px rgba(16,24,40,0.04)"
-          : "none",
-      }}
       _hover={{
         backgroundColor: isActive ? "nav.bgActive" : "nav.bgHover",
       }}
       transition="background-color 0.12s ease-in-out"
     >
-      {/* The one place the chrome wears the brand: a small orange notch on
-          the active row. It survives the compact rail, where the label and
-          background can't carry the signal alone.
+      {/* The active row's indicator light: a small brand-colored LED with a
+          soft glow on the row's left edge, like a channel light on an
+          instrument panel. It survives the compact rail, where the label
+          and background can't carry the signal alone.
           Spec: specs/navigation/shell-visual-language.feature */}
       {isActive && (
         <Box
           position="absolute"
-          left="-1px"
-          top="20%"
-          bottom="20%"
-          width="2.5px"
+          left="2px"
+          top="50%"
+          transform="translateY(-50%)"
+          width="4px"
+          height="4px"
           borderRadius="full"
           backgroundColor="orange.solid"
+          boxShadow="0 0 6px 1.5px rgba(237,137,38,0.55)"
           pointerEvents="none"
         />
       )}

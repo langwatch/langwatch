@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  SHELL_CARD_INSET,
   FLOATING_PANEL_CSS_WIDTH,
   FLOATING_PANEL_INSET,
   FLOATING_PANEL_MAX_WIDTH,
@@ -33,7 +32,6 @@ describe("resolveInspectorFrame", () => {
     it("mirrors the panel's measured height on the panel's own inset", () => {
       const frame = resolveInspectorFrame({
         floating: true,
-        dockShellClaimed: false,
         panelHeightPx: 487,
       });
 
@@ -47,7 +45,6 @@ describe("resolveInspectorFrame", () => {
     it("tucks its right edge under the panel's left edge", () => {
       const frame = resolveInspectorFrame({
         floating: true,
-        dockShellClaimed: false,
         panelHeightPx: 487,
       });
 
@@ -59,7 +56,6 @@ describe("resolveInspectorFrame", () => {
     it("falls back to the panel's resting silhouette before measurement", () => {
       const frame = resolveInspectorFrame({
         floating: true,
-        dockShellClaimed: false,
         panelHeightPx: null,
       });
 
@@ -69,29 +65,16 @@ describe("resolveInspectorFrame", () => {
   });
 
   describe("given the docked sidebar", () => {
-    it("wears the shell's shared card inset under an app shell", () => {
+    it("runs the full viewport edge, square like the flush pane", () => {
       const frame = resolveInspectorFrame({
         floating: false,
-        dockShellClaimed: true,
-        panelHeightPx: null,
-      });
-
-      expect(frame.top).toBe(`${SHELL_CARD_INSET}px`);
-      expect(frame.bottom).toBe(`${SHELL_CARD_INSET}px`);
-      expect(frame.height).toBeNull();
-      expect(frame.right).toBe(
-        `${SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK + SHELL_CARD_INSET}px`,
-      );
-    });
-
-    it("runs the full viewport edge on a no-shell page, square like the pane", () => {
-      const frame = resolveInspectorFrame({
-        floating: false,
-        dockShellClaimed: false,
         panelHeightPx: null,
       });
 
       expect(frame.top).toBe("0px");
+      expect(frame.bottom).toBe("0px");
+      expect(frame.height).toBeNull();
+      expect(frame.right).toBe(`${SIDEBAR_PANEL_WIDTH - INSPECTOR_TUCK}px`);
       expect(frame.borderTopLeftRadius).toBe("0px");
     });
   });
