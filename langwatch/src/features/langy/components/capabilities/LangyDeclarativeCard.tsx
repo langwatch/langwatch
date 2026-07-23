@@ -17,6 +17,7 @@
  * a real answer and says so in real words.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
+import { extractPlatformUrl } from "~/utils/platformHref";
 import { parseCardResult, type CliResultDigest } from "@langwatch/langy";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import {
@@ -494,6 +495,7 @@ export function LangyDeclarativeCard({
         projectSlug={projectSlug}
         // A removed resource has no page left — link to the surface index.
         resourceId={removed ? null : id}
+        platformUrl={removed ? null : extractPlatformUrl(output)}
         icon={descriptor.icon}
       >
         <BodyLine>{writeSentence(tone)}</BodyLine>
@@ -511,6 +513,7 @@ export function LangyDeclarativeCard({
       title={title}
       projectSlug={projectSlug}
       resourceId={tone === "removed" ? null : id}
+      platformUrl={tone === "removed" ? null : extractPlatformUrl(output)}
       icon={descriptor.icon}
     >
       {parsed.ok ? (

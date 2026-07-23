@@ -146,6 +146,9 @@ describe("Workflows REST API", () => {
         expect(body[0].id).toBe(workflow.id);
         expect(body[0].name).toBe("Test Workflow");
         expect(body[0].description).toBe("A test workflow");
+        // Each row's platform link addresses THAT workflow's editor, never
+        // the bare /workflows index.
+        expect(body[0].platformUrl).toContain(`/studio/${workflow.id}`);
       });
 
       it("excludes archived workflows", async () => {
@@ -193,6 +196,7 @@ describe("Workflows REST API", () => {
           isEvaluator: true,
           isComponent: false,
         });
+        expect(body.platformUrl).toContain(`/studio/${workflow.id}`);
       });
     });
 
