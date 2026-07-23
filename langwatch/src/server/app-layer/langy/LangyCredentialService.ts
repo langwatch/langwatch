@@ -301,7 +301,10 @@ export class LangyCredentialService {
     /**
      * The explicit repository the turn targets, when known (a future repo
      * context chip). Present ⇒ the installation token is scoped to only that
-     * repo; absent ⇒ scoped to the installation's full repository set.
+     * repo; absent ⇒ falls back to the project's bound
+     * `repositoryFullName` (set via project settings), and if that's also
+     * unset, to the installation's full repository set. Precedence: explicit
+     * arg > project default > full-installation fallback.
      */
     repositoryFullName?: string;
   }): Promise<LangyCredentials> {
@@ -313,6 +316,12 @@ export class LangyCredentialService {
         `Project ${projectId} not found.`,
       );
     }
+    // #790: no caller passes an explicit override today, so every turn used
+    // to mint a full-installation-scoped token even for a project bound to
+    // one specific repo. Default from the project's stored binding — an
+    // explicit turn-level override (when one exists) still wins.
+    const effectiveRepositoryFullName =
+      repositoryFullName ?? project.repositoryFullName ?? undefined;
 
     // The worker's callback origin + gateway. Both prefer the container-worker
     // overrides (LANGY_WORKER_CALLBACK_URL / LANGY_WORKER_GATEWAY_URL) that haven
@@ -390,7 +399,9 @@ export class LangyCredentialService {
         const minted =
           await getApp().langy.githubInstallations.mintTurnToken({
             organizationId: project.organizationId,
-            ...(repositoryFullName ? { repositoryFullName } : {}),
+            ...(effectiveRepositoryFullName
+              ? { repositoryFullName: effectiveRepositoryFullName }
+              : {}),
           });
         if (minted) {
           githubToken = minted.token;

@@ -50,6 +50,21 @@ vi.mock("../langyApiKey", () => ({
   LangySessionKeyScopeError,
 }));
 
+// The GitHub installation-token mint (LANGY_GITHUB_ENABLED is a hard `true`
+// constant, so getOrProvision always calls this). Hoisted so the vi.mock
+// factory can reference it. Default resolves null (mirrors the pre-existing
+// behaviour of an uninitialized real App throwing and getOrProvision's
+// try/catch swallowing it) so every test above that doesn't care about GitHub
+// keeps passing unchanged; only the regression test below configures it.
+const { mintTurnToken } = vi.hoisted(() => ({ mintTurnToken: vi.fn() }));
+vi.mock("~/server/app-layer", () => ({
+  getApp: () => ({
+    langy: { githubInstallations: { mintTurnToken } },
+  }),
+}));
+
+import { ProjectRepository } from "~/server/projects/project.repository";
+
 import {
   LangyCredentialResolutionError,
   LangyCredentialService,
@@ -90,6 +105,8 @@ beforeEach(() => {
     token: "sk-lw-test-langy-token",
     apiKeyId: "key-1",
   });
+  mintTurnToken.mockReset();
+  mintTurnToken.mockResolvedValue(null);
   process.env.LANGWATCH_API_URL = "https://api.langwatch.test";
   // The endpoint prefers LANGWATCH_ENDPOINT over LANGWATCH_API_URL; clear it so
   // the default cases below exercise the LANGWATCH_API_URL fallback path
@@ -240,6 +257,125 @@ describe("LangyCredentialService", () => {
             updatedById: "u1",
           }),
         });
+      });
+    });
+  });
+
+  // Regression for #790: every Langy turn minted a GitHub installation token
+  // scoped to the WHOLE installation, even for a project bound to one
+  // specific repo, because getOrProvision never defaulted
+  // `repositoryFullName` from the project when no explicit override was
+  // passed — it only forwarded an override the caller happened to supply,
+  // and nothing does today. getOrProvision now falls back to
+  // `project.repositoryFullName` when no explicit argument is given.
+  describe("given a project bound to a specific GitHub repository", () => {
+    describe("when getOrProvision is called without an explicit repositoryFullName override", () => {
+      it("scopes the minted GitHub installation token to the project's bound repository", async () => {
+        const prisma = makePrisma();
+        vi.spyOn(
+          ProjectRepository.prototype,
+          "findForLangyCredentials",
+        ).mockResolvedValueOnce({
+          apiKey: "sk-lw-test-project-key",
+          organizationId: "org-1",
+          repositoryFullName: "acme/widgets",
+        });
+        mintTurnToken.mockResolvedValueOnce({
+          token: "ghs_scoped_to_widgets",
+          repoScopeKey: "repo:acme/widgets",
+          installationId: "inst-1",
+        });
+        const svc = new LangyCredentialService(prisma);
+
+        await svc.getOrProvision({
+          projectId: "p1",
+          session: SESSION,
+          mintSessionKey: false,
+        });
+
+        // No caller passes an explicit `repositoryFullName` override — the
+        // service must default it from the project it just resolved.
+        expect(mintTurnToken).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org-1",
+            repositoryFullName: "acme/widgets",
+          }),
+        );
+      });
+    });
+  });
+
+  describe("given a project with no bound GitHub repository", () => {
+    describe("when getOrProvision is called", () => {
+      it("mints a token scoped to the whole installation", async () => {
+        const prisma = makePrisma();
+        vi.spyOn(
+          ProjectRepository.prototype,
+          "findForLangyCredentials",
+        ).mockResolvedValueOnce({
+          apiKey: "sk-lw-test-project-key",
+          organizationId: "org-1",
+          repositoryFullName: null,
+        });
+        mintTurnToken.mockResolvedValueOnce({
+          token: "ghs_whole_installation",
+          repoScopeKey: null,
+          installationId: "inst-1",
+        });
+        const svc = new LangyCredentialService(prisma);
+
+        await svc.getOrProvision({
+          projectId: "p1",
+          session: SESSION,
+          mintSessionKey: false,
+        });
+
+        // No project-bound repo and no explicit override — the
+        // `repositoryFullName` key must be absent entirely (not `undefined`
+        // or `null`), preserving the pre-fix full-installation behaviour.
+        expect(mintTurnToken).toHaveBeenCalledWith(
+          expect.not.objectContaining({
+            repositoryFullName: expect.anything(),
+          }),
+        );
+      });
+    });
+  });
+
+  describe("given a project bound to a specific GitHub repository, but the turn passes an explicit override", () => {
+    describe("when getOrProvision is called with a repositoryFullName that differs from the project's bound repo", () => {
+      it("scopes the minted GitHub installation token to the explicit override, not the project's bound repository", async () => {
+        const prisma = makePrisma();
+        vi.spyOn(
+          ProjectRepository.prototype,
+          "findForLangyCredentials",
+        ).mockResolvedValueOnce({
+          apiKey: "sk-lw-test-project-key",
+          organizationId: "org-1",
+          repositoryFullName: "acme/widgets",
+        });
+        mintTurnToken.mockResolvedValueOnce({
+          token: "ghs_scoped_to_override",
+          repoScopeKey: "repo:explicit/override",
+          installationId: "inst-1",
+        });
+        const svc = new LangyCredentialService(prisma);
+
+        await svc.getOrProvision({
+          projectId: "p1",
+          session: SESSION,
+          mintSessionKey: false,
+          repositoryFullName: "explicit/override",
+        });
+
+        // Explicit turn-level override wins over the project-level default
+        // even though the project has its own bound repo.
+        expect(mintTurnToken).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId: "org-1",
+            repositoryFullName: "explicit/override",
+          }),
+        );
       });
     });
   });

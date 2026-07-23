@@ -134,6 +134,9 @@ export const useOrganizationTeamProject = (
         // the fail-closed side of ADR-053. A share viewer never runs Langy, so
         // this is inert either way; null keeps it inert AND safe.
         langyEgressAllowlist: null,
+        // Public share viewers never mint Langy GitHub tokens, so an unbound
+        // repo is inert here — same rationale as langyEgressAllowlist above.
+        repositoryFullName: null,
         departmentId: null,
       }
     : undefined;

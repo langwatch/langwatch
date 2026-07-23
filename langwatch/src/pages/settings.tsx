@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import type { OrganizationIntent, Project } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Lock } from "react-feather";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
@@ -570,6 +570,7 @@ type ProjectFormData = {
   language: string;
   framework: string;
   userLinkTemplate?: string;
+  repositoryFullName?: string;
   s3Endpoint?: string;
   s3AccessKeyId?: string;
   s3SecretAccessKey?: string;
@@ -577,6 +578,11 @@ type ProjectFormData = {
   traceSharingEnabled: boolean;
   presenceEnabled: boolean;
 };
+
+/** Sentinel for "no repository bound" in the GitHub repository select — Chakra's
+ * Select doesn't take an empty-string item value cleanly, so `NONE` stands in
+ * for "unset" and is translated back to `null` at submit time. */
+const NO_REPOSITORY_VALUE = "__none__";
 
 function ProjectSettingsForm({ project }: { project: Project }) {
   const { organization, organizations } = useOrganizationTeamProject();
@@ -592,6 +598,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     language: project.language,
     framework: project.framework,
     userLinkTemplate: project.userLinkTemplate ?? "",
+    repositoryFullName: project.repositoryFullName ?? NO_REPOSITORY_VALUE,
     s3Endpoint: project.s3Endpoint ?? "",
     s3AccessKeyId: project.s3AccessKeyId ?? "",
     s3SecretAccessKey: project.s3SecretAccessKey ?? "",
@@ -609,6 +616,24 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   const apiContext = api.useContext();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
   const [showTraceSharingDialog, setShowTraceSharingDialog] = useState(false);
+
+  // The repo Langy's minted GitHub installation tokens get scoped to (#790).
+  // Empty when the org has no GitHub App installation — the query still
+  // resolves gracefully (empty list) rather than gating the field's render.
+  const githubRepos = api.langyGithub.listRepos.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization?.id },
+  );
+  const repositoryCollection = useMemo(() => {
+    const items = [
+      { label: "No repository bound", value: NO_REPOSITORY_VALUE },
+      ...(githubRepos.data ?? []).map((repo) => ({
+        label: repo.fullName,
+        value: repo.fullName,
+      })),
+    ];
+    return createListCollection({ items });
+  }, [githubRepos.data]);
 
   const handleTraceSharingChange = (newValue: boolean) => {
     // Directly update the form value
@@ -645,6 +670,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         projectId: project.id,
         ...data,
         userLinkTemplate: data.userLinkTemplate ?? "",
+        repositoryFullName:
+          data.repositoryFullName && data.repositoryFullName !== NO_REPOSITORY_VALUE
+            ? data.repositoryFullName
+            : null,
         s3Endpoint: data.s3Endpoint ?? "",
         s3AccessKeyId: data.s3AccessKeyId ?? "",
         s3SecretAccessKey: data.s3SecretAccessKey ?? "",
@@ -750,6 +779,39 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                 </Button>
               </HStack>
             )}
+          </HorizontalFormControl>
+          <HorizontalFormControl
+            label="GitHub repository"
+            helper="The repository Langy is bound to for this project. Bot-authored PRs and its GitHub installation token are scoped to just this repo instead of the whole GitHub App installation."
+          >
+            <Controller
+              control={control}
+              name="repositoryFullName"
+              render={({ field }) => (
+                <Select.Root
+                  collection={repositoryCollection}
+                  value={[field.value ?? NO_REPOSITORY_VALUE]}
+                  width="full"
+                  onValueChange={(d) =>
+                    field.onChange(d.value[0] ?? NO_REPOSITORY_VALUE)
+                  }
+                >
+                  <Select.Trigger
+                    background="bg"
+                    aria-label="GitHub repository"
+                  >
+                    <Select.ValueText placeholder="No repository bound" />
+                  </Select.Trigger>
+                  <Select.Content>
+                    {repositoryCollection.items.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        {item.label}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              )}
+            />
           </HorizontalFormControl>
           <HorizontalFormControl
             label="Live presence"
