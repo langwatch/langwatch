@@ -56,6 +56,7 @@ import {
 } from "~/server/app-layer/events/track-event.service";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
+import { getOAuthClient } from "~/mcp/oauthClientRegistry";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -514,8 +515,11 @@ secured
       client_id,
     } = body;
 
-    if (!projectId || !redirect_uri) {
-      return c.json({ error: "projectId and redirect_uri are required" }, 400);
+    if (!projectId || !redirect_uri || !client_id) {
+      return c.json(
+        { error: "projectId, redirect_uri and client_id are required" },
+        400,
+      );
     }
 
     try {
@@ -529,6 +533,33 @@ secured
       }
     } catch {
       return c.json({ error: "Invalid redirect_uri" }, 400);
+    }
+
+    // RFC 6749 §10.6: an authorization server must only ever issue a code to
+    // a redirect_uri that was registered for this client_id — otherwise
+    // whoever crafts the authorization request (which can be an attacker,
+    // not the approving user) can point it at a URI they control and the
+    // approved code is exfiltrated there. PKCE does not defend against this:
+    // it proves the token-exchanger holds the verifier for the challenge in
+    // the code, and an attacker who authored the request holds both. Exact
+    // string match against the client's /oauth/register'd redirect_uris —
+    // no scheme/host-only comparison, which a subdomain or path trick could
+    // slip past.
+    const registeredClient = await getOAuthClient(client_id);
+    if (!registeredClient) {
+      return c.json(
+        { error: "Unknown or unregistered client_id" },
+        400,
+      );
+    }
+    if (!registeredClient.redirectUris.includes(redirect_uri)) {
+      return c.json(
+        {
+          error:
+            "redirect_uri does not match any redirect URI registered for this client_id",
+        },
+        400,
+      );
     }
 
     if (!code_challenge) {
@@ -594,7 +625,12 @@ secured
       userId: session.user.id,
       codeChallenge: code_challenge,
       codeChallengeMethod: code_challenge_method ?? "S256",
-      clientId: client_id ?? "",
+      // Bound here so /oauth/token can require the exchange to present the
+      // exact same client_id + redirect_uri this authorization was validated
+      // and approved against (RFC 6749 §4.1.3 / §3.2.1) — a code minted for
+      // one client's registered URI must never be redeemable against another.
+      clientId: client_id,
+      redirectUri: redirect_uri,
       expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
     });
 
