@@ -276,7 +276,15 @@ export default defineConfig(async (): Promise<UserConfig> => {
         // No-op when API is on plain HTTP.
         secure: false,
       },
-      "/mcp": {
+      // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
+      // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
+      // sending it to the API server, which has no dev-mode page fallback.
+      "^/mcp$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      "^/mcp/health$": {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,
