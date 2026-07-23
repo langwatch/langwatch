@@ -5,8 +5,8 @@ import type { ProjectionStoreContext } from "../../../projections/projectionStor
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   type CodingAgentSessionState,
+  codingAgentSessionStateFromRow,
   projectCodingAgentSessionToRow,
-  rebuildCodingAgentSessionStateFromRow,
 } from "./codingAgentSession.foldProjection";
 
 /**
@@ -74,11 +74,13 @@ export class CodingAgentSessionStore
   }
 
   /**
-   * Read the session's last committed state back (ADR-066). The row round-trips
-   * the full working state — counters, ordered steps (with their start times),
-   * the sub-agent dedup set, the previous-call context size, and the converged
-   * metric units — so a cache miss reconstructs state from ONE point read
-   * instead of replaying the aggregate's history from `event_log`.
+   * Read the session's last committed state back (ADR-066) — the CH-fallthrough
+   * side of the read path: `RedisCachedFoldStore` serves the warm cache and only
+   * calls this on a miss. The row round-trips the full working state — counters,
+   * ordered steps (with their start times), the sub-agent dedup set, the
+   * previous-call context size, and the converged metric units — so a miss reads
+   * ONE point row and decodes it. It never replays `event_log`; that is the
+   * offline rebuild path, not this one.
    *
    * `context.occurredAtMs` prunes the read to a window of partitions around the
    * event being folded; absent, the repository scans (still keyed, still
@@ -93,6 +95,6 @@ export class CodingAgentSessionStore
       sessionId: aggregateId,
       startedAtMs: context.occurredAtMs,
     });
-    return row ? rebuildCodingAgentSessionStateFromRow(row) : null;
+    return row ? codingAgentSessionStateFromRow(row) : null;
   }
 }

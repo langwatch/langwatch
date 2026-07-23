@@ -20,8 +20,8 @@ import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
+  codingAgentSessionStateFromRow,
   projectCodingAgentSessionToRow,
-  rebuildCodingAgentSessionStateFromRow,
 } from "../codingAgentSession.foldProjection";
 
 const SESSION_ID = "8f2c9a1e-4711-4e0f-9d2e-session";
@@ -472,10 +472,10 @@ describe("CodingAgentSessionFoldProjection", () => {
 describe("read-back losslessness (ADR-066)", () => {
   describe("when a folded session is projected to a row and rebuilt", () => {
     /**
-     * The outage fix depends on this exactly: store.get() reconstructs working
-     * state from the row instead of replaying event_log. If any field the fold
-     * needs fails to round-trip, a cache miss would silently fold onto partial
-     * state — so this asserts the WHOLE state survives, and calls out the
+     * The outage fix depends on this exactly: store.get() reads working state
+     * back by decoding the row, instead of replaying event_log. If any field the
+     * fold needs fails to round-trip, a cache miss would silently fold onto
+     * partial state — so this asserts the WHOLE state survives, and calls out the
      * previously-lossy bookkeeping fields by name.
      */
     it("recovers the identical working state, including the bookkeeping the old row dropped", () => {
@@ -540,9 +540,9 @@ describe("read-back losslessness (ADR-066)", () => {
         version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
       });
 
-      const rebuilt = rebuildCodingAgentSessionStateFromRow(row);
+      const decoded = codingAgentSessionStateFromRow(row);
 
-      expect(rebuilt).toEqual(state);
+      expect(decoded).toEqual(state);
     });
   });
 });

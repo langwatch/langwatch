@@ -741,8 +741,8 @@ export class PipelineRegistry {
       createCodingAgentProcessingPipeline({
         // Read-through store (ADR-066): Redis is the warm read tier; on a miss
         // the store reads its own last committed state back from
-        // coding_agent_sessions (store.get() → findBySessionId → rebuild). The
-        // delivery path never reads event_log. Same wiring as trace_summaries.
+        // coding_agent_sessions (store.get() → findBySessionId → decode row).
+        // The delivery path never reads event_log. Same wiring as trace_summaries.
         codingAgentSessionStore: this.cached<CodingAgentSessionState>(
           new CodingAgentSessionStore(
             this.deps.repositories.codingAgentSession,

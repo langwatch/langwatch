@@ -323,7 +323,7 @@ export interface CodingAgentSessionRow {
 
   // ── Read-back state (ADR-066, migration 00053) ─────────────────────────
   // Not analytics columns — these round-trip the fold's working state so
-  // store.get() can reconstruct it without replaying event_log.
+  // store.get() can read it back (decode the row) without replaying event_log.
   /** The dedup set behind `subAgents`; the row keeps count + types, plus this. */
   subAgentIds: string[];
   /** Per-step start times, index-aligned with `steps` (dropped by the 3-tuple). */
@@ -467,17 +467,20 @@ const nullIfEmpty = (value: string): string | null =>
   value === "" ? null : value;
 
 /**
- * Rebuild the fold's working state from its persisted row — the inverse of
- * {@link projectCodingAgentSessionToRow} (ADR-066). This is what makes
- * `store.get()` lossless, so a cache miss reads one row back into state instead
- * of replaying the aggregate's history from `event_log`.
+ * Decode the fold's working state from its persisted row — the `fromRow`
+ * inverse of {@link projectCodingAgentSessionToRow}'s `toRow` (ADR-066).
+ *
+ * This is a deserialize, NOT a rebuild. A rebuild replays the aggregate's
+ * history from `event_log`; this only maps the columns of the last committed
+ * projection back into the state shape, so `store.get()` can return the state
+ * that Redis (or, on a miss, ClickHouse) already holds. It derives nothing.
  *
  * The row mirrors the state field-for-field; the only conversions are the
  * nullable identity fields (stored as "" ) mapping back to null, `steps`
  * zipping with the parallel `stepStartedAt`, and `metricSeries` re-keying by
  * series id.
  */
-export function rebuildCodingAgentSessionStateFromRow(
+export function codingAgentSessionStateFromRow(
   row: CodingAgentSessionRow,
 ): CodingAgentSessionState {
   const metricSeries: Record<string, MetricSeriesFact> = Object.fromEntries(
