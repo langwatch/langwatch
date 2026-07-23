@@ -306,7 +306,7 @@ describe("VersionHistoryListPopover", () => {
     });
   });
 
-  describe("when displaying the author of a version", () => {
+  describe("author of a version", () => {
     const openPopover = async () => {
       const historyButton = screen.getAllByTestId("version-history-button")[0]!;
       fireEvent.click(historyButton);
@@ -331,29 +331,105 @@ describe("VersionHistoryListPopover", () => {
       renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
     };
 
-    it("shows the author's name when present", async () => {
-      renderWithAuthor({
-        id: "u1",
-        name: "Ada Lovelace",
-        email: "ada@example.com",
+    // Chakra tooltips open on a pointer gesture; pointerMove bubbles to the
+    // trigger so zag registers the hover.
+    const hover = (element: HTMLElement) => {
+      fireEvent.pointerEnter(element, { pointerType: "mouse" });
+      fireEvent.pointerMove(element, { pointerType: "mouse" });
+    };
+
+    describe("given the author has a display name", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "Author with a display name is shown by name" */
+        it("shows the author's name", async () => {
+          renderWithAuthor({
+            id: "u1",
+            name: "Ada Lovelace",
+            email: "ada@example.com",
+          });
+          await openPopover();
+
+          expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
+        });
+
+        it("reveals the author's name and email in a tooltip on hover", async () => {
+          renderWithAuthor({
+            id: "u1",
+            name: "Ada Lovelace",
+            email: "ada@example.com",
+          });
+          await openPopover();
+
+          hover(screen.getByText("Ada Lovelace"));
+
+          await waitFor(
+            () =>
+              expect(
+                screen.getAllByText("ada@example.com").length,
+              ).toBeGreaterThan(0),
+            { timeout: 3000 },
+          );
+        });
       });
-      await openPopover();
-
-      expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
     });
 
-    it("falls back to the email when the author has no name", async () => {
-      renderWithAuthor({ id: "u1", name: null, email: "grace@example.com" });
-      await openPopover();
+    describe("given the author has no display name", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "Author without a display name falls back to their email" */
+        it("shows the author's email instead", async () => {
+          renderWithAuthor({ id: "u1", name: null, email: "grace@example.com" });
+          await openPopover();
 
-      expect(screen.getByText("grace@example.com")).toBeInTheDocument();
+          expect(screen.getByText("grace@example.com")).toBeInTheDocument();
+        });
+      });
     });
 
-    it("labels the row 'Unknown author' when no author is recorded", async () => {
-      renderWithAuthor(null);
-      await openPopover();
+    describe("given the version has no author on record", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "Version created outside the app shows Unknown author" */
+        it("labels the row 'Unknown author'", async () => {
+          renderWithAuthor(null);
+          await openPopover();
 
-      expect(screen.getByText("Unknown author")).toBeInTheDocument();
+          expect(screen.getByText("Unknown author")).toBeInTheDocument();
+        });
+
+        it("explains in a tooltip that no author was recorded", async () => {
+          renderWithAuthor(null);
+          await openPopover();
+
+          hover(screen.getByText("Unknown author"));
+
+          await waitFor(
+            () =>
+              expect(
+                screen.getAllByText("No author recorded for this version")
+                  .length,
+              ).toBeGreaterThan(0),
+            { timeout: 3000 },
+          );
+        });
+      });
+    });
+
+    describe("given the author signed in with a profile photo", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "A signed-in author's profile photo is used as the avatar" */
+        it("shows the photo as the avatar", async () => {
+          renderWithAuthor({
+            id: "u1",
+            name: "Ada Lovelace",
+            email: "ada@example.com",
+            image: "https://example.com/ada.png",
+          });
+          await openPopover();
+
+          expect(
+            document.querySelector('img[src="https://example.com/ada.png"]'),
+          ).not.toBeNull();
+        });
+      });
     });
   });
 });
