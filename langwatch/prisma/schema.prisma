@@ -380,6 +380,7 @@ model Project {
   datasetRecords           DatasetRecord[]
   customGraphs             CustomGraph[]
   dashboards               Dashboard[]
+  chartsPrototypeState     ChartsPrototypeState?
   batchEvaluations         BatchEvaluation[]
   traceSharingEnabled      Boolean                             @default(true)
   presenceEnabled          Boolean                             @default(true)
@@ -734,6 +735,26 @@ model CustomGraph {
 
   @@index([projectId])
   @@index([dashboardId])
+}
+
+/// PROTOTYPE (#5670 S1) -- isolated, minimal server-side persistence for the
+/// charts-proto query-builder dashboard. Deliberately NOT the real
+/// Dashboard/CustomGraph tables: those are rendered by the real
+/// /analytics/reports page's CustomGraph component, which expects a different
+/// graph-config shape -- storing this prototype's WidgetSpec array there would
+/// risk a broken render the moment anyone opens a real dashboard normally.
+/// One row per project; the whole composition is a single Json blob, matching
+/// the same shape the prototype used to keep in localStorage.
+model ChartsPrototypeState {
+  id        String   @id @default(nanoid())
+  projectId String   @unique
+  project   Project  @relation(fields: [projectId], references: [id])
+  name      String   @default("Untitled dashboard")
+  widgets   Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("ChartsPrototypeState")
 }
 
 model BatchEvaluation {

@@ -16,6 +16,7 @@ import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
+import { chartsProtoStateRouter } from "./routers/chartsProtoState";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
@@ -75,6 +76,7 @@ import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
 import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
+import { traceQueryRouter } from "./routers/traceQuery";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
@@ -91,6 +93,8 @@ const coreRouters = {
   team: teamRouter,
   traces: tracesRouter,
   tracesV2: tracesV2Router,
+  traceQuery: traceQueryRouter,
+  chartsProtoState: chartsProtoStateRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
   monitors: monitorsRouter,
