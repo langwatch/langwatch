@@ -96,6 +96,49 @@ func hasModelSignal(attrs pcommon.Map) bool {
 	return false
 }
 
+// trustedModelKeys are the span attributes that NAME a model on a worker
+// span, across both the semconv spelling and the Vercel AI SDK wire spelling
+// the ingest canonicalises from. SubstituteTrustedModel rewrites whichever
+// are present.
+var trustedModelKeys = []string{
+	"gen_ai.request.model",
+	"gen_ai.response.model",
+	"ai.model.id",
+	"ai.response.model",
+}
+
+// SubstituteTrustedModel replaces the model name on every model-call span
+// with the manager-held, platform-canonical id (provider-prefixed, exactly as
+// the user configured it). Two reasons, the same posture the mirror lane
+// already takes: the worker-supplied value is an arbitrary string that may
+// carry content, and it is spelled however the worker's SDK happens to run:
+// the codex lane runs the native openai provider on the BARE wire-name, so
+// its spans would name the same model differently from the gateway's gen_ai
+// span and the trace's model filter would list one model twice.
+func SubstituteTrustedModel(td ptrace.Traces, trustedModel string) {
+	if trustedModel == "" {
+		return
+	}
+	rss := td.ResourceSpans()
+	for i := 0; i < rss.Len(); i++ {
+		sss := rss.At(i).ScopeSpans()
+		for j := 0; j < sss.Len(); j++ {
+			spans := sss.At(j).Spans()
+			for k := 0; k < spans.Len(); k++ {
+				span := spans.At(k)
+				if !hasModelSignal(span.Attributes()) {
+					continue
+				}
+				for _, key := range trustedModelKeys {
+					if _, ok := span.Attributes().Get(key); ok {
+						span.Attributes().PutStr(key, trustedModel)
+					}
+				}
+			}
+		}
+	}
+}
+
 // StampMediatedUsageDedup marks every model-call span in the batch as a
 // redundant usage copy: the gateway's gen_ai span is the meter for a mediated
 // LLM call, and without this stamp the trace totals count every call twice

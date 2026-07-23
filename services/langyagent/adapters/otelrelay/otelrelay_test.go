@@ -499,6 +499,43 @@ func TestRelayTracesCodexNonBillable(t *testing.T) {
 			t.Errorf("wire-shape model span on a codex turn must carry the bundled flag, got %v", v.Str())
 		}
 	})
+
+	// One model name per model: the codex lane runs the worker on the BARE
+	// wire-name, so without substitution its spans would name the same model
+	// differently from the gateway's gen_ai span and the trace's model filter
+	// would list one model twice.
+	//
+	// @scenario "Every span of a turn names the model the same way"
+	t.Run("substitutes the manager-held model id on model-call spans", func(t *testing.T) {
+		td := ptrace.NewTraces()
+		ss := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty()
+		model := ss.Spans().AppendEmpty()
+		model.SetName("ai.streamText.doStream")
+		model.SetSpanID(pcommon.SpanID{4, 4, 4, 4, 4, 4, 4, 4})
+		model.Attributes().PutStr("ai.model.id", "gpt-5-mini")
+		model.Attributes().PutStr("ai.response.model", "gpt-5-mini-2025-08-07")
+		tool := ss.Spans().AppendEmpty()
+		tool.SetName("ai.toolCall")
+		tool.SetSpanID(pcommon.SpanID{5, 5, 5, 5, 5, 5, 5, 5})
+		payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+		if err != nil {
+			t.Fatalf("marshal fixture: %v", err)
+		}
+
+		out := post(t, "openai_codex/gpt-5-mini", payload)
+		spans := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
+		got, _ := spans.At(0).Attributes().Get("ai.model.id")
+		if got.Str() != "openai_codex/gpt-5-mini" {
+			t.Errorf("ai.model.id = %q, want the manager-held prefixed id", got.Str())
+		}
+		gotResp, _ := spans.At(0).Attributes().Get("ai.response.model")
+		if gotResp.Str() != "openai_codex/gpt-5-mini" {
+			t.Errorf("ai.response.model = %q, want the manager-held prefixed id", gotResp.Str())
+		}
+		if _, ok := spans.At(1).Attributes().Get("ai.model.id"); ok {
+			t.Error("tool spans must not grow model attributes")
+		}
+	})
 }
 
 func TestPathSignal(t *testing.T) {

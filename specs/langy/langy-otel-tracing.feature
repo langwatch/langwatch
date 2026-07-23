@@ -262,6 +262,18 @@ Feature: Langy agent activity is traced into the user's project
     Then the trace's token and cost totals count the model call once
     And the agent's activity and the gateway's metered call both remain visible as spans
 
+  Scenario: The gateway's model call nests under the agent's own call span
+    Given a turn whose model call is served through the gateway
+    When the turn's trace appears in my project
+    Then the gateway's model-call span sits under the agent span that made the call
+    And not beside the agent's whole call tree
+
+  Scenario: Every span of a turn names the model the same way
+    Given a turn running on a provider-prefixed model
+    When the turn's trace appears in my project
+    Then the agent's span and the gateway's span report the same provider-prefixed model id
+    And the trace's model filter lists the model once
+
   Scenario: Turns of one conversation are grouped together
     Given a Langy conversation with id "conv-123"
     When I send two messages in that conversation

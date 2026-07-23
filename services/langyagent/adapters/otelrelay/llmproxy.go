@@ -105,19 +105,31 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// "gpt-…"; restore the full provider-prefixed id on the wire and
 			// the gateway routes it to the codex credential. See provision.go.
 			rewriteCodexModelBody(pr.Out, entry.info.Model)
-			// Stamp the TURN's traceparent so the gateway's customer-facing
-			// gen_ai span joins the turn's trace. The worker's own traceparent
-			// is deliberately NOT continued, for two reasons: its trace id is
-			// worker-chosen (a prompt-injectable process must never pick which
-			// trace its calls land in), and — verified against opencode's real
-			// export set — the span id it stamps on outbound calls belongs to
-			// an internal fetch span it never exports, so continuing it parents
-			// the gateway span under a node that will never exist. The turn
-			// span is the one stable ancestor both the worker's re-parented
-			// roots and this span share. An invalid (not-yet-set) turn context
-			// stamps nothing — the gateway then roots its own trace.
+			// Stamp a traceparent so the gateway's customer-facing gen_ai span
+			// joins the turn's trace, nested where the call really happened.
+			// The worker's own traceparent is never continued verbatim: its
+			// trace id is worker-chosen (a prompt-injectable process must
+			// never pick which trace its calls land in). It is TRANSLATED
+			// through the same remap the span re-parenting applies: every
+			// worker trace id collapses onto the turn's trace id while span
+			// ids ride through unchanged, so the gateway span parents under
+			// the exported copy of the worker span that made the call (the AI
+			// SDK's active doStream span). A worker with no injected
+			// traceparent parents on the turn span, the one ancestor
+			// guaranteed to exist. An invalid (not-yet-set) turn context
+			// stamps nothing; the gateway then roots its own trace.
 			if sc := entry.turnContext(); sc.IsValid() {
-				pr.Out.Header.Set("traceparent", traceparentHeader(sc))
+				parent := remapWorkerParent(pr.In.Header.Get("Traceparent"), sc)
+				if parent.SpanID() != sc.SpanID() {
+					// Diagnostic for the nesting behavior: present exactly when
+					// the worker injected a traceparent and the gateway span
+					// will nest under that worker span; absent means the
+					// worker sent none and the turn span is the parent.
+					clog.Get(r.baseCtx).Info("otelrelay llm parent remapped from worker traceparent",
+						zap.String("conversation", entry.info.ConversationID),
+						zap.String("parent_span_id", parent.SpanID().String()))
+				}
+				pr.Out.Header.Set("traceparent", traceparentHeader(parent))
 			} else {
 				pr.Out.Header.Del("traceparent")
 			}
@@ -287,6 +299,44 @@ func boundMessage(message string) string {
 		cut = cut[:len(cut)-1]
 	}
 	return cut + "…"
+}
+
+// remapWorkerParent translates the worker's outbound trace context into the
+// turn's trace: the turn's trace id with the WORKER's span id. Span ids
+// survive the relay's re-parenting unchanged, so the worker-side active span
+// id (the AI SDK's doStream span wrapping the call) names the exact node the
+// exported batch will carry, and the gateway's gen_ai span nests under it
+// instead of landing as a sibling of the whole call tree. A missing or
+// malformed worker traceparent falls back to the turn span itself.
+//
+// The worker chooses only WHERE inside its own turn's trace the gateway span
+// hangs; a forged span id can at worst dangle its own turn's model call, the
+// same self-harm surface as any other span-id lie in its exports.
+func remapWorkerParent(workerTraceparent string, turn trace.SpanContext) trace.SpanContext {
+	spanID, ok := traceparentSpanID(workerTraceparent)
+	if !ok {
+		return turn
+	}
+	return trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    turn.TraceID(),
+		SpanID:     spanID,
+		TraceFlags: trace.FlagsSampled,
+	})
+}
+
+// traceparentSpanID extracts the parent span id from a W3C traceparent
+// ("00-<32 hex trace id>-<16 hex span id>-<flags>"). ok is false for a
+// missing, malformed, or all-zero span id.
+func traceparentSpanID(header string) (trace.SpanID, bool) {
+	parts := strings.Split(header, "-")
+	if len(parts) < 4 || len(parts[2]) != 16 {
+		return trace.SpanID{}, false
+	}
+	spanID, err := trace.SpanIDFromHex(parts[2])
+	if err != nil || !spanID.IsValid() {
+		return trace.SpanID{}, false
+	}
+	return spanID, true
 }
 
 // traceparentHeader renders a W3C traceparent for the turn's span context.

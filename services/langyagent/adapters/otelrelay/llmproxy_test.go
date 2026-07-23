@@ -85,6 +85,77 @@ func TestLLMProxy(t *testing.T) {
 		}
 	})
 
+	// The worker's AI SDK injects a traceparent on the outbound LLM fetch. The
+	// relay translates it through the SAME remap the span re-parenting applies
+	// (worker trace ids collapse onto the turn's trace, span ids survive), so
+	// the gateway's gen_ai span nests under the exported copy of the worker
+	// span that made the call rather than landing as a sibling of the call tree.
+	//
+	// @scenario "The gateway's model call nests under the agent's own call span"
+	t.Run("when the worker injects its own traceparent", func(t *testing.T) {
+		requestWithWorkerTP := func(t *testing.T, workerTraceparent string) string {
+			t.Helper()
+			var gotTraceparent string
+			gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				gotTraceparent = req.Header.Get("traceparent")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}))
+			defer gateway.Close()
+
+			relay := startRelay(t)
+			token, _ := relay.Register(WorkerInfo{
+				ConversationID: "conv-remap",
+				GatewayBaseURL: gateway.URL,
+				LLMVirtualKey:  "vk-real",
+			})
+			relay.SetTurnContext(token, turnContext())
+
+			req, _ := http.NewRequest(http.MethodPost, relay.LLMBaseURLFor(token)+"/chat/completions", strings.NewReader(`{}`))
+			if workerTraceparent != "" {
+				req.Header.Set("traceparent", workerTraceparent)
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("proxied LLM call: %v", err)
+			}
+			resp.Body.Close()
+			return gotTraceparent
+		}
+
+		t.Run("the forward carries the turn's trace id with the worker's span id", func(t *testing.T) {
+			workerSpan := "aabbccdd11223344"
+			got := requestWithWorkerTP(t, "00-9f86d081884c7d659a2feaa0c55ad015-"+workerSpan+"-01")
+			want := fmt.Sprintf("00-%s-%s-01", turnTraceID, workerSpan)
+			if got != want {
+				t.Errorf("forwarded traceparent = %q, want the remapped %q", got, want)
+			}
+		})
+
+		t.Run("the worker's own trace id never reaches the gateway", func(t *testing.T) {
+			got := requestWithWorkerTP(t, "00-9f86d081884c7d659a2feaa0c55ad015-aabbccdd11223344-01")
+			if strings.Contains(got, "9f86d081884c7d659a2feaa0c55ad015") {
+				t.Errorf("worker-chosen trace id leaked to the gateway: %q", got)
+			}
+		})
+
+		t.Run("a malformed worker traceparent falls back to the turn span", func(t *testing.T) {
+			got := requestWithWorkerTP(t, "not-a-traceparent")
+			want := fmt.Sprintf("00-%s-%s-01", turnTraceID, turnSpanID)
+			if got != want {
+				t.Errorf("forwarded traceparent = %q, want the turn fallback %q", got, want)
+			}
+		})
+
+		t.Run("an all-zero worker span id falls back to the turn span", func(t *testing.T) {
+			got := requestWithWorkerTP(t, "00-9f86d081884c7d659a2feaa0c55ad015-0000000000000000-01")
+			want := fmt.Sprintf("00-%s-%s-01", turnTraceID, turnSpanID)
+			if got != want {
+				t.Errorf("forwarded traceparent = %q, want the turn fallback %q", got, want)
+			}
+		})
+	})
+
 	t.Run("when the response is a server-sent event stream", func(t *testing.T) {
 		// The gateway writes one event, then BLOCKS until the client has observed
 		// it, then writes the second. This only completes if the relay flushes

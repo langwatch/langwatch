@@ -270,7 +270,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
-		semconv.GenAIRequestModelKey.String(params.Model),
+		semconv.GenAIRequestModelKey.String(canonicalModelID(params.ProviderID, params.Model)),
 		semconv.GenAIUsageInputTokensKey.Int(freshInput),
 		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
 		attrTotalUsage.Int(params.Usage.TotalTokens),
@@ -360,6 +360,22 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	}
 
 	span.End()
+}
+
+// canonicalModelID reports the model under the platform's provider-prefixed
+// spelling ("anthropic/claude-haiku-4-5"): the id the selectors, the cost
+// registry, the playground and the NLP executions all carry. Model resolution
+// strips the prefix for provider routing, and stamping the stripped name made
+// the gateway the one surface reporting bare wire-names: a Langy turn's
+// Models filter listed the SAME model twice, once bare (this span), once
+// prefixed (the worker's own span). A model whose provider is unknown
+// (implicit resolution never fills it) or that already carries a path
+// segment is reported as requested.
+func canonicalModelID(provider domain.ProviderID, model string) string {
+	if provider == "" || model == "" || strings.Contains(model, "/") {
+		return model
+	}
+	return string(provider) + "/" + model
 }
 
 // Shutdown flushes pending spans to customer endpoints.
