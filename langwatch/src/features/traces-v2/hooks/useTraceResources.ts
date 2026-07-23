@@ -5,6 +5,7 @@ import type {
   SpanResourceInfoDto,
 } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
+import { useSharedTrace } from "../context/SharedTraceContext";
 import { useDrawerStore } from "../stores/drawerStore";
 
 export interface TraceResourcesResult {
@@ -35,8 +36,9 @@ export function useTraceResources(
   traceId: string | null | undefined,
 ): TraceResourcesResult {
   const { project } = useOrganizationTeamProject();
+  const shared = useSharedTrace();
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
-  const enabled = !!project?.id && !!traceId;
+  const enabled = !!project?.id && !!traceId && !shared;
 
   const query = api.tracesV2.resourceInfo.useQuery(
     {
@@ -52,18 +54,22 @@ export function useTraceResources(
     },
   );
 
+  const data = shared?.resources ?? query.data;
+
   return useMemo<TraceResourcesResult>(() => {
-    if (!enabled) return NULL_RESULT;
-    if (!query.data) return { ...NULL_RESULT, isLoading: query.isLoading };
+    if (!data) {
+      if (!enabled) return NULL_RESULT;
+      return { ...NULL_RESULT, isLoading: query.isLoading };
+    }
     const bySpanId: Record<string, SpanResourceInfoDto> = {};
-    for (const s of query.data.spans) bySpanId[s.spanId] = s;
+    for (const s of data.spans) bySpanId[s.spanId] = s;
     return {
-      rootSpanId: query.data.rootSpanId,
-      resourceAttributes: query.data.resourceAttributes,
-      scope: query.data.scope,
-      spans: query.data.spans,
+      rootSpanId: data.rootSpanId,
+      resourceAttributes: data.resourceAttributes,
+      scope: data.scope,
+      spans: data.spans,
       bySpanId,
       isLoading: false,
     };
-  }, [enabled, query.data, query.isLoading]);
+  }, [enabled, data, query.isLoading]);
 }

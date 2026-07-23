@@ -31,6 +31,7 @@ export const organizationFactory = Factory.define<
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
   presenceEnabled: false,
+  traceSharingEnabled: true,
   supportContact: null,
   primaryIntent: null,
 }));
