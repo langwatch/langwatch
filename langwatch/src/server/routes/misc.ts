@@ -728,6 +728,16 @@ secured
 //     Redis key on every request.
 //   - per-IP and per-instance limits on top, for fairness once under the cap
 const TRACK_USAGE_EVENT = "daily_usage_stats";
+// Every stat field is `.optional()`, not required: this receiver is a stable
+// contract that self-hosted instances at ANY historical version hit (see
+// usageStatsWorker.ts's docstring), so an older sender predating a field
+// collectUsageStats.ts later added (or a newer one with a field this receiver
+// doesn't know about yet) must still be accepted rather than 400'd — a
+// self-hosted operator gets zero feedback on a rejected send (the worker logs
+// success unconditionally once `fetch` resolves, without checking `.ok`), so
+// a strict shape mismatch here would silently and permanently drop that
+// instance's telemetry. `.strict()` still closes the actual security gap by
+// rejecting keys outside this known set — the two constraints don't conflict.
 const trackUsageBodySchema = z
   .object({
     event: z.literal(TRACK_USAGE_EVENT),
@@ -735,19 +745,19 @@ const trackUsageBodySchema = z
     install_method: z.string().max(100).optional(),
     hostname: z.string().max(255).optional(),
     environment: z.string().max(50).optional(),
-    totalTraces: z.number(),
-    totalScenarioEvents: z.number(),
-    annotations: z.number(),
-    annotationQueues: z.number(),
-    annotationQueueItems: z.number(),
-    annotationScores: z.number(),
-    batchEvaluations: z.number(),
-    customGraphs: z.number(),
-    datasets: z.number(),
-    datasetRecords: z.number(),
-    experiments: z.number(),
-    triggers: z.number(),
-    workflows: z.number(),
+    totalTraces: z.number().optional(),
+    totalScenarioEvents: z.number().optional(),
+    annotations: z.number().optional(),
+    annotationQueues: z.number().optional(),
+    annotationQueueItems: z.number().optional(),
+    annotationScores: z.number().optional(),
+    batchEvaluations: z.number().optional(),
+    customGraphs: z.number().optional(),
+    datasets: z.number().optional(),
+    datasetRecords: z.number().optional(),
+    experiments: z.number().optional(),
+    triggers: z.number().optional(),
+    workflows: z.number().optional(),
     timestamp: z.string().optional(),
   })
   .strict();

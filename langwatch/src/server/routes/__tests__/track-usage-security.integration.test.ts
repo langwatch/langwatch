@@ -125,6 +125,27 @@ describe("POST /api/track_usage", () => {
     });
   });
 
+  describe("when an older self-hosted sender omits stat fields this receiver added later", () => {
+    it("accepts the partial report rather than 400ing every field-set drift", async () => {
+      // usageStatsWorker.ts is a stable receiver contract — self-hosted
+      // instances at any historical version hit it, so a shape older than
+      // today's collectUsageStats.ts (e.g. before totalScenarioEvents was
+      // added) must still be accepted. The worker never checks the response
+      // status, so a 400 here would silently and permanently drop that
+      // instance's telemetry with no operator-visible symptom.
+      const res = await request({
+        body: { event: "daily_usage_stats", instance_id: "legacy-sender__org_1", totalTraces: 1 },
+      });
+
+      expect(res.status).toBe(200);
+      expect(capture).toHaveBeenCalledWith({
+        distinctId: "legacy-sender__org_1",
+        event: "daily_usage_stats",
+        properties: { totalTraces: 1 },
+      });
+    });
+  });
+
   describe("when the body is not valid JSON", () => {
     it("rejects with 400", async () => {
       const res = await app.request("/api/track_usage", {
