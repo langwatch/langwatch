@@ -6,7 +6,8 @@
 # Background: coding agents run a loaded skill through a built-in tool named
 # `Skill` — a `tool_use` block whose input carries the skill slug. The
 # block-cost classifier already treats this as a distinct `skill_invocation`
-# category (ADR-033); the trace UI mirrors that recognition.
+# category (the coding-agent cost-intelligence ADR, on a separate branch);
+# the trace UI mirrors that recognition.
 
 Feature: Skill invocation highlight
 

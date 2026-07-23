@@ -103,7 +103,8 @@ export const TreeRow = memo(function TreeRow({
   // A skill run (a `Skill` tool span) gets the sparkles glyph + purple chip so
   // it stands out from ordinary tool spans in the tree — the waterfall node
   // carries no input, so this flags the invocation without naming the skill
-  // (the transcript card shows the slug). Mirrors ADR-033's skill_invocation.
+  // (the transcript card shows the slug). Mirrors the block-cost classifier's
+  // skill_invocation category.
   const isSkill = isSkillSpan({ type: span.type, name: span.name });
   const TypeIcon = isSkill
     ? LuSparkles

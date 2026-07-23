@@ -4,9 +4,10 @@
  * Claude Code (and compatible harnesses) run a loaded skill through a
  * built-in tool named `Skill` — a `tool_use` block whose input carries the
  * skill's slug. The block-cost classifier already treats this name as a
- * distinct `skill_invocation` category (ADR-033); the trace UI mirrors that
- * so a reader can spot "here I invoked /surf-pr" at a glance instead of it
- * hiding among ordinary Bash/Edit tool calls.
+ * distinct `skill_invocation` category (the coding-agent cost-intelligence
+ * ADR, on a separate branch); the trace UI mirrors that so a reader can spot
+ * "here I invoked /surf-pr" at a glance instead of it hiding among ordinary
+ * Bash/Edit tool calls.
  *
  * Kept as a tiny standalone predicate (no dependency on the block-cost
  * domain, which lives server-side) so both the conversation transcript and

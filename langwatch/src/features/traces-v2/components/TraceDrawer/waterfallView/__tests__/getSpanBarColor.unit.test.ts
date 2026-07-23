@@ -2,14 +2,12 @@ import { describe, expect, it } from "vitest";
 import { getSpanBarColor } from "../types";
 
 describe("getSpanBarColor", () => {
+  // Callers pass a SiblingGroup's shared type/name the same way they pass a
+  // single span's — the function has no notion of "span" vs "group" — so
+  // this is the one case to cover; GroupRow.integration.test.tsx covers the
+  // actual fold-path wiring instead of a second call with identical args.
   describe("given a Skill tool_use span", () => {
     it("returns the purple skill accent regardless of its type", () => {
-      expect(getSpanBarColor("tool", "Skill")).toBe("purple.solid");
-    });
-  });
-
-  describe("given a folded group of Skill spans", () => {
-    it("keeps the purple skill accent for the group bar", () => {
       expect(getSpanBarColor("tool", "Skill")).toBe("purple.solid");
     });
   });

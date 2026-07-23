@@ -72,12 +72,11 @@ describe("skillInvocation", () => {
         expect(isSkillSpan({ type: "tool", name: "Skill" })).toBe(true);
       });
 
-      /** @scenario "Repeated skill spans keep the skill accent when folded" */
-      it("flags each span in a folded group of Skill tool spans", () => {
-        // A sibling group carries the shared type + name of its members, so
-        // the same predicate that flags a row flags the fold.
-        expect(isSkillSpan({ type: "tool", name: "Skill" })).toBe(true);
-      });
+      // "Repeated skill spans keep the skill accent when folded" is bound to
+      // GroupRow.integration.test.tsx instead of a second call to this same
+      // predicate — a sibling group shares its members' type + name, so
+      // re-asserting isSkillSpan here would prove nothing new; the fold path
+      // only needs covering where it actually diverges, in GroupRow's render.
     });
 
     describe("given a non-skill span", () => {
