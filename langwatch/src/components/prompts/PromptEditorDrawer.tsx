@@ -23,6 +23,7 @@ import {
 } from "~/components/variables";
 import { useEvaluationMappings } from "~/experiments-v3/hooks/useEvaluationMappings";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
+import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -58,7 +59,6 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { localConfigToFormValues } from "./utils/localConfigToFormValues";
 
 export type PromptEditorDrawerProps = {
@@ -710,12 +710,14 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating prompt",
-        description: error.message,
-        type: "error",
-      });
+      // No form bridge here on purpose. The only top-level (claimable) values on
+      // this form are `handle`, `scope` and `configId`, and none of them is
+      // rendered as an input by this drawer — the handle/scope are collected by
+      // the separate Save/Change-handle dialog. `applyHandledErrorToForm` would
+      // therefore claim a `handle` field error, set it on a field nobody paints,
+      // and suppress this toast — the user would click Save and see nothing at
+      // all. Toast until there is a field to put the message on.
+      showErrorToast({ error, fallbackTitle: "Couldn't create prompt" });
     },
   });
 
@@ -761,12 +763,14 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // Don't close - let user continue editing or close manually
     },
     onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error updating prompt",
-        description: error.message,
-        type: "error",
-      });
+      // No form bridge here on purpose. The only top-level (claimable) values on
+      // this form are `handle`, `scope` and `configId`, and none of them is
+      // rendered as an input by this drawer — the handle/scope are collected by
+      // the separate Save/Change-handle dialog. `applyHandledErrorToForm` would
+      // therefore claim a `handle` field error, set it on a field nobody paints,
+      // and suppress this toast — the user would click Save and see nothing at
+      // all. Toast until there is a field to put the message on.
+      showErrorToast({ error, fallbackTitle: "Couldn't save prompt" });
     },
   });
 
@@ -783,14 +787,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         type: "success",
       });
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error renaming prompt",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't rename prompt" }),
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;

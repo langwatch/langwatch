@@ -16,8 +16,8 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  */
 import {
-  HttpPollingPullerAdapter,
   type HttpPollingConfig,
+  HttpPollingPullerAdapter,
 } from "./httpPollingPullerAdapter";
 import type { PullResult, PullRunOptions } from "./pullerAdapter";
 

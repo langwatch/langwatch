@@ -9,15 +9,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Check, Terminal, Users } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
-  IngestionTemplateInstallDrawer,
   type IngestionBindingResult,
+  IngestionTemplateInstallDrawer,
 } from "~/components/me/IngestionTemplateInstallDrawer";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
@@ -53,10 +52,7 @@ import { api } from "~/utils/api";
  * NOT render under /[project] chrome — only on /me. Embedding lives on
  * /me/index.tsx.
  */
-const TILE_META: Record<
-  string,
-  { icon: ReactNode; subtitle: string }
-> = {
+const TILE_META: Record<string, { icon: ReactNode; subtitle: string }> = {
   claude_cowork: {
     icon: <Users size={20} />,
     subtitle: "Multi-agent Claude sessions",
@@ -79,28 +75,17 @@ export function TraceIngestSection() {
   );
 
   const utils = api.useUtils();
+  // Neither mutation toasts: both are driven from inside the install drawer,
+  // which is open whenever they can fail and renders this same error inline
+  // via `<HandledErrorAlert>`. A toast would report it a second time.
   const installMutation = api.ingestionKey.install.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
-    },
-    onError: (err) => {
-      toaster.create({
-        title: "Install failed",
-        description: err.message,
-        type: "error",
-      });
     },
   });
   const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
-    },
-    onError: (err) => {
-      toaster.create({
-        title: "Rotate failed",
-        description: err.message,
-        type: "error",
-      });
     },
   });
 
@@ -121,7 +106,7 @@ export function TraceIngestSection() {
   /** Connected ingestion keys, keyed by the source they were minted for. */
   const keyBySourceType = new Map(keys.map((k) => [k.sourceType, k]));
   const openTemplate = openSlug
-    ? templates.find((t) => t.slug === openSlug) ?? null
+    ? (templates.find((t) => t.slug === openSlug) ?? null)
     : null;
 
   const handleInstall = async (
@@ -140,7 +125,7 @@ export function TraceIngestSection() {
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
     } catch {
-      // surfaced via toaster + drawer error state
+      // surfaced inline by the drawer, off `installMutation.error`
     }
   };
 
@@ -160,7 +145,7 @@ export function TraceIngestSection() {
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
     } catch {
-      // surfaced via toaster + drawer error state
+      // surfaced inline by the drawer, off `rotateMutation.error`
     }
   };
 
@@ -234,9 +219,7 @@ export function TraceIngestSection() {
       {openTemplate && (
         <IngestionTemplateInstallDrawer
           open={!!openSlug}
-          onOpenChange={(next) =>
-            handleOpenChange(openTemplate.slug, next)
-          }
+          onOpenChange={(next) => handleOpenChange(openTemplate.slug, next)}
           template={{
             slug: openTemplate.slug,
             displayName: openTemplate.displayName,
@@ -246,10 +229,10 @@ export function TraceIngestSection() {
           installResult={installResults[openTemplate.slug] ?? null}
           isInstalling={installMutation.isPending || rotateMutation.isPending}
           installError={
-            installMutation.error?.message &&
+            installMutation.error &&
             installMutation.variables?.sourceType === openTemplate.sourceType
-              ? installMutation.error.message
-              : rotateMutation.error?.message ?? null
+              ? installMutation.error
+              : (rotateMutation.error ?? null)
           }
           hasExistingKey={keyBySourceType.has(openTemplate.sourceType)}
           onInstall={() =>

@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
+import { explainAnyError } from "~/features/errors";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 
 interface TraceDrawerEmptyStateProps {
@@ -95,6 +96,18 @@ export function TraceDrawerEmptyState({
 }: TraceDrawerEmptyStateProps) {
   const kind = classifyError(error, traceId);
   const { Icon, title, description, palette } = KIND_CONFIG[kind];
+  // The headline above is deliberately generic; this is the one line that says
+  // what actually failed. `explainAnyError` covers all three cases — a handled
+  // code, a message the procedure authored for the user, or nothing at all —
+  // and the last of those is the one we suppress, because repeating the
+  // generic line under a generic headline is noise.
+  const explanation = explainAnyError(error);
+  const detail = explanation.description;
+  // Emptiness, not identity. A registered code with a title and no `describe`
+  // (`not_found`, `dspy_step_not_found`, …) returns a fresh object with an
+  // empty description, so an identity check called it "has detail" and
+  // rendered a padded blank line where the old code named the failure.
+  const hasDetail = !!error && detail.length > 0;
   const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = () => {
@@ -210,15 +223,9 @@ export function TraceDrawerEmptyState({
         </Button>
       </HStack>
 
-      {kind === "load-failed" && error instanceof Error && error.message && (
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          maxWidth="360px"
-          truncate
-          paddingTop={1}
-        >
-          {error.message}
+      {kind === "load-failed" && hasDetail && (
+        <Text textStyle="2xs" color="fg.subtle" maxWidth="360px" paddingTop={1}>
+          {detail}
         </Text>
       )}
     </VStack>

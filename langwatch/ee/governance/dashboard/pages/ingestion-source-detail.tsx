@@ -29,8 +29,6 @@ import { useState } from "react";
 import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { NotFoundScene } from "~/components/NotFoundScene";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -42,9 +40,16 @@ import {
 } from "~/components/ui/dialog";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import {
+  HandledErrorAlert,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRouter } from "~/utils/compat/next-router";
 import { api, type RouterOutputs } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Per-source detail page - health metrics + recent events with raw vs
@@ -72,6 +77,21 @@ const STATUS_META: Record<
   },
   disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
 };
+
+/**
+ * Whether a failed load actually means "no such source".
+ *
+ * Reads the handled payload first — a `NotFoundError` carries `httpStatus`
+ * 404 regardless of which tRPC code wrapped it — and falls back to the tRPC
+ * envelope code for the plain `new TRPCError({ code: "NOT_FOUND" })` the
+ * router throws today. Anything else is a load failure, not a deletion.
+ */
+function isNotFoundError(error: unknown): boolean {
+  if (!error) return false;
+  if (readHandledError(error)?.httpStatus === 404) return true;
+  const code = (error as { data?: { code?: unknown } })?.data?.code;
+  return code === "NOT_FOUND";
+}
 
 const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.0000");
@@ -127,11 +147,7 @@ function IngestionSourceDetailPage() {
       });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to rotate secret",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
   const archiveMutation = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
@@ -139,17 +155,13 @@ function IngestionSourceDetailPage() {
       void router.push("/settings/governance/ingestion-sources");
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to archive",
-        description: e.message,
-        type: "error",
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't archive the source",
       }),
   });
 
   if (!sourceId) {
-    return <NotFoundScene />;
-  }
-  if (sourceQuery.isError) {
     return <NotFoundScene />;
   }
 
@@ -159,6 +171,29 @@ function IngestionSourceDetailPage() {
   const pageTitle = source?.name
     ? `${source.name} · Ingestion Source · LangWatch`
     : "Ingestion Source · LangWatch";
+
+  // "This source doesn't exist" is a claim, and only a genuine 404 earns it.
+  // Every other failure — a permission denial, a 500, a dropped connection —
+  // used to land here too, so an admin whose source was very much alive was
+  // told it had been deleted and went looking for who removed it.
+  if (isNotFoundError(sourceQuery.error)) {
+    return <NotFoundScene />;
+  }
+  if (sourceQuery.error) {
+    return (
+      <GovernanceLayout pageTitle={pageTitle}>
+        <EnterpriseLockedSurface
+          featureName="Ingestion Source detail"
+          description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
+        >
+          <HandledErrorAlert
+            error={sourceQuery.error}
+            fallbackTitle="Couldn't load this ingestion source"
+          />
+        </EnterpriseLockedSurface>
+      </GovernanceLayout>
+    );
+  }
 
   if (!source) {
     return (
@@ -183,134 +218,164 @@ function IngestionSourceDetailPage() {
         featureName="Ingestion Source detail"
         description="Source-level health metrics and event drill-downs are part of the Enterprise plan."
       >
-      <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <HStack alignItems="end">
-          <VStack align="start" gap={1}>
-            <HStack gap={2}>
-              <Link
-                href="/settings/governance/ingestion-sources"
-                color="blue.600"
-                fontSize="xs"
-              >
-                <HStack gap={1}>
-                  <ArrowLeft size={12} />
-                  <Text>All sources</Text>
-                </HStack>
-              </Link>
-            </HStack>
-            <HStack gap={2}>
-              <Heading size="md">{source.name}</Heading>
-              <Badge size="sm" variant="surface">
-                {source.sourceType}
-              </Badge>
-              <HStack gap={1}>
-                <Box color={status.color} display="flex">
-                  <StatusIcon size={14} />
-                </Box>
-                <Text fontSize="sm" color="fg.muted">
-                  {status.label}
-                </Text>
+        <VStack align="stretch" gap={6} width="full" maxW="container.xl">
+          <HStack alignItems="end">
+            <VStack align="start" gap={1}>
+              <HStack gap={2}>
+                <Link
+                  href="/settings/governance/ingestion-sources"
+                  color="blue.600"
+                  fontSize="xs"
+                >
+                  <HStack gap={1}>
+                    <ArrowLeft size={12} />
+                    <Text>All sources</Text>
+                  </HStack>
+                </Link>
               </HStack>
-            </HStack>
-            {source.description && (
-              <Text fontSize="sm" color="fg.muted">
-                {source.description}
-              </Text>
-            )}
-          </VStack>
-          <Spacer />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              rotateMutation.mutate({ organizationId: orgId, id: source.id })
-            }
-            loading={rotateMutation.isPending}
-            title="Mint a new ingestSecret (24h grace on the old one)"
-          >
-            <RotateCw size={14} /> Rotate secret
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            colorPalette="red"
-            onClick={() => {
-              if (!confirm(`Archive "${source.name}"? Historical events stay readable.`)) return;
-              archiveMutation.mutate({ organizationId: orgId, id: source.id });
-            }}
-            loading={archiveMutation.isPending}
-          >
-            <Trash2 size={14} /> Archive
-          </Button>
-        </HStack>
-
-        <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
-          <MetricCard
-            title="Events 24h"
-            value={numeral(health?.events24h ?? 0).format("0,0")}
-            isLoading={healthQuery.isLoading}
-          />
-          <MetricCard
-            title="Events 7d"
-            value={numeral(health?.events7d ?? 0).format("0,0")}
-            isLoading={healthQuery.isLoading}
-          />
-          <MetricCard
-            title="Events 30d"
-            value={numeral(health?.events30d ?? 0).format("0,0")}
-            isLoading={healthQuery.isLoading}
-          />
-          <MetricCard
-            title="Last event"
-            value={fmtRelative(health?.lastSuccessIso ?? null)}
-            isLoading={healthQuery.isLoading}
-          />
-        </SimpleGrid>
-
-        <StaleTimestampCallout
-          health={health ?? null}
-          eventsCount={events.length}
-        />
-
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          padding={5}
-        >
-          <VStack align="start" gap={1} marginBottom={3}>
-            <Heading as="h3" size="sm">
-              Recent events
-            </Heading>
-            <Text fontSize="sm" color="fg.muted">
-              Last {events.length} OCSF-normalised events from this source.
-              Raw payload + normalised fields shown side-by-side. Newest
-              first.
-            </Text>
-          </VStack>
-
-          {eventsQuery.isLoading && <Spinner size="sm" />}
-
-          {!eventsQuery.isLoading && events.length === 0 && (
-            <EmptyEventsHint source={source} />
-          )}
-
-          {events.length > 0 && (
-            <VStack align="stretch" gap={2}>
-              {events.map((ev) => (
-                <EventRow key={ev.eventId} event={ev} />
-              ))}
+              <HStack gap={2}>
+                <Heading size="md">{source.name}</Heading>
+                <Badge size="sm" variant="surface">
+                  {source.sourceType}
+                </Badge>
+                <HStack gap={1}>
+                  <Box color={status.color} display="flex">
+                    <StatusIcon size={14} />
+                  </Box>
+                  <Text fontSize="sm" color="fg.muted">
+                    {status.label}
+                  </Text>
+                </HStack>
+              </HStack>
+              {source.description && (
+                <Text fontSize="sm" color="fg.muted">
+                  {source.description}
+                </Text>
+              )}
             </VStack>
-          )}
-        </Box>
-      </VStack>
+            <Spacer />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                rotateMutation.mutate({ organizationId: orgId, id: source.id })
+              }
+              loading={rotateMutation.isPending}
+              title="Mint a new ingestSecret (24h grace on the old one)"
+            >
+              <RotateCw size={14} /> Rotate secret
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              colorPalette="red"
+              onClick={() => {
+                if (
+                  !confirm(
+                    `Archive "${source.name}"? Historical events stay readable.`,
+                  )
+                )
+                  return;
+                archiveMutation.mutate({
+                  organizationId: orgId,
+                  id: source.id,
+                });
+              }}
+              loading={archiveMutation.isPending}
+            >
+              <Trash2 size={14} /> Archive
+            </Button>
+          </HStack>
 
-      <SecretRevealModal
-        details={secretReveal}
-        sourceId={source.id}
-        sourceType={source.sourceType}
-        onClose={() => setSecretReveal(null)}
-      />
+          {/* The metric cards read `health?.eventsNd ?? 0`, so a failed
+              health query renders "0 events" — indistinguishable from a
+              silent source, and the first thing an admin does about a silent
+              source is go rebuild an integration that was never broken. */}
+          {healthQuery.error ? (
+            <HandledErrorAlert
+              error={healthQuery.error}
+              fallbackTitle="Couldn't load health metrics for this source"
+            />
+          ) : (
+            <SimpleGrid columns={{ base: 2, md: 4 }} gap={4}>
+              <MetricCard
+                title="Events 24h"
+                value={numeral(health?.events24h ?? 0).format("0,0")}
+                isLoading={healthQuery.isLoading}
+              />
+              <MetricCard
+                title="Events 7d"
+                value={numeral(health?.events7d ?? 0).format("0,0")}
+                isLoading={healthQuery.isLoading}
+              />
+              <MetricCard
+                title="Events 30d"
+                value={numeral(health?.events30d ?? 0).format("0,0")}
+                isLoading={healthQuery.isLoading}
+              />
+              <MetricCard
+                title="Last event"
+                value={fmtRelative(health?.lastSuccessIso ?? null)}
+                isLoading={healthQuery.isLoading}
+              />
+            </SimpleGrid>
+          )}
+
+          <StaleTimestampCallout
+            health={health ?? null}
+            eventsCount={events.length}
+          />
+
+          <Box
+            borderWidth="1px"
+            borderColor="border.muted"
+            borderRadius="md"
+            padding={5}
+          >
+            <VStack align="start" gap={1} marginBottom={3}>
+              <Heading as="h3" size="sm">
+                Recent events
+              </Heading>
+              {!eventsQuery.error && (
+                <Text fontSize="sm" color="fg.muted">
+                  Last {events.length} OCSF-normalised events from this source.
+                  Raw payload + normalised fields shown side-by-side. Newest
+                  first.
+                </Text>
+              )}
+            </VStack>
+
+            {eventsQuery.isLoading && <Spinner size="sm" />}
+
+            {/* `EmptyEventsHint` walks an admin through setting up an
+                integration. Showing it because the events query failed sends
+                someone debugging a live source off to re-install something
+                that is already working. */}
+            <HandledErrorAlert
+              error={eventsQuery.error}
+              fallbackTitle="Couldn't load recent events"
+            />
+
+            {!eventsQuery.isLoading &&
+              !eventsQuery.error &&
+              events.length === 0 && <EmptyEventsHint source={source} />}
+
+            {events.length > 0 && (
+              <VStack align="stretch" gap={2}>
+                {events.map((ev) => (
+                  <EventRow key={ev.eventId} event={ev} />
+                ))}
+              </VStack>
+            )}
+          </Box>
+        </VStack>
+
+        <SecretRevealModal
+          details={secretReveal}
+          sourceId={source.id}
+          sourceType={source.sourceType}
+          onClose={() => setSecretReveal(null)}
+        />
       </EnterpriseLockedSurface>
     </GovernanceLayout>
   );
@@ -345,17 +410,15 @@ function StaleTimestampCallout({
       borderRadius="md"
     >
       <Text fontSize="sm" color="amber.900">
-        <strong>Heads up:</strong> the events list shows {eventsCount}{" "}
-        event{eventsCount === 1 ? "" : "s"}, but the rolling
-        24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d health windows are all zero.
-        Your events likely have a stale{" "}
-        <Code fontSize="xs">startTimeUnixNano</Code> (timestamps before
-        today). When firing test events, set{" "}
+        <strong>Heads up:</strong> the events list shows {eventsCount} event
+        {eventsCount === 1 ? "" : "s"}, but the rolling
+        24h&nbsp;/&nbsp;7d&nbsp;/&nbsp;30d health windows are all zero. Your
+        events likely have a stale <Code fontSize="xs">startTimeUnixNano</Code>{" "}
+        (timestamps before today). When firing test events, set{" "}
         <Code fontSize="xs">startTimeUnixNano</Code> to{" "}
-        <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the
-        event lands inside the rolling window. The secret-reveal
-        modal&apos;s &quot;Test it now&quot; curl already does this for
-        you.
+        <Code fontSize="xs">String(Date.now() * 1_000_000)</Code> so the event
+        lands inside the rolling window. The secret-reveal modal&apos;s
+        &quot;Test it now&quot; curl already does this for you.
       </Text>
     </Box>
   );
@@ -376,15 +439,15 @@ function EmptyEventsHint({ source }: { source: Source }) {
     <VStack align="stretch" gap={3}>
       <Text fontSize="sm" color="fg.muted">
         No traces from this source yet. Push an OTLP body to{" "}
-        <Code fontSize="xs">{endpoint}</Code> with the source&apos;s
-        bearer secret to start populating.
+        <Code fontSize="xs">{endpoint}</Code> with the source&apos;s bearer
+        secret to start populating.
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Spans land in the LangWatch trace store with this
-        source&apos;s origin tag, viewable in the trace viewer. If
-        you are sending agent traces from your own LangWatch SDK,
-        use <Code fontSize="xs">/api/otel/v1/traces</Code> with your
-        project API key - different auth, same trace store. See{" "}
+        Spans land in the LangWatch trace store with this source&apos;s origin
+        tag, viewable in the trace viewer. If you are sending agent traces from
+        your own LangWatch SDK, use{" "}
+        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key
+        - different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -394,10 +457,10 @@ function EmptyEventsHint({ source }: { source: Source }) {
         .
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        Lost the secret? Click <strong>Rotate secret</strong> above -
-        the new bearer is shown once with a copy-paste curl example, and
-        the prior secret stays valid for 24h while you roll the new
-        value through every upstream client.
+        Lost the secret? Click <strong>Rotate secret</strong> above - the new
+        bearer is shown once with a copy-paste curl example, and the prior
+        secret stays valid for 24h while you roll the new value through every
+        upstream client.
       </Text>
       {isOtel && (
         <Box
@@ -433,10 +496,9 @@ function EmptyEventsHint({ source }: { source: Source }) {
   }]
 }`}</Code>
           <Text fontSize="xs" color="fg.muted" mt={2}>
-            Returns HTTP 202 with{" "}
-            <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
-            <Code fontSize="xs">events: 0</Code> with a hint, the body
-            shape didn&apos;t parse. See the{" "}
+            Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on
+            success. If you get <Code fontSize="xs">events: 0</Code> with a
+            hint, the body shape didn&apos;t parse. See the{" "}
             <Link
               href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
               color="blue.600"
@@ -496,11 +558,7 @@ function EventRow({ event }: { event: EventRow }) {
       borderRadius="sm"
       padding={3}
     >
-      <HStack
-        gap={3}
-        cursor="pointer"
-        onClick={() => setExpanded((e) => !e)}
-      >
+      <HStack gap={3} cursor="pointer" onClick={() => setExpanded((e) => !e)}>
         <VStack align="start" gap={0} flex={1} minWidth={0}>
           <HStack gap={2} wrap="wrap">
             <Badge size="sm" variant="surface">
@@ -545,7 +603,12 @@ function EventRow({ event }: { event: EventRow }) {
 function NormalisedPanel({ event }: { event: EventRow }) {
   return (
     <Box>
-      <Text fontSize="xs" fontWeight="semibold" color="fg.muted" marginBottom={1}>
+      <Text
+        fontSize="xs"
+        fontWeight="semibold"
+        color="fg.muted"
+        marginBottom={1}
+      >
         Normalised (OCSF)
       </Text>
       <Code
@@ -586,7 +649,12 @@ function RawPanel({ event }: { event: EventRow }) {
   }
   return (
     <Box>
-      <Text fontSize="xs" fontWeight="semibold" color="fg.muted" marginBottom={1}>
+      <Text
+        fontSize="xs"
+        fontWeight="semibold"
+        color="fg.muted"
+        marginBottom={1}
+      >
         Raw payload (as ingested)
       </Text>
       <Code
@@ -692,9 +760,8 @@ function SecretRevealModal({
             <Text fontSize="sm" color="fg.muted">
               This is the only time we&apos;ll show this secret. Save it
               somewhere safe and paste it into the upstream platform&apos;s
-              admin console. The previous secret keeps working for 24h so
-              you have time to roll the new value through every upstream
-              client.
+              admin console. The previous secret keeps working for 24h so you
+              have time to roll the new value through every upstream client.
             </Text>
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -729,22 +796,19 @@ function SecretRevealModal({
                 </Code>
                 {isClaudeCode && (
                   <Text fontSize="xs" color="fg.muted">
-                    Paste this URL into Claude Code&apos;s
-                    {" "}
+                    Paste this URL into Claude Code&apos;s{" "}
                     <Code fontSize="xs" backgroundColor="transparent">
                       OTEL_EXPORTER_OTLP_ENDPOINT
-                    </Code>
-                    {" "}- Claude Code&apos;s SDK appends
-                    {" "}
+                    </Code>{" "}
+                    - Claude Code&apos;s SDK appends{" "}
                     <Code fontSize="xs" backgroundColor="transparent">
                       /v1/logs
-                    </Code>
-                    {" "}and
-                    {" "}
+                    </Code>{" "}
+                    and{" "}
                     <Code fontSize="xs" backgroundColor="transparent">
                       /v1/metrics
-                    </Code>
-                    {" "}itself.
+                    </Code>{" "}
+                    itself.
                   </Text>
                 )}
               </VStack>
@@ -780,8 +844,8 @@ function SecretRevealModal({
                   . To attribute spend to a specific team, also export{" "}
                   <Code fontSize="xs" backgroundColor="transparent">
                     OTEL_RESOURCE_ATTRIBUTES=team.id=…
-                  </Code>
-                  {" "}- it lands as a resource attribute and slots into
+                  </Code>{" "}
+                  - it lands as a resource attribute and slots into
                   /governance&apos;s spendByTeam without further config.
                   Department attribution is resolved from the project&apos;s
                   assignment at read time, not from an OTEL attribute.
@@ -813,7 +877,7 @@ function SecretRevealModal({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
-    IngestionSourceDetailPage,
-  ),
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(IngestionSourceDetailPage),
 );

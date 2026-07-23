@@ -394,9 +394,13 @@ export class SpendSpikeAnomalyEvaluator {
     let dispatchTag: string;
     let dispatchOutcomes: Prisma.InputJsonValue = [];
     try {
-      const dispatchResult = await this.dispatcher.dispatchAlert({ rule, alert });
+      const dispatchResult = await this.dispatcher.dispatchAlert({
+        rule,
+        alert,
+      });
       dispatchTag = dispatchResult.dispatchTag;
-      dispatchOutcomes = dispatchResult.outcomes as unknown as Prisma.InputJsonValue;
+      dispatchOutcomes =
+        dispatchResult.outcomes as unknown as Prisma.InputJsonValue;
     } catch (err) {
       logger.error(
         {

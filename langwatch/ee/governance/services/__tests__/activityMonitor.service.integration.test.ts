@@ -29,7 +29,7 @@
  *   - eventLogDurability.integration.test.ts (write path durability)
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import { type Organization, type Project } from "@prisma/client";
+import type { Organization, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -38,11 +38,11 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  PROJECT_KIND,
-  ensureHiddenGovernanceProject,
-} from "../governanceProject.service";
 import { ActivityMonitorService } from "../activity-monitor/activityMonitor.service";
+import {
+  ensureHiddenGovernanceProject,
+  PROJECT_KIND,
+} from "../governanceProject.service";
 
 const ORIGIN_KEY = "langwatch.origin.kind";
 const ORIGIN_VALUE = "ingestion_source";
@@ -185,7 +185,10 @@ describe("ActivityMonitorService — read-side queries against unified trace sto
       },
     });
 
-    primaryGovProject = await ensureHiddenGovernanceProject(prisma, primaryOrg.id);
+    primaryGovProject = await ensureHiddenGovernanceProject(
+      prisma,
+      primaryOrg.id,
+    );
     crossGovProject = await ensureHiddenGovernanceProject(prisma, crossOrg.id);
 
     primarySourceId = `is-primary-${nanoid()}`;

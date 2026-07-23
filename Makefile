@@ -1,6 +1,7 @@
 .PHONY: help start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
+.PHONY: herrgen herrgen-check
 .PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
@@ -39,6 +40,8 @@ help:
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
 	@echo "    make down                           stop all services"
 	@echo "    make test-scripts                   run bats unit tests under scripts/__tests__/"
+	@echo "    make herrgen                        regenerate the Go error codes for TypeScript"
+	@echo "    make herrgen-check                  fail if those generated codes are stale (CI)"
 	@echo ""
 	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
 	@echo "    make boxd-help                      full boxd target reference"
@@ -158,6 +161,18 @@ test-scripts:
 		exit 1; \
 	fi
 	bats scripts/__tests__/*.unit.bats
+
+# Mirror the Go services' herr error codes into
+# packages/handled-error/src/codes.generated.ts, so the TypeScript control
+# plane stops compiling when a Go service gains a code with no presentation.
+# Run after adding or renaming a `herr.Code(...)` const. `herrgen-check` is the
+# drift check, and go-ci.yaml's `generated` job calls this same target, so what
+# CI runs and what you run cannot drift apart.
+herrgen:
+	@go run ./cmd/herrgen
+
+herrgen-check:
+	@go run ./cmd/herrgen -check
 
 # Stop all services
 down:

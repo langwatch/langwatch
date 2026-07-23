@@ -16,9 +16,13 @@ import { AnnotationScoreDataType } from "@prisma/client";
 import { useEffect, useState } from "react";
 import { Plus, X } from "react-feather";
 import { useForm } from "react-hook-form";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { FullWidthFormControl } from "../FullWidthFormControl";
 import { Checkbox } from "../ui/checkbox";
 import { Radio, RadioGroup } from "../ui/radio";
@@ -55,13 +59,7 @@ export const AddOrEditAnnotationScore = ({
 
   const queryClient = api.useContext();
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-    reset,
-  } = useForm({
+  const form = useForm({
     disabled: Boolean(annotationScoreId && existingAnnotationScore.isLoading),
     defaultValues: {
       name: "",
@@ -71,6 +69,13 @@ export const AddOrEditAnnotationScore = ({
       categoryExplanation: Array(5).fill(""),
     },
   });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+    reset,
+  } = form;
 
   useEffect(() => {
     if (!existingAnnotationScore.data) return;
@@ -198,16 +203,13 @@ export const AddOrEditAnnotationScore = ({
           void queryClient.annotationScore.getById.invalidate();
         },
         onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: annotationScoreId
-              ? "Error updating annotation score"
-              : "Error creating annotation score",
-            description: error.message,
-            type: "error",
-            meta: {
-              closable: true,
-            },
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+            return;
+          showErrorToast({
+            error,
+            fallbackTitle: annotationScoreId
+              ? "Couldn't save annotation score"
+              : "Couldn't create annotation score",
           });
         },
       },
@@ -221,12 +223,14 @@ export const AddOrEditAnnotationScore = ({
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
         <VStack gap={2} align="start">
+          <FormServerError form={form} />
           <FullWidthFormControl
             label="Name"
             helper="Give it a name that makes it easy to identify this score metric"
             invalid={!!errors.name}
           >
             <Input {...register("name")} required />
+            <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
           </FullWidthFormControl>
           <FullWidthFormControl
             label="Description"
@@ -239,6 +243,7 @@ export const AddOrEditAnnotationScore = ({
               autoresize
               maxHeight="6lh"
             />
+            <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
           </FullWidthFormControl>
           <FullWidthFormControl
             label="Score Type"
@@ -266,6 +271,7 @@ export const AddOrEditAnnotationScore = ({
                 </NativeSelect.Root>
               </VStack>
             </HStack>
+            <Field.ErrorText>{errors.dataType?.message}</Field.ErrorText>
 
             {watchDataType === "OPTION" && (
               <Field.Root mt={4}>

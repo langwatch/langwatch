@@ -168,7 +168,10 @@ func TestSync_CodeBlock_UndefinedSecretIsAttributeError(t *testing.T) {
 	res := postSync(t, stack, body)
 	require.Equal(t, "error", res.Status)
 	require.NotNil(t, res.Error)
-	assert.Equal(t, "AttributeError", res.Error.Type)
+	// The exception class rides in the message; error.type stays a code the
+	// client has copy for.
+	assert.Equal(t, "code_runner_error", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "AttributeError")
 	assert.Contains(t, res.Error.Message, "ABSENT")
 }
 
@@ -204,10 +207,12 @@ func TestSync_CodeBlock_SyntaxErrorSurfaced(t *testing.T) {
 	res := postSync(t, stack, body)
 	require.Equal(t, "error", res.Status)
 	require.NotNil(t, res.Error)
-	// The SyntaxError identity is surfaced on the error type; the message
-	// carries Python's "invalid syntax" detail. compile() fails before the
-	// entrypoint runs, so this is raised before any input is marshaled in.
-	assert.Equal(t, "SyntaxError", res.Error.Type)
+	// The SyntaxError identity is surfaced in the message, alongside Python's
+	// "invalid syntax" detail; error.type carries a code the client has copy
+	// for. compile() fails before the entrypoint runs, so this is raised
+	// before any input is marshaled in.
+	assert.Equal(t, "code_runner_error", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "SyntaxError")
 	assert.Contains(t, res.Error.Message, "invalid syntax")
 }
 
@@ -226,7 +231,10 @@ func TestSync_CodeBlock_ZeroDivisionErrorWithTraceback(t *testing.T) {
 	require.Equal(t, "error", res.Status)
 	require.NotNil(t, res.Error)
 	assert.Equal(t, "divide", res.Error.NodeID, "error must name the offending code node")
-	assert.Equal(t, "ZeroDivisionError", res.Error.Type)
+	// error.type is a code the presentation registry is written against; the
+	// exception the customer's own function raised leads the message.
+	assert.Equal(t, "code_runner_error", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "ZeroDivisionError")
 	assert.Contains(t, res.Error.Message, "division by zero")
 	// The full "ZeroDivisionError: division by zero" identity and the
 	// offending user-code frame are preserved in the traceback. User code

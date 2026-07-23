@@ -1,0 +1,112 @@
+language js
+
+// Error toasts must not render an error's own message.
+//
+// Since #5984 the wire message for a handled error IS its code, so
+// `description: error.message` shows the customer `validation_error`; for an
+// unhandled error the message can carry internals (Prisma models, SQL,
+// hostnames). `showErrorToast` from `~/features/errors` reads the handled
+// payload and renders the code-keyed copy instead.
+//
+// This plugin is the author-time nudge: it runs in the editor and in
+// `pnpm lint`, and it matches the common spellings by name. The authority is
+// `src/features/errors/logic/__tests__/noRawErrorToasts.unit.test.ts`, which
+// also tracks renamed catch bindings, hoisted locals and enclosing calls —
+// things a name-matching pattern cannot see. Anything this file flags, that
+// guard flags too; the reverse does not hold, by design.
+//
+// See dev/docs/best_practices/error-handling.md and ADR-045.
+
+// `contains` rather than a literal value match: the leak is almost never
+// written flat. It hides inside a ternary (`err instanceof Error ? err.message
+// : "…"`), behind a cast (`(error as Error).message`), or inside a template
+// literal — three shapes an equality match misses and a customer still reads.
+pattern error_ish() {
+	or {
+		`error`,
+		`err`,
+		`e`,
+		`exception`,
+		`cause`,
+		`(error as $_)`,
+		`(err as $_)`,
+		`(e as $_)`
+	}
+}
+
+// Every way we have actually seen an error turned into copy. `String(…)` was
+// the only stringifier the first version knew, so `JSON.stringify(err)`,
+// `err.toString()` and `String(err.cause)` shipped a raw error to a customer
+// while both guards reported a clean tree.
+pattern leaks_an_error() {
+	or {
+		contains bubble `$errish.message` where { $errish <: error_ish() },
+		contains bubble `$errish?.message` where { $errish <: error_ish() },
+		contains bubble `String($errish)` where { $errish <: error_ish() },
+		contains bubble `JSON.stringify($errish)` where { $errish <: error_ish() },
+		contains bubble `$errish.toString()` where { $errish <: error_ish() }
+	}
+}
+
+pattern report($node) {
+	$node where {
+		register_diagnostic(span=$node, message="Don't render an error's raw message in a toast — for a handled error this is the code slug (the customer reads `validation_error`), and for an unhandled one it can leak internals. Use showErrorToast({ error, fallbackTitle }) from ~/features/errors instead. See dev/docs/best_practices/error-handling.md.", severity="error")
+	}
+}
+
+// `fallbackTitle={error.message}` — the JSX spelling. A pattern anchored on
+// `key: value` never sees it, which is how `HandledErrorAlert` came to sit in
+// the guard's file prefilter while having no coverage at all.
+pattern leaky_copy_attribute() {
+	jsx_attribute() as $attr where {
+		$attr <: r"(?:title|description|fallbackTitle)=[\s\S]*",
+		$attr <: leaks_an_error(),
+		$attr <: report($attr)
+	}
+}
+
+or {
+	// `toaster` re-spreads `createToaster(...)` in `components/ui/toaster.tsx`,
+	// so the status shorthands are first-class and already used at six sites.
+	// A rule that knows only `.create` is one autocomplete away from bypassed.
+	`$call($props)` where {
+		$call <: or {
+			`toaster.create`,
+			`toaster.error`,
+			`toaster.warning`,
+			`toaster.info`,
+			`toaster.success`,
+			`toaster.loading`,
+			`toaster.promise`,
+			`toaster.update`,
+			`showErrorToast`
+		},
+		$props <: contains bubble `$key: $value` where {
+			$key <: or {
+				`title`,
+				`description`,
+				`fallbackTitle`
+			},
+			$value <: leaks_an_error(),
+			$value <: report($value)
+		}
+	},
+	// `FormServerError` renders `errors.root.serverError.message` verbatim, so
+	// a hand-written `form.setError(FORM_SERVER_ERROR, { message: … })`
+	// bypasses `applyHandledErrorToForm` and puts the slug on screen with
+	// nothing in the way.
+	`$form.setError($_, $props)` where {
+		$props <: contains bubble `message: $value` where {
+			$value <: leaks_an_error(),
+			$value <: report($value)
+		}
+	},
+	jsx_self_closing_element(name=$component, attributes=$attrs) where {
+		$component <: r"(?:HandledErrorAlert|ErrorAlert|ErrorCard)",
+		$attrs <: contains bubble leaky_copy_attribute()
+	},
+	jsx_opening_element(name=$component, attributes=$attrs) where {
+		$component <: r"(?:HandledErrorAlert|ErrorAlert|ErrorCard)",
+		$attrs <: contains bubble leaky_copy_attribute()
+	}
+}

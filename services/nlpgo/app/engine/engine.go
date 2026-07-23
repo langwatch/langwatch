@@ -376,6 +376,58 @@ def execute(**inputs):
     return {"result": result}
 `
 
+// Code-runner error types that the runner itself synthesizes, as opposed to a
+// Python exception class raised by the customer's own code.
+const (
+	codeRunnerTimeoutType = "Timeout"
+	codeRunnerFailureType = "RunnerError"
+)
+
+// nodeErrorFromCodeBlock normalises a code-runner failure onto a NodeError code
+// the client knows.
+//
+// codeblock.Error.Type is an OPEN set: it is whatever Python exception class the
+// customer's code raised, plus the two types the runner synthesizes. Forwarding
+// it verbatim put a `ValueError` on the wire as if it were one of our codes, so
+// the client had no copy for it and fell through to a generic failure — and
+// nothing failed to compile, because a forwarded value is invisible to the code
+// generator. Every path here lands on a code that exists: the timeout has its
+// own, and everything else is the code runner reporting a failure, which is what
+// code_runner_error means. The Python class name is not lost — it leads the
+// message, where it belongs, rather than posing as a code.
+func nodeErrorFromCodeBlock(err *codeblock.Error) *NodeError {
+	switch err.Type {
+	case codeRunnerTimeoutType:
+		return &NodeError{
+			Type:      "code_block_timeout",
+			Message:   "the code block ran past its time limit and was stopped",
+			Traceback: err.Traceback,
+		}
+	case codeRunnerFailureType:
+		return &NodeError{
+			Type:      "code_runner_error",
+			Message:   err.Message,
+			Traceback: err.Traceback,
+		}
+	default:
+		return &NodeError{
+			Type:      "code_runner_error",
+			Message:   codeBlockMessage(err),
+			Traceback: err.Traceback,
+		}
+	}
+}
+
+// codeBlockMessage leads with the Python exception class when the runner named
+// one, so the customer still reads "ValueError: ..." even though the code on the
+// wire is ours.
+func codeBlockMessage(err *codeblock.Error) string {
+	if err.Type == "" {
+		return err.Message
+	}
+	return err.Type + ": " + err.Message
+}
+
 func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map[string]any, ns *NodeState, secrets map[string]string) (map[string]any, *NodeError) {
 	if e.code == nil {
 		return nil, &NodeError{Type: "code_runner_unavailable", Message: "no code runner configured"}
@@ -396,7 +448,7 @@ func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, inputs map
 	ns.Stdout = res.Stdout
 	ns.Stderr = res.Stderr
 	if res.Error != nil {
-		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
+		return nil, nodeErrorFromCodeBlock(res.Error)
 	}
 	result, ok := res.Outputs["result"].(bool)
 	if !ok {
@@ -460,7 +512,7 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, inputs map[string]
 	ns.Stdout = res.Stdout
 	ns.Stderr = res.Stderr
 	if res.Error != nil {
-		return nil, &NodeError{Type: res.Error.Type, Message: res.Error.Message, Traceback: res.Error.Traceback}
+		return nil, nodeErrorFromCodeBlock(res.Error)
 	}
 	return res.Outputs, nil
 }

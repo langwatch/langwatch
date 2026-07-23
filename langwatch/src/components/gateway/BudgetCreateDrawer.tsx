@@ -11,10 +11,10 @@ import {
 import { useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { toaster } from "~/components/ui/toaster";
+import { describeError, showErrorToast } from "~/features/errors";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 type BudgetCreateDrawerProps = {
@@ -92,7 +92,10 @@ export function BudgetCreateDrawer({
     }
     const parsed = Number.parseFloat(limitUsd);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      toaster.create({ title: "Limit must be a positive number", type: "error" });
+      toaster.create({
+        title: "Limit must be a positive number",
+        type: "error",
+      });
       return;
     }
     setSubmitError(null);
@@ -102,7 +105,10 @@ export function BudgetCreateDrawer({
         return;
       }
       if (scopeKind === "PROJECT" && !project?.id) {
-        toaster.create({ title: "Project scope requires a project", type: "error" });
+        toaster.create({
+          title: "Project scope requires a project",
+          type: "error",
+        });
         return;
       }
       if (scopeKind === "PRINCIPAL" && !principalUserId) {
@@ -113,10 +119,10 @@ export function BudgetCreateDrawer({
         scopeKind === "ORGANIZATION"
           ? { kind: "ORGANIZATION" as const, organizationId: organization.id }
           : scopeKind === "TEAM"
-          ? { kind: "TEAM" as const, teamId: team?.id ?? "" }
-          : scopeKind === "PROJECT"
-          ? { kind: "PROJECT" as const, projectId: project?.id ?? "" }
-          : { kind: "PRINCIPAL" as const, principalUserId };
+            ? { kind: "TEAM" as const, teamId: team?.id ?? "" }
+            : scopeKind === "PROJECT"
+              ? { kind: "PROJECT" as const, projectId: project?.id ?? "" }
+              : { kind: "PRINCIPAL" as const, principalUserId };
       await createMutation.mutateAsync({
         organizationId: organization.id,
         name,
@@ -130,14 +136,14 @@ export function BudgetCreateDrawer({
       reset();
       onOpenChange(false);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to create budget";
       // Cross-org guard + missing-member errors are inline-actionable; other
       // failures get a toast so the user knows something happened.
       if (scopeKind === "PRINCIPAL") {
-        setSubmitError(message);
+        setSubmitError(
+          describeError({ error, fallbackTitle: "Couldn't create the budget" }),
+        );
       } else {
-        toaster.create({ title: message, type: "error" });
+        showErrorToast({ error, fallbackTitle: "Couldn't create the budget" });
       }
     }
   };
@@ -219,10 +225,7 @@ export function BudgetCreateDrawer({
                     docHref="/ai-gateway/budgets#principal-scope"
                   />
                 </Field.Label>
-                <NativeSelect.Root
-                  size="sm"
-                  disabled={membersQuery.isLoading}
-                >
+                <NativeSelect.Root size="sm" disabled={membersQuery.isLoading}>
                   <NativeSelect.Field
                     value={principalUserId}
                     onChange={(e) => setPrincipalUserId(e.target.value)}
@@ -299,13 +302,15 @@ export function BudgetCreateDrawer({
                 <NativeSelect.Field
                   value={onBreach}
                   onChange={(e) =>
-                    setOnBreach(
-                      (e.target.value as "BLOCK" | "WARN") ?? "BLOCK",
-                    )
+                    setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")
                   }
                 >
-                  <option value="BLOCK">Block — reject requests at limit</option>
-                  <option value="WARN">Warn — tag responses, keep serving</option>
+                  <option value="BLOCK">
+                    Block — reject requests at limit
+                  </option>
+                  <option value="WARN">
+                    Warn — tag responses, keep serving
+                  </option>
                 </NativeSelect.Field>
               </NativeSelect.Root>
             </Field.Root>

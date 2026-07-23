@@ -1,4 +1,5 @@
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { PrivacyRuleDrawer } from "~/pages/settings/data-privacy";
@@ -78,10 +79,9 @@ export function DataPrivacyRuleDrawer({
           });
           closeDrawer();
         } catch (error) {
-          toaster.create({
-            title: "Failed to save rule",
-            description: (error as Error).message,
-            type: "error",
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't save the privacy rule",
           });
         }
       }}

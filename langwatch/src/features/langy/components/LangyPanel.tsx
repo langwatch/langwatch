@@ -49,6 +49,7 @@ import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -1491,16 +1492,10 @@ function LangyPanel({
           meta: { closable: true },
         });
       } catch (error) {
-        if (!isHandledByGlobalHandler(error)) {
-          toaster.create({
-            title: "Failed to apply",
-            description:
-              error instanceof Error ? error.message : "Unknown error",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        }
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't apply this suggestion",
+        });
       } finally {
         clearProposalApplying(proposalId);
       }

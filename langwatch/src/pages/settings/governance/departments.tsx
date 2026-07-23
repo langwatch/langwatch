@@ -10,15 +10,15 @@ import {
 } from "@chakra-ui/react";
 import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
-
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { DepartmentEditDrawer } from "~/components/settings/DepartmentEditDrawer";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -48,7 +48,7 @@ function DepartmentsPage() {
       await refresh();
     },
     onError: (e) =>
-      toaster.create({ title: "Create failed", description: e.message, type: "error" }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create department" }),
   });
 
   const departments = listQuery.data ?? [];
@@ -66,10 +66,10 @@ function DepartmentsPage() {
           </Text>
           <Heading size="md">Departments</Heading>
           <Text color="fg.muted" fontSize="sm" maxW="2xl">
-            A department is an accounting label for spend. Assign people,
-            teams, and projects to one, and spend rolls up by department
-            across the org, including personal AI use. Departments never
-            grant or restrict access.
+            A department is an accounting label for spend. Assign people, teams,
+            and projects to one, and spend rolls up by department across the
+            org, including personal AI use. Departments never grant or restrict
+            access.
           </Text>
         </VStack>
 
@@ -155,8 +155,8 @@ function AssignmentGuide() {
           Assigning departments
         </Text>
         <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-          Assign people and teams to a department where you already manage
-          them. Spend rolls up by department, including personal AI use.
+          Assign people and teams to a department where you already manage them.
+          Spend rolls up by department, including personal AI use.
         </Text>
       </Box>
       <AssignmentLink
@@ -233,7 +233,10 @@ function DepartmentList({
       await onChanged();
     },
     onError: (e) =>
-      toaster.create({ title: "Archive failed", description: e.message, type: "error" }),
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't archive department",
+      }),
   });
 
   return (

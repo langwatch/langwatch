@@ -1,5 +1,6 @@
 import { Alert, Box, Center, Spinner, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
+import { describeError } from "~/features/errors";
 import { TraceDrawerContent } from "~/features/traces-v2/components/TraceDrawer/TraceDrawerContent";
 import {
   SharedTraceProvider,
@@ -108,9 +109,10 @@ export default function SharePage() {
     return (
       <Center height="100vh" padding={8}>
         <Text color="fg.muted">
-          {shared.error instanceof Error
-            ? shared.error.message
-            : "This share link is not available."}
+          {describeError({
+            error: shared.error,
+            fallbackTitle: "This share link isn't available",
+          })}
         </Text>
       </Center>
     );

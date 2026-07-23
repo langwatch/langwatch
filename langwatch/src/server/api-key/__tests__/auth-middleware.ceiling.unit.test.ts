@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
-import type { ResolvedToken } from "../token-resolver";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   requireApiKeyPermission,
 } from "../auth-middleware";
+import type { ResolvedToken } from "../token-resolver";
 
 /**
  * Enforcement side of the API-key ceiling — the middleware and the guard it
@@ -167,8 +167,9 @@ describe("requireApiKeyPermission()", () => {
         const res = await app.request("/");
 
         expect(res.status).toBe(403);
-        // The full handled-error body (ADR-045): the code is the part a
-        // caller can branch on, so pin that rather than a display string.
+        // The `error` field is the CODE, not the status text: the middleware
+        // answers with the same body `onError` would have built (ADR-045), so
+        // a caller keeps the code, the permission in `meta`, and the tips.
         await expect(res.json()).resolves.toMatchObject({
           error: "api_key_permission_denied",
         });

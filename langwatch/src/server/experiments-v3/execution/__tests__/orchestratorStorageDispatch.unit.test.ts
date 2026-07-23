@@ -39,10 +39,7 @@ describe("buildTargetMetadata", () => {
   describe("given a target with a localPromptConfig model", () => {
     it("attributes the model from localPromptConfig even when a loaded prompt exists", () => {
       const loadedPrompts = new Map([
-        [
-          "prompt-1",
-          { name: "Saved Prompt", model: "openai/saved-model" },
-        ],
+        ["prompt-1", { name: "Saved Prompt", model: "openai/saved-model" }],
       ]) as unknown as Map<string, VersionedPrompt>;
 
       const [target] = buildTargetMetadata({
@@ -174,6 +171,44 @@ describe("buildTargetResultDispatch", () => {
           traceId: null,
         }),
       );
+    });
+  });
+
+  describe("given a cell-error event carrying the failure's own message", () => {
+    /**
+     * The wire message for an unhandled failure is one fixed line, so storing
+     * it recorded a Prisma failure, an OOM and a bad mapping identically. This
+     * row is our history, not the customer's live toast.
+     */
+    it("stores the real message, not the generic wire line", () => {
+      const dispatch = buildTargetResultDispatch({
+        ...base,
+        event: {
+          type: "error",
+          message: "This row couldn't be run",
+          serverMessage: "connect ECONNREFUSED 10.0.0.5:5432",
+          traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
+          rowIndex: 2,
+          targetId: "target-1",
+        },
+      });
+
+      expect(dispatch?.error).toBe("connect ECONNREFUSED 10.0.0.5:5432");
+    });
+
+    it("correlates the row to the log line", () => {
+      const dispatch = buildTargetResultDispatch({
+        ...base,
+        event: {
+          type: "error",
+          message: "This row couldn't be run",
+          traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
+          rowIndex: 2,
+          targetId: "target-1",
+        },
+      });
+
+      expect(dispatch?.traceId).toBe("4bf92f3577b34da6a3ce929d0e0e4736");
     });
   });
 

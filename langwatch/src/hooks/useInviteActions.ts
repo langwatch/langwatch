@@ -1,11 +1,11 @@
 import { OrganizationUserRole } from "@prisma/client";
 import type { SubmitHandler } from "react-hook-form";
+import { showErrorToast } from "~/features/errors";
 import type { MembersForm } from "../components/AddMembersForm";
 import { toaster } from "../components/ui/toaster";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
-import { useLicenseEnforcement } from "./useLicenseEnforcement";
 import { api } from "../utils/api";
-import { isHandledByGlobalHandler } from "../utils/trpcError";
+import { useLicenseEnforcement } from "./useLicenseEnforcement";
 
 /**
  * Encapsulates invite mutation handlers: create invite (admin), create invite request (non-admin),
@@ -57,9 +57,10 @@ export function useInviteActions({
   const subscriptionApi = (api as any).subscription;
   // Build-time invariant: subscriptionApi shape is fixed per build (SaaS vs OSS)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, react-hooks/rules-of-hooks
-  const expandSeatsMutation = subscriptionApi?.addTeamMemberOrEvents?.useMutation() as
-    | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
-    | undefined;
+  const expandSeatsMutation =
+    subscriptionApi?.addTeamMemberOrEvents?.useMutation() as
+      | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
+      | undefined;
 
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const createInviteRequestMutation =
@@ -116,16 +117,8 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: "Sorry, something went wrong",
-            description: error.message ?? "Please try that again",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't send the invites" }),
       },
     );
   };
@@ -164,16 +157,11 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: "Sorry, something went wrong",
-            description: error.message ?? "Please try that again",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't send the invitation for approval",
+          }),
       },
     );
   };
@@ -245,12 +233,9 @@ export function useInviteActions({
             });
             performMutation(data);
           } catch (err) {
-            toaster.create({
-              title: "Failed to expand seats",
-              description: err instanceof Error ? err.message : "Please try again",
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
+            showErrorToast({
+              error: err,
+              fallbackTitle: "Couldn't expand seats",
             });
           }
         },
@@ -279,15 +264,11 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: () => {
-          toaster.create({
-            title: "Sorry, something went wrong",
-            description: "Please try that again",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't approve the invitation",
+          }),
       },
     );
   };
@@ -307,15 +288,11 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: () => {
-          toaster.create({
-            title: "Sorry, something went wrong",
-            description: "Please try that again",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't reject the invitation",
+          }),
       },
     );
   };
@@ -335,16 +312,11 @@ export function useInviteActions({
           refetchInvites();
           invalidateLimits();
         },
-        onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: "Sorry, something went wrong",
-            description: error.message ?? "Please try that again",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't delete the invite",
+          }),
       },
     );
   };

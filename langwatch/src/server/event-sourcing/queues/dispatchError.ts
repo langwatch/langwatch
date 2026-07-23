@@ -25,23 +25,35 @@ export class DispatchError extends Error {
    * `retryable` is true.
    */
   readonly retryAfterMs?: number;
+  /**
+   * The remediation sentence, written for a customer, when this rejection has
+   * one — a provider saying "the bot isn't in that channel" is worth relaying
+   * verbatim. Absent for transport failures: `message` there is assembled from
+   * an undici string, a DNS result and a label naming how the feature is built,
+   * none of which is prose for a person. Only this field is lifted onto
+   * `meta.message`; `message` stays the full diagnostic for the log line.
+   */
+  readonly customerMessage?: string;
 
   constructor({
     message,
     retryable,
     cause,
     retryAfterMs,
+    customerMessage,
   }: {
     message: string;
     retryable: boolean;
     cause?: unknown;
     retryAfterMs?: number;
+    customerMessage?: string;
   }) {
     super(message);
     this.name = "DispatchError";
     this.retryable = retryable;
     this.cause = cause;
     this.retryAfterMs = retryAfterMs;
+    this.customerMessage = customerMessage;
   }
 }
 

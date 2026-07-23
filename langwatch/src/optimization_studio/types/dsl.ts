@@ -74,7 +74,28 @@ export interface ExecutionState {
   status: ExecutionStatus;
   trace_id?: string;
   span_id?: string;
+  /**
+   * The raw engineer-facing failure message — it can name a URL or a Go net
+   * error, so it is never a headline.
+   *
+   * Where the state carries an `error_type`, the studio presents from that
+   * code via the registry and this string stays in the debug panel and the
+   * logs (see ADR-045 and `utils/executionStateError`). Where it does NOT —
+   * a client-side timeout, the stream's top-level error frame, the
+   * optimization runner — this is the only thing anyone has, and showing it
+   * beats telling the user "we've been notified" about something nobody was
+   * notified of.
+   */
   error?: string;
+  /**
+   * Stable code for the failure — the nlpgo engine's `NodeError.Type`
+   * (`http_error`, `upstream_http_error`, `llm_error`, …). Generated into
+   * `nodeErrorCodes` and mapped to customer copy by the presentation
+   * registry. Absent on older engines and on non-error states.
+   */
+  error_type?: string;
+  /** The upstream HTTP status, when an HTTP node got a non-2xx response. */
+  upstream_status?: number;
   parameters?: Record<string, any>;
   inputs?: Record<string, any>;
   outputs?: Record<string, any>;
@@ -358,6 +379,10 @@ export type Workflow = {
       trace_id?: string;
       until_node_id?: string;
       error?: string;
+      /** Stable failure code — mirrors `ExecutionState.error_type`. */
+      error_type?: string;
+      /** Upstream HTTP status, when an HTTP node got a non-2xx. */
+      upstream_status?: number;
       result?: Record<string, any>;
       timestamps?: {
         started_at?: number;
@@ -368,6 +393,10 @@ export type Workflow = {
       run_id?: string;
       status?: ExecutionStatus;
       error?: string;
+      /** Stable failure code — mirrors `ExecutionState.error_type`. */
+      error_type?: string;
+      /** Upstream HTTP status, when an HTTP node got a non-2xx. */
+      upstream_status?: number;
       progress?: number;
       total?: number;
       timestamps?: {

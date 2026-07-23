@@ -2,40 +2,6 @@ import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
 import type { AppRouter } from "../server/api/root";
 import type { LimitType } from "../server/license-enforcement";
 
-/**
- * The best display string for any error, in the order the wire can be trusted:
- *
- *   1. `data.error.meta.message` — prose that was deliberately authored to be
- *      shown. This is the only channel that carries a user-facing sentence for
- *      a handled error: `SerializedHandledError` has no `message` field, and a
- *      HandledError's own `message` is server copy that never crosses the
- *      boundary (ADR-045). Go populates it via `herr.FromBody`.
- *   2. `error.message` — for a handled error this is now its code; for a plain
- *      `TRPCError` it is the copy the procedure authored ("Choose a project
- *      first"), which is still exactly what to show.
- *   3. `data.error.code` — last resort, so the user always gets the stable
- *      identifier rather than an empty toast.
- *
- * Prefer a code-keyed explainer (`explainHandledError`, `explainLangyError`)
- * where one exists — this is the generic fallback for the surfaces that don't
- * have bespoke copy yet.
- */
-export function errorDisplayMessage(error: unknown): string {
-  const domain = (error as { data?: { error?: unknown } })?.data?.error as
-    | { code?: unknown; meta?: { message?: unknown } }
-    | undefined;
-
-  const authored = domain?.meta?.message;
-  if (typeof authored === "string" && authored.length > 0) return authored;
-
-  const wire = (error as { message?: unknown })?.message;
-  if (typeof wire === "string" && wire.length > 0) return wire;
-
-  return typeof domain?.code === "string"
-    ? domain.code
-    : "An unknown error occurred";
-}
-
 export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   if (
     error &&
@@ -68,7 +34,7 @@ export function markAsHandledByLicenseHandler(error: Error): void {
  * const mutation = api.prompts.create.useMutation({
  *   onError: (error) => {
  *     if (isHandledByGlobalLicenseHandler(error)) return;
- *     toaster.create({ title: "Error", description: error.message });
+ *     showErrorToast({ error, fallbackTitle: "Couldn't save" });
  *   },
  * });
  * ```
@@ -99,25 +65,34 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
 }
 
 /**
- * Check if an error was already handled by any global error handler
- * (license limit or lite member restriction).
- * Use this single check in component-level onError callbacks to avoid
- * showing duplicate error messages (toast + modal).
+ * Check if an error was already handled by any global error handler, which
+ * surface it as a modal or a bespoke toast — so reporting it again would
+ * duplicate it.
+ *
+ * ALL FOUR interceptors in `utils/api.tsx` count. The first version listed
+ * only two, so a missing-model failure (which opens its own sticky toast
+ * naming the feature and linking to model settings) also drew a second,
+ * vaguer toast next to it — the exact duplication this guard exists to stop.
+ * Anything that calls `markAsHandledBy…` belongs here.
+ *
+ * You rarely need to call this: `showErrorToast` and `<HandledErrorAlert>`
+ * already do, which is why the ~137 copies of this guard in `onError`
+ * callbacks are gone. Reach for it directly only when reporting an error some
+ * other way.
  *
  * @example
  * ```tsx
  * const mutation = api.prompts.create.useMutation({
- *   onError: (error) => {
- *     if (isHandledByGlobalHandler(error)) return;
- *     toaster.create({ title: "Error", description: error.message });
- *   },
+ *   onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save" }),
  * });
  * ```
  */
 export function isHandledByGlobalHandler(error: unknown): boolean {
   return (
     isHandledByGlobalLicenseHandler(error) ||
-    isHandledByLiteMemberHandler(error)
+    isHandledByLiteMemberHandler(error) ||
+    isHandledByMissingModelHandler(error) ||
+    isHandledByProviderDisabledHandler(error)
   );
 }
 

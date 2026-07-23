@@ -20,6 +20,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import NextLink from "~/utils/compat/next-link";
 import { useRouter } from "~/utils/compat/next-router";
 import { impersonateUser } from "../adminClient";
@@ -263,12 +264,9 @@ export function ImpersonateDialog({
       });
       window.location.href = "/";
     } catch (err) {
-      toaster.create({
-        title: "Impersonation failed",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't impersonate the user",
       });
       setLoading(false);
     }
@@ -389,12 +387,9 @@ function UserEditDrawer({
           onClose();
         },
         onError: (err) =>
-          toaster.create({
-            title: "Update failed",
-            description: err.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
+          showErrorToast({
+            error: err,
+            fallbackTitle: "Couldn't update the user",
           }),
       },
     );

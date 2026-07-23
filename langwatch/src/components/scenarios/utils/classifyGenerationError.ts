@@ -3,6 +3,14 @@
  *
  * Tier-1: known error shapes → specific, actionable copy.
  * Tier-2 (unknown): generic copy + raw backend message verbatim.
+ *
+ * Deliberately does NOT read the handled-error registry. Its inputs come from
+ * `generateScenarioWithAI` — a plain `fetch` to /api/scenario/generate — so a
+ * handled payload never arrives here; and the tiers below are decided by regex
+ * over the extracted message, so feeding registry copy in would make a copy
+ * edit in a different file silently reclassify an error. Assert on `code`, not
+ * on prose: if this endpoint ever emits handled errors, switch on
+ * `readHandledError(error)?.code` here rather than on the rendered sentence.
  */
 import { ScenarioGenerationError } from "../services/scenarioGeneration";
 
@@ -55,8 +63,7 @@ function extractMessage(error: unknown): string {
   }
 
   if (error instanceof Error) {
-    // TRPCClientError stores the server message in error.message already,
-    // but also exposes data.message on some shapes. Prefer data.message when present.
+    // Some non-handled shapes carry authored prose on data.message; prefer it.
     const trpcLike = error as Error & {
       data?: { message?: string };
     };
@@ -79,7 +86,9 @@ function extractMessage(error: unknown): string {
  * classified tier. Returns null for kinds without tailored copy so
  * they fall through to message matching.
  */
-function classifyByKind(error: ScenarioGenerationError): GenerationErrorClass | null {
+function classifyByKind(
+  error: ScenarioGenerationError,
+): GenerationErrorClass | null {
   switch (error.kind) {
     case "missing_provider":
       return {

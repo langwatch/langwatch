@@ -12,13 +12,13 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
-
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 /**
@@ -71,13 +71,8 @@ export function IngestionTemplatesEditor({
         });
       }
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Clone failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't clone template" }),
   });
 
   const archiveMutation = api.ingestionTemplates.archive.useMutation({
@@ -85,13 +80,11 @@ export function IngestionTemplatesEditor({
       void utils.ingestionTemplates.adminList.invalidate();
       toaster.create({ title: "Template archived", type: "success" });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Archive failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't archive template",
+      }),
   });
 
   if (listQuery.isLoading) {
@@ -426,13 +419,8 @@ function EditOttlDrawer({
       toaster.create({ title: "OTTL saved", type: "success" });
       onClose();
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Save failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't save OTTL rules" }),
   });
 
   const handleSave = () => {
@@ -544,13 +532,8 @@ function CreateTemplateDrawer({
         onClose();
       }
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Create failed",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't create template" }),
   });
 
   const canSubmit =
@@ -600,8 +583,8 @@ function CreateTemplateDrawer({
                   placeholder="e.g. codex_internal"
                 />
                 <Text fontSize="xs" color="fg.muted">
-                  Lowercase letters / digits / underscores only. Drives the
-                  /me Trace Ingest tile slug + the langwatch.source provenance
+                  Lowercase letters / digits / underscores only. Drives the /me
+                  Trace Ingest tile slug + the langwatch.source provenance
                   attribute on emitted spans.
                 </Text>
               </VStack>
@@ -618,9 +601,9 @@ function CreateTemplateDrawer({
                 />
               </VStack>
               <Text fontSize="xs" color="fg.muted">
-                After creation, you'll edit the OTTL rules in the next step.
-                The template starts with empty rules — admin authoring
-                continues there.
+                After creation, you'll edit the OTTL rules in the next step. The
+                template starts with empty rules — admin authoring continues
+                there.
               </Text>
             </VStack>
           </Drawer.Body>

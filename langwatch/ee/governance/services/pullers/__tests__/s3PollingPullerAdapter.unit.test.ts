@@ -54,7 +54,9 @@ beforeEach(() => {
 
   vi.doMock("@aws-sdk/client-s3", async () => {
     class FakeListCmd {
-      constructor(public readonly input: { Prefix?: string; StartAfter?: string }) {}
+      constructor(
+        public readonly input: { Prefix?: string; StartAfter?: string },
+      ) {}
     }
     class FakeGetCmd {
       constructor(public readonly input: { Bucket: string; Key: string }) {}
@@ -64,8 +66,10 @@ beforeEach(() => {
         if (cmd instanceof FakeListCmd) {
           lastListInvocation = cmd.input;
           const filtered = stubObjects.filter((o) => {
-            if (cmd.input.Prefix && !o.key.startsWith(cmd.input.Prefix)) return false;
-            if (cmd.input.StartAfter && o.key <= cmd.input.StartAfter) return false;
+            if (cmd.input.Prefix && !o.key.startsWith(cmd.input.Prefix))
+              return false;
+            if (cmd.input.StartAfter && o.key <= cmd.input.StartAfter)
+              return false;
             return true;
           });
           return {

@@ -38,7 +38,11 @@ describe("IngestionTemplateService admin authoring", () => {
   beforeAll(async () => {
     await prisma.organization.createMany({
       data: [
-        { id: ORG_ID, name: `Admin Authoring ${suffix}`, slug: `auth-${suffix}` },
+        {
+          id: ORG_ID,
+          name: `Admin Authoring ${suffix}`,
+          slug: `auth-${suffix}`,
+        },
         {
           id: OTHER_ORG_ID,
           name: `Other Org ${suffix}`,
@@ -81,7 +85,8 @@ describe("IngestionTemplateService admin authoring", () => {
         sourceType: "internal_codex",
         displayName: "Internal Codex Wrapper",
         description: "Custom OTTL for our wrapper",
-        ottlRules: 'set(attributes["langwatch.cost.usd"], attributes["custom_cost"])',
+        ottlRules:
+          'set(attributes["langwatch.cost.usd"], attributes["custom_cost"])',
       });
       expect(created.platformPublished).toBe(false);
       expect(created.organizationId).toBe(ORG_ID);
@@ -184,9 +189,7 @@ describe("IngestionTemplateService admin authoring", () => {
       });
       expect(cloned.platformPublished).toBe(false);
       expect(cloned.organizationId).toBe(ORG_ID);
-      expect(cloned.ottlRules).toBe(
-        'set(attributes["langwatch.cost.usd"], 0)',
-      );
+      expect(cloned.ottlRules).toBe('set(attributes["langwatch.cost.usd"], 0)');
       expect(cloned.displayName).toBe("Platform Default (custom)");
       expect(cloned.id).not.toBe(PLATFORM_TEMPLATE_ID);
     });

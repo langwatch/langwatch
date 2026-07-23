@@ -13,7 +13,13 @@ import {
 import { Plus } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Controller, type Control, type SubmitHandler, useForm } from "react-hook-form";
+import {
+  type Control,
+  Controller,
+  type SubmitHandler,
+  useForm,
+} from "react-hook-form";
+import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { Select } from "../ui/select";
@@ -34,7 +40,8 @@ export interface ProjectFormProps {
     data: ProjectFormData & { language: string; framework: string },
   ) => void;
   isLoading?: boolean;
-  error?: string | null;
+  /** The submit mutation's error, passed straight through — handled or not. */
+  error?: unknown;
   defaultTeamId?: string;
   /** Required for creating projects in a different organization via the dropdown menu.
    * Ensures teams are fetched from the target organization, not the current context. */
@@ -52,8 +59,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
   // Use the explicitly passed organizationId if provided, otherwise fall back to the current organization
-  const effectiveOrganizationId =
-    organizationIdProp ?? currentOrganization?.id;
+  const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
 
   const {
     register,
@@ -176,7 +182,12 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
           </>
         )}
 
-        {error && <Text color="red.fg">{error}</Text>}
+        {!!error && (
+          <HandledErrorAlert
+            error={error}
+            fallbackTitle="Couldn't save this project"
+          />
+        )}
 
         <HStack width="full">
           <Spacer />
@@ -229,8 +240,8 @@ function TeamSelectWithCreateButton({
                 field.value === NEW_TEAM_VALUE ? (
                   <Text color="fg.muted">New team</Text>
                 ) : (
-                  teamOptions.find((o) => o.value === field.value)?.label ??
-                  "Select team"
+                  (teamOptions.find((o) => o.value === field.value)?.label ??
+                  "Select team")
                 )
               }
             </Select.ValueText>

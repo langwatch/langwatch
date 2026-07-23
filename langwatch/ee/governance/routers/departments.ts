@@ -7,14 +7,14 @@
  *
  * Spec: specs/ai-gateway/governance/departments.feature
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   DepartmentAssignmentTargetNotFoundError,
   DepartmentNotFoundError,
   DepartmentService,
 } from "@ee/governance/services/department/department.service";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";

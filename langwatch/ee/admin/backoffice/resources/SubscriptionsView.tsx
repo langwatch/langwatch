@@ -20,10 +20,11 @@ import { useDebounce } from "use-debounce";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import {
   BackofficeTable,
-  EmptyCell,
   dateInputToISO,
+  EmptyCell,
   formatDate,
 } from "../BackofficeTable";
 import {
@@ -207,10 +208,7 @@ export default function SubscriptionsView() {
                         <MoreVertical size={16} />
                       </Menu.Trigger>
                       <Menu.Content>
-                        <Menu.Item
-                          value="edit"
-                          onClick={() => setEditing(sub)}
-                        >
+                        <Menu.Item value="edit" onClick={() => setEditing(sub)}>
                           <Pencil size={16} />
                           Edit
                         </Menu.Item>
@@ -311,8 +309,7 @@ function SubscriptionDrawer({
   const mutation = mode === "edit" ? update : create;
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const isOpen =
-    mode === "edit" ? !!subscription : subscription !== undefined;
+  const isOpen = mode === "edit" ? !!subscription : subscription !== undefined;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -369,7 +366,8 @@ function SubscriptionDrawer({
 
     const onSuccess = () => {
       toaster.create({
-        title: mode === "edit" ? "Subscription updated" : "Subscription created",
+        title:
+          mode === "edit" ? "Subscription updated" : "Subscription created",
         type: "success",
         duration: 3000,
         meta: { closable: true },
@@ -377,16 +375,19 @@ function SubscriptionDrawer({
       onClose();
     };
     const onError = (err: Error) =>
-      toaster.create({
-        title: mode === "edit" ? "Update failed" : "Create failed",
-        description: err.message,
-        type: "error",
-        duration: 5000,
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle:
+          mode === "edit"
+            ? "Couldn't update the subscription"
+            : "Couldn't create the subscription",
       });
 
     if (mode === "edit" && subscription) {
-      update.mutate({ id: subscription.id, data: payload }, { onSuccess, onError });
+      update.mutate(
+        { id: subscription.id, data: payload },
+        { onSuccess, onError },
+      );
     } else {
       create.mutate(payload, { onSuccess, onError });
     }
@@ -438,9 +439,7 @@ function SubscriptionDrawer({
                 <EnumSelect
                   value={form.status}
                   options={Object.values(SubscriptionStatus)}
-                  onChange={(v) =>
-                    setField("status", v as SubscriptionStatus)
-                  }
+                  onChange={(v) => setField("status", v as SubscriptionStatus)}
                 />
               </Field.Root>
             </HStack>

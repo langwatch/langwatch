@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { describeError, showErrorToast } from "~/features/errors";
 import { toaster } from "../components/ui/toaster";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
@@ -124,12 +125,9 @@ export function useProviderFormSubmit({
         onSuccess?.();
       } catch (err) {
         onError?.(err);
-        toaster.create({
-          title: "Failed to update provider",
-          description: err instanceof Error ? err.message : String(err),
-          type: "error",
-          duration: 4000,
-          meta: { closable: true },
+        showErrorToast({
+          error: err,
+          fallbackTitle: "Couldn't update the provider",
         });
       }
     },
@@ -408,14 +406,17 @@ export function useProviderFormSubmit({
               x.r.status === "rejected",
           );
         if (failed.length > 0) {
+          // Each rejection keeps its own label, so the user learns WHICH role
+          // failed and why. The reason is a tRPC rejection, so its message is
+          // the code slug — `describeError` turns each one into the copy
+          // written for that code rather than listing slugs.
           const reasons = failed
             .map(
               (f) =>
-                `${f.label}: ${
-                  f.r.reason instanceof Error
-                    ? f.r.reason.message
-                    : String(f.r.reason)
-                }`,
+                `${f.label}: ${describeError({
+                  error: f.r.reason,
+                  fallbackTitle: "Couldn't save this default",
+                })}`,
             )
             .join("; ");
           toaster.create({
@@ -463,12 +464,9 @@ export function useProviderFormSubmit({
       onSuccess?.();
     } catch (err) {
       onError?.(err);
-      toaster.create({
-        title: "Failed to save settings",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 4000,
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't save the provider settings",
       });
     } finally {
       setIsSaving(false);

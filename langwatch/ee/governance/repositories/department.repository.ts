@@ -20,10 +20,7 @@ export class DepartmentRepository {
   }
 
   /** Cross-org-safe: returns the row only when it belongs to the org. */
-  findById(
-    client: Client,
-    params: { id: string; organizationId: string },
-  ) {
+  findById(client: Client, params: { id: string; organizationId: string }) {
     return client.department.findFirst({
       where: {
         id: params.id,
@@ -33,10 +30,7 @@ export class DepartmentRepository {
     });
   }
 
-  create(
-    client: Client,
-    params: { organizationId: string; name: string },
-  ) {
+  create(client: Client, params: { organizationId: string; name: string }) {
     return client.department.create({
       data: { organizationId: params.organizationId, name: params.name },
     });

@@ -1,3 +1,4 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import {
   type DatasetReference,
@@ -8,7 +9,6 @@ import {
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
-import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================
@@ -219,7 +219,19 @@ export type EvaluationV3Event =
       cost?: number;
       duration?: number;
       traceId?: string;
+      /**
+       * Raw engineer-facing message — a legacy fallback the client renders
+       * only when there is no `domainError`. Since the node-error code now
+       * travels, this is for older engines and un-coded failures.
+       */
       error?: string;
+      /**
+       * The coded failure, mirroring the evaluator side
+       * (`EvaluationV3EvaluatorResult.domainError`). Built from the engine's
+       * `NodeError.Type`; the client renders customer copy from the
+       * presentation registry rather than the raw `error` string.
+       */
+      domainError?: SerializedHandledError;
     }
   | {
       type: "evaluator_result";
@@ -234,7 +246,37 @@ export type EvaluationV3Event =
   | { type: "progress"; completed: number; total: number }
   | {
       type: "error";
+      /**
+       * Wire message. For a coded failure this is the code itself (#5984); for
+       * an unhandled one it is a fixed generic line — never a thrown error's
+       * own `message`, which is server copy naming internal services.
+       */
       message: string;
+      /**
+       * The failure's own words, for OUR record — the run row in ClickHouse and
+       * the log line beside it. ADR-045 stops the CUSTOMER reading internals;
+       * it does not ask us to blank our own history, which is what persisting
+       * the generic wire line did (a Prisma failure, an OOM and a bad mapping
+       * all stored as the same eleven words).
+       *
+       * Server-only: `toClientEvent` strips it before the SSE writer, so it
+       * never reaches a browser. Everything that serialises an event for a
+       * client goes through that function.
+       */
+      serverMessage?: string;
+      /**
+       * The coded failure, when we knew what went wrong. The client presents
+       * from this via the registry, exactly as it does for `target_result`.
+       */
+      domainError?: SerializedHandledError;
+      /**
+       * The trace to hand support. An unhandled failure deliberately tells the
+       * client nothing about what went wrong, which leaves the id as the only
+       * thing that ties "it broke" to the log line — the same reasoning as
+       * `data.traceId` on the tRPC boundary. A handled failure also carries it
+       * inside `domainError`; this is the field a caller can read either way.
+       */
+      traceId?: string;
       rowIndex?: number;
       targetId?: string;
       evaluatorId?: string;

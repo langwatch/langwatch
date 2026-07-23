@@ -1,6 +1,11 @@
 import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
+import {
+  describeError,
+  explainSerializedError,
+  showErrorToast,
+} from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type {
@@ -264,7 +269,18 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
 
         case "target_result":
-          if (event.error) {
+          if (event.domainError) {
+            // The failure carries a code, so the customer reads the registry's
+            // copy — never the raw engine string (`httpblock: … no such host`).
+            const { title, description } = explainSerializedError(
+              event.domainError,
+            );
+            updateTargetError(
+              event.rowIndex,
+              event.targetId,
+              description ? `${title}. ${description}` : title,
+            );
+          } else if (event.error) {
             updateTargetError(event.rowIndex, event.targetId, event.error);
           } else {
             updateTargetOutput(event.rowIndex, event.targetId, event.output, {
@@ -295,7 +311,20 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           });
           break;
 
-        case "error":
+        case "error": {
+          // A coded frame reads from the registry; an uncoded one carries the
+          // engine's own diagnostic (missing column, evaluator crash), which
+          // the server already vetted as safe to show and which is the only
+          // thing that tells the user what to change.
+          const coded = event.domainError
+            ? explainSerializedError(event.domainError)
+            : null;
+          const detail = coded
+            ? coded.description
+              ? `${coded.title}. ${coded.description}`
+              : coded.title
+            : event.message;
+
           if (event.rowIndex !== undefined && event.targetId) {
             if (event.evaluatorId) {
               // Evaluator error
@@ -306,25 +335,32 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
                 {
                   status: "error",
                   error_type: "EvaluatorError",
-                  details: event.message,
+                  details: detail,
                   traceback: [],
+                  ...(event.domainError
+                    ? { domainError: event.domainError }
+                    : {}),
                 },
               );
             } else {
               // Target error
-              updateTargetError(event.rowIndex, event.targetId, event.message);
+              updateTargetError(event.rowIndex, event.targetId, detail);
             }
           } else {
             // Fatal error
-            setError(event.message);
+            setError(detail);
             setResults({ status: "error" });
             toaster.create({
-              title: "Execution Error",
-              description: event.message,
+              title: coded?.title ?? "Couldn't finish the evaluation",
+              description: coded
+                ? coded.description || undefined
+                : event.message,
               type: "error",
+              meta: { closable: true },
             });
           }
           break;
+        }
 
         case "stopped":
           setStatus("stopped");
@@ -708,13 +744,20 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           chunkTimeout: 300_000, // 5min between events
           onError: (err) => {
             setStatus("error");
-            setError(err.message);
+            // `error` is exported hook state that ends up on screen, so it gets
+            // the same treatment as the toast: registry copy, never the wire
+            // message (which is the code slug for a handled failure).
+            setError(
+              describeError({
+                error: err,
+                fallbackTitle: "Couldn't run the evaluation",
+              }),
+            );
             setIsAborting(false); // Clear aborting state on error
             cleanupThisExecution();
-            toaster.create({
-              title: "Execution Failed",
-              description: err.message,
-              type: "error",
+            showErrorToast({
+              error: err,
+              fallbackTitle: "Couldn't run the evaluation",
             });
           },
         });
@@ -722,9 +765,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         // Clean up this execution's cells when SSE completes
         cleanupThisExecution();
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Unknown error";
         setStatus("error");
-        setError(message);
+        setError(
+          describeError({
+            error: err,
+            fallbackTitle: "Couldn't run the evaluation",
+          }),
+        );
         setIsAborting(false); // Clear aborting state on error
         cleanupThisExecution();
       }
@@ -782,12 +829,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     } catch (err) {
       // On error, reset aborting state since abort failed
       setIsAborting(false);
-      const message = err instanceof Error ? err.message : "Failed to abort";
-      toaster.create({
-        title: "Abort Failed",
-        description: message,
-        type: "error",
-      });
+      showErrorToast({ error: err, fallbackTitle: "Couldn't stop the run" });
     }
     // Note: No finally block - isAborting stays true until `stopped` event
   }, [project?.id, runId]);

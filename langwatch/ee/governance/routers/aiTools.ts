@@ -20,13 +20,13 @@
  * So this router OWNS the catalog entity only - the per-tile behaviors
  * are wired client-side against existing endpoints.
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   AiToolEntryService,
   SUPPORTED_TILE_TYPES,
 } from "@ee/governance/services/aiToolEntry.service";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -224,9 +224,7 @@ export const aiToolsRouter = createTRPCRouter({
           departmentIds: input.departmentIds,
           order: input.order,
           enabled: input.enabled,
-          type: input.type as
-            | (typeof SUPPORTED_TILE_TYPES)[number]
-            | undefined,
+          type: input.type as (typeof SUPPORTED_TILE_TYPES)[number] | undefined,
           config: input.config,
           actorUserId: ctx.session.user.id,
         });

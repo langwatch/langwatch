@@ -21,18 +21,17 @@
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
-import http from "http";
-import type { AddressInfo } from "net";
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import http from "http";
 import { nanoid } from "nanoid";
+import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
-
-import { runIngestionPull } from "../pullerWorker";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
+import { runIngestionPull } from "../pullerWorker";
 
 const ns = `puller-e2e-${nanoid(8)}`;
 

@@ -2,6 +2,11 @@ import { Button, Field, Heading, HStack, Input, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useDebounce } from "use-debounce";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
@@ -11,7 +16,6 @@ import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmMod
 import { api } from "../../utils/api";
 import { exactModelMatchRegex } from "../../utils/modelCostRegex";
 import { isSafeRegex } from "../../utils/safeRegex";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
   LLMModelCostMatchingSpans,
@@ -128,14 +132,7 @@ function LLMModelCostForm({
     return project?.id ? [{ scopeType: "PROJECT", scopeId: project.id }] : [];
   });
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    getValues,
-    setValue,
-    formState: { errors },
-  } = useForm<LLMModelCostForm>({
+  const form = useForm<LLMModelCostForm>({
     defaultValues: {
       model: currentLLMModelCost?.model ?? prefillModel,
       inputCostPerToken: currentLLMModelCost?.inputCostPerToken,
@@ -145,6 +142,14 @@ function LLMModelCostForm({
       regex: currentLLMModelCost?.regex ?? prefillRegex,
     },
   });
+  const {
+    register,
+    handleSubmit,
+    control,
+    getValues,
+    setValue,
+    formState: { errors },
+  } = form;
 
   // Live values feeding the matching-spans preview. Debounced so the
   // ClickHouse-backed preview doesn't fire on every keystroke; rates pass
@@ -209,15 +214,13 @@ function LLMModelCostForm({
           void llmModelCostsQuery.refetch();
         },
         onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: "Error",
-            description: error.message || "Error creating LLM model cost",
-            type: "error",
-            duration: 5000,
-            meta: {
-              closable: true,
-            },
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+            return;
+          showErrorToast({
+            error,
+            fallbackTitle: id
+              ? "Couldn't update model cost"
+              : "Couldn't create model cost",
           });
         },
       },
@@ -228,6 +231,7 @@ function LLMModelCostForm({
     <>
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)}>
+        <FormServerError form={form} />
         <HorizontalFormControl
           label="Applies to"
           helper="Pick the scope this cost rule applies to. Project-level rules override team-level, which override organization-level."

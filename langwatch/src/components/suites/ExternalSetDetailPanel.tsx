@@ -15,15 +15,24 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
+import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
+import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
+import { GroupRow } from "./GroupRow";
+import {
+  RunHistoryFilters,
+  type RunHistoryFilterValues,
+} from "./RunHistoryFilters";
+import { RunHistorySkeleton } from "./RunHistorySkeleton";
+import { RunRow } from "./RunRow";
 import {
   availableGroupByOptions,
   computeBatchRunSummary,
@@ -31,17 +40,9 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
 } from "./run-history-transforms";
-import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { useAutoExpansion } from "./useAutoExpansion";
-import { useScrollToBatch } from "./useScrollToBatch";
-import {
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-} from "./RunHistoryFilters";
-import { RunHistorySkeleton } from "./RunHistorySkeleton";
-import { RunRow } from "./RunRow";
-import { GroupRow } from "./GroupRow";
 import { useRunHistoryStore } from "./useRunHistoryStore";
+import { useScrollToBatch } from "./useScrollToBatch";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
 type ExternalSetDetailPanelProps = {
@@ -78,7 +79,6 @@ export function ExternalSetDetailPanel({
     ? groupBy
     : "none";
 
-
   // Live updates: SSE invalidates getSuiteRunData directly; its connection
   // state disables the fallback freshness polling below.
   const { isConnected: sseConnected } = useSimulationUpdateListener({
@@ -109,7 +109,8 @@ export function ExternalSetDetailPanel({
     },
   );
 
-  const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+  const runData =
+    runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
 
   useSuiteRunFreshness({
     scenarioSetId,
@@ -214,11 +215,7 @@ export function ExternalSetDetailPanel({
   return (
     <VStack align="stretch" gap={0} height="100%">
       {/* Header */}
-      <HStack
-        paddingX={6}
-        paddingY={4}
-        justify="space-between"
-      >
+      <HStack paddingX={6} paddingY={4} justify="space-between">
         <VStack align="start" gap={0}>
           <Text
             fontSize="xs"
@@ -250,7 +247,8 @@ export function ExternalSetDetailPanel({
             right: 0,
             height: "5px",
             borderTop: "1px solid var(--chakra-colors-border-muted)",
-            background: "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
+            background:
+              "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
             pointerEvents: "none",
           }}
         >
@@ -273,16 +271,19 @@ export function ExternalSetDetailPanel({
       <VStack ref={runListRef} align="stretch" gap={0} flex={1} overflow="auto">
         {isLoading && <RunHistorySkeleton />}
 
+        {/* The alert is this panel's whole error surface: one component that
+            reads the handled payload, an authored non-5xx message, or the
+            generic unknown state, and carries the tips, docs link and
+            copyable error id with it. */}
         {error && (
           <EmptyState.Root paddingY={12}>
             <EmptyState.Content>
-              <EmptyState.Indicator color="red.fg">
-                <TriangleAlert size={28} />
-              </EmptyState.Indicator>
-              <EmptyState.Title>Couldn&apos;t load run data</EmptyState.Title>
-              <EmptyState.Description maxWidth="360px" textAlign="center">
-                {error.message}
-              </EmptyState.Description>
+              <Box maxWidth="420px" width="100%">
+                <HandledErrorAlert
+                  error={error}
+                  fallbackTitle="Couldn't load run data"
+                />
+              </Box>
               <Button
                 size="sm"
                 variant="outline"
@@ -320,7 +321,9 @@ export function ExternalSetDetailPanel({
                           resolveTargetName={resolveTargetName}
                           onScenarioRunClick={handleScenarioRunClick}
                           viewMode={viewMode}
-                          isHighlighted={highlightedBatchId === batchRun.batchRunId}
+                          isHighlighted={
+                            highlightedBatchId === batchRun.batchRunId
+                          }
                         />
                       );
                     })

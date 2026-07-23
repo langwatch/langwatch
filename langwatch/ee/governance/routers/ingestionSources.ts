@@ -17,8 +17,6 @@
  * file is just the admin-side configuration surface that powers the
  * /settings/ingestion-sources UI.
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   IngestionSourceService,
@@ -30,6 +28,8 @@ import {
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -121,10 +121,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         name: z.string().min(1).max(128),
         description: z.string().nullable().optional(),
         parserConfig: z.record(z.string(), z.unknown()).optional(),
-        pullConfig: z
-          .record(z.string(), z.unknown())
-          .nullable()
-          .optional(),
+        pullConfig: z.record(z.string(), z.unknown()).nullable().optional(),
         pullSchedule: z.string().min(1).max(64).nullable().optional(),
       }),
     )
@@ -201,10 +198,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .use(checkOrganizationPermission("ingestionSources:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
-      const archived = await service.archive(
-        input.id,
-        input.organizationId,
-      );
+      const archived = await service.archive(input.id, input.organizationId);
       return toDto(archived);
     }),
 

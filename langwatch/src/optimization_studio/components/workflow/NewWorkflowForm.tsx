@@ -7,15 +7,18 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
+import { useRouter } from "~/utils/compat/next-router";
 import { Dialog } from "../../../components/ui/dialog";
-import { toaster } from "../../../components/ui/toaster";
 import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
-import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 import { trackEvent } from "../../../utils/tracking";
 import type { Workflow } from "../../types/dsl";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
@@ -171,19 +174,20 @@ export const NewWorkflowForm = ({
   // License enforcement for workflow creation
   const { checkAndProceed } = useLicenseEnforcement("workflows");
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<FormData>({
+  const form = useForm<FormData>({
     defaultValues: {
       name: template.name ?? "New Workflow",
       icon: defaultIcon,
       description: template.description ?? "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = form;
   const createWorkflowMutation = api.workflow.create.useMutation();
   const icon = watch("icon");
 
@@ -216,12 +220,13 @@ export const NewWorkflowForm = ({
             );
           },
           onError: (error) => {
-            // Skip toast if the global license handler already showed the upgrade modal
-            if (isHandledByGlobalHandler(error)) return;
-            toaster.create({
-              title: "Error creating workflow",
-              description: error.message,
-              type: "error",
+            if (
+              applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })
+            )
+              return;
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't create workflow",
             });
           },
         },
@@ -248,7 +253,9 @@ export const NewWorkflowForm = ({
       <form onSubmit={handleSubmit(onSubmit)}>
         <Dialog.Body>
           <VStack gap={4} align="stretch">
-            <Field.Root invalid={!!errors.name}>
+            <FormServerError form={form} />
+
+            <Field.Root invalid={!!errors.name || !!errors.icon}>
               <EmojiPickerModal
                 open={emojiPicker.open}
                 onClose={emojiPicker.onClose}
@@ -274,7 +281,9 @@ export const NewWorkflowForm = ({
                   }}
                 />
               </HStack>
-              <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+              <Field.ErrorText>
+                {errors.name?.message ?? errors.icon?.message}
+              </Field.ErrorText>
             </Field.Root>
             <Field.Root invalid={!!errors.description}>
               <Field.Label>Description</Field.Label>

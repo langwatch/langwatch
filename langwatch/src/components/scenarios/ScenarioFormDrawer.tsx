@@ -1,30 +1,50 @@
-import { Button, Grid, GridItem, Heading, HStack, Text } from "@chakra-ui/react";
-import type { Scenario } from "@prisma/client";
+import {
+  Button,
+  Grid,
+  GridItem,
+  Heading,
+  HStack,
+  Text,
+} from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
-import { useRouter } from "~/utils/compat/next-router";
+import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { KSUID_RESOURCES } from "../../utils/constants";
 import { type UseFormReturn, useWatch } from "react-hook-form";
-import { getComplexProps, setFlowCallbacks, useDrawer, useDrawerParams } from "../../hooks/useDrawer";
-import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
+import { useRouter } from "~/utils/compat/next-router";
 import { checkCompoundLimits } from "../../hooks/useCompoundLicenseCheck";
+import {
+  getComplexProps,
+  setFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
-import { api } from "../../utils/api";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
-import type { TypedAgent } from "../../server/agents/agent.repository";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
+import type { TypedAgent } from "../../server/agents/agent.repository";
+import { api } from "../../utils/api";
+import { KSUID_RESOURCES } from "../../utils/constants";
+import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { hasScenarioInputMapping } from "../suites/ScenarioInputMappingSection";
-import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
+import { TagList } from "../ui/TagList";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
-import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
-import { ScenarioForm, type ScenarioFormData, type ScenarioInitialData } from "./ScenarioForm";
+import {
+  ScenarioForm,
+  type ScenarioFormData,
+  type ScenarioInitialData,
+} from "./ScenarioForm";
+import { ScenarioRunModelDialog } from "./ScenarioRunModelDialog";
 import type { TargetValue } from "./TargetSelector";
 
 export type ScenarioFormDrawerProps = {
@@ -39,13 +59,17 @@ export type ScenarioFormDrawerProps = {
  * Reads scenarioId from drawer URL params and passes it as a prop.
  * Use this when rendering via the drawer registry / URL navigation.
  */
-export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "scenarioId">) {
+export function ScenarioFormDrawerFromUrl(
+  props: Omit<ScenarioFormDrawerProps, "scenarioId">,
+) {
   const params = useDrawerParams();
   const { drawerOpen } = useDrawer();
   // When rendered from the drawer registry (CurrentDrawer), no `open` prop is
   // passed.  Fall back to checking the URL so the drawer actually opens.
   const open = props.open ?? drawerOpen("scenarioEditor");
-  return <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />;
+  return (
+    <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />
+  );
 }
 
 /**
@@ -142,14 +166,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to create scenario",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (
+        formInstance &&
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
+      )
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't create scenario" });
     },
   });
   const updateMutation = api.scenarios.update.useMutation({
@@ -162,14 +188,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
-      // Skip toast if already handled by global license handler (shows modal instead)
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to update scenario",
-        description: error.message,
-        type: "error",
-        meta: { closable: true },
-      });
+      if (
+        formInstance &&
+        applyHandledErrorToForm({
+          error,
+          form: formInstance,
+          hasFormErrorSlot: true,
+        })
+      )
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't save scenario" });
     },
   });
 
@@ -185,7 +213,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         {
           urlParams: { scenarioId: newScenarioId },
         },
-        { resetStack: true }
+        { resetStack: true },
       );
     },
     [openDrawer],
@@ -251,7 +279,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }
       });
     },
-    [project?.id, scenario, createMutation, updateMutation, scenarioEnforcement, transitionToEditMode],
+    [
+      project?.id,
+      scenario,
+      createMutation,
+      updateMutation,
+      scenarioEnforcement,
+      transitionToEditMode,
+    ],
   );
   const handleSaveAndRun = useCallback(
     async (target: TargetValue) => {
@@ -365,16 +400,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // Intentionally NOT calling onClose() here: closeDrawer() does its
         // own router.push to strip drawer.* params, which would race with
         // this redirect and silently win (lw#3586 F11).
-        void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
+        void router.push(
+          `/${project.slug}/simulations?pendingBatch=${batchRunId}`,
+        );
       })();
     } catch (error) {
-      toaster.create({
-        title: "Failed to run scenario",
-        description:
-          error instanceof Error ? error.message : "An error occurred",
-        type: "error",
-        meta: { closable: true },
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
     }
   }, [
     formInstance,
@@ -443,6 +474,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               borderRightWidth="1px"
               borderColor="border"
             >
+              {formInstance && <FormServerError form={formInstance} />}
               <ScenarioForm
                 key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
@@ -457,9 +489,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         </Drawer.Body>
         {/* Bottom Bar */}
         <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          {formInstance && (
-            <FooterLabels form={formInstance} />
-          )}
+          {formInstance && <FooterLabels form={formInstance} />}
           <HStack gap={2} flexShrink={0}>
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel
@@ -526,7 +556,10 @@ function FooterLabels({ form }: { form: UseFormReturn<ScenarioFormData> }) {
       <TagList
         labels={labels}
         onRemove={(_label, index) =>
-          form.setValue("labels", labels.filter((_, i) => i !== index))
+          form.setValue(
+            "labels",
+            labels.filter((_, i) => i !== index),
+          )
         }
         onAdd={(label) => form.setValue("labels", [...labels, label])}
       />

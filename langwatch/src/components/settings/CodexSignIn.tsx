@@ -1,6 +1,7 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Check, ExternalLink, LogOut, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { showErrorToast } from "~/features/errors";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import { api } from "~/utils/api";
 import {
@@ -143,11 +144,9 @@ function CodexCodingDefaultsDialog({
                   onClose();
                 })
                 .catch((error: unknown) => {
-                  toaster.create({
-                    title: "Could not set the defaults",
-                    description:
-                      error instanceof Error ? error.message : undefined,
-                    type: "error",
+                  showErrorToast({
+                    error,
+                    fallbackTitle: "Couldn't set the defaults",
                   });
                 })
             }

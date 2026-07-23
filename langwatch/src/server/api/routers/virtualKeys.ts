@@ -14,30 +14,28 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import type { PrismaClient } from "@prisma/client";
-
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 import type { Session } from "~/server/auth";
-
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import {
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
-  type GuardrailAttachment,
-} from "~/server/gateway/virtualKey.config";
-import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
-import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-
-import { authorizeInResolver, hasProjectPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { GuardrailAttachForbiddenError } from "~/server/gateway/errors";
 import {
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
   isVisibleToMembership,
   loadMembershipSet,
 } from "~/server/gateway/virtualKey.authz";
+import {
+  type GuardrailAttachment,
+  parseVirtualKeyConfig,
+  virtualKeyConfigSchema,
+} from "~/server/gateway/virtualKey.config";
+import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
+import { authorizeInResolver, hasProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeInputSchema = scopeAssignmentSchema;
 
@@ -136,7 +134,7 @@ async function assertScopesBelongToOrg(
  *     VK trace-project's guardrails) — else BAD_REQUEST
  *     `guardrail_project_mismatch`.
  *   - the actor must hold `gatewayGuardrails:attach` on that project —
- *     else FORBIDDEN `missing_perm:gatewayGuardrails:attach`.
+ *     else a handled `guardrail_attach_forbidden` (403).
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  *       — @cross-project + @rbac scenarios.
@@ -184,10 +182,7 @@ async function assertGuardrailAttachmentsAllowed(
     "gatewayGuardrails:attach",
   );
   if (!allowed) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "missing_perm:gatewayGuardrails:attach",
-    });
+    throw new GuardrailAttachForbiddenError();
   }
 }
 

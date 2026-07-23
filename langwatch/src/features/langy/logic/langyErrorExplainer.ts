@@ -1,7 +1,8 @@
 import {
+  explainHandledError,
   type HandledErrorShape,
   readHandledError,
-} from "~/features/automations/logic/errorExplainer";
+} from "~/features/errors";
 
 /**
  * Langy error explainer (ADR-045).
@@ -16,11 +17,20 @@ import {
  *   - `suppress` — NOT an error at all: not-connected / no-data conditions
  *                  render the connect card / empty state instead of red.
  *
- * Copy is keyed on an EXACT, static list of known `kind`s — never a heuristic
- * match on the string — so a new backend kind lands in the explicit generic
- * default (with its `meta` + `reasons` surfaced for debugging) rather than
- * being silently pattern-matched into the wrong bucket. `unknown` (unhandled)
- * gets one calm generic message plus a trace id.
+ * The WORDS are not decided here. Every title and description comes from the
+ * shared presentation registry (`features/errors/logic/presentation.ts`),
+ * keyed by code; this module decides only what Langy owns — how the failure is
+ * rendered, which action button it offers, and whether the meta and reason
+ * chain are surfaced for debugging. Both files used to author copy for the
+ * same twenty-one codes, and they had drifted into contradicting each other:
+ * `langy_egress_misconfigured` was "we're on it, try again shortly" in one and
+ * "a network policy an admin must fix" in the other. Only one could be true.
+ *
+ * Cases are keyed on an EXACT, static list of known `kind`s — never a
+ * heuristic match on the string — so a new backend kind lands in the explicit
+ * generic default (with its `meta` + `reasons` surfaced for debugging) rather
+ * than being silently pattern-matched into the wrong bucket. `unknown`
+ * (unhandled) gets one calm generic message plus a trace id.
  */
 
 export type LangyErrorRender =
@@ -68,10 +78,25 @@ export interface LangyErrorPresentation {
   reasons?: LangySerializedReason[];
 }
 
-/** Richer than the automations shape: also carries trace id + reason chain. */
-export interface LangyDomainError extends HandledErrorShape {
+/**
+ * The shared shape, with the reason chain narrowed to Langy's own parsed
+ * representation — Langy is the one surface that renders reasons (in a card,
+ * for an engineer debugging an agent turn) rather than hiding them.
+ */
+export interface LangyDomainError
+  extends Omit<
+    HandledErrorShape,
+    "reasons" | "traceId" | "fault" | "tips" | "docsUrl"
+  > {
   traceId?: string;
   reasons?: LangySerializedReason[];
+  // Optional, unlike the shared shape: Langy also builds this type by hand for
+  // stream frames and for a synthesised "unknown", neither of which has a
+  // fault or remediation to report. `readLangyTrpcError` still fills them in
+  // from the shared reader when the error came over tRPC.
+  fault?: HandledErrorShape["fault"];
+  tips?: HandledErrorShape["tips"];
+  docsUrl?: HandledErrorShape["docsUrl"];
 }
 
 /**
@@ -224,19 +249,31 @@ export function readLangyStreamError(
 export function readLangyTrpcError(err: unknown): LangyDomainError | null {
   const domain = readHandledError(err);
   if (!domain) return null;
-  const serialized = (
-    err as {
-      data?: {
-        error?: { traceId?: unknown; reasons?: unknown };
-      };
-    }
-  )?.data?.error;
-  const traceId = serialized?.traceId;
-  return {
-    ...domain,
-    traceId: typeof traceId === "string" ? traceId : undefined,
-    reasons: parseReasons(serialized?.reasons),
-  };
+  // The shared reader already lifted and validated traceId; only the reason
+  // chain needs Langy's own parse, since it renders them.
+  return { ...domain, reasons: parseReasons(domain.reasons) };
+}
+
+/**
+ * The registry's words for this code.
+ *
+ * `LangyDomainError` is the same shape with the remediation channel made
+ * optional (a stream frame and a synthesised "unknown" have no fault or tips),
+ * so the gaps are filled with the server-side defaults before asking. Reasons
+ * are dropped: the registry never reads them, and Langy's parsed form is its
+ * own.
+ */
+function registryCopy(domain: LangyDomainError) {
+  return explainHandledError({
+    code: domain.code,
+    meta: domain.meta,
+    httpStatus: domain.httpStatus,
+    fault: domain.fault ?? "customer",
+    tips: domain.tips ?? [],
+    docsUrl: domain.docsUrl,
+    traceId: domain.traceId,
+    reasons: [],
+  });
 }
 
 export function explainLangyError(
@@ -249,70 +286,20 @@ export function explainLangyError(
     reasons: domain.reasons,
   };
 
+  const { title, description, isRegistered } = registryCopy(domain);
+  const copy = { kind: domain.code, title, description };
+  const retry = { label: "Try again", kind: "retry" } as const;
+
   switch (domain.code) {
     case "langy_conversation_not_found":
-      return {
-        kind: domain.code,
-        title: "Conversation not found",
-        description:
-          "This conversation is no longer available. Start a new chat to keep going.",
-        render: "card",
-        ...debug,
-      };
-
     case "langy_conversation_not_owned":
-      return {
-        kind: domain.code,
-        title: "This conversation belongs to someone else",
-        description:
-          "You can view shared conversations but only the owner can continue them.",
-        render: "card",
-        ...debug,
-      };
+      return { ...copy, render: "card", ...debug };
 
     case "langy_agent_unavailable":
-      return {
-        kind: domain.code,
-        title: "Langy is unavailable",
-        description:
-          "Langy can't be reached right now. Your message is safe — send it again in a moment.",
-        render: "card",
-        action: { label: "Try again", kind: "retry" },
-        ...debug,
-      };
-
     case "langy_agent_at_capacity":
-      return {
-        kind: domain.code,
-        title: "Langy is busy right now",
-        description:
-          "Too many conversations are running at once. Give it a few seconds and try again.",
-        render: "card",
-        action: { label: "Try again", kind: "retry" },
-        ...debug,
-      };
-
     case "langy_agent_session_lost":
-      return {
-        kind: domain.code,
-        title: "Langy lost its place",
-        description:
-          "Langy dropped this conversation before the reply finished. Send your message again to pick it back up.",
-        render: "card",
-        action: { label: "Try again", kind: "retry" },
-        ...debug,
-      };
-
     case "langy_turn_timeout":
-      return {
-        kind: domain.code,
-        title: "That took too long",
-        description:
-          "Langy didn't finish in time. Try again, or ask for a narrower slice — a shorter time range or a single trace.",
-        render: "card",
-        action: { label: "Try again", kind: "retry" },
-        ...debug,
-      };
+      return { ...copy, render: "card", action: retry, ...debug };
 
     case "langy_worker_stopped":
       // The worker stopped mid-reply (its process died, or the liveness sweep
@@ -321,54 +308,22 @@ export function explainLangyError(
       // never auto-retried — re-driving would only walk into the same dead worker,
       // which is exactly the flicker this replaced. Nothing was lost: the user's
       // message is on record, so retrying is safe, it is just their call.
-      return {
-        kind: domain.code,
-        title: "Langy's worker stopped",
-        description:
-          "Langy's worker stopped before it could finish. Nothing you did is wrong and your message is safe — try again.",
-        render: "card",
-        action: { label: "Try again", kind: "retry" },
-        ...debug,
-      };
+      return { ...copy, render: "card", action: retry, ...debug };
 
     case "langy_agent_errored":
       // The agent reported its own failure — usually the model call was
-      // rejected upstream. Honest copy: the reply failed; nothing crashed and
-      // nothing was lost. Deterministic, so no auto-retry — the user decides.
-      return {
-        kind: domain.code,
-        title: "Langy's reply failed",
-        description:
-          "Langy hit an error while writing this reply. Your message is safe — try again.",
-        render: "card",
-        action: { label: "Try again", kind: "retry" },
-        ...debug,
-      };
+      // rejected upstream. Nothing crashed and nothing was lost. Deterministic,
+      // so no auto-retry — the user decides.
+      return { ...copy, render: "card", action: retry, ...debug };
 
     case "langy_worker_spawn_failed":
       // The manager tried to start a worker for this turn and it never came up.
       // Nothing the user did is wrong and nothing is lost — their message is on
       // record — so this reads as a hiccup with a retry, not a fault.
-      return {
-        kind: domain.code,
-        title: "Langy couldn't start up",
-        description:
-          "Langy failed to get going for this reply. Nothing was lost — try again in a moment.",
-        render: "card",
-        action: { label: "Try again", kind: "retry" },
-        ...debug,
-      };
+      return { ...copy, render: "card", action: retry, ...debug };
 
     case "langy_worker_restarting":
-      return {
-        kind: domain.code,
-        title: "Langy restarted",
-        description:
-          "An update interrupted this reply. Nothing was lost — send your message again.",
-        render: "card",
-        action: { label: "Try again", kind: "retry" },
-        ...debug,
-      };
+      return { ...copy, render: "card", action: retry, ...debug };
 
     case "langy_github_not_connected":
       // The ONLY suppressed kind, and the reason the mode exists.
@@ -380,14 +335,11 @@ export function explainLangyError(
       // connect card in the message flow instead (see LangyPanel), so the answer
       // to "I need GitHub" is a Connect button exactly where the turn stopped.
       //
-      // The title/description are still populated: they are what the card falls
+      // The title/description still come through: they are what the card falls
       // back to if a future caller renders this generically, and they are what a
       // test reads. Nothing in the UI shows them today.
       return {
-        kind: domain.code,
-        title: "Install the GitHub App to continue",
-        description:
-          "Langy needs the LangWatch GitHub App installed to open pull requests.",
+        ...copy,
         render: "suppress",
         action: { label: "Install GitHub App", kind: "connect-github" },
         ...debug,
@@ -398,38 +350,15 @@ export function explainLangyError(
       // installation. Deterministic — the identical request 404s identically —
       // so no retry: the fix is granting the app access to that repository on
       // GitHub (Settings → Integrations → Configure deep-links there).
-      return {
-        kind: domain.code,
-        title: "That repository isn't available to Langy",
-        description:
-          "The LangWatch GitHub App doesn't have access to that repository. " +
-          "Grant it access from Settings → Integrations → Configure, then try again.",
-        render: "card",
-        ...debug,
-      };
+      return { ...copy, render: "card", ...debug };
 
     case "langy_model_not_configured":
-      // A prerequisite, not a fault: retrying the same send won't help until a
-      // model is set, so this offers the setup action instead of a retry.
-      return {
-        kind: domain.code,
-        title: "Choose a model for Langy",
-        description:
-          "Langy needs a model to run. Pick one in your project's model settings, then try again.",
-        render: "card",
-        action: { label: "Configure model", kind: "configure-model" },
-        ...debug,
-      };
-
     case "langy_model_not_allowed":
-      // The picked override isn't on the project's Langy allowlist. Deterministic
-      // — the identical request fails again — so no retry; the meta.model is
-      // surfaced so the user sees which one was rejected.
+      // A prerequisite, not a fault: retrying the same send won't help until the
+      // model is set or swapped, so this offers the setup action instead of a
+      // retry. `meta.model` rides along so the user sees which one was rejected.
       return {
-        kind: domain.code,
-        title: "That model isn't available here",
-        description:
-          "The model you picked isn't enabled for this project. Choose one of the configured models and send again.",
+        ...copy,
         render: "card",
         action: { label: "Configure model", kind: "configure-model" },
         ...debug,
@@ -438,26 +367,12 @@ export function explainLangyError(
     case "langy_egress_misconfigured":
       // Fail-closed network policy: Langy refuses to run rather than leak. Not a
       // user error and not a retry — an admin has to fix the policy.
-      return {
-        kind: domain.code,
-        title: "Langy is blocked by a network policy",
-        description:
-          "Langy's outbound network policy for this project is misconfigured, so it can't run safely. Ask a workspace admin to review it.",
-        render: "card",
-        ...debug,
-      };
+      return { ...copy, render: "card", ...debug };
 
     case "langy_insufficient_scope":
       // The caller holds none of Langy's permissions in this project. A
       // permissions gap an admin resolves — retrying won't change it.
-      return {
-        kind: domain.code,
-        title: "Langy doesn't have access here",
-        description:
-          "Langy doesn't have the permissions it needs in this project. Ask a workspace admin to grant them.",
-        render: "card",
-        ...debug,
-      };
+      return { ...copy, render: "card", ...debug };
 
     case "langy_codex_session_expired":
       // The stored OpenAI session could not be refreshed. A setup step, not a
@@ -492,44 +407,39 @@ export function explainLangyError(
       // there's no retry action — the answer is to wait for the reply to finish.
       // It is a WAIT, not a turn failure, so it rides above the composer as a
       // dismissable notice that keeps the user's draft — not a red history card.
-      return {
-        kind: domain.code,
-        title: "Langy is still replying",
-        description:
-          "There's already a response in progress for this conversation. Wait for it to finish before sending another message.",
-        render: "composer-notice",
-        ...debug,
-      };
+      return { ...copy, render: "composer-notice", ...debug };
 
     case "unknown":
       return {
         kind: "unknown",
         title: "Something went wrong",
         description:
-          "Langy hit an unexpected error. Try again — if it keeps happening, share the details below with support.",
+          "Langy hit an unexpected error. Try again, and if it keeps happening, share the details below with support.",
         render: "card",
-        action: { label: "Try again", kind: "retry" },
+        action: retry,
         traceId: domain.traceId,
         code: domain.code,
         ...debug,
       };
 
     default: {
-      // A handled kind we don't have bespoke copy for yet: still useful, never
-      // a raw string, and its meta + reasons are surfaced for debugging. A
-      // server-authored sentence in `meta.message` wins over the stock line —
-      // that is the only channel carrying prose (ADR-045), and it is how a
-      // proxied Go herr explains itself before we write copy for its code.
-      const authored = domain.meta?.message;
+      // A code with no registered copy: still useful, never a raw string, and
+      // its meta + reasons are surfaced for debugging. Registered copy wins
+      // whenever there is any — a Langy-adjacent code the switch above doesn't
+      // name (`langy_empty_message`, `langy_credential_resolution`) is far
+      // better served by its own entry than by the stock line.
       return {
         kind: domain.code,
-        title: "Langy couldn't finish that",
+        title: isRegistered ? title : "Langy couldn't finish that",
+        // For an unregistered code this is the server-authored sentence the
+        // registry lifted out of `meta.message` — the only channel carrying
+        // prose (ADR-045), and how a proxied Go herr explains itself before we
+        // write copy for its code.
         description:
-          typeof authored === "string" && authored.length > 0
-            ? authored
-            : "The request was rejected. Try rephrasing or start again.",
+          description ||
+          "The request was rejected. Try rephrasing or start again.",
         render: "card",
-        action: { label: "Try again", kind: "retry" },
+        action: retry,
         traceId: domain.traceId,
         code: domain.code,
         ...debug,

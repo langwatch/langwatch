@@ -2453,9 +2453,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           [variantA, variantB, comparisonTarget],
           [],
         );
-        const datasetRows = [
-          { question: "Name a fruit.", expected: "apple" },
-        ];
+        const datasetRows = [{ question: "Name a fruit.", expected: "apple" }];
         const datasetColumns = [
           { id: "question", name: "question", type: "string" },
           { id: "expected", name: "expected", type: "string" },

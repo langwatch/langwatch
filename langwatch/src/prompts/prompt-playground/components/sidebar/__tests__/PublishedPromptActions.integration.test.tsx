@@ -292,10 +292,15 @@ describe("PublishedPromptActions", () => {
 
         await clickDuplicate(user);
 
+        // The headline is the call site's `fallbackTitle` — an unrecognised
+        // rejection has no registry copy of its own. The raw `error.message`
+        // is deliberately NOT the description: since #5984 the wire message
+        // for a handled error is its code slug, so relaying it showed
+        // customers "validation_error". Don't restore it.
         expect(toaster.create).toHaveBeenCalledWith(
           expect.objectContaining({
+            title: "Couldn't duplicate the prompt",
             type: "error",
-            description: "Prompt not found",
           }),
         );
         expect(mockInvalidatePromptList).not.toHaveBeenCalled();
@@ -303,7 +308,9 @@ describe("PublishedPromptActions", () => {
 
       it("stays quiet when the prompt-limit dialog already told the user", async () => {
         const user = userEvent.setup();
-        const limitError = new Error("You have reached the maximum number of prompts");
+        const limitError = new Error(
+          "You have reached the maximum number of prompts",
+        );
         markAsHandledByLicenseHandler(limitError);
         mockDuplicate.mockRejectedValue(limitError);
         renderWithChakra(

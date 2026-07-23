@@ -2,7 +2,7 @@
 
 import {
   type GovernanceOcsfEventInput,
-  GovernanceOcsfEventsClickHouseRepository,
+  type GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";

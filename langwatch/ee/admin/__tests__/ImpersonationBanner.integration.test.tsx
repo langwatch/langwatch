@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { ImpersonationBanner } from "../ImpersonationBanner";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ImpersonationBanner } from "../ImpersonationBanner";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -40,9 +41,7 @@ describe("ImpersonationBanner", () => {
 
     it("displays the impersonation text and stop action", () => {
       render(<ImpersonationBanner user={impersonatedUser} />, { wrapper });
-      expect(
-        screen.getByText("Impersonating Target User"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Impersonating Target User")).toBeInTheDocument();
       // Chakra renders multiple copies for responsive breakpoints
       const stopLinks = screen.getAllByRole("link", { name: "Stop" });
       expect(stopLinks.length).toBeGreaterThan(0);
@@ -64,9 +63,9 @@ describe("ImpersonationBanner", () => {
     });
 
     it("sends DELETE request when Stop is clicked", async () => {
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(null, { status: 200 }),
-      );
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(null, { status: 200 }));
 
       render(<ImpersonationBanner user={impersonatedUser} />, { wrapper });
 

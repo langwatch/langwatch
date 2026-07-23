@@ -13,7 +13,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 vi.mock("../../../src/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 beforeEach(() => {
@@ -47,14 +47,17 @@ describe("NurturingService", () => {
       it("sends HTTP request to cdp.customer.io/v1/identify with Basic Auth", async () => {
         const { service, fetchFn } = createService();
 
-        await service.identifyUser({ userId: "user-123", traits: { email: "test@example.com" } });
+        await service.identifyUser({
+          userId: "user-123",
+          traits: { email: "test@example.com" },
+        });
 
         expect(fetchFn).toHaveBeenCalledTimes(1);
         const [url, options] = fetchFn.mock.calls[0]!;
         expect(url).toBe("https://cdp.customer.io/v1/identify");
         expect(options.method).toBe("POST");
 
-        const authHeader = options.headers["Authorization"];
+        const authHeader = options.headers.Authorization;
         const expectedAuth =
           "Basic " + Buffer.from("test-api-key:").toString("base64");
         expect(authHeader).toBe(expectedAuth);
@@ -63,10 +66,13 @@ describe("NurturingService", () => {
       it("includes user ID and traits in the request body", async () => {
         const { service, fetchFn } = createService();
 
-        await service.identifyUser({ userId: "user-123", traits: {
-          email: "test@example.com",
-          name: "Jane Doe",
-        }});
+        await service.identifyUser({
+          userId: "user-123",
+          traits: {
+            email: "test@example.com",
+            name: "Jane Doe",
+          },
+        });
 
         const body = JSON.parse(fetchFn.mock.calls[0]![1].body);
         expect(body).toEqual({
@@ -81,7 +87,10 @@ describe("NurturingService", () => {
       it("sends request to cdp-eu.customer.io/v1/identify", async () => {
         const { service, fetchFn } = createService({ region: "eu" });
 
-        await service.identifyUser({ userId: "user-123", traits: { email: "test@example.com" } });
+        await service.identifyUser({
+          userId: "user-123",
+          traits: { email: "test@example.com" },
+        });
 
         const [url] = fetchFn.mock.calls[0]!;
         expect(url).toBe("https://cdp-eu.customer.io/v1/identify");
@@ -95,9 +104,13 @@ describe("NurturingService", () => {
       it("sends event payload to the track endpoint", async () => {
         const { service, fetchFn } = createService();
 
-        await service.trackEvent({ userId: "user-123", event: "signed_up", properties: {
-          role: "engineer",
-        }});
+        await service.trackEvent({
+          userId: "user-123",
+          event: "signed_up",
+          properties: {
+            role: "engineer",
+          },
+        });
 
         expect(fetchFn).toHaveBeenCalledTimes(1);
         const [url, options] = fetchFn.mock.calls[0]!;
@@ -120,10 +133,14 @@ describe("NurturingService", () => {
       it("sends org traits to the group endpoint", async () => {
         const { service, fetchFn } = createService();
 
-        await service.groupUser({ userId: "user-123", groupId: "org-456", traits: {
-          name: "Acme Corp",
-          plan: "free",
-        }});
+        await service.groupUser({
+          userId: "user-123",
+          groupId: "org-456",
+          traits: {
+            name: "Acme Corp",
+            plan: "free",
+          },
+        });
 
         expect(fetchFn).toHaveBeenCalledTimes(1);
         const [url, options] = fetchFn.mock.calls[0]!;
@@ -210,7 +227,9 @@ describe("NurturingService", () => {
           // Simulate the abort signal triggering
           if (options?.signal) {
             options.signal.addEventListener("abort", () => {
-              reject(new DOMException("The operation was aborted.", "AbortError"));
+              reject(
+                new DOMException("The operation was aborted.", "AbortError"),
+              );
             });
           }
         });
@@ -223,7 +242,10 @@ describe("NurturingService", () => {
 
       // Use fake timers to trigger the timeout immediately
       vi.useFakeTimers();
-      const promise = service.identifyUser({ userId: "user-1", traits: { email: "a@b.com" } });
+      const promise = service.identifyUser({
+        userId: "user-1",
+        traits: { email: "a@b.com" },
+      });
       vi.advanceTimersByTime(10_000);
       await promise;
       vi.useRealTimers();
@@ -240,7 +262,10 @@ describe("NurturingService", () => {
       });
 
       await expect(
-        service.identifyUser({ userId: "user-123", traits: { email: "test@example.com" } }),
+        service.identifyUser({
+          userId: "user-123",
+          traits: { email: "test@example.com" },
+        }),
       ).resolves.toBeUndefined();
     });
 
@@ -252,7 +277,10 @@ describe("NurturingService", () => {
         fetchFn: createMockFetch({ ok: false, status: 500 }),
       });
 
-      await service.identifyUser({ userId: "user-123", traits: { email: "test@example.com" } });
+      await service.identifyUser({
+        userId: "user-123",
+        traits: { email: "test@example.com" },
+      });
 
       expect(captureException).toHaveBeenCalled();
     });
@@ -266,7 +294,10 @@ describe("NurturingService", () => {
         fetchFn,
       });
 
-      await service.identifyUser({ userId: "user-123", traits: { email: "test@example.com" } });
+      await service.identifyUser({
+        userId: "user-123",
+        traits: { email: "test@example.com" },
+      });
 
       expect(fetchFn).not.toHaveBeenCalled();
     });

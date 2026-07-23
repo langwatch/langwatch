@@ -107,10 +107,7 @@ export class HttpPollingPullerAdapter
 
     while (pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (
-        options.deadlineMs !== undefined &&
-        Date.now() > options.deadlineMs
-      ) {
+      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
         logger.info(
           { adapter: this.id, pageCount, cursor },
           "Deadline reached mid-pagination, returning cursor for next run",
@@ -217,10 +214,7 @@ export class HttpPollingPullerAdapter
         lastError = error instanceof Error ? error : new Error(String(error));
         // 4xx errors land here too (re-thrown above); only retry on
         // network/transport errors and 5xx
-        if (
-          error instanceof Error &&
-          /^HTTP 4\d{2}/.test(error.message)
-        ) {
+        if (error instanceof Error && /^HTTP 4\d{2}/.test(error.message)) {
           throw error;
         }
       }

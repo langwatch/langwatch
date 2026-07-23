@@ -1,16 +1,41 @@
 import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { describeError, showErrorToast } from "~/features/errors";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { BaseComponent } from "../types/dsl";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
+import {
+  type CodedExecutionFailure,
+  explainExecutionStateError,
+} from "../utils/executionStateError";
 import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
+
+/** The engine's code for "somebody pressed stop", not a failure. */
+const STOP_ERROR_TYPE = "context_canceled";
+
+/**
+ * Whether a failed state is really a cancellation.
+ *
+ * The code is asked first because it is the fact: the engine emits
+ * `context_canceled` for a deliberate stop, and it matches neither of the
+ * words the prose check looks for — so a user who pressed Stop got a red
+ * "something went wrong" toast for doing exactly what they meant to.
+ *
+ * The prose check stays as the fallback for the frames that carry no code at
+ * all (the stream's top-level `error`, the optimization runner).
+ */
+function isDeliberateStop(failure: CodedExecutionFailure | undefined): boolean {
+  if (failure?.error_type === STOP_ERROR_TYPE) return true;
+  const raw = failure?.error?.toLowerCase() ?? "";
+  return raw.includes("stopped") || raw.includes("interrupted");
+}
 
 export const PostEventProvider = ({
   children,
@@ -87,14 +112,15 @@ export const usePostEvent = () => {
       setIsLoading(true);
 
       const onError = (error: Error) => {
+        // showErrorToast suppresses the duplicate toast on its own, but the
+        // state writes below must be skipped too: a license-limit rejection
+        // opens the upgrade modal, and flipping the studio into an error
+        // state behind it is not what the user is looking at.
         if (isHandledByGlobalHandler(error)) return;
-        // Show error to user
-        toaster.create({
-          title: "Failed to post message",
-          description: error.message || "Unknown error",
-          type: "error",
-          duration: 5000,
-          meta: { closable: true },
+
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't reach the workflow engine",
         });
 
         // Update evaluation state if relevant
@@ -102,7 +128,10 @@ export const usePostEvent = () => {
           setEvaluationState({
             status: "error",
             run_id: undefined,
-            error: error.message,
+            error: describeError({
+              error,
+              fallbackTitle: "Couldn't reach the workflow engine",
+            }),
             timestamps: { finished_at: Date.now() },
           });
         }
@@ -110,7 +139,10 @@ export const usePostEvent = () => {
         if (event.type === "execute_component") {
           setComponentExecutionState(event.payload.node_id, {
             status: "error",
-            error: error.message,
+            error: describeError({
+              error,
+              fallbackTitle: "Couldn't reach the workflow engine",
+            }),
             timestamps: { finished_at: Date.now() },
           });
         }
@@ -187,38 +219,63 @@ export const useHandleServerMessage = ({
     setOpenResultsPanelRequest,
   } = workflowStore;
 
-  const alertOnError = useCallback((message: string | undefined) => {
-    // Keyed by the message so repeated identical failures (e.g.
-    // "LangWatch NLP is unreachable" while the engine is down and the
-    // studio retries) update one toast instead of stacking a wall.
-    const dedupeId = `studio-error-${message?.slice(0, 140) ?? "unknown"}`;
-    if (
-      !!message?.toLowerCase().includes("stopped") ||
-      !!message?.toLowerCase().includes("interrupted")
-    ) {
-      toaster.create({
-        id: dedupeId,
-        title: "Stopped",
-        description: message?.slice(0, 140),
-        type: "info",
-        meta: {
-          closable: true,
-        },
-        duration: 3000,
-      });
-    } else {
-      toaster.create({
-        id: dedupeId,
-        title: "Error",
-        description: message?.slice(0, 140),
-        type: "error",
-        meta: {
-          closable: true,
-        },
-        duration: 5000,
-      });
-    }
-  }, []);
+  /**
+   * Toasts a failed run.
+   *
+   * The words come from the state's `error_type` via the code-keyed registry
+   * (ADR-045). A state with no code — or one whose code the registry has no
+   * copy for — falls back to its raw message. See
+   * `explainExecutionStateError`, which explains why saying "we've been
+   * notified" there would be untrue.
+   */
+  const alertOnError = useCallback(
+    (failure: CodedExecutionFailure | undefined) => {
+      const explanation = explainExecutionStateError(failure);
+      const wasStopped = isDeliberateStop(failure);
+
+      // Keyed by what the toast actually SAYS, so a repeating failure (the
+      // engine down while the studio retries) updates one toast instead of
+      // stacking a wall of them — while two different failures stay two
+      // toasts. Keying on `error_type` alone collapsed every uncoded failure
+      // onto one id, so a second, different one would silently replace the
+      // first — and that includes a code the registry doesn't know, which
+      // presents from its raw message just like an uncoded one does.
+      const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${
+        explanation.isRegistered
+          ? failure?.error_type
+          : explanation.title + explanation.description
+      }`;
+
+      if (wasStopped) {
+        toaster.create({
+          id: dedupeId,
+          title: "Stopped",
+          // Only registered copy has anything to add here; the generic
+          // "we've been notified" would be wrong for a deliberate stop.
+          description: explanation.isRegistered
+            ? explanation.description || undefined
+            : undefined,
+          type: "info",
+          meta: {
+            closable: true,
+          },
+          duration: 3000,
+        });
+      } else {
+        toaster.create({
+          id: dedupeId,
+          title: explanation.title,
+          description: explanation.description || undefined,
+          type: "error",
+          meta: {
+            closable: true,
+          },
+          duration: 5000,
+        });
+      }
+    },
+    [],
+  );
 
   return useCallback(
     (message: StudioServerEvent) => {
@@ -287,7 +344,7 @@ export const useHandleServerMessage = ({
               workflowStore.setSelectedNode(focusNodeId);
               workflowStore.setPropertiesExpanded(true);
             }
-            alertOnError(message.payload.execution_state.error);
+            alertOnError(message.payload.execution_state);
             stopWorkflowIfRunning(message.payload.execution_state.error);
           }
           break;
@@ -307,7 +364,7 @@ export const useHandleServerMessage = ({
           const currentEvaluationState = getWorkflow().state.evaluation;
           setEvaluationState(evaluationState);
           if (evaluationState?.status === "error") {
-            alertOnError(evaluationState.error);
+            alertOnError(evaluationState);
             if (currentEvaluationState?.status !== "waiting") {
               setTimeout(() => {
                 setOpenResultsPanelRequest("evaluations");
@@ -320,7 +377,7 @@ export const useHandleServerMessage = ({
           const currentOptimizationState = getWorkflow().state.optimization;
           setOptimizationState(message.payload.optimization_state);
           if (message.payload.optimization_state?.status === "error") {
-            alertOnError(message.payload.optimization_state.error);
+            alertOnError(message.payload.optimization_state);
             if (currentOptimizationState?.status !== "waiting") {
               setTimeout(() => {
                 setOpenResultsPanelRequest("optimizations");
@@ -335,7 +392,10 @@ export const useHandleServerMessage = ({
           );
           checkIfUnreachableErrorMessage(message.payload.message);
           stopWorkflowIfRunning(message.payload.message);
-          alertOnError(message.payload.message);
+          // The stream's `error` frame carries no code (see StudioServerEvent),
+          // so this presents as the generic unknown state — the message rides
+          // along only so a deliberate stop still reads as "Stopped".
+          alertOnError({ error: message.payload.message });
           break;
         case "debug":
           break;

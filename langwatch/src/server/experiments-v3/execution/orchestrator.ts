@@ -10,6 +10,7 @@
  * 6. Checks abort flags between executions
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -33,9 +34,9 @@ import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
@@ -52,8 +53,8 @@ import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
   extractTargetOutput,
-  mapErrorEvent,
   mapNlpEvent,
+  mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
 } from "./resultMapper";
@@ -1283,7 +1284,11 @@ export async function* executeCell(
       { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
       "Cell execution failed",
     );
-    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
+    yield mapThrownErrorEvent({
+      error,
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+    });
   }
 }
 
@@ -1357,6 +1362,8 @@ export async function* executeWorkflowCell(
     let sawCost = false;
     let targetFailed = false;
     let targetError: string | undefined;
+    let targetErrorType: string | undefined;
+    let targetUpstreamStatus: number | undefined;
     let durationMs: number | undefined;
     let finalTraceId = traceId;
     const evaluatorEvents: EvaluationV3Event[] = [];
@@ -1377,6 +1384,8 @@ export async function* executeWorkflowCell(
         if (ex?.status === "error") {
           targetFailed = true;
           targetError = ex.error ?? targetError;
+          targetErrorType = ex.error_type ?? targetErrorType;
+          targetUpstreamStatus = ex.upstream_status ?? targetUpstreamStatus;
         }
         continue;
       }
@@ -1417,6 +1426,11 @@ export async function* executeWorkflowCell(
               outputs: execution_state.outputs,
               cost: execution_state.cost,
               error: execution_state.error,
+              // The coded half of the failure — without it the evaluator cell
+              // renders the engine's raw message verbatim.
+              error_type: execution_state.error_type,
+              upstream_status: execution_state.upstream_status,
+              trace_id: execution_state.trace_id ?? finalTraceId,
             },
           ),
         );
@@ -1435,6 +1449,16 @@ export async function* executeWorkflowCell(
       error: targetFailed
         ? (targetError ?? "Workflow execution failed")
         : undefined,
+      ...(targetFailed && targetErrorType
+        ? {
+            domainError: nodeErrorToDomainError({
+              errorType: targetErrorType,
+              message: targetError,
+              upstreamStatus: targetUpstreamStatus,
+              traceId: finalTraceId,
+            }),
+          }
+        : {}),
     };
 
     for (const evaluatorEvent of evaluatorEvents) {
@@ -1445,7 +1469,11 @@ export async function* executeWorkflowCell(
       { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
       "Workflow cell execution failed",
     );
-    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
+    yield mapThrownErrorEvent({
+      error,
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+    });
   }
 }
 
@@ -1701,6 +1729,13 @@ export const buildTargetMetadata = ({
  * falsy target outputs (`false`, `0`, `""`) must persist as
  * `{ output: value }` (only null/undefined become a null `predicted`), and
  * error events must land as predicted-null rows carrying the error message.
+ *
+ * The stored message is the failure's OWN (`serverMessage`), not the wire
+ * line. This row is the run history that support and the customer's own run
+ * views read back; recording "This row couldn't be run" for a Prisma failure,
+ * an OOM and a bad mapping alike leaves nothing to read back. ADR-045 is about
+ * what the customer is shown live, not about erasing our own record — and
+ * `toClientEvent` is what keeps the two apart.
  */
 export const buildTargetResultDispatch = ({
   tenantId,
@@ -1752,8 +1787,8 @@ export const buildTargetResultDispatch = ({
       predicted: null,
       cost: null,
       duration: null,
-      error: event.message,
-      traceId: null,
+      error: event.serverMessage ?? event.message,
+      traceId: event.traceId ?? null,
       occurredAt,
     };
   }
@@ -2600,7 +2635,9 @@ const getLoadedDataForTarget = (
           agent.workflowId ??
           (agent.config as { workflow_id?: string }).workflow_id;
         const workflow = linkedWorkflowId
-          ? loadedWorkflows?.get(workflowLoadKey({ workflowId: linkedWorkflowId }))
+          ? loadedWorkflows?.get(
+              workflowLoadKey({ workflowId: linkedWorkflowId }),
+            )
           : undefined;
         return { agent, workflow };
       }

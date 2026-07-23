@@ -17,6 +17,7 @@ import {
 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -80,11 +81,7 @@ export function TraceOverflowMenu({
       toaster.create({ title: "Trace pinned", type: "success" });
     },
     onError: (error) =>
-      toaster.create({
-        title: "Failed to pin trace",
-        description: error.message,
-        type: "error",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
   });
 
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
@@ -95,11 +92,7 @@ export function TraceOverflowMenu({
       toaster.create({ title: "Trace unpinned", type: "success" });
     },
     onError: (error) =>
-      toaster.create({
-        title: "Failed to unpin trace",
-        description: error.message,
-        type: "error",
-      }),
+      showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
   });
 
   const handleTogglePin = useCallback(() => {

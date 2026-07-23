@@ -47,15 +47,14 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
 import { Pagination } from "~/components/ui/Pagination";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
-import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "~/server/datasets/types";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AddRowsFromCSVModal } from "../AddRowsFromCSVModal";
 import {
   type AutosaveState,
@@ -211,16 +210,8 @@ export function DatasetEditorTable({
       // background so a cell edited then navigated-away-from shows its saved
       // value on return (the edit is persisted per-record, not into this cache).
       staleTime: 0,
-      onError: (error) => {
-        if (isHandledByGlobalHandler(error)) return;
-        toaster.create({
-          title: "Error fetching dataset",
-          description: error.message,
-          type: "error",
-          duration: 5000,
-          meta: { closable: true },
-        });
-      },
+      onError: (error) =>
+        showErrorToast({ error, fallbackTitle: "Couldn't load dataset" }),
     },
   );
 
@@ -611,14 +602,8 @@ export function DatasetEditorTable({
           ),
           fullColumnTypes,
         );
-      } catch {
-        toaster.create({
-          title: "Error downloading dataset",
-          description: "Please try again",
-          type: "error",
-          duration: 5000,
-          meta: { closable: true },
-        });
+      } catch (error) {
+        showErrorToast({ error, fallbackTitle: "Couldn't download dataset" });
         return;
       }
     }

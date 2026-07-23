@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -83,9 +84,9 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
       onOpenChange(false);
       onSaved?.();
     } catch (e) {
-      toaster.create({
-        title: e instanceof Error ? e.message : "Failed to save cache rule",
-        type: "error",
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't save the cache rule",
       });
     }
   };

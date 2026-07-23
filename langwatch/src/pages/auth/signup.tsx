@@ -1,5 +1,4 @@
 import {
-  Alert,
   Button,
   Card,
   Container,
@@ -10,11 +9,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useSearchParams } from "~/utils/compat/next-navigation";
-import { signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { HandledErrorAlert } from "~/features/errors";
+import { signIn, useSession } from "~/utils/auth-client";
+import { useSearchParams } from "~/utils/compat/next-navigation";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { Link } from "../../components/ui/link";
@@ -81,17 +81,25 @@ function SignUpForm() {
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
       await register.mutateAsync(values);
+    } catch {
+      // `register.error` renders in the alert below, carrying the reason the
+      // server actually gave ("User already exists", "Too many signup
+      // attempts"). A toast here would only cover that with a vaguer line.
+      return;
+    }
 
-      setSignInLoading(true);
+    // The account exists from here on, so this leg fails on its own terms —
+    // and it has no alert of its own, which is why it toasts.
+    setSignInLoading(true);
+    try {
       const response = await signIn("credentials", {
         email: values.email,
         password: values.password,
         callbackUrl: callbackUrl,
       });
-      setSignInLoading(false);
 
       if (response?.error) {
-        throw new Error("Sign up failed");
+        throw new Error("Sign in failed");
       }
 
       if (response?.status && response.status >= 400) {
@@ -99,13 +107,16 @@ function SignUpForm() {
       }
     } catch {
       toaster.create({
-        title: "Error",
-        description: "Failed to sign up",
+        title: "Couldn't sign you in",
+        description:
+          "Your account was created — sign in with your new details.",
         type: "error",
         meta: {
           closable: true,
         },
       });
+    } finally {
+      setSignInLoading(false);
     }
   };
 
@@ -155,17 +166,10 @@ function SignUpForm() {
                 <Input type="password" {...form.register("confirmPassword")} />
               </HorizontalFormControl>
               {register.error && (
-                <Alert.Root
-                  borderStartWidth="4px"
-                  borderStartColor="colorPalette.solid"
-                  colorPalette="red"
-                >
-                  <Alert.Content>
-                    <Alert.Description>
-                      {register.error.message}
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
+                <HandledErrorAlert
+                  error={register.error}
+                  fallbackTitle="Couldn't create your account"
+                />
               )}
               <HStack width="full" paddingTop={4}>
                 <Link

@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import {
@@ -5,13 +6,22 @@ import {
   coerceScore,
   extractTargetOutput,
   isEvaluatorNode,
-  mapErrorEvent,
   mapEvaluatorResult,
   mapNlpEvent,
   mapTargetResult,
+  mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   parseNodeId,
+  toClientEvent,
 } from "../resultMapper";
+
+class DatasetColumnMissingError extends HandledError {
+  constructor() {
+    super("invalid_dataset", 'Column "expected_output" is not mapped', {
+      httpStatus: 422,
+    });
+  }
+}
 
 describe("resultMapper", () => {
   describe("parseNodeId", () => {
@@ -257,6 +267,42 @@ describe("resultMapper", () => {
         traceId: undefined,
         error: "API key invalid",
       });
+    });
+
+    it("lifts a coded engine failure onto the handled channel", () => {
+      const result = mapTargetResult("target-1", 1, {
+        error:
+          'httpblock: Post "https://api.example.com": lookup api.example.com: no such host',
+        error_type: "http_error",
+        trace_id: "trace-9",
+      });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      // The raw string is kept as a legacy fallback, but a domainError now
+      // rides alongside it carrying the code.
+      expect(result.domainError?.code).toBe("http_error");
+      expect(result.domainError?.traceId).toBe("trace-9");
+      // The leaky message never crosses in the handled payload (#5984).
+      expect(JSON.stringify(result.domainError)).not.toContain("no such host");
+    });
+
+    it("carries the upstream status for an upstream_http_error", () => {
+      const result = mapTargetResult("target-1", 0, {
+        error: "httpblock: upstream returned 500",
+        error_type: "upstream_http_error",
+        upstream_status: 500,
+      });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      expect(result.domainError?.meta).toEqual({ upstreamStatus: 500 });
+    });
+
+    it("leaves domainError unset when the engine sent no code", () => {
+      const result = mapTargetResult("target-1", 0, { error: "plain string" });
+
+      if (result.type !== "target_result") throw new Error("wrong event");
+      expect(result.domainError).toBeUndefined();
+      expect(result.error).toBe("plain string");
     });
 
     it("handles missing timestamps", () => {
@@ -888,35 +934,100 @@ describe("resultMapper", () => {
       }
     });
   });
+});
 
-  describe("mapErrorEvent", () => {
-    it("creates generic error event", () => {
-      const result = mapErrorEvent("Something went wrong");
+/**
+ * The single choke point deciding whether a thrown error's message reaches a
+ * customer. Everything the orchestrator and the two route-level catches emit
+ * for a failure passes through here.
+ */
+describe("mapThrownErrorEvent", () => {
+  describe("given a handled error", () => {
+    it("carries the code as the wire message", () => {
+      const event = mapThrownErrorEvent({
+        error: new DatasetColumnMissingError(),
+        rowIndex: 3,
+        targetId: "target-1",
+      });
 
-      expect(result).toEqual({
+      expect(event).toMatchObject({
         type: "error",
-        message: "Something went wrong",
-        rowIndex: undefined,
-        targetId: undefined,
-        evaluatorId: undefined,
+        message: "invalid_dataset",
+        rowIndex: 3,
+        targetId: "target-1",
       });
     });
 
-    it("creates error event with context", () => {
-      const result = mapErrorEvent(
-        "Failed to execute",
-        2,
-        "target-1",
-        "eval-1",
+    it("carries the serialised handled payload the client renders from", () => {
+      const event = mapThrownErrorEvent({
+        error: new DatasetColumnMissingError(),
+        rowIndex: 3,
+      });
+
+      expect(event.type).toBe("error");
+      if (event.type !== "error") return;
+      expect(event.domainError).toMatchObject({
+        code: "invalid_dataset",
+        httpStatus: 422,
+      });
+    });
+  });
+
+  describe("given an unhandled infrastructure error", () => {
+    const connectionRefused = () =>
+      new Error("connect ECONNREFUSED 10.0.0.5:5432");
+
+    it("puts neither host nor port on the wire", () => {
+      const event = toClientEvent(
+        mapThrownErrorEvent({
+          error: connectionRefused(),
+          rowIndex: 0,
+          targetId: "target-1",
+        }),
       );
 
-      expect(result).toEqual({
-        type: "error",
-        message: "Failed to execute",
-        rowIndex: 2,
+      const wire = JSON.stringify(event);
+      expect(wire).not.toContain("10.0.0.5");
+      expect(wire).not.toContain("5432");
+      expect(wire).not.toContain("ECONNREFUSED");
+    });
+
+    it("keeps the real message for the server's own record", () => {
+      const event = mapThrownErrorEvent({
+        error: connectionRefused(),
+        rowIndex: 0,
         targetId: "target-1",
-        evaluatorId: "eval-1",
       });
+
+      expect(event.type).toBe("error");
+      if (event.type !== "error") return;
+      expect(event.serverMessage).toBe("connect ECONNREFUSED 10.0.0.5:5432");
+    });
+  });
+
+  describe("given a failure that took the whole run", () => {
+    it("does not blame a single row", () => {
+      const runLevel = mapThrownErrorEvent({ error: new Error("boom") });
+      const cellLevel = mapThrownErrorEvent({
+        error: new Error("boom"),
+        rowIndex: 0,
+        targetId: "target-1",
+      });
+
+      expect(runLevel.type).toBe("error");
+      expect(cellLevel.type).toBe("error");
+      if (runLevel.type !== "error" || cellLevel.type !== "error") return;
+      expect(runLevel.message).not.toBe(cellLevel.message);
+      expect(runLevel.message.toLowerCase()).not.toContain("row");
+    });
+  });
+});
+
+describe("toClientEvent", () => {
+  describe("when the event carries no server-only field", () => {
+    it("returns it untouched", () => {
+      const event = mapThrownErrorEvent({ error: "not an Error at all" });
+      expect(toClientEvent(event)).toBe(event);
     });
   });
 });

@@ -15,22 +15,23 @@ import {
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CreateGroupDialog } from "~/components/settings/CreateGroupDialog";
-import { GroupDetailDialog } from "~/components/settings/GroupDetailDialog";
 import {
   roleBadgeColor,
-  scopeTypeLabel,
   SourceBadge,
+  scopeTypeLabel,
 } from "~/components/settings/GroupBindingInputRow";
+import { GroupDetailDialog } from "~/components/settings/GroupDetailDialog";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
-import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
+import { showErrorToast } from "~/features/errors";
 import SettingsLayout from "../../components/SettingsLayout";
+import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
 import type { RouterOutputs } from "../../utils/api";
+import { api } from "../../utils/api";
 
 type Group = RouterOutputs["group"]["listAll"][number];
 
@@ -48,7 +49,8 @@ function GroupsSettings() {
       void queryClient.group.listAll.invalidate();
       setGroupToDelete(null);
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't delete the group" }),
   });
 
   const groups = api.group.listAll.useQuery(
@@ -69,7 +71,8 @@ function GroupsSettings() {
             <Alert.Content>
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
-                Groups are available on Enterprise plans. Contact sales to upgrade.
+                Groups are available on Enterprise plans. Contact sales to
+                upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
@@ -105,9 +108,15 @@ function GroupsSettings() {
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader>Group</Table.ColumnHeader>
-                    <Table.ColumnHeader width="120px">Source</Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
-                    <Table.ColumnHeader width="80px" textAlign="right">Members</Table.ColumnHeader>
+                    <Table.ColumnHeader width="120px">
+                      Source
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">
+                      Access
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader width="80px" textAlign="right">
+                      Members
+                    </Table.ColumnHeader>
                     {canManage && <Table.ColumnHeader width="48px" />}
                   </Table.Row>
                 </Table.Header>
@@ -117,7 +126,12 @@ function GroupsSettings() {
                       key={g.id}
                       cursor="pointer"
                       onClick={() => setSelectedGroup(g)}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedGroup(g); } }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedGroup(g);
+                        }
+                      }}
                       tabIndex={0}
                       role="button"
                       _hover={{ bg: "bg.muted" }}
@@ -130,24 +144,34 @@ function GroupsSettings() {
                         <VStack gap={1} align="end">
                           {g.bindings.map((b, i) => (
                             <HStack key={i} gap={1} fontSize="xs">
-                              <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+                              <Badge
+                                colorPalette={roleBadgeColor(b.role)}
+                                size="sm"
+                              >
                                 {b.customRoleName ?? b.role}
                               </Badge>
                               <Text color="fg.muted">on</Text>
                               <Badge colorPalette="purple" size="sm">
-                                {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
+                                {scopeTypeLabel(b.scopeType)}{" "}
+                                {b.scopeName ?? b.scopeId}
                               </Badge>
                             </HStack>
                           ))}
                           {g.bindings.length === 0 && (
-                            <Text fontSize="xs" color="fg.subtle" textAlign="right">
+                            <Text
+                              fontSize="xs"
+                              color="fg.subtle"
+                              textAlign="right"
+                            >
                               No access configured
                             </Text>
                           )}
                         </VStack>
                       </Table.Cell>
                       <Table.Cell textAlign="right">
-                        <Text fontSize="sm" color="fg.muted">{g.memberCount}</Text>
+                        <Text fontSize="sm" color="fg.muted">
+                          {g.memberCount}
+                        </Text>
                       </Table.Cell>
                       {canManage && (
                         <Table.Cell>
@@ -198,7 +222,12 @@ function GroupsSettings() {
                     <Table.Row
                       cursor="pointer"
                       onClick={() => setCreating(true)}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCreating(true); } }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setCreating(true);
+                        }
+                      }}
                       tabIndex={0}
                       role="button"
                       _hover={{ bg: "bg.muted" }}
@@ -237,7 +266,9 @@ function GroupsSettings() {
 
       <Dialog.Root
         open={!!groupToDelete}
-        onOpenChange={(e) => { if (!e.open) setGroupToDelete(null); }}
+        onOpenChange={(e) => {
+          if (!e.open) setGroupToDelete(null);
+        }}
       >
         <Dialog.Content bg="bg" maxWidth="440px">
           <Dialog.Header>
@@ -252,13 +283,18 @@ function GroupsSettings() {
             </Text>
           </Dialog.Body>
           <Dialog.Footer>
-            <Button variant="outline" onClick={() => setGroupToDelete(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setGroupToDelete(null)}>
+              Cancel
+            </Button>
             <Button
               colorPalette="red"
               loading={deleteGroup.isPending}
               onClick={() =>
                 groupToDelete &&
-                deleteGroup.mutate({ organizationId: organization.id, groupId: groupToDelete.id })
+                deleteGroup.mutate({
+                  organizationId: organization.id,
+                  groupId: groupToDelete.id,
+                })
               }
             >
               Delete

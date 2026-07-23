@@ -8,10 +8,10 @@
  */
 
 import {
-  context as otelContext,
   isSpanContextValid,
-  propagation,
+  context as otelContext,
   trace as otelTrace,
+  propagation,
   type Span,
   SpanKind,
   SpanStatusCode,
@@ -125,6 +125,39 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
  */
 
 /**
+ * How deep to walk a `cause` chain looking for the message tRPC copied.
+ *
+ * `new TRPCError({ cause })` takes `cause.message` verbatim, and a wrapper
+ * (`new Error("…", { cause: driverErr })`) can re-donate the same string one
+ * level further down. Three links covers every wrapping we do; a bound also
+ * means a self-referential `cause` can't spin here.
+ */
+const MAX_CAUSE_DEPTH = 3;
+
+/**
+ * True when `message` is not our words but the caught error's own.
+ *
+ * tRPC's constructor defaults `message` to `cause.message`, so an inherited
+ * message and an authored one are indistinguishable by the time they reach
+ * this formatter — except by comparison with the cause that donated it. A
+ * procedure that writes its own sentence and passes `cause` for the log line
+ * produces a message that matches nothing in the chain, and is authored.
+ *
+ * Deliberately conservative: a procedure that writes `message: err.message`
+ * reads as inherited and degrades to the generic copy. Showing a driver
+ * string is the worse of the two mistakes.
+ */
+function isInheritedFromCause(message: string, cause: unknown): boolean {
+  let current = cause;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
+    if (!(current instanceof Error)) return false;
+    if (current.message === message) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
  * Extracted for testing — see
  * langwatch/src/server/api/__tests__/modelNotConfigured.trpc.integration.test.ts.
  * Keep `errorFormatter` in `t.create` calling this so production and
@@ -224,12 +257,46 @@ export function errorFormatterForTesting({
     : isInternalServerError
       ? HandledError.toUserMessage(error.cause)
       : shape.message;
+  // Whether `message` is prose a procedure deliberately wrote for a person.
+  //
+  // The client renders this one (`readAuthoredMessage`) because #5984 left
+  // plain non-5xx messages alone on purpose: several hundred procedures throw
+  // a `TRPCError` carrying real copy, and replacing those with "we've been
+  // notified" tells the user to wait for something that will never change.
+  //
+  // But only the server can tell authored copy from an accident, and it needs
+  // `cause`, which never crosses the wire. Two accidents to exclude:
+  //
+  //   - `new TRPCError({ code: "NOT_FOUND" })` — tRPC defaults `message` to
+  //     the code NAME, so the customer would read "NOT_FOUND".
+  //   - `new TRPCError({ code: "BAD_REQUEST", cause: err })` — tRPC defaults
+  //     `message` to the CAUSE's message, so a driver string ("fetch failed",
+  //     "Invalid time value") would be presented as our own copy. That is the
+  //     leak #5984 closed at 5xx, reopened one status class down.
+  //
+  // What is NOT an accident is `new TRPCError({ code, message: <copy>, cause:
+  // err })` — passing `cause` for the log line while writing the sentence
+  // yourself. That is the majority shape in this codebase, and an earlier
+  // version of this gate rejected it wholesale on `cause === undefined`,
+  // which told an admin who mistyped a rule field to "try again in a moment".
+  // So the test is authored-vs-INHERITED, not caused-vs-uncaused.
+  //
+  // Deciding this here rather than by sniffing the message client-side is the
+  // difference between a fact and a guess.
+  const isAuthoredMessage =
+    !handled &&
+    !isInternalServerError &&
+    typeof shape.message === "string" &&
+    shape.message.length > 0 &&
+    shape.message !== error.code &&
+    !isInheritedFromCause(shape.message, error.cause);
+
+  // tRPC includes stacks in development error shapes. Local callers should
+  // exercise the same safe wire contract as production callers — including on
+  // a plain 4xx, which used to keep its stack because this ran only for 5xx
+  // and handled errors.
   const shapeData = { ...shape.data };
-  if (isInternalServerError || handled) {
-    // tRPC includes stacks in development error shapes. Local callers should
-    // exercise the same safe wire contract as production callers.
-    delete shapeData.stack;
-  }
+  delete shapeData.stack;
 
   return {
     ...shape,
@@ -242,6 +309,16 @@ export function errorFormatterForTesting({
         aiCallFailedCause ??
         limitInfo,
       error: domainError,
+      // See `isAuthoredMessage`. Absent/false means the client must not render
+      // `message` — it degrades to the generic unknown state instead.
+      authored: isAuthoredMessage,
+      // The trace id for EVERY failure, not just handled ones. An unhandled
+      // error deliberately tells the client nothing about what went wrong
+      // (ADR-045), which leaves support with nothing to correlate on — so the
+      // one thing it does carry is the id that ties the customer's "it broke"
+      // to the logs. Safe to expose: an opaque id is not a detail about the
+      // failure, and a handled error already ships it inside `error`.
+      traceId: traceIdForError(error),
     },
   };
 }
@@ -483,6 +560,31 @@ function recordSpanError(span: Span, error: unknown): void {
 }
 
 /**
+ * Trace id per failed call, captured while its span is still live.
+ *
+ * `errorFormatter` runs after the middleware chain has unwound and every span
+ * has ended, so `getActiveSpan()` there is not the span that saw the failure.
+ * A handled error carries its own `traceId` (captured at construction), but an
+ * unhandled one has nothing — and it is exactly the unhandled case where the
+ * id is the only thing support gets. Keyed weakly so a retained error can't
+ * pin the entry.
+ */
+const errorTraceIds = new WeakMap<object, string>();
+
+function rememberTraceId(error: unknown, span: Span): void {
+  if (error && typeof error === "object") {
+    errorTraceIds.set(error, span.spanContext().traceId);
+  }
+}
+
+/** The trace id for a failed call, or the ambient one if we never saw it. */
+function traceIdForError(error: unknown): string | undefined {
+  const remembered =
+    error && typeof error === "object" ? errorTraceIds.get(error) : undefined;
+  return remembered ?? otelTrace.getActiveSpan()?.spanContext().traceId;
+}
+
+/**
  * The trace context the caller sent with this call, so a tRPC span continues
  * the trace the browser started rather than rooting a fresh one. Without this
  * the UI and the server work it triggers are two unrelated traces, which is the
@@ -527,51 +629,57 @@ export function callerTraceContext({
   return propagation.extract(active, headers);
 }
 
-export const tracerMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
-  const tracer = otelTrace.getTracer("langwatch:trpc");
-  const spanName = `trpc.${path}`;
+export const tracerMiddleware = t.middleware(
+  async ({ ctx, path, type, next }) => {
+    const tracer = otelTrace.getTracer("langwatch:trpc");
+    const spanName = `trpc.${path}`;
 
-  // For silenced routes (presence heartbeats, SSE subscription
-  // messages) we want zero spans on the happy path — they otherwise
-  // drown out the trace surface — but failures still need a span so
-  // real errors stay visible. Capture the start time before `next()`
-  // so the error span's duration matches the actual call.
-  const parentContext = callerTraceContext({ req: ctx.req, type });
+    // For silenced routes (presence heartbeats, SSE subscription
+    // messages) we want zero spans on the happy path — they otherwise
+    // drown out the trace surface — but failures still need a span so
+    // real errors stay visible. Capture the start time before `next()`
+    // so the error span's duration matches the actual call.
+    const parentContext = callerTraceContext({ req: ctx.req, type });
 
-  if (isSilencedCall(path, type)) {
-    const startTime = Date.now();
-    const result = await next();
-    if (result.ok) return result;
+    if (isSilencedCall(path, type)) {
+      const startTime = Date.now();
+      const result = await next();
+      if (result.ok) return result;
 
-    const span = tracer.startSpan(
-      spanName,
-      {
-        kind: SpanKind.SERVER,
-        startTime,
-        attributes: spanAttributes(path, type),
-      },
-      parentContext,
+      const span = tracer.startSpan(
+        spanName,
+        {
+          kind: SpanKind.SERVER,
+          startTime,
+          attributes: spanAttributes(path, type),
+        },
+        parentContext,
+      );
+      rememberTraceId(result.error, span);
+      recordSpanError(span, result.error);
+      span.end();
+      return result;
+    }
+
+    return otelContext.with(parentContext, () =>
+      tracer.startActiveSpan(
+        spanName,
+        { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
+        async (span) => {
+          // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+          // returned as { ok: false, error } result objects — NOT thrown.
+          const result = await next();
+          if (!result.ok) {
+            rememberTraceId(result.error, span);
+            recordSpanError(span, result.error);
+          }
+          span.end();
+          return result;
+        },
+      ),
     );
-    recordSpanError(span, result.error);
-    span.end();
-    return result;
-  }
-
-  return otelContext.with(parentContext, () =>
-    tracer.startActiveSpan(
-      spanName,
-      { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
-      async (span) => {
-        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-        // returned as { ok: false, error } result objects — NOT thrown.
-        const result = await next();
-        if (!result.ok) recordSpanError(span, result.error);
-        span.end();
-        return result;
-      },
-    ),
-  );
-});
+  },
+);
 
 function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
   const map: Partial<Record<number, TRPCError["code"]>> = {

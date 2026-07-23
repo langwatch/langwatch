@@ -6,9 +6,14 @@
  * the returned state props.
  */
 
-import type { SimulationSuite } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
+import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  explainHandledError,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
@@ -34,8 +39,12 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(null);
-  const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(null);
+  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(
+    null,
+  );
+  const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(
+    null,
+  );
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
@@ -87,34 +96,47 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         });
       }
 
-      optionsRef.current.onRunScheduled?.(variables.id, variables.batchRunId ?? result.batchRunId);
+      optionsRef.current.onRunScheduled?.(
+        variables.id,
+        variables.batchRunId ?? result.batchRunId,
+      );
     },
     onError: (err, variables) => {
       setPendingSuite(null);
       setPendingBatchRunId(null);
 
-      const isAllArchived =
-        err.data?.code === "BAD_REQUEST" &&
-        (err.message.includes("All scenarios") ||
-          err.message.includes("All targets"));
-      toaster.create({
-        title: isAllArchived ? "Cannot start run plan" : "Run plan failed to start",
-        description: err.message,
-        type: "error",
-        meta: { closable: true },
-        ...(isAllArchived
-          ? {
-              action: {
-                label: "Edit Run Plan",
-                onClick: () => {
-                  openDrawer("suiteEditor", {
-                    urlParams: { suiteId: variables.id },
-                  });
-                },
-              },
-            }
-          : {}),
-      });
+      // A run plan with nothing runnable left is a curated rejection with its
+      // own way out — this toast adds the "Edit Run Plan" action, which is the
+      // fix. Keyed off the stable code; the words stay in the registry, which
+      // already owns copy for both of these.
+      const handled = readHandledError(err);
+      const allArchived =
+        handled &&
+        (handled.code === "suite_all_scenarios_archived" ||
+          handled.code === "suite_all_targets_archived")
+          ? handled
+          : null;
+
+      if (allArchived) {
+        const { title, description } = explainHandledError(allArchived);
+        toaster.create({
+          title,
+          description: description || undefined,
+          type: "error",
+          meta: { closable: true },
+          action: {
+            label: "Edit Run Plan",
+            onClick: () => {
+              openDrawer("suiteEditor", {
+                urlParams: { suiteId: variables.id },
+              });
+            },
+          },
+        });
+        return;
+      }
+
+      showErrorToast({ error: err, fallbackTitle: "Couldn't start run plan" });
     },
   });
 
@@ -150,7 +172,8 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   );
 
   const activeScenarioCount = useMemo(() => {
-    if (!pendingSuite || !allScenarios) return pendingSuite?.scenarioIds.length ?? 0;
+    if (!pendingSuite || !allScenarios)
+      return pendingSuite?.scenarioIds.length ?? 0;
     const activeIds = new Set(allScenarios.map((s) => s.id));
     return pendingSuite.scenarioIds.filter((id) => activeIds.has(id)).length;
   }, [pendingSuite, allScenarios]);

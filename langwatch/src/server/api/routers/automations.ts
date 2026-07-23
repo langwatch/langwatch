@@ -1,7 +1,3 @@
-import { generate as ksuid } from "@langwatch/ksuid";
-import { AlertType, type Prisma, TriggerAction, TriggerKind } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   MAX_TRACE_DEBOUNCE_MS,
@@ -10,48 +6,57 @@ import {
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
-import {
-  actionParamsSchemaFor,
-  persistActionParamsFor,
-  redactActionParamsFor,
-} from "~/server/app-layer/automations/providers/registry";
-import { getApp } from "~/server/app-layer/app";
+import type { SlackActionParams } from "@langwatch/automations/providers/slack";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import { HandledError } from "@langwatch/handled-error";
-import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { generate as ksuid } from "@langwatch/ksuid";
+import {
+  AlertType,
+  type Prisma,
+  TriggerAction,
+  TriggerKind,
+} from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
+import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import {
   InvalidEmailRecipientError,
   MissingAnnotatorError,
   NotificationDeliveryError,
   ProjectNotFoundError,
 } from "~/server/app-layer/automations/errors";
-import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
-import { type SlackActionParams } from "@langwatch/automations/providers/slack";
-import {
-  decryptWebhookHeaders,
-  type WebhookStoredActionParams,
-} from "~/server/app-layer/automations/providers/webhook/server";
-import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
 import {
   buildGraphAlertTriggerData,
   type GraphAlertActionParams,
   graphAlertActionParamsSchema,
 } from "~/server/app-layer/automations/graph-alert.builder";
 import {
+  actionParamsSchemaFor,
+  persistActionParamsFor,
+  redactActionParamsFor,
+} from "~/server/app-layer/automations/providers/registry";
+import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import {
+  decryptWebhookHeaders,
+  type WebhookStoredActionParams,
+} from "~/server/app-layer/automations/providers/webhook/server";
+import {
   buildReportTriggerData,
   extractReportFromTriggerRow,
   reportActionParamsSchema,
 } from "~/server/app-layer/automations/report.builder";
-import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
-import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import {
   type DraftProject,
   validateTemplateDraft,
 } from "~/server/app-layer/automations/trigger-template.service";
-import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
+import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
+import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -201,12 +206,13 @@ function toTemplateTRPCError(err: unknown): TRPCError {
   // A provider rejection (Slack not_in_channel, dead webhook, bad token) arrives
   // as a DispatchError with an already-actionable message — lift it onto the
   // typed HandledError channel so the UI shows a clean 4xx, not a generic 500.
-  const domainError =
-    HandledError.isHandled(err)
-      ? err
-      : isDispatchError(err)
-        ? new NotificationDeliveryError(err.message)
-        : null;
+  const domainError = HandledError.isHandled(err)
+    ? err
+    : isDispatchError(err)
+      ? new NotificationDeliveryError(err.message, {
+          customerMessage: err.customerMessage,
+        })
+      : null;
   if (domainError) {
     return new TRPCError({
       code: httpStatusToTRPCCode(domainError.httpStatus),
@@ -289,7 +295,8 @@ export const automationRouter = createTRPCRouter({
       if (input.action === TriggerAction.SEND_WEBHOOK) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Webhook automations must be created through the provider-aware upsert API.",
+          message:
+            "Webhook automations must be created through the provider-aware upsert API.",
         });
       }
 
@@ -833,7 +840,8 @@ export const automationRouter = createTRPCRouter({
               triggerId: input.automationId,
               projectId: input.projectId,
             });
-            const stored = (row?.actionParams ?? {}) as WebhookStoredActionParams;
+            const stored = (row?.actionParams ??
+              {}) as WebhookStoredActionParams;
             if (stored.url !== webhookDestination.url) {
               throw new TRPCError({
                 code: "BAD_REQUEST",

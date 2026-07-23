@@ -99,13 +99,14 @@ Concretely:
    so the client's handled/unknown logic is identical regardless of transport.
 
 7. **The client is the single place that decides presentation.** A shared reader
-   (`readHandledError`, already used by
-   `src/features/automations/logic/errorExplainer.ts`) lifts `data.error`;
+   (`readHandledError`, in `langwatch/src/features/errors`) lifts `data.error`;
    an `explain*`-style mapping keyed on `code` turns it into user-facing copy and
    an optional action/render choice. The server never dictates UI; it emits the
    typed fact, the client renders it. Absence of a domain payload → the generic
    unknown treatment. *(Amended 2026-07-18 — see below: remediation facts now
-   travel with the error for consumers that have no client explainer.)*
+   travel with the error for consumers that have no client explainer. Amended
+   2026-07-21 — the per-feature explainers this named are gone; there is now one
+   registry, `features/errors/logic/presentation.ts`.)*
 
 `code` (Go: `Code`) is a **serialisable string discriminant** and is the correct
 check across process, worker, and serialisation boundaries — use
@@ -229,15 +230,25 @@ message next to a perfectly clean serialised payload. That message is written
 for whoever is reading the logs — it names env vars, hostnames and internal
 services — and it was reaching browsers, REST callers and the chat stream.
 
-**A handled error's free-text message never crosses a boundary.** Every
+**A handled error's free-text message never crosses the tRPC boundary.** Every
 transport sends the stable `code` where a message is required:
 
 - **tRPC** — `message` is the code; `data.error` is the `SerializedHandledError`
   (renamed from `data.domainError`), or `null`.
-- **Hono** — `message` is the code; the code, `meta`, `reasons`, `tips`,
-  `docsUrl` and `fault` carry everything a caller needs.
-- **Streams** (`sse.ts`, `scenario-generate.ts`) — the frame's `message` /
-  `error` string is the code, with the serialised payload beside it.
+- **Hono** — the **`error` field** is the code, and `message` carries the
+  error's own sentence alongside it (`errorSchema.parse({ error: code, message })`
+  in `error-handler.ts`); `meta`, `reasons`, `tips`, `docsUrl` and `fault` carry
+  the rest. *(Corrected 2026-07-22 — an earlier revision of this line claimed
+  Hono's `message` was the code. It never was, and published SDKs read it. The
+  consequence is stated in the 2026-07-22 amendment below: a handled error's
+  `message` must be **written** customer-safe, which is the durable form of the
+  rule this amendment was reaching for.)*
+- **Streams and stream-adjacent routes** — the code goes in the string slot,
+  with the serialised payload beside it, but the payload key differs by route:
+  `sse.ts` emits `{ type: "error", message: <code>, error: <serialised> }`,
+  while `scenario-generate.ts` emits `{ error: <code>, domainError: <serialised> }`.
+  The Langy chat and studio `post_event` frames carry **no** structured payload
+  at all yet — §6 above is still an outstanding decision, not a description.
 - **Go `herr`** — already correct: `toErrorBody` defaults `Message` to the code,
   and free text appears only when a caller explicitly sets `Meta["message"]`.
 
@@ -265,20 +276,33 @@ the deprecated pre-`HandledError` alias.
 
 ### Reading a message for display
 
-A handled error carries no message on the wire, so anything rendering one reads,
-in order: **`meta.message` → `message` → `code`**.
+> **Superseded for the app (2026-07-21) — see the amendment below.** The order
+> here is now the rule for **consumers with no presentation registry**: the CLI,
+> the SDKs, the MCP server, an agent reading a REST body. The app no longer
+> reads a message at all — it keys copy off `code` in
+> `features/errors/logic/presentation.ts` — and `errorDisplayMessage`, named at
+> the end of this section, has been deleted.
+
+A handled error carries no message on the tRPC wire, so a consumer rendering one
+reads, in order: **`meta.message` → `message` → `code`**.
 
 - `meta.message` is prose the server *deliberately* authored to be shown. It is
   the only channel that carries a sentence, and it is opt-in per error — which
   is what keeps the leak closed: the constructor's `message` stays server-side.
   `herr.FromBody` populates it, so proxied Go errors explain themselves.
-- `message` is the code for a handled error, but real copy for a plain
-  `TRPCError` a procedure authored — still exactly what to show.
-- `code` is the last resort, so a caller never gets an empty string.
+- `message` is the code on tRPC and SSE, but on a REST body it is the handled
+  error's own sentence, and on a plain `TRPCError` it is copy a procedure
+  authored — still exactly what to show, which is why it has to be written
+  customer-safe.
+- `code` is the last resort, so a caller never gets an empty string. A bare slug
+  is ugly but *specific*: `project_slug_taken` is more use to a CLI user than a
+  generic "the request failed" invented over the top of it.
 
-`errorDisplayMessage` (`src/utils/trpcError.ts`) implements this for the app; the
-CLI does it in `asErrorBody`, and the Python SDK in `extract_api_error_detail`
-(which also appends `tips` and `docsUrl`, since those exist to be shown).
+The CLI implements this in `parseHandledError`
+(`packages/cli-cards/src/handled-error.ts`), and the Python SDK in
+`extract_api_error_detail` (which also appends `tips` and `docsUrl`, since those
+exist to be shown). The app's `errorDisplayMessage` (`src/utils/trpcError.ts`)
+used to as well; it was deleted by the 2026-07-21 amendment.
 
 ### One deliberate asymmetry
 
@@ -301,6 +325,95 @@ For unhandled errors that is unchanged, but a handled one now shows its code
 slug. Each is a missing explainer entry — the fix is copy at the call site, and
 never re-widening the wire.
 
+## Amendment 2026-07-21: the client half — one registry, and types that enforce it
+
+§7 said "the client is the single place that decides presentation" and left it
+there. In practice the client decided nothing: three independent explainers
+existed (automations, Langy, experiments-v3), one of them covering six codes out
+of sixty, and ~105 call sites rendered `error.message` directly into a toast.
+
+That was survivable until #5984, which correctly established that **a handled
+error's free-text message never crosses the boundary** — it is server copy that
+names env vars and internal services — so the wire message became the stable
+`code`. Correct for the leak, and it turned every one of those 105 call sites
+into a slug renderer: a rejected form now told the customer `validation_error`.
+
+Three decisions close it:
+
+1. **One code-keyed registry owns all customer-facing copy.** Both the title and
+   the description are written client-side against the `code`. The server
+   contributes only structured fact (`code`, `meta`, `tips`, `docsUrl`, `fault`,
+   `traceId`). Where the server genuinely must author dynamic prose, it uses
+   `meta.message` — the deliberate opt-in channel, mirroring Go's
+   `Meta["message"]`. An unrecognised code degrades on `fault`, never on the
+   code slug. A call site may supply a *fallback* title naming the action that
+   failed; registry copy outranks it, because it describes the actual failure.
+
+2. **A customer sees message, tips, docs and a copyable error id — nothing
+   else.** Raw `meta` and the reason chain are not rendered: they exist for
+   agents and logs. This makes `meta` a per-code contract rather than a debug
+   dump — the registry reads a field only where its entry declares the shape.
+   Correspondingly, the boundary now attaches `data.traceId` for **unhandled**
+   errors too. An unhandled error deliberately tells the client nothing about
+   what failed, which previously left support with nothing to correlate on; an
+   opaque id is not a detail about the failure.
+
+3. **The type system enforces coverage, and tests enforce what it can't.** The
+   registry is exhaustive over `AppErrorCode | GoErrorCode | NodeErrorCode`, so an error code
+   with no copy fails `pnpm typecheck`. `GoErrorCode` is generated from the
+   `herr.Code` declarations in the Go services by `cmd/herrgen`, which means a
+   Go engineer adding a code to the gateway breaks the TypeScript build until
+   someone writes the customer copy for it — the Go↔TS parity of §5 extended
+   from the wire to the words. Two things types cannot see are covered by tests
+   that scan source: that the enumerated app codes match the codes subclasses
+   actually raise (in both directions — a listed code nothing raises is dead
+   copy), and that no call site renders an error's raw message into a toast.
+
+Consequences: `src/features/errors` is the single client entry point
+(`readHandledError`, `explainHandledError`, `showErrorToast`,
+`HandledErrorAlert`, `applyHandledErrorToForm`); the automations explainer is
+deleted and Langy's builds on the shared reader while keeping its own
+card/inline/suppress renderer; `showErrorToast` absorbs the
+`isHandledByGlobalHandler` dedup that ~137 call sites were copy-pasting; and
+server-side validation errors are mapped back onto the fields that caused them
+rather than thrown into a toast the user has to translate.
+
+## Amendment 2026-07-22: a handled error's `message` is customer-safe copy
+
+The 2026-07-20 amendment said "a handled error's free-text message never crosses
+a boundary." That was true of tRPC, where the message is replaced by the code,
+and **not** true of REST, where `error-handler.ts` has always sent
+`{ error: code, message }` and published SDKs read both. Writing the rule as a
+wire guarantee taught the wrong lesson downstream: the best-practices doc went as
+far as "naming an env var or an internal service is fine and useful", on the
+premise that nothing would ever see it.
+
+The rule is inverted, and this is the durable form of it:
+
+1. **Nothing on a handled error is sensitive — that is what "handled" means.**
+   A handled error is a fact we chose to publish because the caller can act on
+   it. Its `message` is therefore **customer-safe copy, written to be read**. No
+   env vars, no internal hostnames, no service names, no driver text. Those
+   belong in the log line next to the throw, which is where the trace id ties
+   them back.
+2. **`message` is still not the app's UI copy.** It is what a consumer *without*
+   a presentation registry falls back to (CLI, SDKs, MCP, an agent reading a
+   REST body). What a customer reads in the product comes from the code-keyed
+   registry, per the 2026-07-21 amendment. One code, one authoring surface —
+   `message` is not a second copy channel to be tuned for the browser.
+3. **Degrade towards the specific.** A consumer with nothing better shows the
+   `code`. A bare slug is an ugly last resort but a precise one, and it beats a
+   generic sentence invented over the top of a failure we had already named.
+   The app can do better than the slug because it has a registry (unregistered
+   codes degrade on `fault`); a consumer without one should not pretend to.
+4. **A foreign or unrecognised error maps to the nearest known code, else
+   `unknown`.** Best effort, then the honest generic — never a fabricated
+   domain code, which promises the caller an action they do not have.
+
+No wire change: this is a rule about how `message` is *written*, and it makes
+the REST behaviour that was already shipping correct by construction rather than
+by luck.
+
 ## References
 
 - Code (TS): `packages/handled-error` (`HandledError`,
@@ -310,10 +423,15 @@ never re-widening the wire.
   `langwatch/src/server/app-layer/error-remediation.ts` (tips/docs registry),
   `langwatch/src/server/api/trpc.ts` (`handledErrorMiddleware`, `errorFormatter`),
   `langwatch/src/app/api/middleware/error-handler.ts` (`handleError`),
-  `langwatch/src/features/automations/logic/errorExplainer.ts`
-  (`readHandledError`/`explainHandledError`).
+  `langwatch/src/features/errors` — in particular
+  `logic/presentation.ts` (the code-keyed customer copy) and `logic/codes.ts`
+  (`APP_ERROR_CODES`), alongside `readHandledError`, `showErrorToast`,
+  `HandledErrorAlert` and `applyHandledErrorToForm`; `tools/herrgen` +
+  `cmd/herrgen` (Go codes → `packages/handled-error/src/codes.generated.ts`).
 - Code (Go): `pkg/herr/herr.go` (`E`, `New`), `pkg/herr/http.go`
   (`WriteHTTP`, code→status registry).
 - Related ADRs: [027](./027-typed-dispatcherror-contract.md) (typed
   `DispatchError` contract — a domain-specific precedent for this pattern).
-- Spec: `specs/features/domain-error-contract.feature`.
+- Specs: `specs/features/domain-error-contract.feature` (the boundary),
+  `specs/features/handled-error-presentation.feature` (what the customer reads),
+  `specs/ci/herr-codes-generation.feature` (Go code generation).

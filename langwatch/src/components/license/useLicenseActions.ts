@@ -1,7 +1,7 @@
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { toaster } from "../ui/toaster";
 import { getUserFriendlyLicenseError } from "../../../ee/licensing/constants";
+import { toaster } from "../ui/toaster";
 
 interface UseLicenseActionsOptions {
   organizationId: string;
@@ -25,12 +25,24 @@ export function useLicenseActions({
       window.location.reload();
     },
     onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to activate license",
-        description: getUserFriendlyLicenseError(error.message),
-        type: "error",
-      });
+      // License validation rejects with a curated, actionable message that no
+      // error code covers ("the key is invalid or has been tampered with").
+      // Keep it when we recognise it; anything else goes through the registry
+      // so an internal message never reaches the customer.
+      const friendly = getUserFriendlyLicenseError(error.message);
+      if (friendly !== error.message) {
+        toaster.create({
+          title: "Couldn't activate license",
+          // `friendly` only reaches here when `getUserFriendlyLicenseError`
+          // RECOGNISED the message and returned its own curated copy; the
+          // guard sees a message-derived value and cannot see the lookup in
+          // between.
+          description: friendly, // no-raw-error-toast-ok
+          type: "error",
+        });
+        return;
+      }
+      showErrorToast({ error, fallbackTitle: "Couldn't activate license" });
     },
   });
 
@@ -38,20 +50,15 @@ export function useLicenseActions({
     onSuccess: () => {
       toaster.create({
         title: "License removed",
-        description: "Your organization is now running without a license. Some features may be limited.",
+        description:
+          "Your organization is now running without a license. Some features may be limited.",
         type: "info",
       });
       onRemoveSuccess();
       window.location.reload();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Failed to remove license",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't remove license" }),
   });
 
   const upload = (licenseKey: string) => {

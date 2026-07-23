@@ -8,9 +8,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
-import { Mail, Send } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   MAX_TRACE_DEBOUNCE_MS,
@@ -18,28 +15,6 @@ import {
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import {
-  CLIENT_PROVIDERS,
-  type NotifyPreview,
-} from "~/features/automations/providers/registry";
-import {
-  type ConfigFormCtx,
-  isNotifyEntry,
-} from "~/features/automations/providers/types";
-import { Dialog } from "~/components/ui/dialog";
-import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
-import { useDrawer } from "~/hooks/useDrawer";
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import type { FilterParam } from "~/hooks/useFilterParams";
-import { useFilterParams } from "~/hooks/useFilterParams";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  type FilterField,
-  sanitizeTriggerFilters,
-  type TriggerFilterValue,
-} from "~/server/filters/types";
 import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
 import {
   EXAMPLE_MATCHES,
@@ -56,11 +31,37 @@ import {
   type ReportTemplateContext,
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
-import { api } from "~/utils/api";
+import { AlertType, TriggerAction, TriggerKind } from "@prisma/client";
+import { Mail, Send } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dialog } from "~/components/ui/dialog";
+import { Drawer } from "~/components/ui/drawer";
+import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
-  errorDisplayMessage,
-  isHandledByGlobalHandler,
-} from "~/utils/trpcError";
+  CLIENT_PROVIDERS,
+  type NotifyPreview,
+} from "~/features/automations/providers/registry";
+import {
+  type ConfigFormCtx,
+  isNotifyEntry,
+} from "~/features/automations/providers/types";
+import {
+  explainAnyError,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import type { FilterParam } from "~/hooks/useFilterParams";
+import { useFilterParams } from "~/hooks/useFilterParams";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  type FilterField,
+  sanitizeTriggerFilters,
+  type TriggerFilterValue,
+} from "~/server/filters/types";
+import { api } from "~/utils/api";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
@@ -80,7 +81,6 @@ import {
   subjectIsSet,
   templatesFromDraft,
 } from "./logic/draftReducer";
-import { explainHandledError, readHandledError } from "./logic/errorExplainer";
 import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
 import {
@@ -89,6 +89,34 @@ import {
   useDraft,
   useSection,
 } from "./state/selectors";
+
+/**
+ * Headlines naming the template the server rejected.
+ *
+ * An automation carries up to four Liquid templates, so "This template isn't
+ * valid" — the registry's copy for `template_validation_error`, which has no
+ * way to know which drawer this is — leaves the author opening each editor in
+ * turn to find the syntax error the description is describing. The failing
+ * field rides on the handled payload's `meta.field`; these are the words for
+ * each one.
+ */
+const TEMPLATE_FIELD_TITLES: Record<string, string> = {
+  emailSubjectTemplate: "Your email subject template isn't valid",
+  emailBodyTemplate: "Your email body template isn't valid",
+  slackTemplate: "Your Slack message template isn't valid",
+  slackTemplateType: "Your Slack message format isn't valid",
+};
+
+/**
+ * The headline for a rejected template, or nothing for any other failure —
+ * in which case the caller's normal title selection applies.
+ */
+function templateValidationTitle(error: unknown): string | undefined {
+  const handled = readHandledError(error);
+  if (handled?.code !== "template_validation_error") return undefined;
+
+  return TEMPLATE_FIELD_TITLES[String(handled.meta.field ?? "")];
+}
 
 /** Facet-ordered "why can't I save yet" copy: Name → Type → Subject →
  *  Cadence → Severity → Delivery. Type is always chosen (the source defaults
@@ -778,22 +806,29 @@ export function AutomationDrawer({
           });
         },
         onError: (err) => {
-          const domain = readHandledError(err);
-          const { title, description } = domain
-            ? explainHandledError(domain)
-            : { title: "Test fire failed", description: errorDisplayMessage(err) };
+          // The attempt log is the persistent record of what the toast just
+          // said, so it has to say the same thing — same title selection as
+          // `showErrorToast`: registered copy names the actual failure and
+          // wins, anything else takes the generic headline for the action.
+          // A rejected template beats both, because it names which of the
+          // four editors to open.
+          const explanation = explainAnyError(err);
+          const templateTitle = templateValidationTitle(err);
           pushAttempt({
             at: Date.now(),
             channel,
             status: "failure",
-            errorTitle: title,
-            errorDetail: description || errorDisplayMessage(err),
+            errorTitle:
+              templateTitle ??
+              (explanation.isRegistered
+                ? explanation.title
+                : "Test fire failed"),
+            errorDetail: explanation.description,
           });
-          toaster.create({
-            title,
-            type: "error",
-            description: description || errorDisplayMessage(err),
-            meta: { closable: true },
+          showErrorToast({
+            error: err,
+            title: templateTitle,
+            fallbackTitle: "Test fire failed",
           });
         },
       },
@@ -861,22 +896,14 @@ export function AutomationDrawer({
           void queryClient.graphs.getById.invalidate();
           closeDrawer();
         },
-        onError: (err) => {
-          if (isHandledByGlobalHandler(err)) return;
-          const domain = readHandledError(err);
-          const { title, description } = domain
-            ? explainHandledError(domain)
-            : {
-                title: "Could not save automation",
-                description: errorDisplayMessage(err),
-              };
-          toaster.create({
-            title,
-            type: "error",
-            description: description || errorDisplayMessage(err),
-            meta: { closable: true },
-          });
-        },
+        // Save validates the same four templates, so it names the offending
+        // one too — see `templateValidationTitle`.
+        onError: (err) =>
+          showErrorToast({
+            error: err,
+            title: templateValidationTitle(err),
+            fallbackTitle: "Couldn't save automation",
+          }),
       },
     );
   }, [

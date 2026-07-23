@@ -29,6 +29,7 @@ import {
 import { FileText, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { HandledErrorAlert } from "~/features/errors";
 import { api } from "~/utils/api";
 
 interface OttlEditorProps {
@@ -41,12 +42,30 @@ interface OttlEditorProps {
   enabled: boolean;
 }
 
+/**
+ * What we know about a statement, which is three things and not two.
+ *
+ * `unknown` is the one that was missing. When the gateway can't be reached
+ * the check never ran, and a two-state model has nowhere to put that — so it
+ * was recorded as `ok`, painting a green dot on every line and telling the
+ * admin their statements had been validated. A dot that means "we didn't
+ * look" has to look different from one that means "this is fine".
+ */
+type StatementValidity = "valid" | "invalid" | "unknown";
+
 interface PerStatementStatus {
-  ok: boolean;
+  validity: StatementValidity;
   message: string | null;
 }
 
 const VALIDATE_DEBOUNCE_MS = 600;
+
+/** Shared because they are immutable and never rendered per-index. */
+const UNKNOWN_STATUS: PerStatementStatus = {
+  validity: "unknown",
+  message: null,
+};
+const VALID_STATUS: PerStatementStatus = { validity: "valid", message: null };
 
 export function OttlEditor({
   organizationId,
@@ -59,6 +78,8 @@ export function OttlEditor({
     PerStatementStatus[]
   >([]);
   const [validating, setValidating] = useState(false);
+  /** The failure that stopped validation running at all, if any. */
+  const [validationError, setValidationError] = useState<unknown>(null);
 
   const starterQuery = api.ingestionSources.ottlStarter.useQuery(
     { organizationId, sourceType },
@@ -76,7 +97,8 @@ export function OttlEditor({
     async (next: string[]) => {
       const nonEmpty = next.filter((s) => s.trim().length > 0);
       if (nonEmpty.length === 0) {
-        setValidationStatus(next.map(() => ({ ok: true, message: null })));
+        setValidationError(null);
+        setValidationStatus(next.map(() => UNKNOWN_STATUS));
         return;
       }
       setValidating(true);
@@ -85,8 +107,9 @@ export function OttlEditor({
           organizationId,
           statements: next,
         });
+        setValidationError(null);
         if (result.ok) {
-          setValidationStatus(next.map(() => ({ ok: true, message: null })));
+          setValidationStatus(next.map(() => VALID_STATUS));
         } else {
           const errsByIdx = new Map<number, string>();
           for (const err of result.errors) {
@@ -95,24 +118,19 @@ export function OttlEditor({
             errsByIdx.set(err.statementIndex, `${err.message}${where}`);
           }
           setValidationStatus(
-            next.map((_, idx) => {
+            next.map((_, idx): PerStatementStatus => {
               const msg = errsByIdx.get(idx);
-              return msg
-                ? { ok: false, message: msg }
-                : { ok: true, message: null };
+              return msg ? { validity: "invalid", message: msg } : VALID_STATUS;
             }),
           );
         }
       } catch (err) {
-        // Validation infra error (gateway unreachable in a way the
-        // client didn't soft-handle, network blip). Surface a single
-        // banner-style message; don't block save.
-        setValidationStatus(
-          next.map(() => ({
-            ok: true,
-            message: `Validation unavailable: ${(err as Error).message}`,
-          })),
-        );
+        // The check didn't run — the gateway is unreachable, or the request
+        // failed on the way there. Don't block save, but don't claim a
+        // result either: every statement goes back to `unknown` (neutral
+        // dot, no green) and the reason renders once, above the list.
+        setValidationError(err);
+        setValidationStatus(next.map(() => UNKNOWN_STATUS));
       } finally {
         setValidating(false);
       }
@@ -173,8 +191,8 @@ export function OttlEditor({
           </Text>
           <Text fontSize="xs" color="fg.muted">
             Each line maps an upstream OTLP attribute onto the canonical{" "}
-            <code>langwatch.*</code> namespace. The aigateway evaluates
-            them in order via embedded <code>pkg/ottl</code>.
+            <code>langwatch.*</code> namespace. The aigateway evaluates them in
+            order via embedded <code>pkg/ottl</code>.
           </Text>
         </VStack>
         <Spacer />
@@ -203,8 +221,8 @@ export function OttlEditor({
                 Template available for this source type
               </Text>
               <Text fontSize="xs" color="fg.muted">
-                Loads the canonical extraction statements maintained by LangWatch.
-                You can customize them after loading.
+                Loads the canonical extraction statements maintained by
+                LangWatch. You can customize them after loading.
               </Text>
             </VStack>
             <Button size="sm" colorPalette="orange" onClick={useTemplate}>
@@ -214,6 +232,13 @@ export function OttlEditor({
         </Box>
       )}
 
+      {/* Why the dots went neutral. Rendered once for the whole editor
+          because the failure belongs to the check, not to any one line. */}
+      <HandledErrorAlert
+        error={validationError}
+        fallbackTitle="Couldn't check these statements"
+      />
+
       <VStack align="stretch" gap={1}>
         {isEmpty && !hasStarter && (
           <Text fontSize="xs" color="fg.muted" fontStyle="italic">
@@ -222,7 +247,8 @@ export function OttlEditor({
         )}
         {statements.map((stmt, idx) => {
           const status = validationStatus[idx];
-          const showError = status && !status.ok && stmt.trim().length > 0;
+          const isWritten = stmt.trim().length > 0;
+          const showError = status?.validity === "invalid" && isWritten;
           return (
             <Box key={idx}>
               <HStack alignItems="start" gap={2}>
@@ -231,12 +257,16 @@ export function OttlEditor({
                   height="6px"
                   borderRadius="full"
                   marginTop={3}
+                  // Green is a positive claim — "the gateway parsed this" —
+                  // so it needs a `valid` verdict to earn it. A blank line,
+                  // a check that hasn't run yet, and a check that couldn't
+                  // run all stay neutral.
                   backgroundColor={
-                    !stmt.trim()
-                      ? "border.muted"
-                      : showError
-                        ? "red.500"
-                        : "green.400"
+                    showError
+                      ? "red.500"
+                      : isWritten && status?.validity === "valid"
+                        ? "green.400"
+                        : "border.muted"
                   }
                   flexShrink={0}
                 />

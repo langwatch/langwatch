@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   LOCAL_GATEWAY_URL,
-  SAAS_GATEWAY_URL,
   resolveGatewayBaseUrl,
+  SAAS_GATEWAY_URL,
 } from "../gatewayUrl";
 
 describe("resolveGatewayBaseUrl", () => {

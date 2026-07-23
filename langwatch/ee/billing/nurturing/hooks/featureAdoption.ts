@@ -24,9 +24,13 @@ export function fireTeamMemberInvitedNurturing({
     .catch(captureException);
 
   void nurturing
-    .trackEvent({ userId, event: "team_member_invited", properties: {
-      role,
-    }})
+    .trackEvent({
+      userId,
+      event: "team_member_invited",
+      properties: {
+        role,
+      },
+    })
     .catch(captureException);
 }
 
@@ -55,10 +59,14 @@ export function fireWorkflowCreatedNurturing({
     .catch(captureException);
 
   void nurturing
-    .trackEvent({ userId, event: "workflow_created", properties: {
-      workflow_id: workflowId,
-      project_id: projectId,
-    }})
+    .trackEvent({
+      userId,
+      event: "workflow_created",
+      properties: {
+        workflow_id: workflowId,
+        project_id: projectId,
+      },
+    })
     .catch(captureException);
 }
 
@@ -87,10 +95,14 @@ export function fireScenarioCreatedNurturing({
     .catch(captureException);
 
   void nurturing
-    .trackEvent({ userId, event: "scenario_created", properties: {
-      scenario_id: scenarioId,
-      project_id: projectId,
-    }})
+    .trackEvent({
+      userId,
+      event: "scenario_created",
+      properties: {
+        scenario_id: scenarioId,
+        project_id: projectId,
+      },
+    })
     .catch(captureException);
 }
 
@@ -112,9 +124,13 @@ export function fireExperimentRanNurturing({
   if (!nurturing) return;
 
   void nurturing
-    .trackEvent({ userId, event: "experiment_ran", properties: {
-      experiment_id: experimentId,
-      project_id: projectId,
-    }})
+    .trackEvent({
+      userId,
+      event: "experiment_ran",
+      properties: {
+        experiment_id: experimentId,
+        project_id: projectId,
+      },
+    })
     .catch(captureException);
 }

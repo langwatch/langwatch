@@ -13,6 +13,7 @@ import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -55,9 +56,21 @@ const SCOPE_TYPE_ITEMS = [
 const scopeTypeCollection = createListCollection({ items: SCOPE_TYPE_ITEMS });
 
 const BASE_ROLE_ITEMS = [
-  { label: "Admin", value: "ADMIN", customRoleId: undefined as string | undefined },
-  { label: "Member", value: "MEMBER", customRoleId: undefined as string | undefined },
-  { label: "Viewer", value: "VIEWER", customRoleId: undefined as string | undefined },
+  {
+    label: "Admin",
+    value: "ADMIN",
+    customRoleId: undefined as string | undefined,
+  },
+  {
+    label: "Member",
+    value: "MEMBER",
+    customRoleId: undefined as string | undefined,
+  },
+  {
+    label: "Viewer",
+    value: "VIEWER",
+    customRoleId: undefined as string | undefined,
+  },
 ];
 
 // ── BindingInputRow ───────────────────────────────────────────────────────────
@@ -75,16 +88,18 @@ export const BindingInputRow = forwardRef<
     buttonLabel?: string;
     isPending?: boolean;
   }
->(function BindingInputRow({
-  organizationId,
-  onAdd,
-  buttonLabel = "Add",
-  isPending = false,
-}, ref) {
-  const [scopeType, setScopeType] = useState<RoleBindingScopeType>(RoleBindingScopeType.TEAM);
+>(function BindingInputRow(
+  { organizationId, onAdd, buttonLabel = "Add", isPending = false },
+  ref,
+) {
+  const [scopeType, setScopeType] = useState<RoleBindingScopeType>(
+    RoleBindingScopeType.TEAM,
+  );
   const [scopeId, setScopeId] = useState("");
   const [roleValue, setRoleValue] = useState("MEMBER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
+  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
+    undefined,
+  );
   const [teamSearch, setTeamSearch] = useState("");
   const [projectTeamId, setProjectTeamId] = useState("");
   const [projectTeamSearch, setProjectTeamSearch] = useState("");
@@ -96,60 +111,87 @@ export const BindingInputRow = forwardRef<
   const teams = api.team.getTeamsWithMembers.useQuery({ organizationId });
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  const roleItems = useMemo(() => [
-    ...BASE_ROLE_ITEMS,
-    ...(customRoles.data ?? []).map((r) => ({
-      label: r.name,
-      value: `CUSTOM:${r.id}`,
-      customRoleId: r.id,
-    })),
-  ], [customRoles.data]);
-  const roleCollection = useMemo(() => createListCollection({ items: roleItems }), [roleItems]);
+  const roleItems = useMemo(
+    () => [
+      ...BASE_ROLE_ITEMS,
+      ...(customRoles.data ?? []).map((r) => ({
+        label: r.name,
+        value: `CUSTOM:${r.id}`,
+        customRoleId: r.id,
+      })),
+    ],
+    [customRoles.data],
+  );
+  const roleCollection = useMemo(
+    () => createListCollection({ items: roleItems }),
+    [roleItems],
+  );
 
   const allTeamItems = useMemo(
     () => (teams.data ?? []).map((t) => ({ label: t.name, value: t.id })),
     [teams.data],
   );
   const teamItems = useMemo(
-    () => teamSearch
-      ? allTeamItems.filter((t) => t.label.toLowerCase().includes(teamSearch.toLowerCase()))
-      : allTeamItems,
+    () =>
+      teamSearch
+        ? allTeamItems.filter((t) =>
+            t.label.toLowerCase().includes(teamSearch.toLowerCase()),
+          )
+        : allTeamItems,
     [allTeamItems, teamSearch],
   );
-  const teamCollection = useMemo(() => createListCollection({ items: teamItems }), [teamItems]);
+  const teamCollection = useMemo(
+    () => createListCollection({ items: teamItems }),
+    [teamItems],
+  );
 
   // For project cascade: teams that have at least one project
   const allProjectTeamItems = useMemo(
-    () => (teams.data ?? [])
-      .filter((t) => t.projects.length > 0)
-      .map((t) => ({ label: t.name, value: t.id })),
+    () =>
+      (teams.data ?? [])
+        .filter((t) => t.projects.length > 0)
+        .map((t) => ({ label: t.name, value: t.id })),
     [teams.data],
   );
   const projectTeamItems = useMemo(
-    () => projectTeamSearch
-      ? allProjectTeamItems.filter((t) => t.label.toLowerCase().includes(projectTeamSearch.toLowerCase()))
-      : allProjectTeamItems,
+    () =>
+      projectTeamSearch
+        ? allProjectTeamItems.filter((t) =>
+            t.label.toLowerCase().includes(projectTeamSearch.toLowerCase()),
+          )
+        : allProjectTeamItems,
     [allProjectTeamItems, projectTeamSearch],
   );
-  const projectTeamCollection = useMemo(() => createListCollection({ items: projectTeamItems }), [projectTeamItems]);
+  const projectTeamCollection = useMemo(
+    () => createListCollection({ items: projectTeamItems }),
+    [projectTeamItems],
+  );
 
   // Projects filtered to the selected team
   const allProjectItems = useMemo(
-    () => (teams.data ?? [])
-      .find((t) => t.id === projectTeamId)
-      ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [],
+    () =>
+      (teams.data ?? [])
+        .find((t) => t.id === projectTeamId)
+        ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [],
     [teams.data, projectTeamId],
   );
   const projectItems = useMemo(
-    () => projectSearch
-      ? allProjectItems.filter((p) => p.label.toLowerCase().includes(projectSearch.toLowerCase()))
-      : allProjectItems,
+    () =>
+      projectSearch
+        ? allProjectItems.filter((p) =>
+            p.label.toLowerCase().includes(projectSearch.toLowerCase()),
+          )
+        : allProjectItems,
     [allProjectItems, projectSearch],
   );
-  const projectCollection = useMemo(() => createListCollection({ items: projectItems }), [projectItems]);
+  const projectCollection = useMemo(
+    () => createListCollection({ items: projectItems }),
+    [projectItems],
+  );
 
   function getScopeName() {
-    if (scopeType === RoleBindingScopeType.ORGANIZATION) return organization?.name ?? "Organization";
+    if (scopeType === RoleBindingScopeType.ORGANIZATION)
+      return organization?.name ?? "Organization";
     if (scopeType === RoleBindingScopeType.TEAM)
       return allTeamItems.find((t) => t.value === scopeId)?.label;
     if (scopeType === RoleBindingScopeType.PROJECT)
@@ -158,18 +200,24 @@ export const BindingInputRow = forwardRef<
   }
 
   const isReady =
-    isDirty && (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
+    isDirty &&
+    (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
 
   function buildBinding(): PendingBinding {
     const cid = customRoleId;
-    const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
+    const cname = cid
+      ? customRoles.data?.find((r) => r.id === cid)?.name
+      : undefined;
     return {
       roleValue,
       role: cid ? "CUSTOM" : roleValue,
       customRoleId: cid,
       customRoleName: cname,
       scopeType,
-      scopeId: scopeType === RoleBindingScopeType.ORGANIZATION ? organizationId : scopeId,
+      scopeId:
+        scopeType === RoleBindingScopeType.ORGANIZATION
+          ? organizationId
+          : scopeId,
       scopeName: getScopeName(),
     };
   }
@@ -215,21 +263,29 @@ export const BindingInputRow = forwardRef<
         size="sm"
         width="160px"
       >
-        <Select.Trigger><Select.ValueText placeholder="Role..." /></Select.Trigger>
+        <Select.Trigger>
+          <Select.ValueText placeholder="Role..." />
+        </Select.Trigger>
         <Select.Content>
           {roleItems.map((item) => (
-            <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+            <Select.Item key={item.value} item={item}>
+              {item.label}
+            </Select.Item>
           ))}
         </Select.Content>
       </Select.Root>
 
-      <Text fontSize="sm" color="fg.muted">on</Text>
+      <Text fontSize="sm" color="fg.muted">
+        on
+      </Text>
 
       <Select.Root
         collection={scopeTypeCollection}
         value={[scopeType]}
         onValueChange={(e) => {
-          setScopeType((e.value[0] as RoleBindingScopeType) ?? RoleBindingScopeType.TEAM);
+          setScopeType(
+            (e.value[0] as RoleBindingScopeType) ?? RoleBindingScopeType.TEAM,
+          );
           setScopeId("");
           setTeamSearch("");
           setProjectTeamId("");
@@ -240,10 +296,14 @@ export const BindingInputRow = forwardRef<
         size="sm"
         width="130px"
       >
-        <Select.Trigger><Select.ValueText /></Select.Trigger>
+        <Select.Trigger>
+          <Select.ValueText />
+        </Select.Trigger>
         <Select.Content>
           {SCOPE_TYPE_ITEMS.map((item) => (
-            <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+            <Select.Item key={item.value} item={item}>
+              {item.label}
+            </Select.Item>
           ))}
         </Select.Content>
       </Select.Root>
@@ -252,14 +312,23 @@ export const BindingInputRow = forwardRef<
         <Select.Root
           collection={teamCollection}
           value={scopeId ? [scopeId] : []}
-          onValueChange={(e) => { setScopeId(e.value[0] ?? ""); setIsDirty(true); }}
+          onValueChange={(e) => {
+            setScopeId(e.value[0] ?? "");
+            setIsDirty(true);
+          }}
           size="sm"
           width="160px"
         >
-          <Select.Trigger><Select.ValueText placeholder="Select team..." /></Select.Trigger>
+          <Select.Trigger>
+            <Select.ValueText placeholder="Select team..." />
+          </Select.Trigger>
           <Select.Content>
             <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-              <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
+              <InputGroup
+                startElement={<Search size={14} />}
+                startOffset="2px"
+                width="full"
+              >
                 <Input
                   size="sm"
                   placeholder="Search teams..."
@@ -270,14 +339,18 @@ export const BindingInputRow = forwardRef<
               </InputGroup>
             </Box>
             {teamItems.map((item) => (
-              <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+              <Select.Item key={item.value} item={item}>
+                {item.label}
+              </Select.Item>
             ))}
           </Select.Content>
         </Select.Root>
       )}
 
       {scopeType === RoleBindingScopeType.ORGANIZATION && (
-        <Text fontSize="sm" color="fg.muted" minWidth="160px">(whole organization)</Text>
+        <Text fontSize="sm" color="fg.muted" minWidth="160px">
+          (whole organization)
+        </Text>
       )}
 
       {scopeType === RoleBindingScopeType.PROJECT && (
@@ -293,10 +366,16 @@ export const BindingInputRow = forwardRef<
             size="sm"
             width="160px"
           >
-            <Select.Trigger><Select.ValueText placeholder="Select team..." /></Select.Trigger>
+            <Select.Trigger>
+              <Select.ValueText placeholder="Select team..." />
+            </Select.Trigger>
             <Select.Content>
               <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-                <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
+                <InputGroup
+                  startElement={<Search size={14} />}
+                  startOffset="2px"
+                  width="full"
+                >
                   <Input
                     size="sm"
                     placeholder="Search teams..."
@@ -307,7 +386,9 @@ export const BindingInputRow = forwardRef<
                 </InputGroup>
               </Box>
               {projectTeamItems.map((item) => (
-                <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+                <Select.Item key={item.value} item={item}>
+                  {item.label}
+                </Select.Item>
               ))}
             </Select.Content>
           </Select.Root>
@@ -316,14 +397,23 @@ export const BindingInputRow = forwardRef<
             <Select.Root
               collection={projectCollection}
               value={scopeId ? [scopeId] : []}
-              onValueChange={(e) => { setScopeId(e.value[0] ?? ""); setIsDirty(true); }}
+              onValueChange={(e) => {
+                setScopeId(e.value[0] ?? "");
+                setIsDirty(true);
+              }}
               size="sm"
               width="160px"
             >
-              <Select.Trigger><Select.ValueText placeholder="Select project..." /></Select.Trigger>
+              <Select.Trigger>
+                <Select.ValueText placeholder="Select project..." />
+              </Select.Trigger>
               <Select.Content>
                 <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-                  <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
+                  <InputGroup
+                    startElement={<Search size={14} />}
+                    startOffset="2px"
+                    width="full"
+                  >
                     <Input
                       size="sm"
                       placeholder="Search projects..."
@@ -334,7 +424,9 @@ export const BindingInputRow = forwardRef<
                   </InputGroup>
                 </Box>
                 {projectItems.map((item) => (
-                  <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
                 ))}
               </Select.Content>
             </Select.Root>
@@ -371,7 +463,8 @@ export function AddBindingForm({
       toaster.create({ title: "Binding added", type: "success" });
       onAdded();
     },
-    onError: (e) => toaster.create({ title: e.message, type: "error" }),
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't add the binding" }),
   });
 
   return (

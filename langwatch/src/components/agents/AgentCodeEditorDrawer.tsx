@@ -23,13 +23,13 @@ import {
   ScenarioInputMappingSection,
 } from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
-import { toaster } from "~/components/ui/toaster";
 import {
   type AvailableSource,
   type FieldMapping,
   type Variable,
   VariablesSection,
 } from "~/components/variables";
+import { showErrorToast } from "~/features/errors";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -44,8 +44,8 @@ import type {
   Field as DSLField,
 } from "~/optimization_studio/types/dsl";
 import {
-  DEFAULT_CODE,
   buildCodeConfig,
+  DEFAULT_CODE,
   getCodeFromConfig,
 } from "~/optimization_studio/utils/codeAgentConfig";
 import type {
@@ -54,7 +54,6 @@ import type {
 } from "~/server/agents/agent.repository";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 const DEFAULT_INPUTS: DSLField[] = [{ identifier: "input", type: "str" }];
 const DEFAULT_OUTPUTS: DSLField[] = [{ identifier: "output", type: "str" }];
@@ -200,14 +199,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
       onSave?.(agent);
       onClose();
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating agent",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
 
   const updateMutation = api.agents.update.useMutation({

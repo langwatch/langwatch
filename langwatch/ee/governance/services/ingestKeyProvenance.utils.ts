@@ -48,7 +48,8 @@ export const PROVENANCE_ATTR_TEMPLATE_ID = "langwatch.template.id" as const;
  * Receiver-stamped marker: "true" when the trace's LLM usage is bundled into a
  * subscription (not billed per token). Read by the trace summary / cost split.
  */
-export const PROVENANCE_ATTR_NON_BILLABLE = "langwatch.cost.non_billable" as const;
+export const PROVENANCE_ATTR_NON_BILLABLE =
+  "langwatch.cost.non_billable" as const;
 
 /**
  * Trace origin stamped on ingest-key traces, derived from the key's
@@ -157,13 +158,22 @@ function buildProvenanceAttributes(
   provenance: IngestKeyProvenance,
 ): OtlpAttribute[] {
   const attrs: OtlpAttribute[] = [
-    { key: PROVENANCE_ATTR_SOURCE, value: { stringValue: provenance.sourceType } },
-    { key: PROVENANCE_ATTR_API_KEY_ID, value: { stringValue: provenance.apiKeyId } },
+    {
+      key: PROVENANCE_ATTR_SOURCE,
+      value: { stringValue: provenance.sourceType },
+    },
+    {
+      key: PROVENANCE_ATTR_API_KEY_ID,
+      value: { stringValue: provenance.apiKeyId },
+    },
     {
       key: PROVENANCE_ATTR_ORIGIN,
       value: { stringValue: originForIngestSourceType(provenance.sourceType) },
     },
-    { key: PROVENANCE_ATTR_ORGANIZATION_ID, value: { stringValue: provenance.organizationId } },
+    {
+      key: PROVENANCE_ATTR_ORGANIZATION_ID,
+      value: { stringValue: provenance.organizationId },
+    },
   ];
   if (provenance.templateId) {
     attrs.push({

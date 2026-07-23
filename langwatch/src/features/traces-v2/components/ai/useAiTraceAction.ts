@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { explainAnyError } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { api } from "~/utils/api";
@@ -109,11 +110,21 @@ export function useAiTraceAction({
     },
     onError: (e) => {
       if (cancelledRef.current) return;
-      // tRPC-layer failures (network blip, ModelNotConfiguredError, etc.)
-      // arrive here with a string message. Wrap them in the same
-      // structured shape the server returns for handled failures so the
-      // composer renders a single error path.
-      setError({ code: "unknown", message: e.message });
+      // tRPC-layer failures (network blip, ModelNotConfiguredError, a
+      // permission rejection) arrive here without the server's structured
+      // `AiActionError`, and their wire message is the error code — so the
+      // words come from `explainAnyError`, which covers all three shapes.
+      // Reading only the handled payload dropped the middle one: `aiAction`
+      // is permission-guarded and throws a cause-free `TRPCError` whose
+      // message is copy meant to be read, and it was being replaced with
+      // "we've been notified".
+      const explanation = explainAnyError(e);
+      setError({
+        code: "unknown",
+        message: explanation.description
+          ? `${explanation.title}. ${explanation.description}`
+          : explanation.title,
+      });
     },
   });
 
