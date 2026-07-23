@@ -18,11 +18,11 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { IconType } from "react-icons";
 import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 import { SERIF } from "~/features/asaplangy";
-import { LangyMark } from "~/features/langy/components/LangyMark";
 import { getIsMac } from "~/features/command-bar/utils/platform";
+import { LangyMark } from "~/features/langy/components/LangyMark";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useRouter } from "~/utils/compat/next-router";
 import { useColorModeValue } from "../ui/color-mode";
 import { Tooltip } from "../ui/tooltip";
@@ -41,17 +41,17 @@ const LANTERN_COLORS_DARK = ["#a8480d", "#f56b1a", "#5b41c2"];
  * The Langy mark as the homebar announcement's identity — its own instance,
  * deliberately NOT the panel's.
  *
- * Different colour: the site's violet brand ramp, not the panel's
- * orange→purple AI gradient, so the homebar reads as the site announcing
- * Langy rather than the panel leaking into the page. Own paint-server id for
- * the same reason the launcher has one — duplicate SVG gradient ids resolve
- * to whichever comes first in the DOM.
+ * Same grey as every other slide's glyph: in the ticker each announcement's
+ * icon is quiet identification, not branding, and one coloured mark in the
+ * row would outrank the words beside it. The mark's shape says Langy; the
+ * paint stays the row's. Own paint-server id for the same reason the
+ * launcher has one — duplicate SVG gradient ids resolve to whichever comes
+ * first in the DOM.
  *
  * Same footprint as every other slide's glyph — 14px, bare. The mark's
  * wireframe reads softer this small, but a bigger tile made the banner row
  * change height whenever this slide was the active one, and a row that
- * breathes per-slide costs more than a crisper mark buys. The violet
- * gradient stays: that is what says Langy at any size.
+ * breathes per-slide costs more than a crisper mark buys.
  */
 const LANGY_HOMEBAR_MARK_GRADIENT_ID = "langy-homebar-mark-grad";
 
@@ -72,8 +72,8 @@ function LangyHomebarMark() {
             x2="100%"
             y2="0%"
           >
-            <stop offset="0%" stopColor="#5b41c2" />
-            <stop offset="100%" stopColor="#8a76de" />
+            <stop offset="0%" stopColor="var(--chakra-colors-fg-muted)" />
+            <stop offset="100%" stopColor="var(--chakra-colors-fg-muted)" />
           </linearGradient>
         </defs>
       </svg>
@@ -503,8 +503,12 @@ export function HomePageBanners({
 
     // Ease the advance speed toward its target (0 while hovered / reduced /
     // single-slide, 1 otherwise) so hovering slows to a stop, not a cut.
+    // The lantern's ticker is the exception: its segment fill IS the
+    // countdown, and a bar that freezes under the pointer (or right after
+    // picking a slide, while the pointer is still on the control) reads as
+    // stuck rather than polite. There the rotation simply keeps running.
     const wantMoving =
-      !hoveredRef.current &&
+      (variant === "lantern" || !hoveredRef.current) &&
       !reduceMotionRef.current &&
       eligibleLenRef.current > 1;
     const targetSpeed = wantMoving ? 1 : 0;
@@ -650,11 +654,35 @@ export function HomePageBanners({
           )}
         </Box>
 
+        {/* Light mode only: a white bloom over the ground's middle. On a
+            pale page the mesh's colours behind the greeting and the field
+            read as smudge rather than light, so this keeps that zone clean.
+            An ellipse rather than a band on purpose: the colour still leaks
+            past its left and right edges, so the ground reads as light the
+            content stands in front of rather than a curtain dropped over
+            it. Dark keeps the full field: the same colours read as depth
+            there. Covers the ground's own bleed box so it tracks exactly.
+            Anything of the page's own chrome the bleed reaches (the demo
+            row above the hero) stacks itself above this — the order is
+            colour, then bloom, then every element. */}
+        <Box
+          aria-hidden
+          position="absolute"
+          insetInline={{ base: "-8%", md: "-14%" }}
+          insetBlock={{ base: "-30%", md: "-45%" }}
+          pointerEvents="none"
+          display={{ base: "block", _dark: "none" }}
+          background="radial-gradient(62% 64% at 50% 28%, var(--chakra-colors-bg) 0%, var(--chakra-colors-bg) 52%, transparent 78%)"
+        />
+
         <VStack
           position="relative"
           zIndex={1}
           align="center"
-          gap={5}
+          /* Wider than the hero's own rhythm on purpose: the ticker is an
+             aside, not the next line of the block above it, and the pause
+             before it is what says so. */
+          gap={9}
           paddingX={{ base: 4, md: 5 }}
           paddingY={{ base: 8, md: 12 }}
         >
@@ -711,11 +739,11 @@ export function HomePageBanners({
                   {slide.badge ? (
                     <chakra.span
                       flexShrink={0}
-                      fontFamily="mono"
-                      fontSize="10px"
-                      letterSpacing="0.1em"
-                      textTransform="uppercase"
-                      color="orange.fg"
+                      fontSize="11px"
+                      fontWeight="600"
+                      /* A step deeper than orange.fg on light: over the white
+                         bloom the default reads brownish; dark keeps it. */
+                      color={{ base: "orange.700", _dark: "orange.fg" }}
                     >
                       {slide.badge}
                     </chakra.span>
@@ -797,11 +825,24 @@ export function HomePageBanners({
                           // control — steps to get through — which is the wrong
                           // promise for pagination. A hairline at low alpha
                           // recedes to being punctuation: seen when you look at
-                          // it, never competing with the sentence above.
+                          // it, never competing with the sentence above. Only
+                          // the ACTIVE segment darkens — position, not history;
+                          // shading the already-shown ones read as a checklist.
                           background={
-                            i < active ? "fg.muted/40" : "fg.muted/15"
+                            i === active ? "fg.muted/40" : "fg.muted/15"
                           }
                           transition="background 200ms ease"
+                          /* The fill's accent, resolved per colour mode here
+                             because the motion.div below takes a raw style
+                             object that cannot carry Chakra conditionals. */
+                          css={{
+                            "--ticker-accent":
+                              "var(--chakra-colors-orange-700)",
+                            _dark: {
+                              "--ticker-accent":
+                                "var(--chakra-colors-orange-fg)",
+                            },
+                          }}
                         >
                           {i === active ? (
                             <motion.div
@@ -811,7 +852,7 @@ export function HomePageBanners({
                                 // exactly twice — the word, and the segment it
                                 // belongs to — is what ties the two rows into
                                 // one object rather than a line and a widget.
-                                background: "var(--chakra-colors-orange-fg)",
+                                background: "var(--ticker-accent)",
                                 scaleX: progress,
                                 transformOrigin: "left",
                               }}

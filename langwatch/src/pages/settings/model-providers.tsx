@@ -111,14 +111,33 @@ export default function ModelsPage() {
   // The prior behavior of hiding already-configured providers prevented
   // the very multi-instance flow the scope picker exists to support.
   const addableProviders = useMemo(() => {
-    return Object.keys(modelProvidersRegistry).map((providerKey) => ({
-      provider: providerKey as keyof typeof modelProvidersRegistry,
-      name:
-        modelProvidersRegistry[
-          providerKey as keyof typeof modelProvidersRegistry
-        ]?.name ?? providerKey,
-      icon: modelProviderIcons[providerKey as keyof typeof modelProviderIcons],
-    }));
+    return Object.keys(modelProvidersRegistry)
+      .map((providerKey) => ({
+        provider: providerKey as keyof typeof modelProvidersRegistry,
+        name:
+          modelProvidersRegistry[
+            providerKey as keyof typeof modelProvidersRegistry
+          ]?.name ?? providerKey,
+        icon: modelProviderIcons[
+          providerKey as keyof typeof modelProviderIcons
+        ],
+        // Sign-in providers (Codex) are a niche, subscription-billed harness,
+        // not a general API-key provider — so they sort to the bottom of the
+        // add menu here. On Langy / onboarding the surface-aware grid promotes
+        // them to the top instead (see providersForSurface). The registry keeps
+        // literal entry types via `satisfies`, so widen to read the optional
+        // authFlow — same pattern as ModelProviderForm's isOAuthDeviceProvider.
+        authFlow: (
+          modelProvidersRegistry[
+            providerKey as keyof typeof modelProvidersRegistry
+          ] as { authFlow?: "api-key" | "oauth-device" } | undefined
+        )?.authFlow,
+      }))
+      .sort((a, b) => {
+        const aDevice = a.authFlow === "oauth-device" ? 1 : 0;
+        const bDevice = b.authFlow === "oauth-device" ? 1 : 0;
+        return aDevice - bDevice;
+      });
   }, []);
 
   const utils = api.useContext();

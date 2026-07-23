@@ -165,7 +165,7 @@ import "../langyTheme.css";
 // composer's model picker with whatever's actually resolving today — opening
 // Langy on a project that already has a configured default model lands on
 // THAT model, not on an unrelated branch-primary pick.
-const LANGY_GATE_FEATURE_KEY = "prompt.create_default";
+const LANGY_GATE_FEATURE_KEY = "langy.chat";
 
 // The floating card's symmetric viewport inset: a rounded card with a small,
 // SYMMETRIC inset on every side (a soft brand glow + shadow behind it).
@@ -1383,7 +1383,16 @@ function LangyPanel({
     recovery.reset();
   };
 
+  // "Sign in to Codex" from the session-expired card: the message column swaps
+  // to the inline model setup landed on codex, and completing it (the re-auth)
+  // re-drives the failed turn. Declared here so every escape hatch below
+  // (new chat, close, switching the composer model) can clear it — otherwise a
+  // user who takes the plan-limit card's "pick another model" suggestion sends
+  // successfully but the reply renders behind a stuck setup screen.
+  const [reconnectCodex, setReconnectCodex] = useState(false);
+
   const handleNewChat = () => {
+    setReconnectCodex(false);
     resetChatEngine({ clearMessages: true });
     startNewConversation();
     // Starting a chat means you want the chat, not the filing cabinet.
@@ -1561,7 +1570,9 @@ function LangyPanel({
   // re-drives the last TURN, and nothing about a failed history read means a
   // turn should run. Re-reading is the whole remedy.
   const onHistoryErrorAction = useCallback(
-    (kind: "connect-github" | "configure-model" | "retry") => {
+    (
+      kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry",
+    ) => {
       if (kind !== "retry") return;
       void refetchHistory();
     },
@@ -1569,7 +1580,13 @@ function LangyPanel({
   );
 
   const onErrorAction = useCallback(
-    (kind: "connect-github" | "configure-model" | "retry") => {
+    (
+      kind: "connect-github" | "configure-model" | "reconnect-codex" | "retry",
+    ) => {
+      if (kind === "reconnect-codex") {
+        setReconnectCodex(true);
+        return;
+      }
       if (kind !== "retry") return;
       retryTurn();
     },
@@ -2206,7 +2223,10 @@ function LangyPanel({
           <PanelHeader
             conversationTitle={conversationTitle}
             onNewChat={handleNewChat}
-            onClose={closePanel}
+            onClose={() => {
+              setReconnectCodex(false);
+              closePanel();
+            }}
             // Riding beside a drawer, the drawer owns the only close affordance
             // on screen; a second X on the companion read as "close the drawer"
             // and kept dismissing Langy instead. Closing the drawer returns
@@ -2357,7 +2377,7 @@ function LangyPanel({
                     ) : null}
                     {showCardGallery ? (
                       <LangyCardGallery />
-                    ) : langyNeedsModel ? (
+                    ) : langyNeedsModel || reconnectCodex ? (
                       <VStack
                         align="stretch"
                         gap={2}
@@ -2365,14 +2385,27 @@ function LangyPanel({
                         paddingTop="18px"
                       >
                         <Text fontSize="sm" fontWeight="semibold">
-                          Langy needs a model to get started
+                          {reconnectCodex
+                            ? "Sign in to Codex again"
+                            : "Langy needs a model to get started"}
                         </Text>
                         {/* The one subtitle under this heading is the provider
                         grid's own description; a second line here read as a
                         double title. */}
                         <ModelProviderScreen
                           variant="langy"
-                          onComplete={() => void resolvedDefaultQuery.refetch()}
+                          {...(reconnectCodex
+                            ? { initialProviderKey: "codex" as const }
+                            : {})}
+                          onComplete={() => {
+                            void resolvedDefaultQuery.refetch();
+                            if (reconnectCodex) {
+                              // Re-authenticated: back to the conversation and
+                              // re-drive the turn the dead session failed.
+                              setReconnectCodex(false);
+                              retryTurn();
+                            }
+                          }}
                         />
                       </VStack>
                     ) : historyErrorPresentation ? (
@@ -2675,7 +2708,13 @@ function LangyPanel({
                   model={modelOverride}
                   modelOptions={modelOptions}
                   langyDefaultModel={langyDefaultModel}
-                  onModelChange={setModelOverride}
+                  onModelChange={(model) => {
+                    // Switching models is choosing the other way out of a dead
+                    // codex session; leaving the reconnect screen up would trap
+                    // the panel on the sign-in it no longer needs.
+                    setReconnectCodex(false);
+                    setModelOverride(model);
+                  }}
                   onSend={send}
                   onStop={handleStop}
                   variant={floating ? "floating" : "sidebar"}

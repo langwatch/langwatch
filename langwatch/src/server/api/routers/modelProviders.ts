@@ -3,6 +3,10 @@ import {
   SCOPE_TIERS,
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
+import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
+import { auditLog } from "../../auditLog";
+import { CodexAccountService } from "../../modelProviders/codexAccount.service";
+import { CODEX_DEFAULT_MODEL } from "../../modelProviders/codexRestrictions";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
 import {
   featureByKey,
@@ -30,23 +34,22 @@ import {
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
+  getProjectModelProviders,
+  getProjectModelProvidersForFrontend,
+  listOrgModelProvidersForFrontend,
+  listProjectModelProvidersForFrontend,
+} from "./modelProviders.utils";
+import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "./providerValidation";
-import {
-  getProjectModelProviders,
-  getProjectModelProvidersForFrontend,
-  listProjectModelProvidersForFrontend,
-  listOrgModelProvidersForFrontend,
-} from "./modelProviders.utils";
-import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
 
 export type { ModelMetadataForFrontend } from "./modelProviders.utils";
 export {
-  getProjectModelProviders,
   getModelMetadataForFrontend,
-  mergeCustomModelMetadata,
+  getProjectModelProviders,
   getProjectModelProvidersForFrontend,
+  mergeCustomModelMetadata,
   prepareEnvKeys,
   prepareLitellmParams,
 } from "./modelProviders.utils";
@@ -229,6 +232,185 @@ export const modelProviderRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
+    }),
+
+  /**
+   * Codex sign-in, step 1: ask OpenAI for a device code. Nothing is stored —
+   * the pending sign-in's identifiers travel to the client and come back on
+   * every poll, so polling works across server instances.
+   * Spec: specs/model-providers/codex-account-provider.feature
+   */
+  codexSignInStart: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:update"))
+    .mutation(async () => {
+      const codex = new CodexAccountService();
+      return await codex.startDeviceSignIn();
+    }),
+
+  /**
+   * Codex sign-in, step 2..n: one poll of the pending device authorization.
+   * While the user hasn't approved yet this returns `{ status: "pending" }`.
+   * On approval it exchanges the code, saves the provider row with the
+   * encrypted token set at the requested scopes (service authz fails closed
+   * on any non-manageable scope), and — when the caller asks — writes the
+   * coding-assistant defaults so Langy and the tiny assists start using the
+   * account immediately.
+   */
+  codexSignInPoll: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        deviceAuthId: z.string(),
+        userCode: z.string(),
+        scopes: z.array(scopeAssignmentSchema).min(1),
+        /** Langy setup + onboarding pass true: also point the allowed
+         *  feature slots at the codex model. Settings passes false. */
+        setAsCodingDefaults: z.boolean().default(false),
+      }),
+    )
+    .use(checkProjectPermission("project:update"))
+    .mutation(async ({ input, ctx }) => {
+      const codex = new CodexAccountService();
+      const poll = await codex.pollDeviceSignIn({
+        deviceAuthId: input.deviceAuthId,
+        userCode: input.userCode,
+      });
+      if (poll.status === "pending") {
+        return { status: "pending" as const };
+      }
+
+      const service = ModelProviderService.create(ctx.prisma);
+      const saved = await service.updateModelProvider(
+        {
+          projectId: input.projectId,
+          provider: "openai_codex",
+          enabled: true,
+          customKeys: poll.keys,
+          scopes: input.scopes,
+        },
+        { prisma: ctx.prisma, session: ctx.session },
+      );
+
+      if (input.setAsCodingDefaults) {
+        for (const scope of input.scopes) {
+          await assertCanWriteScope(
+            { prisma: ctx.prisma, session: ctx.session },
+            scope.scopeType,
+            scope.scopeId,
+          );
+        }
+        // The widest selected scope carries the defaults; role values
+        // cascade down from it. One scope is the norm (the sign-in surfaces
+        // pick the widest manageable), so this is scopes[0] in practice.
+        // ROLE-level writes, not per-feature: Langy's own role plus the
+        // Fast tier — the two roles whose whole feature set is
+        // codex-licensed. The Default role (playground, evaluators,
+        // workflows) is deliberately untouched.
+        const scope = input.scopes[0]!;
+        for (const role of ["LANGY", "FAST"] as const) {
+          await setRoleAtScope(
+            { prisma: ctx.prisma },
+            {
+              scopeType: scope.scopeType,
+              scopeId: scope.scopeId,
+              role,
+              model: CODEX_DEFAULT_MODEL,
+              authorId: ctx.session?.user?.id ?? null,
+            },
+          );
+        }
+      }
+
+      // The response hands the connector their own account email (PII), so
+      // the connect event is audit-logged: who, where, and which scopes. The
+      // email itself deliberately stays out of the log row.
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "modelProvider.codexConnect",
+        targetKind: "modelProvider",
+        targetId: saved?.id,
+        args: {
+          scopes: input.scopes,
+          setAsCodingDefaults: input.setAsCodingDefaults,
+          plan: poll.keys.CODEX_PLAN,
+        },
+      });
+
+      return {
+        status: "complete" as const,
+        providerId: saved?.id,
+        email: poll.keys.CODEX_EMAIL,
+        plan: poll.keys.CODEX_PLAN,
+      };
+    }),
+
+  /**
+   * Point the coding-assistant roles (LANGY + FAST) at the codex model,
+   * after the fact. The settings-page connect flow doesn't write defaults
+   * during sign-in; it asks with a dialog once connected and calls this on
+   * "yes" — the same role writes the Langy/onboarding flows perform inline.
+   */
+  codexApplyCodingDefaults: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        scopes: z.array(scopeAssignmentSchema).min(1),
+      }),
+    )
+    .use(checkProjectPermission("project:update"))
+    .mutation(async ({ input, ctx }) => {
+      for (const scope of input.scopes) {
+        await assertCanWriteScope(
+          { prisma: ctx.prisma, session: ctx.session },
+          scope.scopeType,
+          scope.scopeId,
+        );
+      }
+      const scope = input.scopes[0]!;
+      for (const role of ["LANGY", "FAST"] as const) {
+        await setRoleAtScope(
+          { prisma: ctx.prisma },
+          {
+            scopeType: scope.scopeType,
+            scopeId: scope.scopeId,
+            role,
+            model: CODEX_DEFAULT_MODEL,
+            authorId: ctx.session?.user?.id ?? null,
+          },
+        );
+      }
+      void auditLog({
+        userId: ctx.session.user.id,
+        projectId: input.projectId,
+        action: "modelProvider.codexApplyCodingDefaults",
+        args: { scopes: input.scopes },
+      });
+      return { applied: true as const };
+    }),
+
+  /**
+   * The connected Codex account for a project, for the setup surfaces'
+   * connected state. Never returns tokens, and deliberately NOT the account
+   * email: this is a project:view query, so a plain member must not read the
+   * (often personal) OpenAI address the connecting admin signed in with. The
+   * plan tier is non-identifying. The connector still sees their own email at
+   * connect time from the sign-in mutation's result.
+   */
+  codexStatus: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input }) => {
+      const providers = await getProjectModelProviders(input.projectId);
+      const row = providers.openai_codex;
+      if (!row?.enabled) return { connected: false as const };
+      const keys = (row.customKeys ?? {}) as Partial<Record<string, string>>;
+      return {
+        connected: true as const,
+        providerId: row.id,
+        plan: keys.CODEX_PLAN ?? "",
+      };
     }),
 
   isManagedProvider: protectedProcedure

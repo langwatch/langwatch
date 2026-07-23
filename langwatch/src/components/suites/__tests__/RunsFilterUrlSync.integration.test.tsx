@@ -12,26 +12,35 @@
  * @see https://github.com/langwatch/langwatch/issues/3191
  * @see https://github.com/langwatch/langwatch/pull/3205
  */
+
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import React, { useEffect, useRef } from "react";
-import { render, screen, act, cleanup, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Routes, Route, useLocation } from "react-router";
+
+// The empty states carry the Setup via Agent menu, whose langy hooks need
+// app context these tests do not build; the control has its own tests.
+vi.mock("~/components/SetupWithAgentButton", () => ({
+  SetupWithAgentButton: () => null,
+}));
+
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 
 // The global test-setup.ts stubs ~/utils/compat/next-router with an empty
 // router. For these tests we need the real compat layer because the bug
 // under test lives in its buildUrl / routeParamKeys logic.
 vi.unmock("~/utils/compat/next-router");
-vi.mock("~/utils/compat/next-router", async () =>
-  await vi.importActual<object>("~/utils/compat/next-router"),
+vi.mock(
+  "~/utils/compat/next-router",
+  async () => await vi.importActual<object>("~/utils/compat/next-router"),
 );
 
+import { useRouter } from "~/utils/compat/next-router";
+import { createRunHistoryStore } from "../useRunHistoryStore";
 import {
   ALL_RUNS_ID,
   EXTERNAL_SET_PREFIX,
   useSuiteRouting,
 } from "../useSuiteRouting";
-import { createRunHistoryStore } from "../useRunHistoryStore";
-import { useRouter } from "~/utils/compat/next-router";
 
 type Store = ReturnType<typeof createRunHistoryStore>;
 
@@ -55,10 +64,7 @@ function Harness({ store }: { store: Store }) {
   const prevGroupBy = useRef(groupBy);
 
   useEffect(() => {
-    if (
-      prevFilters.current !== filters ||
-      prevGroupBy.current !== groupBy
-    ) {
+    if (prevFilters.current !== filters || prevGroupBy.current !== groupBy) {
       prevFilters.current = filters;
       prevGroupBy.current = groupBy;
       syncToUrl(router);
@@ -200,9 +206,7 @@ describe("given the Runs page at /my-project/simulations/run-plans/critical-path
 describe("given the Runs page at /my-project/simulations/python-examples (external set)", () => {
   describe("when a filter is applied", () => {
     it("keeps selection as external:python-examples and preserves the set path", async () => {
-      const store = renderHarness(
-        "/my-project/simulations/python-examples",
-      );
+      const store = renderHarness("/my-project/simulations/python-examples");
 
       expect(screen.getByTestId("selection").textContent).toBe(
         `${EXTERNAL_SET_PREFIX}python-examples`,
