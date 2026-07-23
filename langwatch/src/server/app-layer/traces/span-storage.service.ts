@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -6,8 +7,6 @@ import {
   mapNormalizedSpanToSpan,
 } from "~/server/traces/mappers/span.mapper";
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
-import { createLogger } from "~/utils/logger/server";
-import { redactSpanContent } from "./visibility-window.service";
 import type { BlobStore } from "./blob-store.service";
 import type {
   ModelSpanSampleRow,
@@ -16,10 +15,13 @@ import type {
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
   SpanStorageRepository,
+  SpanSummaryPage,
+  SpanSummaryPageCursor,
   SpanSummaryRow,
 } from "./repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "./types";
+import { redactSpanContent } from "./visibility-window.service";
 
 /**
  * Optional blob-offload resolution dependencies for the v2 read path (ADR-022).
@@ -37,7 +39,14 @@ export interface SpanReadBlobResolutionDeps {
 type ByTraceId = { tenantId: string; traceId: string } & OccurredAtHint;
 type BySpanId = ByTraceId & { spanId: string };
 type Paginated = ByTraceId & { limit: number; offset: number };
+/** Full-span delta: keyed on span start (see `findSpansSince`). */
 type Since = ByTraceId & { sinceStartTimeMs: number };
+/**
+ * Span-summary delta: keyed on the ROW VERSION, so spans updated in place
+ * (end time, duration, status, cost) are picked up too — a start-keyed poll
+ * only ever sees brand-new spans.
+ */
+type SinceUpdated = ByTraceId & { sinceUpdatedAtMs: number };
 
 /**
  * Read-side visibility gate. Read routes pass the caller's plan cutoff
@@ -202,13 +211,15 @@ export class SpanStorageService {
     );
   }
 
-  async getSpanSummariesPaginated(
-    params: Paginated,
-  ): Promise<{ rows: SpanSummaryRow[]; total: number }> {
-    return this.repository.findSpanSummariesPaginated(params);
+  async getSpanSummariesPage(
+    params: ByTraceId & { limit: number; cursor?: SpanSummaryPageCursor },
+  ): Promise<SpanSummaryPage> {
+    return this.repository.findSpanSummariesPage(params);
   }
 
-  async getSpanSummariesSince(params: Since): Promise<SpanSummaryRow[]> {
+  async getSpanSummariesSince(
+    params: SinceUpdated,
+  ): Promise<SpanSummaryRow[]> {
     return this.repository.findSpanSummariesSince(params);
   }
 

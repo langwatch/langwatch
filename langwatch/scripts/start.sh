@@ -78,23 +78,37 @@ if [[ "$NODE_ENV" = "development" ]]; then
   echo "  ✓ gateway: port=${GATEWAY_PORT_DERIVED} cp=${GATEWAY_CONTROL_PLANE_URL:-(unset, using LW_GATEWAY_BASE_URL)} public=${LW_GATEWAY_PUBLIC_URL}"
 fi
 
-RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
+# DOTENV_CONFIG_QUIET silences dotenv v17's promotional "injected env" banner
+# for lanes that load it via `import "dotenv/config"` (e.g. workers.ts, which
+# must keep that side-effect import first). server.mts / vite.config.ts pass
+# `quiet: true` explicitly.
+RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true DOTENV_CONFIG_QUIET=true"
 if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
 fi
 
-START_APP_COMMAND="pnpm run start:app"
+# `-s` silences pnpm's own `> pkg@ver script` lifecycle banner so each lane's
+# output starts with real logs, not the script header. Child stdout is untouched.
+START_APP_COMMAND="pnpm -s run start:app"
 
+# Dev-only single-process mode: WORKERS_IN_PROCESS=1 hosts the worker stack
+# inside `start:app` (the app boots with the "all" role) instead of a separate
+# concurrently lane. When it's set we skip the standalone workers command below
+# and let start:app inherit the flag from the environment. Production never sets
+# this — it runs web and worker as separate deployments.
 START_WORKERS_COMMAND=""
-if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
-  START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
+if [[ "$NODE_ENV" = "development" && ( "$WORKERS_IN_PROCESS" = "true" || "$WORKERS_IN_PROCESS" = "1" ) ]]; then
+  export WORKERS_IN_PROCESS
+  echo "  ✓ workers: in-process (WORKERS_IN_PROCESS=1) — no separate worker lane"
+elif [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
+  START_WORKERS_COMMAND="pnpm -s run start:workers && exit 1"
 fi
 
 # In development, Vite runs on PORT (default 5560) and proxies /api/* to PORT+1000.
 # In production, only the API server runs on PORT (default 5560).
 START_VITE_COMMAND=""
 if [[ "$NODE_ENV" = "development" ]]; then
-  START_VITE_COMMAND="pnpm run dev:vite"
+  START_VITE_COMMAND="pnpm -s run dev:vite"
 fi
 
 # AI Gateway data plane (Go service). Bundled into pnpm dev so wrappers

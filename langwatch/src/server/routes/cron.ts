@@ -1,16 +1,15 @@
 /**
  * Hono routes for cron jobs.
  */
-import type { Project, Trigger } from "@prisma/client";
+
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
-import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { scheduleTopicClustering } from "~/server/topicClustering/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
-import { createLogger } from "~/utils/logger/server";
+import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   reportHasFailures,
@@ -76,31 +75,6 @@ secured
 secured
   .access(cronPolicy())
   .post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
-
-// ---------- GET|POST /api/cron/schedule_topic_clustering ----------
-const scheduleTopicClusteringHandler = async (c: CronContext) => {
-  if (!validateCronKey(c)) {
-    return c.body(null, 401);
-  }
-  try {
-    await scheduleTopicClustering();
-    return c.json({ message: "Topic clustering scheduled" });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error scheduling topic clustering",
-        error: error?.message ? error?.message.toString() : `${error}`,
-      },
-      500,
-    );
-  }
-};
-secured
-  .access(cronPolicy())
-  .get("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
-secured
-  .access(cronPolicy())
-  .post("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
 
 // ---------- GET /api/cron/trace_analytics ----------
 secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
@@ -200,62 +174,13 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
   return c.json({ success: true });
 });
 
-// ---------- GET /api/cron/triggers ----------
-secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
-  if (!validateCronKey(c)) {
-    return c.body(null, 401);
-  }
-
-  let triggers: Trigger[];
-  let projects: Project[];
-
-  try {
-    projects = await prisma.project.findMany({
-      where: { firstMessage: true, archivedAt: null },
-    });
-
-    triggers = await prisma.trigger.findMany({
-      where: {
-        active: true,
-        projectId: { in: projects.map((project) => project.id) },
-      },
-    });
-  } catch (error) {
-    return c.json(
-      {
-        error: "Failed to fetch triggers",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      500,
-    );
-  }
-
-  // Only process custom graph triggers — trace-based triggers are handled
-  // reactively by the alertTrigger reactor on the trace-processing pipeline.
-  const graphTriggers = triggers.filter((t) => t.customGraphId);
-
-  const results = [];
-
-  for (const trigger of graphTriggers) {
-    try {
-      const result = await processCustomGraphTrigger(trigger, projects);
-      results.push(result);
-    } catch (error) {
-      logger.error(
-        { triggerId: trigger.id, error },
-        "error processing custom graph trigger",
-      );
-      results.push({
-        triggerId: trigger.id,
-        status: "error",
-        message: error instanceof Error ? error.message : "Unknown error",
-        type: "customGraph",
-      });
-    }
-  }
-
-  return c.json(results);
-});
+// NOTE: the `/api/cron/triggers` graph-alert sweep was removed (ADR-034):
+// custom-graph threshold alerts now fire exclusively from the event-sourced
+// path (real-time activity subscriber + scheduled graph-alert process manager),
+// and trace-based triggers were already reactive. There is no cron graph-alert
+// path anymore. Likewise the webhook delivery-log prune (ADR-040 §6) runs as
+// the daily `webhookDeliveryPrune` scheduled process manager on the worker,
+// not as a cron route.
 
 // ---------- POST /api/cron/seed_demo ----------
 //
@@ -290,5 +215,46 @@ const seedDemoHandler = async (c: CronContext) => {
 };
 secured.access(cronPolicy()).get("/cron/seed_demo", seedDemoHandler);
 secured.access(cronPolicy()).post("/cron/seed_demo", seedDemoHandler);
+
+/**
+ * Revokes every Langy session key whose lifetime has elapsed.
+ *
+ * THIS IS THE GUARANTEE. The agent manager revokes a worker's session key the
+ * moment it sees the worker die, which is the fast path and covers the ordinary
+ * cases — capability change, idle reap, shutdown, crash. But a manager that is
+ * SIGKILLed (OOM, node eviction, `--force` delete) sees nothing and runs no
+ * cleanup at all, and every key its workers held then stays valid for the rest of
+ * its TTL. No callback can close that hole: the process that would make the call
+ * is the one that died.
+ *
+ * So this reaper is not redundant with revocation-on-death — it is what makes the
+ * scheme safe, and removing it would reintroduce the long tail of live, orphaned
+ * credentials the whole change set out to remove.
+ */
+const langySessionKeysReapHandler = async (c: CronContext) => {
+  if (!validateInternalSecret(c)) return c.body(null, 401);
+  try {
+    const revoked = await reapExpiredLangySessionApiKeys({ prisma });
+    // Worth watching: a number that stays stubbornly high means workers are dying
+    // without their manager noticing, i.e. the fast path is not firing.
+    if (revoked > 0) {
+      logger.info({ revoked }, "reaped expired Langy session keys");
+    }
+    return c.json({ revoked });
+  } catch (error) {
+    logger.error({ error }, "reaping expired Langy session keys failed");
+    captureException(toError(error), {
+      extra: { context: "cron:langy_session_keys_reap" },
+    });
+    return c.json({ error: "reap failed" }, { status: 500 });
+  }
+};
+
+secured
+  .access(cronPolicy())
+  .get("/cron/langy_session_keys_reap", langySessionKeysReapHandler);
+secured
+  .access(cronPolicy())
+  .post("/cron/langy_session_keys_reap", langySessionKeysReapHandler);
 
 export const app = secured.hono;

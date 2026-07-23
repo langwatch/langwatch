@@ -1,17 +1,19 @@
+import type { createLogger } from "@langwatch/observability";
 import type { ProcessRole } from "../../app-layer/config";
-import type { createLogger } from "../../../utils/logger/server";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
+import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
-import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
-import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { EventStore } from "../stores/eventStore.types";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
 import type { JobRegistryEntry } from "./queues/queueManager";
 
@@ -49,6 +51,8 @@ export interface EventSourcingServiceOptions<
    * Fold projections (stateful, reduce events into accumulated state).
    */
   foldProjections?: FoldProjectionDefinition<any, EventType>[];
+  /** Default operational projections (direct store load/apply/store). */
+  stateProjections?: StateProjectionDefinition<any, EventType>[];
   /**
    * Map projections (stateless, transform individual events into records).
    */
@@ -89,6 +93,8 @@ export interface EventSourcingServiceOptions<
    * Reactors (post-map side-effect handlers) for this pipeline.
    */
   mapReactors?: Array<{ mapName: string; definition: ReactorDefinition<EventType> }>;
+  /** Live event-only consumers, independent of projection state. */
+  subscribers?: EventSubscriberDefinition<EventType>[];
   /**
    * Optional global projection registry for cross-pipeline projections.
    * When provided, events are dispatched to global projections after local dispatch.

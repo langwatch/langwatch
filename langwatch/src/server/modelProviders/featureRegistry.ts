@@ -2,9 +2,9 @@
  * Feature registry — the single source of truth for every AI-powered
  * surface in the platform that needs a model.
  *
- * Each entry binds a stable feature key to one of the three model roles
- * (DEFAULT / FAST / EMBEDDINGS) and supplies the copy the UI renders when
- * surfacing the role expansion list or the missing-model popup.
+ * Each entry binds a stable feature key to one of the model roles
+ * (DEFAULT / FAST / LANGY / EMBEDDINGS) and supplies the copy the UI renders
+ * when surfacing the role expansion list or the missing-model popup.
  *
  * Rules:
  *   - Keys are snake_case, area-prefixed, and STABLE FOREVER. We deprecate,
@@ -21,7 +21,7 @@
  * resolution semantics and the contract this file underpins.
  */
 
-export const MODEL_ROLES = ["DEFAULT", "FAST", "EMBEDDINGS"] as const;
+export const MODEL_ROLES = ["DEFAULT", "FAST", "LANGY", "EMBEDDINGS"] as const;
 export type ModelRole = (typeof MODEL_ROLES)[number];
 
 export interface FeatureDescriptor {
@@ -39,6 +39,16 @@ export interface FeatureDescriptor {
 }
 
 const REGISTRY: FeatureDescriptor[] = [
+  // LANGY — the assistant's own conversation model. Its own role (not
+  // DEFAULT) so an org can run Langy on a subscription-billed model (codex)
+  // while the playground and evaluations stay on an API-key provider.
+  {
+    key: "langy.chat",
+    role: "LANGY",
+    displayName: "Langy",
+    description: "The model Langy chats and works with.",
+  },
+
   // DEFAULT — heavy / user-content-creating surfaces.
   {
     key: "prompt.create_default",
@@ -57,8 +67,7 @@ const REGISTRY: FeatureDescriptor[] = [
     key: "scenarios.user_simulator",
     role: "DEFAULT",
     displayName: "Scenario user simulator",
-    description:
-      "Model that role-plays the user in scenario simulations.",
+    description: "Model that role-plays the user in scenario simulations.",
   },
   {
     key: "scenarios.judge",
@@ -66,6 +75,12 @@ const REGISTRY: FeatureDescriptor[] = [
     displayName: "Scenario judge",
     description:
       "Model that judges whether a scenario met its success criteria.",
+  },
+  {
+    key: "workflows.create_default",
+    role: "DEFAULT",
+    displayName: "New workflow model",
+    description: "Starts new workflows with a ready-to-use model.",
   },
 
   // FAST — assistive / background surfaces.
@@ -115,6 +130,13 @@ const REGISTRY: FeatureDescriptor[] = [
     displayName: "Topic clustering",
     description: "Names the clusters surfaced in Analytics → Topics.",
   },
+  {
+    key: "langy.conversation_title",
+    role: "FAST",
+    displayName: "Langy chat titles",
+    description:
+      "Names each Langy conversation from its messages. Point this at a cheap model.",
+  },
 
   // EMBEDDINGS — single line, no per-feature expand surfaced in the UI.
   {
@@ -124,8 +146,7 @@ const REGISTRY: FeatureDescriptor[] = [
     // EMBEDDINGS column / row header tells the user what kind of model
     // this is without parenthetical clutter.
     displayName: "Topic clustering",
-    description:
-      "Vectors used to group similar traces in Analytics → Topics.",
+    description: "Vectors used to group similar traces in Analytics → Topics.",
   },
 ];
 

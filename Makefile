@@ -16,10 +16,26 @@ help:
 	@echo "    make quickstart dev-infra           local app + redis + workers compose; shared dev for PG/CH/NLP/S3"
 	@echo "    make quickstart frontend-only       no compose; pure pnpm dev against your .env URLs"
 	@echo "    make quickstart migration           postgres + clickhouse on host ports (prisma migrate; no workers)"
-	@echo "    make quickstart full-local          kitchen-sink local (dedicated workers container + bullboard + ai-server)"
+	@echo "    make quickstart full-local          kitchen-sink local (dedicated workers container + ai-server)"
 	@echo "    make quickstart-help                non-interactive preset reference"
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
+	@echo ""
+	@echo "  Local dev by hostname (thuishaven — ADR-048):"
+	@echo "    make haven setup                    one-time: install/verify portless + trust its CA"
+	@echo "    make haven install                  go install the haven binary (then run 'haven ...' directly)"
+	@echo "    make haven up                       start this worktree's hostname stack (== pnpm dev:haven)"
+	@echo "    make haven list                     which worktree runs what (all stacks)"
+	@echo "    make haven doctor                   check proxy / haven / observability health"
+	@echo "    make haven <cmd>                    any haven subcommand (see 'haven help')"
+	@echo "    (dashboard at https://langwatch.localhost)"
 	@echo "    make service-watch svc=<name>       run a Go service with live reload (air)"
+	@echo ""
+	@echo "  Local observability (logs/traces/metrics → Grafana for agent debugging):"
+	@echo "    make observability                  start the LGTM stack on colima, capped (OTLP :4318, Grafana :3000)"
+	@echo "    make observability-connect          mint a Grafana token + configure gcx"
+	@echo "    make observability-logs             tail the stack logs"
+	@echo "    make observability-down             stop the stack (discards all telemetry)"
+	@echo "    (once it is up, every 'pnpm dev' stack exports to it, tagged by worktree)"
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
 	@echo "    make down                           stop all services"
 	@echo "    make test-scripts                   run bats unit tests under scripts/__tests__/"
@@ -43,6 +59,10 @@ help:
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
 
 include boxd.mk
+# dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`
+# passthrough neutralises the trailing words (e.g. `down`, `install`) as no-op
+# goals, and for that override to beat the real `down` / `install` recipes it
+# must be evaluated after they are defined. See the include at end of file.
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -141,7 +161,11 @@ test-scripts:
 
 # Stop all services
 down:
+ifneq (haven,$(firstword $(MAKECMDGOALS)))
 	$(COMPOSE) --profile full down
+else
+	@:
+endif
 
 # Tail logs
 logs:
@@ -159,8 +183,15 @@ clean:
 # LEGACY COMMANDS (run services locally, not in Docker)
 # =============================================================================
 
+# Guarded so `make haven install` (which go-installs the haven CLI via the
+# `haven` target in dev/haven.mk) doesn't ALSO run pnpm install: when `haven`
+# is the first goal this recipe is a no-op. Plain `make install` is unaffected.
 install:
+ifneq (haven,$(firstword $(MAKECMDGOALS)))
 	cd langwatch && pnpm install
+else
+	@:
+endif
 
 # Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
 # the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service
@@ -246,3 +277,8 @@ sync-all-openapi:
 	pnpm run task generateOpenAPISpec
 	cd typescript-sdk && pnpm run generate:openapi-types
 	cd python-sdk && make generate/api-client
+
+# Included last on purpose (see the note next to `include boxd.mk`): the
+# `make haven <sub>` passthrough must define its no-op goals after the real
+# `down` / `install` targets so its override wins.
+include dev/haven.mk

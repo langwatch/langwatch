@@ -1,8 +1,4 @@
 import type {
-  OutboxEnqueueRequest,
-  OutboxReactorDefinition,
-} from "../../../outbox/outboxReactor.types";
-import type {
   ReactorContext,
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
@@ -52,10 +48,10 @@ const MESSAGE_EVENT_TYPES = new Set<string>([
  * Wraps the reactor's `handle` with these guards so each call site
  * doesn't repeat the same preamble.
  */
-/** Pure guard check, shared between the `.withReactor` and `.withOutbox`
- *  variants below so both branches stay in sync. Returns true when the
- *  reactor's user-provided body should run. */
-function passesTraceOriginGuards(
+/** Pure guard check, shared between the reactor variant below and the
+ *  alert-trigger match subscriber (ADR-052) so both stay in sync. Returns
+ *  true when the reactor's/subscriber's user-provided body should run. */
+export function passesTraceOriginGuards(
   event: TraceProcessingEvent,
   foldState: TraceSummaryData,
 ): boolean {
@@ -87,49 +83,34 @@ function passesTraceOriginGuards(
   return true;
 }
 
+/**
+ * An extra pure guard, ANDed with the origin guards. Must be synchronous and
+ * side-effect free: it runs pre-enqueue via `shouldReact` on the fold's hot
+ * path. Guards needing IO belong in `handle`.
+ */
+type ExtraGuard = (
+  event: TraceProcessingEvent,
+  context: ReactorContext<TraceSummaryData>,
+) => boolean;
+
 export function defineOriginGuardedTraceReactor(opts: {
   name: string;
   jobIdPrefix: string;
   ttl?: number;
   delay?: number;
+  isRelevant?: ExtraGuard;
   handle: (
     event: TraceProcessingEvent,
     context: ReactorContext<TraceSummaryData>,
   ) => Promise<void>;
 }): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return {
-    name: opts.name,
-    options: {
-      makeJobId: (payload) =>
-        `${opts.jobIdPrefix}:${payload.event.tenantId}:${payload.event.aggregateId}`,
-      ttl: opts.ttl ?? 30_000,
-      delay: opts.delay ?? 30_000,
-    },
-
-    async handle(event, context) {
-      if (!passesTraceOriginGuards(event, context.foldState)) return;
-      await opts.handle(event, context);
-    },
-  };
-}
-
-/**
- * Outbox-flavored counterpart of `defineOriginGuardedTraceReactor`. Same
- * guards (stale event / non-message event / old trace / blocked guardrail /
- * origin-not-resolved), but the body returns an `OutboxEnqueueRequest[]`
- * instead of performing side effects. Used by `.withOutbox`-registered
- * reactors whose `decide()` builds settle payloads.
- */
-export function defineOriginGuardedTraceOutboxReactor(opts: {
-  name: string;
-  jobIdPrefix: string;
-  ttl?: number;
-  delay?: number;
-  decide: (
+  const passes = (
     event: TraceProcessingEvent,
     context: ReactorContext<TraceSummaryData>,
-  ) => Promise<OutboxEnqueueRequest[]>;
-}): OutboxReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+  ): boolean =>
+    passesTraceOriginGuards(event, context.foldState) &&
+    (opts.isRelevant?.(event, context) ?? true);
+
   return {
     name: opts.name,
     options: {
@@ -139,9 +120,18 @@ export function defineOriginGuardedTraceOutboxReactor(opts: {
       delay: opts.delay ?? 30_000,
     },
 
-    async decide(event, context) {
-      if (!passesTraceOriginGuards(event, context.foldState)) return [];
-      return opts.decide(event, context);
+    // Pre-enqueue (ADR-026). The guards are pure and read only the payload the
+    // handler would receive, so evaluating them here is equivalent to the
+    // early-return in `handle` — except a filtered event never pays a
+    // serialize + gzip + blob write that the queue's dedup would then discard.
+    // A 10k-span trace fans this reactor out once per span; the guards reject
+    // nearly all of it. Kept in `handle` too: the queue is not the only caller
+    // (inline mode), and a fail-open `shouldReact` may dispatch anyway.
+    shouldReact: passes,
+
+    async handle(event, context) {
+      if (!passes(event, context)) return;
+      await opts.handle(event, context);
     },
   };
 }

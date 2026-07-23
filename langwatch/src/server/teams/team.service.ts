@@ -1,5 +1,5 @@
 import { Prisma, RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
-import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -14,6 +14,19 @@ export const TEAM_ROLE_PRIORITY: Record<TeamUserRole, number> = {
   [TeamUserRole.VIEWER]: 2,
   [TeamUserRole.CUSTOM]: 3,
 };
+
+const principalInOrganizationWhere = (
+  organizationId: string,
+): Prisma.RoleBindingWhereInput => ({
+  OR: [
+    {
+      userId: { not: null },
+      user: { orgMemberships: { some: { organizationId } } },
+    },
+    { groupId: { not: null }, group: { organizationId } },
+    { apiKeyId: { not: null }, apiKey: { organizationId } },
+  ],
+});
 
 // Ascending, nulls last — matches Postgres `ORDER BY col ASC` (the ordering the
 // previous Prisma `orderBy` produced before members were resolved in memory).
@@ -282,6 +295,7 @@ export class TeamService {
               organizationId,
               scopeType: RoleBindingScopeType.TEAM,
               scopeId: team.id,
+              ...principalInOrganizationWhere(organizationId),
             },
             include: {
               user: { select: { id: true, name: true, email: true } },
@@ -296,6 +310,7 @@ export class TeamService {
                   organizationId,
                   scopeType: RoleBindingScopeType.PROJECT,
                   scopeId: { in: projectIds },
+                  ...principalInOrganizationWhere(organizationId),
                 },
                 include: {
                   user: { select: { id: true, name: true, email: true } },
@@ -322,7 +337,11 @@ export class TeamService {
         );
         const groupMemberships = allGroupIds.length > 0
           ? await this.prisma.groupMembership.findMany({
-              where: { groupId: { in: allGroupIds } },
+              where: {
+                groupId: { in: allGroupIds },
+                group: { organizationId },
+                user: { orgMemberships: { some: { organizationId } } },
+              },
               include: { user: { select: { id: true, name: true, email: true } } },
             })
           : [];

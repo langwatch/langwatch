@@ -1,0 +1,73 @@
+# The SSRF address-classification rule set exists twice: pkg/ssrf (Go) and
+# @langwatch/ssrf (TypeScript). Both are held to one corpus,
+# pkg/ssrf/testdata/address_vectors.json.
+#
+# Those two suites otherwise run in two unrelated workflows (go-ci and
+# langwatch-app-ci), so "the two languages disagree about an address" shows up
+# as two red Xs in different places, or — worse — as one, if only one side's
+# paths changed. This workflow runs both halves against the corpus in a single
+# job so divergence is one unambiguous failure on any change to either
+# implementation or to the vectors themselves.
+#
+# If you add a range to pkg/ssrf/address.go or packages/ssrf/src/index.ts, add a
+# vector here too; this is the gate that makes that non-optional.
+name: ssrf-conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ssrf-conformance-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ssrf: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.ssrf }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        with:
+          filters: |
+            ssrf:
+              - 'pkg/ssrf/**'
+              - 'langwatch/packages/ssrf/**'
+              - '.github/workflows/ssrf-conformance.yaml'
+
+  conformance:
+    needs: changes
+    if: ${{ needs.changes.outputs.ssrf == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Go half of the corpus
+        run: go test -count=1 -race ./pkg/ssrf/...
+
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          install-dir: langwatch
+
+      # Runs even when the Go half already failed, so a divergence report names
+      # both sides in one log instead of making you re-run to see the second.
+      - name: TypeScript half of the corpus
+        if: ${{ !cancelled() }}
+        working-directory: langwatch
+        run: pnpm --filter @langwatch/ssrf test:unit

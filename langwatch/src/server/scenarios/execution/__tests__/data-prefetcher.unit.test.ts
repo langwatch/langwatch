@@ -28,8 +28,9 @@ import type { ExecutionContext, TargetConfig, LiteLLMParams } from "../types";
 // Mock only env.mjs since it's a module-level import
 vi.mock("~/env.mjs", () => ({
   env: {
-    LANGWATCH_NLP_SERVICE: "http://localhost:8080",
-    BASE_HOST: "http://localhost:3000",
+    LANGWATCH_NLP_SERVICE: "http://langwatch_nlp:5561",
+    LANGWATCH_ENDPOINT: "http://app:5560",
+    // BASE_HOST no longer needed — telemetry endpoint comes from LANGWATCH_ENDPOINT
   },
 }));
 
@@ -686,42 +687,30 @@ describe("prefetchScenarioData", () => {
       describe("when prefetching scenario data", () => {
         /** @scenario "Return success with LiteLLM params on valid configuration" */
         it("returns success with complete data", async () => {
-          // The source reads process.env.LANGWATCH_ENDPOINT directly (not via env.mjs)
-          const previousLangwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
-          process.env.LANGWATCH_ENDPOINT = "http://localhost:3000";
+          const deps = createMockDeps({
+            promptFetcher: {
+              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+            },
+          });
 
-          try {
-            const deps = createMockDeps({
-              promptFetcher: {
-                getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-              },
+          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(result.success).toBe(true);
+          if (result.success) {
+            expect(result.data.context).toEqual(defaultContext);
+            expect(result.data.scenario).toEqual(defaultScenario);
+            expect(result.data.adapterData).toMatchObject({
+              type: "prompt",
+              promptId: "prompt_123",
+              systemPrompt: "You are helpful",
             });
-
-            const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-            const result = await prefetchScenarioData(defaultContext, target, deps);
-
-            expect(result.success).toBe(true);
-            if (result.success) {
-              expect(result.data.context).toEqual(defaultContext);
-              expect(result.data.scenario).toEqual(defaultScenario);
-              expect(result.data.adapterData).toMatchObject({
-                type: "prompt",
-                promptId: "prompt_123",
-                systemPrompt: "You are helpful",
-              });
-              expect(result.data.modelParams).toEqual(defaultModelParams);
-              expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
-              expect(result.telemetry).toEqual({
-                endpoint: "http://localhost:3000",
-                apiKey: "test-api-key",
-              });
-            }
-          } finally {
-            if (previousLangwatchEndpoint === undefined) {
-              delete process.env.LANGWATCH_ENDPOINT;
-            } else {
-              process.env.LANGWATCH_ENDPOINT = previousLangwatchEndpoint;
-            }
+            expect(result.data.modelParams).toEqual(defaultModelParams);
+            expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
+            expect(result.telemetry).toEqual({
+              endpoint: "http://app:5560",
+              apiKey: "test-api-key",
+            });
           }
         });
       });
@@ -1321,6 +1310,84 @@ describe("prefetchScenarioData", () => {
           expect(value?.model).toBe(DEFAULT_MODEL);
           expect(value?.temperature).toBe(0.7);
         }
+      });
+    });
+
+    describe("spec-version gating of the legacy default fallback", () => {
+      // Nodes own their model since spec_version 1.5: a modelless llm param
+      // on a modern DSL is stale state that must NOT be silently substituted
+      // with DEFAULT_MODEL — it stays unhydrated so the engine raises its
+      // typed llm_model_not_set error. The comparison is component-wise, so
+      // a hypothetical "1.10" is newer than "1.5", not parseFloat's 1.1.
+      const modellessDsl = (spec_version: string) => ({
+        spec_version,
+        workflow_id: "wf_1",
+        nodes: [
+          {
+            id: "llm_call",
+            type: "signature",
+            data: {
+              name: "LLM Call",
+              parameters: [
+                { identifier: "llm", type: "llm", value: undefined },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      });
+
+      const setupFor = (dsl: Record<string, unknown>) => {
+        const prepareFn = vi.fn().mockResolvedValue(defaultModelParamsResult);
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(workflowAgent),
+          },
+          workflowVersionFetcher: {
+            getLatestDsl: vi
+              .fn()
+              .mockResolvedValue({ workflowId: "wf_1", dsl }),
+          },
+          modelParamsProvider: { prepare: prepareFn },
+        });
+        return { deps, prepareFn };
+      };
+
+      it.each(["1.5", "1.10"])(
+        "does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param",
+        async (specVersion) => {
+          const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
+
+          const result = await prefetchScenarioData(
+            defaultContext,
+            workflowTarget,
+            deps,
+          );
+
+          expect(result.success).toBe(true);
+          expect(
+            prepareFn.mock.calls.some(
+              (call) => (call[1] as string) === DEFAULT_MODEL,
+            ),
+          ).toBe(false);
+        },
+      );
+
+      it("still falls back to DEFAULT_MODEL on a 1.4 DSL", async () => {
+        const { deps, prepareFn } = setupFor(modellessDsl("1.4"));
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(true);
+        expect(
+          prepareFn.mock.calls.some(
+            (call) => (call[1] as string) === DEFAULT_MODEL,
+          ),
+        ).toBe(true);
       });
     });
 

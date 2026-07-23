@@ -21,16 +21,16 @@ Feature: Custom labels in Deploy dialog
   # --- Backend: Custom tag definitions ---
   # Tag definitions are organization-scoped.
 
-  @unit @unimplemented
-  Scenario: Built-in tags are always available
-    When I check the built-in tag list
-    Then "latest", "production", and "staging" are included
-    And they are marked as built-in
+  @unit
+  Scenario: Only "latest" is a protected (built-in) tag
+    When I check the protected-tags constant
+    Then only "latest" is protected from creation/deletion
+    # production/staging are SEEDED on first use but mutable
 
-  @unit @unimplemented
-  Scenario: Custom tags cannot shadow built-in tags
-    When I try to create a tag named "production"
-    Then the operation fails because it conflicts with a built-in tag
+  @unit
+  Scenario: Cannot create a tag that shadows the protected "latest" tag
+    When I try to create a tag named "latest"
+    Then the operation fails with a validation error
 
   @integration @unimplemented
   Scenario: Deleting a custom tag cascades to assignments

@@ -1,10 +1,4 @@
-import {
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import type {
   SpanTreeNode,
@@ -83,8 +77,7 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     headerQuery.data && headerQuery.data.traceId === traceId
       ? headerQuery.data
       : null;
-  const spanTree =
-    spanTreeQuery.data && trace ? spanTreeQuery.data : [];
+  const spanTree = spanTreeQuery.data && trace ? spanTreeQuery.data : [];
   // Show the full-shell skeleton whenever we have a traceId in the URL but
   // no result yet — including the moment before the project context has
   // loaded and the query is still disabled. Without this guard, hard
@@ -98,7 +91,10 @@ export function useTraceDrawerScaffold(): TraceDrawerScaffold {
     trace?.traceId ?? null,
   );
   // Warm sibling trace headers so navigating between turns is instant.
-  useConversationPrefetch(trace?.conversationId ?? null, trace?.traceId ?? null);
+  useConversationPrefetch(
+    trace?.conversationId ?? null,
+    trace?.traceId ?? null,
+  );
 
   const {
     navigateToTrace,

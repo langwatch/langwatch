@@ -87,7 +87,7 @@ Feature: boxd Makefile orchestrates per-PR / per-branch / per-issue VM forks
     When I run "make boxd-fork-issue ISSUE=4242"
     Then the VM "langwatch-issue4242" is forked from "langwatch-golden"
     And every .env file is uploaded with stale-localhost URLs rewritten
-    And ports are mapped (default proxy + aigw + bullboard + ai-server + next)
+    And ports are mapped (default proxy + aigw + ai-server + next)
     And a tmux session "claude-issue4242" is started inside the VM running claude
 
   @integration

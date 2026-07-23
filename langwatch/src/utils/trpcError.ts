@@ -1,7 +1,42 @@
 import { TRPCClientError, type TRPCClientErrorLike } from "@trpc/client";
+import type { AppRouter } from "../server/api/root";
 import type { LimitType } from "../server/license-enforcement";
 
-export const isNotFound = (error: TRPCClientErrorLike<any> | null) => {
+/**
+ * The best display string for any error, in the order the wire can be trusted:
+ *
+ *   1. `data.error.meta.message` — prose that was deliberately authored to be
+ *      shown. This is the only channel that carries a user-facing sentence for
+ *      a handled error: `SerializedHandledError` has no `message` field, and a
+ *      HandledError's own `message` is server copy that never crosses the
+ *      boundary (ADR-045). Go populates it via `herr.FromBody`.
+ *   2. `error.message` — for a handled error this is now its code; for a plain
+ *      `TRPCError` it is the copy the procedure authored ("Choose a project
+ *      first"), which is still exactly what to show.
+ *   3. `data.error.code` — last resort, so the user always gets the stable
+ *      identifier rather than an empty toast.
+ *
+ * Prefer a code-keyed explainer (`explainHandledError`, `explainLangyError`)
+ * where one exists — this is the generic fallback for the surfaces that don't
+ * have bespoke copy yet.
+ */
+export function errorDisplayMessage(error: unknown): string {
+  const domain = (error as { data?: { error?: unknown } })?.data?.error as
+    | { code?: unknown; meta?: { message?: unknown } }
+    | undefined;
+
+  const authored = domain?.meta?.message;
+  if (typeof authored === "string" && authored.length > 0) return authored;
+
+  const wire = (error as { message?: unknown })?.message;
+  if (typeof wire === "string" && wire.length > 0) return wire;
+
+  return typeof domain?.code === "string"
+    ? domain.code
+    : "An unknown error occurred";
+}
+
+export const isNotFound = (error: TRPCClientErrorLike<AppRouter> | null) => {
   if (
     error &&
     error instanceof TRPCClientError &&
@@ -97,13 +132,16 @@ export function extractLiteMemberRestrictionInfo(
   if (!(error instanceof TRPCClientError)) return null;
   if (error.data?.code !== "UNAUTHORIZED") return null;
 
-  const domainError = error.data?.domainError as
-    | { kind?: string; meta?: { resource?: string } }
+  const handledError = error.data?.error as
+    | { code?: string; kind?: string; meta?: { resource?: string } }
     | undefined;
 
-  if (domainError?.kind !== "lite_member_restricted") return null;
+  // `kind` is the deprecated pre-`HandledError` discriminant, read as a
+  // fallback so this resolves across the transition (see SerializedHandledError).
+  const handledCode = handledError?.code ?? handledError?.kind;
+  if (handledCode !== "lite_member_restricted") return null;
 
-  return { resource: domainError.meta?.resource };
+  return { resource: handledError?.meta?.resource };
 }
 
 export function extractLimitExceededInfo(
@@ -139,7 +177,7 @@ export function isHandledByMissingModelHandler(error: unknown): boolean {
 export interface MissingModelExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   projectId?: string;
 }
 
@@ -171,7 +209,12 @@ export function extractMissingModelInfo(
   if (!cause.featureKey || !cause.role) return null;
 
   const role = cause.role as MissingModelExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
 
@@ -197,7 +240,7 @@ export function isHandledByProviderDisabledHandler(error: unknown): boolean {
 export interface ProviderDisabledExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   projectId: string;
   resolvedScope: "project" | "team" | "organization";
   resolvedModel: string;
@@ -248,7 +291,12 @@ export function extractProviderDisabledInfo(
   }
 
   const role = cause.role as ProviderDisabledExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
   const resolvedScope =
@@ -287,7 +335,7 @@ export const AI_CALL_FAILED_CAUSE = "AI_CALL_FAILED" as const;
 export interface AiCallFailedExtracted {
   featureKey: string;
   featureDisplayName: string;
-  role: "DEFAULT" | "FAST" | "EMBEDDINGS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   /** Best-effort short message from the provider/SDK. */
   errorMessage?: string;
 }
@@ -309,7 +357,12 @@ export function extractAiCallFailedInfo(
   if (cause?.code !== AI_CALL_FAILED_CAUSE) return null;
   if (!cause.featureKey || !cause.role) return null;
   const role = cause.role as AiCallFailedExtracted["role"];
-  if (role !== "DEFAULT" && role !== "FAST" && role !== "EMBEDDINGS") {
+  if (
+    role !== "DEFAULT" &&
+    role !== "FAST" &&
+    role !== "LANGY" &&
+    role !== "EMBEDDINGS"
+  ) {
     return null;
   }
 

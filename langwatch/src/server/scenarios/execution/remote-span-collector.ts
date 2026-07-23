@@ -10,11 +10,11 @@
  */
 
 import { JudgeSpanCollector } from "@langwatch/scenario";
+import { createLogger } from "@langwatch/observability";
 import type { Attributes } from "@opentelemetry/api";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import { createLogger } from "~/utils/logger/server";
-import type { Span } from "../../tracer/types";
 import { langwatchSpanToReadableSpan } from "../../tracer/spanToReadableSpan";
+import type { Span } from "../../tracer/types";
 import { createSyntheticErrorSpan } from "./synthetic-error-span";
 import type { SpanQueryFn } from "./types";
 

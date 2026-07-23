@@ -1,5 +1,5 @@
 import promBundle from "express-prom-bundle";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from "fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
@@ -66,20 +66,29 @@ async function loadDevHttpsCredentials(
   return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
 }
 
+import { createLogger } from "@langwatch/observability";
+import { getRequestListener } from "@hono/node-server";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { register } from "prom-client";
 import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
-import { initializeWebApp } from "./server/app-layer/presets";
+import {
+  initializeInProcessApp,
+  initializeWebApp,
+} from "./server/app-layer/presets";
 import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
-import { getWorkerMetricsPort, isMetricsAuthorized } from "./server/metrics";
+import {
+  getWorkerMetricsPort,
+  isMetricsAuthorized,
+  normalizeMetricsPath,
+} from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
-import { createLogger } from "./utils/logger/server";
+import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 
 const logger = createLogger("langwatch:start");
 
@@ -101,7 +110,7 @@ export const metricsMiddleware = promBundle({
   },
   normalizePath: (req) => {
     if (req.url?.includes("/assets/")) return "/assets/*";
-    return req.url?.split("?")[0] ?? req.url;
+    return normalizeMetricsPath(req.url?.split("?")[0] ?? "/");
   },
 });
 
@@ -109,9 +118,29 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
 
+  // Dev-only single-process mode: host the background worker stack inside this
+  // web process instead of a separate `pnpm run start:workers` process. Opt-in
+  // via WORKERS_IN_PROCESS=1 (see scripts/start.sh + `pnpm dev:single`). Never
+  // honoured in production — prod runs web and worker as separate deployments.
+  //
+  // Gate on NODE_ENV === "development" exactly (not `dev`, which is
+  // `!== "production"`) so this matches scripts/start.sh's lane-skip predicate.
+  // If they disagreed, an exotic NODE_ENV (e.g. "staging") would spawn BOTH the
+  // standalone workers lane AND the in-process stack — duplicate consumers.
+  const isInProcessWorkerModeEnabled =
+    process.env.NODE_ENV === "development" &&
+    (process.env.WORKERS_IN_PROCESS === "1" ||
+      process.env.WORKERS_IN_PROCESS === "true");
+
   // Initialize the app-layer (services, repositories, event sourcing, etc.)
-  // This was previously done by Next.js instrumentation hook.
-  initializeWebApp();
+  // This was previously done by Next.js instrumentation hook. In-process mode
+  // boots with the "all" role so the outbox consumer / drainer / heartbeat
+  // scheduler wire up exactly as on a dedicated worker.
+  if (isInProcessWorkerModeEnabled) {
+    initializeInProcessApp();
+  } else {
+    initializeWebApp();
+  }
 
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
   // session store, and without it every request ends in a "Redirecting to
@@ -143,10 +172,24 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   //      Vite dev server runs separately on PORT (default 5560) and proxies /api/* here.
   // Prod: Single server on PORT (default 5560) serves API routes + static files.
   const basePort = parseInt(process.env.PORT ?? "5560");
-  const port = dev ? basePort + 1000 : basePort;
+  // In portless (haven) mode the API binds an ephemeral loopback port that
+  // Vite proxies `/api` to under the app origin (`app.<slug>.../api`);
+  // otherwise PORT+1000.
+  const port = process.env.LANGWATCH_API_PORT
+    ? parseInt(process.env.LANGWATCH_API_PORT)
+    : dev
+      ? basePort + 1000
+      : basePort;
 
   const mcpHandler = createMcpHandler();
   const honoApp = createApiRouter();
+  // The Node→Hono bridge. `getRequestListener` streams request bodies through
+  // (no buffering — the Langy ndjson relay depends on this) and streams the
+  // response back. `overrideGlobalObjects: false`: never patch the process's
+  // global Request/Response for the rest of the app.
+  const apiListener = getRequestListener(honoFetchForNode(honoApp), {
+    overrideGlobalObjects: false,
+  });
 
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
@@ -224,7 +267,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
           res.end("Unauthorized");
           return;
         }
-        if (pathname === "/metrics") {
+        if (pathname === "/metrics" || isInProcessWorkerModeEnabled) {
+          // /metrics, or /workers/metrics in single-process mode: the workers
+          // share this process's prom-client registry (no separate listener),
+          // so both paths serve the same registry.
           res.setHeader("Content-Type", register.contentType);
           res.end(await register.metrics());
         } else {
@@ -252,12 +298,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
       // ---- API Routes (all go through Hono) ----
       if (pathname.startsWith("/api/")) {
-        const handled = await routeThroughHono(honoApp, req, res, hostname, port);
-        if (handled) return;
-
-        res.statusCode = 404;
-        res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify({ error: "Not Found" }));
+        await apiListener(req, res);
         return;
       }
 
@@ -299,6 +340,15 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   const wsHandle = setupTRPCWebSocket(server as ReturnType<typeof createServer>);
 
   server.once("error", (err) => {
+    // Write synchronously to stderr BEFORE the structured log: pino's
+    // transports are async worker threads that never flush past the
+    // process.exit(1) below, so without this a bind failure (e.g.
+    // EADDRINUSE when two dev processes race for the same port) is an
+    // exit(1) with zero output anywhere — stdout, Loki, or otherwise.
+    writeSync(
+      2,
+      `[langwatch:start] server error, exiting: ${err.stack ?? String(err)}\n`,
+    );
     logger.error({ error: err }, "error occurred on server");
     process.exit(1);
   });
@@ -330,6 +380,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     );
   });
 
+  // Assigned by the in-process worker boot below. Declared here so the
+  // shutdown handler can drain it, and so the boot can run *after* the signal
+  // handlers are installed (a SIGTERM while workers are still booting hits
+  // `workerHandle?.shutdown()` as a no-op — the process still exits cleanly,
+  // it just doesn't wait for the still-booting workers to drain).
+  let workerHandle: WorkerHandle | undefined;
+
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "Received signal, shutting down...");
@@ -350,6 +407,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     server.close();
     if ("closeAllConnections" in server) server.closeAllConnections();
     mcpHandler.closeAllSessions();
+    // Drain in-process workers (if any) before closing the shared App below,
+    // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go away.
+    try {
+      await workerHandle?.shutdown();
+    } catch (error) {
+      logger.error({ error }, "error shutting down in-process workers");
+    }
     try {
       await Promise.all([getApp().close(), shutdownPostHog()]);
     } catch (error) {
@@ -372,100 +436,102 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       "unhandled rejection detected"
     );
   });
+
+  // In-process worker stack (dev opt-in via WORKERS_IN_PROCESS=1). Booted last —
+  // after the server is listening AND the shutdown handlers are installed — so
+  // the UI comes up even if the workers are slow to start. `workerHandle` isn't
+  // assigned until this await resolves, so a SIGTERM during the boot still lets
+  // the process exit cleanly; it just won't drain workers that are still
+  // mid-boot. A boot failure is logged and the web server keeps running (only
+  // the background jobs won't run).
+  if (isInProcessWorkerModeEnabled) {
+    logger.info("WORKERS_IN_PROCESS=1 — hosting the worker stack in-process");
+    try {
+      // shouldStartMetricsServer: false — in one process the worker prom
+      // registry is this process's registry, already served at /metrics; no
+      // second listener.
+      workerHandle = await startWorkers({ shouldStartMetricsServer: false });
+      logger.info("in-process workers ready");
+    } catch (error) {
+      logger.error(
+        { error },
+        "in-process workers failed to start — web server continues, background jobs will not run",
+      );
+    }
+  }
 };
 
-// Exported for the langwatch#5219 regression test, which drives the
-// null-body branch directly to prove it never writes a 0-byte body.
-export async function routeThroughHono(
-  honoApp: Hono,
-  req: IncomingMessage,
-  res: ServerResponse,
-  hostname: string,
-  port: number
-): Promise<boolean> {
-  const body =
-    req.method !== "GET" && req.method !== "HEAD"
-      ? await readBody(req)
-      : undefined;
+/**
+ * The Hono app's fetch, adjusted for the Node server entry. This is the ONLY
+ * bridge logic we own — the Node↔fetch conversion itself is
+ * `@hono/node-server`'s `getRequestListener`, which passes request bodies
+ * through as live streams (`Readable.toWeb`) instead of buffering them. That
+ * property is load-bearing: the Langy frame relay
+ * (`POST /api/internal/langy/relay/frames`) is a long-lived ndjson connection
+ * whose route reads line by line while the turn runs; the previous hand-rolled
+ * bridge `await`ed the ENTIRE body before Hono ran, so every frame of a turn
+ * arrived in one burst after the turn ended.
+ *
+ * Two response adjustments survive from the old bridge:
+ *
+ *  1. Hono's default not-found sentinel ("404 Not Found" text) becomes the
+ *     uniform JSON 404 the /api surface has always returned. A route's own
+ *     404 (different body) passes through untouched.
+ *  2. langwatch#5219: a null-body response on a status that SHOULD carry a
+ *     body must never reach the wire as 0 bytes — a tRPC client then throws
+ *     `Unexpected end of JSON input` on `response.json()`. It becomes a
+ *     parseable JSON error instead. 204/205/304 and HEAD legitimately carry
+ *     no body and are left alone (a 304 revision-poll or 204 long-poll no-diff
+ *     must stay empty).
+ *
+ * Forwards every argument `getRequestListener` passes to `honoApp.fetch` —
+ * notably the second (`{ incoming, outgoing }`, Hono's `env`) — rather than
+ * declaring only `request`. Node's calling convention silently drops extra
+ * arguments a function doesn't declare, so a one-parameter wrapper here means
+ * `c.env` is `undefined` in every route handler despite `getRequestListener`
+ * always supplying it; that in turn makes `@hono/node-server/conninfo`'s
+ * `getConnInfo(c)` throw for every request in production (it reads
+ * `c.env.incoming.socket`). No existing handler reads `c.env` today, so this
+ * is additive — it only starts mattering for code that begins relying on it
+ * (see `~/utils/getClientIp.ts`'s `getConnInfo` fallback).
+ *
+ * Exported for the langwatch#5219 + streaming-bridge regression tests.
+ */
+export function honoFetchForNode(
+  honoApp: Pick<Hono, "fetch">,
+): (...args: Parameters<Hono["fetch"]>) => Promise<Response> {
+  return async (request, ...rest) => {
+    const response = await honoApp.fetch(request, ...rest);
 
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value === undefined) continue;
-    if (Array.isArray(value)) {
-      for (const v of value) headers.append(key, v);
-    } else {
-      headers.set(key, value);
-    }
-  }
-
-  const honoReq = new Request(`http://${hostname}:${port}${req.url}`, {
-    method: req.method,
-    headers,
-    body: body as BodyInit | undefined,
-    // @ts-ignore - duplex needed for streaming bodies
-    duplex: "half",
-  });
-
-  const honoRes = await honoApp.fetch(honoReq);
-
-  if (honoRes.status === 404) {
-    const text = await honoRes.text();
-    if (text === "404 Not Found") return false;
-    res.statusCode = 404;
-    honoRes.headers.forEach((v, k) => res.setHeader(k, v));
-    res.end(text);
-    return true;
-  }
-
-  res.statusCode = honoRes.status;
-  honoRes.headers.forEach((v, k) => res.setHeader(k, v));
-
-  if (honoRes.body) {
-    const reader = honoRes.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      res.write(value);
-    }
-    res.end();
-  } else if (
-    ![204, 205, 304].includes(honoRes.status) &&
-    req.method !== "HEAD"
-  ) {
-    // Null-body responses on a status that SHOULD carry a body (e.g. an error
-    // that slipped past a handler's own serialization) would otherwise
-    // `res.end("")` — a 0-byte body. A tRPC client then throws `Unexpected end
-    // of JSON input` on `response.json()` (langwatch#5219). Never emit an empty
-    // body here: fall back to a parseable JSON error so the client gets
-    // something it can decode.
-    const text = await honoRes.text();
-    if (text.length > 0) {
-      res.end(text);
-    } else {
-      if (!res.getHeader("Content-Type")) {
-        res.setHeader("Content-Type", "application/json");
+    if (response.status === 404) {
+      const text = await response.clone().text();
+      if (text === "404 Not Found") {
+        return new Response(JSON.stringify({ error: "Not Found" }), {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        });
       }
-      res.end(
+      return response;
+    }
+
+    if (
+      !response.body &&
+      ![204, 205, 304].includes(response.status) &&
+      request.method !== "HEAD"
+    ) {
+      const headers = new Headers(response.headers);
+      if (!headers.get("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+      }
+      return new Response(
         JSON.stringify({
           error: "Internal server error",
           message: "The server returned an empty response.",
         }),
+        { status: response.status, headers },
       );
     }
-  } else {
-    // 204/205/304 and HEAD legitimately carry no body — write nothing. Injecting
-    // a JSON error here would corrupt valid no-content paths (e.g. a 304
-    // revision-poll or a 204 long-poll no-diff).
-    res.end();
-  }
-  return true;
-}
 
-function readBody(req: IncomingMessage): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
-    req.on("end", () => resolve(new Uint8Array(Buffer.concat(chunks))));
-    req.on("error", reject);
-  });
+    return response;
+  };
 }

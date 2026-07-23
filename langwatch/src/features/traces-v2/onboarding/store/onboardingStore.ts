@@ -102,22 +102,16 @@ interface OnboardingState {
    */
   currentSpotlightId: string | null;
   /**
-   * Global per-browser flag: has the spotlight tour been auto-started
-   * for the first real trace yet? Flipped to true the first time
-   * `hasAnyTraces` transitions false → true in ANY project, so seeing
-   * the tour once suppresses it everywhere on this browser — it's no
-   * longer keyed by project. Persisted so a refresh doesn't replay it.
-   * See
-   * specs/traces-v2/tour-visibility-and-persistence.feature
+   * Browser-level guard against starting the automatic first-trace tour
+   * more than once in the same profile. The server-backed user preference
+   * is the authoritative dismissal across projects, browsers, and devices.
+   * See specs/traces-v2/tour-visibility-and-persistence.feature
    */
   firstTraceSpotlightFired: boolean;
   /**
-   * Per-browser map of drawer spotlight ids that have been displayed at
-   * least once. Drawer spotlights are show-once: the moment one renders
-   * it's marked seen here, so it never repeats — even if the user
-   * dismisses the queue mid-way. Not keyed by project: the features
-   * being introduced (conversation strip, I/O section, …) are the same
-   * everywhere. Persisted to localStorage.
+   * Browser-level map of drawer spotlight ids already displayed. This
+   * preserves step-level show-once behavior locally, while the server-backed
+   * preference suppresses the full automatic queue after dismissal.
    */
   seenDrawerSpotlights: Record<string, boolean>;
 

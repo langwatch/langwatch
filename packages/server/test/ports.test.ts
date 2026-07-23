@@ -15,7 +15,6 @@ describe("port allocation", () => {
         redis: 6561,
         clickhouseHttp: 6562,
         clickhouseNative: 6563,
-        bullboard: 6564,
       });
     });
   });
@@ -26,12 +25,11 @@ describe("port allocation", () => {
       expect(a.langwatch).toBe(5570);
       expect(a.postgres).toBe(6570);
       expect(a.redis).toBe(6571);
-      expect(a.bullboard).toBe(6574);
     });
   });
 
   describe("portsToCheck", () => {
-    it("returns one entry per always-on service (bullboard is opt-in)", () => {
+    it("returns one entry per service", () => {
       const a = allocatePorts(5560);
       const checks = portsToCheck(a);
       expect(checks.map((c) => c.label)).toEqual([

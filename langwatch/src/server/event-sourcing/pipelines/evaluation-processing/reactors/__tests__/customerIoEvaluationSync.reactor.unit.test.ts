@@ -5,12 +5,12 @@ import type { ProjectService } from "../../../../../app-layer/projects/project.s
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../../schemas/events";
 import {
-  createCustomerIoEvaluationSyncReactor,
   type CustomerIoEvaluationSyncReactorDeps,
+  createCustomerIoEvaluationSyncReactor,
 } from "../customerIoEvaluationSync.reactor";
 
 // Suppress logger output
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -130,6 +130,7 @@ describe("customerIoEvaluationSync reactor", () => {
   });
 
   describe("makeJobId", () => {
+    /** @scenario 'Evaluation sync reactor uses project-and-evaluation-scoped job ID for debouncing' */
     it("returns cio-eval-sync-{projectId}-{evaluationId}", () => {
       const deps = createDeps();
       const reactor = createCustomerIoEvaluationSyncReactor(deps);

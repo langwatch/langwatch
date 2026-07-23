@@ -1,3 +1,4 @@
+import type { OrganizationIntent } from "@prisma/client";
 import type { z } from "zod";
 
 import { getApp } from "../../../../src/server/app-layer/app";
@@ -40,6 +41,7 @@ export function fireSignupNurturingCalls({
   organizationId,
   organizationName,
   signUpData,
+  primaryIntent,
 }: {
   userId: string;
   email: string | null | undefined;
@@ -47,6 +49,8 @@ export function fireSignupNurturingCalls({
   organizationId: string;
   organizationName: string;
   signUpData?: SignUpData | null;
+  /** ADR-038 org intent — explicit trait; deliberately NOT part of signupData. */
+  primaryIntent?: OrganizationIntent | null;
 }): void {
   const nurturing = getApp().nurturing;
   if (!nurturing) return;
@@ -68,6 +72,7 @@ export function fireSignupNurturingCalls({
       utm_term: signUpData?.utmTerm,
       utm_content: signUpData?.utmContent,
       referrer: signUpData?.referrer,
+      primary_intent: primaryIntent?.toLowerCase(),
     }),
     has_traces: false,
     has_evaluations: false,
@@ -95,7 +100,10 @@ export function fireSignupNurturingCalls({
     .trackEvent({
       userId,
       event: "signed_up",
-      properties: pickDefined(signUpData ?? {}),
+      properties: pickDefined({
+        ...(signUpData ?? {}),
+        primary_intent: primaryIntent?.toLowerCase(),
+      }),
     })
     .catch(captureException);
 }

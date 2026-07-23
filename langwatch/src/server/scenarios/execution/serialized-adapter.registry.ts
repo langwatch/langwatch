@@ -20,7 +20,7 @@ import {
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
   SerializedWorkflowAgentAdapter,
-} from "./serialized.adapters";
+} from "./serialized-adapters";
 
 type AdapterFactory = (params: {
   data: TargetAdapterData;

@@ -35,6 +35,8 @@ function createTestSpan(
     droppedAttributesCount: 0 as const,
     droppedEventsCount: 0 as const,
     droppedLinksCount: 0 as const,
+    cost: null,
+    nonBilledCost: null,
     ...overrides,
   };
 }

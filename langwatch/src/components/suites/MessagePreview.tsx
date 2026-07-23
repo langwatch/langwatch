@@ -7,6 +7,7 @@
  */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -15,6 +16,13 @@ type MessagePreviewProps = {
   messages: ScenarioRunData["messages"];
   streamingMessages?: StreamingMessage[];
 };
+
+/**
+ * The preview is bottom-anchored inside a ~200px overflow-hidden card, so
+ * only the last few blobs are ever visible. Rendering just the tail keeps
+ * long conversations from mounting hundreds of invisible nodes per card.
+ */
+const PREVIEW_TAIL_LENGTH = 8;
 
 /** Extract text from plain strings or multimodal content arrays. */
 function textContent(content: unknown): string {
@@ -47,6 +55,35 @@ function extractTextParts(parts: unknown[]): string {
     )
     .map((item) => item.text)
     .join(" ");
+}
+
+/**
+ * Compact chat blob echoing the traces conversation Bubble tones:
+ * user turns in blue on the right, agent turns muted on the left,
+ * each with the speaker-side corner clipped.
+ */
+function PreviewBubble({
+  isUser,
+  children,
+}: {
+  isUser: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Box
+      bg={isUser ? "blue.subtle" : "bg.muted"}
+      color="fg"
+      borderRadius="lg"
+      borderTopRightRadius={isUser ? "sm" : "lg"}
+      borderTopLeftRadius={isUser ? "lg" : "sm"}
+      paddingX={2.5}
+      paddingY={1.5}
+      fontSize="xs"
+      lineClamp={3}
+    >
+      {children}
+    </Box>
+  );
 }
 
 function TypingIndicator() {
@@ -151,7 +188,7 @@ export function MessagePreview({
       overflow="hidden"
       justifyContent="flex-end"
     >
-      {(messages ?? []).map((message, index) => {
+      {(messages ?? []).slice(-PREVIEW_TAIL_LENGTH).map((message, index) => {
         // Tool call indicators (assistant messages with tool_calls or toolCalls)
         const toolCalls = ("tool_calls" in message && message.tool_calls)
           ? message.tool_calls
@@ -211,17 +248,7 @@ export function MessagePreview({
             alignSelf={isUser ? "flex-end" : "flex-start"}
             maxWidth="85%"
           >
-            <Box
-              bg={isUser ? "gray.600" : "bg.subtle"}
-              color={isUser ? "white" : "fg"}
-              borderRadius="lg"
-              paddingX={2.5}
-              paddingY={1.5}
-              fontSize="xs"
-              lineClamp={3}
-            >
-              {text}
-            </Box>
+            <PreviewBubble isUser={isUser}>{text}</PreviewBubble>
           </Box>
         );
       })}
@@ -233,17 +260,9 @@ export function MessagePreview({
             alignSelf={isUser ? "flex-end" : "flex-start"}
             maxWidth="85%"
           >
-            <Box
-              bg={isUser ? "gray.600" : "bg.subtle"}
-              color={isUser ? "white" : "fg"}
-              borderRadius="lg"
-              paddingX={2.5}
-              paddingY={1.5}
-              fontSize="xs"
-              lineClamp={3}
-            >
+            <PreviewBubble isUser={isUser}>
               {sm.content || <TypingIndicator />}
-            </Box>
+            </PreviewBubble>
           </Box>
         );
       })}

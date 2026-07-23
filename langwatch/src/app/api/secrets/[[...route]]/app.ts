@@ -1,10 +1,11 @@
+import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
 import { badRequestSchema } from "../../shared/schemas";
 import { SecretsService } from "../secrets.service";

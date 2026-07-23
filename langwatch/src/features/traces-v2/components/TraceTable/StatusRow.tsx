@@ -1,5 +1,6 @@
 import { Box, HStack, type SystemStyleObject, Text } from "@chakra-ui/react";
 import type React from "react";
+import type { LangyContextTargetProps } from "~/features/langy/hooks/useLangyContextTarget";
 import type { TraceStatus } from "../../types/trace";
 import { Tbody } from "./TablePrimitives";
 
@@ -101,6 +102,14 @@ interface StatusRowGroupProps {
    * invalidation). Both can be true simultaneously.
    */
   isPulsing?: boolean;
+  /**
+   * Set while the Langy panel is open and this row has registered itself as a
+   * context target (see `useLangyContextTarget`): the shimmer-ring class, the
+   * added-state data attribute, and a capture-phase click handler that takes
+   * the row into Langy's context instead of opening the drawer. Empty — and so
+   * completely inert — whenever Langy is closed.
+   */
+  langyTargetProps?: LangyContextTargetProps;
   children: React.ReactNode;
   ref?: React.Ref<HTMLTableSectionElement>;
   /** Set by virtualizer; used by `measureElement` to look up the row index. */
@@ -114,6 +123,7 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
   traceId,
   isNew = false,
   isPulsing = false,
+  langyTargetProps,
   children,
   ref,
   "data-index": dataIndex,
@@ -122,6 +132,7 @@ export const StatusRowGroup: React.FC<StatusRowGroupProps> = ({
     ref={ref}
     data-index={dataIndex}
     onClick={onClick}
+    {...langyTargetProps}
     data-trace-id={traceId}
     data-new={isNew ? "true" : undefined}
     data-pulsing={isPulsing ? "true" : undefined}

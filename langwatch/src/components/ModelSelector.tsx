@@ -13,6 +13,14 @@ import React, { useEffect, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import {
+  isCodexModel,
+  isModelAllowedForFeature,
+} from "../server/modelProviders/codexRestrictions";
+import {
+  buildCustomModelDisplayNames,
+  modelDisplayLabel,
+} from "../server/modelProviders/customModelDisplayNames";
+import {
   modelProviderIcons,
   ProviderIconGlyph,
 } from "../server/modelProviders/iconsMap";
@@ -63,10 +71,31 @@ export type ModelOptionGroup = {
 
 export type GroupedModelOptions = ModelOptionGroup[];
 
+/**
+ * Fail-closed gate for restricted-provider models (codex today): a picker
+ * only offers them when it declares which feature it serves AND that
+ * feature is licensed to run them. Pickers that pass no `featureKey`
+ * (playground, workflows, evaluators) therefore never see them.
+ * Exported for tests.
+ */
+export const filterRestrictedModels = ({
+  models,
+  featureKey,
+}: {
+  models: string[];
+  featureKey?: string | undefined;
+}): string[] =>
+  models.filter((model) =>
+    featureKey === undefined
+      ? !isCodexModel(model)
+      : isModelAllowedForFeature({ modelId: model, featureKey }),
+  );
+
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
   mode: "chat" | "embedding" = "chat",
+  opts?: { featureKey?: string | undefined },
 ) => {
   const { project } = useOrganizationTeamProject();
   // `listAllForProjectForFrontend` returns the providers actually
@@ -107,7 +136,10 @@ export const useModelSelectionOptions = (
     };
   }
 
-  const allModels = getCustomModels(providersByKey, options, mode);
+  const allModels = filterRestrictedModels({
+    models: getCustomModels(providersByKey, options, mode),
+    featureKey: opts?.featureKey,
+  });
 
   // Build a set of custom model IDs for quick lookup
   const customModelIdSet = new Set<string>();
@@ -121,12 +153,15 @@ export const useModelSelectionOptions = (
     }
   }
 
+  const displayNames = buildCustomModelDisplayNames(
+    modelProviders.data?.providers ?? [],
+  );
+
   const selectOptions: ModelOption[] = allModels.map((modelValue) => {
     const provider = modelValue.split("/")[0]!;
-    const modelName = modelValue.split("/").slice(1).join("/");
 
     return {
-      label: modelName,
+      label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
       value: modelValue,
       icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
       isDisabled: false,

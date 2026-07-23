@@ -1,7 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
-import type { ProjectService } from "../../../../app-layer/projects/project.service";
-import { createLogger } from "../../../../../utils/logger/server";
 import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
+import type { ProjectService } from "../../../../app-layer/projects/project.service";
 import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";

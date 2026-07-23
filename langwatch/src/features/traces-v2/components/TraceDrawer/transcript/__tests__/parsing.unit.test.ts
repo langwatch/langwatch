@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyChatTextLeaves,
   coerceToChatMessages,
+  collectChatTextLeaves,
   extractSystemText,
   parseContentBlocks,
 } from "../parsing";
@@ -223,13 +225,106 @@ describe("parseContentBlocks", () => {
   });
 
   describe("given a non-audio file content part", () => {
-    it("falls through to a raw block, unchanged", () => {
+    it("renders it as an attachment media block instead of raw JSON", () => {
       const blocks = parseContentBlocks([
         { type: "file", mediaType: "application/pdf", data: "QUJD" },
       ]);
 
       expect(blocks).toHaveLength(1);
-      expect(blocks[0]).toMatchObject({ kind: "raw" });
+      expect(blocks[0]).toMatchObject({
+        kind: "media",
+        part: { type: "binary", mimeType: "application/pdf" },
+      });
+    });
+  });
+
+  describe("given image and externalized binary content parts", () => {
+    it("maps an externalized image_url reference to an image media block", () => {
+      const blocks = parseContentBlocks([
+        { type: "image_url", image_url: { url: "/api/files/p1/i1" } },
+      ]);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({
+        kind: "media",
+        part: {
+          type: "image",
+          source: { type: "url", value: "/api/files/p1/i1" },
+        },
+      });
+    });
+
+    it("maps an externalized binary PDF reference to an attachment media block", () => {
+      const blocks = parseContentBlocks([
+        {
+          type: "binary",
+          mimeType: "application/pdf",
+          url: "/api/files/p1/f1",
+          filename: "report.pdf",
+        },
+      ]);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({
+        kind: "media",
+        part: { type: "binary", filename: "report.pdf" },
+      });
+    });
+  });
+});
+
+describe("chat text leaves (translation splice)", () => {
+  describe("given a conversation mixing prose, text parts and tool blocks", () => {
+    const messages = [
+      { role: "user", content: "Hej världen" },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Det regnar" },
+          { type: "tool_use", id: "t1", name: "get_weather", input: { q: 1 } },
+        ],
+      },
+      {
+        role: "user",
+        content: '{"type":"tool_result","tool_use_id":"t1","content":"12C"}',
+      },
+    ];
+
+    it("collects only the prose leaves, never roles or tool payloads", () => {
+      expect(collectChatTextLeaves(messages)).toEqual({
+        "0": "Hej världen",
+        "1.0": "Det regnar",
+      });
+    });
+
+    it("splices translations back so the result still coerces to the same chat", () => {
+      const translated = applyChatTextLeaves(messages, {
+        "0": "Hello world",
+        "1.0": "It is raining",
+      });
+
+      const coerced = coerceToChatMessages(
+        JSON.parse(JSON.stringify(translated)),
+      );
+      expect(coerced).toHaveLength(3);
+      expect(coerced?.[0]).toMatchObject({
+        role: "user",
+        content: "Hello world",
+      });
+      expect(coerced?.[1]).toMatchObject({
+        role: "assistant",
+        content: [
+          { type: "text", text: "It is raining" },
+          { type: "tool_use", id: "t1", name: "get_weather", input: { q: 1 } },
+        ],
+      });
+      // The tool_result message had no prose leaf — untouched.
+      expect(coerced?.[2]).toEqual(messages[2]);
+    });
+
+    it("leaves the original messages unmutated", () => {
+      applyChatTextLeaves(messages, { "0": "Hello world" });
+      expect(messages[0]!.content).toBe("Hej världen");
     });
   });
 });

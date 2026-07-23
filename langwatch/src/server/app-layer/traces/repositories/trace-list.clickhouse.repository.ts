@@ -39,6 +39,8 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrCacheCreationTokens: string;
   AttrReasoningTokens: string;
   AttrLabels: string;
+  AttrInputMediaRefs: string;
+  AttrOutputMediaRefs: string;
   LastEventOccurredAt: number;
 }
 
@@ -115,11 +117,28 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       query.filterWhere,
     );
 
-    const sortExpression =
+    const rawSortExpression =
       query.sort.column === "TotalTokens"
         ? "(coalesce(TotalPromptTokenCount, 0) + coalesce(TotalCompletionTokenCount, 0))"
         : query.sort.column;
+    // Every supported list sort is numeric (OccurredAt is normalized to epoch
+    // milliseconds). Coalescing nullable metrics makes the keyset comparison
+    // use exactly the same value as ORDER BY and as the service-side cursor.
+    const sortExpression =
+      query.sort.column === "OccurredAt"
+        ? "toFloat64(toUnixTimestamp64Milli(OccurredAt))"
+        : `toFloat64(coalesce(${rawSortExpression}, 0))`;
     const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
+    const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
+    const cursorClause = query.cursor
+      ? `AND (
+              ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
+              OR (
+                ${sortExpression} = {cursorSortValue:Float64}
+                AND TraceId > {cursorTraceId:String}
+              )
+            )`
+      : "";
 
     const client = await this.resolveClient(query.tenantId);
 
@@ -157,6 +176,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrOrigin,
           AttrNonBillable,
           AttrCacheReadTokens,
+          AttrInputMediaRefs,
+          AttrOutputMediaRefs,
           AttrCacheCreationTokens,
           AttrReasoningTokens,
           AttrLabels,
@@ -209,6 +230,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['langwatch.origin'] AS AttrOrigin,
             Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,
             Attributes['langwatch.reserved.cache_read_tokens'] AS AttrCacheReadTokens,
+            Attributes['langwatch.reserved.media_refs.input'] AS AttrInputMediaRefs,
+            Attributes['langwatch.reserved.media_refs.output'] AS AttrOutputMediaRefs,
             Attributes['langwatch.reserved.cache_creation_tokens'] AS AttrCacheCreationTokens,
             Attributes['langwatch.reserved.reasoning_tokens'] AS AttrReasoningTokens,
             Attributes['langwatch.labels'] AS AttrLabels,
@@ -257,19 +280,31 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               FROM ${TABLE_NAME}
               WHERE ${whereClause}
                 AND ${dedupFilter}
-              ORDER BY ${sortExpression} ${sortDir}
+                ${cursorClause}
+              -- Offset pagination needs a total order. Many traces legitimately
+              -- share timestamps, costs, token counts, and durations; without
+              -- a unique tie-breaker ClickHouse may return tied rows in a
+              -- different order on adjacent requests, causing duplicates and
+              -- omissions between pages.
+              ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             )
             AND ${dedupFilter}
-          ORDER BY ${sortExpression} ${sortDir}
+          ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
           LIMIT {limit:UInt32}
         )
       `,
         query_params: {
           ...params,
           limit: query.limit,
-          offset: query.offset,
+          offset: query.offset ?? 0,
+          ...(query.cursor
+            ? {
+                cursorSortValue: query.cursor.sortValue,
+                cursorTraceId: query.cursor.traceId,
+              }
+            : {}),
         },
         format: "JSONEachRow",
       }),
@@ -1090,6 +1125,13 @@ function buildListAttributes(
   if (row.AttrCacheReadTokens) {
     attributes["langwatch.reserved.cache_read_tokens"] =
       row.AttrCacheReadTokens;
+  }
+  if (row.AttrInputMediaRefs) {
+    attributes["langwatch.reserved.media_refs.input"] = row.AttrInputMediaRefs;
+  }
+  if (row.AttrOutputMediaRefs) {
+    attributes["langwatch.reserved.media_refs.output"] =
+      row.AttrOutputMediaRefs;
   }
   if (row.AttrCacheCreationTokens) {
     attributes["langwatch.reserved.cache_creation_tokens"] =

@@ -1,5 +1,5 @@
+import type { RequestContext } from "@langwatch/observability";
 import type { Context as HonoContext } from "hono";
-import { type RequestContext } from "../core";
 
 /**
  * Creates a RequestContext from a Hono context.

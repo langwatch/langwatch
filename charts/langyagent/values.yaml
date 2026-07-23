@@ -1,0 +1,330 @@
+image:
+  # Published by the `langyagent` matrix entry in
+  # .github/workflows/publish-docker-app.yml on every `langwatch@*` release.
+  # Self-hosters who mirror to an internal registry override `repository`.
+  repository: docker.io/langwatch/langyagent
+  tag: ""            # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
+  pullPolicy: IfNotPresent
+
+# Lift this pod as part of the umbrella chart. Set false to run the agent
+# externally or disable Langy's backend entirely.
+chartManaged: true
+
+# Single replica is intentional — see deployment.yaml. Do NOT bump this
+# without adding conversation-sticky routing first.
+replicaCount: 1
+
+# Sized for v1 (low traffic, ~5-15 concurrent sessions). Each OpenCode
+# subprocess costs memory; LANGY_MAX_WORKERS caps concurrency.
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+# Deployment environment reported to the manager as ENVIRONMENT (surfaced via the
+# ConfigMap). Empty (the default) inherits the umbrella's global.env, which itself
+# defaults to "production"; a standalone install with no global falls back to
+# "production" too. This value is SECURITY-LOAD-BEARING: the manager refuses to
+# honour LANGY_UNSAFE_DEV_DISABLE_ISOLATION (the local-dev per-worker UID-isolation
+# bypass) unless ENVIRONMENT is a local-like value, so a prod pod MUST report a
+# production environment for that refusal to fire. Only set this to a local-like
+# value ("local"/"dev"/"development"/"test") for a throwaway dev cluster.
+environment: ""
+
+# Manager tunables (read by services/langyagent/config.go). Surfaced via the ConfigMap.
+manager:
+  port: 8080
+  maxWorkers: 20
+  workerIdleMs: 600000        # 10 min — idle workers are reaped
+  # How long to wait for a freshly-spawned worker's opencode to bind before
+  # aborting the spawn. Under gVisor (runsc), process/syscall startup is
+  # materially slower than runc: a cold opencode boot on the dev gVisor node
+  # measured ~28s (2026-07-07), so the previous 15s default aborted the FIRST
+  # message of every conversation (and every message after workerIdleMs) with
+  # "context deadline exceeded", surfacing as an empty reply. 60s gives gVisor
+  # cold-boot comfortable headroom. Warm workers are unaffected (this only
+  # gates the spawn). A true fix for first-message latency is a warm pool /
+  # spawn-on-panel-open — tracked separately.
+  readinessTimeoutMs: 60000
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Auth secret shared with the control plane. Helm never materialises it —
+# the operator creates it out-of-band (terraform / external-secrets), and
+# the SAME value must be set as LANGY_INTERNAL_SECRET on langwatch-app.
+#   kubectl create secret generic langwatch-langyagent-auth \
+#     --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32)
+secrets:
+  existingSecretName: langwatch-langyagent-auth
+  internalSecretKey: LANGY_INTERNAL_SECRET
+
+# Mirror lane (ADR-061) — a secondary exporter for the turn's gen_ai trace
+# data: the manager ALSO posts a copy of each Langy turn's traces into a
+# LangWatch project the OPERATOR designates (an internal ops project), so
+# whoever runs this install can watch Langy work with LangWatch's own trace
+# tools. Optional: leave the block empty (the default) and the lane stays
+# dormant. The key is an ordinary project API key for the designated mirror
+# project; rotate it like any project key.
+#   kubectl create secret generic langwatch-langyagent-mirror \
+#     --from-literal=LANGY_MIRROR_TRACE_KEY=<mirror project API key>
+mirror:
+  # Base URL of the LangWatch deployment holding the mirror project —
+  # /api/otel/v1/traces is appended by the manager.
+  traceEndpoint: ""
+  # Secret holding the mirror project's API key. Helm never materialises it;
+  # the operator creates it out-of-band, like the auth secret above.
+  existingSecretName: ""
+  traceKeyKey: LANGY_MIRROR_TRACE_KEY
+
+# /health (manager HTTP) backs both probes.
+probes:
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Single replica → PDB stays OFF (a minAvailable:1 PDB deadlocks drains).
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+terminationGracePeriodSeconds: 30
+
+# emptyDir for /workspace. Bump sizeLimit if many concurrent sessions write
+# large per-worker homes; leave {} for the cluster default.
+workspaceVolume: {}
+
+## SecurityContext.
+##
+## Why the manager runs as ROOT here (counter-intuitive but load-bearing):
+## per-worker UID isolation requires `child_process.spawn({uid, gid})` —
+## that syscall path needs CAP_SETUID + CAP_SETGID + CAP_CHOWN, which only
+## a root-effective-uid process holds inside a container. With the manager
+## as UID 1000, every OpenCode subprocess inherited UID 1000 too, so worker
+## A could `cat /workspace/sessions/<worker-B>/.config/opencode/config.json`
+## and steal worker B's project API key + GitHub token (PR #4913 review).
+##
+## Mitigations that keep the blast radius small even with root in the pod:
+##   - Drop ALL caps and add back ONLY what's strictly required: the five
+##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE/FOWNER —
+##     FOWNER lets root chmod a per-worker dir it has already chowned away
+##     to the worker UID). NET_ADMIN was dropped alongside the iptables
+##     lockdown it existed for — the worker→worker exfil hole it guarded is
+##     now closed by opencode's own per-worker password (ADR-033 Fix A′),
+##     which needs no netfilter. No SYS_*.
+##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
+##     cannot regain caps via setuid binaries.
+##   - readOnlyRootFilesystem stays on so a worker can't pivot through
+##     `/etc` or `/usr`.
+##   - fsGroup intentionally OMITTED — setting it would group-share every
+##     worker's files and re-open the cross-worker boundary.
+##   - runtimeClassName: gvisor (operator-set) hardens the pod->node escape
+##     surface, complementary to the in-pod per-UID isolation.
+podSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  # fsGroup intentionally absent — see header.
+
+containerSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+    # CHOWN, DAC_OVERRIDE, SETUID, SETGID are required so the manager can
+    # chown per-session dirs to a unique UID, write 0600 config blobs as
+    # that UID, and spawn the OpenCode subprocess directly into it.
+    #
+    # FOWNER is required because setupWorkerHome (worker.go) chowns the
+    # per-worker home to the worker UID and THEN chmods it 0700. Once the
+    # dir is owned by the worker UID, root (UID 0) can only chmod it with
+    # CAP_FOWNER — DAC_OVERRIDE does not cover the chmod ownership check.
+    # Without FOWNER every spawn dies with "chmod home: operation not
+    # permitted" (verified live on the dev gVisor node 2026-07-07). Not
+    # gVisor-specific: the same EPERM occurs on runc under drop-ALL.
+    #
+    # NET_ADMIN was previously added (2026-06-30) for an iptables OUTPUT rule
+    # dropping loopback-TCP from non-root UIDs to the opencode internal port
+    # range. That rule (services/langyagent/iptables.go) is deleted in this
+    # change — dead under gVisor (no netfilter) and superseded by the
+    # per-worker OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′) — so NET_ADMIN is
+    # dropped here too. Nothing else in the manager touches the network stack.
+    #
+    # Any addition beyond this needs to be justified in the
+    # SecurityContext header above.
+    add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID"]
+
+# Sandboxed container runtime for this pod. The agent runs LLM-driven
+# arbitrary code (opencode workers shell out to git/npm/gh), so the headline
+# risk is a worker breaking OUT of the container to the node. The default
+# `gvisor` (runsc) inserts a user-space kernel between the worker and the
+# host kernel and shrinks that node-escape surface — required posture for
+# this workload.
+#
+# OPERATOR REQUIREMENT — the cluster MUST define a `gvisor` RuntimeClass
+# before the langyagent chart is enabled (`langyagent.chartManaged: true`).
+# Without it, pods will fail to schedule with
+#   FailedCreatePodSandBox: ... runtimeclasses.node.k8s.io "gvisor" not found
+# Install via the gVisor operator or by applying the RuntimeClass manifest
+# from https://gvisor.dev/docs/user_guide/install/. The langyagent chart
+# refuses to deploy with chartManaged=true and an unset/empty runtimeClass
+# would be a security regression, so the default is opinionated.
+#
+# To opt OUT (NOT recommended; documented for completeness): set
+#   runtimeClassName: ""
+# which omits the field from the pod spec → kubelet uses the node default
+# runtime (runc/containerd, no sandbox). Worker→worker isolation inside the
+# pod is still enforced by the per-UID + bearer-token authproxy work, but
+# pod→host isolation reverts to standard cgroups + namespaces only.
+runtimeClassName: "gvisor"
+
+networkPolicy:
+  enabled: true
+  # langyagent is a subchart of the langwatch chart, so it shares the release.
+  # By default the policy targets the sibling pods that chart actually renders
+  # (templated from .Release in networkpolicy.yaml):
+  #   control plane -> app.kubernetes.io/name: <release>-app, instance: <release>
+  #   gateway       -> app.kubernetes.io/name: gateway,       instance: <release>
+  # Override any list below ONLY for a non-standard topology; an empty list
+  # means "use the release-aware default".
+  ingressFrom: []
+  controlPlanePort: 5560
+  # The gateway pod (charts/gateway) listens on containerPort 5563 — NOT 80.
+  # NetworkPolicy egress uses a podSelector + ports[].port, which Kubernetes
+  # matches against the destination POD port (post-DNAT), not the Service
+  # port. The earlier value 80 was the Service port: traffic to the gateway
+  # at 5563 was dropped, so opencode couldn't reach the gateway and Langy
+  # was dead-on-arrival the moment an operator enabled `chartManaged: true`.
+  egressToControlPlane: []
+  gatewayPort: 5563
+  egressToGateway: []
+  # External HTTPS egress for OpenCode workers — needed for `git clone`,
+  # `gh` API calls, npm/pip installs the LLM-driven tools shell out to, and
+  # opencode's own update/telemetry. Default false: this pod runs LLM-
+  # driven arbitrary shell with the user's API key + GitHub user-to-server
+  # token in env, so default-on egress IS the most dangerous posture (a
+  # prompt-injection can curl creds to attacker-controlled IPs). Private
+  # ranges + the cloud metadata service are blocked below regardless, but
+  # operators who actually need PR-opening / git-clone must opt in
+  # explicitly here. Sergio's 2026-06-30 review round 3.
+  #
+  # ADR-043 rung 4: this `0.0.0.0/0:443` rule is the L3/L4 backstop. FQDN
+  # bounding ("only github/npm/…") is NOT expressible at L3/L4 and is instead
+  # enforced at L7 by the per-worker egress adapter (see `egress` below), which
+  # is now the SOLE egress path for workers (their tools egress via HTTPS_PROXY).
+  # Because the adapter shares the pod netns with the workers, this rule cannot
+  # be narrowed by podSelector to "only the adapter" — L4 can't tell adapter
+  # bytes from worker bytes. Operators who need bypass-proof FQDN egress enable
+  # `egress.cilium.enabled` below (a datapath `toFQDNs` policy) or the ADR-033
+  # Fix B per-worker netns; both enforce the SAME floor the adapter does.
+  allowExternalHttps: false
+  # Internal / private IP ranges CARVED OUT of the `:443`-to-anywhere rule
+  # (which is rendered only when allowExternalHttps=true). A compromised worker
+  # (RCE via prompt injection / supply chain) must not use that public-egress
+  # rule to pivot onto internal services on :443 — the kube-apiserver, neighbour
+  # pods, node kubelet, sidecars, or the cloud metadata service
+  # (169.254.169.254, classic SSRF -> IAM credential theft). These `except`
+  # entries also close the DNS-rebinding vector: an attacker hostname that
+  # re-resolves to an internal IP is dropped by IP, not admitted by name.
+  # Legitimate cluster-internal traffic (control plane, gateway, DNS) uses the
+  # explicit podSelector rules above and is unaffected by this list.
+  #
+  # The :80 (plaintext) side: there is deliberately NO :80 egress rule anywhere
+  # in this policy, so IMDSv2 over http://169.254.169.254 (port 80) is denied by
+  # DEFAULT-DENY, independently of this list. Do NOT add a broad :80 egress rule
+  # without re-adding 169.254.0.0/16 protection there too.
+  #
+  # Operators on a non-standard topology (a service CIDR outside RFC1918, extra
+  # VPC CIDRs) APPEND their ranges here — the template iterates the list.
+  privateExcept:
+    - 10.0.0.0/8          # RFC1918 (covers the EKS default service CIDR 10.100/16)
+    - 172.16.0.0/12       # RFC1918 (covers the EKS default service CIDR 172.20/16)
+    - 192.168.0.0/16      # RFC1918
+    - 169.254.0.0/16      # link-local + cloud metadata (169.254.169.254)
+    - 100.64.0.0/10       # RFC 6598 CGNAT — EKS "custom networking" / secondary
+                          # CIDR places PODS (and sometimes NODES + the apiserver
+                          # ENI) here; NOT covered by RFC1918, so it MUST be
+                          # excluded or a worker reaches neighbours on :443.
+  privateExceptV6:
+    - fd00::/8            # unique-local (incl. IPv6 metadata fd00:ec2::254)
+    - fe80::/10           # link-local
+
+# Egress enforcement (ADR-043) — the per-worker L7 egress adapter. Monitor
+# first, enforce last: the default posture is monitor-only. These map to the
+# manager's LANGY_EGRESS_* env via the ConfigMap.
+egress:
+  # OPERATOR FLOOR, NOT CUSTOMER POLICY. The always-allowed structural
+  # destinations Langy needs regardless of any per-project allow-list
+  # (floor ∪ customer-list). Only make this a hard ceiling (enforceFloor) once
+  # monitoring has proven this set is complete for your install. The gateway +
+  # control plane already have their own explicit egress rules and are
+  # NO_PROXY'd, so this list is the external hosts the workers structurally
+  # reach.
+  fqdnFloor:
+    - github.com
+    - api.github.com
+    - codeload.github.com
+  # rung 1a: refuse cleartext forwards and non-:443 CONNECTs. Always-safe
+  # (worker egress is HTTPS already); on by default.
+  requireTls: true
+  # rung 3 lever: make the floor a HARD CEILING for projects that set no
+  # allow-list. OFF by default — the stock posture stays monitor-only so an
+  # install that configures nothing upgrades into watching, not blocking. Flip
+  # ON per install only after reading the monitoring.
+  enforceFloor: false
+  # Peek the TLS ClientHello SNI as an anti-domain-fronting cross-check of the
+  # CONNECT authority. Cheap; on by default.
+  sniCrossCheck: true
+  # Optional bypass-proof upgrade: a Cilium CiliumNetworkPolicy with `toFQDNs`
+  # enforces the SAME floor at the datapath, which a worker cannot bypass by
+  # ignoring HTTPS_PROXY. Requires the Cilium CNI. The stock default is the
+  # cooperative adapter + monitored bypass (ADR-043 "honest limit"); this is the
+  # opt-in mandatory-enforcement path. The non-Cilium equivalent is the ADR-033
+  # Fix B per-worker netns.
+  cilium:
+    enabled: false
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Node placement for the agent pod. Rendered by deployment.yaml only when set;
+# empty (the default) keeps existing behaviour — the scheduler places the pod on
+# any eligible node.
+#
+# DEFENCE-IN-DEPTH — public-subnet placement (opt-in). This pod runs LLM-driven
+# arbitrary shell (worker RCE is in-scope). Pinning it to a node group whose
+# subnet has NO route to private RDS / ElastiCache / internal ALBs means that
+# even if the NetworkPolicy AND gVisor are both bypassed, the node itself cannot
+# reach the private data tier — the network topology becomes the last-resort
+# wall. The public subnet still egresses to the internet (via an internet
+# gateway) for git/gh/npm; the point is it has no private-subnet return route.
+#
+# This requires infra-side setup that lives in the Terraform/EKS repo, NOT this
+# chart: a dedicated managed node group in the PUBLIC subnet, labelled (e.g.
+# langwatch.ai/workload=langy-public) and tainted so only this pod lands there.
+# The chart's job is only to select+tolerate that node group. Example:
+#
+#   nodeSelector:
+#     langwatch.ai/workload: langy-public
+#   tolerations:
+#     - key: langwatch.ai/workload
+#       operator: Equal
+#       value: langy-public
+#       effect: NoSchedule
+#
+# Prefer nodeSelector for a hard pin; use affinity for soft/weighted rules.
+nodeSelector: {}
+affinity: {}
+tolerations: []

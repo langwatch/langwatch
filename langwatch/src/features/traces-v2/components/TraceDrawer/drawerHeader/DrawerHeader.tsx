@@ -37,7 +37,6 @@ import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useSpanTree } from "../../../hooks/useSpanTree";
 import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigation";
-import { useTraceHeader } from "../../../hooks/useTraceHeader";
 import { useTraceRefresh } from "../../../hooks/useTraceRefresh";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
@@ -55,6 +54,7 @@ import {
   SPAN_TYPE_COLORS,
   STATUS_COLORS,
 } from "../../../utils/formatters";
+import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { TooltipRow } from "../../shared/TooltipRow";
@@ -72,7 +72,8 @@ import {
   type PinCategory,
   renderPinPills,
 } from "./PinStrip";
-import { ThreadProgressIndicator } from "./ThreadProgressIndicator";
+import { ShareTraceDialog } from "./ShareTraceDialog";
+import { SyntheticTraceBadge } from "./SyntheticTraceBadge";
 import { TraceOverflowMenu } from "./TraceOverflowMenu";
 import { useRetainedTraceHeader } from "./useRetainedTraceHeader";
 import {
@@ -85,6 +86,12 @@ interface DrawerHeaderProps {
   trace: TraceHeader;
   /** Parent's drawer-close handler (URL teardown). */
   onClose: () => void;
+  /**
+   * Public share view: no session, no drawer to close. Suppresses every
+   * affordance that mutates, needs a session, or only makes sense inside the
+   * drawer chrome. See TraceViewerContext.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -410,11 +417,6 @@ interface HoistedPinDef {
 }
 
 const HOISTED_AUTO_PINS: HoistedPinDef[] = [
-  // Conversation / thread are surfaced via the clickable
-  // ThreadProgressIndicator in row 2 when this trace lives in a multi-turn
-  // conversation. The auto-pins below stay as the fallback for single-turn
-  // traces — the resolution logic skips them when the indicator is showing.
-  //
   // Only `Conversation` is hoisted. The legacy `Thread` chip used to live
   // here and fell back to `conversationId` when no explicit thread was set,
   // which produced two chips with the same value side-by-side in the
@@ -478,6 +480,7 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
 export const DrawerHeader = memo(function DrawerHeader({
   trace: traceProp,
   onClose,
+  readOnly = false,
 }: DrawerHeaderProps) {
   // Retain attribute-derived fields across payload flaps (row-data seed →
   // full summary → refetch) so chips never vanish once shown for the same
@@ -508,14 +511,13 @@ export const DrawerHeader = memo(function DrawerHeader({
 
   const { canGoBack, goBack, goBackTo, backStackDepth, backStack } =
     useTraceDrawerNavigation();
-  const headerQuery = useTraceHeader();
-  const isNavigating = headerQuery.isFetching;
 
   const statusColor = STATUS_COLORS[trace.status] as string;
   const { project } = useOrganizationTeamProject();
   const dejaView = useDejaViewLink({
     aggregateId: trace.traceId,
     tenantId: project?.id,
+    enabled: !readOnly,
   });
 
   // Cache + reasoning are summed across the trace's spans by the fold and
@@ -586,21 +588,6 @@ export const DrawerHeader = memo(function DrawerHeader({
   // pin shape change.
   const applyQueryTextFromPin = useFilterStore((s) => s.applyQueryText);
   const { closeDrawer, openDrawer } = useDrawer();
-  // When the trace lives in a multi-turn conversation the
-  // ThreadProgressIndicator already exposes the conversation id (with copy
-  // + filter affordances), so the conversation / thread auto-pins would be
-  // redundant. Skip them in that case to keep the strip lean.
-  // While the conversation context is still resolving we don't yet know
-  // whether the indicator will take over — render the chip optimistically
-  // and the half-second flap ("chip shows, context lands with total > 1,
-  // chip unmounts") is exactly the flash users reported. Treat "unknown"
-  // as covered so the chip only ever *appears* (once we know the trace is
-  // single-turn) and never appears-then-vanishes.
-  const conversationCoveredByIndicator =
-    conversationContext.total > 1 ||
-    (!!trace.conversationId &&
-      conversationContext.isLoading &&
-      conversationContext.turns.length === 0);
   // Resolve auto + user pins into a single array with category buckets so the
   // strip can group them with subtle dividers between identity / run / tag /
   // custom. Auto-pins are skipped when the user has already pinned the same
@@ -655,13 +642,6 @@ export const DrawerHeader = memo(function DrawerHeader({
       }
     };
     for (const def of HOISTED_AUTO_PINS) {
-      if (
-        conversationCoveredByIndicator &&
-        (def.key === "gen_ai.conversation.id" ||
-          def.key === "langwatch.thread_id")
-      ) {
-        continue;
-      }
       // The rich `Scenario run` chip (built from `useScenarioChipData`
       // in `TraceHeaderChips`) already surfaces the scenario run id with
       // status + criteria + click-to-open behaviour. The plain hoisted
@@ -777,7 +757,6 @@ export const DrawerHeader = memo(function DrawerHeader({
     pins,
     trace,
     resources.resourceAttributes,
-    conversationCoveredByIndicator,
     toggleFacet,
     applyQueryTextFromPin,
     closeDrawer,
@@ -791,6 +770,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   };
 
   const [rawOpen, setRawOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Local listener for the `\` shortcut. Lives here (rather than in
   // TraceDrawerShell) because the raw-JSON dialog's open state is also
@@ -909,7 +889,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           with hover-to-expand + click-to-copy. */}
       <HStack justify="space-between" align="center" gap={2.5} minWidth={0}>
         <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
-          {canGoBack && (
+          {canGoBack && !readOnly && (
             <MenuRoot>
               <Tooltip
                 content={
@@ -973,28 +953,25 @@ export const DrawerHeader = memo(function DrawerHeader({
             </MenuRoot>
           )}
           <TraceIdChip traceId={trace.traceId} />
-          <EditableTraceName
-            traceId={trace.traceId}
-            titleText={titleText}
-            titleIsFallback={titleIsFallback}
-          />
-          <StatusChip trace={trace} statusColor={statusColor} />
-          {conversationContext.total > 1 && (
-            <ThreadProgressIndicator
-              position={conversationContext.position}
-              total={conversationContext.total}
-              conversationId={trace.conversationId}
-              onFilterByConversation={
-                trace.conversationId
-                  ? () => {
-                      toggleFacet("conversation", trace.conversationId!);
-                      closeDrawer();
-                    }
-                  : undefined
-              }
-              isLoading={isNavigating}
+          {readOnly ? (
+            // Renaming is a mutation; a share viewer has no session to make it.
+            <Text
+              fontSize="sm"
+              fontWeight="600"
+              color={titleIsFallback ? "fg.muted" : "fg"}
+              lineClamp={1}
+            >
+              {titleText}
+            </Text>
+          ) : (
+            <EditableTraceName
+              traceId={trace.traceId}
+              titleText={titleText}
+              titleIsFallback={titleIsFallback}
             />
           )}
+          <StatusChip trace={trace} statusColor={statusColor} />
+          <SyntheticTraceBadge attributes={trace.attributes} />
         </HStack>
 
         {/* Negative marginRight cancels the header's paddingX so the
@@ -1005,112 +982,120 @@ export const DrawerHeader = memo(function DrawerHeader({
             button sits ~8px from the top of the drawer chrome, the
             VStack's paddingTop={3} (12px) puts ours too low without
             this offset. */}
-        <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
-                <Kbd>R</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={() => void handleRefresh()}
-              disabled={isRefreshing}
-              aria-label="Refresh trace"
-              css={
-                isRefreshing
-                  ? {
-                      "& svg": {
-                        animation:
-                          "tracesV2DrawerRefreshSpin 0.9s linear infinite",
-                      },
-                      "@keyframes tracesV2DrawerRefreshSpin": {
-                        from: { transform: "rotate(0deg)" },
-                        to: { transform: "rotate(360deg)" },
-                      },
-                    }
-                  : undefined
+        {/* The whole action cluster is drawer chrome or needs a session:
+            refresh, maximize, the overflow menu (which fires
+            `pinnedTrace.getPin` on mount), dock and close. It must be
+            unmounted, not hidden — `display:none` would still run the menu's
+            queries. */}
+        {!readOnly && (
+          <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
+            <Tooltip
+              content={
+                <HStack gap={1}>
+                  <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
+                  <Kbd>R</Kbd>
+                </HStack>
               }
+              positioning={{ placement: "bottom" }}
             >
-              <Icon as={LuRefreshCw} boxSize={3.5} />
-            </Button>
-          </Tooltip>
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
-                <Kbd>M</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={handleMaximizeClick}
-              aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing}
+                aria-label="Refresh trace"
+                css={
+                  isRefreshing
+                    ? {
+                        "& svg": {
+                          animation:
+                            "tracesV2DrawerRefreshSpin 0.9s linear infinite",
+                        },
+                        "@keyframes tracesV2DrawerRefreshSpin": {
+                          from: { transform: "rotate(0deg)" },
+                          to: { transform: "rotate(360deg)" },
+                        },
+                      }
+                    : undefined
+                }
+              >
+                <Icon as={LuRefreshCw} boxSize={3.5} />
+              </Button>
+            </Tooltip>
+            <Tooltip
+              content={
+                <HStack gap={1}>
+                  <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
+                  <Kbd>M</Kbd>
+                </HStack>
+              }
+              positioning={{ placement: "bottom" }}
             >
-              <Icon
-                as={isMaximized ? LuMinimize2 : LuMaximize2}
-                boxSize={3.5}
-              />
-            </Button>
-          </Tooltip>
-          <TraceOverflowMenu
-            traceId={trace.traceId}
-            conversationId={trace.conversationId}
-            onCopyTraceId={handleCopyTraceId}
-            onFindSimilar={findSimilarQuery ? handleFindSimilar : null}
-            dejaViewHref={dejaView.href ?? null}
-            onOpenRawJson={() => setRawOpen(true)}
-            onShowShortcuts={() => setShortcutsOpen(true)}
-            pinned={pinned}
-            onTogglePinned={togglePinned}
-          />
-          <Box
-            width="1px"
-            height="16px"
-            bg="border.muted"
-            marginX={0.5}
-            flexShrink={0}
-          />
-          <Tooltip
-            content={
-              <HStack gap={1}>
-                <Text>Close</Text>
-                <Kbd>Esc</Kbd>
-              </HStack>
-            }
-            positioning={{ placement: "bottom" }}
-          >
-            {/* Plain ghost Button — the standard Chakra `CloseButton`
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={handleMaximizeClick}
+                aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
+              >
+                <Icon
+                  as={isMaximized ? LuMinimize2 : LuMaximize2}
+                  boxSize={3.5}
+                />
+              </Button>
+            </Tooltip>
+            <TraceOverflowMenu
+              traceId={trace.traceId}
+              conversationId={trace.conversationId}
+              onCopyTraceId={handleCopyTraceId}
+              onFindSimilar={findSimilarQuery ? handleFindSimilar : null}
+              dejaViewHref={dejaView.href ?? null}
+              onOpenRawJson={() => setRawOpen(true)}
+              onShowShortcuts={() => setShortcutsOpen(true)}
+              onShare={() => setShareOpen(true)}
+              pinned={pinned}
+              onTogglePinned={togglePinned}
+            />
+            <Box
+              width="1px"
+              height="16px"
+              bg="border.muted"
+              marginX={0.5}
+              flexShrink={0}
+            />
+            <Tooltip
+              content={
+                <HStack gap={1}>
+                  <Text>Close</Text>
+                  <Kbd>Esc</Kbd>
+                </HStack>
+              }
+              positioning={{ placement: "bottom" }}
+            >
+              {/* Plain ghost Button — the standard Chakra `CloseButton`
                 (IconButton wrapper) intermittently swallowed the click
                 under our Drawer.Root setup: the URL stripped fine but
                 the drawer didn't unmount, leaving the operator stuck.
                 A bare Button calling `onClose` directly is the same
                 pattern this drawer used pre-revamp and behaves
                 reliably across Chakra's Drawer focus management. */}
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={onClose}
-              aria-label="Close drawer"
-              paddingX={1.5}
-              paddingY={1.5}
-              height="auto"
-              minWidth="auto"
-              color="fg.muted"
-              _hover={{ bg: "bg.muted", color: "fg" }}
-              _active={{ bg: "bg.emphasized" }}
-            >
-              <Icon as={LuX} boxSize={4} strokeWidth={2.25} />
-            </Button>
-          </Tooltip>
-        </HStack>
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={onClose}
+                aria-label="Close drawer"
+                paddingX={1.5}
+                paddingY={1.5}
+                height="auto"
+                minWidth="auto"
+                color="fg.muted"
+                _hover={{ bg: "bg.muted", color: "fg" }}
+                _active={{ bg: "bg.emphasized" }}
+              >
+                <Icon as={LuX} boxSize={4} strokeWidth={2.25} />
+              </Button>
+            </Tooltip>
+          </HStack>
+        )}
       </HStack>
 
       {/* Row 2: Unified context strip. Three logical sections — performance
@@ -1260,6 +1245,9 @@ export const DrawerHeader = memo(function DrawerHeader({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           hasConversation={!!trace.conversationId}
+          // Conversation mode needs a session (tracesV2.list + annotation
+          // reads), so share viewers don't get the tab at all. See ADR-057.
+          isConversationHidden={readOnly}
           // `useConversationContext` returns `isLoading: true` while the
           // turns are in flight; combined with `turns.length === 0` it
           // means the conversation hasn't resolved yet. We only want the
@@ -1271,6 +1259,15 @@ export const DrawerHeader = memo(function DrawerHeader({
             conversationContext.turns.length === 0
           }
           traceId={trace.traceId}
+          // Usage/Terminal ride the session-backed tracesV2 reads, which are
+          // protected — share viewers don't get those tabs either.
+          showTerminal={
+            !readOnly &&
+            isTerminalOrigin({
+              serviceName: trace.serviceName,
+              origin: trace.origin,
+            })
+          }
           endSlot={
             <HStack gap={2}>
               {/* Presence avatars sit at the trailing edge of the mode-tab
@@ -1318,6 +1315,14 @@ export const DrawerHeader = memo(function DrawerHeader({
         onClose={() => setRawOpen(false)}
         trace={trace}
       />
+      {!readOnly && (
+        <ShareTraceDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          projectId={project?.id}
+          traceId={trace.traceId}
+        />
+      )}
     </VStack>
   );
 });

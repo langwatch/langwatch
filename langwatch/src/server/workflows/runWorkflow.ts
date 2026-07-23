@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { addEnvs } from "../../optimization_studio/server/addEnvs";
@@ -6,13 +7,13 @@ import type {
   Workflow,
 } from "../../optimization_studio/types/dsl";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
+import { migrateDSLVersion } from "../../optimization_studio/types/migrate";
 import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
-import { nlpgoFetch, type NLPOrigin } from "../nlpgo/nlpgoFetch";
 import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators";
 import type { MaybeStoredModelProvider } from "../modelProviders/registry";
-import { createLogger } from "../../utils/logger";
+import { type NLPOrigin, nlpgoFetch } from "../nlpgo/nlpgoFetch";
 import { stripUnsupportedLLMParamsFromWorkflow } from "./stripUnsupportedLLMParams";
 
 const logger = createLogger("langwatch:workflows:runWorkflow");
@@ -25,7 +26,6 @@ const getWorkFlow = (state: Workflow) => {
     icon: state.icon,
     description: state.description,
     version: state.version,
-    default_llm: state.default_llm,
     enable_tracing: state.enable_tracing,
     nodes: state.nodes,
     edges: state.edges,
@@ -208,7 +208,13 @@ export async function runWorkflow(
     throw new Error("Published workflow version not found.");
   }
 
-  const workflowData = publishedWorkflowVersion.dsl as unknown as Workflow;
+  // Published versions can predate the node-owned LLM config migration
+  // (spec_version 1.5): migrate on read so legacy workflows whose nodes
+  // relied on the old workflow-level default_llm still dispatch with a
+  // model on every LLM node.
+  const workflowData = migrateDSLVersion(
+    publishedWorkflowVersion.dsl as unknown as Workflow,
+  );
   const modelProviders = await getProjectModelProviders(projectId);
 
   // Validate inputs and LLM keys

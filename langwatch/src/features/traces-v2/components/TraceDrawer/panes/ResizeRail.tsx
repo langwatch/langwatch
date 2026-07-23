@@ -78,10 +78,7 @@ export function ResizeRail() {
         typeof window !== "undefined"
           ? window.innerWidth - DRAWER_MAXIMIZE_EDGE_PX
           : Number.POSITIVE_INFINITY;
-      let clamped = Math.max(
-        DRAWER_MIN_WIDTH_PX,
-        Math.min(maxWidth, proposed),
-      );
+      let clamped = Math.max(DRAWER_MIN_WIDTH_PX, Math.min(maxWidth, proposed));
       // Magnet snap: when the user drags the rail within ~32px of the
       // viewport edge (i.e., proposed width is within 32px of max), snap
       // to the max-edge value so it's easy to commit a full-screen

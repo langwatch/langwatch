@@ -4,11 +4,13 @@ import { motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Columns, X } from "react-feather";
+import { Columns, Copy, MoreHorizontal, Trash2, X } from "react-feather";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { Drawer } from "~/components/ui/drawer";
+import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Component, ComponentType } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
@@ -16,7 +18,6 @@ import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { ComponentExecutionButton, getNodeDisplayName } from "../nodes/Nodes";
 import { DrawerFooterContext } from "./useInsideDrawer";
-import { Tooltip } from "~/components/ui/tooltip";
 
 /**
  * Determines whether a node type supports the expand (Input/Output panels)
@@ -52,14 +53,21 @@ export function StudioDrawerWrapper({
   onClose,
   footer,
 }: StudioDrawerWrapperProps) {
-  const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded } =
-    useWorkflowStore(
-      useShallow((state) => ({
-        deselectAllNodes: state.deselectAllNodes,
-        propertiesExpanded: state.propertiesExpanded,
-        setPropertiesExpanded: state.setPropertiesExpanded,
-      })),
-    );
+  const {
+    deselectAllNodes,
+    propertiesExpanded,
+    setPropertiesExpanded,
+    duplicateNode,
+    deleteNode,
+  } = useWorkflowStore(
+    useShallow((state) => ({
+      deselectAllNodes: state.deselectAllNodes,
+      propertiesExpanded: state.propertiesExpanded,
+      setPropertiesExpanded: state.setPropertiesExpanded,
+      duplicateNode: state.duplicateNode,
+      deleteNode: state.deleteNode,
+    })),
+  );
 
   // Footer registered by child components via useRegisterDrawerFooter
   const [registeredFooter, setRegisteredFooter] =
@@ -164,6 +172,41 @@ export function StudioDrawerWrapper({
               </Button>
             </Tooltip>
           </>
+        )}
+        {isExpandableNode(node) && (
+          <Menu.Root positioning={{ placement: "bottom-end" }}>
+            <Menu.Trigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                color="fg.muted"
+                aria-label="Node actions"
+              >
+                <MoreHorizontal size={16} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item
+                value="duplicate"
+                onClick={() => duplicateNode(node.id)}
+              >
+                <Copy size={14} />
+                Duplicate
+              </Menu.Item>
+              <Menu.Item
+                value="delete"
+                onClick={() => {
+                  deleteNode(node.id);
+                  setPropertiesExpanded(false);
+                  deselectAllNodes();
+                  onClose();
+                }}
+              >
+                <Trash2 size={14} />
+                Delete
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
         )}
         <Button
           variant="ghost"

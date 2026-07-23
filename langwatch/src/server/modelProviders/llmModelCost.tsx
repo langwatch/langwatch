@@ -1,9 +1,13 @@
 import type { PrismaClient } from "@prisma/client";
-import escapeStringRegexp from "escape-string-regexp";
 import { prisma } from "../db";
 import { resolveScopeChain } from "../scopes/resolveScopeChain";
 import type { ScopeTier } from "../scopes/scope.types";
 import { llmModels } from "./loadModelCatalog";
+
+// Inlined from escape-string-regexp to preserve the previous escaping behavior.
+function escapeStringRegexp(value: string): string {
+  return value.replace(/[|\\{}()[\]^$+*?.]/g, "\\$&").replace(/-/g, "\\x2d");
+}
 
 const getImportedModelCosts = () => {
   const models = llmModels.models;

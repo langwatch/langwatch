@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
+import { havenHmrGate } from "./vite/havenHmrGate";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -12,9 +13,16 @@ import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawe
 // The API server (`server.mts`) loads its own copy via `dotenv.config()`
 // the same way; doing it here keeps both processes reading from one
 // source of truth.
-dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config({ path: path.resolve(__dirname, ".env"), quiet: true });
+// Portless (haven) overlay wins: loaded after .env with override so the
+// resolved app port + api hostname take effect. Absent in non-portless runs.
+dotenv.config({
+  path: path.resolve(__dirname, ".env.portless"),
+  override: true,
+  quiet: true,
+});
 
-const FRONTEND_PORT = parseInt(process.env.PORT ?? "5560");
+const FRONTEND_PORT = parseInt(process.env.LANGWATCH_APP_PORT ?? process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
 // When `LANGWATCH_DEV_HTTP2=1` is set, Vite serves the SPA over
@@ -24,6 +32,15 @@ const API_PORT = FRONTEND_PORT + 1000;
 // asks to trust the cert once for the whole local stack.
 const USE_HTTP2 = process.env.LANGWATCH_DEV_HTTP2 === "1";
 const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
+// In portless (haven) mode the app and its API are ONE origin
+// (app.<slug>.langwatch.localhost): the SPA is served here and /api/* is proxied
+// straight to the API backend on loopback. Proxying to loopback (not the app's
+// own public hostname) avoids a self-proxy loop and needs no TLS/CA. Outside
+// portless we keep the legacy PORT+1000 target (or an explicit LANGWATCH_API_URL).
+const API_TARGET =
+  process.env.LANGWATCH_PORTLESS === "1"
+    ? `http://127.0.0.1:${process.env.LANGWATCH_API_PORT ?? API_PORT}`
+    : (process.env.LANGWATCH_API_URL ?? `${API_PROTOCOL}://localhost:${API_PORT}`);
 
 /**
  * Load (and lazily generate) the dev TLS credentials. Mirrors
@@ -127,18 +144,19 @@ export default defineConfig(async (): Promise<UserConfig> => {
   }
 
   return {
-  plugins: [react(), patchObjectInspectBrowserStub()],
+  plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
   resolve: {
     alias: {
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
       "@ee": path.resolve(__dirname, "./ee"),
-
-      // Browser stubs for Node.js-only modules
-      "pino-pretty": path.resolve(__dirname, "./src/noop-css.cjs"),
-      "pino": path.resolve(__dirname, "node_modules/pino/browser.js"),
     },
+    // ONE zod instance for the app AND linked workspace packages
+    // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
+    // z.record's key/value overload detection), so a second physical copy
+    // resolved from a package's own node_modules silently mis-parses.
+    dedupe: ["zod"],
   },
   define: {
     // Literal replacements for process.env references in browser code.
@@ -196,7 +214,10 @@ export default defineConfig(async (): Promise<UserConfig> => {
         "**/dist/**",
         "**/.next/**",
         "**/coverage/**",
-        "**/server.log",
+        // Any dev-server tee target (server.log, server-qa.log, ...): the
+        // server appends on every request, so watching one turns each page
+        // load into a full-reload loop.
+        "**/server*.log",
       ],
       // Docker-on-macOS bind mounts don't surface inotify events reliably,
       // so Vite's default fs.watch sits silent on edits made from the host.
@@ -235,41 +256,64 @@ export default defineConfig(async (): Promise<UserConfig> => {
     // production server (start.ts) listens on a single port so this
     // splitting is dev-only.
     proxy: {
+      // The tRPC WS transport enforces a same-origin allowlist (built from
+      // NEXTAUTH_URL) and fail-closes on a missing/mismatched Origin. The
+      // catch-all `/api` proxy below sets `changeOrigin: true`, which rewrites
+      // the WS handshake Origin so the backend sees a null/foreign origin and
+      // rejects every upgrade — silently breaking all WS-backed workbench
+      // state. A dedicated, earlier entry keeps the browser's real Origin.
+      "/api/trpc-ws": {
+        target: API_TARGET,
+        changeOrigin: false,
+        ws: true,
+        secure: false,
+      },
       "/api": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         ws: true,
         // Self-signed dev cert — don't fail the proxy on cert verification.
         // No-op when API is on plain HTTP.
         secure: false,
       },
-      "/mcp": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+      // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
+      // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
+      // sending it to the API server, which has no dev-mode page fallback.
+      // server.proxy regexes test against the full req.url (path + query),
+      // so the optional "(?:\?.*)?" is required or a query-bearing request
+      // like "/mcp?sessionId=..." falls through to the frontend instead.
+      "^/mcp(?:\\?.*)?$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      "^/mcp/health(?:\\?.*)?$": {
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/sse": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/messages": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/oauth": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/.well-known/oauth-protected-resource": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },
       "/.well-known/oauth-authorization-server": {
-        target: `${API_PROTOCOL}://localhost:${API_PORT}`,
+        target: API_TARGET,
         changeOrigin: true,
         secure: false,
       },

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NurturingService } from "./nurturing.service";
 
 /**
@@ -11,7 +11,7 @@ import { NurturingService } from "./nurturing.service";
  */
 
 // Suppress logger and captureException
-vi.mock("../../../src/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     info: vi.fn(),
     warn: vi.fn(),
@@ -54,6 +54,7 @@ describe("NurturingService app wiring", () => {
   });
 
   describe("when the app config has no customerIoApiKey", () => {
+    /** @scenario 'Service is undefined when CUSTOMER_IO_API_KEY is absent' */
     it("produces undefined (no service created)", () => {
       // This mirrors what presets.ts does: undefined when no API key
       const apiKey: string | undefined = undefined;
@@ -68,6 +69,7 @@ describe("NurturingService app wiring", () => {
   });
 
   describe("when the app config has no customerIoRegion", () => {
+    /** @scenario 'Region defaults to EU when CUSTOMER_IO_REGION is not set' */
     it("defaults to the EU regional endpoint", async () => {
       const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
         new Response(null, { status: 200 }),
@@ -85,6 +87,7 @@ describe("NurturingService app wiring", () => {
   });
 
   describe("when createTestApp is called", () => {
+    /** @scenario 'Test app passes no NurturingService' */
     it("nurturing is undefined (no service in tests)", () => {
       // createTestApp() passes nurturing: undefined
       const nurturing: NurturingService | undefined = undefined;

@@ -155,6 +155,18 @@ Rule: Search bar keyboard shortcuts
     When the user presses Tab
     Then the highlighted suggestion is inserted into the search bar
 
+  # The search bar used to carry a lightbulb button whose popover listed
+  # these tips. That was one more button crowding the bar; the tips now live
+  # in the single keyboard-shortcuts dialog (opened with "?") alongside every
+  # other shortcut, so there is one place to look.
+  Scenario: Search tips live in the keyboard shortcuts dialog
+    Given the search bar is shown
+    Then there is no lightbulb "Search shortcuts" button next to it
+    When the user opens the keyboard shortcuts dialog with "?"
+    Then a "Search" section lists: Ask AI to build a query (⌘/Ctrl I),
+      combine a facet with OR (Shift or ⌘/Ctrl click), and flip an operator
+      by clicking AND / OR in the query
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # QUERY SYNTAX
@@ -413,66 +425,6 @@ Rule: Filter column collapse and expand
     Given the user collapses or expands the sidebar
     When the user navigates away and returns to the Observe page
     Then the sidebar restores from `langwatch:traces-v2:ui` in localStorage
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FACET FINDER — FILTER THE SIDEBAR'S FACETS BY NAME
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Facet finder
-  A search control in the sidebar header filters which facet SECTIONS are
-  shown, so the user can jump to a facet by name without scrolling. It filters
-  the already-visible facets in place — it does not change which facets are
-  enabled (that is Configure) and does not search facet values (that is the
-  per-facet value search).
-
-  Background:
-    Given the user is authenticated with "traces:view" permission
-    And the sidebar shows the Model, Cost, Duration, and Status facets
-
-  Scenario: The finder is collapsed until invoked
-    Then a facet-finder search icon is shown in the sidebar header
-    And no finder input is shown
-
-  Scenario: Opening the finder focuses the input
-    When the user clicks the facet-finder icon
-    Then a "Find a facet…" input appears below the header
-    And it is focused for immediate typing
-
-  Scenario: Typing filters the facet sections by name
-    Given the facet finder is open
-    When the user types "cost"
-    Then only facet sections whose name matches "cost" remain
-    And the non-matching sections are hidden
-
-  Scenario: Matching is case-insensitive and also matches the field key
-    Given the facet finder is open
-    When the user types "PROMPT"
-    Then the "Prompt version" facet remains visible
-    # Matches the human label OR the raw field key, lower-cased.
-
-  Scenario: The finder shows how many facets match
-    Given the sidebar shows 12 facets
-    And the facet finder is open
-    When the user types a query that matches 3 of them
-    Then the finder shows a "3 of 12" count
-
-  Scenario: No match shows an inline hint, not a blank column
-    Given the facet finder is open
-    When the user types a query that matches no shown facet
-    Then an inline "No facets match" hint is shown
-
-  Scenario: Clearing the finder restores every facet
-    Given the user has filtered the facets with a query
-    When the user presses Escape or clicks the clear button
-    Then every previously visible facet is shown again
-    And the finder input closes
-
-  Scenario: The finder is a transient view filter, not a visibility change
-    Given the user filtered to a single facet with the finder
-    When the user clears the finder
-    Then the other facets reappear without opening Configure
-    And no facet's shown or hidden setting was changed
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1206,13 +1158,110 @@ Rule: Performance
 # AI QUERY COMPOSER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: AI query composer (Ask AI)
-  Natural-language → query translation runs in a separate FloatingAiBar mode,
-  not inline in the structured search bar.
+Rule: The search bar's ask affordance belongs to Langy when Langy is available
+  The Ask AI query composer predates Langy. For a user who has Langy (it is
+  rolled out to them and they may start a conversation), the search bar's ask
+  button is the Langy entry point instead: a Langy-styled ask surface floats
+  over the search bar — at the top of the trace explorer, next to the traces
+  the question is about — and Enter hands the question and the active search
+  to the Langy panel. When the panel is already open there is no second
+  composer: the panel takes the question. Users without Langy keep the inline
+  Ask AI composer below, unchanged — the affordance is never a dead button.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
+    And Langy is available to the user, with permission to start a conversation
+
+  Scenario: The ask button reads Ask Langy
+    When the Observe page loads
+    Then the search bar's ask button reads "Ask Langy"
+    And the placeholder text reads "Search filters, free text, or Ask Langy…"
+    And the inline submit hint reads "Press ⌘ + Enter to Ask Langy"
+
+  Scenario: Clicking Ask Langy floats the ask surface over the search bar
+    Given the Langy panel is closed
+    When the user clicks "Ask Langy" (or presses ⌘I / Ctrl+I)
+    Then a Langy-styled ask surface floats where the search bar was
+    And the user can type their question there, next to their traces
+    And the inline AI composer does not open
+
+  Scenario: The floating surface shows what will go with the question
+    Given the search bar contains the applied query "status:error"
+    When the user opens the Langy ask surface
+    Then it says the active search goes with the question
+
+  Scenario: Enter hands the question and the search to the panel
+    Given the Langy ask surface is open with "why are these failing?" typed
+    And the search bar contains the applied query "status:error"
+    When the user presses Enter
+    Then the ask surface dissolves
+    And the Langy panel opens and asks "why are these failing?"
+    And the active search rides along as attached context
+
+  Scenario: Escape closes the ask surface without sending anything
+    Given the Langy ask surface is open
+    When the user presses Escape
+    Then the surface closes and the search bar returns
+    And nothing was sent or attached
+
+  Scenario: An open Langy panel is used instead of a second composer
+    Given the Langy panel is already open
+    And the search bar contains the applied query "status:error"
+    When the user clicks "Ask Langy"
+    Then no floating surface appears
+    And the active search attaches to the open panel's conversation context
+
+  Scenario: The panel opening elsewhere retires the floating surface
+    Given the Langy ask surface is open
+    When the Langy panel opens some other way
+    Then the ask surface closes — two composers are never on screen
+
+  Scenario: ⌘+Enter hands the typed question straight to Langy
+    Given the user typed "why are checkout traces failing" in the search bar
+    When the user presses ⌘+Enter / Ctrl+Enter
+    Then the Langy panel opens and asks "why are checkout traces failing"
+
+  Scenario: A question that is just the applied filter is not attached twice
+    Given the search bar contains the applied query "status:error"
+    When the user presses ⌘+Enter / Ctrl+Enter on that same text
+    Then Langy is asked "status:error"
+    And no separate search attachment duplicates it
+
+  Scenario: No model provider setup is demanded on the way to Langy
+    Given the project has no enabled model provider
+    When the user clicks "Ask Langy"
+    Then the Langy ask surface opens
+    # Langy walks the user through model setup itself when it needs one.
+
+  Scenario: Sample data keeps the handoff gated
+    Given the trace list is showing sample data
+    Then the ask button is dimmed
+    And its tooltip explains it works on real traces, not the sample data
+
+  Scenario: A broken ask surface gives the search bar straight back
+    Given the Langy ask surface fails to render
+    Then the surface folds away and the search bar returns
+    And searching keeps working
+
+  Scenario: The keyboard shortcuts dialog names Langy
+    When the user opens the keyboard shortcuts dialog with "?"
+    Then the "Search" section lists "Ask Langy about these traces" for ⌘/Ctrl I
+
+  Scenario: Without Langy the inline Ask AI composer remains
+    Given Langy is not available to the user
+    Then the search bar's ask button reads "Ask AI"
+    And clicking it opens the inline AI composer
+
+Rule: AI query composer (Ask AI)
+  Natural-language → query translation runs in a separate FloatingAiBar mode,
+  not inline in the structured search bar. This is the ask affordance for
+  users WITHOUT Langy (see the rule above).
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+    And Langy is not available to the user
 
   Scenario: Free-text in the structured bar stays free-text
     When the user types "show me all errors" in the structured search bar
@@ -1301,6 +1350,41 @@ Rule: AI query composer (Ask AI)
     When the composer renders the error
     Then the pill shows the message as a tooltip on hover (no expand affordance)
     And no popover opens on click
+
+  # The FloatingAiBar portal covers the docked search bar while AI mode is
+  # active, so an error that only renders in the docked bar's banner is
+  # invisible exactly when the user is looking for it. The floating bar owns
+  # its own error surface: the tip row under the input swaps to the error
+  # pill the moment a failure lands, and stays until the prompt changes or
+  # AI mode closes.
+
+  Scenario: Provider error is visible while the FloatingAiBar is open
+    Given the user is in AI mode with the FloatingAiBar open
+    When the AI search request fails with a provider error
+    Then the row under the floating input swaps from the rotating tip to a red error pill
+    And the pill shows the curated error message
+    And the composer stays open so the user can rephrase or bail out
+
+  Scenario: Provider config errors point the user at Model Providers settings
+    Given the AI search request fails with a provider error (e.g. 404 "Resource not found")
+    When the floating bar renders the error
+    Then the error row includes a "Review model providers" link to /settings/model-providers
+    And the message names the model that failed when the backend knows it
+
+  Scenario: Editing the prompt clears the floating error row
+    Given the floating bar shows an error pill
+    When the user edits the prompt text
+    Then the error row swaps back to the rotating tip
+
+  Scenario: The floating error row can be dismissed
+    Given the floating bar shows an error pill
+    When the user clicks the pill's dismiss button
+    Then the error clears, matching the docked banner's dismiss
+
+  Scenario: The floating error strip never blocks the UI underneath
+    Given the floating bar shows an error pill
+    Then only the pill itself takes pointer events
+    And the rest of the strip's width stays click-transparent
 
 
 # ─────────────────────────────────────────────────────────────────────────────

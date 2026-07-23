@@ -1,19 +1,34 @@
 import { on } from "node:events";
+import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
-import { ValidationError } from "~/server/app-layer/domain-error";
 import {
   generateTraceAction,
   generateTraceQueryFromPrompt,
 } from "~/server/app-layer/traces/ai-query";
+import {
+  contentAttrKeys,
+  enrichCodingAgentSpansFromLogs,
+} from "~/server/app-layer/traces/claude-code-log-enrichment";
+import {
+  buildCodingAgentTranscript,
+  type CodingAgentTranscript,
+} from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
+import {
+  DERIVED_INPUT_ATTR_PREFIX,
+  DERIVED_OUTPUT_ATTR_PREFIX,
+} from "~/server/app-layer/traces/log-content-derivation";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
-import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type {
+  SpanSummaryPage,
+  SpanSummaryRow,
+} from "~/server/app-layer/traces/repositories/span-storage.repository";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -47,23 +62,34 @@ import {
   redactHiddenAttributesCompiled,
 } from "~/server/traces/mappers/redactAttributes";
 import {
+  applyDerivedTraceEventProtections,
   applySpanProtections,
   extractRedactionsFromAllSpanInputs,
   extractRedactionsFromAllSpanOutputs,
   redactObject,
 } from "~/server/traces/mappers/redaction";
-import type { CategoryVisibility } from "~/server/traces/protections";
+import type {
+  CategoryVisibility,
+  Protections,
+} from "~/server/traces/protections";
+import {
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+} from "~/shared/traces/media-refs";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
+import { gateHeaderCost, gateResources, gateTreeCost } from "./tracesV2.gates";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
   ContentPrivacy,
   SpanDetail,
   SpanLangwatchSignals,
+  SpanTreeCursor,
   SpanTreeNode,
   TraceHeader,
   TraceResourceInfoDto,
 } from "./tracesV2.schemas";
+import { spanTreeCursorSchema } from "./tracesV2.schemas";
 
 // ---------------------------------------------------------------------------
 // Shared input fragments
@@ -117,7 +143,9 @@ function buildFilterWhere(input: {
 // Mappers – internal types → scoped output models
 // ---------------------------------------------------------------------------
 
-function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
+export function mapTraceSummaryToHeader(
+  summary: TraceSummaryData,
+): TraceHeader {
   const totalTokens =
     (summary.totalPromptTokenCount ?? 0) +
     (summary.totalCompletionTokenCount ?? 0);
@@ -171,7 +199,67 @@ function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader {
   };
 }
 
-function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
+/**
+ * Maps one repository span-summary page onto the wire shape of
+ * `tracesV2.spanTreePaginated`. `nextCursor` comes from the repository's
+ * over-fetch-derived `hasMore` — never from comparing the page length to the
+ * requested limit, which would misread a repository-clamped page as final.
+ */
+export function mapSpanSummaryPage(page: SpanSummaryPage): {
+  nodes: SpanTreeNode[];
+  nextCursor: SpanTreeCursor | null;
+} {
+  const last = page.hasMore ? page.rows.at(-1) : undefined;
+  if (page.hasMore && !last) {
+    // A null cursor here would read as end-of-trace and silently drop every
+    // remaining span — fail loudly instead if a repository ever breaks the
+    // "hasMore implies rows" invariant.
+    throw new Error(
+      "span-summary page reported hasMore without any rows to key the cursor from",
+    );
+  }
+  return {
+    nodes: page.rows.map(mapSpanSummaryToTreeNode),
+    nextCursor: last
+      ? { startTimeMs: last.startTimeMs, spanId: last.spanId }
+      : null,
+  };
+}
+
+/**
+ * Trace-level DROP banner. A `drop` disposition strips the category at
+ * ingestion, so the computed content was never stored and is empty. The check
+ * uses the ORIGINAL computed content (the pre-redaction header), not the
+ * redacted one: an old pre-rule trace still has its content, so the banner
+ * won't show even though the now-`drop` policy hides it; restricted content
+ * has disposition "restrict" (not "drop") so it can't be mislabeled here.
+ * Resolution failures must not break the header — the derivation just yields
+ * no banner. Shared by the internal `tracesV2.header` read and the anonymous
+ * share payload (`sharedTrace.get`). See ADR-057.
+ */
+export async function deriveTraceDropPrivacy(
+  rawHeader: Pick<TraceHeader, "input" | "output">,
+  projectId: string,
+): Promise<TraceHeader["privacy"]> {
+  try {
+    const policy = await getDataPrivacyPolicyService().getResolvedForProject({
+      projectId,
+    });
+    const droppedCategories: string[] = [];
+    if (policy.categories.input.disposition === "drop" && !rawHeader.input) {
+      droppedCategories.push("input");
+    }
+    if (policy.categories.output.disposition === "drop" && !rawHeader.output) {
+      droppedCategories.push("output");
+    }
+    return droppedCategories.length > 0 ? { droppedCategories } : null;
+  } catch {
+    // Skip the drop derivation on resolver/cache/db failure.
+    return null;
+  }
+}
+
+export function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
   let status: SpanTreeNode["status"] = "unset";
   if (row.statusCode === 2) status = "error";
   else if (row.statusCode === 1) status = "ok";
@@ -191,6 +279,7 @@ function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     outputTokens: row.outputTokens,
     cacheReadTokens: row.cacheReadTokens,
     cacheCreationTokens: row.cacheCreationTokens,
+    updatedAtMs: row.updatedAtMs,
   };
 }
 
@@ -413,6 +502,43 @@ function buildSpanContentRedactions(
   ]);
 }
 
+/**
+ * The full per-span redaction pipeline behind bulk span reads: span-level
+ * protections (category visibility, restricted custom attributes, hidden
+ * content scrubbed out of params), the DTO mapping, the content redaction
+ * pass, and the privacy annotations. The single implementation is shared by
+ * the internal `tracesV2.spansFull` read and the anonymous share payload
+ * (`sharedTrace.get`) — the two surfaces must never drift apart, because a
+ * redaction added to one and forgotten in the other silently leaks to share
+ * viewers. See ADR-057.
+ *
+ * Per-span events are deliberately absent (the `[]` below): only the
+ * single-span `tracesV2.spanDetail` read fetches them. The trace-level events
+ * timeline covers the shared view; per-span events in the share payload are an
+ * ADR-057 follow-up.
+ */
+export function mapSpansToDetailDtos(
+  spans: Span[],
+  protections: Protections,
+): SpanDetail[] {
+  const redactions = buildSpanContentRedactions(spans, protections);
+  return spans.map((span) => {
+    const detail = mapSpanToDetail(
+      applySpanProtections(span, protections, redactions),
+      [],
+    );
+    const redacted = redactV2Content(detail, protections);
+    const detailParams = detail.params as Record<string, unknown> | null;
+    redacted.contentPrivacy = buildContentPrivacy(
+      protections,
+      readDroppedFromParams(detailParams),
+    );
+    redacted.piiAnalysisIncomplete = readPiiIncompleteFromParams(detailParams);
+    redacted.restrictedAttributes = protections.restrictedAttributes ?? null;
+    return redacted;
+  });
+}
+
 type V2RedactionFlags = {
   inputRedacted: boolean;
   outputRedacted: boolean;
@@ -531,6 +657,8 @@ export function redactV2Content<
     outputRedacted?: boolean | null;
     inputVisibleTo?: string | null;
     outputVisibleTo?: string | null;
+    inputMediaRefs?: unknown;
+    outputMediaRefs?: unknown;
     attributes?: Record<string, string>;
     params?: Record<string, unknown> | null;
   },
@@ -568,6 +696,18 @@ export function redactV2Content<
       ? (protections.capturedOutputVisibleTo ?? null)
       : null,
   };
+  // Media refs point at the exact content that was just redacted, and the
+  // /api/files URLs they carry are fetchable on their own — so the parsed ref
+  // fields AND their reserved-attribute copies must be dropped alongside the
+  // text, never just hidden by the UI.
+  if (inputRedacted) delete redacted.inputMediaRefs;
+  if (outputRedacted) delete redacted.outputMediaRefs;
+  if ((inputRedacted || outputRedacted) && redacted.attributes) {
+    const attributes = { ...redacted.attributes };
+    if (inputRedacted) delete attributes[RESERVED_INPUT_MEDIA_REFS];
+    if (outputRedacted) delete attributes[RESERVED_OUTPUT_MEDIA_REFS];
+    redacted.attributes = attributes;
+  }
   // Custom attribute rules with a restrict disposition, plus the standalone
   // system/tools attribute keys when those categories are hidden: replace the
   // matched attribute values (header attributes, span params, span-event
@@ -725,6 +865,98 @@ const sortSchema = z.object({
 // Router
 // ---------------------------------------------------------------------------
 
+/**
+ * Load one trace's spans, enriched and REDACTED.
+ *
+ * Extracted so `spansFull` and `codingAgentTranscript` cannot drift apart. The
+ * transcript endpoint returning content that had skipped this pass would be a way
+ * around the data-privacy policy the span reads enforce, so there is exactly one
+ * way in.
+ */
+async function loadProtectedSpansFull({
+  input,
+  ctx,
+}: {
+  input: { projectId: string; traceId: string; occurredAtMs?: number };
+  ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+}): Promise<SpanDetail[]> {
+  const app = getApp();
+  const protections = await getUserProtectionsForProject(ctx as never, {
+    projectId: input.projectId,
+  });
+  const storedSpans = await app.traces.spans.getSpansByTraceId({
+    tenantId: input.projectId,
+    traceId: input.traceId,
+    visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
+    ...occurredAtFromInput(input),
+  });
+  // Claude Code's real `llm_request` spans carry tokens + `request_id` but NO
+  // message content and NO cost — both live in the trace's OTLP log records.
+  // Join them on BEFORE protections run, so the joined content goes through the
+  // same redaction pass as any other span content rather than bypassing it.
+  const spans = await enrichCodingAgentSpansFromLogs({
+    logRecords: app.traces.logRecords,
+    tenantId: input.projectId,
+    traceId: input.traceId,
+    spans: storedSpans,
+    occurredAtMs: input.occurredAtMs,
+  });
+
+  const redactions = buildSpanContentRedactions(spans, protections);
+  return spans.map((span) => {
+    const detail = mapSpanToDetail(
+      applySpanProtections(span, protections, redactions),
+      [],
+    );
+    const redacted = redactV2Content(detail, protections);
+    const detailParams = detail.params as Record<string, unknown> | null;
+    redacted.contentPrivacy = buildContentPrivacy(
+      protections,
+      readDroppedFromParams(detailParams),
+    );
+    redacted.piiAnalysisIncomplete = readPiiIncompleteFromParams(detailParams);
+    redacted.restrictedAttributes = protections.restrictedAttributes ?? null;
+    return redacted;
+  });
+}
+
+/** Load one trace's log records, gated by the viewer's visibility exactly as `traceLogs` does. */
+async function loadProtectedTraceLogs({
+  input,
+  ctx,
+}: {
+  input: { projectId: string; traceId: string; occurredAtMs?: number };
+  ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+}): Promise<TraceLogRecordDto[]> {
+  const app = getApp();
+  const protections = await getUserProtectionsForProject(ctx as never, {
+    projectId: input.projectId,
+  });
+  const visibilityCutoffMs = await getVisibilityCutoffMsForProject(
+    input.projectId,
+  );
+  const rows = await app.traces.logRecords.getLogsByTraceId(
+    input.projectId,
+    input.traceId,
+    input.occurredAtMs,
+  );
+  return rows.map((row) =>
+    gateTraceLogVisibility(
+      {
+        spanId: row.spanId,
+        timeUnixMs: row.timeUnixMs,
+        body: row.body,
+        attributes: row.attributes,
+        resourceAttributes: row.resourceAttributes,
+        scopeName: row.scopeName,
+        scopeVersion: row.scopeVersion,
+      },
+      protections,
+      visibilityCutoffMs,
+    ),
+  );
+}
+
 export const tracesV2Router = createTRPCRouter({
   list: protectedProcedure
     .input(
@@ -734,6 +966,12 @@ export const tracesV2Router = createTRPCRouter({
         sort: sortSchema,
         page: z.number().int().min(1).default(1),
         pageSize: z.number().int().min(1).max(1000).default(50),
+        cursor: z
+          .object({
+            sortValue: z.number().finite(),
+            traceId: z.string().min(1),
+          })
+          .optional(),
         query: z.string().nullish(),
       }),
     )
@@ -749,6 +987,7 @@ export const tracesV2Router = createTRPCRouter({
         sort: input.sort,
         page: input.page,
         pageSize: input.pageSize,
+        cursor: input.cursor,
         filterWhere: buildFilterWhere(input),
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
@@ -1041,44 +1280,24 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
+          // Single-trace header read: resolve offloaded (ADR-022) IO back to
+          // the full value, exactly like legacy traces.getById. The list read
+          // never passes this.
+          full: true,
         },
       );
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
       }
       const rawHeader = mapTraceSummaryToHeader(summary);
-      const header = redactV2Content(rawHeader, protections);
-
-      // Trace-level DROP banner. A `drop` disposition strips the category at
-      // ingestion, so the computed content was never stored and is empty. The
-      // check uses the ORIGINAL computed content (rawHeader), not the redacted
-      // one: an old pre-rule trace still has its content, so the banner won't
-      // show even though the now-`drop` policy hides it; restricted content has
-      // disposition "restrict" (not "drop") so it can't be mislabeled here.
-      // Resolution failures must not break the header — skip the derivation.
-      try {
-        const policy =
-          await getDataPrivacyPolicyService().getResolvedForProject({
-            projectId: input.projectId,
-          });
-        const droppedCategories: string[] = [];
-        if (
-          policy.categories.input.disposition === "drop" &&
-          !rawHeader.input
-        ) {
-          droppedCategories.push("input");
-        }
-        if (
-          policy.categories.output.disposition === "drop" &&
-          !rawHeader.output
-        ) {
-          droppedCategories.push("output");
-        }
-        header.privacy =
-          droppedCategories.length > 0 ? { droppedCategories } : null;
-      } catch {
-        // Skip the drop derivation on resolver/cache/db failure.
-      }
+      // Cost is gated by the viewer's own `cost:view` (via `protections`), the
+      // same rule the detail-pane spans apply through `applySpanProtections` —
+      // a `traces:view`-only viewer must not see spend in the header either.
+      const header = gateHeaderCost({
+        header: redactV2Content(rawHeader, protections),
+        protections,
+      });
+      header.privacy = await deriveTraceDropPrivacy(rawHeader, input.projectId);
 
       return header;
     }),
@@ -1087,7 +1306,7 @@ export const tracesV2Router = createTRPCRouter({
    * Lets a user rename a trace. Trim happens in the procedure so the event
    * always carries a canonical form, then the schema check rejects empty /
    * over-long names — when those rejections fire we surface them as a
-   * `ValidationError` (DomainError), so the client receives the rich
+   * `ValidationError` (HandledError), so the client receives the rich
    * `domainError` payload via tRPC's error formatter alongside the safe
    * user-facing message. The command pipeline still re-validates via Zod
    * as a defence-in-depth check (replays from a poisoned event store).
@@ -1213,55 +1432,90 @@ export const tracesV2Router = createTRPCRouter({
       );
     }),
 
+  /**
+   * One page of the span tree in `(startTimeMs, spanId)` order. This is the
+   * only fetch path the frontend uses for span trees — traces can carry
+   * 20k–100k+ spans, so the client assembles the tree page by page (see
+   * `spanTreePagedQuery.ts`) instead of ever pulling it in one response.
+   * `nextCursor` is null on the final page.
+   */
   spanTreePaginated: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceId: z.string(),
         limit: z.number().int().min(1).max(1000).default(200),
-        offset: z.number().int().min(0).default(0),
+        cursor: spanTreeCursorSchema.optional(),
         ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
     .query(
-      async ({ input }): Promise<{ nodes: SpanTreeNode[]; total: number }> => {
+      async ({
+        input,
+        ctx,
+      }): Promise<{
+        nodes: SpanTreeNode[];
+        nextCursor: SpanTreeCursor | null;
+      }> => {
         const app = getApp();
-        const result = await app.traces.spans.getSpanSummariesPaginated({
+        const protections = await getUserProtectionsForProject(ctx, {
+          projectId: input.projectId,
+        });
+        const page = await app.traces.spans.getSpanSummariesPage({
           tenantId: input.projectId,
           traceId: input.traceId,
           limit: input.limit,
-          offset: input.offset,
+          cursor: input.cursor,
           ...occurredAtFromInput(input),
         });
-        return {
-          nodes: result.rows.map(mapSpanSummaryToTreeNode),
-          total: result.total,
-        };
+        const { nodes, nextCursor } = mapSpanSummaryPage(page);
+        return { nodes: gateTreeCost({ nodes, protections }), nextCursor };
       },
     ),
 
+  /**
+   * Spans of a live trace whose row version is newer than `sinceUpdatedAtMs`.
+   * Keyed on the row version rather than the span start so an in-place update
+   * (end time, duration, status, cost) is picked up too — the root span
+   * starts first and ends last, so a start-keyed delta left its duration, and
+   * with it the waterfall's time scale, frozen at first projection.
+   */
   spanTreeDelta: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        sinceStartTimeMs: z.number(),
+        sinceUpdatedAtMs: z.number().int().min(0),
         ...spanReadHintShape,
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<SpanTreeNode[]> => {
+    .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const rows = await app.traces.spans.getSpanSummariesSince({
         tenantId: input.projectId,
         traceId: input.traceId,
-        sinceStartTimeMs: input.sinceStartTimeMs,
+        sinceUpdatedAtMs: input.sinceUpdatedAtMs,
         ...occurredAtFromInput(input),
       });
-      return rows.map(mapSpanSummaryToTreeNode);
+      return gateTreeCost({
+        nodes: rows.map(mapSpanSummaryToTreeNode),
+        protections,
+      });
     }),
 
+  /**
+   * Whole-tree read in one response. The frontend no longer fetches through
+   * this — `useSpanTree` pages via `spanTreePaginated` under the same React
+   * Query key, and this procedure remains as that cache entry's type/key
+   * anchor (preview seeding, SSE invalidation, cancel). The underlying read
+   * is bounded (`MAX_LIGHT_SPAN_READ_ROWS`) so a direct call can never
+   * materialize a 100k-span trace in one shot.
+   */
   spanTree: protectedProcedure
     .input(
       z.object({
@@ -1271,14 +1525,20 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<SpanTreeNode[]> => {
+    .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const rows = await app.traces.spans.getSpanSummaryByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
-      return rows.map(mapSpanSummaryToTreeNode);
+      return gateTreeCost({
+        nodes: rows.map(mapSpanSummaryToTreeNode),
+        protections,
+      });
     }),
 
   /**
@@ -1321,37 +1581,43 @@ export const tracesV2Router = createTRPCRouter({
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }): Promise<SpanDetail[]> => {
-      const app = getApp();
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const spans = await app.traces.spans.getSpansByTraceId({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-          input.projectId,
-        ),
-        ...occurredAtFromInput(input),
-      });
-      // Span-level protections first (category visibility, restricted custom
-      // attributes, hidden content scrubbed out of params), then the DTO pass.
-      const redactions = buildSpanContentRedactions(spans, protections);
-      return spans.map((span) => {
-        const detail = mapSpanToDetail(
-          applySpanProtections(span, protections, redactions),
-          [],
-        );
-        const redacted = redactV2Content(detail, protections);
-        const detailParams = detail.params as Record<string, unknown> | null;
-        redacted.contentPrivacy = buildContentPrivacy(
-          protections,
-          readDroppedFromParams(detailParams),
-        );
-        redacted.piiAnalysisIncomplete =
-          readPiiIncompleteFromParams(detailParams);
-        redacted.restrictedAttributes =
-          protections.restrictedAttributes ?? null;
-        return redacted;
+      return loadProtectedSpansFull({ input, ctx });
+    }),
+
+  /**
+   * The coding-agent TRANSCRIPT for one trace — what the agent did, in order.
+   *
+   * The Terminal view used to assemble this in the browser out of three modules.
+   * It lives here now because a transcript is not a rendering concern: the CLI
+   * wants it, an MCP server wants it, and an export wants it, and none of them
+   * are going to run React to get one. One derivation, one answer.
+   *
+   * Reads spans AND logs through the same loaders the sibling endpoints use, so
+   * its content has been through the identical redaction pass — a transcript
+   * endpoint that did its own reads would be a way around the data-privacy
+   * policy, which is precisely why it does not.
+   */
+  codingAgentTranscript: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
+      const [spans, logs] = await Promise.all([
+        loadProtectedSpansFull({ input, ctx }),
+        loadProtectedTraceLogs({ input, ctx }),
+      ]);
+
+      return buildCodingAgentTranscript({
+        spans,
+        logs: logs.map((row) => ({
+          timestampMs: row.timeUnixMs,
+          attributes: (row.attributes ?? {}) as Record<string, unknown>,
+        })),
       });
     }),
 
@@ -1482,8 +1748,11 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<TraceResourceInfoDto> => {
+    .query(async ({ input, ctx }): Promise<TraceResourceInfoDto> => {
       const app = getApp();
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
       const rows = await app.traces.spans.getSpanResourcesByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
@@ -1500,16 +1769,23 @@ export const tracesV2Router = createTRPCRouter({
       // Pick the root span (no parent) if present; fall back to earliest.
       const root = rows.find((r) => r.parentSpanId == null) ?? rows[0] ?? null;
 
-      return {
-        rootSpanId: root?.spanId ?? null,
-        resourceAttributes: withoutHiddenResourceAttrs(
-          root?.resourceAttributes ?? {},
-        ),
-        scope: root
-          ? { name: root.scopeName ?? "", version: root.scopeVersion }
-          : null,
-        spans,
-      };
+      // `withoutHiddenResourceAttrs` drops the fixed non-billable set; layer the
+      // viewer's data-privacy restrict rules on top via `gateResources` so the
+      // authenticated read honours the same hidden-attribute policy as the share
+      // surface.
+      return gateResources({
+        resources: {
+          rootSpanId: root?.spanId ?? null,
+          resourceAttributes: withoutHiddenResourceAttrs(
+            root?.resourceAttributes ?? {},
+          ),
+          scope: root
+            ? { name: root.scopeName ?? "", version: root.scopeVersion }
+            : null,
+          spans,
+        },
+        protections,
+      });
     }),
 
   /**
@@ -1527,13 +1803,19 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }): Promise<DerivedTraceEvent[]> => {
+    .query(async ({ input, ctx }): Promise<DerivedTraceEvent[]> => {
       const app = getApp();
-      return app.traces.spans.getTraceEventsByTraceId({
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+      const events = await app.traces.spans.getTraceEventsByTraceId({
         tenantId: input.projectId,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
+      // Event/exception attributes are captured content — same gating as the
+      // shared-trace payload, so the two surfaces cannot drift apart.
+      return applyDerivedTraceEventProtections(events, protections);
     }),
 
   evals: protectedProcedure
@@ -1548,4 +1830,240 @@ export const tracesV2Router = createTRPCRouter({
       const app = getApp();
       return app.evaluations.runs.findByTraceId(input.projectId, input.traceId);
     }),
+
+  /**
+   * The pre-folded coding-agent session rollup for one trace (ADR-056).
+   *
+   * Returns null for an ordinary LLM trace — the fold writes no row for those,
+   * so null is the normal answer rather than an error, and the caller simply
+   * doesn't offer the Session view.
+   *
+   * Unlike the sibling span / log reads this needs NO content redaction: the row
+   * is counters, bounded sets and ids by construction. It carries no prompt, no
+   * reply and no tool output, so there is nothing here for the data-privacy
+   * policy to gate. (If that ever stops being true, this comment is the thing
+   * that has to change first.)
+   */
+  codingAgentSession: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input }) => {
+      const app = getApp();
+      // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
+      // session row — which already spans every trace of the run, so no
+      // conversation-membership fan-out is needed here anymore.
+      return app.codingAgents.sessions.getSessionForTrace({
+        projectId: input.projectId,
+        traceId: input.traceId,
+      });
+    }),
+
+  /**
+   * Every log record correlated to one trace (generic — not Claude-specific).
+   * Logs key by traceId (to spans only via `request_id`), so this is a
+   * trace-level read: the raw-log inspector renders untruncated bodies on
+   * demand, and the dashboard frontend join composes span content client-side
+   * from these logs. `occurredAtMs` is threaded as a `TimeUnixMs`
+   * partition-pruning hint like the sibling span reads.
+   *
+   * These records carry raw captured content (prompts / responses) in their
+   * `body`, so — exactly like the sibling span reads — the read is gated behind
+   * the viewer's captured-input / captured-output visibility via
+   * {@link redactTraceLogContent}, or the raw-log procedure would be a bypass of
+   * the data-privacy policy the span endpoints enforce.
+   */
+  traceLogs: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        ...spanReadHintShape,
+      }),
+    )
+    .use(checkProjectPermission("traces:view"))
+    .query(async ({ input, ctx }): Promise<TraceLogRecordDto[]> => {
+      // The free-plan teaser window and the viewer's captured-content
+      // permissions are both applied inside the loader, which the transcript
+      // endpoint shares — so the two reads cannot diverge on what they hide.
+      return loadProtectedTraceLogs({ input, ctx });
+    }),
 });
+
+/**
+ * One trace-correlated log record as returned to the frontend raw-log
+ * inspector. The `traceId` is implied by the query; `attributes` carries the
+ * emitter's event payload (`body`, `event.name`, `request_id`, `cost_usd`, …).
+ */
+export interface TraceLogRecordDto {
+  spanId: string;
+  timeUnixMs: number;
+  body: string;
+  attributes: Record<string, string>;
+  resourceAttributes: Record<string, string>;
+  scopeName: string;
+  scopeVersion: string | null;
+  /**
+   * True when this record carried captured content the viewer may not see, so
+   * the content was withheld — the top-level body, the per-event content
+   * attributes (`prompt` / `response` / `body`), and the ingest-derived
+   * `langwatch.gen_ai.*` content attrs. The UI renders the redacted
+   * placeholder, mirroring the span endpoints' `inputRedacted` /
+   * `outputRedacted`.
+   */
+  bodyRedacted?: boolean;
+  /** Audience label naming who CAN see the withheld content, when restricted. */
+  bodyVisibleTo?: string | null;
+}
+
+/** The log-record attribute carrying the emitter's event name. */
+const LOG_EVENT_NAME_ATTR = "event.name";
+
+/**
+ * Log `event.name` values whose content payload is captured INPUT — the user's
+ * prompt or the model-call request payload. Gated behind captured-input
+ * visibility. Mirrors the input events the read-path Claude enrichment joins.
+ */
+const LOG_INPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
+  "user_prompt",
+  "api_request_body",
+]);
+
+/**
+ * Log `event.name` values whose content payload is captured OUTPUT — the
+ * assistant's reply or the model-call response payload. Gated behind
+ * captured-output visibility.
+ */
+const LOG_OUTPUT_CONTENT_EVENTS: ReadonlySet<string> = new Set([
+  "assistant_response",
+  "api_response_body",
+]);
+
+/**
+ * Enforce captured-content visibility on one trace-correlated log record before
+ * it leaves the API. The raw log records carry prompt / response content under
+ * PER-EVENT attribute keys — `prompt` for `user_prompt`, `response` for
+ * `assistant_response`, `body` for the raw `api_*_body` payloads — plus the
+ * top-level OTLP body for content-of-record emitters. This procedure must
+ * withhold every one of those keys behind the SAME `canSeeCapturedInput` /
+ * `canSeeCapturedOutput` visibility the sibling span endpoints enforce, so the
+ * key list comes from {@link contentAttrKeys}, the very mapping the read-path
+ * enrichment and transcript derivation surface content from — a key stripped
+ * from one list but not the other is a policy bypass.
+ *
+ * Ingest also stamps DERIVED content onto the attributes
+ * (`langwatch.gen_ai.output.text`, `…output.tool_calls`, …input counts): the
+ * same captured content re-shaped, so it is stripped by prefix alongside the
+ * raw keys.
+ *
+ * Input-category events gate on input visibility, output-category events on
+ * output visibility, and any UNCLASSIFIED record that still carries a content
+ * body fails closed (both visibilities required). Only content is withheld:
+ * event name, `request_id`, `cost_usd`, `query_source` and every other
+ * metadata attribute (and cost, governed by its own permission) pass through
+ * untouched, so a structural record like the `api_request` cost anchor is
+ * returned intact.
+ */
+export function redactTraceLogContent(
+  row: TraceLogRecordDto,
+  protections: {
+    canSeeCapturedInput?: boolean | null;
+    canSeeCapturedOutput?: boolean | null;
+    capturedInputVisibleTo?: string | null;
+    capturedOutputVisibleTo?: string | null;
+  },
+): TraceLogRecordDto {
+  const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
+  const presentContentKeys = contentAttrKeys(eventName).filter((key) => {
+    const value = row.attributes[key];
+    return typeof value === "string" && value.length > 0;
+  });
+  const derivedContentKeys = Object.keys(row.attributes).filter(
+    (key) =>
+      key.startsWith(DERIVED_INPUT_ATTR_PREFIX) ||
+      key.startsWith(DERIVED_OUTPUT_ATTR_PREFIX),
+  );
+  // The top-level OTLP body is content only when it is NOT merely echoing the
+  // event-name marker (claude_code stamps the marker there; a generic
+  // content-of-record emitter puts the record's content there).
+  const topBodyIsContent = row.body.length > 0 && row.body !== eventName;
+  if (
+    presentContentKeys.length === 0 &&
+    derivedContentKeys.length === 0 &&
+    !topBodyIsContent
+  ) {
+    return row;
+  }
+
+  const isInput = LOG_INPUT_CONTENT_EVENTS.has(eventName);
+  const isOutput = LOG_OUTPUT_CONTENT_EVENTS.has(eventName);
+  const canSeeInput = protections.canSeeCapturedInput === true;
+  const canSeeOutput = protections.canSeeCapturedOutput === true;
+  const hidden = isInput
+    ? !canSeeInput
+    : isOutput
+      ? !canSeeOutput
+      : // Unclassified content record — reveal only to a viewer allowed BOTH.
+        !(canSeeInput && canSeeOutput);
+  if (!hidden) return row;
+
+  const attributes = { ...row.attributes };
+  for (const key of presentContentKeys) delete attributes[key];
+  // Derived attrs are stripped by the category they were computed from; an
+  // unclassified hidden record sheds both, mirroring its fail-closed gate.
+  for (const key of derivedContentKeys) {
+    const isDerivedInput = key.startsWith(DERIVED_INPUT_ATTR_PREFIX);
+    if (isInput ? isDerivedInput : isOutput ? !isDerivedInput : true) {
+      delete attributes[key];
+    }
+  }
+  return {
+    ...row,
+    body: topBodyIsContent ? "" : row.body,
+    attributes,
+    bodyRedacted: true,
+    bodyVisibleTo: isInput
+      ? (protections.capturedInputVisibleTo ?? null)
+      : isOutput
+        ? (protections.capturedOutputVisibleTo ?? null)
+        : null,
+  };
+}
+
+/**
+ * Apply BOTH gates to one trace-correlated log record: the free-plan teaser
+ * window and the viewer's captured-content permission.
+ *
+ * A record older than the plan `visibilityCutoffMs` has its captured content
+ * withheld regardless of the viewer's permission — a plan gate, not an audience
+ * gate, so it offers no "visible to …" label (there is no group that can see
+ * it, only a plan upgrade). This mirrors the sibling span reads, which
+ * teaser-redact pre-cutoff spans via `applyVisibilityGate`. Post-cutoff records
+ * (and every record when `visibilityCutoffMs` is null — a paid plan with no
+ * window) fall through to the viewer's real captured-input / captured-output
+ * visibility. Fails closed: a pre-cutoff record is gated as if no captured
+ * content were visible.
+ */
+export function gateTraceLogVisibility(
+  row: TraceLogRecordDto,
+  protections: {
+    canSeeCapturedInput?: boolean | null;
+    canSeeCapturedOutput?: boolean | null;
+    capturedInputVisibleTo?: string | null;
+    capturedOutputVisibleTo?: string | null;
+  },
+  visibilityCutoffMs: number | null,
+): TraceLogRecordDto {
+  const isBeforeCutoff =
+    visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;
+  return redactTraceLogContent(
+    row,
+    isBeforeCutoff
+      ? { canSeeCapturedInput: false, canSeeCapturedOutput: false }
+      : protections,
+  );
+}

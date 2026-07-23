@@ -29,22 +29,22 @@
  *   - specs/ai-gateway/governance/folds.feature §"governance_ocsf_events"
  *   - specs/ai-gateway/governance/siem-export.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   type GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
 import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "../governanceOcsfEventsSync.reactor";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

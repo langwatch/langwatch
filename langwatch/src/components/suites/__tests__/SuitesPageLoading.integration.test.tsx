@@ -8,9 +8,15 @@
  *
  * @see specs/features/suites/single-loading-indicator.feature
  */
-import { ChakraProvider, Spinner, defaultSystem } from "@chakra-ui/react";
+import { ChakraProvider, defaultSystem, Spinner } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The empty states carry the Setup via Agent menu, whose langy hooks need
+// app context these tests do not build; the control has its own tests.
+vi.mock("~/components/SetupWithAgentButton", () => ({
+  SetupWithAgentButton: () => null,
+}));
 
 const mockSuitesQuery = vi.fn();
 let allRunsPanelLoading = false;
@@ -18,7 +24,10 @@ let allRunsPanelLoading = false;
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      suites: { getAll: { invalidate: vi.fn() }, getSummaries: { invalidate: vi.fn() } },
+      suites: {
+        getAll: { invalidate: vi.fn() },
+        getSummaries: { invalidate: vi.fn() },
+      },
     }),
     suites: {
       getAll: { useQuery: (...args: unknown[]) => mockSuitesQuery(...args) },

@@ -30,6 +30,51 @@ export const isMetricsAuthorized = (req: IncomingMessage): boolean => {
   );
 };
 
+/**
+ * Collapses ID-shaped path segments to `{id}` so the `path` label on the HTTP
+ * request histogram stays low-cardinality (route template, not raw URL).
+ *
+ * Every distinct label value is a permanent series in this process's registry
+ * AND in Prometheus's head, held for the lifetime of the process. The
+ * Next.js → Hono migration (#3170) dropped the route-template normalization
+ * the original middleware had, so raw URLs — `/api/traces/trace_<nanoid>` and
+ * friends — accumulate one series per entity ever requested and grow the
+ * registry without bound. A path label must never contain per-entity IDs.
+ */
+export const normalizeMetricsPath = (path: string): string => {
+  const segments = path.replace(/\/{2,}/g, "/").split("/");
+  const normalized = segments.map((segment) => {
+    if (segment === "") return segment;
+    // percent-encoded leftovers (`abc%3D%3D`) are never route words
+    if (segment.includes("%")) return "{id}";
+    // purely numeric
+    if (/^\d+$/.test(segment)) return "{id}";
+    // uuid
+    if (
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        segment,
+      )
+    )
+      return "{id}";
+    // bare hex ids (trace ids are 16/32 hex chars)
+    if (/^[0-9a-f]{8,}$/i.test(segment)) return "{id}";
+    // prefixed entity ids: trace_…, project_…, prompt_…, eval_… — the tail of
+    // a generated id always carries a digit or uppercase, which route words
+    // (`batch_clustering`) never do
+    if (/^[a-z]+_[A-Za-z0-9_-]{6,}$/.test(segment) && /[A-Z0-9]/.test(segment))
+      return "{id}";
+    // long unprefixed tokens (nanoid, base64ish) — a digit or an uppercase
+    // letter marks a generated token; route words are lowercase-only
+    if (
+      /^[A-Za-z0-9_-]{16,}$/.test(segment) &&
+      (/\d/.test(segment) || /[A-Z]/.test(segment))
+    )
+      return "{id}";
+    return segment;
+  });
+  return normalized.join("/") || "/";
+};
+
 type Endpoint =
   | "collector"
   | "log_steps"
@@ -161,6 +206,31 @@ const edgeSpoolFailOpenCounter = new Counter({
 export const getEdgeSpoolFailOpenCounter = (reason: "flag_store" | "spool") =>
   edgeSpoolFailOpenCounter.labels(reason);
 
+// Trace media extraction fail-open counter. The edge media extraction falls
+// back to the unmodified command data when the flag store, the data-privacy
+// policy probe, or the object store errors — ingestion is never blocked. A
+// healthy fleet emits this at ~zero rate; sustained increments (esp.
+// reason="storage") indicate an object-store outage worth alerting on.
+register.removeSingleMetric("langwatch_edge_media_extract_fail_open_total");
+const edgeMediaExtractFailOpenCounter = new Counter({
+  name: "langwatch_edge_media_extract_fail_open_total",
+  help: "Count of edge media-extraction fail-open events by failing stage",
+  labelNames: ["reason"] as const,
+});
+
+export const getEdgeMediaExtractFailOpenCounter = (
+  reason:
+    | "flag_store"
+    | "privacy_probe"
+    | "storage"
+    // Budget drops: parts left inline because the per-span cap or the
+    // extraction deadline was hit, or because one part's store failed while
+    // the rest of the span proceeded. Not errors of the hook itself.
+    | "part_cap"
+    | "deadline"
+    | "part_store",
+) => edgeMediaExtractFailOpenCounter.labels(reason);
+
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
 // fleet emits this at ~zero rate. Sustained increments indicate either
 // causality_depth propagation is broken on the evaluator side or a customer
@@ -220,71 +290,6 @@ export const getPiiChecksCounter = (method: string) =>
   piiChecksCounter.labels(method);
 
 // ============================================================================
-// BullMQ Queue Metrics
-// ============================================================================
-
-export type BullMQQueueState =
-  | "waiting"
-  | "active"
-  | "completed"
-  | "failed"
-  | "delayed"
-  | "paused"
-  | "prioritized"
-  | "waiting-children";
-
-// Gauge for BullMQ job counts by state (from getJobCounts())
-register.removeSingleMetric("bullmq_job_total");
-const bullmqJobTotal = new Gauge({
-  name: "bullmq_job_total",
-  help: "Total number of jobs in the queue by state",
-  labelNames: ["queue_name", "state"] as const,
-});
-
-export const setBullMQJobCount = (
-  queueName: string,
-  state: BullMQQueueState,
-  count: number,
-) => bullmqJobTotal.labels(queueName, state).set(count);
-
-// Histogram for job wait time (time from enqueue to processing start)
-register.removeSingleMetric("bullmq_job_wait_duration_milliseconds");
-export const bullmqJobWaitDurationHistogram = new Histogram({
-  name: "bullmq_job_wait_duration_milliseconds",
-  help: "Time jobs spend waiting in queue before processing starts",
-  labelNames: ["queue_name"] as const,
-  buckets: [
-    10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000,
-    300000,
-  ],
-});
-
-export const getBullMQJobWaitDurationHistogram = (queueName: string) =>
-  bullmqJobWaitDurationHistogram.labels(queueName);
-
-export function recordJobWaitDuration(
-  job: { timestamp?: number },
-  queueName: string,
-): void {
-  if (job.timestamp) {
-    getBullMQJobWaitDurationHistogram(queueName).observe(
-      Date.now() - job.timestamp,
-    );
-  }
-}
-
-// Counter for stalled jobs
-register.removeSingleMetric("bullmq_job_stalled_total");
-const bullmqJobStalledTotal = new Counter({
-  name: "bullmq_job_stalled_total",
-  help: "Total number of jobs that have stalled",
-  labelNames: ["queue_name"] as const,
-});
-
-export const getBullMQJobStalledCounter = (queueName: string) =>
-  bullmqJobStalledTotal.labels(queueName);
-
-// ============================================================================
 // Event Sourcing Metrics
 // ============================================================================
 
@@ -315,6 +320,59 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
 type ESStatus = "completed" | "failed";
 /** Reactors additionally skip pre-enqueue when shouldReact returns false. */
 type ReactorStatus = ESStatus | "skipped";
+
+// --- Unified projection metrics ---
+// Keep the existing kind-specific metrics below for backwards compatibility,
+// while giving dashboards one complete view across every projection lane.
+register.removeSingleMetric("es_projection_total");
+const esProjectionTotal = new Counter({
+  name: "es_projection_total",
+  help: "Total number of event-sourcing projection executions",
+  labelNames: [
+    "pipeline_name",
+    "projection_kind",
+    "projection_name",
+    "status",
+  ] as const,
+});
+
+export const incrementEsProjectionTotal = ({
+  pipelineName,
+  projectionKind,
+  projectionName,
+  status,
+}: {
+  pipelineName: string;
+  projectionKind: "fold" | "map" | "state";
+  projectionName: string;
+  status: ESStatus;
+}) =>
+  esProjectionTotal
+    .labels(pipelineName, projectionKind, projectionName, status)
+    .inc();
+
+register.removeSingleMetric("es_projection_duration_milliseconds");
+const esProjectionDuration = new Histogram({
+  name: "es_projection_duration_milliseconds",
+  help: "Duration of event-sourcing projection execution in milliseconds",
+  labelNames: ["pipeline_name", "projection_kind", "projection_name"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+});
+
+export const observeEsProjectionDuration = ({
+  pipelineName,
+  projectionKind,
+  projectionName,
+  durationMs,
+}: {
+  pipelineName: string;
+  projectionKind: "fold" | "map" | "state";
+  projectionName: string;
+  durationMs: number;
+}) =>
+  esProjectionDuration
+    .labels(pipelineName, projectionKind, projectionName)
+    .observe(durationMs);
 
 // --- Command metrics ---
 register.removeSingleMetric("es_command_total");
@@ -352,11 +410,23 @@ const esFoldProjectionTotal = new Counter({
   labelNames: ["pipeline_name", "projection_name", "status"] as const,
 });
 
-export const incrementEsFoldProjectionTotal = (
-  pipelineName: string,
-  projectionName: string,
-  status: ESStatus,
-) => esFoldProjectionTotal.labels(pipelineName, projectionName, status).inc();
+export const incrementEsFoldProjectionTotal = ({
+  pipelineName,
+  projectionName,
+  status,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  status: ESStatus;
+}) => {
+  esFoldProjectionTotal.labels(pipelineName, projectionName, status).inc();
+  incrementEsProjectionTotal({
+    pipelineName,
+    projectionKind: "fold",
+    projectionName,
+    status,
+  });
+};
 
 register.removeSingleMetric("es_fold_projection_duration_milliseconds");
 const esFoldProjectionDuration = new Histogram({
@@ -366,14 +436,62 @@ const esFoldProjectionDuration = new Histogram({
   buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
 });
 
-export const observeEsFoldProjectionDuration = (
-  pipelineName: string,
-  projectionName: string,
-  durationMs: number,
-) =>
+export const observeEsFoldProjectionDuration = ({
+  pipelineName,
+  projectionName,
+  durationMs,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  durationMs: number;
+}) => {
   esFoldProjectionDuration
     .labels(pipelineName, projectionName)
     .observe(durationMs);
+  observeEsProjectionDuration({
+    pipelineName,
+    projectionKind: "fold",
+    projectionName,
+    durationMs,
+  });
+};
+
+register.removeSingleMetric("es_fold_refold_total");
+const esFoldRefoldTotal = new Counter({
+  name: "es_fold_refold_total",
+  help: "Out-of-order fold re-folds, by whether the aggregate's history was replayed from the event log",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * `performed` — the aggregate's full history was re-read and replayed.
+ * `declined` — the projection set `refoldOnOutOfOrder: false`, so the batch was
+ * applied on top instead (the events are never lost; only the replay is skipped).
+ * `unavailable` — no eventLoader was wired, so a re-fold was impossible.
+ */
+export const incrementEsFoldRefoldTotal = (
+  projectionName: string,
+  outcome: "performed" | "declined" | "unavailable",
+) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
+
+register.removeSingleMetric("es_reactor_collapsed_total");
+const esReactorCollapsedTotal = new Counter({
+  name: "es_reactor_collapsed_total",
+  help: "Reactor dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
+  labelNames: ["pipeline_name", "reactor_name"] as const,
+});
+
+/**
+ * Counts the sends a coalesced batch did NOT make. Each one would have
+ * serialized, gzipped and blobbed `{event, foldState}` only for the queue's
+ * dedup to discard it, so this is the direct measure of the churn the collapse
+ * removes (2026-07-09 incident).
+ */
+export const incrementEsReactorCollapsedTotal = (
+  pipelineName: string,
+  reactorName: string,
+  skipped: number,
+) => esReactorCollapsedTotal.labels(pipelineName, reactorName).inc(skipped);
 
 // --- Map projection metrics ---
 register.removeSingleMetric("es_map_projection_total");
@@ -383,11 +501,23 @@ const esMapProjectionTotal = new Counter({
   labelNames: ["pipeline_name", "projection_name", "status"] as const,
 });
 
-export const incrementEsMapProjectionTotal = (
-  pipelineName: string,
-  projectionName: string,
-  status: ESStatus,
-) => esMapProjectionTotal.labels(pipelineName, projectionName, status).inc();
+export const incrementEsMapProjectionTotal = ({
+  pipelineName,
+  projectionName,
+  status,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  status: ESStatus;
+}) => {
+  esMapProjectionTotal.labels(pipelineName, projectionName, status).inc();
+  incrementEsProjectionTotal({
+    pipelineName,
+    projectionKind: "map",
+    projectionName,
+    status,
+  });
+};
 
 register.removeSingleMetric("es_map_projection_duration_milliseconds");
 const esMapProjectionDuration = new Histogram({
@@ -397,14 +527,25 @@ const esMapProjectionDuration = new Histogram({
   buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
 });
 
-export const observeEsMapProjectionDuration = (
-  pipelineName: string,
-  projectionName: string,
-  durationMs: number,
-) =>
+export const observeEsMapProjectionDuration = ({
+  pipelineName,
+  projectionName,
+  durationMs,
+}: {
+  pipelineName: string;
+  projectionName: string;
+  durationMs: number;
+}) => {
   esMapProjectionDuration
     .labels(pipelineName, projectionName)
     .observe(durationMs);
+  observeEsProjectionDuration({
+    pipelineName,
+    projectionKind: "map",
+    projectionName,
+    durationMs,
+  });
+};
 
 // --- Reactor metrics ---
 register.removeSingleMetric("es_reactor_total");
@@ -433,6 +574,254 @@ export const observeEsReactorDuration = (
   reactorName: string,
   durationMs: number,
 ) => esReactorDuration.labels(pipelineName, reactorName).observe(durationMs);
+
+// --- Event subscriber metrics ---
+register.removeSingleMetric("es_subscriber_total");
+const esSubscriberTotal = new Counter({
+  name: "es_subscriber_total",
+  help: "Total number of event-sourcing subscriber executions",
+  labelNames: ["pipeline_name", "subscriber_name", "status"] as const,
+});
+
+export const incrementEsSubscriberTotal = ({
+  pipelineName,
+  subscriberName,
+  status,
+}: {
+  pipelineName: string;
+  subscriberName: string;
+  status: ESStatus;
+}) => esSubscriberTotal.labels(pipelineName, subscriberName, status).inc();
+
+register.removeSingleMetric("es_subscriber_duration_milliseconds");
+const esSubscriberDuration = new Histogram({
+  name: "es_subscriber_duration_milliseconds",
+  help: "Duration of event-sourcing subscriber execution in milliseconds",
+  labelNames: ["pipeline_name", "subscriber_name"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+});
+
+export const observeEsSubscriberDuration = ({
+  pipelineName,
+  subscriberName,
+  durationMs,
+}: {
+  pipelineName: string;
+  subscriberName: string;
+  durationMs: number;
+}) =>
+  esSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
+
+// --- Process manager metrics ---
+register.removeSingleMetric("es_process_manager_total");
+const esProcessManagerTotal = new Counter({
+  name: "es_process_manager_total",
+  help: "Total number of process-manager evolutions",
+  labelNames: ["process_name", "input_kind", "outcome"] as const,
+});
+
+export const incrementEsProcessManagerTotal = ({
+  processName,
+  inputKind,
+  outcome,
+}: {
+  processName: string;
+  inputKind: "event" | "wake";
+  outcome:
+    | "committed"
+    | "duplicate_event"
+    | "stale_wake"
+    | "revision_conflict"
+    | "failed";
+}) => esProcessManagerTotal.labels(processName, inputKind, outcome).inc();
+
+register.removeSingleMetric("es_process_manager_duration_milliseconds");
+const esProcessManagerDuration = new Histogram({
+  name: "es_process_manager_duration_milliseconds",
+  help: "Duration of process-manager evolutions in milliseconds",
+  labelNames: ["process_name", "input_kind"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+});
+
+export const observeEsProcessManagerDuration = ({
+  processName,
+  inputKind,
+  durationMs,
+}: {
+  processName: string;
+  inputKind: "event" | "wake";
+  durationMs: number;
+}) =>
+  esProcessManagerDuration.labels(processName, inputKind).observe(durationMs);
+
+register.removeSingleMetric("es_process_outbox_total");
+const esProcessOutboxTotal = new Counter({
+  name: "es_process_outbox_total",
+  help: "Total number of process-manager outbox delivery attempts",
+  labelNames: ["process_name", "intent_type", "status"] as const,
+});
+
+export const incrementEsProcessOutboxTotal = ({
+  processName,
+  intentType,
+  status,
+}: {
+  processName: string;
+  intentType: string;
+  status: "dispatched" | "retried" | "dead";
+}) => esProcessOutboxTotal.labels(processName, intentType, status).inc();
+
+register.removeSingleMetric("es_process_outbox_duration_milliseconds");
+const esProcessOutboxDuration = new Histogram({
+  name: "es_process_outbox_duration_milliseconds",
+  help: "Duration of process-manager outbox delivery attempts in milliseconds",
+  labelNames: ["process_name", "intent_type"] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000],
+});
+
+export const observeEsProcessOutboxDuration = ({
+  processName,
+  intentType,
+  durationMs,
+}: {
+  processName: string;
+  intentType: string;
+  durationMs: number;
+}) =>
+  esProcessOutboxDuration.labels(processName, intentType).observe(durationMs);
+
+// How late a wake fires relative to the instant it was scheduled for
+// (ADR-054): the direct answer to "is the scheduler stalling". Buckets run
+// to hours because a wake surviving a fleet outage legitimately fires very
+// late once — the ALERT is on sustained lag, not a single spike.
+register.removeSingleMetric("es_process_wake_lag_milliseconds");
+const esProcessWakeLag = new Histogram({
+  name: "es_process_wake_lag_milliseconds",
+  help: "Delay between a process wake's scheduled instant and it being handled",
+  labelNames: ["process_name"] as const,
+  buckets: [
+    100, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000, 21600000,
+    86400000,
+  ],
+});
+
+export const observeEsProcessWakeLag = ({
+  processName,
+  lagMs,
+}: {
+  processName: string;
+  lagMs: number;
+}) => esProcessWakeLag.labels(processName).observe(Math.max(0, lagMs));
+
+// How long a committed intent sat in the outbox before its dispatch began
+// (ADR-054): the direct answer to "is the outbox draining". Excludes retry
+// waits by design — attempt > 1 rows re-enter with backoff, so only the
+// first attempt measures pure queueing delay.
+register.removeSingleMetric("es_process_outbox_dispatch_lag_milliseconds");
+const esProcessOutboxDispatchLag = new Histogram({
+  name: "es_process_outbox_dispatch_lag_milliseconds",
+  help: "Delay between an intent being committed and its first dispatch starting",
+  labelNames: ["process_name"] as const,
+  buckets: [
+    50, 250, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000,
+  ],
+});
+
+export const observeEsProcessOutboxDispatchLag = ({
+  processName,
+  lagMs,
+}: {
+  processName: string;
+  lagMs: number;
+}) => esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
+
+// Commits whose intents were dropped as already-dispatched (ADR-054).
+// Legitimate on event redelivery — but a sustained per-process rate is
+// exactly how the ADR-051 lost-day scheduling bug hid, so it is measured,
+// logged AND alertable rather than only logged.
+register.removeSingleMetric("es_process_intents_suppressed_total");
+const esProcessIntentsSuppressed = new Counter({
+  name: "es_process_intents_suppressed_total",
+  help: "Process-manager commits whose intents were suppressed as already-dispatched",
+  labelNames: ["process_name"] as const,
+});
+
+export const incrementEsProcessIntentsSuppressed = ({
+  processName,
+  count,
+}: {
+  processName: string;
+  count: number;
+}) => esProcessIntentsSuppressed.labels(processName).inc(count);
+
+// --- Topic clustering domain metrics (ADR-051/ADR-054) ---
+// Run-page outcomes as the domain sees them, not just generic es_* counters:
+// `failed_final` is the alertable one (retries exhausted, run_failed
+// recorded); `failed_retryable` is expected noise under provider hiccups.
+register.removeSingleMetric("topic_clustering_page_total");
+const topicClusteringPageTotal = new Counter({
+  name: "topic_clustering_page_total",
+  help: "Topic clustering page executions by outcome",
+  labelNames: ["outcome"] as const,
+});
+
+export const incrementTopicClusteringPageTotal = ({
+  outcome,
+}: {
+  outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+}) => topicClusteringPageTotal.labels(outcome).inc();
+
+register.removeSingleMetric("topic_clustering_page_duration_milliseconds");
+const topicClusteringPageDuration = new Histogram({
+  name: "topic_clustering_page_duration_milliseconds",
+  help: "Duration of one topic clustering page (langevals call included)",
+  labelNames: ["mode"] as const,
+  // A page is embeddings + LLM naming over up to 2000 traces — minutes are
+  // normal, and the outbox lease caps everything at 20.
+  buckets: [1000, 5000, 15000, 30000, 60000, 120000, 300000, 600000, 1200000],
+});
+
+export const observeTopicClusteringPageDuration = ({
+  mode,
+  durationMs,
+}: {
+  mode: "batch" | "incremental";
+  durationMs: number;
+}) => topicClusteringPageDuration.labels(mode).observe(durationMs);
+
+// --- Governance ingestion-pull domain metrics (ADR-054) ---
+// Pull-run outcomes as the domain sees them, not just generic es_* counters:
+// `failed_final` is the alertable one (retries exhausted, run_failed
+// recorded); `failed_retryable` is expected noise under provider hiccups.
+register.removeSingleMetric("ingestion_pull_total");
+const ingestionPullTotal = new Counter({
+  name: "ingestion_pull_total",
+  help: "Governance ingestion pull executions by outcome",
+  labelNames: ["outcome"] as const,
+});
+
+export const incrementIngestionPullTotal = ({
+  outcome,
+}: {
+  outcome: "completed" | "failed_retryable" | "failed_final";
+}) => ingestionPullTotal.labels(outcome).inc();
+
+register.removeSingleMetric("ingestion_pull_duration_milliseconds");
+const ingestionPullDuration = new Histogram({
+  name: "ingestion_pull_duration_milliseconds",
+  help: "Duration of one governance ingestion pull (adapter poll and OCSF sink writes)",
+  // Unlabelled on purpose: the executor only knows the sourceId, and the
+  // adapter kind lives behind the run port — no cheap low-cardinality label.
+  // A pull is a network poll plus row inserts, capped by the worker's
+  // 5-minute soft deadline, so buckets run 100ms to 5min.
+  buckets: [100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000],
+});
+
+export const observeIngestionPullDuration = ({
+  durationMs,
+}: {
+  durationMs: number;
+}) => ingestionPullDuration.observe(durationMs);
 
 // --- Fold cache metrics ---
 register.removeSingleMetric("es_fold_cache_total");
@@ -483,8 +872,213 @@ const esFoldCacheRedisErrorTotal = new Counter({
 
 export const incrementEsFoldCacheRedisError = (
   projectionName: string,
-  operation: "get" | "set",
+  operation: "get" | "set" | "del",
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
+
+register.removeSingleMetric("es_fold_cache_entry_bytes");
+const esFoldCacheEntryBytes = new Histogram({
+  name: "es_fold_cache_entry_bytes",
+  help: "Serialized size of a cached fold state entry, in bytes",
+  labelNames: ["projection_name"] as const,
+  buckets: [1_024, 8_192, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216],
+});
+
+export const observeEsFoldCacheEntryBytes = (
+  projectionName: string,
+  bytes: number,
+) => esFoldCacheEntryBytes.labels(projectionName).observe(bytes);
+
+// ============================================================================
+// Fold redelivery
+// ============================================================================
+
+register.removeSingleMetric("es_fold_dedup_unavailable_total");
+const esFoldDedupUnavailable = new Counter({
+  name: "es_fold_dedup_unavailable_total",
+  help: "Retried fold deliveries that had no applied-event-id set to check against, by reason",
+  labelNames: ["projection_name", "reason"] as const,
+});
+
+/**
+ * A RETRY reached the fold with no record of what an earlier attempt applied.
+ *
+ * This is the moment the batch is about to be re-applied on top of durable
+ * state that already contains it. It has to be its own counter rather than a
+ * label on the cache result, because the dangerous case is invisible in the
+ * existing signals: a miss on a retry and a miss on a fresh delivery are the
+ * same observation, and `es_fold_duplicate_events_skipped_total` staying flat
+ * during an incident reads as good news whether dedup was idle or blind.
+ */
+export const incrementEsFoldDedupUnavailable = (
+  projectionName: string,
+  reason: "cache_miss" | "read_error" | "unreadable" | "legacy_entry",
+) => esFoldDedupUnavailable.labels(projectionName, reason).inc();
+
+register.removeSingleMetric("es_fold_duplicate_events_skipped_total");
+const esFoldDuplicateEventsSkipped = new Counter({
+  name: "es_fold_duplicate_events_skipped_total",
+  help: "Redelivered events recognised as already folded in and skipped",
+  labelNames: ["projection_name"] as const,
+});
+
+export const incrementEsFoldDuplicateEventsSkipped = (
+  projectionName: string,
+  count = 1,
+) => esFoldDuplicateEventsSkipped.labels(projectionName).inc(count);
+
+register.removeSingleMetric("es_fold_blind_reapply_events");
+const esFoldBlindReapplyEvents = new Histogram({
+  name: "es_fold_blind_reapply_events",
+  help: "Events re-applied on a retry that carried no applied-event-id set to check against",
+  labelNames: ["projection_name"] as const,
+  buckets: [1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
+
+/**
+ * Blast radius of a blind re-apply, in events.
+ *
+ * `es_fold_dedup_unavailable_total` counts the *occurrences* of a retry
+ * arriving with nothing to check against; this measures how much accumulation
+ * each one re-applies. One re-applied event on a coalesced batch of 500 and
+ * 500 of them are the same increment on the counter and very different
+ * incidents — a coalescing fold can double-count an entire batch at once.
+ */
+export const observeEsFoldBlindReapplyEvents = (
+  projectionName: string,
+  events: number,
+) => esFoldBlindReapplyEvents.labels(projectionName).observe(events);
+
+// ============================================================================
+// Langy Metrics
+// ============================================================================
+//
+// Operational counters for the Langy turn flow. Per-tenant / per-conversation
+// attribution deliberately lives in the structured log lines next to each
+// increment, never as labels (see the cardinality doctrine above) — these
+// series answer "is Langy healthy fleet-wide?", the logs answer "which
+// tenant?".
+
+// One increment per turn-acceptance attempt at the admission boundary.
+register.removeSingleMetric("langwatch_langy_turns_total");
+const langyTurnsTotal = new Counter({
+  name: "langwatch_langy_turns_total",
+  help: "Langy turn-acceptance attempts by outcome at the admission boundary",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyTurnsCounter = (
+  outcome: "accepted" | "replay" | "busy" | "rejected" | "mismatch" | "error",
+) => langyTurnsTotal.labels(outcome);
+
+// One increment per dispatch attempt to the agent manager.
+register.removeSingleMetric("langwatch_langy_dispatch_total");
+const langyDispatchTotal = new Counter({
+  name: "langwatch_langy_dispatch_total",
+  help: "Langy turn dispatches to the agent manager by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyDispatchCounter = (
+  outcome:
+    | "accepted"
+    | "busy"
+    | "credentials_required"
+    | "rejected"
+    | "unavailable"
+    | "error",
+) => langyDispatchTotal.labels(outcome);
+
+// One increment per durable turn-result ingested on /api/internal/langy.
+register.removeSingleMetric("langwatch_langy_turn_results_total");
+const langyTurnResultsTotal = new Counter({
+  name: "langwatch_langy_turn_results_total",
+  help: "Durable Langy turn results ingested from the agent manager by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyTurnResultsCounter = (outcome: "completed" | "failed") =>
+  langyTurnResultsTotal.labels(outcome);
+
+// Incremented from the relay's per-connection tally when a frame stream ends.
+register.removeSingleMetric("langwatch_langy_relay_frames_total");
+const langyRelayFramesTotal = new Counter({
+  name: "langwatch_langy_relay_frames_total",
+  help: "Langy relay frames by processing result, summed per stream at close",
+  labelNames: ["result"] as const,
+});
+export const getLangyRelayFramesCounter = (
+  result: "applied" | "duplicate" | "rejected" | "terminal",
+) => langyRelayFramesTotal.labels(result);
+
+// Session-key lifecycle: minted per turn (when no live worker holds one),
+// revoked on turn end, reaped when the 6h TTL lapses.
+register.removeSingleMetric("langwatch_langy_session_keys_total");
+const langySessionKeysTotal = new Counter({
+  name: "langwatch_langy_session_keys_total",
+  help: "Langy session API keys by lifecycle operation",
+  labelNames: ["op"] as const,
+});
+export const getLangySessionKeysCounter = (
+  op: "minted" | "revoked" | "revoke_refused" | "reaped",
+) => langySessionKeysTotal.labels(op);
+
+// The message rate limit fails open on Redis trouble by design; a sustained
+// fail_open rate is a Redis outage worth alerting on without log grepping.
+register.removeSingleMetric("langwatch_langy_rate_limit_total");
+const langyRateLimitTotal = new Counter({
+  name: "langwatch_langy_rate_limit_total",
+  help: "Langy message rate-limit decisions that were not plain allows",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
+  langyRateLimitTotal.labels(outcome);
+
+// Model-emitted ```langy-card blocks at the relay stamp (ADR-060 §8). The
+// failure outcomes are the drift alarm for prompt regressions in block
+// emission — a rising unsalvageable/invalid rate means the agent's emission
+// quality slipped, exactly like ADR-059's probe-miss counter for cards.
+register.removeSingleMetric("langwatch_langy_blocks_total");
+const langyBlocksTotal = new Counter({
+  name: "langwatch_langy_blocks_total",
+  help: "Model-emitted langy-card blocks stamped by the relay, by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyBlocksCounter = (
+  outcome: "stamped" | "unsalvageable" | "invalid",
+) => langyBlocksTotal.labels(outcome);
+
+// ============================================================================
+// Fold redelivery
+// ============================================================================
+
+register.removeSingleMetric("es_fold_post_store_failure_total");
+const esFoldPostStoreFailure = new Counter({
+  name: "es_fold_post_store_failure_total",
+  help: "Fold deliveries that threw after their state was durably stored, by stage",
+  labelNames: ["projection_name", "stage"] as const,
+});
+
+/**
+ * A fold threw *after* its state was already written durably.
+ *
+ * Queue delivery is at-least-once and the fold's state is stored before
+ * reactors are dispatched, so anything that throws from that point fails the
+ * job without un-writing it: the queue re-delivers events the store already
+ * holds. Folds accumulate rather than being idempotent (trace summary does
+ * `spanCount + 1` and sums cost), so the re-apply double-counts.
+ *
+ * Every other fold signal reports this as a plain failure, which is
+ * indistinguishable from one that threw *before* the write and is therefore
+ * harmless to retry. The two need opposite responses, so they need separate
+ * counters.
+ *
+ * Rate against `es_fold_projection_total{status="failed"}` for the share of
+ * fold failures that land in the dangerous half.
+ */
+export const incrementEsFoldPostStoreFailure = ({
+  projectionName,
+  stage,
+}: {
+  projectionName: string;
+  stage: "reactor_dispatch";
+}) => esFoldPostStoreFailure.labels(projectionName, stage).inc();
 
 // ============================================================================
 // Stored Objects Metrics

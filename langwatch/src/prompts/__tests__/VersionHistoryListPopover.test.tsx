@@ -47,14 +47,15 @@ const mockVersions = [
   },
 ] as unknown as VersionedPrompt[];
 
+const { mockUseQuery } = vi.hoisted(() => ({
+  mockUseQuery: vi.fn(),
+}));
+
 vi.mock("~/utils/api", () => ({
   api: {
     prompts: {
       getAllVersionsForPrompt: {
-        useQuery: () => ({
-          data: mockVersions,
-          isLoading: false,
-        }),
+        useQuery: mockUseQuery,
       },
     },
   },
@@ -79,6 +80,10 @@ const renderWithChakra = (ui: React.ReactElement) => {
 describe("VersionHistoryListPopover", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseQuery.mockReturnValue({
+      data: mockVersions,
+      isLoading: false,
+    });
   });
 
   afterEach(() => {
@@ -271,6 +276,33 @@ describe("VersionHistoryListPopover", () => {
       // Should show "current" tag - only one should exist (for v2)
       const currentTags = screen.getAllByText("current");
       expect(currentTags).toHaveLength(1);
+    });
+  });
+
+  describe("when the popover is closed", () => {
+    it("does not enable the version history query", () => {
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+
+      expect(mockUseQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ idOrHandle: "config-1" }),
+        expect.objectContaining({ enabled: false }),
+      );
+    });
+  });
+
+  describe("when the popover is opened", () => {
+    it("enables the version history query", async () => {
+      renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+
+      await waitFor(() => {
+        expect(mockUseQuery).toHaveBeenLastCalledWith(
+          expect.objectContaining({ idOrHandle: "config-1" }),
+          expect.objectContaining({ enabled: true }),
+        );
+      });
     });
   });
 });

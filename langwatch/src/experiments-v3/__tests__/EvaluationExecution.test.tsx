@@ -49,10 +49,16 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../hooks/useTargetName", () => ({
-  useTargetName: (target: { id: string }) =>
-    target.id === "target-1" ? "My Prompt" : "Other Prompt",
-}));
+vi.mock("../hooks/useTargetName", () => {
+  const useTargetName = (target: { id: string }) =>
+    target.id === "target-1" ? "My Prompt" : "Other Prompt";
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
@@ -95,6 +101,9 @@ vi.mock("~/hooks/useDrawer", () => ({
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
+    // Batched name lookups (useTargetNames). No target here is a comparison
+    // column, so every caller passes an empty variant list.
+    useQueries: () => [],
     useContext: () => ({
       agents: {
         getById: {

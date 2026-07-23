@@ -1,14 +1,17 @@
-import { DomainError, NotFoundError } from "../app-layer/domain-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
+
+import { remediation } from "../app-layer/error-remediation";
 
 /**
  * Thrown when an API key cannot be located by id.
  */
 export class ApiKeyNotFoundError extends NotFoundError {
-  declare readonly kind: "api_key_not_found";
+  declare readonly code: "api_key_not_found";
 
   constructor(apiKeyId: string, options: { reasons?: readonly Error[] } = {}) {
     super("api_key_not_found", "API Key", apiKeyId, {
       meta: { apiKeyId },
+      ...remediation("api_key_not_found"),
       ...options,
     });
     this.name = "ApiKeyNotFoundError";
@@ -18,8 +21,8 @@ export class ApiKeyNotFoundError extends NotFoundError {
 /**
  * Thrown when a user attempts to modify an API key they do not own.
  */
-export class ApiKeyNotOwnedError extends DomainError {
-  declare readonly kind: "api_key_not_owned";
+export class ApiKeyNotOwnedError extends HandledError {
+  declare readonly code: "api_key_not_owned";
 
   constructor(
     apiKeyId: string,
@@ -28,6 +31,7 @@ export class ApiKeyNotOwnedError extends DomainError {
     super("api_key_not_owned", "Not authorized to modify this API Key", {
       meta: { apiKeyId },
       httpStatus: 403,
+      ...remediation("api_key_not_owned"),
       ...options,
     });
     this.name = "ApiKeyNotOwnedError";
@@ -37,8 +41,8 @@ export class ApiKeyNotOwnedError extends DomainError {
 /**
  * Thrown when an API key is already revoked and cannot be revoked again.
  */
-export class ApiKeyAlreadyRevokedError extends DomainError {
-  declare readonly kind: "api_key_already_revoked";
+export class ApiKeyAlreadyRevokedError extends HandledError {
+  declare readonly code: "api_key_already_revoked";
 
   constructor(
     apiKeyId: string,
@@ -47,6 +51,7 @@ export class ApiKeyAlreadyRevokedError extends DomainError {
     super("api_key_already_revoked", "API Key is already revoked", {
       meta: { apiKeyId },
       httpStatus: 409,
+      ...remediation("api_key_already_revoked"),
       ...options,
     });
     this.name = "ApiKeyAlreadyRevokedError";
@@ -59,8 +64,8 @@ export class ApiKeyAlreadyRevokedError extends DomainError {
  * permission set (intersection of requested scopes ∩ user's current role)
  * does not grant the action.
  */
-export class ApiKeyPermissionDeniedError extends DomainError {
-  declare readonly kind: "api_key_permission_denied";
+export class ApiKeyPermissionDeniedError extends HandledError {
+  declare readonly code: "api_key_permission_denied";
 
   constructor(
     permission: string,
@@ -75,6 +80,7 @@ export class ApiKeyPermissionDeniedError extends DomainError {
       {
         meta: { permission, ...options.meta },
         httpStatus: 403,
+        ...remediation("api_key_permission_denied"),
         reasons: options.reasons,
       },
     );
@@ -87,8 +93,41 @@ export class ApiKeyPermissionDeniedError extends DomainError {
  * creator's ceiling — e.g., binding a role the creator does not hold on the
  * target scope. Surfaced to the user before the token is persisted.
  */
-export class ApiKeyScopeViolationError extends DomainError {
-  declare readonly kind: "api_key_scope_violation";
+/**
+ * Thrown when a caller tries to create a key with — or rename a key to — a
+ * name in HIDDEN_SYSTEM_KEY_NAMES. Those names mark keys the product mints
+ * and retires on its own, and the listings + by-id mutation guards key on
+ * them; letting a customer claim one would make their key invisible AND
+ * unrevocable (the system-managed guard refuses mutations on it).
+ */
+export class ApiKeyReservedNameError extends HandledError {
+  declare readonly code: "api_key_reserved_name";
+
+  constructor(
+    name: string,
+    options: {
+      meta?: Record<string, unknown>;
+      reasons?: readonly Error[];
+    } = {},
+  ) {
+    super(
+      "api_key_reserved_name",
+      `The API key name "${name}" is reserved for keys LangWatch manages`,
+      {
+        httpStatus: 422,
+        ...remediation("api_key_reserved_name"),
+        ...options,
+        // After ...options so a caller-supplied meta can add fields but never
+        // drop the attempted name this class promises to carry.
+        meta: { ...options.meta, name },
+      },
+    );
+    this.name = "ApiKeyReservedNameError";
+  }
+}
+
+export class ApiKeyScopeViolationError extends HandledError {
+  declare readonly code: "api_key_scope_violation";
 
   constructor(
     message: string,
@@ -99,6 +138,7 @@ export class ApiKeyScopeViolationError extends DomainError {
   ) {
     super("api_key_scope_violation", message, {
       httpStatus: 403,
+      ...remediation("api_key_scope_violation"),
       ...options,
     });
     this.name = "ApiKeyScopeViolationError";

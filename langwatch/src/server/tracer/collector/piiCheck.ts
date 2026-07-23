@@ -1,8 +1,8 @@
 import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
+import { createLogger } from "@langwatch/observability";
 import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
-import { createLogger } from "../../../utils/logger/server";
 import { normalizePresidioMarkers } from "../../data-privacy/redaction/markers";
 import type { BatchEvaluationResult } from "../../evaluations/evaluators";
 import {
@@ -151,8 +151,14 @@ const dlpCheck = async (
   text: string,
   piiRedactionLevel: PIIRedactionLevel,
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
+  const credentials = getCredentials();
+  if (!credentials) {
+    throw new Error(
+      "Google DLP redaction requested but GOOGLE_APPLICATION_CREDENTIALS is not configured. Configure the credentials or lower the data-privacy PII level for this scope.",
+    );
+  }
   const [response] = await getDlpClient().inspectContent({
-    parent: `projects/${getCredentials()!.project_id}/locations/global`,
+    parent: `projects/${credentials.project_id}/locations/global`,
     inspectConfig: {
       infoTypes: (piiRedactionLevel === "ESSENTIAL"
         ? essentialInfoTypes

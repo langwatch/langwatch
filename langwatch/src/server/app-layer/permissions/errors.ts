@@ -1,7 +1,7 @@
-import { DomainError } from "../domain-error";
+import { HandledError } from "@langwatch/handled-error";
 
-export class LiteMemberRestrictedError extends DomainError {
-  declare readonly kind: "lite_member_restricted";
+export class LiteMemberRestrictedError extends HandledError {
+  declare readonly code: "lite_member_restricted";
 
   constructor(resource: string) {
     super("lite_member_restricted", "This feature is not available for your account", {

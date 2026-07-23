@@ -70,7 +70,13 @@ export type PromptEditorDrawerProps = {
     version?: number;
     versionId?: string;
     inputs?: Array<{ identifier: string; type: string }>;
-    outputs?: Array<{ identifier: string; type: string }>;
+    // json_schema flows to the target so structured outputs stay field-selectable
+    // in the comparison config — see promptEditorCallbacks.onSave.
+    outputs?: Array<{
+      identifier: string;
+      type: string;
+      json_schema?: object | null;
+    }>;
   }) => void;
   /** If provided, loads an existing prompt for editing */
   promptId?: string;
@@ -536,6 +542,47 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     _onMappingsChangeProp,
     modelMetadata,
     resolvedDefaultModel,
+  ]);
+
+  // Backfill the model once resolvedDefaultModel arrives AFTER the init
+  // effect above already ran with an empty model — e.g. this drawer first
+  // opened on a project with zero providers (getResolvedDefault had
+  // nothing to resolve), and a provider was added in another tab since
+  // (#5827: the cache now refreshes cross-tab, but the init effect is a
+  // one-shot gated by isFormInitialized and never re-fires). Scoped to
+  // brand-new/not-found prompts only, and only while the model field is
+  // still the unresolved empty placeholder, so it can never clobber a
+  // real user edit or server value.
+  const isNewOrNotFoundPrompt =
+    !promptId || (!promptQuery.data && !promptQuery.isLoading);
+  useEffect(() => {
+    if (!isFormInitialized) return;
+    if (!isNewOrNotFoundPrompt) return;
+    if (!resolvedDefaultModel) return;
+    if (methods.getValues("version.configData.llm.model")) return;
+
+    methods.setValue("version.configData.llm.model", resolvedDefaultModel, {
+      shouldDirty: false,
+    });
+    // Only backfill maxTokens alongside the model if the user hasn't
+    // already edited it — a manual token-limit change must survive the
+    // late-arriving default same as it would survive anything else.
+    const maxTokensIsDirty = methods.getFieldState(
+      "version.configData.llm.maxTokens",
+      methods.formState,
+    ).isDirty;
+    const maxTokens = getMaxTokenLimit(modelMetadata?.[resolvedDefaultModel]);
+    if (maxTokens && !maxTokensIsDirty) {
+      methods.setValue("version.configData.llm.maxTokens", maxTokens, {
+        shouldDirty: false,
+      });
+    }
+  }, [
+    isFormInitialized,
+    isNewOrNotFoundPrompt,
+    resolvedDefaultModel,
+    modelMetadata,
+    methods,
   ]);
 
   // Reset when drawer closes

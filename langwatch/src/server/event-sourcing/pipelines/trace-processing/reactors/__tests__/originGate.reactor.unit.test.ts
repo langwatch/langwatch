@@ -79,11 +79,13 @@ function createEvent(
 
 function createContext(
   foldState: TraceSummaryData,
+  overrides: Partial<ReactorContext<TraceSummaryData>> = {},
 ): ReactorContext<TraceSummaryData> {
   return {
     tenantId: "tenant-1",
     aggregateId: "trace-1",
     foldState,
+    ...overrides,
   };
 }
 
@@ -156,6 +158,7 @@ describe("originGate reactor", () => {
   });
 
   describe("when origin is absent (pure OTEL trace)", () => {
+    /** @scenario "Deferred check deduplicates per trace" */
     it("schedules deferred origin resolution with traceId as id", async () => {
       const deps = createDeps();
       const reactor = createOriginGateReactor(deps);
@@ -168,6 +171,21 @@ describe("originGate reactor", () => {
         tenantId: "tenant-1",
         traceId: "trace-1",
       });
+    });
+  });
+
+  describe("when the trace aggregate has an empty id", () => {
+    it("skips without scheduling", async () => {
+      const deps = createDeps();
+      const reactor = createOriginGateReactor(deps);
+      const state = createFoldState({ attributes: {} });
+
+      await reactor.handle(
+        createEvent({ aggregateId: "" }),
+        createContext(state, { aggregateId: "" }),
+      );
+
+      expect(deps.scheduleDeferred).not.toHaveBeenCalled();
     });
   });
 
@@ -229,6 +247,7 @@ describe("originGate reactor", () => {
 
 describe("createDeferredOriginHandler()", () => {
   describe("when called", () => {
+    /** @scenario 'Deferred check treats still-empty origin as "application"' */
     it("dispatches resolveOrigin command unconditionally", async () => {
       const resolveOriginFn = vi.fn().mockResolvedValue(undefined);
       const handler = createDeferredOriginHandler(resolveOriginFn);

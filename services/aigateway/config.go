@@ -2,7 +2,9 @@ package aigateway
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -11,13 +13,31 @@ import (
 
 // Config is the top-level service configuration.
 type Config struct {
-	Environment         string                    `env:"ENVIRONMENT"`
-	Server              config.Server             `env:"SERVER"`
-	Log                 clog.Config               `env:"LOG"`
-	ControlPlane        ControlPlaneConfig        `env:"LW_GATEWAY"`
-	AuthCache           AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
-	CustomerTraceBridge CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
-	OTel                config.OTel               `env:"OTEL"`
+	Environment                   string                    `env:"ENVIRONMENT"`
+	BlockLocalHTTPCalls           bool                      `env:"BLOCK_LOCAL_HTTP_CALLS"`
+	RequireHTTPSCustomerEndpoints bool                      `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
+	AllowedProxyHosts             string                    `env:"ALLOWED_PROXY_HOSTS"`
+	Server                        config.Server             `env:"SERVER"`
+	Log                           clog.Config               `env:"LOG"`
+	ControlPlane                  ControlPlaneConfig        `env:"LW_GATEWAY"`
+	AuthCache                     AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
+	CustomerTraceBridge           CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
+	LangyMirror                   LangyMirrorConfig         `env:"LANGY_MIRROR"`
+	OTel                          config.OTel               `env:"OTEL"`
+	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
+	// non-streaming response writes a keep-alive byte while dispatch is
+	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
+	// negative disables heartbeating entirely. Plain seconds, not a Go
+	// duration string ("45s") — config.Hydrate parses time.Duration fields
+	// as raw nanosecond integers, not via time.ParseDuration, so "45s"
+	// would fail to parse. Plain seconds sidesteps that trap entirely.
+	//
+	// Lives on Config directly rather than the shared config.Server (unlike
+	// MaxRequestBodyBytes, which every config.Server-embedding service
+	// wires up) because this concept is specific to the gateway's
+	// non-streaming HTTP surface — services/langyagent and services/nlpgo
+	// both embed config.Server too but have no use for this field.
+	NonStreamingHeartbeatIntervalSeconds int64 `env:"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS"`
 }
 
 // ControlPlaneConfig holds control plane connection settings.
@@ -55,6 +75,19 @@ type CustomerTraceBridgeConfig struct {
 	BaseURL string `env:"BASE_URL"`
 }
 
+// LangyMirrorConfig points the gateway's ADR-061 mirror leg at LangWatch's own
+// mirror project. Product configuration shared verbatim with the Go manager
+// (LANGY_MIRROR_TRACE_ENDPOINT / LANGY_MIRROR_TRACE_KEY), plus the mirror
+// project's id so the bridge can route the mirror copy there. Never OTEL_* —
+// that namespace is the gateway's own telemetry only. All three unset (the
+// self-hosted default) leaves the gateway's mirror leg dormant; the customer
+// path is unaffected either way.
+type LangyMirrorConfig struct {
+	TraceEndpoint string `env:"TRACE_ENDPOINT"`
+	TraceKey      string `env:"TRACE_KEY"`
+	ProjectID     string `env:"PROJECT_ID"`
+}
+
 func defaultConfig() Config {
 	return Config{
 		Environment: "local",
@@ -63,13 +96,23 @@ func defaultConfig() Config {
 			GracefulSeconds:     10,
 			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
 		},
+		NonStreamingHeartbeatIntervalSeconds: int64(config.DefaultNonStreamingHeartbeatInterval / time.Second),
 		ControlPlane: ControlPlaneConfig{
 			BaseURL: "http://localhost:5560",
 		},
 		OTel: config.OTel{
-			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
+			// Left unset so an operator-supplied ratio is distinguishable from
+			// the default; resolved in LoadConfig.
+			SampleRatio: config.UnsetSampleRatio,
 		},
 	}
+}
+
+func splitAllowedHosts(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
 }
 
 // LoadConfig hydrates configuration from environment variables and validates it.
@@ -78,18 +121,38 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	cfg.OTel.SampleRatioSet = os.Getenv("OTEL_SAMPLE_RATIO") != ""
 	applyLegacyEnvAliases(&cfg)
+	if err := validateHostedEgressSecurity(cfg); err != nil {
+		return Config{}, err
+	}
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
-	// Apply environment-aware sample ratio default when not explicitly set.
-	if cfg.OTel.SampleRatio == 1.0 && cfg.Environment != "local" {
-		cfg.OTel.SampleRatio = 0.1
+	if err := cfg.OTel.Resolve(); err != nil {
+		return Config{}, err
 	}
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// validateHostedEgressSecurity makes the SSRF controls a startup invariant for
+// deployed gateway instances. Local/self-hosted development keeps the legacy
+// permissive default, but a hosted process must never silently boot with the
+// compatibility defaults after a missing or misspelled environment variable.
+func validateHostedEgressSecurity(cfg Config) error {
+	if cfg.Environment == "" || cfg.Environment == "local" {
+		return nil
+	}
+	if !cfg.BlockLocalHTTPCalls {
+		return fmt.Errorf("hosted gateway requires BLOCK_LOCAL_HTTP_CALLS=true")
+	}
+	if !cfg.RequireHTTPSCustomerEndpoints {
+		return fmt.Errorf("hosted gateway requires REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true")
+	}
+	return nil
 }
 
 // applyLegacyEnvAliases reads the chart/saas-style env var names that the

@@ -1,6 +1,9 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // ProviderID identifies a model provider (e.g. "openai", "anthropic", "azure").
 type ProviderID string
@@ -33,7 +36,26 @@ const (
 	// themselves (vLLM, LiteLLM proxy, ...). Requires a base URL; the
 	// API key is optional (many self-hosted servers run unauthenticated).
 	ProviderCustom ProviderID = "custom"
+	// OpenAICodex is the user's own ChatGPT subscription, reached through
+	// OpenAI's codex backend (chatgpt.com/backend-api/codex) with an OAuth
+	// access token instead of an API key. Responses-API + SSE only; the
+	// gateway proxies directly (no Bifrost enum) and refreshes a 401'd
+	// token once via the control plane. See adapters/providers/codex.go.
+	ProviderOpenAICodex ProviderID = "openai_codex"
 )
+
+// CodexTokenRefresher exchanges a codex provider row's stored refresh token
+// for a fresh access token via the control plane (which owns storage and
+// rotation). A dead session (refresh rejected — the user must sign in again)
+// is reported as an error wrapping ErrCodexSessionDead.
+type CodexTokenRefresher interface {
+	RefreshCodexToken(ctx context.Context, providerRowID string) (accessToken string, accountID string, err error)
+}
+
+// ErrCodexSessionDead is the sentinel a CodexTokenRefresher wraps when the
+// stored OpenAI session cannot be refreshed. The dispatcher turns it into
+// the client-facing 401 with code ErrCodexSessionExpired.
+var ErrCodexSessionDead = errors.New("codex session expired; sign in again")
 
 // Credential holds the resolved credentials for a provider.
 type Credential struct {
@@ -48,6 +70,48 @@ type Credential struct {
 	// the "gpt-5-mini" model. Bedrock + Vertex have analogous mappings.
 	// nil or empty when the provider doesn't need deployment mapping.
 	DeploymentMap map[string]string
+}
+
+// WithDeploymentSelfMap ensures Azure / Bedrock / Vertex credentials carry a
+// deployment entry for bareModel so Bifrost's per-key readers resolve a
+// deployment ("deployment not found for model X" / "deployments not set"
+// otherwise). By default the model id IS the deployment name
+// (azure/gpt-5-mini → deployment "gpt-5-mini"), so a {bareModel: bareModel}
+// self-map suffices; when the provider defines an explicit deployment (the
+// model id need not equal the deployment name), the control plane / gateway
+// forwards it as Extra["deployment"] and that wins. Non-mapped providers
+// (OpenAI, ...) and an empty bareModel are returned unchanged.
+//
+// Every dispatch path shares this so Azure resolves its deployment identically
+// regardless of entry point: dispatcheradapter (Studio / workflows /
+// runSignature) and the gatewayproxy /go/proxy path (scenario User Simulator,
+// playground). The /go/proxy path previously skipped it, so Azure calls that
+// got past the endpoint check then failed deployment resolution (#5760).
+func WithDeploymentSelfMap(cred Credential, bareModel string) Credential {
+	if bareModel == "" {
+		return cred
+	}
+	switch cred.ProviderID {
+	case ProviderAzure, ProviderBedrock, ProviderVertex:
+	default:
+		return cred
+	}
+	if _, present := cred.DeploymentMap[bareModel]; present {
+		return cred
+	}
+	deployment := bareModel
+	if explicit := cred.Extra["deployment"]; explicit != "" {
+		deployment = explicit
+	}
+	// Copy on write: cred arrives by value, but DeploymentMap is a reference, so
+	// writing through it would land in the caller's map.
+	next := make(map[string]string, len(cred.DeploymentMap)+1)
+	for model, target := range cred.DeploymentMap {
+		next[model] = target
+	}
+	next[bareModel] = deployment
+	cred.DeploymentMap = next
+	return cred
 }
 
 // Provider dispatches requests to a specific AI provider.

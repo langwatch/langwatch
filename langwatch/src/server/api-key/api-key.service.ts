@@ -1,7 +1,17 @@
-import type { PrismaClient, ApiKey } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import type { ApiKey, PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import type { Permission } from "~/server/api/rbac";
+import {
+  MalformedCustomRolePermissionsError,
+  parseCustomRolePermissions,
+  permissionFormatSchema,
+} from "~/server/rbac/custom-role-permissions";
+import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
+import { CUSTOM_ROLE_KIND, RoleRepository } from "~/server/role/repositories/role.repository";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { ApiKeyRepository, type ApiKeyWithBindings } from "./api-key.repository";
-import { RoleRepository, CUSTOM_ROLE_KIND } from "~/server/role/repositories/role.repository";
 import {
   generateApiKeyToken,
   hashSecret,
@@ -13,17 +23,26 @@ import {
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   ApiKeyNotOwnedError,
+  ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
 } from "./errors";
-import type { Permission } from "~/server/api/rbac";
-import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
-import { parseCustomRolePermissions, permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
-import { DomainError } from "~/server/app-layer/domain-error";
-import { createLogger } from "~/utils/logger/server";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
 const logger = createLogger("langwatch:api-key:service");
+
+/**
+ * Keys the product mints and retires on its own — today the ephemeral
+ * "Langy session" key, one per chat session with a 6h TTL.
+ *
+ * They are already absent from every listing (the repository filters
+ * HIDDEN_SYSTEM_KEY_NAMES), but absence is not immutability: a caller who
+ * learned an id could still rename or revoke one, and revoking it breaks the
+ * Langy turn currently authenticating with it. The by-id mutations refuse them
+ * for the same reason the listings hide them.
+ */
+function isSystemManaged(apiKey: { name: string }): boolean {
+  return HIDDEN_SYSTEM_KEY_NAMES.includes(apiKey.name);
+}
 
 type RoleBindingBase = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -96,6 +115,7 @@ export class ApiKeyService {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    isSystemManaged = false,
   }: {
     name: string;
     description?: string | null;
@@ -109,7 +129,19 @@ export class ApiKeyService {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    /**
+     * Only the product's own minting paths (e.g. the Langy session key) may
+     * claim a HIDDEN_SYSTEM_KEY_NAMES name. Customer entry points leave this
+     * unset: a customer-created key with a reserved name would vanish from
+     * every listing and the system-managed guard would refuse to ever rename
+     * or revoke it — a stealth, permanent credential.
+     */
+    isSystemManaged?: boolean;
   }): Promise<{ token: string; apiKey: ApiKey }> {
+    if (!isSystemManaged && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+      throw new ApiKeyReservedNameError(name);
+    }
+
     const hasCustomBinding = bindings.some((b) => b.role === TeamUserRole.CUSTOM);
     const hasPermissions = !!permissions && permissions.length > 0;
     const isRestricted = permissionMode === "restricted";
@@ -259,6 +291,15 @@ export class ApiKeyService {
     if (!existing) throw new ApiKeyNotFoundError(id);
     if (existing.organizationId !== organizationId) {
       throw new ApiKeyNotFoundError(id);
+    }
+    // Reported as not-found, like the tenancy mismatch above, so the response
+    // doesn't confirm the id exists.
+    if (isSystemManaged(existing)) throw new ApiKeyNotFoundError(id);
+    // Renaming a customer key TO a reserved name is the same squat as
+    // creating one: the key would drop out of every listing and this very
+    // guard would then refuse to rename or revoke it.
+    if (name !== undefined && HIDDEN_SYSTEM_KEY_NAMES.includes(name)) {
+      throw new ApiKeyReservedNameError(name);
     }
 
     if (!callerIsAdmin) {
@@ -548,7 +589,7 @@ export class ApiKeyService {
         permissions: customRole.permissions,
       });
     } catch (err) {
-      if (DomainError.isHandled(err) && err.kind === "malformed_custom_role_permissions") {
+      if (err instanceof MalformedCustomRolePermissionsError) {
         throw new ApiKeyScopeViolationError(
           `Custom role ${customRoleId} has malformed permissions`,
           {
@@ -752,6 +793,7 @@ export class ApiKeyService {
     if (apiKey.organizationId !== organizationId) {
       throw new ApiKeyNotFoundError(id);
     }
+    if (isSystemManaged(apiKey)) throw new ApiKeyNotFoundError(id);
     if (!callerIsAdmin) {
       if (!apiKey.userId || apiKey.userId !== callerUserId) {
         throw new ApiKeyNotOwnedError(id);

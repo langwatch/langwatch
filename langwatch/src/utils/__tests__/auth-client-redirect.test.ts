@@ -48,6 +48,27 @@ describe("safeRedirectTarget", () => {
     });
   });
 
+  describe("when the callbackUrl uses backslashes in place of slashes (@regression)", () => {
+    // The WHATWG URL parser treats `\` as `/` for special schemes, so a
+    // leading `/\`, `\/`, or `\\` is authority-introducing exactly like
+    // `//` — a naive `startsWith("//")` check misses it entirely.
+    it("blocks /\\evil.com", () => {
+      expect(safeRedirectTarget("/\\evil.com/steal", ORIGIN)).toBe("/");
+    });
+
+    it("blocks \\/evil.com", () => {
+      expect(safeRedirectTarget("\\/evil.com/steal", ORIGIN)).toBe("/");
+    });
+
+    it("blocks \\\\evil.com", () => {
+      expect(safeRedirectTarget("\\\\evil.com/steal", ORIGIN)).toBe("/");
+    });
+
+    it("allows a single backslash inside an otherwise same-origin path", () => {
+      expect(safeRedirectTarget("\\settings", ORIGIN)).toBe("/settings");
+    });
+  });
+
   describe("when the callbackUrl is a cross-origin absolute URL", () => {
     it("blocks https://evil.com", () => {
       expect(safeRedirectTarget("https://evil.com/phish", ORIGIN)).toBe("/");

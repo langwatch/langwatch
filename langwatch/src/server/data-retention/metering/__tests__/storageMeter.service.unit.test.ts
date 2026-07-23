@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { RETENTION_MANAGED_TABLES } from "../../retentionPolicy.schema";
+import {
+  PRODUCTION_STORAGE_METER_TABLES,
+} from "../../retentionPolicy.schema";
 import { StorageMeterService } from "../storageMeter.service";
 
 /**
@@ -41,6 +43,29 @@ describe("StorageMeterService memory guard", () => {
       for (const [arg] of query.mock.calls) {
         assertGuarded(arg);
       }
+    });
+
+    it("meters Langy analytics into the traces category", async () => {
+      const query = vi.fn(async ({ query }: { query: string }) => ({
+        json: async () => [
+          { total: query.includes("FROM langy_analytics_events") ? "17" : "0" },
+        ],
+      }));
+      const service = new StorageMeterService({
+        resolveClickHouseClient: async () => ({ query }) as any,
+      });
+
+      const breakdown = await service.getStorageBreakdown({
+        tenantId: "project-langy",
+      });
+
+      expect(breakdown.byCategory.traces).toBe(17);
+      expect(breakdown.totalBytes).toBe(17);
+      expect(
+        query.mock.calls.some(([request]) =>
+          request.query.includes("FROM langy_analytics_events"),
+        ),
+      ).toBe(true);
     });
   });
 
@@ -284,11 +309,15 @@ describe("StorageMeterService memory guard", () => {
           tenantId: "p-heavy",
         });
 
-        expect(total).toBe(10 * RETENTION_MANAGED_TABLES.length);
+        expect(total).toBe(10 * PRODUCTION_STORAGE_METER_TABLES.length);
         // one failed aggregate attempt + one query per table for the fallback
         expect(query).toHaveBeenCalledTimes(
-          1 + RETENTION_MANAGED_TABLES.length,
+          1 + PRODUCTION_STORAGE_METER_TABLES.length,
         );
+        const queries = query.mock.calls.map((call) => call[0].query).join("\n");
+        expect(queries).not.toContain("metric_data_points");
+        expect(queries).not.toContain("metric_series");
+        expect(queries).not.toContain("metric_time_rollups");
       });
     });
   });

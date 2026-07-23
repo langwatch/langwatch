@@ -48,10 +48,18 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
     });
 
     teamA = await prisma.team.create({
-      data: { name: `${NS}-client-a`, slug: `${NS}-client-a`, organizationId: org.id },
+      data: {
+        name: `${NS}-client-a`,
+        slug: `${NS}-client-a`,
+        organizationId: org.id,
+      },
     });
     teamB = await prisma.team.create({
-      data: { name: `${NS}-client-b`, slug: `${NS}-client-b`, organizationId: org.id },
+      data: {
+        name: `${NS}-client-b`,
+        slug: `${NS}-client-b`,
+        organizationId: org.id,
+      },
     });
 
     devProject = await prisma.project.create({
@@ -114,8 +122,12 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
     await prisma.teamUser.deleteMany({
       where: { teamId: { in: [teamA.id, teamB.id] } },
     });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: org.id } });
-    await prisma.project.deleteMany({ where: { teamId: { in: [teamA.id, teamB.id] } } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: org.id },
+    });
+    await prisma.project.deleteMany({
+      where: { teamId: { in: [teamA.id, teamB.id] } },
+    });
     await prisma.team.deleteMany({ where: { organizationId: org.id } });
     await prisma.organization.delete({ where: { id: org.id } });
     await prisma.user.deleteMany({
@@ -316,6 +328,180 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       });
 
       expect(result).toBe(true);
+    });
+
+    it("denies analytics:view once the user is removed from the group", async () => {
+      const group = await prisma.group.create({
+        data: {
+          organizationId: org.id,
+          name: `${NS}-leavers`,
+          slug: `${NS}-leavers`,
+        },
+      });
+      const membership = await prisma.groupMembership.create({
+        data: { userId: bob.id, groupId: group.id },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: org.id,
+          groupId: group.id,
+          role: TeamUserRole.VIEWER,
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: devProject.id,
+        },
+      });
+
+      const scope: ScopeRef = {
+        type: "project",
+        id: devProject.id,
+        teamId: teamA.id,
+      };
+      const check = () =>
+        checkRoleBindingPermission({
+          prisma,
+          userId: bob.id,
+          organizationId: org.id,
+          scope,
+          permission: "analytics:view",
+        });
+
+      await expect(check()).resolves.toBe(true);
+
+      await prisma.groupMembership.delete({
+        where: {
+          userId_groupId: { userId: bob.id, groupId: membership.groupId },
+        },
+      });
+
+      await expect(check()).resolves.toBe(false);
+    });
+
+    it("does not grant through a group after the user leaves the organization", async () => {
+      const existing = await prisma.organizationUser.findFirst({
+        where: { userId: bob.id, organizationId: org.id },
+      });
+      const group = await prisma.group.create({
+        data: {
+          organizationId: org.id,
+          name: `${NS}-offboarded`,
+          slug: `${NS}-offboarded`,
+        },
+      });
+      await prisma.groupMembership.create({
+        data: { userId: bob.id, groupId: group.id },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: org.id,
+          groupId: group.id,
+          role: TeamUserRole.VIEWER,
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: devProject.id,
+        },
+      });
+
+      const check = () =>
+        checkRoleBindingPermission({
+          prisma,
+          userId: bob.id,
+          organizationId: org.id,
+          scope: { type: "project", id: devProject.id, teamId: teamA.id },
+          permission: "analytics:view",
+        });
+
+      await expect(check()).resolves.toBe(true);
+
+      await prisma.organizationUser.deleteMany({
+        where: { userId: bob.id, organizationId: org.id },
+      });
+
+      try {
+        await expect(check()).resolves.toBe(false);
+      } finally {
+        if (existing) {
+          await prisma.organizationUser.create({
+            data: {
+              userId: bob.id,
+              organizationId: org.id,
+              role: existing.role,
+            },
+          });
+        }
+      }
+    });
+
+    it("denies a permission the group's role does not carry", async () => {
+      const group = await prisma.group.create({
+        data: {
+          organizationId: org.id,
+          name: `${NS}-readers`,
+          slug: `${NS}-readers`,
+        },
+      });
+      await prisma.groupMembership.create({
+        data: { userId: bob.id, groupId: group.id },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: org.id,
+          groupId: group.id,
+          role: TeamUserRole.VIEWER,
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: devProject.id,
+        },
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: bob.id,
+        organizationId: org.id,
+        scope: { type: "project", id: devProject.id, teamId: teamA.id },
+        permission: "datasets:manage",
+      });
+
+      expect(result).toBe(false);
+    });
+
+    it("does not grant through a group belonging to another organization", async () => {
+      const otherOrg = await prisma.organization.create({
+        data: { name: `${NS}-other`, slug: `${NS}-other` },
+      });
+      const group = await prisma.group.create({
+        data: {
+          organizationId: otherOrg.id,
+          name: `${NS}-outsiders`,
+          slug: `${NS}-outsiders`,
+        },
+      });
+      await prisma.groupMembership.create({
+        data: { userId: bob.id, groupId: group.id },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: otherOrg.id,
+          groupId: group.id,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.PROJECT,
+          scopeId: devProject.id,
+        },
+      });
+
+      const result = await checkRoleBindingPermission({
+        prisma,
+        userId: bob.id,
+        organizationId: org.id,
+        scope: { type: "project", id: devProject.id, teamId: teamA.id },
+        permission: "analytics:view",
+      });
+
+      expect(result).toBe(false);
+
+      await prisma.groupMembership.deleteMany({ where: { groupId: group.id } });
+      await prisma.roleBinding.deleteMany({
+        where: { organizationId: otherOrg.id },
+      });
+      await prisma.group.delete({ where: { id: group.id } });
+      await prisma.organization.delete({ where: { id: otherOrg.id } });
     });
 
     it("grants datasets:manage when user is in multiple groups and one grants MEMBER at the same scope", async () => {
@@ -560,7 +746,9 @@ describe("checkRoleBindingPermission() integration", () => {
 
   afterAll(async () => {
     await prisma.roleBinding.deleteMany({ where: { organizationId: org.id } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: org.id } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: org.id },
+    });
     await prisma.project.deleteMany({ where: { teamId: team.id } });
     await prisma.team.delete({ where: { id: team.id } });
     await prisma.organization.delete({ where: { id: org.id } });

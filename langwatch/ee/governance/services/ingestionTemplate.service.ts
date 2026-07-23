@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+
+import { createLogger } from "@langwatch/observability";
 /**
  * IngestionTemplateService — owns the catalog read + admin-authoring
  * surface for the personal-project trace-ingest flow.
@@ -15,7 +17,6 @@
  */
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { customAlphabet } from "nanoid";
-
 import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
 import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
 import {
@@ -23,8 +24,6 @@ import {
   type GovernanceCallSurface,
 } from "./auditSurface";
 import { seedPlatformIngestionTemplates } from "./platformIngestionTemplates.seeds";
-
-import { createLogger } from "~/utils/logger/server";
 
 const slugSuffixGenerator = customAlphabet(
   "abcdefghijklmnopqrstuvwxyz0123456789",

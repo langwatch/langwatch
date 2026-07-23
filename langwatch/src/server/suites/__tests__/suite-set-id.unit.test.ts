@@ -9,6 +9,7 @@ import { INTERNAL_SET_PREFIX } from "../../scenarios/internal-set-id";
 
 describe("suite-set-id", () => {
   describe("getSuiteSetId()", () => {
+    /** @scenario "Suite run uses suite ID as setId" */
     it("generates a set ID with internal prefix and suite suffix", () => {
       const result = getSuiteSetId("suite_abc123");
       expect(result).toBe("__internal__suite_abc123__suite");

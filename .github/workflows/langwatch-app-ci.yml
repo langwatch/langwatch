@@ -47,6 +47,7 @@ jobs:
             feature-parity:
               - 'specs/**'
               - 'langwatch/**'
+              - 'tools/**'
               - 'mcp-server/**'
               - 'typescript-sdk/**'
               - 'python-sdk/**'
@@ -74,9 +75,29 @@ jobs:
         working-directory: langwatch
         run: pnpm start:prepare:files
 
+      # tsgo (and tsc) write incremental .tsbuildinfo caches to explicit paths
+      # under node_modules/.cache/tsbuildinfo (see tsconfig.tsgo*.json). A warm
+      # cache turns the full ~13-19s cold check into a ~1.5s revalidation of
+      # only the files whose content changed. Restored after install so pnpm
+      # can't clobber it; keyed rolling per-SHA with a prefix fallback so every
+      # run refreshes the cache off the most recent match (mirrors the Turbo
+      # cache pattern used by the build job).
+      - name: Cache TypeScript incremental build info
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: langwatch/node_modules/.cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('langwatch/pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-
+
       - name: Run typecheck
         working-directory: langwatch
         run: pnpm typecheck
+
+      - name: Run typecheck (tests)
+        working-directory: langwatch
+        run: pnpm run typecheck:tests
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -124,9 +145,11 @@ jobs:
         id: unit-tests
         working-directory: langwatch
         run: |
+          # shardFailureReporter feeds the globalSetup hard-floor so a wedged
+          # shard that already printed failures exits 1, not a masked 0.
           pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default \
+            --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
             --dangerouslyIgnoreUnhandledErrors
 
       - name: Extract test failures
@@ -176,6 +199,8 @@ jobs:
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
       CI_REDIS_URL: "redis://localhost:6379"
       CI_CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/test_langwatch"
+      LANGWATCH_NLP_SERVICE: "http://localhost:5561"
+      LANGWATCH_ENDPOINT: "http://localhost:3000"
       BUILD_TIME: "true"
       CI: "true"
 
@@ -267,9 +292,12 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: |
+          # shardFailureReporter feeds the globalSetup hard-floor so a wedged
+          # shard that already printed failures exits 1, not a masked 0.
           pnpm test:integration --shard=${{ matrix.shard }}/6 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default --reporter=json --outputFile=test-results.json
+            --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
+            --outputFile=test-results.json
 
       - name: Extract test failures
         if: failure()
@@ -301,6 +329,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: mongolyy/reviewdog-action-biome@c49bee54c1f87e4be32446ae3deca3a186b88a3a # v2
@@ -396,15 +425,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
-
-      # Cache Turbo build outputs
-      - name: Cache Turbo
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: langwatch/.turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With

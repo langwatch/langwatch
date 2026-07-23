@@ -2,8 +2,27 @@ packages:
   - .
   - "packages/*"
   - "../mcp-server"
+  # The handled-error contract (HandledError ⇔ Go herr), shared by the app,
+  # mcp-server, CLI and SDKs. Source-only, OTel peer-dep'd like langy.
+  - "../packages/handled-error"
+  # Langy's shared contract (ADR-059, ADR-060): the CARD vocabulary and its
+  # CLI verb registry / digest / domain error (`@langwatch/langy/cards`, shared
+  # with typescript-sdk), the inline ```langy-card channel, and the
+  # conversation-projection contract. Source-only and zod-peer-dep'd, so it
+  # compiles against the app's own zod (3.25) via the `zod/v4` subpath both
+  # majors ship, and the server pipeline AND the browser panel render a turn
+  # identically from it.
+  - "../packages/langy"
 
 minimumReleaseAge: 10080
+# Adding workspace packages forces a re-resolve; these shipped fresh releases
+# inside the age gate with no older version satisfying the requested ranges.
+# Version-pinned so only the pinned release bypasses the gate; drop each entry
+# once that version ages past it.
+minimumReleaseAgeExclude:
+  - ws@8.21.1
+  - "@browserbasehq/sdk@2.16.0"
+  - postcss@8.5.19
 
 overrides:
   pino: ^10.3.0
@@ -55,9 +74,6 @@ overrides:
   "@opentelemetry/sdk-node@<0.217.0": "0.217.0"
 
 packageExtensions:
-  bullmq-otel:
-    dependencies:
-      tslib: "^2.6.0"
   "@google-cloud/dlp":
     dependencies:
       protobufjs: "^7.5.4"

@@ -45,7 +45,8 @@ describe("tagRenameCommand", () => {
     it("prints confirmation message", async () => {
       mockRenameTag.mockResolvedValue(undefined);
 
-      await tagRenameCommand("canary", "beta");
+      const result = await tagRenameCommand("canary", "beta");
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Renamed tag: canary -> beta"));
     });

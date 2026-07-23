@@ -7,15 +7,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Database, Edit3, Lightbulb, MessageSquare } from "lucide-react";
+import {
+  Database,
+  Edit3,
+  Languages,
+  Lightbulb,
+  MessageSquare,
+} from "lucide-react";
 import { forwardRef, useState } from "react";
+import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
+import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
-import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
-import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { AnnotationPopover } from "./AnnotationPopover";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
@@ -24,6 +30,17 @@ interface TurnAnnotationProps {
   traceId: string;
   /** The current output for this turn — pre-filled into the suggest form. */
   output?: string | null;
+  /**
+   * Per-turn translate-to-English control, owned by the ChatTurnRow so the
+   * bubbles can swap text. Rendered here so it sits with the turn's other
+   * inline actions — but unlike them it does NOT require annotation
+   * permissions (reading a conversation is a viewer activity).
+   */
+  translation?: {
+    isActive: boolean;
+    isLoading: boolean;
+    onToggle: () => void;
+  };
 }
 
 /**
@@ -31,7 +48,11 @@ interface TurnAnnotationProps {
  * its own popover trigger — clicking opens the form anchored to that button
  * rather than dropping a heavy panel into the conversation flow.
  */
-export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
+export function TurnActionRow({
+  traceId,
+  output,
+  translation,
+}: TurnAnnotationProps) {
   const { hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
   const [openPopover, setOpenPopover] = useState<"annotate" | "suggest" | null>(
@@ -45,7 +66,7 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
   const annotationsGate = usePersonalFeatureGate("annotations");
   const datasetsGate = usePersonalFeatureGate("datasets");
 
-  if (!canManage) return null;
+  if (!canManage && !translation) return null;
 
   // The trio used to sit permanently visible on every turn separator —
   // ~180px of chrome multiplied across N turns adds a lot of visual
@@ -53,8 +74,10 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
   // Default to invisible + reveal on `_groupHover` of the parent
   // ChatTurnRow Flex (which already declares `role="group"`). Forced
   // visible while a popover is open so the anchor doesn't vanish under
-  // the user mid-edit.
-  const isForceVisible = openPopover !== null;
+  // the user mid-edit — and while a translation is showing/loading so
+  // the way back to the original text stays discoverable.
+  const isForceVisible =
+    openPopover !== null || !!translation?.isActive || !!translation?.isLoading;
 
   return (
     <HStack
@@ -68,57 +91,94 @@ export function TurnActionRow({ traceId, output }: TurnAnnotationProps) {
       _groupFocusWithin={{ opacity: 1 }}
       transition="opacity 120ms ease"
     >
-      <AnnotationPopover
-        traceId={traceId}
-        output={output}
-        mode="annotate"
-        open={openPopover === "annotate"}
-        onOpenChange={async (open) => {
-          if (open) {
-            const allowed = await annotationsGate.requestEnable();
-            if (!allowed) return;
+      {translation && (
+        <Tooltip
+          content={
+            translation.isActive
+              ? "Show the original text"
+              : "Translate this turn to English"
           }
-          setOpenPopover(open ? "annotate" : null);
-        }}
-        triggerTooltip="Add a note or score"
-        trigger={<ActionButton icon={Edit3} label="Annotate" />}
-      />
-      <AnnotationPopover
-        traceId={traceId}
-        output={output}
-        mode="suggest"
-        open={openPopover === "suggest"}
-        onOpenChange={async (open) => {
-          if (open) {
-            const allowed = await annotationsGate.requestEnable();
-            if (!allowed) return;
-          }
-          setOpenPopover(open ? "suggest" : null);
-        }}
-        triggerTooltip="Suggest a corrected output"
-        trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
-      />
-      <Tooltip
-        content="Add this turn to a dataset"
-        positioning={{ placement: "top" }}
-      >
-        <Button
-          size="2xs"
-          variant="ghost"
-          color="fg.muted"
-          gap={1}
-          paddingX={2}
-          onClick={async (e) => {
-            e.stopPropagation();
-            const allowed = await datasetsGate.requestEnable();
-            if (!allowed) return;
-            openDrawer("addDatasetRecord", { traceId });
-          }}
+          positioning={{ placement: "top" }}
         >
-          <Icon as={Database} boxSize={3} />
-          <Text textStyle="2xs">Dataset</Text>
-        </Button>
-      </Tooltip>
+          <Button
+            size="2xs"
+            variant="ghost"
+            color={translation.isActive ? "blue.fg" : "fg.muted"}
+            gap={1}
+            paddingX={2}
+            aria-pressed={translation.isActive}
+            disabled={translation.isLoading}
+            onClick={(e) => {
+              e.stopPropagation();
+              translation.onToggle();
+            }}
+          >
+            <Icon as={Languages} boxSize={3} />
+            <Text textStyle="2xs">
+              {translation.isLoading
+                ? "Translating…"
+                : translation.isActive
+                  ? "Original"
+                  : "Translate"}
+            </Text>
+          </Button>
+        </Tooltip>
+      )}
+      {canManage && (
+        <>
+          <AnnotationPopover
+            traceId={traceId}
+            output={output}
+            mode="annotate"
+            open={openPopover === "annotate"}
+            onOpenChange={async (open) => {
+              if (open) {
+                const allowed = await annotationsGate.requestEnable();
+                if (!allowed) return;
+              }
+              setOpenPopover(open ? "annotate" : null);
+            }}
+            triggerTooltip="Add a note or score"
+            trigger={<ActionButton icon={Edit3} label="Annotate" />}
+          />
+          <AnnotationPopover
+            traceId={traceId}
+            output={output}
+            mode="suggest"
+            open={openPopover === "suggest"}
+            onOpenChange={async (open) => {
+              if (open) {
+                const allowed = await annotationsGate.requestEnable();
+                if (!allowed) return;
+              }
+              setOpenPopover(open ? "suggest" : null);
+            }}
+            triggerTooltip="Suggest a corrected output"
+            trigger={<ActionButton icon={Lightbulb} label="Suggest" />}
+          />
+          <Tooltip
+            content="Add this turn to a dataset"
+            positioning={{ placement: "top" }}
+          >
+            <Button
+              size="2xs"
+              variant="ghost"
+              color="fg.muted"
+              gap={1}
+              paddingX={2}
+              onClick={async (e) => {
+                e.stopPropagation();
+                const allowed = await datasetsGate.requestEnable();
+                if (!allowed) return;
+                openDrawer("addDatasetRecord", { traceId });
+              }}
+            >
+              <Icon as={Database} boxSize={3} />
+              <Text textStyle="2xs">Dataset</Text>
+            </Button>
+          </Tooltip>
+        </>
+      )}
       <PersonalFeatureGateDialog state={annotationsGate.dialogState} />
       <PersonalFeatureGateDialog state={datasetsGate.dialogState} />
     </HStack>

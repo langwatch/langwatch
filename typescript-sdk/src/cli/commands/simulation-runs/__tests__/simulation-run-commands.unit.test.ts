@@ -76,7 +76,7 @@ describe("listSimulationRunsCommand()", () => {
         json: async () => ({ runs: [makeRun()], hasMore: false }),
       });
 
-      await listSimulationRunsCommand({ format: "table" });
+      await listSimulationRunsCommand({});
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("/api/simulation-runs"),
@@ -99,19 +99,20 @@ describe("listSimulationRunsCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
-      const result = { runs: [makeRun()], hasMore: false };
+  describe("when a machine format is requested", () => {
+    it("returns the raw run listing as the payload instead of printing", async () => {
+      const response = { runs: [makeRun()], hasMore: false };
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () => result,
+        json: async () => response,
       });
 
-      await listSimulationRunsCommand({ format: "json" });
+      const result = await listSimulationRunsCommand({});
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(result, null, 2),
-      );
+      // The command no longer decides the format — it hands the payload to
+      // the output port, which renders json/yaml/agents/--jq from this value.
+      expect(result?.data).toEqual(response);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 
@@ -174,19 +175,18 @@ describe("getSimulationRunCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the run detail as the payload instead of printing", async () => {
       const run = makeRun();
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => run,
       });
 
-      await getSimulationRunCommand("run_abc123", { format: "json" });
+      const result = await getSimulationRunCommand("run_abc123");
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(run, null, 2),
-      );
+      expect(result?.data).toEqual(run);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

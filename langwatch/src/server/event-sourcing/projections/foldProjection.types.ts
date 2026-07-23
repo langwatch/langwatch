@@ -83,6 +83,44 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
      * lower-bound the event_log rehydration scan for time-local aggregates. */
     occurredAtMs?: number;
   }) => Promise<Event[]>;
+
+  /**
+   * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log order
+   * (EventTimestamp, EventId), sorted by occurredAt ASC. Used by the executor
+   * for `refoldOnStoreMiss` — bounding at the delivered event guarantees a
+   * re-fold never pre-applies an event that is persisted but still queued for
+   * this projection (per-aggregate FIFO delivers it next; applying it twice
+   * would double-count).
+   *
+   * Auto-wired by EventSourcingService at registration time, like
+   * `eventLoader`.
+   */
+  eventLoaderUpTo?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    upToEvent: Event;
+  }) => Promise<Event[]>;
+
+  /**
+   * Cursor-paginated variant of `eventLoaderUpTo`: returns ONE page of the
+   * aggregate's history up to AND INCLUDING `upToEvent`, ordered by
+   * (timestamp, eventId), strictly after the `after` cursor, at most `limit`
+   * events. Lets the executor stream a store-miss re-fold of a huge aggregate
+   * (a hot trace can carry 100k+ events) page-by-page instead of loading the
+   * whole history — and every payload — into memory at once.
+   *
+   * Auto-wired by EventSourcingService when the event store supports paginated
+   * reads. The executor only uses it for order-insensitive folds
+   * (`refoldOnOutOfOrder: false`), for which the (timestamp, eventId) page
+   * order is as valid as occurredAt order.
+   */
+  eventLoaderUpToPaged?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    upToEvent: Event;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }) => Promise<Event[]>;
 }
 
 /**
@@ -92,12 +130,59 @@ export interface FoldProjectionOptions {
   /** Kill switch configuration. When enabled, the projection is disabled. */
   killSwitch?: KillSwitchOptions;
   /**
+   * Order used when the executor coalesces or rebuilds fold state.
+   *
+   * `occurredAt` (default) follows business time. `acceptedAt` follows the
+   * canonical event-log cursor `(createdAt/EventTimestamp, EventId)` and is for
+   * lifecycle aggregates whose accepted transition order must win even when a
+   * producer submits a backdated business timestamp.
+   */
+  eventOrdering?: "occurredAt" | "acceptedAt";
+  /**
    * Maximum number of same-aggregate events to coalesce into a single
    * load/apply/store cycle when the group is backed up. 1 (the default)
    * disables coalescing. Higher values bound how much of a backed-up group
    * is drained per dispatch — converting an O(n²) backlog into O(n).
    */
   coalesceMaxBatch?: number;
+  /**
+   * Re-fold from the event log when `store.get()` returns null instead of
+   * starting from `init()`.
+   *
+   * A fold whose persisted row cannot be read back into fold state (e.g. the
+   * slim analytics tables — deliberately lossy rows) has NO state continuity
+   * of its own: without this option, every store miss silently folds only the
+   * delivered events, so a partial batch overwrites the complete row and
+   * late dimension-only events land on empty state. With this option, a miss
+   * rebuilds state from the aggregate's event history up to the delivered
+   * event (log order, `eventLoaderUpTo`), which is the event-sourcing-native
+   * source of truth.
+   *
+   * Pair the store with a RedisCachedFoldStore so the re-fold only runs on
+   * cache expiry/eviction/restart, not on every event.
+   */
+  refoldOnStoreMiss?: boolean;
+  /**
+   * Re-fold the aggregate's whole history from the event log when an event
+   * arrives having occurred BEFORE the persisted checkpoint. Defaults to true.
+   *
+   * Set false when `apply` is order-insensitive — its accumulators commute
+   * (sums, counters, min/max) and any precedence rule keys on data carried by
+   * the event rather than on arrival order. Such a fold reaches the same state
+   * whichever order it sees events in, so replaying the history derives nothing.
+   *
+   * The replay is not merely wasted there, it is actively harmful: it reads
+   * EVERY event for the aggregate, and since `apply` raises the checkpoint to
+   * the highest occurredAt it has seen, one replay pins the checkpoint at the
+   * aggregate's maximum event time — making every later batch look out of order
+   * too. A hot trace re-folded 730 times in two hours, re-reading 5.66M event
+   * rows, and never caught up (2026-07-09; see
+   * specs/event-sourcing/hot-trace-fold-amplification.feature).
+   *
+   * Turning it off never drops events: the executor applies them in occurredAt
+   * order on top of the state it loaded.
+   */
+  refoldOnOutOfOrder?: boolean;
 }
 
 /**

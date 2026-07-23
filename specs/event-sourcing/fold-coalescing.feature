@@ -43,16 +43,54 @@ Feature: Group-coalesced fold projections
   @unit @coalescing @reactors
   Scenario: Coalescing still dispatches per-span reactors for every event
     Given a coalesced batch of several events for one aggregate
+    And a reactor that is not keyed on the aggregate
     When the batch is folded
     Then the fold state is loaded and stored once
-    And reactors are dispatched once per event, in occurredAt order
+    And that reactor is dispatched once per event, in occurredAt order
 
-  # The per-event reactor dispatch above keeps every span's work, but reactors
-  # that read trace-level data derived from stored_spans (alert triggers,
-  # scenario role metrics) would otherwise re-issue that multi-MB read once per
-  # event. Sharing it across one fold version is what keeps the recovery path
-  # from re-amplifying reads on the single-threaded Redis/ClickHouse, while a
-  # fold that has advanced with newer spans still re-reads (no stale data).
+  @unit @coalescing @reactors
+  Scenario: Reactors keyed on the aggregate are dispatched once per coalesced batch
+    Given a coalesced batch of five events for one aggregate
+    And a reactor whose deduplication id is the same for every event in the batch
+    When the batch is folded
+    Then the reactor is dispatched once
+    And it receives the last event in occurredAt order
+
+  @unit @coalescing @reactors
+  Scenario: Reactors keyed per event are still dispatched for every event
+    Given a coalesced batch of five events for one aggregate
+    And a reactor whose deduplication id includes the event id
+    When the batch is folded
+    Then the reactor is dispatched five times
+
+  @unit @coalescing @reactors
+  Scenario: Reactors without a deduplication id are dispatched for every event
+    Given a coalesced batch of five events for one aggregate
+    And a reactor with no deduplication id
+    When the batch is folded
+    Then the reactor is dispatched five times
+
+  @unit @coalescing @reactors
+  Scenario: The relevance check still filters events before collapsing
+    Given a coalesced batch of five events for one aggregate
+    And an aggregate-keyed reactor that finds only two of them relevant
+    When the batch is folded
+    Then the reactor is dispatched once
+    And it receives the last relevant event
+
+  # A reactor whose deduplication id varies per event (per-span embedded-eval
+  # sync) — or which declares none at all — must see every event, so it is
+  # dispatched per event as above. A reactor keyed on the aggregate would be
+  # squashed to a single queue job by the dedup anyway, so it is collapsed to one
+  # dispatch instead of paying N serialize+gzip+blob round-trips to reach the same
+  # state. See hot-trace-fold-amplification.feature.
+  #
+  # Separately, reactors that read trace-level data derived from stored_spans
+  # (alert triggers, scenario role metrics) would otherwise re-issue that
+  # multi-MB read once per event. Sharing it across one fold version is what
+  # keeps the recovery path from re-amplifying reads on the single-threaded
+  # Redis/ClickHouse, while a fold that has advanced with newer spans still
+  # re-reads (no stale data).
   @unit @coalescing @reactors
   Scenario: Repeated trace-level derivations within one fold version read stored spans once
     Given several reactor invocations derive trace data for the same trace at one fold version

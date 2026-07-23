@@ -26,46 +26,46 @@
  * Wire format is snake_case JSON to match RFC 8628 + every other OAuth
  * library out there (incl. the Go CLI's keyring-backed client).
  */
-import type { Context } from "hono";
-import { randomBytes } from "node:crypto";
-import { z } from "zod";
 
-import { env } from "~/env.mjs";
-import { connection as redisConnection } from "~/server/redis";
-import { prisma } from "~/server/db";
-import { getServerAuthSession } from "~/server/auth";
-import { hasOrganizationPermission, hasProjectPermission } from "~/server/api/rbac";
-import type { Permission } from "~/server/api/rbac";
+import { randomBytes } from "node:crypto";
+import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
+import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import {
-  PersonalVirtualKeyService,
   NoEligibleProvidersError,
   PersonalVirtualKeyAlreadyExistsError,
+  PersonalVirtualKeyService,
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
-import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
-import { featureFlagService } from "~/server/featureFlag";
-import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
-import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
+import { createLogger } from "@langwatch/observability";
+import type { Context } from "hono";
+import { z } from "zod";
+import { env } from "~/env.mjs";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
 } from "~/server/api/enterprise";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { createLogger } from "~/utils/logger/server";
-import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import type { Permission } from "~/server/api/rbac";
+import { hasOrganizationPermission, hasProjectPermission } from "~/server/api/rbac";
 import {
   createServiceApp,
   handlerManagedAuth,
 } from "~/server/api/security";
+import { getServerAuthSession } from "~/server/auth";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
+import { prisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
+import { connection as redisConnection } from "~/server/redis";
 
 const logger = createLogger("langwatch:auth-cli");
 
@@ -1659,17 +1659,22 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
 
   // Governance gate: the device-session flow provisions a personal
   // workspace (Team + Project) and a personal virtual key for the user.
-  // That is a governance-plane capability; for an org without governance
-  // enabled it silently created a personal project that then captured the
-  // user's evaluations (customer report). Refuse it and point at project
-  // login, which writes a real project's API key to `.env`.
+  // That is a governance-plane capability. The flag defaults on (ADR-038
+  // Decision 7: this fallback and the registry default are a pinned
+  // pair, enforced by governanceGaDefaults.unit.test.ts), so the gate
+  // fires only for orgs whose flag evaluates false (switched off in
+  // PostHog or via an operator override), where /me is a 404 and
+  // refusing device login is correct. The refusal points at project
+  // login, which writes a real project's API key to `.env`; the
+  // device-session flow silently capturing evaluations into a personal
+  // project (customer report) stays impossible for gated orgs.
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,
       organizationId: organization_id,
-      defaultValue: false,
+      defaultValue: true,
     })
-    .catch(() => false);
+    .catch(() => true);
   if (!governanceEnabled) {
     return c.json(
       {

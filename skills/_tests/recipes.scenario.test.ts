@@ -1,6 +1,5 @@
 import scenario from "@langwatch/scenario";
 import fs from "fs";
-import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
 import os from "os";
@@ -8,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
+  copyFixtureToWorkDir,
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
@@ -86,9 +86,10 @@ describe("Recipes", () => {
         path.join(os.tmpdir(), "langwatch-recipe-rag-dataset-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-rag-agent",
+        workingDirectory: tempFolder,
+      });
       copyRecipeSkillToWorkDir(tempFolder, "generate-rag-dataset");
 
       const result = await scenario.run({
@@ -185,9 +186,10 @@ describe("Recipes", () => {
         path.join(os.tmpdir(), "langwatch-recipe-compliance-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-health-agent")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-health-agent",
+        workingDirectory: tempFolder,
+      });
       copyRecipeSkillToWorkDir(tempFolder, "test-compliance");
 
       const result = await scenario.run({
@@ -278,9 +280,10 @@ describe("Recipes", () => {
         path.join(os.tmpdir(), "langwatch-recipe-debug-instrumentation-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "python-openai",
+        workingDirectory: tempFolder,
+      });
       copyRecipeSkillToWorkDir(tempFolder, "debug-instrumentation");
 
       // Provide an .env so the CLI is authenticated

@@ -8,6 +8,7 @@ package otelsetup
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -18,6 +19,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
@@ -109,17 +112,59 @@ var AutoStampedBaggageKeys = []string{
 	BaggageKeyCausalityDepth,
 }
 
+// BatchScheduledDelay is the BatchSpanProcessor scheduled export delay used by
+// the default (single-tenant) pipeline when Options.BatchTimeout is unset. Kept
+// short — vs the OTel ~5s default — so an uncatchable SIGKILL/OOM loses at most
+// this window of buffered spans; the SIGTERM path force-flushes earlier still.
+// This stays BATCH export (async, no per-span latency) — NOT synchronous export.
+const BatchScheduledDelay = 2 * time.Second
+
+// AttrLangWatchOrigin marks telemetry that belongs to LangWatch's own
+// operational planes, so a payload arriving at the wrong destination is
+// identifiable as ours by inspection. This is the one guard that survives a
+// valid-but-wrong endpoint: it rides in the data, not in the config. The
+// Langy relay stamps the same key (value "langy_worker") on its
+// content-stripped internal copies; ingest-side enforcement can key on the
+// attribute's presence.
+const AttrLangWatchOrigin = "langwatch.origin"
+
+// OriginPlatformInternal is the AttrLangWatchOrigin value for a service's own
+// spans, metrics, and logs. It is NEVER stamped on a multi-tenant pipeline:
+// nlpgo's provider resource reaches customer projects through the tenant
+// router, so marking it would brand legitimate customer traces as internal.
+const OriginPlatformInternal = "platform_internal"
+
+// SamplerChoice is the resolved sampling decision, collapsed from the official
+// OTEL_TRACES_SAMPLER vocabulary: always_on ≡ Ratio 1, always_off ≡ Ratio 0,
+// traceidratio carries its argument, and the parentbased_* variants set
+// ParentBased so a sampled upstream parent keeps its children.
+type SamplerChoice struct {
+	// ParentBased wraps the root sampler so the parent span's sampled flag
+	// wins for child spans.
+	ParentBased bool
+	// Ratio is the root sampling fraction in [0,1]. >=1 samples everything;
+	// 0 — including the zero value — samples nothing.
+	Ratio float64
+}
+
 // Options configures the telemetry provider. Fields left empty are filled from
 // the context's ServiceInfo when available.
 type Options struct {
 	NodeID       string
-	OTLPEndpoint string            // OTLP HTTP endpoint (empty = noop)
+	OTLPEndpoint string            // FULL OTLP/HTTP traces URL (empty = no primary span exporter)
 	OTLPHeaders  map[string]string // auth headers for the collector
-	BatchTimeout time.Duration
-	MaxQueueSize int
-	// SampleRatio controls the fraction of traces sampled (0.0–1.0).
-	// 0 means "use default" (AlwaysSample). Set explicitly via config.
-	SampleRatio float64
+	// MetricsEndpoint is the FULL /v1/metrics URL for the primary metric
+	// reader. Empty = derived from OTLPEndpoint (strip /v1/traces, append
+	// /v1/metrics), which is correct whenever both signals share a collector.
+	MetricsEndpoint string
+	BatchTimeout    time.Duration
+	MaxQueueSize    int
+	// Sampler selects the trace sampler. The zero value samples nothing —
+	// callers are expected to pass the choice resolved by config.OTel.Resolve,
+	// which maps the official OTEL_TRACES_SAMPLER / OTEL_TRACES_SAMPLER_ARG
+	// pair (or the deprecated OTEL_SAMPLE_RATIO, or the environment-aware
+	// default) onto this struct and rejects out-of-range values at boot.
+	Sampler SamplerChoice
 	// MultiTenant=true installs a per-request, per-tenant span router
 	// (TenantRouter) instead of the standard static-headers exporter.
 	// Required for nlpgo: each Studio event arrives with its own
@@ -130,6 +175,14 @@ type Options struct {
 	// admin token. When true, OTLPHeaders is ignored (the per-tenant
 	// processors set their own auth).
 	MultiTenant bool
+	// OpsEndpoint is the OPTIONAL internal-collector base URL for the
+	// multi-tenant path's OPERATIONAL spans — the ones that never acquire a
+	// tenant api_key (startup, health, background work). Without it those
+	// spans are dropped, which made the service look like it exported no
+	// telemetry of its own. Ignored unless MultiTenant.
+	OpsEndpoint string
+	// OpsHeaders carries optional auth headers for the ops exporter.
+	OpsHeaders map[string]string
 	// SyncExport=true swaps each tenant's BatchSpanProcessor for a
 	// SimpleSpanProcessor (sync OnEnd → exporter). Only honored when
 	// MultiTenant=true. Purpose: deterministic test mode. The default
@@ -146,18 +199,40 @@ type Options struct {
 	// and a stalled collector wedges the request thread. Gated on the
 	// NLPGO_SPAN_SYNC env var in deps.go.
 	SyncExport bool
+
+	// DebugCollectorEndpoint is an OPTIONAL second OTLP/HTTP endpoint
+	// (base URL, no signal path) for a developer's local observability
+	// stack. When non-empty it is ADDITIVE: an extra BatchSpanProcessor
+	// dual-exports every span here (on both the MultiTenant and the
+	// single-tenant paths) WITHOUT disturbing the primary product/ops
+	// pipeline, and net-new OTLP logs + metrics pipelines are installed.
+	// Empty (the default) leaves behavior byte-for-byte unchanged.
+	DebugCollectorEndpoint string
+	// DebugCollectorHeaders carries optional auth headers for the debug
+	// collector exporters.
+	DebugCollectorHeaders map[string]string
 }
 
 // Provider holds the configured OTel SDK providers.
 type Provider struct {
 	tp *sdktrace.TracerProvider
+	lp *sdklog.LoggerProvider
+	mp *sdkmetric.MeterProvider
+}
+
+// LoggerProvider returns the OTLP log provider, or nil when the debug
+// collector is disabled. Consumers (clog) use it to tee zap output into
+// the collector; deps.go relies on Shutdown to flush it, so callers do
+// not own its lifecycle.
+func (p *Provider) LoggerProvider() *sdklog.LoggerProvider {
+	return p.lp
 }
 
 // buildResourceAttrs assembles the standard service.* + node.id
 // resource attributes used by both the static and multi-tenant span
 // pipelines. Kept as a helper so the two branches in New() stay in
 // lockstep without copy-paste drift.
-func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string) []attribute.KeyValue {
+func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string, internalOrigin bool) []attribute.KeyValue {
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(serviceName),
 		semconv.ServiceVersion(serviceVersion),
@@ -168,7 +243,47 @@ func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string)
 	if nodeID != "" {
 		attrs = append(attrs, attribute.String("node.id", nodeID))
 	}
+	if internalOrigin {
+		attrs = append(attrs, attribute.String(AttrLangWatchOrigin, OriginPlatformInternal))
+	}
 	return attrs
+}
+
+// buildResource assembles the OTel resource shared by the trace, log,
+// and metric pipelines so service.name / service.version /
+// deployment.environment.name / node.id stay identical across every
+// signal. Merge failure (schema-URL mismatch) is impossible here — all
+// attrs use the same semconv schema — so the error is discarded, matching
+// the existing trace-path call sites.
+func buildResource(serviceName, serviceVersion, environment, nodeID string, internalOrigin bool) *resource.Resource {
+	attrs := buildResourceAttrs(serviceName, serviceVersion, environment, nodeID, internalOrigin)
+	res, _ := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(semconv.SchemaURL, attrs...),
+	)
+	return res
+}
+
+// sameCollectorBase reports whether the primary traces endpoint (a full
+// per-signal URL or a base) and a debug-collector base URL address the same
+// collector — compared as base URLs, modulo the /v1/traces suffix and
+// trailing slashes.
+func sameCollectorBase(primaryTracesEndpoint, debugBase string) bool {
+	a := strings.TrimRight(primaryTracesEndpoint, "/")
+	a = strings.TrimRight(strings.TrimSuffix(a, "/v1/traces"), "/")
+	b := strings.TrimRight(debugBase, "/")
+	return a != "" && strings.EqualFold(a, b)
+}
+
+// withSignalPath appends the OTLP per-signal path (e.g. "/v1/traces")
+// to a base collector endpoint if it is not already present. Mirrors the
+// primary-endpoint logic in pkg/config/otel.go, but per-signal so the one
+// debug-collector base URL fans out to /v1/traces, /v1/logs, /v1/metrics.
+func withSignalPath(endpoint, signalPath string) string {
+	if endpoint == "" || strings.HasSuffix(endpoint, signalPath) {
+		return endpoint
+	}
+	return strings.TrimRight(endpoint, "/") + signalPath
 }
 
 // New creates the telemetry provider. If TraceEndpoint is empty, a noop
@@ -196,110 +311,257 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	)
 	otelapi.SetTextMapPropagator(prop)
 
-	if opts.OTLPEndpoint == "" {
+	// Nothing to install: no primary product/ops endpoint and no debug
+	// collector. Returns the noop provider — behavior for everyone who
+	// hasn't opted into the local observability stack is unchanged.
+	if opts.OTLPEndpoint == "" && opts.DebugCollectorEndpoint == "" {
 		return &Provider{}, nil
 	}
 
-	if opts.MultiTenant {
-		// nlpgo path: a TenantRouter is the only span processor.
-		// Per-tenant otlptracehttp exporters are constructed lazily
-		// inside it, each with its own `X-Auth-Token` header sourced
-		// from the Studio event's `workflow.api_key`. Static
-		// OTLPHeaders are intentionally NOT applied here — they would
-		// be wrong for every tenant after the first.
-		attrs := buildResourceAttrs(serviceName, serviceVersion, environment, opts.NodeID)
-		res, _ := resource.Merge(
-			resource.Default(),
-			resource.NewWithAttributes(semconv.SchemaURL, attrs...),
-		)
-		var rootSampler sdktrace.Sampler
-		if opts.SampleRatio > 0 && opts.SampleRatio < 1.0 {
-			rootSampler = sdktrace.TraceIDRatioBased(opts.SampleRatio)
-		} else {
-			rootSampler = sdktrace.AlwaysSample()
-		}
-		router := NewTenantRouter(opts.OTLPEndpoint)
-		if opts.SyncExport {
-			router.newProcessor = newSyncTenantProcessor
-		}
-		tp := sdktrace.NewTracerProvider(
-			sdktrace.WithResource(res),
-			sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
-			sdktrace.WithSpanProcessor(router),
-			sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
-			sdktrace.WithIDGenerator(NewIDGenerator()),
-		)
-		otelapi.SetTracerProvider(tp)
-		return &Provider{tp: tp}, nil
+	// The internal-origin marker goes on every single-tenant resource: those
+	// providers carry exclusively LangWatch's own telemetry. Multi-tenant
+	// providers (nlpgo) are excluded — their resource reaches customer
+	// projects through the tenant router.
+	res := buildResource(serviceName, serviceVersion, environment, opts.NodeID, !opts.MultiTenant)
+
+	// Ordered so that only a ratio of 1.0 or above means "sample everything".
+	// The previous arrangement made AlwaysSample the default branch, which put
+	// every out-of-range value — a negative typo, or 10 meaning "10%" — onto
+	// full export, amplifying exactly what the operator was trying to reduce.
+	// config.OTel.Resolve rejects those at boot; this fails toward exporting
+	// nothing for callers that construct Options directly. NaN lands here too:
+	// it compares false against both bounds.
+	var rootSampler sdktrace.Sampler
+	switch {
+	case opts.Sampler.Ratio >= 1.0:
+		rootSampler = sdktrace.AlwaysSample()
+	case opts.Sampler.Ratio > 0:
+		rootSampler = sdktrace.TraceIDRatioBased(opts.Sampler.Ratio)
+	default:
+		rootSampler = sdktrace.NeverSample()
+	}
+	sampler := rootSampler
+	if opts.Sampler.ParentBased {
+		sampler = sdktrace.ParentBased(rootSampler)
 	}
 
-	exporterOpts := []otlptracehttp.Option{
-		otlptracehttp.WithEndpointURL(opts.OTLPEndpoint),
+	tpOpts := []sdktrace.TracerProviderOption{
+		sdktrace.WithResource(res),
+		sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
+		sdktrace.WithSampler(sampler),
+		sdktrace.WithIDGenerator(NewIDGenerator()),
 	}
-	if len(opts.OTLPHeaders) > 0 {
-		exporterOpts = append(exporterOpts, otlptracehttp.WithHeaders(opts.OTLPHeaders))
+
+	// Primary product/ops span pipeline — unchanged from before the
+	// debug-collector feature. The baggage processor above still runs
+	// first (registration order), so it stamps attributes before either
+	// the primary or the debug exporter sees the span.
+	if opts.OTLPEndpoint != "" {
+		if opts.MultiTenant {
+			// nlpgo path: a TenantRouter routes each span to a per-tenant
+			// otlptracehttp exporter constructed lazily with its own
+			// `X-Auth-Token` sourced from the Studio event's
+			// `workflow.api_key`. Static OTLPHeaders are intentionally NOT
+			// applied here — they would be wrong for every tenant after
+			// the first.
+			router := NewTenantRouter(opts.OTLPEndpoint)
+			if opts.SyncExport {
+				router.newProcessor = newSyncTenantProcessor
+			}
+			if opts.OpsEndpoint != "" {
+				opsOpts := []otlptracehttp.Option{
+					otlptracehttp.WithEndpointURL(withSignalPath(opts.OpsEndpoint, "/v1/traces")),
+				}
+				if len(opts.OpsHeaders) > 0 {
+					opsOpts = append(opsOpts, otlptracehttp.WithHeaders(opts.OpsHeaders))
+				}
+				opsExp, opsErr := otlptracehttp.New(ctx, opsOpts...)
+				if opsErr != nil {
+					return nil, opsErr
+				}
+				// Ops spans carry the FULL internal identity — including the
+				// internal-origin marker the shared multi-tenant resource
+				// deliberately omits.
+				router.WithOpsFallback(
+					sdktrace.NewBatchSpanProcessor(opsExp),
+					buildResource(serviceName, serviceVersion, environment, opts.NodeID, true),
+				)
+			}
+			tpOpts = append(tpOpts, sdktrace.WithSpanProcessor(router))
+		} else {
+			// aigateway path: a single static-headers batch exporter.
+			exporterOpts := []otlptracehttp.Option{
+				otlptracehttp.WithEndpointURL(opts.OTLPEndpoint),
+			}
+			if len(opts.OTLPHeaders) > 0 {
+				exporterOpts = append(exporterOpts, otlptracehttp.WithHeaders(opts.OTLPHeaders))
+			}
+			exp, err := otlptracehttp.New(ctx, exporterOpts...)
+			if err != nil {
+				return nil, err
+			}
+
+			// Suppress startup-race auth/transport noise from the OTLP
+			// exporter — the default handler emits WARN for every batch,
+			// which floods logs for ~5s until the control-plane mints auth.
+			// The filter auto-disables once the healthyExporter wrapper sees
+			// a successful export, or after the 30s grace window elapses.
+			startupFilter := newStartupErrorHandler(
+				slogErrorHandler{},
+				30*time.Second,
+			)
+			otelapi.SetErrorHandler(startupFilter)
+			wrappedExp := healthyExporterWrap(exp, startupFilter.markHealthy)
+
+			batchTimeout := opts.BatchTimeout
+			if batchTimeout == 0 {
+				batchTimeout = BatchScheduledDelay
+			}
+			queueSize := opts.MaxQueueSize
+			if queueSize == 0 {
+				queueSize = 8192
+			}
+			tpOpts = append(tpOpts,
+				sdktrace.WithBatcher(wrappedExp,
+					sdktrace.WithBatchTimeout(batchTimeout),
+					sdktrace.WithMaxQueueSize(queueSize),
+				),
+			)
+		}
 	}
-	exp, err := otlptracehttp.New(ctx, exporterOpts...)
-	if err != nil {
+
+	// Additive debug-collector span exporter — dual export. Every span
+	// (on both paths) is also batched to the developer's local collector.
+	// This never diverts spans from the primary pipeline above.
+	//
+	// Skipped when the debug collector IS the primary collector: with the
+	// official env vars a dev shell exports OTEL_EXPORTER_OTLP_ENDPOINT and
+	// OTEL_DEBUG_COLLECTOR_ENDPOINT both at the local stack, and a second
+	// processor would just duplicate every span. (The debug LOG pipeline
+	// below is NOT skipped — there is no primary log pipeline to duplicate.)
+	debugDuplicatesPrimary := opts.OTLPEndpoint != "" &&
+		opts.DebugCollectorEndpoint != "" &&
+		sameCollectorBase(opts.OTLPEndpoint, opts.DebugCollectorEndpoint)
+	if opts.DebugCollectorEndpoint != "" && !debugDuplicatesPrimary {
+		debugProc, err := newDebugSpanProcessor(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders)
+		if err != nil {
+			return nil, err
+		}
+		tpOpts = append(tpOpts, sdktrace.WithSpanProcessor(debugProc))
+	}
+
+	tp := sdktrace.NewTracerProvider(tpOpts...)
+	otelapi.SetTracerProvider(tp)
+	provider := &Provider{tp: tp}
+
+	if err := installDebugLogs(ctx, opts, res, provider); err != nil {
+		return nil, err
+	}
+	if err := installMetrics(ctx, opts, res, provider); err != nil {
 		return nil, err
 	}
 
-	// Suppress startup-race auth/transport noise from the OTLP exporter —
-	// the default handler emits WARN for every batch, which floods logs
-	// for ~5s until the control-plane mints auth. The filter auto-disables
-	// once the healthyExporter wrapper sees a successful export, or after
-	// the 30s grace window elapses (whichever comes first).
-	startupFilter := newStartupErrorHandler(
-		slogErrorHandler{},
-		30*time.Second,
-	)
-	otelapi.SetErrorHandler(startupFilter)
-	wrappedExp := healthyExporterWrap(exp, startupFilter.markHealthy)
-
-	attrs := buildResourceAttrs(serviceName, serviceVersion, environment, opts.NodeID)
-
-	res, _ := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, attrs...),
-	)
-
-	batchTimeout := opts.BatchTimeout
-	if batchTimeout == 0 {
-		batchTimeout = 5 * time.Second
-	}
-	queueSize := opts.MaxQueueSize
-	if queueSize == 0 {
-		queueSize = 8192
-	}
-
-	var rootSampler sdktrace.Sampler
-	if opts.SampleRatio > 0 && opts.SampleRatio < 1.0 {
-		rootSampler = sdktrace.TraceIDRatioBased(opts.SampleRatio)
-	} else {
-		rootSampler = sdktrace.AlwaysSample()
-	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithResource(res),
-		sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
-		sdktrace.WithBatcher(wrappedExp,
-			sdktrace.WithBatchTimeout(batchTimeout),
-			sdktrace.WithMaxQueueSize(queueSize),
-		),
-		sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
-		sdktrace.WithIDGenerator(NewIDGenerator()),
-	)
-	otelapi.SetTracerProvider(tp)
-
-	return &Provider{tp: tp}, nil
+	return provider, nil
 }
 
-// Shutdown flushes pending telemetry. Safe to call on a noop provider.
-func (p *Provider) Shutdown(ctx context.Context) error {
-	if p.tp != nil {
-		return p.tp.Shutdown(ctx)
+// installDebugLogs attaches the debug collector's net-new OTLP log pipeline to
+// the provider. Gated on the debug endpoint, so it's a no-op unless a developer
+// opted into the local observability stack (product/ops logs go through zap).
+func installDebugLogs(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {
+	if opts.DebugCollectorEndpoint == "" {
+		return nil
 	}
+	lp, err := newLoggerProvider(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders, res)
+	if err != nil {
+		return err
+	}
+	provider.lp = lp
 	return nil
+}
+
+// installMetrics builds and installs the global MeterProvider from whatever
+// metric sinks are configured, fanning the same instruments to each:
+//
+//   - the PRIMARY product/ops endpoint, for SINGLE-TENANT services (aigateway,
+//     langyagent) — their instruments (gateway.*, langy.worker.*) + runtime
+//     metrics export to the same collector as their spans. This is the wiring
+//     that lights those instruments up: before it, the primary path installed
+//     only a TracerProvider, leaving the global MeterProvider a no-op in prod.
+//   - the DEBUG collector, when a developer opted into the local stack.
+//
+// MultiTenant services (nlpgo) opt OUT of the primary reader: a metric stream
+// has no per-tenant routing analog to the span TenantRouter, so there is no
+// single correct static destination. When no sink applies (noop, or multi-tenant
+// with no debug collector) the global MeterProvider is left as the SDK no-op.
+func installMetrics(ctx context.Context, opts Options, res *resource.Resource, provider *Provider) error {
+	var readers []sdkmetric.Reader
+	if opts.OTLPEndpoint != "" && !opts.MultiTenant {
+		metricsURL := opts.MetricsEndpoint
+		if metricsURL == "" {
+			metricsURL = metricsEndpointFromTraces(opts.OTLPEndpoint)
+		}
+		r, err := newMetricReader(ctx, metricsURL, opts.OTLPHeaders)
+		if err != nil {
+			return err
+		}
+		readers = append(readers, r)
+	}
+	if opts.DebugCollectorEndpoint != "" {
+		// When the primary reader above already targets the same collector,
+		// a debug reader would double every metric. Multi-tenant services
+		// install no primary reader, so their debug reader always survives.
+		primaryCoversDebug := len(readers) > 0 &&
+			sameCollectorBase(opts.OTLPEndpoint, opts.DebugCollectorEndpoint)
+		if !primaryCoversDebug {
+			r, err := newMetricReader(ctx, withSignalPath(opts.DebugCollectorEndpoint, "/v1/metrics"), opts.DebugCollectorHeaders)
+			if err != nil {
+				return err
+			}
+			readers = append(readers, r)
+		}
+	}
+	if len(readers) == 0 {
+		return nil
+	}
+
+	mpOpts := []sdkmetric.Option{sdkmetric.WithResource(res)}
+	for _, r := range readers {
+		mpOpts = append(mpOpts, sdkmetric.WithReader(r))
+	}
+	mp := sdkmetric.NewMeterProvider(mpOpts...)
+	otelapi.SetMeterProvider(mp)
+	// Runtime metrics (GC, goroutines, mem) are the first cut — a start failure
+	// must not sink service init, so warn and carry on.
+	if err := startRuntimeMetrics(mp); err != nil {
+		slog.Warn("otel runtime metrics start failed", "err", err)
+	}
+	provider.mp = mp
+	return nil
+}
+
+// Shutdown flushes pending telemetry across every configured signal
+// (traces, and — when the debug collector is enabled — logs + metrics).
+// Safe to call on a noop provider. Registered as the "otel" lifecycle
+// closer in each service's serve.go, so no extra closers are needed for
+// the log/metric providers.
+func (p *Provider) Shutdown(ctx context.Context) error {
+	var errs []error
+	if p.tp != nil {
+		if err := p.tp.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if p.lp != nil {
+		if err := p.lp.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if p.mp != nil {
+		if err := p.mp.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // ForceFlush exports any pending spans synchronously. Safe to call on
@@ -318,10 +580,26 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 // negligible vs the alternative of losing observability for the
 // requests that triggered the failure path.
 func (p *Provider) ForceFlush(ctx context.Context) error {
+	var errs []error
 	if p.tp != nil {
-		return p.tp.ForceFlush(ctx)
+		if err := p.tp.ForceFlush(ctx); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	// The log + metric providers are only set when the debug collector is
+	// enabled; flushing them mirrors the per-request span flush so a
+	// Lambda freeze can't strand debug logs/metrics either.
+	if p.lp != nil {
+		if err := p.lp.ForceFlush(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if p.mp != nil {
+		if err := p.mp.ForceFlush(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // healthyExporter wraps a SpanExporter, invoking `onHealthy` the first
@@ -347,4 +625,32 @@ func (h *healthyExporter) ExportSpans(ctx context.Context, spans []sdktrace.Read
 
 func (h *healthyExporter) Shutdown(ctx context.Context) error {
 	return h.inner.Shutdown(ctx)
+}
+
+// ForceFlushGlobal force-flushes whatever tracer and meter providers are
+// currently installed as the OTel globals, best-effort and bounded by ctx. It
+// exists for callers that do NOT hold a *Provider handle but must still ship
+// buffered telemetry before the process may die — the process root on a fatal
+// panic, or an early-shutdown hook that wants to flush before a slow drain.
+//
+// Because pkg/otelsetup installs its *sdktrace.TracerProvider as the global,
+// this also flushes every span processor registered on it (primary + any debug
+// exporter). A no-op provider (no endpoint configured) or one without ForceFlush
+// is silently skipped.
+//
+// HONEST LIMIT: SIGKILL and OOM are uncatchable, so this cannot guarantee
+// zero loss. It narrows the window for the failures the process CAN observe
+// (SIGTERM, recovered-then-fatal panic); the short BatchScheduledDelay covers
+// the rest.
+func ForceFlushGlobal(ctx context.Context) {
+	if tp, ok := otelapi.GetTracerProvider().(interface {
+		ForceFlush(context.Context) error
+	}); ok {
+		_ = tp.ForceFlush(ctx)
+	}
+	if mp, ok := otelapi.GetMeterProvider().(interface {
+		ForceFlush(context.Context) error
+	}); ok {
+		_ = mp.ForceFlush(ctx)
+	}
 }

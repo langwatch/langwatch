@@ -77,18 +77,17 @@ describe("runExperimentCommand()", () => {
 
   describe("when format is json", () => {
     it("outputs raw JSON", async () => {
-      const result = {
+      const runResult = {
         runId: "run_123",
         status: "running",
         total: 10,
       };
-      mockStartRun.mockResolvedValue(result);
+      mockStartRun.mockResolvedValue(runResult);
 
-      await runExperimentCommand("quality-check", { format: "json" });
+      const result = await runExperimentCommand("quality-check", {});
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(result, null, 2),
-      );
+      expect(result?.data).toEqual(runResult);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 
@@ -152,11 +151,10 @@ describe("experimentStatusCommand()", () => {
       };
       mockGetRunStatus.mockResolvedValue(status);
 
-      await experimentStatusCommand("doc-qa", { runId: "run_123", format: "json" });
+      const result = await experimentStatusCommand("doc-qa", { runId: "run_123" });
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(status, null, 2),
-      );
+      expect(result?.data).toEqual(status);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

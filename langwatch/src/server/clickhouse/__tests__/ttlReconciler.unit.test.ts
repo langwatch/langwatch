@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  resolveHotDays,
-  parseTTLDaysFromEngineMetadata,
-  hasLegacyRetentionTTL,
-  shouldRewriteTTL,
   buildDesiredTTLExpression,
-  TABLE_TTL_CONFIG,
-  TIERED_STORAGE_POLICY,
+  hasLegacyRetentionTTL,
+  parseTTLDaysFromEngineMetadata,
   reconcileTTL,
+  resolveHotDays,
+  shouldRewriteTTL,
+  TABLE_TTL_CONFIG,
   type TableTTLEntry,
+  TIERED_STORAGE_POLICY,
 } from "../ttlReconciler";
 
 const legacyRetentionEngineFull =
@@ -267,7 +267,8 @@ describe("ttlReconciler", () => {
     const savedEnv: Record<string, string | undefined> = {};
 
     beforeEach(() => {
-      savedEnv.CLICKHOUSE_COLD_STORAGE_ENABLED = process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
+      savedEnv.CLICKHOUSE_COLD_STORAGE_ENABLED =
+        process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
       savedEnv.CLICKHOUSE_URL = process.env.CLICKHOUSE_URL;
       delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
       delete process.env.CLICKHOUSE_URL;
@@ -341,14 +342,22 @@ describe("ttlReconciler", () => {
         "dspy_steps",
         "evaluation_runs",
         "event_log",
+        "langy_analytics_events",
         "experiment_run_items",
         "experiment_runs",
         "simulation_runs",
         "stored_log_records",
+        "log_records",
         "suite_runs",
-        "stored_metric_records",
+        "metric_data_points",
+        "metric_series",
+        "metric_time_rollups",
         "stored_spans",
         "trace_summaries",
+        "trace_analytics",
+        "trace_analytics_rollup",
+        "evaluation_analytics",
+        "evaluation_analytics_rollup",
       ]);
     });
 

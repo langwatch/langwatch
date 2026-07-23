@@ -14,6 +14,7 @@ import {
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useAllModelProvidersList } from "~/hooks/useAllModelProvidersList";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
@@ -27,6 +28,7 @@ import { Menu } from "../../components/ui/menu";
 import { TriggerAnchor } from "../../components/ui/TriggerAnchor";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { buildCustomModelDisplayNames } from "../../server/modelProviders/customModelDisplayNames";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
 import { filterProvidersByScope } from "../../utils/filterProvidersByScope";
@@ -35,41 +37,16 @@ export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
-  // The settings page renders one row per stored ModelProvider — the
-  // Record-by-provider-key shape returned by `useModelProvidersSettings`
-  // collapses multi-instance setups (two "OpenAI" rows at different
-  // scopes) into a single entry and silently drops the loser. Use the
-  // flat list endpoint instead so the table reflects every row.
-  //
-  // The "All you can see" view fans out across the whole organization
-  // so an admin sees providers a sibling project has configured. Members
-  // without `organization:view` (project-only members) fall back to the
-  // per-project endpoint, which they always have permission to read.
-  const canViewOrg = hasPermission("organization:view");
-  const orgQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-    { organizationId: organization?.id ?? "" },
-    {
-      enabled: !!organization?.id && canViewOrg,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const projectQuery = api.modelProvider.listAllForProjectForFrontend.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      enabled: !!project?.id && !canViewOrg,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const activeQuery = canViewOrg ? orgQuery : projectQuery;
-  const allProvidersList = activeQuery.data?.providers ?? [];
-  const isLoading = activeQuery.isLoading;
-  const refetch = activeQuery.refetch;
+  // Flat, uncollapsed list — see useAllModelProvidersList for why this
+  // table can't use the collapsed Record from useModelProvidersSettings.
+  const {
+    providers: allProvidersList,
+    isLoading,
+    refetch,
+  } = useAllModelProvidersList();
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
-  const updateMutation = api.modelProvider.update.useMutation();
   const deleteMutation = api.modelProvider.delete.useMutation();
   const [providerToDelete, setProviderToDelete] = useState<{
     id?: string;
@@ -107,6 +84,14 @@ export default function ModelsPage() {
     [allEnabledProviders],
   );
 
+  // Display names for the Default Models table's chips. Built from the ALL
+  // set (not the scope-filtered one) for the same reason as
+  // `enabledProviderKeys` above.
+  const defaultModelsDisplayNames = useMemo(
+    () => buildCustomModelDisplayNames(allProvidersList),
+    [allProvidersList],
+  );
+
   // Client-side filter for the scope dropdown at the top of the page.
   // The list query returns every provider the caller can see; this just
   // narrows the visible rows. See specs/model-providers/scope-filter.feature.
@@ -126,14 +111,33 @@ export default function ModelsPage() {
   // The prior behavior of hiding already-configured providers prevented
   // the very multi-instance flow the scope picker exists to support.
   const addableProviders = useMemo(() => {
-    return Object.keys(modelProvidersRegistry).map((providerKey) => ({
-      provider: providerKey as keyof typeof modelProvidersRegistry,
-      name:
-        modelProvidersRegistry[
-          providerKey as keyof typeof modelProvidersRegistry
-        ]?.name ?? providerKey,
-      icon: modelProviderIcons[providerKey as keyof typeof modelProviderIcons],
-    }));
+    return Object.keys(modelProvidersRegistry)
+      .map((providerKey) => ({
+        provider: providerKey as keyof typeof modelProvidersRegistry,
+        name:
+          modelProvidersRegistry[
+            providerKey as keyof typeof modelProvidersRegistry
+          ]?.name ?? providerKey,
+        icon: modelProviderIcons[
+          providerKey as keyof typeof modelProviderIcons
+        ],
+        // Sign-in providers (Codex) are a niche, subscription-billed harness,
+        // not a general API-key provider — so they sort to the bottom of the
+        // add menu here. On Langy / onboarding the surface-aware grid promotes
+        // them to the top instead (see providersForSurface). The registry keeps
+        // literal entry types via `satisfies`, so widen to read the optional
+        // authFlow — same pattern as ModelProviderForm's isOAuthDeviceProvider.
+        authFlow: (
+          modelProvidersRegistry[
+            providerKey as keyof typeof modelProvidersRegistry
+          ] as { authFlow?: "api-key" | "oauth-device" } | undefined
+        )?.authFlow,
+      }))
+      .sort((a, b) => {
+        const aDevice = a.authFlow === "oauth-device" ? 1 : 0;
+        const bDevice = b.authFlow === "oauth-device" ? 1 : 0;
+        return aDevice - bDevice;
+      });
   }, []);
 
   const utils = api.useContext();
@@ -420,6 +424,7 @@ export default function ModelsPage() {
           enabledProviderKeys={enabledProviderKeys}
           noProvidersConfigured={!isLoading && enabledProviders.length === 0}
           hierarchy={hierarchy}
+          displayNames={defaultModelsDisplayNames}
         />
 
         <Dialog.Root

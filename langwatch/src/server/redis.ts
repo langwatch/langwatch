@@ -3,8 +3,8 @@ import IORedis, { Cluster } from "ioredis";
 // PHASE_PRODUCTION_BUILD was "phase-production-build" from next/constants
 const PHASE_PRODUCTION_BUILD = "phase-production-build";
 
+import { createLogger } from "@langwatch/observability";
 import { env } from "../env.mjs";
-import { createLogger } from "../utils/logger/server";
 import { parseRedisDbIndex } from "./redis-db-index";
 
 export { parseRedisDbIndex } from "./redis-db-index";
@@ -118,13 +118,11 @@ if (!isBuildOrNoRedis) {
 }
 
 /**
- * Block server boot until Redis answers a PING, or exit loudly on timeout.
- *
- * When Redis is down (forgot to start compose, wrong REDIS_URL, host port
- * not published) the auth layer swallows the error and the user sees an
- * endless "Redirecting to Sign in..." loop — ten minutes of head-scratching
- * per new contributor. Surfacing the error here converts that into an
- * obvious boot-time failure the developer can action immediately.
+ * Ping Redis with a timeout, throwing (rather than exiting) on failure. Callers
+ * that own the process lifecycle decide what to do with the rejection —
+ * {@link verifyRedisReady} below exits loudly for boot paths that should kill
+ * the process; `startWorkers()` lets it propagate so an in-process worker boot
+ * failure doesn't take the web server down with it.
  *
  * No-ops in build/test modes where {@link isBuildOrNoRedis} is true.
  */
@@ -134,7 +132,7 @@ if (!isBuildOrNoRedis) {
 // and the pod crashlooped right when the event-sourcing dispatcher needed
 // to come back online). The boot guard is still useful for dev surface
 // errors; it just shouldn't trip on a real-world TLS handshake.
-export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
+export async function assertRedisReady(timeoutMs = 15_000): Promise<void> {
   if (isBuildOrNoRedis || !connection) return;
   const target = env.REDIS_CLUSTER_ENDPOINTS ?? env.REDIS_URL ?? "(unset)";
   try {
@@ -157,6 +155,30 @@ export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
         `  Hybrid dev? 'pnpm dev' on host + docker redis needs the host port published (6379).\n` +
         `  Full-compose dev? Run 'make dev' instead of 'pnpm dev'.`,
     );
+    throw error instanceof Error ? error : new Error(message);
+  }
+}
+
+/**
+ * Block server boot until Redis answers a PING, or exit loudly on failure.
+ *
+ * When Redis is down (forgot to start compose, wrong REDIS_URL, host port
+ * not published) the auth layer swallows the error and the user sees an
+ * endless "Redirecting to Sign in..." loop — ten minutes of head-scratching
+ * per new contributor. Surfacing the error here converts that into an
+ * obvious boot-time failure the developer can action immediately.
+ *
+ * Only for boot paths where killing the whole process on failure is correct
+ * (the web server's own startup, the standalone worker entrypoint). Anything
+ * that boots Redis-dependent work *after* something else is already serving
+ * traffic — see `startWorkers()` — must use {@link assertRedisReady} instead
+ * and handle the rejection itself, or a Redis hiccup takes down more than it
+ * should.
+ */
+export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
+  try {
+    await assertRedisReady(timeoutMs);
+  } catch {
     // Don't throw in build phase — some tools import start.ts at build time.
     process.exit(1);
   }

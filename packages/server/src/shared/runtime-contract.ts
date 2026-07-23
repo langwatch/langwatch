@@ -13,8 +13,6 @@ export type RuntimeContext = {
   predeps: PredepResult;
   envFile: string;
   version: string;
-  /** Opt-in: start bullboard alongside the rest. CLI flag `--bullboard`. */
-  bullboard: boolean;
   /** Pass-through env from the user shell (OPENAI_API_KEY, …) — propagated to children, never persisted. */
   userEnv: Record<string, string>;
 };

@@ -1,7 +1,7 @@
-import { createLogger } from "~/utils/logger";
+import { createLogger } from "@langwatch/observability";
 import { ReplicateToProjectDialog } from "~/components/ui/ReplicateToProjectDialog";
-import { useProjectsForCopy } from "~/hooks/useProjectsForCopy";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useProjectsForCopy } from "~/hooks/useProjectsForCopy";
 import { api } from "~/utils/api";
 
 const logger = createLogger("CopyAgentDialog");

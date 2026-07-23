@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
-import { useSession } from "~/utils/auth-client";
+import { isSameOrigin, useSession } from "~/utils/auth-client";
 import { useEffect } from "react";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -108,8 +108,7 @@ export default function Error() {
       if (typeof window !== "undefined" && typeof document !== "undefined") {
         if (isAuth0) {
           const referrer = document.referrer;
-          // Check if referrer is from our own domain
-          const isValidDomain = referrer?.startsWith(window.location.origin);
+          const isValidDomain = !!referrer && isSameOrigin(referrer);
           if (isValidDomain) {
             window.location.href = referrer;
           } else {

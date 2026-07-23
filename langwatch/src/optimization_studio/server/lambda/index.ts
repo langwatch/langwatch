@@ -11,15 +11,15 @@ import {
   LambdaClient,
   UpdateFunctionCodeCommand,
 } from "@aws-sdk/client-lambda";
+import { createLogger } from "@langwatch/observability";
 import { env } from "../../../env.mjs";
-import { TtlCache } from "../../../server/utils/ttlCache";
 import {
-  STAGED_PAYLOAD_HEADER,
   deleteStagedObject,
-  stagePayloadToS3,
+  STAGED_PAYLOAD_HEADER,
   type StagedObject,
+  stagePayloadToS3,
 } from "../../../server/s3/stagePayload";
-import { createLogger } from "../../../utils/logger/server";
+import { TtlCache } from "../../../server/utils/ttlCache";
 import { captureException } from "../../../utils/posthogErrorCapture";
 import type { StudioClientEvent } from "../../types/events";
 
@@ -353,7 +353,7 @@ const updateProjectLambdaImage = async (
 // CallerRateLimitExceeded for every worker in the region. Each retried call
 // then burns 4-12s of fastq budget against a 429, pinning all 100 slots and
 // stalling every other group on the pod — including unrelated fold groups
-// like projectDailySdkUsage/<date>:other:. See
+// like traceSummary/<date>:other:. See
 // specs/nlp-go/studio-lambda-cache.feature.
 //
 // Two layers:

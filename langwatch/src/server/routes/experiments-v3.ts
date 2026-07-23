@@ -9,7 +9,8 @@
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
  */
-import { zValidator } from "@hono/zod-validator";
+import { validator as zValidator } from "~/server/api/validation";
+import { createLogger } from "@langwatch/observability";
 import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -49,7 +50,6 @@ import {
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
 import type { NextRequestShim as any } from "./types";

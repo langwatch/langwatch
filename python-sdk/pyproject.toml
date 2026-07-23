@@ -74,7 +74,7 @@ markers = [
 [dependency-groups]
 dev = ["black>=26.3.1"]
 examples = [
-    "anthropic>=0.36.0,<0.114.0",
+    "anthropic>=0.36.0,<0.117.0",
     "chainlit>=2.11.1,<3",
     "cloudpickle>=3.1.1",
     "dspy-ai>=3.0.3,<4",
@@ -84,8 +84,8 @@ examples = [
     "jupyter>=1.0.0,<2.0.0",
     "langchain>=1.0.0,<2.0.0",
     "langchain-community>=0.3.0,<1.0.0",
-    "langchain-openai>=0.3.0,<1.0.0",
-    "langchain-text-splitters>=0.3.0,<1.0.0",
+    "langchain-openai>=1.1.14,<2.0.0",
+    "langchain-text-splitters>=1.1.2,<2.0.0",
     "langchain-google-vertexai>=2.0.0,<4.0.0",
     "litellm>=1.84.0",
     "openinference-instrumentation-dspy>=0.1.23,<0.2.0",
@@ -96,7 +96,7 @@ examples = [
     "pytest>=7.4.2,<10.0.0",
     "python-dotenv==1.2.2",
     "streamlit>=1.37.1,<2.0.0",
-    "uvicorn>=0.38.0,<0.50.0",
+    "uvicorn>=0.38.0,<0.51.0",
     "json-repair>=0.42.0",
     "openinference-instrumentation-openai>=0.1.30",
     "opentelemetry-instrumentation-langchain>=0.40.4",
@@ -128,4 +128,6 @@ constraint-dependencies = [
     "langsmith>=0.8.18",  # security: langsmith advisory (#1532)
     "python-engineio>=4.13.2",  # security: python-engineio advisory (#1545, #1546)
     "python-socketio>=5.16.2",  # security: python-socketio advisory (#1547)
+    "bleach>=6.4.0",  # security: bleach advisory (#1494)
+    "onnx>=1.22.0",  # security: onnx advisory (#1560)
 ]

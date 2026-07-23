@@ -6,18 +6,19 @@
  * - src/pages/api/annotations/[id].ts
  * - src/pages/api/annotations/trace/[trace].ts
  */
-import { nanoid } from "nanoid";
+
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
-import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger/server";
+import { nanoid } from "nanoid";
 import type { Permission } from "~/server/api/rbac";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import {
+  apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
-  apiKeyCeilingDenialResponse,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { prisma } from "~/server/db";
 
 const logger = createLogger("langwatch:annotations");
 const tokenResolver = TokenResolver.create(prisma);
@@ -258,7 +259,11 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/annotations/trace/:trace",
 });
 
 secured.access(handlerManagedAuth(AUTH_REASON)).post("/annotations/trace/:trace", async (c) => {
-  const auth = await authenticateRequest(c, "annotations:manage");
+  // `:create` (not `:manage`) — same fix as evaluators' POST route. Creating
+  // is a lesser privilege than update/delete, and LANGY_CANDIDATE_PERMISSIONS
+  // only ever grants annotations:create, never :manage. PATCH/DELETE above
+  // correctly stay on :manage.
+  const auth = await authenticateRequest(c, "annotations:create");
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }

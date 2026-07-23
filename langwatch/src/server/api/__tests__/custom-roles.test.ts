@@ -36,9 +36,6 @@ const mockProjectResult = {
   team: {
     id: "team-123",
     organizationId: "org-123",
-    organization: {
-      members: [{ role: OrganizationUserRole.MEMBER }],
-    },
   },
 };
 
@@ -83,8 +80,13 @@ const mockSession = {
 describe("Custom Role Functionality Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default setup for every test: project returns team info, no group memberships
+    // Default setup for every test: project returns team info, the caller is a
+    // current org member (resolveProjectPermission fails closed otherwise), and
+    // there are no group memberships.
     mockPrisma.project.findUnique.mockResolvedValue(mockProjectResult);
+    mockPrisma.organizationUser.findFirst.mockResolvedValue({
+      role: OrganizationUserRole.MEMBER,
+    });
     mockPrisma.groupMembership.findMany.mockResolvedValue([]);
   });
 

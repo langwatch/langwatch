@@ -10,11 +10,11 @@ import {
 } from "@chakra-ui/react";
 import { Edit3, Lightbulb, MessageSquare } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
 } from "~/hooks/useAnnotationsByTraceIds";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { AnnotationPopover } from "./AnnotationPopover";
 import type { ParsedTurn } from "./types";

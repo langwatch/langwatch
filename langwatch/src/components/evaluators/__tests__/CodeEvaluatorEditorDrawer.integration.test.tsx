@@ -133,6 +133,37 @@ describe("CodeEvaluatorEditorDrawer", () => {
       });
     });
 
+    describe("when required fields are incomplete", () => {
+      /** @scenario A disabled code evaluator Create button explains what is missing */
+      it("names the missing requirement and clears it once filled", async () => {
+        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+
+        await waitFor(() => {
+          expect(screen.getByText("Create evaluator")).toBeInTheDocument();
+        });
+
+        // Create mode seeds default code and inputs, so the one outstanding
+        // requirement is the name: the button is disabled and says why, instead
+        // of being a silent dead button.
+        expect(screen.getByTestId("save-code-evaluator")).toBeDisabled();
+        expect(
+          screen.getByTestId("code-evaluator-disabled-reason"),
+        ).toHaveTextContent("Add a name to create the evaluator.");
+
+        // Filling the name satisfies it: the reason clears and Create enables.
+        fireEvent.change(screen.getByTestId("code-evaluator-name"), {
+          target: { value: "my eval" },
+        });
+
+        await waitFor(() => {
+          expect(screen.getByTestId("save-code-evaluator")).toBeEnabled();
+        });
+        expect(
+          screen.queryByTestId("code-evaluator-disabled-reason"),
+        ).not.toBeInTheDocument();
+      });
+    });
+
     describe("when the drawer shows the outputs section", () => {
       /** @scenario Code evaluator outputs are the fixed evaluator contract */
       it("presents the fixed evaluator result fields and no output editor", async () => {

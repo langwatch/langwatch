@@ -19,6 +19,38 @@ If no feature file exists for your task, create one before writing code.
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
 
+### Local dev by hostname — thuishaven / portless (recommended)
+
+Stop juggling ports. Opt in with `pnpm dev:haven` and traffic routes through
+**`haven`** (the Go orchestrator in `tools/thuishaven`, binary `cmd/haven`), which
+gives every worktree's services a
+stable hostname via the [portless](https://github.com/vercel-labs/portless) proxy —
+`app|gateway|nlp.<slug>.langwatch.localhost`, where `<slug>` is the worktree's own
+directory name, sanitised (a checkout at `.../worktrees/portless` is the `portless`
+stack). The app and its API share one origin — open `app.<slug>...` for the UI,
+hit `app.<slug>.../api` for the API. `.localhost` resolves to loopback natively,
+so there is no `/etc/hosts`, DNS, or sudo for name resolution, and two worktrees
+can never collide.
+
+Hostname routing is **opt-in** — `pnpm dev` uses the plain `PORT`+offset scheme;
+`pnpm dev:haven` (or `make haven up`) routes through haven.
+
+```bash
+make haven setup        # one-time: install/verify portless (443, trusted CA)
+make haven install      # optional: go install so plain `haven ...` works everywhere
+pnpm dev:haven          # == make haven up (registers hostnames, supervises the stack)
+make haven list         # which worktree runs what (all stacks)
+make haven doctor       # proxy / daemon / observability health
+```
+
+Open `https://langwatch.localhost` for the cross-worktree dashboard;
+`observability.langwatch.localhost` proxies the local Grafana LGTM stack;
+`telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
+resolved config lands in `langwatch/.env.portless` (loaded last with
+`override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
+`HAVEN_AGENT=1`) for plain, token-free output; `haven list --json` is
+machine-readable. See `tools/thuishaven/README.md`.
+
 ```bash
 make quickstart                        # Interactive preset picker
 make quickstart all-local              # Local CH + PG + Redis + app + workers, no NLP (fast iteration default)
@@ -27,7 +59,7 @@ make quickstart dev-storage            # Local DBs + workers, stored-objects -> 
 make quickstart dev-infra              # Local app + redis + workers compose; shared dev for PG/CH/NLP/S3
 make quickstart frontend-only          # No compose, fastest — UI / design work
 make quickstart migration              # postgres + clickhouse on host ports for prisma migrate (no app, no workers)
-make quickstart full-local             # Kitchen-sink local: all-local-nlp + dedicated workers container + bullboard + ai-server
+make quickstart full-local             # Kitchen-sink local: all-local-nlp + dedicated workers container + ai-server
 make quickstart-help                   # Non-interactive preset reference
 make down                              # Stop all services
 make service svc=aigateway             # Start the Go AI Gateway data plane on :5563
@@ -45,6 +77,8 @@ For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 **Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
+
+**Two processes vs one (workers).** By default `pnpm dev` runs the app and the background workers as two Node processes (a separate `workers` lane under `concurrently`), matching prod's separate app/worker deployments. To run them as a **single process** locally, use `pnpm dev:single` (or `WORKERS_IN_PROCESS=1 pnpm dev`): the app boots with the `"all"` process role and hosts the worker stack in-process via `startWorkers()`, saving the RAM of a second Node process. **Under haven the default is a single process:** `pnpm dev:haven` hosts the workers in the app child (no separate `workers` lane) to save the RAM of a second Node process — the sensible default when a laptop juggles several worktrees. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. Opt back into a standalone `workers` lane with `pnpm dev:workers:haven` (or `WORKERS_IN_PROCESS=0 pnpm dev:haven`); `pnpm dev:single:haven` is the explicit single-process form, now equivalent to the `dev:haven` default. This is dev-only — `NODE_ENV=production` ignores the flag. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
 
 ### AI Gateway (Go, services/aigateway/)
 
@@ -95,7 +129,7 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, `pnpm dev` may tee output to `langwatch/server.log` — check it with `grep` if available.
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
@@ -135,6 +169,11 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmThreads"`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
+| Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
+| Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |
+| Leaving a killed vitest run behind | Interrupting vitest orphans its forked workers (they reparent to `ppid 1` and keep holding RAM). After an interrupted run, sweep with `pkill -f "vitest/dist/workers"` |
 | Writing tests in the incorrect order | Outside-In TDD: integration tests first, then unit tests |
 | Defining BDD specs on the end of the TODO list | BDD specs should come before any other tasks to guide them, not the other way around |
 | `gh pr edit --body` | Use `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="..."` (avoids Projects classic deprecation warning) |
@@ -153,7 +192,7 @@ specs/               # BDD feature specs
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
 | Setting up a Monitor / sleep that *can* take more than 5 minutes | Anthropic's prompt cache TTL is 5min, so any wait that crosses it forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). Cap each poll cycle at **4.5 min (270s)** — re-check, then re-arm. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
-| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements |
+| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`typescript-sdk/src/cli/**` and `typescript-sdk/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
 
 ## TypeScript
 
@@ -163,6 +202,7 @@ specs/               # BDD feature specs
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
 | Using positional parameters for functions with multiple args | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)` |
+| A workspace package tsconfig without `incremental` + `tsBuildInfoFile` | Every package tsconfig sets `"incremental": true` and its own `"tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/<pkg>.tsbuildinfo"`. Without it each typecheck re-checks cold; without a per-package path the packages clobber each other's cache |
 
 ## Database
 

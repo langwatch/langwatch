@@ -38,6 +38,8 @@ import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { langyEgressRouter } from "./routers/langyEgress";
+import { langyRouter } from "./routers/langy";
 import { langyGithubRouter } from "./routers/langyGithub";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
@@ -64,9 +66,9 @@ import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { scimTokenRouter } from "./routers/scimToken";
-import { sdkRadarRouter } from "./routers/sdkRadar";
 import { secretsRouter } from "./routers/secrets";
 import { shareRouter } from "./routers/share";
+import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
@@ -75,6 +77,7 @@ import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
+import { codingAgentsRouter } from "./routers/codingAgents";
 import { translateRouter } from "./routers/translate";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
@@ -89,6 +92,7 @@ const coreRouters = {
   team: teamRouter,
   traces: tracesRouter,
   tracesV2: tracesV2Router,
+  codingAgents: codingAgentsRouter,
   spans: spansRouter,
   analytics: analyticsRouter,
   monitors: monitorsRouter,
@@ -115,6 +119,7 @@ const coreRouters = {
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,
+  sharedTrace: sharedTraceRouter,
   pinnedTrace: pinnedTraceRouter,
   dataRetention: dataRetentionRouter,
   emailSuppression: emailSuppressionRouter,
@@ -130,7 +135,6 @@ const coreRouters = {
   prompts: promptsRouter,
   promptTags: promptTagsRouter,
   savedViews: savedViewsRouter,
-  sdkRadar: sdkRadarRouter,
   secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
@@ -159,6 +163,8 @@ const coreRouters = {
   gatewayGuardrails: gatewayGuardrailsRouter,
   gatewayUsage: gatewayUsageRouter,
   langyGithub: langyGithubRouter,
+  langyEgress: langyEgressRouter,
+  langy: langyRouter,
 };
 
 const eeRouters = {

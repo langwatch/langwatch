@@ -1,4 +1,6 @@
+import type { OrganizationIntent } from "@prisma/client";
 import { useMemo, useState } from "react";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { readAttribution } from "~/utils/attribution";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
@@ -22,6 +24,7 @@ export const useOnboardingFlow = () => {
     void 0,
   );
   const [agreement, setAgreement] = useState<boolean>(false);
+  const [intent, setIntent] = useState<OrganizationIntent | undefined>(void 0);
   const [usageStyle, setUsageStyle] = useState<UsageStyle | undefined>(void 0);
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>(void 0);
   const [phoneHasValue, setPhoneHasValue] = useState<boolean>(false);
@@ -35,16 +38,40 @@ export const useOnboardingFlow = () => {
   const [selectedDesires, setDesires] = useState<DesireType[]>([]);
   const [role, setRole] = useState<RoleType | undefined>(void 0);
 
-  // Flow configuration (memoized)
+  // The intent fork rides the governance flag, on by default (ADR-038
+  // v5): flag off (or loading, which reports enabled=false) = the exact
+  // pre-fork flow. User-level evaluation — there is no org yet during
+  // onboarding.
+  const { enabled: intentForkEnabled, isLoading: intentForkLoading } =
+    useFeatureFlag("release_ui_ai_governance_enabled");
+
+  // Flow configuration — recomputed when the intent changes (ADR-038 fork).
+  // Safe mid-flow: intent only changes while ON the INTENT screen, whose
+  // index exists in every config variant.
   const flow = useMemo(
-    () => getOnboardingFlowConfig(Boolean(isSaaS)),
-    [isSaaS],
+    () =>
+      getOnboardingFlowConfig({
+        isSaaS: Boolean(isSaaS),
+        intent,
+        intentForkEnabled,
+      }),
+    [isSaaS, intent, intentForkEnabled],
   );
 
   const canProceed = (currentScreenIndex: OnboardingScreenIndex) => {
     switch (currentScreenIndex) {
       case OnboardingScreenIndex.ORGANIZATION:
-        return Boolean(organizationName?.trim() && agreement);
+        // Hold the first screen until the fork flag resolves: advancing
+        // while it loads would take the pre-fork path and, if the flag then
+        // resolves enabled, the (kept) BASIC_INFO position silently skips
+        // the required INTENT screen. Resolution is one query; on error the
+        // flag settles disabled and the pre-fork flow proceeds.
+        return (
+          Boolean(organizationName?.trim() && agreement) && !intentForkLoading
+        );
+
+      case OnboardingScreenIndex.INTENT:
+        return intent !== void 0;
 
       case OnboardingScreenIndex.BASIC_INFO: {
         if (usageStyle === void 0) return false;
@@ -76,6 +103,7 @@ export const useOnboardingFlow = () => {
   const getFormData = (): OnboardingFormData => ({
     organizationName,
     agreement,
+    intent,
     usageStyle,
     phoneNumber,
     companySize,
@@ -94,6 +122,7 @@ export const useOnboardingFlow = () => {
     () => ({
       organizationName,
       agreement,
+      intent,
       usageStyle,
       phoneNumber,
       companySize,
@@ -103,6 +132,7 @@ export const useOnboardingFlow = () => {
       attribution,
       setOrganizationName,
       setAgreement,
+      setIntent,
       setUsageStyle,
       setPhoneNumber,
       setPhoneHasValue,
@@ -115,6 +145,7 @@ export const useOnboardingFlow = () => {
     [
       organizationName,
       agreement,
+      intent,
       usageStyle,
       phoneNumber,
       companySize,
@@ -130,6 +161,8 @@ export const useOnboardingFlow = () => {
     setOrganizationName,
     agreement,
     setAgreement,
+    intent,
+    setIntent,
     usageStyle,
     setUsageStyle,
     phoneNumber,

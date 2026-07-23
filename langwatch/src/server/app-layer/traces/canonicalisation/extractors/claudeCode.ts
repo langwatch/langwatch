@@ -1,18 +1,14 @@
 /**
- * Claude Code Extractor (log side)
+ * Claude Code Extractor
  *
- * Handles: the `user_prompt` log event of Anthropic Claude Code's native
- * OpenTelemetry log records (scope `com.anthropic.claude_code.events`),
+ * Log side handles: the `user_prompt` log event of Anthropic Claude Code's
+ * native OpenTelemetry log records (scope `com.anthropic.claude_code.events`),
  * lifting the user-typed prompt onto `langwatch.input` so the trace
- * summary headline input is populated.
- *
- * The cost-bearing model-call events (`api_request`, `api_request_body`,
- * `api_response_body`) are NOT handled here: they are trapped at ingest
- * and CONVERTED into a single standard gen_ai.* span by
- * `claude-code-log-to-span.ts`, then dropped from the log path. The
- * existing span pipeline + canonicalisation + fold lift model / tokens /
- * cost / input / output from that span. This extractor therefore only
- * sees the lifecycle/prompt events that stay on the log path.
+ * summary headline input is populated. It is the only claude_code event
+ * this extractor lifts; the model-call events (`api_request`,
+ * `api_request_body`, `api_response_body`) stay on the log path untouched
+ * by this extractor and are consumed downstream by the trace I/O fold and
+ * the ingest-time body derivation (see log-content-derivation.ts).
  *
  * Detection: log record scope matches CLAUDE_CODE_SCOPE_NAMES and
  *            attributes["event.name"] === "user_prompt".
@@ -22,21 +18,32 @@
  *                         OTEL_LOG_USER_PROMPTS=1)
  * - langwatch.thread.id  (user_prompt — from session.id)
  *
- * Span-side `apply()` is a no-op — Claude Code Path A claude_code traffic
- * comes through the gateway as gen_ai.* spans handled by GenAIExtractor,
- * and Path B model calls become synthesized gen_ai.* spans whose attrs are
- * already canonical.
+ * Span side handles: Claude Code's native `claude_code.llm_request` span.
+ * This is the CLI's own OTel exporter, a different wire than gateway-proxied
+ * traffic — the gateway re-emits gen_ai.* semconv spans (GenAIExtractor's
+ * job), but the CLI's native span carries model/token usage under bare,
+ * un-prefixed attribute names (`model`, `input_tokens`, `output_tokens`,
+ * `cache_read_tokens`, `cache_creation_tokens`). Nothing lifted these onto
+ * canonical gen_ai.usage.* attributes before, so SpanCostService (which only
+ * reads the canonical names) saw no tokens for a native Claude Code trace —
+ * trace.totalCost / totalPromptTokenCount / totalCompletionTokenCount came up
+ * empty everywhere that reads canonical attrs (trace list, drawer header,
+ * cost tooltips), even though the coding-agent-specific session/terminal
+ * derivations (which read the bare names directly) were unaffected.
  *
  * The body-parsing helpers (extractAssistantTextFromResponseBody,
- * extractUserTextFromRequestBody) and the isConversationalQuerySource gate
- * live here as the home of claude_code body knowledge and are imported by
- * the log-to-span converter. The langwatch wrapper sets all 4 OTEL_LOG_*
- * unlock knobs (USER_PROMPTS + TOOL_CONTENT + TOOL_DETAILS + RAW_API_BODIES)
- * so the converted spans carry input/output text on every turn.
+ * extractAssistantOutputFromResponseBody, buildInputMessagesFromRequestBody)
+ * and the isConversationalQuerySource gate live here as the home of
+ * claude_code body knowledge, and are imported by the ingest-time derivation
+ * and the read-time span enrichment. The langwatch wrapper sets all 4
+ * OTEL_LOG_* unlock knobs (USER_PROMPTS + TOOL_CONTENT + TOOL_DETAILS +
+ * RAW_API_BODIES) so the bodies carry input/output text on every turn.
  */
 
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
 
+import { ATTR_KEYS } from "./_constants";
+import { asNumber } from "./_guards";
 import type {
   CanonicalAttributesExtractor,
   ExtractorContext,
@@ -46,6 +53,9 @@ import type {
 const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
   "com.anthropic.claude_code.events",
 ]);
+
+/** The CLI's own native model-call span — see the span-side doc above. */
+const LLM_REQUEST_SPAN_NAME = "claude_code.llm_request";
 
 /**
  * Claude Code emits an `api_response_body` event for EVERY model call it
@@ -74,9 +84,9 @@ const CONVERSATIONAL_QUERY_SOURCES: ReadonlySet<string> = new Set([
  * True when an `api_response_body` came from a genuine conversation turn whose
  * text is the assistant's reply to the user — as opposed to a non-conversational
  * utility call (see CONVERSATIONAL_QUERY_SOURCES). An absent query_source is
- * treated as conversational for backwards-compat. Exported so the log-to-span
- * converter gates the synthesized span's gen_ai.completion through this exact
- * allowlist instead of duplicating it.
+ * treated as conversational for backwards-compat. Exported so the trace I/O
+ * fold gates the trace's output text through this exact allowlist instead of
+ * duplicating it.
  */
 export const isConversationalQuerySource = (
   querySource: string | null,
@@ -89,9 +99,40 @@ const asString = (raw: unknown): string | null =>
 export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
   readonly id = "claude-code";
 
-  apply(_ctx: ExtractorContext): void {
-    // Path A claude_code traffic comes through the gateway as gen_ai.*
-    // spans; the GenAIExtractor handles that side. Nothing to do here.
+  apply(ctx: ExtractorContext): void {
+    // Gateway-proxied claude_code traffic already arrives as gen_ai.* spans
+    // (GenAIExtractor's job) — only the CLI's own native span needs lifting.
+    if (ctx.span.name !== LLM_REQUEST_SPAN_NAME) return;
+
+    const attrs = ctx.bag.attrs;
+    let fired = false;
+
+    const liftNumber = (rawKey: string, canonicalKey: string) => {
+      const n = asNumber(attrs.get(rawKey));
+      if (n !== null && n > 0) {
+        ctx.setAttrIfAbsent(canonicalKey, n);
+        fired = true;
+      }
+    };
+
+    liftNumber("input_tokens", ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS);
+    liftNumber("output_tokens", ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS);
+    liftNumber(
+      "cache_read_tokens",
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+    );
+    liftNumber(
+      "cache_creation_tokens",
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+    );
+
+    const model = attrs.get("model");
+    if (typeof model === "string" && model.length > 0) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_REQUEST_MODEL, model);
+      fired = true;
+    }
+
+    if (fired) ctx.recordRule("claude-code/llm_request");
   }
 
   applyLog(ctx: LogExtractorContext): void {
@@ -99,9 +140,9 @@ export class ClaudeCodeExtractor implements CanonicalAttributesExtractor {
     const eventName = ctx.bag.attrs.get("event.name");
 
     // The model-call events (api_request / api_request_body /
-    // api_response_body) are trapped at ingest and converted to a gen_ai
-    // span by claude-code-log-to-span.ts — they never reach the log path,
-    // so the only claude_code event this extractor lifts is user_prompt.
+    // api_response_body) are folded downstream from the log path itself,
+    // not lifted here — the only claude_code event this extractor lifts
+    // onto canonical attributes is user_prompt.
     if (eventName === "user_prompt") {
       this.liftUserPrompt(ctx);
     }
@@ -210,18 +251,17 @@ function parseJsonBody(raw: unknown): Record<string, unknown> | null {
 }
 
 /**
- * The assistant's reply for a model call's span OUTPUT, rendered from its
- * api_response_body. Unlike {@link extractAssistantTextFromResponseBody} (the
- * headline path, text only), this includes `tool_use` blocks so a model call
- * whose reply IS a tool invocation still shows what it did: the call that
- * decided to run Bash renders `[tool_use: Bash]` plus the command instead of an
- * empty output. Text and tool_use blocks are concatenated in wire order.
+ * The assistant's reply for a model call, rendered from its api_response_body.
+ * Unlike {@link extractAssistantTextFromResponseBody} (the headline path, text
+ * only), this includes `tool_use` blocks so a model call whose reply IS a tool
+ * invocation still shows what it did: the call that decided to run Bash renders
+ * `[tool_use: Bash]` plus the command instead of an empty output. Text and
+ * tool_use blocks are concatenated in wire order.
  *
- * Used only for the synthesized span's `gen_ai.completion`; the trace headline
- * keeps the text-only extractor so a tool-deciding turn's headline stays the
- * final text reply, not a tool marker.
+ * The trace headline keeps the text-only extractor so a tool-deciding turn's
+ * headline stays the final text reply, not a tool marker.
  *
- * @internal exported for the log-to-span converter + unit testing
+ * @internal exported for unit testing
  */
 export function extractAssistantOutputFromResponseBody(
   raw: unknown,
@@ -255,118 +295,6 @@ export function extractAssistantOutputFromResponseBody(
   return capPayloadString(parts.join("\n\n"), undefined, "assistant_output");
 }
 
-/**
- * Recover the tool RESULTS fed back to the model from an api_request_body
- * conversation. Claude Code's telemetry never carries a tool's stdout (see
- * project_claude_tool_output_no_env_var) — the only place a tool's output
- * appears is the NEXT model call's request body, where the result is sent back
- * as a `tool_result` content block keyed by `tool_use_id`. Returns a map from
- * `tool_use_id` to its flattened result text so the converter can attach each
- * tool's output to the matching tool span. The first occurrence of a given
- * `tool_use_id` wins (the result is identical in every later turn that echoes
- * the conversation).
- *
- * Claude truncates a large request body INLINE at ~60KB (`body_truncated=true`),
- * so on a real tool-using turn the whole body does NOT JSON.parse — its tail
- * (the most recent tool_result) is cut. So this falls back to a string-aware
- * brace scan that recovers every COMPLETE tool_result block present before the
- * truncation point and skips the cut-off trailing one. The real wire shape is
- * `{"tool_use_id":"…","type":"tool_result","content":"…"|[…],"is_error":bool}`,
- * with `content` a plain string (Bash) or an array of blocks (Read, etc.) —
- * {@link contentToText} flattens both.
- *
- * @internal exported for the log-to-span converter + unit testing
- */
-export function collectToolResultsFromRequestBody(
-  raw: unknown,
-): Map<string, string> {
-  const out = new Map<string, string>();
-  const parsed = parseJsonBody(raw);
-  if (parsed && Array.isArray(parsed.messages)) {
-    // Clean path: the body parsed whole (short turn, not truncated).
-    for (const m of parsed.messages) {
-      if (!m || typeof m !== "object") continue;
-      collectToolResultBlocks((m as { content?: unknown }).content, out);
-    }
-    return out;
-  }
-  // Truncated body: scan the raw string for complete tool_result objects.
-  if (typeof raw === "string" && raw.length > 0) {
-    scanToolResultsFromTruncatedBody(raw, out);
-  }
-  return out;
-}
-
-/** Record any `tool_result` blocks in a message `content` array into `out`. */
-function collectToolResultBlocks(
-  content: unknown,
-  out: Map<string, string>,
-): void {
-  if (!Array.isArray(content)) return;
-  for (const block of content) {
-    if (!block || typeof block !== "object") continue;
-    const b = block as { type?: unknown; tool_use_id?: unknown; content?: unknown };
-    if (b.type !== "tool_result") continue;
-    if (typeof b.tool_use_id !== "string" || b.tool_use_id.length === 0) {
-      continue;
-    }
-    if (out.has(b.tool_use_id)) continue;
-    const text = contentToText(b.content);
-    if (text.length > 0) out.set(b.tool_use_id, text);
-  }
-}
-
-/**
- * String-aware brace scan that pulls every COMPLETE `{…}` object out of a
- * (possibly truncated) JSON body and records the ones that are `tool_result`
- * blocks. An object whose closing brace was cut by truncation never balances,
- * so it is simply never recorded — which is the right behaviour: a truncated
- * result has no recoverable text. Tracks string/escape state so braces inside
- * string values do not corrupt the depth count.
- */
-function scanToolResultsFromTruncatedBody(
-  raw: string,
-  out: Map<string, string>,
-): void {
-  const stack: number[] = [];
-  let inStr = false;
-  let esc = false;
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (ch === "\\") esc = true;
-      else if (ch === '"') inStr = false;
-      continue;
-    }
-    if (ch === '"') inStr = true;
-    else if (ch === "{") stack.push(i);
-    else if (ch === "}") {
-      const start = stack.pop();
-      if (start === undefined) continue;
-      // Only attempt the ones that could be a tool_result block (innermost
-      // pops first, so the block itself is tried before its enclosing message).
-      const slice = raw.slice(start, i + 1);
-      if (!slice.includes('"tool_result"')) continue;
-      let obj: unknown;
-      try {
-        obj = JSON.parse(slice);
-      } catch {
-        continue;
-      }
-      if (!obj || typeof obj !== "object") continue;
-      const b = obj as { type?: unknown; tool_use_id?: unknown; content?: unknown };
-      if (b.type !== "tool_result") continue;
-      if (typeof b.tool_use_id !== "string" || b.tool_use_id.length === 0) {
-        continue;
-      }
-      if (out.has(b.tool_use_id)) continue;
-      const text = contentToText(b.content);
-      if (text.length > 0) out.set(b.tool_use_id, text);
-    }
-  }
-}
-
 /** JSON.stringify that never throws on a circular/odd value. */
 function safeStringify(value: unknown): string {
   try {
@@ -376,26 +304,6 @@ function safeStringify(value: unknown): string {
   }
 }
 
-/**
- * Walk a claude_code.api_request_body JSON payload (the Anthropic
- * /v1/messages REQUEST) and pull out the latest user turn's text — the
- * span's gen_ai.prompt. The body shape:
- *   { "model": "...", "system": "...", "messages": [
- *       { "role": "user", "content": "..." },
- *       { "role": "assistant", "content": [{ "type": "text", "text": "..." }] },
- *       { "role": "user", "content": [{ "type": "text", "text": "..." }] }
- *     ] }
- *
- * `content` is either a plain string or an array of content blocks. We take
- * the LAST `role === "user"` message (the current turn's input) and
- * concatenate its text. Returns null when the body isn't parseable (claude
- * truncates large request bodies inline, so the caller falls back to the raw
- * capped body), has no messages, or the last user message has no text.
- *
- * Pure extraction — the caller bounds the result with capPayloadString.
- *
- * @internal exported for the log-to-span converter + unit testing
- */
 /**
  * Flatten one Anthropic message `content` (string OR array of content blocks)
  * to display text. Text + tool_result blocks contribute their text; tool_use
@@ -438,13 +346,12 @@ function contentToText(content: unknown): string {
  * with each message's content flattened to text via {@link contentToText}.
  *
  * This is what makes the trace detail render a real multi-turn conversation
- * instead of a single user message holding the raw request JSON — the failure
- * mode when the converter fell back to the raw body blob. Returns null when the
- * body isn't parseable (claude truncates large bodies inline, so the caller
- * falls back to the clean `user_prompt` text), has no `messages` array, or every
- * turn flattened to empty.
+ * instead of a single user message holding the raw request JSON. Returns null
+ * when the body isn't parseable (claude truncates large bodies inline, so the
+ * caller falls back to the clean `user_prompt` text), has no `messages` array,
+ * or every turn flattened to empty.
  *
- * @internal exported for the log-to-span converter + unit testing
+ * @internal exported for the ingest-time body derivation + unit testing
  */
 export function buildInputMessagesFromRequestBody(
   raw: unknown,
@@ -484,41 +391,3 @@ export function buildInputMessagesFromRequestBody(
   return out.length > 0 ? out : null;
 }
 
-export function extractUserTextFromRequestBody(raw: unknown): string | null {
-  if (raw === null || raw === undefined) return null;
-  let parsed: unknown = raw;
-  if (typeof raw === "string") {
-    if (raw.length === 0) return null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-  if (!parsed || typeof parsed !== "object") return null;
-  const messages = (parsed as { messages?: unknown }).messages;
-  if (!Array.isArray(messages)) return null;
-
-  let lastUserContent: unknown = null;
-  for (const m of messages) {
-    if (!m || typeof m !== "object") continue;
-    const message = m as { role?: unknown; content?: unknown };
-    if (message.role === "user") lastUserContent = message.content;
-  }
-  if (lastUserContent === null) return null;
-
-  if (typeof lastUserContent === "string") {
-    return lastUserContent.length > 0 ? lastUserContent : null;
-  }
-  if (!Array.isArray(lastUserContent)) return null;
-  const parts: string[] = [];
-  for (const c of lastUserContent) {
-    if (!c || typeof c !== "object") continue;
-    const block = c as { type?: unknown; text?: unknown };
-    if (block.type !== "text") continue;
-    if (typeof block.text !== "string") continue;
-    if (block.text.length === 0) continue;
-    parts.push(block.text);
-  }
-  return parts.length > 0 ? parts.join("\n\n") : null;
-}

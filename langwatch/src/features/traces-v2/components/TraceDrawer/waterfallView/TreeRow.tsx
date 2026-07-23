@@ -1,5 +1,5 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { BookText } from "lucide-react";
+import { BookText, ScrollText } from "lucide-react";
 import { memo, useCallback } from "react";
 import {
   LuChevronDown,
@@ -36,6 +36,7 @@ export const TreeRow = memo(function TreeRow({
   rootDuration,
   isSelected,
   isPrompt,
+  logCount,
   isPinned,
   isCollapsed,
   hasChildren,
@@ -52,6 +53,12 @@ export const TreeRow = memo(function TreeRow({
   isSelected: boolean;
   /** Whether this span carries a managed prompt (shows a book icon). */
   isPrompt: boolean;
+  /**
+   * Log records correlated to this span — a tool the user denied, an API
+   * retry, a compaction — that never show up in the span's own input/output
+   * because they only exist as logs. 0 hides the indicator.
+   */
+  logCount: number;
   /** Whether this span is currently pinned in the SpanTabBar. */
   isPinned: boolean;
   isCollapsed: boolean;
@@ -211,6 +218,9 @@ export const TreeRow = memo(function TreeRow({
         <TipCell label="Offset" value={`+${formatDuration(offsetMs)}`} />
         {isCollapsed && hiddenDescendantCount > 0 && (
           <TipCell label="Hidden spans" value={`${hiddenDescendantCount}`} />
+        )}
+        {logCount > 0 && (
+          <TipCell label="Logs" value={`${logCount} — click to view`} />
         )}
         <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
         {/* Always rendered so the tooltip grid keeps a stable row count
@@ -400,6 +410,20 @@ export const TreeRow = memo(function TreeRow({
                   aria-label="Uses a managed prompt"
                 >
                   <BookText />
+                </Icon>
+              )}
+              {/* Flags a span that has correlated log records — the ONLY
+                  place a tool the user denied, a mid-run retry, or a
+                  compaction shows up, since none of those produce a span
+                  of their own. Generic: not scoped to any span type. */}
+              {logCount > 0 && (
+                <Icon
+                  boxSize="11px"
+                  color="cyan.fg"
+                  flexShrink={0}
+                  aria-label={`Has ${logCount} log ${logCount === 1 ? "record" : "records"}`}
+                >
+                  <ScrollText />
                 </Icon>
               )}
               {/* Hidden-descendant count — a collapsed parent says how

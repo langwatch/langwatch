@@ -23,6 +23,8 @@ export function BatchActionBar({
       padding="8px"
       paddingX="16px"
       zIndex={1000}
+      // See SelectionActionBar: lets other bottom-center floaters stack above.
+      data-bottom-floating-bar=""
       data-testid="batch-action-bar"
     >
       <HStack gap={3}>

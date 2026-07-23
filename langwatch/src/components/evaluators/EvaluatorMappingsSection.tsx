@@ -1,4 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type AvailableSource,
@@ -9,10 +10,9 @@ import { validateEvaluatorMappingsWithFields } from "~/experiments-v3/utils/mapp
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectSpanNames } from "~/hooks/useProjectSpanNames";
 import {
-  getTraceAvailableSources,
   getThreadAvailableSources,
+  getTraceAvailableSources,
 } from "~/server/tracer/tracesMapping";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("EvaluatorMappingsSection");
 

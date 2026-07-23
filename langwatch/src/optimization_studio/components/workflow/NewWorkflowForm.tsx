@@ -162,12 +162,6 @@ export const NewWorkflowForm = ({
   const router = useRouter();
   const emojiPicker = useDisclosure();
 
-  // Cascade-resolved model for workflow LLM node defaults.
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "studio.autocomplete" },
-    { enabled: !!project?.id },
-  );
-
   const [defaultIcon] = useState(
     template.icon && template.icon !== "🧩"
       ? template.icon
@@ -196,16 +190,14 @@ export const NewWorkflowForm = ({
   const onSubmit = async (data: FormData) => {
     if (!project) return;
 
+    // LLM nodes without a model are materialized server-side at creation
+    // from the project's resolved default, so the template goes as-is.
     const newWorkflow: Workflow = {
       ...template,
       version: "1",
       name: data.name,
       description: data.description,
       icon: data.icon ?? defaultIcon,
-      default_llm: {
-        ...template.default_llm,
-        model: resolvedDefault.data?.model ?? "",
-      },
     };
 
     checkAndProceed(() => {

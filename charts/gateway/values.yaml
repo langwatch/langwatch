@@ -32,6 +32,8 @@ autoscaling:
         target:
           type: AverageValue
           averageValue: "150"
+  # Optional autoscaling/v2 scale-up/down stabilization and rate policies.
+  behavior: {}
 
 podDisruptionBudget:
   enabled: true
@@ -41,6 +43,13 @@ service:
   type: ClusterIP
   port: 80
   targetPort: 5563
+  # Opt-in cloud load-balancer/TLS settings, such as AWS NLB annotations.
+  annotations: {}
+  # Render a separate ClusterIP when the primary Service is public, so
+  # in-cluster callers do not hairpin through the load balancer.
+  internal:
+    enabled: false
+    port: 80
 
 ingress:
   enabled: true
@@ -199,6 +208,18 @@ terminationGracePeriodSeconds: 30
 security:
   maxRequestBodyBytes: 10485760  # 10 MiB
 
+  # Application-layer SSRF admission for tenant-supplied provider endpoints.
+  # Keep false for local/self-hosted installs that intentionally reach HTTP,
+  # loopback, or private Kubernetes services. SaaS operators should set true
+  # and also enable/tighten networkPolicy as the authoritative egress boundary.
+  blockLocalHTTPCalls: false
+  # Hosted-cloud transport policy. Independent of address-space blocking and
+  # disabled by default so self-hosted HTTP endpoints remain compatible.
+  requireHTTPSCustomEndpoints: false
+  # Exact, case-insensitive hostnames allowed to use private egress while the
+  # guard is enabled. Cloud metadata/link-local destinations remain blocked.
+  allowedProxyHosts: []
+
   # HTTP server slowloris protection. ReadHeaderTimeout catches the
   # classic TLS-handshake-then-stall; ReadTimeout bounds the whole body
   # read so a trickling sender can't hold a goroutine indefinitely.
@@ -250,6 +271,8 @@ probes:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+podLabels: {}
+podAnnotations: {}
 
 # NetworkPolicy — deny-by-default ingress + egress. Enable in
 # production; dev environments may prefer to leave it off until the
@@ -298,6 +321,22 @@ networkPolicy:
     - ipBlock:
         cidr: 0.0.0.0/0
         except:
+          - 0.0.0.0/8
           - 10.0.0.0/8
+          - 100.64.0.0/10
+          - 127.0.0.0/8
+          - 168.63.129.16/32
+          - 169.254.0.0/16
           - 172.16.0.0/12
+          - 192.0.0.0/24
+          - 192.0.2.0/24
+          - 192.88.99.0/24
           - 192.168.0.0/16
+          - 198.18.0.0/15
+          - 198.51.100.0/24
+          - 203.0.113.0/24
+          - 224.0.0.0/4
+          - 240.0.0.0/4
+  providerPorts:
+    - protocol: TCP
+      port: 443

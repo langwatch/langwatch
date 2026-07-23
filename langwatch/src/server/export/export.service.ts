@@ -8,12 +8,13 @@
  * Memory-efficient: only one batch of traces (up to 100) is held in memory at a time.
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
-import { createLogger } from "~/utils/logger/server";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
   serializeTracesToFullCsv,
   serializeTracesToSummaryCsv,
@@ -58,7 +59,12 @@ export class ExportService {
       "~/server/traces/trace.service"
     );
     const resolvedPrisma = prisma ?? (await import("~/server/db")).prisma;
-    const traceService = TraceServiceImpl.create(resolvedPrisma);
+    // Export is a content-consuming read: wire blob-resolution deps so a full
+    // export reads the whole IO value, not the 64 KB preview (#4991 AC1).
+    const traceService = TraceServiceImpl.create(
+      resolvedPrisma,
+      buildTraceBlobResolutionDeps(),
+    );
     return new ExportService({ traceService });
   }
 
@@ -148,6 +154,13 @@ export class ExportService {
         {
           downloadMode: true,
           includeSpans,
+          // DATA LOSS (#4991): summary mode reads no span content, but it still
+          // emits trace-level `trace.input`/`trace.output` (see the csv/json
+          // summary serializers) — so it is content-consuming too. Gating on
+          // `includeSpans` therefore shipped the truncated 64 KB preview for any
+          // offloaded trace, silently. Resolve for every export mode; the batch
+          // resolver keeps the extra event_log reads bounded.
+          resolveBlobs: true,
           scrollId: scrollId ?? null,
         },
       );

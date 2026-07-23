@@ -102,6 +102,20 @@ export const Resources = {
   //   - aiTools:manage → org ADMIN only. Catalog editor surface at
   //     /settings/governance/tool-catalog (CRUD + reorder + enable).
   AI_TOOLS: "aiTools",
+  // The Langy in-product assistant. Its own resource rather than riding on
+  // `evaluations:view`, because starting a turn is not a read: it provisions
+  // credentials, spawns an OpenCode worker and spends the project's model
+  // budget. `langy:view` reads conversations; `langy:create` starts or
+  // continues a turn (and forks, which creates one); `langy:update` renames;
+  // `langy:delete` archives. Project-scoped, since conversations belong to a
+  // project — except `langy:manage`, which also appears in the ORG role bag
+  // to gate the org-wide GitHub App connection.
+  //
+  // Granted from MEMBER upward, and to org admins; VIEWER and EXTERNAL get
+  // nothing. The permission grain is not what keeps Langy scarce — the
+  // `release_langy_enabled` flag is — so it draws the line at "can this person
+  // act on the project at all" rather than trying to be finer than that.
+  LANGY: "langy",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -189,6 +203,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
+    // Langy (manage implies create/update/delete via the hierarchy rule)
+    "langy:view",
+    "langy:manage",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -269,6 +286,11 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
+    // Langy — may run the assistant, not administer it
+    "langy:view",
+    "langy:create",
+    "langy:update",
+    "langy:delete",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -392,6 +414,12 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "organization:view",
     "organization:manage",
     "organization:delete",
+    // Org admins get Langy at member level, and `langy:manage` additionally
+    // gates connecting the org-wide GitHub App, which grants Langy repository
+    // access for every project underneath. Manage implies the rest via the
+    // hierarchy rule.
+    "langy:view",
+    "langy:manage",
     // AI Governance — org-level permissions for the governance offering
     // (anomaly rules, ingestion sources, OCSF SIEM export, activity
     // monitor, top-level Govern section). Default-attached to ADMIN so
@@ -749,13 +777,17 @@ async function checkPermissionFromBindings({
   });
   const groupIds = groupMemberships.map((m) => m.groupId);
 
-  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes
+  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes.
+  // The direct-binding branch is gated on current organization membership so a
+  // stale cross-org binding (one naming this user at a scope in an org they no
+  // longer/never belonged to) is never selected. Membership — not the binding
+  // row — is the tenancy boundary.
   const bindings = await prisma.roleBinding.findMany({
     where: {
       organizationId,
       scopeId: { in: scopeIds },
       OR: [
-        { userId },
+        { userId, user: { orgMemberships: { some: { organizationId } } } },
         ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
       ],
     },
@@ -770,7 +802,13 @@ async function checkPermissionFromBindings({
     if (!teamScope) return false;
 
     const teamUser = await prisma.teamUser.findFirst({
-      where: { userId, teamId: teamScope.scopeId },
+      // Gate the legacy fallback on org membership too: a stale cross-org
+      // TeamUser row must not confer access any more than a stale RoleBinding.
+      where: {
+        userId,
+        teamId: teamScope.scopeId,
+        team: { organization: { members: { some: { userId } } } },
+      },
       select: { role: true, assignedRoleId: true },
     });
 
@@ -861,6 +899,31 @@ async function resolveBindingPermission(
 }
 
 /**
+ * The single source of truth for "is this user a CURRENT member of this org,
+ * and with what role". `null` means no `OrganizationUser` row — the caller must
+ * fail closed rather than fall through to bindings, because a stale cross-org
+ * RoleBinding can still name a non-member at a project/team scope.
+ *
+ * Every scoped permission path derives membership through here so a future
+ * tenancy fix lands once instead of in each resolver.
+ */
+async function getCurrentOrganizationRole({
+  prisma,
+  userId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}): Promise<OrganizationUserRole | null> {
+  const member = await prisma.organizationUser?.findFirst({
+    where: { userId, organizationId },
+    select: { role: true },
+  });
+  return member?.role ?? null;
+}
+
+/**
  * Resolve a project permission check, returning the permission decision
  * along with the user's organization role.
  */
@@ -880,31 +943,30 @@ export async function resolveProjectPermission(
 
   const projectTeam = await ctx.prisma.project.findUnique?.({
     where: { id: projectId },
-    select: {
-      team: {
-        select: {
-          id: true,
-          organizationId: true,
-          organization: {
-            select: {
-              members: {
-                where: { userId: ctx.session.user.id },
-                select: { role: true },
-              },
-            },
-          },
-        },
-      },
-    },
+    select: { team: { select: { id: true, organizationId: true } } },
   });
 
   const teamId = projectTeam?.team.id;
   const organizationId = projectTeam?.team.organizationId;
-  const organizationRole =
-    projectTeam?.team.organization?.members[0]?.role ?? null;
 
   if (!teamId || !organizationId) {
-    return { permitted: false, organizationRole };
+    return { permitted: false, organizationRole: null };
+  }
+
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId,
+  });
+
+  // Fail closed on current organization membership. A user who is not an
+  // OrganizationUser of the owning org is denied outright, even if a stale
+  // RoleBinding (created through a since-closed cross-org path) still names them
+  // at this project/team scope. The membership check — not the binding row — is
+  // the authoritative tenancy boundary. See the same gate in resolveTeamPermission
+  // and batchScopePermissions, and the direct-binding predicate below.
+  if (organizationRole === null) {
+    return { permitted: false, organizationRole: null };
   }
 
   const permitted = await checkPermissionFromBindings({
@@ -957,12 +1019,18 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  const organizationUser = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId: ctx.session.user.id, organizationId: team.organizationId },
-    select: { role: true },
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId: team.organizationId,
   });
 
-  const organizationRole = organizationUser?.role ?? null;
+  // Fail closed on current organization membership — a non-member is denied even
+  // if a stale cross-org binding names them at this team scope. See the matching
+  // gate in resolveProjectPermission.
+  if (organizationRole === null) {
+    return { permitted: false, organizationRole: null };
+  }
 
   const permitted = await checkPermissionFromBindings({
     prisma: ctx.prisma,
@@ -1130,35 +1198,64 @@ export async function hasOrganizationPermission(
  * team-scoped binding inherits to its projects. Callers pass the
  * project→teamId map alongside the project ids.
  */
-export async function batchScopePermissions(
-  ctx: { prisma: PrismaClient; session: Session | null },
-  args: {
-    organizationId: string;
-    teamIds: string[];
-    projectIds: string[];
-    projectTeamId: Record<string, string>;
-    permission: Permission;
-  },
-): Promise<{ teams: Map<string, boolean>; projects: Map<string, boolean> }> {
-  const teamsMap = new Map<string, boolean>();
-  const projectsMap = new Map<string, boolean>();
-  if (!ctx.session?.user) {
-    args.teamIds.forEach((id) => teamsMap.set(id, false));
-    args.projectIds.forEach((id) => projectsMap.set(id, false));
-    return { teams: teamsMap, projects: projectsMap };
-  }
-  const userId = ctx.session.user.id;
+/**
+ * The permission-INDEPENDENT half of a scoped permission check, loaded once.
+ *
+ * Every lookup a scoped check makes — the caller's org membership, their group
+ * memberships, the role bindings on the scopes in play, the custom roles those
+ * bindings reference, and the legacy TeamUser fallback — is the same regardless
+ * of WHICH permission is being asked about. Only `bindingGrants` consults the
+ * permission, and it is pure.
+ *
+ * Separating the two is what lets a caller ask about N permissions for the price
+ * of one round of queries instead of N rounds. That is not merely a speed-up: a
+ * caller that fanned N checks out concurrently wanted N connections from the
+ * Prisma pool AT ONCE, and starved anything sharing it — including an interactive
+ * transaction with a 5s budget, which then aborted and failed the request
+ * outright. Fewer queries is the fix; making the same queries faster is not.
+ */
+type ScopeResolution = {
+  organizationRole: OrganizationUserRole | null;
+  bindingsByScope: Map<string, ResolvedBinding[]>;
+  customRoleById: Map<string, { id: string; permissions: unknown }>;
+  /** No RoleBindings at all for this user ⇒ fall back to legacy TeamUser roles. */
+  needsLegacyFallback: boolean;
+  legacyByTeam: Map<
+    string,
+    { role: TeamUserRole; assignedRoleId: string | null }
+  >;
+};
 
-  const orgMember = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId, organizationId: args.organizationId },
-    select: { role: true },
+type ResolvedBinding = {
+  role: TeamUserRole;
+  customRoleId: string | null;
+  scopeType: RoleBindingScopeType;
+  scopeId: string;
+};
+
+const scopeKey = (scopeType: RoleBindingScopeType, scopeId: string) =>
+  `${scopeType}::${scopeId}`;
+
+/**
+ * Loads everything a scoped permission decision needs, in ~4 queries, for ANY
+ * number of permissions and scopes. Returns null when the caller is not a member
+ * of the organization at all — the "no" that short-circuits every question.
+ */
+async function loadScopeResolution(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  args: { organizationId: string; scopeIds: string[] },
+): Promise<ScopeResolution | null> {
+  const userId = ctx.session?.user?.id;
+  if (!userId) return null;
+
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId,
+    organizationId: args.organizationId,
   });
-  const organizationRole: OrganizationUserRole | null = orgMember?.role ?? null;
-  if (!orgMember) {
-    args.teamIds.forEach((id) => teamsMap.set(id, false));
-    args.projectIds.forEach((id) => projectsMap.set(id, false));
-    return { teams: teamsMap, projects: projectsMap };
-  }
+  // Fail closed on current membership — a non-member gets nothing, even if a
+  // stale cross-org binding names them at one of these scopes.
+  if (organizationRole === null) return null;
 
   const groupMemberships = await ctx.prisma.groupMembership.findMany({
     where: { userId, group: { organizationId: args.organizationId } },
@@ -1166,15 +1263,23 @@ export async function batchScopePermissions(
   });
   const groupIds = groupMemberships.map((m) => m.groupId);
 
-  const scopeIds = [args.organizationId, ...args.teamIds, ...args.projectIds];
-  const bindings =
+  const scopeIds = [args.organizationId, ...args.scopeIds];
+  const bindings: ResolvedBinding[] =
     scopeIds.length > 0
       ? await ctx.prisma.roleBinding.findMany({
           where: {
             organizationId: args.organizationId,
             scopeId: { in: scopeIds },
+            // Non-membership already short-circuits above, but gate the direct
+            // branch on membership too so this query is safe on its own if the
+            // early return is ever refactored away.
             OR: [
-              { userId },
+              {
+                userId,
+                user: {
+                  orgMemberships: { some: { organizationId: args.organizationId } },
+                },
+              },
               ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
             ],
           },
@@ -1199,134 +1304,286 @@ export async function batchScopePermissions(
           select: { id: true, permissions: true },
         })
       : [];
-  const customRoleById = new Map(customRoles.map((c) => [c.id, c]));
 
-  const evaluateBinding = (binding: {
-    role: TeamUserRole;
-    customRoleId: string | null;
-    scopeType: RoleBindingScopeType;
-  }): boolean => {
-    // A team/project binding can never grant an org-exclusive permission,
-    // even via a custom role that lists it (ADR-021).
-    if (!bindingScopeCanGrant(binding.scopeType, args.permission)) return false;
-    if (binding.customRoleId) {
-      const custom = customRoleById.get(binding.customRoleId);
-      if (custom) {
-        const perms = Array.isArray(custom.permissions)
-          ? (custom.permissions as string[])
-          : [];
-        if (perms.length > 0) {
-          return hasPermissionWithHierarchy(perms, args.permission);
-        }
-      }
-    }
-    if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
-      if (binding.role === TeamUserRole.CUSTOM) return false;
-      if (organizationRole === OrganizationUserRole.EXTERNAL) return false;
-      if (binding.role === TeamUserRole.ADMIN) return true;
-      return organizationRoleHasPermission(
-        OrganizationUserRole.MEMBER,
-        args.permission,
-      );
-    }
-    if (organizationRole === OrganizationUserRole.EXTERNAL) {
-      return hasPermissionWithHierarchy(
-        EXTERNAL_MEMBER_PERMISSIONS,
-        args.permission,
-      );
-    }
-    return teamRoleHasPermission(binding.role, args.permission);
-  };
-
-  const bindingsByScope = new Map<string, typeof bindings>();
+  const bindingsByScope = new Map<string, ResolvedBinding[]>();
   for (const b of bindings) {
-    const key = `${b.scopeType}::${b.scopeId}`;
+    const key = scopeKey(b.scopeType, b.scopeId);
     const list = bindingsByScope.get(key) ?? [];
     list.push(b);
     bindingsByScope.set(key, list);
   }
-  const orgBindings =
-    bindingsByScope.get(
-      `${RoleBindingScopeType.ORGANIZATION}::${args.organizationId}`,
-    ) ?? [];
-  const orgGrants = orgBindings.some(evaluateBinding);
 
-  // Legacy fallback: a user with no RoleBindings at all (binding count
-  // is zero across the org for them) falls back to TeamUser. We mirror
-  // that fallback per-scope here so this batch path keeps parity with
-  // the per-call helpers.
+  // Legacy fallback: a user with NO RoleBindings anywhere in the org falls back
+  // to their TeamUser role. Mirrored here so the batch paths keep exact parity
+  // with the per-call helpers.
   const needsLegacyFallback = bindings.length === 0;
   const legacyTeamUser = needsLegacyFallback
     ? await ctx.prisma.teamUser.findMany({
-        where: {
-          userId,
-          team: { organizationId: args.organizationId },
-        },
+        where: { userId, team: { organizationId: args.organizationId } },
         select: { teamId: true, role: true, assignedRoleId: true },
       })
     : [];
-  const legacyByTeam = new Map(legacyTeamUser.map((t) => [t.teamId, t]));
 
-  for (const teamId of args.teamIds) {
-    if (orgGrants) {
-      teamsMap.set(teamId, true);
-      continue;
-    }
-    const teamBindings =
-      bindingsByScope.get(`${RoleBindingScopeType.TEAM}::${teamId}`) ?? [];
-    if (teamBindings.some(evaluateBinding)) {
-      teamsMap.set(teamId, true);
-      continue;
-    }
-    if (needsLegacyFallback) {
-      const legacy = legacyByTeam.get(teamId);
-      if (legacy) {
-        const permitted = evaluateBinding({
-          role: legacy.role,
-          customRoleId: legacy.assignedRoleId ?? null,
-          scopeType: RoleBindingScopeType.TEAM,
-        });
-        teamsMap.set(teamId, permitted);
-        continue;
+  return {
+    organizationRole,
+    bindingsByScope,
+    customRoleById: new Map(customRoles.map((c) => [c.id, c])),
+    needsLegacyFallback,
+    legacyByTeam: new Map(
+      legacyTeamUser.map((t) => [
+        t.teamId,
+        { role: t.role, assignedRoleId: t.assignedRoleId },
+      ]),
+    ),
+  };
+}
+
+/**
+ * Does this ONE binding grant this ONE permission? Pure — no I/O.
+ *
+ * This is the only part of a scoped check that depends on the permission, which
+ * is why the loader above can be shared across all of them.
+ */
+function bindingGrants(
+  resolution: ScopeResolution,
+  binding: {
+    role: TeamUserRole;
+    customRoleId: string | null;
+    scopeType: RoleBindingScopeType;
+  },
+  permission: Permission,
+): boolean {
+  // A team/project binding can never grant an org-exclusive permission, even via
+  // a custom role that lists it (ADR-021).
+  if (!bindingScopeCanGrant(binding.scopeType, permission)) return false;
+
+  if (binding.customRoleId) {
+    const custom = resolution.customRoleById.get(binding.customRoleId);
+    if (custom) {
+      const perms = Array.isArray(custom.permissions)
+        ? (custom.permissions as string[])
+        : [];
+      if (perms.length > 0) {
+        return hasPermissionWithHierarchy(perms, permission);
       }
     }
-    teamsMap.set(teamId, false);
+  }
+
+  if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
+    if (binding.role === TeamUserRole.CUSTOM) return false;
+    if (resolution.organizationRole === OrganizationUserRole.EXTERNAL) {
+      return false;
+    }
+    if (binding.role === TeamUserRole.ADMIN) return true;
+    return organizationRoleHasPermission(
+      OrganizationUserRole.MEMBER,
+      permission,
+    );
+  }
+
+  if (resolution.organizationRole === OrganizationUserRole.EXTERNAL) {
+    return hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission);
+  }
+  return teamRoleHasPermission(binding.role, permission);
+}
+
+/** Does the caller hold `permission` on this project, given a loaded resolution? */
+function projectGrants(
+  resolution: ScopeResolution,
+  args: { organizationId: string; projectId: string; teamId?: string },
+  permission: Permission,
+): boolean {
+  const grantedBy = (key: string) =>
+    (resolution.bindingsByScope.get(key) ?? []).some((b) =>
+      bindingGrants(resolution, b, permission),
+    );
+
+  if (
+    grantedBy(scopeKey(RoleBindingScopeType.ORGANIZATION, args.organizationId))
+  ) {
+    return true;
+  }
+  if (grantedBy(scopeKey(RoleBindingScopeType.PROJECT, args.projectId))) {
+    return true;
+  }
+  if (args.teamId) {
+    if (grantedBy(scopeKey(RoleBindingScopeType.TEAM, args.teamId))) {
+      return true;
+    }
+    if (resolution.needsLegacyFallback) {
+      const legacy = resolution.legacyByTeam.get(args.teamId);
+      if (legacy) {
+        return bindingGrants(
+          resolution,
+          {
+            role: legacy.role,
+            customRoleId: legacy.assignedRoleId,
+            scopeType: RoleBindingScopeType.TEAM,
+          },
+          permission,
+        );
+      }
+    }
+  }
+  return false;
+}
+
+/** Does the caller hold `permission` on this team, given a loaded resolution? */
+function teamGrants(
+  resolution: ScopeResolution,
+  args: { organizationId: string; teamId: string },
+  permission: Permission,
+): boolean {
+  const grantedBy = (key: string) =>
+    (resolution.bindingsByScope.get(key) ?? []).some((b) =>
+      bindingGrants(resolution, b, permission),
+    );
+
+  if (
+    grantedBy(scopeKey(RoleBindingScopeType.ORGANIZATION, args.organizationId))
+  ) {
+    return true;
+  }
+  if (grantedBy(scopeKey(RoleBindingScopeType.TEAM, args.teamId))) return true;
+  if (resolution.needsLegacyFallback) {
+    const legacy = resolution.legacyByTeam.get(args.teamId);
+    if (legacy) {
+      return bindingGrants(
+        resolution,
+        {
+          role: legacy.role,
+          customRoleId: legacy.assignedRoleId,
+          scopeType: RoleBindingScopeType.TEAM,
+        },
+        permission,
+      );
+    }
+  }
+  return false;
+}
+
+/**
+ * MANY permissions, ONE project scope — resolved in ~4 queries total.
+ *
+ * The counterpart axis to `batchScopePermissions` (one permission, many scopes),
+ * and the fix for the pattern that function's own docstring warns about: a caller
+ * that needs to know which of N permissions a user holds must NOT issue N scoped
+ * checks. Langy's session-key mint did exactly that — 27 candidate permissions at
+ * ~3 queries each, ~81 queries per chat turn. Serially that was ~500ms of latency;
+ * fanned out with Promise.all it became ~81 connections demanded at once, which
+ * starved the Prisma pool and made `ApiKeyService.create`'s interactive
+ * transaction exceed its 5-second budget and abort — turning a slow turn into a
+ * failed one.
+ *
+ * Returns the held subset, in the order given, so callers can use it directly as
+ * a least-privilege grant list.
+ */
+export async function batchProjectPermissions(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  args: {
+    organizationId: string;
+    projectId: string;
+    teamId?: string;
+    permissions: Permission[];
+  },
+): Promise<Permission[]> {
+  const resolution = await loadScopeResolution(ctx, {
+    organizationId: args.organizationId,
+    scopeIds: [args.projectId, ...(args.teamId ? [args.teamId] : [])],
+  });
+  if (!resolution) return [];
+
+  return args.permissions.filter((permission) =>
+    projectGrants(
+      resolution,
+      {
+        organizationId: args.organizationId,
+        projectId: args.projectId,
+        ...(args.teamId ? { teamId: args.teamId } : {}),
+      },
+      permission,
+    ),
+  );
+}
+
+/**
+ * Batched team + project permission check used by surfaces that need to
+ * test the SAME permission across many scopes inside one organization
+ * (e.g. the model-defaults settings page enumerating every team +
+ * project the caller can read/write). One scoped permission check costs
+ * ~3-5 queries (team/project lookup, organizationUser, groupMembership,
+ * roleBinding, optional customRole). N team + M project checks ran in a
+ * Promise.all fan-out, that's hundreds of queries per page load on large
+ * orgs.
+ *
+ * This helper does the four lookups ONCE — via `loadScopeResolution` — then
+ * resolves each id in-memory against the same rules a per-call check applies.
+ *
+ * Project resolution still needs to know the project's team so a
+ * team-scoped binding inherits to its projects. Callers pass the
+ * project→teamId map alongside the project ids.
+ */
+export async function batchScopePermissions(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  args: {
+    organizationId: string;
+    teamIds: string[];
+    projectIds: string[];
+    projectTeamId: Record<string, string>;
+    permission: Permission;
+  },
+): Promise<{ teams: Map<string, boolean>; projects: Map<string, boolean> }> {
+  const teamsMap = new Map<string, boolean>();
+  const projectsMap = new Map<string, boolean>();
+
+  // A project inherits TEAM-scoped bindings from its team, so the binding
+  // load must cover the projects' team ids too — `projectGrants` below
+  // checks `scopeKey(TEAM, teamId)`, and a binding that was never loaded
+  // can't grant. Without this, a member whose only access is a TEAM-scope
+  // binding (no legacy TeamUser rows) fails every project in the batch
+  // while the single-project resolver — which always queries the team
+  // scope — grants it.
+  const resolution = await loadScopeResolution(ctx, {
+    organizationId: args.organizationId,
+    scopeIds: [
+      ...new Set([
+        ...args.teamIds,
+        ...args.projectIds,
+        ...Object.values(args.projectTeamId),
+      ]),
+    ],
+  });
+  if (!resolution) {
+    args.teamIds.forEach((id) => teamsMap.set(id, false));
+    args.projectIds.forEach((id) => projectsMap.set(id, false));
+    return { teams: teamsMap, projects: projectsMap };
+  }
+
+  for (const teamId of args.teamIds) {
+    teamsMap.set(
+      teamId,
+      teamGrants(
+        resolution,
+        { organizationId: args.organizationId, teamId },
+        args.permission,
+      ),
+    );
   }
 
   for (const projectId of args.projectIds) {
-    if (orgGrants) {
-      projectsMap.set(projectId, true);
-      continue;
-    }
-    const projectBindings =
-      bindingsByScope.get(`${RoleBindingScopeType.PROJECT}::${projectId}`) ??
-      [];
-    if (projectBindings.some(evaluateBinding)) {
-      projectsMap.set(projectId, true);
-      continue;
-    }
     const teamId = args.projectTeamId[projectId];
-    if (teamId) {
-      const teamBindings =
-        bindingsByScope.get(`${RoleBindingScopeType.TEAM}::${teamId}`) ?? [];
-      if (teamBindings.some(evaluateBinding)) {
-        projectsMap.set(projectId, true);
-        continue;
-      }
-      if (needsLegacyFallback) {
-        const legacy = legacyByTeam.get(teamId);
-        if (legacy) {
-          const permitted = evaluateBinding({
-            role: legacy.role,
-            customRoleId: legacy.assignedRoleId ?? null,
-            scopeType: RoleBindingScopeType.TEAM,
-          });
-          projectsMap.set(projectId, permitted);
-          continue;
-        }
-      }
-    }
-    projectsMap.set(projectId, false);
+    projectsMap.set(
+      projectId,
+      projectGrants(
+        resolution,
+        {
+          organizationId: args.organizationId,
+          projectId,
+          ...(teamId ? { teamId } : {}),
+        },
+        args.permission,
+      ),
+    );
   }
 
   return { teams: teamsMap, projects: projectsMap };
@@ -1351,19 +1608,28 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
   "playground:view",
 ];
 
+/**
+ * Whether `projectId` is the public demo project. The demo grants
+ * `DEMO_VIEW_PERMISSIONS` to every authenticated user (see `isDemoProject`), so a
+ * surface that must NOT be reachable there at all — e.g. the per-user Langy chat,
+ * whose conversations belong to whoever actually used Langy on the demo — gates
+ * on this directly instead of on the permission check that the demo silently
+ * grants.
+ */
+export function isDemoProjectId(projectId: string | null | undefined): boolean {
+  if (!projectId) return false;
+  // Prefer dynamic process.env in tests; fall back to validated env.
+  const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
+  return !!demoId && projectId === demoId;
+}
+
 export function isDemoProject(
   projectId: string,
   permission: Permission,
 ): boolean {
-  if (!projectId || projectId !== env.DEMO_PROJECT_ID) {
-    // Prefer dynamic process.env in tests; fall back to env.DEMO_PROJECT_ID
-    const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
-    if (!demoId || projectId !== demoId) {
-      return false;
-    }
-  }
-
-  return DEMO_VIEW_PERMISSIONS.includes(permission);
+  return (
+    isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission)
+  );
 }
 
 // ============================================================================
@@ -1465,67 +1731,6 @@ export const authorizeInResolver = ({
 };
 
 // ============================================================================
-// PUBLIC SHARE HANDLING
-// ============================================================================
-
-type PublicResourceTypes = "TRACE" | "THREAD";
-
-export const checkPermissionOrPubliclyShared =
-  <
-    Key extends keyof InputType,
-    InputType extends { [key in Key]: string } & { projectId: string },
-  >(
-    permissionCheck: PermissionMiddleware<InputType>,
-    {
-      resourceType,
-      resourceParam,
-    }: {
-      resourceType: PublicResourceTypes | ((input: any) => PublicResourceTypes);
-      resourceParam: Key;
-    },
-  ) =>
-  async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
-    let allowed = false;
-    try {
-      await permissionCheck({
-        ctx,
-        input,
-        next: async () => true as any,
-      });
-      allowed = true;
-    } catch (e) {
-      if (e instanceof TRPCError && e.code === "UNAUTHORIZED") {
-        allowed = false;
-      } else {
-        throw e;
-      }
-    }
-
-    if (!allowed) {
-      const sharedResource = await ctx.prisma.publicShare.findFirst({
-        where: {
-          resourceType:
-            typeof resourceType === "function"
-              ? resourceType(input)
-              : resourceType,
-          resourceId: input[resourceParam],
-        },
-      });
-      if (!sharedResource) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message:
-            "You do not have permission and this resource is not publicly shared",
-        });
-      }
-      ctx.publiclyShared = true;
-    }
-
-    ctx.permissionChecked = true;
-    return next();
-  };
-
-// ============================================================================
 // OPS PERMISSION
 // ============================================================================
 
@@ -1546,16 +1751,25 @@ export type OpsScope = { kind: "none" } | { kind: "platform" };
  *
  * Only users listed in ADMIN_EMAILS get the `platform` scope. All ops
  * data is platform-wide so no org-scoped tier exists.
+ *
+ * Impersonation: an impersonation session rewrites `session.user` to the
+ * impersonated (customer) identity, which would hide the ops UI (Deja
+ * View) exactly when an admin impersonates a customer to debug their
+ * account. The impersonator's own grant carries through instead — the
+ * scope is resolved against the real admin's email as well.
  */
 export function resolveOpsScope({
   userEmail,
+  impersonatorEmail,
 }: {
   userId: string;
   userEmail: string | null | undefined;
+  /** Email of the real admin behind an impersonation session, if any. */
+  impersonatorEmail?: string | null;
   permission: Permission;
   prisma: unknown;
 }): OpsScope {
-  if (isAdmin({ email: userEmail })) {
+  if (isAdmin({ email: userEmail }) || isAdmin({ email: impersonatorEmail })) {
     return { kind: "platform" };
   }
 
@@ -1579,6 +1793,7 @@ export const checkOpsPermission =
     const opsScope = await resolveOpsScope({
       userId: user.id,
       userEmail: user.email,
+      impersonatorEmail: user.impersonator?.email,
       permission,
       prisma: ctx.prisma,
     });

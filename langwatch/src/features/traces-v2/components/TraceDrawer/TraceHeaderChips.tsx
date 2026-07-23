@@ -1,4 +1,12 @@
-import { Avatar, Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Avatar,
+  Box,
+  Circle,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Lightbulb } from "lucide-react";
 import {
   LuBookMarked,
@@ -12,10 +20,10 @@ import {
   LuSparkles,
   LuTriangleAlert,
 } from "react-icons/lu";
-import { getEvalChipDisplay } from "~/utils/evaluationResults";
+import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
-import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
+import { getEvalChipDisplay } from "~/utils/evaluationResults";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
 import type { RichEval } from "../../hooks/useTraceEvaluations";
 import {

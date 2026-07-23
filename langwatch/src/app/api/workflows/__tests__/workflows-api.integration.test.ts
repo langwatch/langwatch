@@ -530,7 +530,10 @@ describe("Workflows REST API", () => {
           { data: [{ question: "x" }], dataset_id: "dataset_123" },
         );
 
-        expect(res.status).toBe(400);
+        // 422: the body failed the request SCHEMA (the two fields are mutually
+        // exclusive). The "no committed version" case below stays 400 — that
+        // one is the handler refusing a well-formed request.
+        expect(res.status).toBe(422);
       });
     });
 

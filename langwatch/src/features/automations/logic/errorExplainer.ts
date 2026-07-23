@@ -1,38 +1,47 @@
 /**
- * Reads the structured `domainError` the server attaches via `errorFormatter`
- * (see `src/server/api/trpc.ts`) and translates each known `kind` into a
+ * Reads the structured handled error the server attaches via `errorFormatter`
+ * (see `src/server/api/trpc.ts`) and translates each known `code` into a
  * field-targeted toast. Pure — no React, no Chakra — so the UI just calls
- * `explainDomainError` with the `{ kind, meta, … }` shape and renders the
+ * `explainHandledError` with the `{ code, meta, … }` shape and renders the
  * returned title/description.
  */
 
-export interface DomainErrorShape {
-  kind: string;
+export interface HandledErrorShape {
+  code: string;
   meta: Record<string, unknown>;
   httpStatus: number;
 }
 
-/** Reads `error.data.domainError` from any tRPC client error, returning null
- *  when the cause was not one of our domain errors (e.g. an infrastructure
- *  failure or a Zod parse error). Validates the shape before returning so a
- *  malformed payload can't crash `explainDomainError` on `domain.meta.*`
+/** Reads `error.data.error` from any tRPC client error, returning null
+ *  when the cause was not one of our handled errors (e.g. an infrastructure
+ *  failure). Validates the shape before returning so a
+ *  malformed payload can't crash `explainHandledError` on `domain.meta.*`
  *  access — the helper trusts `unknown` input and a misconfigured server
  *  shouldn't take the UI with it. */
-export function readDomainError(err: unknown): DomainErrorShape | null {
-  const candidate = (err as { data?: { domainError?: unknown } })?.data
-    ?.domainError;
+export function readHandledError(err: unknown): HandledErrorShape | null {
+  const candidate = (err as { data?: { error?: unknown } })?.data?.error;
   if (!candidate || typeof candidate !== "object") return null;
 
   const value = candidate as {
+    code?: unknown;
+    // `kind` is the deprecated pre-`HandledError` discriminant — read it as a
+    // fallback so a payload from an older server (or an older client reading a
+    // newer server) still resolves during the transition.
     kind?: unknown;
     meta?: unknown;
     httpStatus?: unknown;
   };
-  if (typeof value.kind !== "string") return null;
+  const code =
+    typeof value.code === "string"
+      ? value.code
+      : typeof value.kind === "string"
+        ? value.kind
+        : null;
+  if (code === null) return null;
   if (typeof value.httpStatus !== "number") return null;
 
   return {
-    kind: value.kind,
+    code,
     httpStatus: value.httpStatus,
     meta:
       value.meta && typeof value.meta === "object"
@@ -41,16 +50,16 @@ export function readDomainError(err: unknown): DomainErrorShape | null {
   };
 }
 
-export interface DomainErrorExplanation {
+export interface HandledErrorExplanation {
   title: string;
   /** Empty string when there's nothing to add beyond the title. */
   description: string;
 }
 
-export function explainDomainError(
-  domain: DomainErrorShape,
-): DomainErrorExplanation {
-  switch (domain.kind) {
+export function explainHandledError(
+  domain: HandledErrorShape,
+): HandledErrorExplanation {
+  switch (domain.code) {
     case "template_validation_error": {
       const field = String(domain.meta.field ?? "template");
       const syntax = String(domain.meta.syntaxError ?? "Invalid Liquid syntax");
@@ -88,7 +97,16 @@ export function explainDomainError(
     }
     case "project_not_found":
       return { title: "Project not found", description: "" };
-    default:
-      return { title: "Something went wrong", description: "" };
+    default: {
+      // No bespoke copy for this code yet. If the server deliberately authored
+      // a user-facing sentence it rides in `meta.message` (the only channel
+      // that carries prose — see ADR-045); otherwise say something calm rather
+      // than showing a raw code slug.
+      const authored = domain.meta.message;
+      return {
+        title: "Something went wrong",
+        description: typeof authored === "string" ? authored : "",
+      };
+    }
   }
 }

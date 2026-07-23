@@ -123,14 +123,17 @@ export class EvaluatorService {
   /**
    * Result from computing workflow fields, includes metadata about the workflow.
    */
-  private async computeWorkflowFieldsWithMeta(workflowId: string): Promise<{
+  private async computeWorkflowFieldsWithMeta(
+    workflowId: string,
+    projectId: string,
+  ): Promise<{
     fields: EvaluatorField[];
     outputFields: EvaluatorField[];
     workflowName?: string;
     workflowIcon?: string;
   }> {
-    const workflow = await this.prisma.workflow.findUnique({
-      where: { id: workflowId },
+    const workflow = await this.prisma.workflow.findFirst({
+      where: { id: workflowId, projectId, archivedAt: null },
       include: { currentVersion: true },
     });
 
@@ -195,7 +198,10 @@ export class EvaluatorService {
   async enrichWithFields(evaluator: Evaluator): Promise<EvaluatorWithFields> {
     if (evaluator.type === "workflow" && evaluator.workflowId) {
       const { fields, outputFields, workflowName, workflowIcon } =
-        await this.computeWorkflowFieldsWithMeta(evaluator.workflowId);
+        await this.computeWorkflowFieldsWithMeta(
+          evaluator.workflowId,
+          evaluator.projectId,
+        );
       return { ...evaluator, fields, outputFields, workflowName, workflowIcon };
     }
 

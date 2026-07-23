@@ -93,16 +93,17 @@ describe("listWorkflowsCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the raw workflow list as the payload instead of printing", async () => {
       const workflows = [makeWorkflow()];
       mockGetAll.mockResolvedValue(workflows);
 
-      await listWorkflowsCommand({ format: "json" });
+      const result = await listWorkflowsCommand();
 
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(workflows, null, 2),
-      );
+      // The command no longer decides the format — it hands the payload to
+      // the output port, which renders json/yaml/agents/--jq from this value.
+      expect(result?.data).toEqual(workflows);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 

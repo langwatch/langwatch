@@ -146,29 +146,79 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     aggregateType: AggregateType,
     anchorOccurredAtMs?: number,
   ): Promise<readonly EventType[]> {
-    EventUtils.validateTenantId(context, `${this.constructor.name}.getEvents`);
+    // For time-local aggregate types, lower-bound the event_log scan to a
+    // window around the triggering work's time so ClickHouse prunes old weekly
+    // partitions instead of cold-scanning every partition on S3. Returns
+    // undefined (unbounded scan) for long-lived aggregate types or when no
+    // usable anchor time is available, so behaviour is unchanged there.
+    return await this.readEvents({
+      operation: "getEvents",
+      aggregateId,
+      context,
+      aggregateType,
+      occurredAtFromMs: rehydrationLowerBoundMs(
+        aggregateType,
+        anchorOccurredAtMs,
+      ),
+    });
+  }
+
+  /**
+   * Retrieves events with an EXPLICIT occurred-at lower bound, applied
+   * verbatim for ANY aggregate type — unlike `getEvents`, whose anchor is
+   * gated to time-local aggregate types because its callers supply a
+   * heuristic time.
+   *
+   * For reads that hold a provable bound of their own: a cursor tail
+   * catch-up wants only events ACCEPTED after its cursor, so occurred-at can
+   * be floored a safety window below that point and still prune every older
+   * weekly partition. The caller owns the margin — the bound MUST sit far
+   * enough below the wanted range that no delayed or replayed event's
+   * occurred-at can fall under it (rows with an unknown occurred time are
+   * always kept by the repositories, so the bound can never drop those).
+   */
+  async getEventsOccurredSince(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    occurredAtFromMs: number,
+  ): Promise<readonly EventType[]> {
+    return await this.readEvents({
+      operation: "getEventsOccurredSince",
+      aggregateId,
+      context,
+      aggregateType,
+      occurredAtFromMs,
+    });
+  }
+
+  private async readEvents({
+    operation,
+    aggregateId,
+    context,
+    aggregateType,
+    occurredAtFromMs,
+  }: {
+    operation: "getEvents" | "getEventsOccurredSince";
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    occurredAtFromMs: number | undefined;
+  }): Promise<readonly EventType[]> {
+    const label = `${this.constructor.name}.${operation}`;
+    EventUtils.validateTenantId(context, label);
 
     if (this.hasMissingAggregateId(aggregateId)) {
       this.logWarning(
-        `${this.constructor.name}.getEvents`,
+        label,
         { tenantId: context.tenantId, aggregateType },
         "Skipped event_log read for an empty aggregateId (would scan the whole empty-id key range); returning no events",
       );
       return [];
     }
 
-    // For time-local aggregate types, lower-bound the event_log scan to a
-    // window around the triggering work's time so ClickHouse prunes old weekly
-    // partitions instead of cold-scanning every partition on S3. Returns
-    // undefined (unbounded scan) for long-lived aggregate types or when no
-    // usable anchor time is available, so behaviour is unchanged there.
-    const occurredAtFromMs = rehydrationLowerBoundMs(
-      aggregateType,
-      anchorOccurredAtMs,
-    );
-
     return await this.instrument(
-      `${this.constructor.name}.getEvents`,
+      label,
       {
         "aggregate.id": String(aggregateId),
         "tenant.id": context.tenantId,
@@ -191,7 +241,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
           return deduplicateEvents(processed);
         } catch (error) {
           this.logError(
-            `${this.constructor.name}.getEvents`,
+            label,
             {
               aggregateId: String(aggregateId),
               tenantId: context.tenantId,
@@ -259,6 +309,109 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
               aggregateType,
               upToEventId: upToEvent.id,
               upToTimestamp: upToEvent.createdAt,
+            },
+            error,
+          );
+          throw error;
+        }
+      },
+    );
+  }
+
+  async getEventsUpToPaged(request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    upToEvent: EventType;
+    after: { timestamp: number; eventId: string } | undefined;
+    limit: number;
+  }): Promise<readonly EventType[]> {
+    const { aggregateId, context, aggregateType } = request;
+    EventUtils.validateTenantId(
+      context,
+      `${this.constructor.name}.getEventsUpToPaged`,
+    );
+
+    if (this.hasMissingAggregateId(aggregateId)) {
+      this.logWarning(
+        `${this.constructor.name}.getEventsUpToPaged`,
+        { tenantId: context.tenantId, aggregateType },
+        "Skipped event_log read for an empty aggregateId (would scan the whole empty-id key range); returning no events",
+      );
+      return [];
+    }
+
+    const pagedRead = this.repository.getEventRecordsUpToPaged;
+    if (!pagedRead) {
+      throw new Error(
+        `${this.constructor.name}: the event repository does not implement getEventRecordsUpToPaged; a paginated re-fold cannot be served`,
+      );
+    }
+
+    return await this.readEventsUpToPagedFromRepository(pagedRead, request);
+  }
+
+  /**
+   * Instrumented repository call + row-to-event mapping for
+   * {@link getEventsUpToPaged}, split out so the public method only carries
+   * validation and capability-checking.
+   */
+  private async readEventsUpToPagedFromRepository(
+    pagedRead: NonNullable<EventRepository["getEventRecordsUpToPaged"]>,
+    request: {
+      aggregateId: string;
+      context: EventStoreReadContext<EventType>;
+      aggregateType: AggregateType;
+      upToEvent: EventType;
+      after: { timestamp: number; eventId: string } | undefined;
+      limit: number;
+    },
+  ): Promise<readonly EventType[]> {
+    const { aggregateId, context, aggregateType, upToEvent, after, limit } =
+      request;
+    return await this.instrument(
+      `${this.constructor.name}.getEventsUpToPaged`,
+      {
+        "aggregate.id": String(aggregateId),
+        "tenant.id": context.tenantId,
+        "aggregate.type": aggregateType,
+        "up_to.event_id": upToEvent.id,
+        "page.limit": limit,
+      },
+      async () => {
+        try {
+          const records = await pagedRead.call(this.repository, {
+            tenantId: context.tenantId,
+            aggregateType,
+            aggregateId,
+            upToTimestamp: upToEvent.createdAt,
+            upToEventId: upToEvent.id,
+            after,
+            limit,
+          });
+
+          const events = records.map((record) =>
+            recordToEvent<EventType>(record, aggregateId),
+          );
+
+          // Do NOT dedup here: `deduplicateEvents` can drop the raw page's
+          // last row (a retry sharing an idempotencyKey with an earlier row
+          // in the same page), which would both feed a stale cursor to the
+          // caller (re-reading the same range forever) and make a full page
+          // look short, i.e. mistaken for exhaustion, silently truncating the
+          // re-fold. The caller's cross-page `seen` set (idempotencyKey ??
+          // id) reproduces the same dedup effect without touching the raw
+          // page length or its last row.
+          return this.postProcessEvents(events);
+        } catch (error) {
+          this.logError(
+            `${this.constructor.name}.getEventsUpToPaged`,
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+              upToEventId: upToEvent.id,
+              limit,
             },
             error,
           );

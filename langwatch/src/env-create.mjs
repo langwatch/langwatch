@@ -13,6 +13,30 @@ export const gatewaySecretsSchema = {
   LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
 };
 
+/**
+ * Share of browser *sessions* recorded, 0..1. Sessions rather than traces so a
+ * recorded visit is complete; the decision also reaches the server, which drops
+ * the backend half of an unsampled browser trace. Defaults to all of them.
+ * See ADR-058.
+ *
+ * Blank in .env means "unset" — without the preprocess, `z.coerce` turns `""`
+ * into 0 and silently records nothing.
+ *
+ * A meaningless value falls back to recording everything rather than failing
+ * validation. Without the `catch`, `RUM_SAMPLE_RATIO=banana` (or `2`) refuses to
+ * parse and takes the whole app down at boot — an optional telemetry dial is not
+ * worth a deployment for, and the safe reading of nonsense is "record
+ * everything", per the spec scenario "A nonsensical share records rather than
+ * silently collecting nothing". An explicit `0` still means zero; only
+ * unparseable and out-of-range values land on the fallback.
+ *
+ * Exported so tests exercise the real schema rather than an inline copy.
+ */
+export const rumSampleRatioSchema = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.coerce.number().min(0).max(1).default(1).catch(1),
+);
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -115,7 +139,8 @@ export function createEnvConfig() {
       AZURE_OPENAI_KEY: z.string().optional(),
       OPENAI_API_KEY: z.string().optional(),
       SENDGRID_API_KEY: z.string().optional(),
-      LANGWATCH_NLP_SERVICE: z.string().optional(),
+      LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
+      LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
       LANGEVALS_ENDPOINT: z.string().optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
@@ -155,6 +180,12 @@ export function createEnvConfig() {
       EMAIL_DEFAULT_FROM: z.string().optional(),
       S3_KEY_SALT: z.string().optional(),
       IS_SAAS: z.boolean().optional(),
+      // Browser tracing (ADR-058). Off unless explicitly enabled: it adds
+      // frontend telemetry volume, and the ingest route it exports to is
+      // inert without OTEL_EXPORTER_OTLP_ENDPOINT anyway.
+      RUM_ENABLED: z.boolean().optional(),
+      // See `rumSampleRatioSchema` above.
+      RUM_SAMPLE_RATIO: rumSampleRatioSchema,
       // Controls SSRF blocking for outbound HTTP calls (TS proxy + scenario
       // runner; mirrored on the Python NLP side via the same env name). When
       // true: private IPs, localhost, and hostnames resolving to private IPs
@@ -222,13 +253,22 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: z.string().optional(),
       GITHUB_CLIENT_SECRET: z.string().optional(),
 
-      // GitHub App used by Langy to open PRs as the requesting user.
-      // Separate from the GITHUB_CLIENT_* identity-login app above. All
-      // optional: when unset, the Langy GitHub feature is silently off and
-      // unconnected users get a "Connect GitHub" reply. Issue #4747.
+      // GitHub App used by Langy to open bot-authored PRs on repositories the
+      // App is installed on. Separate from the GITHUB_CLIENT_* identity-login
+      // app above. All optional: when the private key is unset the Langy GitHub
+      // feature is silently off, the connect card explains it is unavailable,
+      // and no installation token can be minted. Issue #4747.
+      //   GITHUB_LANGY_APP_ID        — numeric App ID (JWT `iss`).
+      //   GITHUB_LANGY_PRIVATE_KEY   — the App's RSA private key PEM (signs the
+      //                                app JWT used to mint installation tokens).
+      //   GITHUB_LANGY_WEBHOOK_SECRET— verifies X-Hub-Signature-256 on inbound
+      //                                installation webhooks.
+      //   GITHUB_LANGY_APP_SLUG      — the App's slug, for the install deep-link
+      //                                github.com/apps/<slug>/installations/new.
       GITHUB_LANGY_APP_ID: z.string().optional(),
-      GITHUB_LANGY_CLIENT_ID: z.string().optional(),
-      GITHUB_LANGY_CLIENT_SECRET: z.string().optional(),
+      GITHUB_LANGY_PRIVATE_KEY: z.string().optional(),
+      GITHUB_LANGY_WEBHOOK_SECRET: z.string().optional(),
+      GITHUB_LANGY_APP_SLUG: z.string().optional(),
 
       // Gitlab
       GITLAB_CLIENT_ID: z.string().optional(),
@@ -327,6 +367,7 @@ export function createEnvConfig() {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
+      LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
@@ -345,6 +386,10 @@ export function createEnvConfig() {
       IS_SAAS:
         process.env.IS_SAAS === "1" ||
         process.env.IS_SAAS?.toLowerCase() === "true",
+      RUM_ENABLED:
+        process.env.RUM_ENABLED === "1" ||
+        process.env.RUM_ENABLED?.toLowerCase() === "true",
+      RUM_SAMPLE_RATIO: process.env.RUM_SAMPLE_RATIO,
       BLOCK_LOCAL_HTTP_CALLS:
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
@@ -390,8 +435,9 @@ export function createEnvConfig() {
       GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
       GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
       GITHUB_LANGY_APP_ID: process.env.GITHUB_LANGY_APP_ID,
-      GITHUB_LANGY_CLIENT_ID: process.env.GITHUB_LANGY_CLIENT_ID,
-      GITHUB_LANGY_CLIENT_SECRET: process.env.GITHUB_LANGY_CLIENT_SECRET,
+      GITHUB_LANGY_PRIVATE_KEY: process.env.GITHUB_LANGY_PRIVATE_KEY,
+      GITHUB_LANGY_WEBHOOK_SECRET: process.env.GITHUB_LANGY_WEBHOOK_SECRET,
+      GITHUB_LANGY_APP_SLUG: process.env.GITHUB_LANGY_APP_SLUG,
       GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
       GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

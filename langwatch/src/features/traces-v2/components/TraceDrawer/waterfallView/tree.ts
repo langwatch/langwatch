@@ -1,10 +1,20 @@
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import {
+  COLLAPSE_TIMELINE_BELOW_PX,
   type FlatRow,
   SIBLING_GROUP_THRESHOLD,
   type SiblingGroup,
   type WaterfallTreeNode,
 } from "./types";
+
+/**
+ * Whether the timeline/flame-graph panel fits. `0` means "not measured yet"
+ * (the ResizeObserver hasn't fired its first callback) — treated as "yes,
+ * show it" so a wide drawer doesn't flash collapsed-then-expanded on mount.
+ */
+export function shouldShowTimeline(containerWidthPx: number): boolean {
+  return containerWidthPx === 0 || containerWidthPx >= COLLAPSE_TIMELINE_BELOW_PX;
+}
 
 export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
   const byId = new Map<string, SpanTreeNode>();

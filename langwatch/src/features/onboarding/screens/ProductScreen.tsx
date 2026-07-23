@@ -23,7 +23,8 @@ export const ProductScreen: React.FC = () => {
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
   });
-  const { project: activeProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
+  const { project: activeProject, slug: skipSlug } =
+    useProjectBySlugOrLatest(organization);
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
@@ -42,6 +43,7 @@ export const ProductScreen: React.FC = () => {
   const screens = useCreateProductScreens({
     flow,
     onSelectProduct: handleSelectProduct,
+    onContinue: navigation.nextScreen,
   });
 
   const currentVisibleIndex = useMemo(

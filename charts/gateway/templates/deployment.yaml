@@ -17,10 +17,20 @@ spec:
     matchLabels: {{- include "gateway.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: {{- include "gateway.selectorLabels" . | nindent 8 }}
+      labels:
+        {{- include "gateway.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
+      # The gateway never calls the Kubernetes API. Do not project a cluster
+      # credential into a public-facing, tenant-controlled egress workload.
+      automountServiceAccountToken: false
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
       containers:

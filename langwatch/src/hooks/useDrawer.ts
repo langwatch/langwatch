@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 import Router, { useRouter } from "~/utils/compat/next-router";
@@ -6,8 +7,6 @@ import type {
   DrawerProps,
   DrawerType,
 } from "../components/drawerRegistry";
-import { getTracesV2Preferred } from "../features/traces-v2/hooks/useTracesV2Preference";
-import { createLogger } from "../utils/logger";
 import { URL_QS_PARSE_OPTIONS } from "../utils/qsParseOptions";
 import { routeTraceDrawerForV2 } from "./traceDrawerV2Routing";
 
@@ -25,6 +24,43 @@ const logger = createLogger("useDrawer");
 let complexProps: Record<string, unknown> = {};
 
 export const getComplexProps = () => complexProps;
+
+// ============================================================================
+// Reactive subscription for the non-serializable drawer props
+// ============================================================================
+//
+// CurrentDrawer reads complexProps + flowCallbacks with plain getters during
+// render, so it only picks up changes when it re-renders — normally driven by
+// a URL change. A change that does NOT touch the URL (e.g. a page reload
+// re-hydrating a comparison editor's targets/dataset-columns from the workbench
+// store) would otherwise never reach the open drawer. This version counter +
+// listener set drives a useSyncExternalStore subscription in CurrentDrawer.
+let drawerPropsVersion = 0;
+const drawerPropsListeners = new Set<() => void>();
+const notifyDrawerPropsChanged = () => {
+  drawerPropsVersion += 1;
+  for (const listener of drawerPropsListeners) listener();
+};
+export const subscribeDrawerProps = (listener: () => void): (() => void) => {
+  drawerPropsListeners.add(listener);
+  return () => {
+    drawerPropsListeners.delete(listener);
+  };
+};
+export const getDrawerPropsVersion = (): number => drawerPropsVersion;
+
+/**
+ * Merge non-serializable props into the CURRENT drawer's complexProps and
+ * notify subscribers so CurrentDrawer re-renders and re-reads them. Use to
+ * (re)attach in-memory context to an already-open drawer WITHOUT a URL change —
+ * e.g. rebuilding a comparison editor's context after a reload wiped the
+ * ephemeral complexProps. `openDrawer` still fully REPLACES complexProps on a
+ * fresh open; this only augments what is already attached.
+ */
+export const setComplexProps = (props: Record<string, unknown>): void => {
+  complexProps = { ...complexProps, ...props };
+  notifyDrawerPropsChanged();
+};
 
 // ============================================================================
 // Flow Callbacks (persist across drawer navigation within a flow)
@@ -56,6 +92,13 @@ export const setFlowCallbacks = <T extends DrawerType>(
   drawer: T,
   callbacks: DrawerCallbacks<T>,
 ) => {
+  // Deliberately does NOT notify. Callers register callbacks BEFORE opening a
+  // drawer (the URL change renders it) or, on the re-hydration path, right
+  // before a setComplexProps that does notify — and CurrentDrawer re-reads both
+  // maps on any re-render, so a notify here is redundant. It is also expensive:
+  // this is called from ~65 sites across the app, and notifying would re-render
+  // CurrentDrawer — and cascade through the open drawer's subtree — every time
+  // any unrelated flow registered a callback.
   flowCallbacks[drawer] = callbacks as Record<string, unknown>;
 };
 
@@ -406,15 +449,16 @@ export const useDrawer = () => {
         replaceCurrentInStack?: boolean;
       } = {},
     ) => {
-      // Traces V2 opt-in (transitional during rollout): route any trace open
-      // to the new explorer when this device opted in, so every entry point
-      // honors the choice — not only the call sites that go through
-      // useTraceDetailsDrawer. See routeTraceDrawerForV2.
+      // The Trace Explorer drawer is the default for every trace open, from
+      // every entry point — not only the call sites that go through
+      // useTraceDetailsDrawer. Only the legacy Traces page keeps the legacy
+      // drawer, so operators who deliberately navigated there get a coherent
+      // legacy view until the page is removed. See routeTraceDrawerForV2.
       const { drawer: effectiveDrawer, props: effectiveProps } =
         routeTraceDrawerForV2(
           drawer,
           props as Record<string, unknown> | undefined,
-          getTracesV2Preferred(),
+          router.pathname === "/[project]/messages",
         );
 
       // Extract urlParams and merge with props

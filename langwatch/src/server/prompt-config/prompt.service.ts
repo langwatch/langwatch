@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type {
   LlmPromptConfigVersion,
   Prisma,
@@ -5,18 +6,24 @@ import type {
   PromptScope,
 } from "@prisma/client";
 import type { z } from "zod";
-import { createLogger } from "~/utils/logger";
 import {
   deriveResponseFormatFromOutputs,
+  handleSchema,
   type inputsSchema,
   type messageSchema,
   type outputsSchema,
   type promptingTechniqueSchema,
 } from "~/prompts/schemas/field-schemas";
 import { SchemaVersion } from "./enums";
-import { NotFoundError, SystemPromptRequiredError } from "./errors";
+import {
+  HandleGenerationError,
+  NotFoundError,
+  SystemPromptRequiredError,
+} from "./errors";
+import { toHandleSlug } from "./handle-slug";
+import { hoistSystemMessage } from "./hoist-system-message";
+import { mergeAutoDetectedInputs } from "./mergeAutoDetectedInputs";
 import { PromptVersionService } from "./prompt-version.service";
-import { TagValidationError } from "./repositories/llm-config-tag.repository";
 import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
 import {
   type CreateLlmConfigParams,
@@ -24,8 +31,7 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
-import { PromptTagAssignmentRepository } from "./repositories/llm-config-tag.repository";
-import { PromptTagRepository } from "./repositories/prompt-tag.repository";
+import { PromptTagAssignmentRepository, TagValidationError } from "./repositories/llm-config-tag.repository";
 import {
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
@@ -34,7 +40,7 @@ import {
   parseRuntimeParameters,
   runtimeParametersEqual,
 } from "./repositories/llm-config-version-schema";
-import { mergeAutoDetectedInputs } from "./mergeAutoDetectedInputs";
+import { PromptTagRepository } from "./repositories/prompt-tag.repository";
 import {
   transformCamelToSnake,
   transformSnakeToCamel,
@@ -501,6 +507,187 @@ export class PromptService {
       config,
       newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
     );
+  }
+
+  /**
+   * Duplicates a prompt inside the project it already belongs to.
+   * Single Responsibility: Recreate a prompt's configuration under a free handle.
+   *
+   * Duplicates are numbered from one: `support-bot-1`, `support-bot-2`, ...
+   * The hyphen is not cosmetic — `handleSchema` allows only lowercase letters,
+   * digits, hyphens, underscores and one slash, and a handle that fails it is
+   * silently forced into draft mode when the prompt is reopened (see
+   * `isHandleValid` in `llmPromptConfigUtils.ts`).
+   *
+   * @throws NotFoundError when the source prompt does not exist in the project
+   * @throws HandleGenerationError when every candidate handle is taken
+   */
+  async duplicatePrompt(params: {
+    idOrHandle: string;
+    projectId: string;
+    authorId?: string;
+  }): Promise<VersionedPrompt> {
+    const { idOrHandle, projectId, authorId } = params;
+
+    const source = await this.getPromptByIdOrHandle({ idOrHandle, projectId });
+
+    if (!source) {
+      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
+    }
+
+    const baseHandle = this.deriveBaseHandle(source);
+    const handle = await this.generateUniqueHandle({
+      candidateFor: (attempt) => `${baseHandle}-${attempt + 1}`,
+      projectId,
+      scope: source.scope,
+    });
+
+    return await this.createPrompt({
+      ...this.buildCreateParamsFromSource(source),
+      projectId,
+      handle,
+      authorId,
+      commitMessage: `Duplicated from "${baseHandle}"`,
+    });
+  }
+
+  /**
+   * Copies a prompt into another project, recording the source it came from.
+   * Single Responsibility: Recreate a prompt's configuration in a target project.
+   *
+   * Permission on the source project is the caller's concern; this method
+   * assumes it has already been established.
+   *
+   * @throws NotFoundError when the source prompt does not exist
+   * @throws HandleGenerationError when every candidate handle is taken
+   */
+  async copyPrompt(params: {
+    idOrHandle: string;
+    sourceProjectId: string;
+    targetProjectId: string;
+    authorId?: string;
+  }): Promise<VersionedPrompt & { copiedFromPromptId: string }> {
+    const { idOrHandle, sourceProjectId, targetProjectId, authorId } = params;
+
+    const source = await this.getPromptByIdOrHandle({
+      idOrHandle,
+      projectId: sourceProjectId,
+    });
+
+    if (!source) {
+      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
+    }
+
+    const baseHandle = this.deriveBaseHandle(source);
+    const handle = await this.generateUniqueHandle({
+      // The bare handle is free in most target projects, so try it first.
+      candidateFor: (attempt) =>
+        attempt === 0 ? baseHandle : `${baseHandle}_copy${attempt}`,
+      projectId: targetProjectId,
+      scope: source.scope,
+    });
+
+    const copied = await this.createPrompt({
+      ...this.buildCreateParamsFromSource(source),
+      projectId: targetProjectId,
+      handle,
+      authorId,
+      commitMessage: `Copied from "${baseHandle}"`,
+    });
+
+    await this.repository.setCopiedFromPrompt({
+      id: copied.id,
+      projectId: targetProjectId,
+      copiedFromPromptId: source.id,
+    });
+
+    return { ...copied, copiedFromPromptId: source.id };
+  }
+
+  /**
+   * Finds the first handle no other prompt in the project has taken.
+   * `candidateFor(0)` is the first handle tried.
+   *
+   * @throws HandleGenerationError once `maxAttempts` candidates are exhausted
+   */
+  private async generateUniqueHandle(params: {
+    candidateFor: (attempt: number) => string;
+    projectId: string;
+    scope: PromptScope;
+    maxAttempts?: number;
+  }): Promise<string> {
+    const { candidateFor, projectId, scope, maxAttempts = 100 } = params;
+
+    for (let attempt = 0; attempt <= maxAttempts; attempt++) {
+      const handle = candidateFor(attempt);
+      const isAvailable = await this.checkHandleUniqueness({
+        handle,
+        projectId,
+        scope,
+      });
+
+      if (isAvailable) {
+        return handle;
+      }
+    }
+
+    throw new HandleGenerationError(
+      `Failed to generate a unique handle after ${maxAttempts} attempts, starting from "${candidateFor(
+        0,
+      )}" in project ${projectId}.`,
+    );
+  }
+
+  /**
+   * The handle a duplicate or copy numbers from.
+   *
+   * A prompt is not guaranteed to have a handle — draft and legacy configs
+   * carry `handle: null` — and a display name is free-form text the handle
+   * format rejects. Slugify anything that would not survive `handleSchema`,
+   * because an invalid handle silently forces the prompt into draft mode when
+   * it is reopened (see `isHandleValid` in `llmPromptConfigUtils.ts`).
+   */
+  private deriveBaseHandle(source: VersionedPrompt): string {
+    const candidate = source.handle ?? source.name;
+
+    return handleSchema.safeParse(candidate).success
+      ? candidate
+      : toHandleSlug(candidate);
+  }
+
+  /**
+   * Maps a source prompt's configuration into `createPrompt` parameters,
+   * leaving the target-specific fields (project, handle, author, commit
+   * message) to the caller.
+   */
+  private buildCreateParamsFromSource(source: VersionedPrompt) {
+    const { prompt, messages } = hoistSystemMessage(source);
+
+    return {
+      scope: source.scope,
+      prompt,
+      messages,
+      inputs: source.inputs ?? undefined,
+      outputs: source.outputs ?? undefined,
+      model: source.model ?? undefined,
+      temperature: source.temperature ?? undefined,
+      maxTokens: source.maxTokens ?? undefined,
+      // Traditional sampling parameters
+      topP: source.topP ?? undefined,
+      frequencyPenalty: source.frequencyPenalty ?? undefined,
+      presencePenalty: source.presencePenalty ?? undefined,
+      // Other sampling parameters
+      seed: source.seed ?? undefined,
+      topK: source.topK ?? undefined,
+      minP: source.minP ?? undefined,
+      repetitionPenalty: source.repetitionPenalty ?? undefined,
+      // Reasoning parameter (canonical/unified field)
+      reasoning: source.reasoning ?? undefined,
+      verbosity: source.verbosity ?? undefined,
+      promptingTechnique: source.promptingTechnique ?? undefined,
+      demonstrations: source.demonstrations ?? undefined,
+      parameters: source.parameters ?? undefined,
+    };
   }
 
   /**

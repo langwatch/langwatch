@@ -1,7 +1,7 @@
 import type fastq from "fastq";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { Logger } from "pino";
+import type { Logger } from "@langwatch/observability";
 import {
   gqActiveGroups,
   gqBlockedGroups,
@@ -96,8 +96,9 @@ export class GroupQueueMetricsCollector {
         this.params.activeJobCountFn(),
       );
 
-      // Oldest pending age: readyKey scores are constant (1), so we need to
-      // check per-group job sets for the actual dispatchAfterMs timestamps.
+      // Oldest pending age: readyKey scores are dispatch-eligibility times but
+      // are re-scored to a FUTURE activeUntil while a group processes, so the
+      // per-group jobs zsets carry the trustworthy dispatchAfterMs timestamps.
       // Sample up to 10 groups to avoid scanning all groups every collection.
       const sampleGroups = await this.params.redisConnection.zrange(
         readyKey,
