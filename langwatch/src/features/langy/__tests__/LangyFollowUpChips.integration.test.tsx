@@ -27,14 +27,17 @@ import { LangyCapabilityRenderer } from "../components/capabilities/LangyCapabil
 
 afterEach(cleanup);
 
-/** A settled trace search carrying a structured error filter over the last day. */
+/**
+ * A settled trace search exactly as the live transport hands it to the panel:
+ * a `bash` call the envelope retyped, its input still the shell payload.
+ */
 function traceSearch(
   over: { name?: string; state?: string; output?: unknown } = {},
 ) {
   return {
     name: over.name ?? "langwatch.trace.search",
     state: over.state ?? "output-available",
-    input: { filters: { "traces.error": ["true"] }, startDate: "24h" },
+    input: { command: "langwatch trace search --query 'checkout failed'" },
     output:
       over.output ??
       JSON.stringify({
@@ -68,20 +71,7 @@ const chipRow = () =>
 describe("LangyCapabilityRenderer follow-up chips", () => {
   describe("given a trace search that found traces", () => {
     describe("when the card renders", () => {
-      it("offers to graph the search, filtered to what it found", () => {
-        renderCall(traceSearch());
-
-        const row = chipRow()!;
-        const graph = within(row)
-          .getByText("Graph these")
-          .closest("a") as HTMLAnchorElement;
-
-        expect(graph.getAttribute("href")).toBe(
-          "/demo/analytics/custom?has_error=true",
-        );
-      });
-
-      it("offers to alert on the search, filtered to what it found", () => {
+      it("offers to alert on the search, carrying the text as the alert's subject", () => {
         renderCall(traceSearch());
 
         const row = chipRow()!;
@@ -90,11 +80,23 @@ describe("LangyCapabilityRenderer follow-up chips", () => {
           .closest("a") as HTMLAnchorElement;
 
         expect(alert.getAttribute("href")).toBe(
-          "/demo/messages?has_error=true&drawer.open=automation",
+          "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22",
         );
       });
 
-      it("drops the offers no destination can carry (dataset, annotation)", () => {
+      it("keeps the graph offer plain — the builder cannot hold free text, so no carried verb", () => {
+        renderCall(traceSearch());
+
+        const row = chipRow()!;
+        expect(within(row).queryByText("Graph these")).toBeNull();
+        const analytics = within(row)
+          .getByText("Open in Analytics")
+          .closest("a") as HTMLAnchorElement;
+
+        expect(analytics.getAttribute("href")).toBe("/demo/analytics");
+      });
+
+      it("never words an offer as if the data travelled when it did not", () => {
         renderCall(traceSearch());
 
         const row = chipRow()!;

@@ -44,7 +44,7 @@ import type {
   LangyMessageRow,
 } from "~/server/app-layer/langy/repositories/langy-message.repository";
 import { LANGY_TURN_OVERRIDE_FALLBACK } from "~/server/app-layer/langy/langyPromptRegistry";
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import {
   LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
@@ -58,7 +58,7 @@ import {
 import type { LangyConversationService } from "./langy-conversation.service";
 import { buildFinalAssistantParts } from "./langy-final-parts";
 import { extractTextFromParts } from "./langy-message.service";
-import type { LangyMessagePart } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
+import type { LangyMessagePart } from "@langwatch/langy";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
 import { resolveLangyTurnBaseDependencies } from "./langy-turn-base-dependencies";
 import type { LangyTurnAdmissionRepository } from "./repositories/langy-turn-admission.repository";
@@ -439,6 +439,11 @@ export class LangyTurnService {
             : {}),
           ...(credentials.egressAllowlist
             ? { egressAllowlist: credentials.egressAllowlist }
+            : {}),
+          // ADR-061 mirror tier is part of the worker signature, so a tier
+          // change must be a probe MISS (re-warm) rather than a stale mirror.
+          ...(credentials.mirrorTier
+            ? { mirrorTier: credentials.mirrorTier }
             : {}),
         });
 

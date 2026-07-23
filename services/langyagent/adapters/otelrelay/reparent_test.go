@@ -79,6 +79,43 @@ func TestReparentTraces(t *testing.T) {
 		if v, _ := attrs.Get("tag.tags"); v.AsString() != "langy" {
 			t.Errorf("tag.tags = %q, want langy", v.AsString())
 		}
+		// The OTel GenAI semconv twins ride alongside the reserved keys, so
+		// the trace speaks the standard names to any consumer.
+		if v, _ := attrs.Get("gen_ai.conversation.id"); v.AsString() != "conv-123" {
+			t.Errorf("gen_ai.conversation.id = %q, want conv-123", v.AsString())
+		}
+		if v, _ := attrs.Get("user.id"); v.AsString() != "user-1" {
+			t.Errorf("user.id = %q, want user-1", v.AsString())
+		}
+		// And on every SPAN: the product's thread filter reads the span
+		// attribute, not the resource.
+		for i, span := range []ptrace.Span{root, child} {
+			if v, _ := span.Attributes().Get("gen_ai.conversation.id"); v.AsString() != "conv-123" {
+				t.Errorf("span %d gen_ai.conversation.id = %q, want conv-123", i, v.AsString())
+			}
+		}
+	})
+
+	t.Run("when the worker forges the semconv identity keys", func(t *testing.T) {
+		td, _, _ := workerBatch()
+		res := td.ResourceSpans().At(0).Resource().Attributes()
+		res.PutStr("gen_ai.conversation.id", "someone-elses-thread")
+		res.PutStr("user.id", "someone-else")
+		forged := td.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+		forged.Attributes().PutStr("gen_ai.conversation.id", "someone-elses-thread")
+
+		ReparentTraces(td, "conv-123", "user-1", turnContext())
+
+		attrs := td.ResourceSpans().At(0).Resource().Attributes()
+		if v, _ := attrs.Get("gen_ai.conversation.id"); v.AsString() != "conv-123" {
+			t.Errorf("forged resource conversation id must be swept; got %q", v.AsString())
+		}
+		if v, _ := attrs.Get("user.id"); v.AsString() != "user-1" {
+			t.Errorf("forged resource user id must be swept; got %q", v.AsString())
+		}
+		if v, _ := forged.Attributes().Get("gen_ai.conversation.id"); v.AsString() != "conv-123" {
+			t.Errorf("forged span conversation id must be swept; got %q", v.AsString())
+		}
 	})
 
 	t.Run("when no turn context has been recorded yet", func(t *testing.T) {

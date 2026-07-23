@@ -54,8 +54,14 @@ export class ModelDefaultsRepository {
     // the (scopeType, scopeId) scope and the call site is bounded by
     // the caller's transaction. No tenancy predicate in the SQL itself
     // because there is no row read or write here.
+    //
+    // $executeRaw, not $queryRaw: pg_advisory_xact_lock returns `void`, and
+    // $queryRaw tries to deserialize that column ("Failed to deserialize
+    // column of type 'void'" on Prisma 5.7 / Postgres). $executeRaw runs the
+    // statement and reads only the command tag, so the void result never gets
+    // decoded — the lock is still taken.
     await this.prisma
-      .$queryRaw`-- @tenancy: advisory-lock helper, scopeType+scopeId bounded
+      .$executeRaw`-- @tenancy: advisory-lock helper, scopeType+scopeId bounded
 SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 0))`;
   }
 

@@ -29,7 +29,7 @@ import {
   handledErrorFromThrown,
   toCliErrorDocument,
   type CliHandledError,
-} from "@langwatch/cli-cards/handled-error";
+} from "@langwatch/langy/cards/handled-error";
 import { redactSecrets } from "../telemetry/events";
 import { withFallbackSuggestions } from "./errorSuggestions";
 import {

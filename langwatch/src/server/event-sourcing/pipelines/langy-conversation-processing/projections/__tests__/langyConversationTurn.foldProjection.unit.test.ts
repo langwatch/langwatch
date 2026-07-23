@@ -6,14 +6,14 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_TURN_STATUS,
   LANGY_TURN_TOOL_CALL_STATUS,
-} from "../../schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import {
-  LangyConversationTurnFoldProjection,
   type LangyConversationTurnData,
   makeConversationTurnKey,
   parseConversationTurnKey,
-} from "../langyConversationTurn.foldProjection";
+} from "@langwatch/langy";
+import { LangyConversationTurnFoldProjection } from "../langyConversationTurn.foldProjection";
 
 const noopStore: StateProjectionStore<LangyConversationTurnData> = {
   store: async () => {},

@@ -59,7 +59,7 @@
  *    that authenticates, which is the same boundary every other read crosses.
  */
 
-import { cliResultDigestSchema } from "@langwatch/cli-cards";
+import { cliResultDigestSchema } from "@langwatch/langy";
 import type { LangyMessageRow } from "./repositories/langy-message.repository";
 import {
   MAX_LABEL_LENGTH,

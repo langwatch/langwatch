@@ -179,6 +179,15 @@ interface LangyContextTargetState {
   setSpotlight: (id: string | null) => void;
 
   /**
+   * The thing that was just taken into context, and a nonce so taking the SAME
+   * thing twice replays rather than sits there already-equal and paints
+   * nothing. Cleared by the flourish itself once it has finished.
+   */
+  absorbFlash: { id: string; nonce: number } | null;
+  flashAbsorb: (id: string) => void;
+  clearAbsorbFlash: (nonce: number) => void;
+
+  /**
    * Pick-a-thing mode. Nothing on the page reacts to Langy until this is on —
    * no ring, no button, no click interception — so the page stays the page and
    * "add to context" is a mode you enter on purpose rather than a state the
@@ -239,10 +248,21 @@ export const useLangyContextTargetStore = create<LangyContextTargetState>()(
     nearIds: new Set<string>(),
     hoveredId: null,
     spotlightId: null,
+    absorbFlash: null,
     armSource: null,
 
     setSpotlight: (id) =>
       set((state) => (state.spotlightId === id ? state : { spotlightId: id })),
+
+    flashAbsorb: (id) =>
+      set((state) => ({
+        absorbFlash: { id, nonce: (state.absorbFlash?.nonce ?? 0) + 1 },
+      })),
+
+    clearAbsorbFlash: (nonce) =>
+      set((state) =>
+        state.absorbFlash?.nonce === nonce ? { absorbFlash: null } : state,
+      ),
 
     arm: (source) =>
       set((state) => (state.armSource === source ? state : { armSource: source })),
@@ -433,6 +453,10 @@ useLangyStore.subscribe((state, previous) => {
  */
 export function absorbContextTarget(target: LangyContextTarget): void {
   useLangyContextTargetStore.getState().pick(target);
+  // The flourish: the thing floods purple and drains, so taking something into
+  // context is a moment on the page rather than a chip quietly appearing in a
+  // composer the reader may not even be looking at.
+  useLangyContextTargetStore.getState().flashAbsorb(target.id);
   useLangyStore.getState().chooseChip(target.id);
   // Doing the thing retires the hint that teaches it. Nobody needs to be told
   // how to do what they have just done.

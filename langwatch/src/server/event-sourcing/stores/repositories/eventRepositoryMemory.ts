@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { compareOrdinal } from "../../utils/compareOrdinal";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
@@ -63,12 +64,16 @@ export class EventRepositoryMemory implements EventRepository {
       return false;
     });
 
-    // Sort by timestamp then eventId to ensure consistent ordering
+    // Sort by timestamp then eventId to ensure consistent ordering. The id
+    // tie-break is plain relational (byte-wise), never localeCompare: it must
+    // order exactly like ClickHouse's `ORDER BY EventTimestamp, EventId` and
+    // the shared cursor comparator, or a same-millisecond tie folds in a
+    // different order in tests than in prod.
     const sortedRecords = [...filteredRecords].sort((a, b) => {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }
-      return a.EventId.localeCompare(b.EventId);
+      return compareOrdinal(a.EventId, b.EventId);
     });
 
     // Return a copy to prevent mutation

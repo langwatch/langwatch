@@ -124,6 +124,12 @@ async function main() {
         firstMessage: false,
         integrated: false,
         userLinkTemplate: null,
+        // `piiRedactionLevel`, `capturedInputVisibility` and
+        // `capturedOutputVisibility` used to be set here. None of the three
+        // exists on Project any more — not in the schema, not in the database —
+        // so Prisma rejected the whole create with "Unknown argument" and this
+        // script could not seed a fresh install AT ALL. They are removed rather
+        // than reinstated, because the columns they referenced are gone.
       },
     });
     console.log(`Created project ${project.id} (${project.slug})`);

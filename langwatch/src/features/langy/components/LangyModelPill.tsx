@@ -1,7 +1,7 @@
 import {
   Box,
-  chakra,
   Combobox,
+  chakra,
   createListCollection,
   HStack,
   Portal,
@@ -16,12 +16,15 @@ import {
   Image,
   Layers3,
   LoaderCircle,
+  SlidersHorizontal,
   Sparkles,
   Zap,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useModelSelectionOptions } from "~/components/ModelSelector";
+import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import {
   modelProviderIcons,
   ProviderIconGlyph,
@@ -117,10 +120,13 @@ export function LangyModelPill({
   /** Lock the picker (e.g. while a turn is in flight) — greyed, can't open. */
   disabled?: boolean;
 }) {
+  // Langy is a licensed codex surface: declaring `langy.chat` re-admits
+  // codex models the shared hook fail-closes everywhere else.
   const { selectOptions, modelOption } = useModelSelectionOptions(
     options,
     model,
     "chat",
+    { featureKey: LANGY_CHAT_FEATURE_KEY },
   );
   const currentProvider = model.split("/")[0] ?? "";
   const hasCurrentProvider = currentProvider in modelProviderIcons;
@@ -475,6 +481,38 @@ export function LangyModelPill({
                     ),
                   )
                 : null}
+            </Box>
+            {/* Same escape hatch the shared ModelSelector pins to its foot:
+                the list you are looking at is configurable, and this is the
+                road to it. Sticky so it stays visible over a scrolled list. */}
+            <Box
+              position="sticky"
+              bottom={0}
+              background="bg.panel"
+              borderTopWidth="1px"
+              borderColor="border.muted"
+            >
+              <Link
+                href="/settings/model-providers"
+                isExternal
+                display="flex"
+                alignItems="center"
+                gap={1.5}
+                paddingX={3}
+                paddingY={2}
+                color="fg.muted"
+                _hover={{
+                  background: "bg.subtle",
+                  color: "fg",
+                  textDecoration: "none",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SlidersHorizontal size={12} />
+                <Text textStyle="2xs" fontWeight="500">
+                  Configure available models
+                </Text>
+              </Link>
             </Box>
           </Combobox.Content>
         </Combobox.Positioner>

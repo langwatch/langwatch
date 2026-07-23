@@ -1,6 +1,9 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // ProviderID identifies a model provider (e.g. "openai", "anthropic", "azure").
 type ProviderID string
@@ -33,7 +36,26 @@ const (
 	// themselves (vLLM, LiteLLM proxy, ...). Requires a base URL; the
 	// API key is optional (many self-hosted servers run unauthenticated).
 	ProviderCustom ProviderID = "custom"
+	// OpenAICodex is the user's own ChatGPT subscription, reached through
+	// OpenAI's codex backend (chatgpt.com/backend-api/codex) with an OAuth
+	// access token instead of an API key. Responses-API + SSE only; the
+	// gateway proxies directly (no Bifrost enum) and refreshes a 401'd
+	// token once via the control plane. See adapters/providers/codex.go.
+	ProviderOpenAICodex ProviderID = "openai_codex"
 )
+
+// CodexTokenRefresher exchanges a codex provider row's stored refresh token
+// for a fresh access token via the control plane (which owns storage and
+// rotation). A dead session (refresh rejected — the user must sign in again)
+// is reported as an error wrapping ErrCodexSessionDead.
+type CodexTokenRefresher interface {
+	RefreshCodexToken(ctx context.Context, providerRowID string) (accessToken string, accountID string, err error)
+}
+
+// ErrCodexSessionDead is the sentinel a CodexTokenRefresher wraps when the
+// stored OpenAI session cannot be refreshed. The dispatcher turns it into
+// the client-facing 401 with code ErrCodexSessionExpired.
+var ErrCodexSessionDead = errors.New("codex session expired; sign in again")
 
 // Credential holds the resolved credentials for a provider.
 type Credential struct {

@@ -333,6 +333,53 @@ func (c *Client) setCommonHeaders(req *http.Request) {
 	}
 }
 
+// RefreshCodexToken asks the control plane — the codex OAuth session's owner —
+// to refresh the provider row's stored tokens and hand back a fresh access
+// token. Implements domain.CodexTokenRefresher; a dead session (the control
+// plane answers 401 codex_session_expired) wraps domain.ErrCodexSessionDead
+// so the dispatcher stops retrying and surfaces the sign-in-again error.
+func (c *Client) RefreshCodexToken(ctx context.Context, providerRowID string) (string, string, error) {
+	payload, err := json.Marshal(map[string]string{"provider_row_id": providerRowID})
+	if err != nil {
+		return "", "", err
+	}
+	resp, err := c.signedPost(ctx, "/api/internal/gateway/codex/refresh", payload)
+	if err != nil {
+		return "", "", fmt.Errorf("codex refresh call: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", "", fmt.Errorf("codex refresh read: %w", err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		// herr carries the typed code for surfacing; ErrCodexSessionDead rides
+		// as a reason so the dispatcher's errors.Is sentinel check still fires.
+		return "", "", herr.New(ctx, domain.ErrCodexSessionExpired, nil, domain.ErrCodexSessionDead)
+	}
+	if resp.StatusCode != http.StatusOK {
+		snippet := body
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
+		return "", "", herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+			"reason":      "codex refresh failed",
+			"http_status": resp.StatusCode,
+			"body":        string(snippet),
+		})
+	}
+	var parsed struct {
+		AccessToken string `json:"access_token"`
+		AccountID   string `json:"account_id"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil || parsed.AccessToken == "" {
+		return "", "", herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+			"reason": "codex refresh: malformed response",
+		})
+	}
+	return parsed.AccessToken, parsed.AccountID, nil
+}
+
 // signedPost is a helper for POST requests to the control plane.
 func (c *Client) signedPost(ctx context.Context, path string, body []byte) (*http.Response, error) {
 	endpoint, _ := url.JoinPath(c.baseURL, path)

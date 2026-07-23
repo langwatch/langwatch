@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
-import { StateProjectionExecutor } from "../stateProjectionExecutor";
+import {
+  compareCursors,
+  orderEvents,
+  StateProjectionExecutor,
+} from "../stateProjectionExecutor";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
@@ -118,6 +122,45 @@ describe("StateProjectionExecutor", () => {
 
         expect(apply).not.toHaveBeenCalled();
         expect(store.store).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given same-instant events whose ids cross the base62 case boundary", () => {
+    // KSUIDs encode the per-second sequence in ASCII base62 (0-9 < A-Z < a-z).
+    // ICU collation ("Z".localeCompare("a") > 0) inverts that at the Z -> a
+    // step, so cursor comparison must stay ordinal — it also has to agree
+    // with ClickHouse, which orders String columns by bytes.
+    const boundaryIds = [
+      "event_0001aaaY",
+      "event_0001aaaZ",
+      "event_0001aaaa",
+      "event_0001aaab",
+    ];
+
+    describe("when the batch is ordered", () => {
+      it("keeps byte order across the boundary", () => {
+        const shuffled = [
+          boundaryIds[2]!,
+          boundaryIds[0]!,
+          boundaryIds[3]!,
+          boundaryIds[1]!,
+        ].map((id) => event({ id, acceptedAt: 200, occurredAt: 100 }));
+
+        expect(orderEvents(shuffled).map((entry) => entry.id)).toEqual(
+          boundaryIds,
+        );
+      });
+    });
+
+    describe("when cursors on either side of the boundary are compared", () => {
+      it("ranks an uppercase-suffixed id before a lowercase-suffixed one", () => {
+        expect(
+          compareCursors(
+            { acceptedAt: 200, eventId: boundaryIds[1]! },
+            { acceptedAt: 200, eventId: boundaryIds[2]! },
+          ),
+        ).toBeLessThan(0);
       });
     });
   });

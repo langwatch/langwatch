@@ -56,6 +56,7 @@ import {
 } from "~/server/app-layer/events/track-event.service";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
+import { getOAuthClient } from "~/mcp/oauthClientRegistry";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -72,6 +73,7 @@ import {
   type MaybeStoredLLMModelCost,
 } from "~/server/modelProviders/llmModelCost";
 import { getPostHogInstance } from "~/server/posthog";
+import { rateLimit } from "~/server/rateLimit";
 import { connection as redis } from "~/server/redis";
 import {
   estimateCost,
@@ -83,6 +85,7 @@ import {
 } from "~/server/tracer/types";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { encrypt } from "~/utils/encryption";
+import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
@@ -512,8 +515,11 @@ secured
       client_id,
     } = body;
 
-    if (!projectId || !redirect_uri) {
-      return c.json({ error: "projectId and redirect_uri are required" }, 400);
+    if (!projectId || !redirect_uri || !client_id) {
+      return c.json(
+        { error: "projectId, redirect_uri and client_id are required" },
+        400,
+      );
     }
 
     try {
@@ -527,6 +533,33 @@ secured
       }
     } catch {
       return c.json({ error: "Invalid redirect_uri" }, 400);
+    }
+
+    // RFC 6749 §10.6: an authorization server must only ever issue a code to
+    // a redirect_uri that was registered for this client_id — otherwise
+    // whoever crafts the authorization request (which can be an attacker,
+    // not the approving user) can point it at a URI they control and the
+    // approved code is exfiltrated there. PKCE does not defend against this:
+    // it proves the token-exchanger holds the verifier for the challenge in
+    // the code, and an attacker who authored the request holds both. Exact
+    // string match against the client's /oauth/register'd redirect_uris —
+    // no scheme/host-only comparison, which a subdomain or path trick could
+    // slip past.
+    const registeredClient = await getOAuthClient(client_id);
+    if (!registeredClient) {
+      return c.json(
+        { error: "Unknown or unregistered client_id" },
+        400,
+      );
+    }
+    if (!registeredClient.redirectUris.includes(redirect_uri)) {
+      return c.json(
+        {
+          error:
+            "redirect_uri does not match any redirect URI registered for this client_id",
+        },
+        400,
+      );
     }
 
     if (!code_challenge) {
@@ -592,7 +625,12 @@ secured
       userId: session.user.id,
       codeChallenge: code_challenge,
       codeChallengeMethod: code_challenge_method ?? "S256",
-      clientId: client_id ?? "",
+      // Bound here so /oauth/token can require the exchange to present the
+      // exact same client_id + redirect_uri this authorization was validated
+      // and approved against (RFC 6749 §4.1.3 / §3.2.1) — a code minted for
+      // one client's registered URI must never be redeemable against another.
+      clientId: client_id,
+      redirectUri: redirect_uri,
       expiresAt: Date.now() + AUTH_CODE_TTL_SECONDS * 1000,
     });
 
@@ -711,33 +749,163 @@ secured
 // =============================================
 // POST /api/track_usage
 // =============================================
+// Self-hosted instances report anonymous daily usage counts here with no
+// credential to present (see usageStatsWorker.ts), so the route stays public.
+// What it accepts is bounded instead:
+//   - `.strict()` schema matching exactly the one report `collectUsageStats`
+//     produces, so a spoofed event can't also smuggle arbitrary properties
+//     into PostHog even once it gets the event name right
+//   - a capped payload size
+//   - a global rate limit — the actual bound. `ip` and `instance_id` are both
+//     values the caller supplies, so an abuser rotates either one and lands
+//     in a fresh bucket every request (mirrors the reasoning in
+//     rum-ingest.service.ts). Checked first, on a fixed key, so a flood the
+//     global bucket is already refusing doesn't also mint a fresh per-caller
+//     Redis key on every request.
+//   - per-IP and per-instance limits on top, for fairness once under the cap
+const TRACK_USAGE_EVENT = "daily_usage_stats";
+// Every stat field is `.optional()`, not required: this receiver is a stable
+// contract that self-hosted instances at ANY historical version hit (see
+// usageStatsWorker.ts's docstring), so an older sender predating a field
+// collectUsageStats.ts later added (or a newer one with a field this receiver
+// doesn't know about yet) must still be accepted rather than 400'd — a
+// self-hosted operator gets zero feedback on a rejected send (the worker logs
+// success unconditionally once `fetch` resolves, without checking `.ok`), so
+// a strict shape mismatch here would silently and permanently drop that
+// instance's telemetry. `.strict()` still closes the actual security gap by
+// rejecting keys outside this known set — the two constraints don't conflict.
+const trackUsageBodySchema = z
+  .object({
+    event: z.literal(TRACK_USAGE_EVENT),
+    instance_id: z.string().min(1).max(200),
+    install_method: z.string().max(100).optional(),
+    hostname: z.string().max(255).optional(),
+    environment: z.string().max(50).optional(),
+    totalTraces: z.number().optional(),
+    totalScenarioEvents: z.number().optional(),
+    annotations: z.number().optional(),
+    annotationQueues: z.number().optional(),
+    annotationQueueItems: z.number().optional(),
+    annotationScores: z.number().optional(),
+    batchEvaluations: z.number().optional(),
+    customGraphs: z.number().optional(),
+    datasets: z.number().optional(),
+    datasetRecords: z.number().optional(),
+    experiments: z.number().optional(),
+    triggers: z.number().optional(),
+    workflows: z.number().optional(),
+    timestamp: z.string().optional(),
+  })
+  .strict();
+
+// A self-hosted instance sends this once per organization per day
+// (usageStatsWorker.ts), so these ceilings stay generous for legitimate
+// traffic while bounding abuse.
+const TRACK_USAGE_GLOBAL_PER_MINUTE = 500;
+const TRACK_USAGE_PER_IP_PER_MINUTE = 10;
+const TRACK_USAGE_PER_INSTANCE_PER_HOUR = 5;
+
+interface TrackUsageRateLimitVerdict {
+  allowed: boolean;
+  retryAfterSeconds: number;
+}
+
+function toVerdict(result: {
+  allowed: boolean;
+  resetAt: number;
+}): TrackUsageRateLimitVerdict {
+  return {
+    allowed: result.allowed,
+    retryAfterSeconds: Math.max(
+      1,
+      Math.ceil((result.resetAt - Date.now()) / 1000),
+    ),
+  };
+}
+
+/**
+ * Checked before the body is even parsed, on keys no request-body field can
+ * influence, so a flood of malformed JSON is capped exactly like valid
+ * traffic — an attacker can't dodge the limiter just by sending garbage.
+ */
+async function enforceGlobalAndIpRateLimit(
+  ip: string,
+): Promise<TrackUsageRateLimitVerdict> {
+  const global = await rateLimit({
+    key: "track_usage:global",
+    windowSeconds: 60,
+    max: TRACK_USAGE_GLOBAL_PER_MINUTE,
+  });
+  if (!global.allowed) return toVerdict(global);
+
+  const perIp = await rateLimit({
+    key: `track_usage:ip:${ip}`,
+    windowSeconds: 60,
+    max: TRACK_USAGE_PER_IP_PER_MINUTE,
+  });
+  return toVerdict(perIp);
+}
+
+async function enforceInstanceRateLimit(
+  instanceId: string,
+): Promise<TrackUsageRateLimitVerdict> {
+  const perInstance = await rateLimit({
+    key: `track_usage:instance:${instanceId}`,
+    windowSeconds: 3600,
+    max: TRACK_USAGE_PER_INSTANCE_PER_HOUR,
+  });
+  return toVerdict(perInstance);
+}
+
 secured
   .access(publicEndpoint("anonymous product telemetry, no credential"))
-  .post("/track_usage", async (c) => {
-    let body: Record<string, any>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
+  .post(
+    "/track_usage",
+    bodyLimit({ maxSize: 10 * 1024 }),
+    async (c) => {
+      const ip = getClientIpFromHonoContext(c) ?? "unknown";
 
-    const { event, instance_id, ...properties } = body;
-
-    const posthog = getPostHogInstance();
-    if (posthog) {
-      try {
-        posthog.capture({
-          distinctId: instance_id,
-          event,
-          properties,
-        });
-      } catch (error) {
-        captureException(toError(error));
+      const ipLimit = await enforceGlobalAndIpRateLimit(ip);
+      if (!ipLimit.allowed) {
+        c.header("Retry-After", String(ipLimit.retryAfterSeconds));
+        return c.json({ message: "Too many requests" }, 429);
       }
-    }
 
-    return c.json({ message: "Event captured" });
-  });
+      let rawBody: unknown;
+      try {
+        rawBody = await c.req.json();
+      } catch {
+        return c.json({ message: "Bad request" }, 400);
+      }
+
+      const parsed = trackUsageBodySchema.safeParse(rawBody);
+      if (!parsed.success) {
+        return c.json({ message: "Bad request" }, 400);
+      }
+      const { event, instance_id, ...properties } = parsed.data;
+
+      const instanceLimit = await enforceInstanceRateLimit(instance_id);
+      if (!instanceLimit.allowed) {
+        c.header("Retry-After", String(instanceLimit.retryAfterSeconds));
+        return c.json({ message: "Too many requests" }, 429);
+      }
+
+      const posthog = getPostHogInstance();
+      if (posthog) {
+        try {
+          posthog.capture({
+            distinctId: instance_id,
+            event,
+            properties,
+          });
+        } catch (error) {
+          captureException(toError(error));
+        }
+      }
+
+      return c.json({ message: "Event captured" });
+    },
+  );
 
 // =============================================
 // POST /api/trigger/slack

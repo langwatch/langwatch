@@ -11,9 +11,6 @@ import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { LANGY_SKILLS, type LangySkill } from "~/shared/langy/langySkills";
 import {
-  allKindIntents,
-  kindIntentForQuery,
-  type LangyKindIntent,
 } from "../logic/langyContextKindIntent";
 import {
   absorbContextTarget,
@@ -80,7 +77,7 @@ type PaletteGroup =
   | "Platform";
 
 const GROUP_ORDER: Record<PaletteMode, PaletteGroup[]> = {
-  context: ["Context", "On this page", "Commands"],
+  context: ["Context", "On this page"],
   skills: ["Skills", "Recipes", "Platform", "Commands"],
 };
 
@@ -91,17 +88,6 @@ interface PaletteItem {
   detail: string;
   group: PaletteGroup;
   searchText: string;
-}
-
-/** The palette row a kind intent becomes ("Show traces on this page"). */
-function intentItem(intent: LangyKindIntent): PaletteItem {
-  return {
-    value: `intent:${intent.action}:${intent.kind}`,
-    label: intent.label,
-    detail: intent.detail,
-    group: "Commands",
-    searchText: "", // Appended for the query that produced it; never filtered.
-  };
 }
 
 /** Where a skill lands in the list, by where its ability comes from. */
@@ -205,26 +191,16 @@ export function LangyComposerPalette({
     const filtered = q
       ? items.filter((item) => item.searchText.includes(q))
       : items;
-    // `#trace` on a page (or query) that names a KIND rather than a resource
-    // gets an intent row — appended, never filtered out by its own query.
-    const intent =
-      mode === "context"
-        ? kindIntentForQuery({
-            query,
-            presentKinds: new Set(
-              Object.values(registeredTargets).map((target) => target.kind),
-            ),
-          })
-        : null;
-    let rows = intent ? [...filtered, intentItem(intent)] : filtered;
-    // `#` must never dead-end: a page with nothing pickable (and a query that
-    // names no kind) gets the doors instead of an empty box — one browse /
-    // reveal intent per kind.
-    if (mode === "context" && rows.length === 0) {
-      rows = allKindIntents(
-        new Set(Object.values(registeredTargets).map((target) => target.kind)),
-      ).map(intentItem);
-    }
+    // `#` is CONTEXT, and only context.
+    //
+    // It used to append "browse"/"reveal" intent rows under a Commands
+    // heading — a way out of a page with nothing pickable on it. But they made
+    // the one palette that is supposed to answer "what can I attach?" answer
+    // with things that attach nothing, and on an empty page they were the
+    // ENTIRE list, so `#` read as a command menu that happened to be filed
+    // under a different key. The real fix for a page with nothing to pick is
+    // for the page to offer its things, not for this list to change subject.
+    const rows = filtered;
     // Sorted into group order BEFORE the collection is built, so the order the
     // eye reads and the order ↑/↓ walks are the same order. Grouped rendering
     // over an unsorted collection is how a palette ends up jumping between

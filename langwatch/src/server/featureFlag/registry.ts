@@ -154,6 +154,24 @@ export const FEATURE_FLAGS = [
     description:
       "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
   },
+  // Externalizes inline media (base64 audio turns, data-URI images, file
+  // attachments) from span attributes into the content-addressed
+  // stored-objects store at the ingestion edge, before the command is staged.
+  // Fail-open by construction (any error keeps the original inline payload)
+  // and skipped for projects with data-privacy content-drop rules.
+  //
+  // Default OFF: the stored-objects store is not yet covered by the
+  // data-retention deletion path or the storage meter, so extracted media
+  // would outlive the trace's retention policy uncounted. The default flips
+  // on once stored-objects retention lands (#5951); until then the flag is a
+  // per-project / per-deployment opt-in.
+  {
+    key: "release_trace_media_extraction",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media rides inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
+  },
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
@@ -222,6 +240,14 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: specs/home/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
+  },
+  {
+    key: "release_ui_langy_peek_dock_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Langy",
+    description:
+      "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
   },
   {
     key: "release_webhook_automations",

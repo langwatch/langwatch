@@ -5,6 +5,19 @@ import { z } from "zod";
 // ---------------------------------------------------------------------------
 
 /**
+ * Compact media reference riding a trace summary (see media-refs.ts). The
+ * url is contractually a stored-objects reference — the list cell mounts it
+ * straight into an <img src>, so anything else must fail loudly here rather
+ * than reach a renderer.
+ */
+const traceMediaRefSchema = z.object({
+  kind: z.enum(["audio", "image", "video", "file"]),
+  url: z.string().startsWith("/api/files/"),
+  filename: z.string().optional(),
+  mimeType: z.string().optional(),
+});
+
+/**
  * Trace list row shape returned by `tracesV2.list`. Defaults are wide because
  * older callers / replayed cached responses may pre-date newer fields — falling
  * back keeps consumers safe instead of throwing on a fresh deploy.
@@ -34,6 +47,12 @@ const traceListItemSchema = z.object({
   sizeBytes: z.number().int().nonnegative().default(0),
   input: z.string().nullable(),
   output: z.string().nullable(),
+  // Compact media references derived from the winning span IO at fold time
+  // (langwatch.reserved.media_refs.* on the summary): what lets the table
+  // lead an Input preview with a thumbnail or an audio indicator without
+  // loading span payloads. Absent on media-free traces and older summaries.
+  inputMediaRefs: z.array(traceMediaRefSchema).optional(),
+  outputMediaRefs: z.array(traceMediaRefSchema).optional(),
   // Set when a restrict privacy rule hides the content from this viewer, so the
   // table cell shows a "Redacted" marker instead of an em-dash that reads as
   // "no content". `*VisibleTo` is the human audience label ("Admins" / "no one")
@@ -67,7 +86,7 @@ export type TraceListItemDto = z.infer<typeof traceListItemSchema>;
  * Trace header: everything the drawer header + summary tab needs.
  * Returned by `tracesV2.header`.
  */
-const traceHeaderSchema = z.object({
+export const traceHeaderSchema = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
@@ -141,7 +160,7 @@ export type TraceHeader = z.infer<typeof traceHeaderSchema>;
  * Span tree node: lightweight per-span data for waterfall / flame / span-list.
  * Returned by `tracesV2.spanTree`.
  */
-const spanTreeNodeSchema = z.object({
+export const spanTreeNodeSchema = z.object({
   spanId: z.string(),
   parentSpanId: z.string().nullable(),
   name: z.string(),

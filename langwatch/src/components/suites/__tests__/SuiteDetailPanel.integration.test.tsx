@@ -13,6 +13,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// The empty states carry the Setup via Agent menu, whose langy hooks need
+// app context these tests do not build; the control has its own tests.
+vi.mock("~/components/SetupWithAgentButton", () => ({
+  SetupWithAgentButton: () => null,
+}));
+
 /** Local type standing in for Prisma's SimulationSuite (avoids generated-client dependency). */
 type SimulationSuite = {
   id: string;
@@ -30,6 +36,7 @@ type SimulationSuite = {
   createdAt: Date;
   updatedAt: Date;
 };
+
 import { SuiteDetailPanel, SuiteEmptyState } from "../SuiteDetailPanel";
 
 // Hoisted mocks
@@ -113,9 +120,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function makeSuite(
-  overrides: Partial<SimulationSuite> = {},
-): SimulationSuite {
+function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
     id: "suite_1",
     projectId: "proj_1",
@@ -333,17 +338,16 @@ describe("<SuiteEmptyState/>", () => {
   });
 
   it("displays the empty state message", () => {
-    render(
-      <SuiteEmptyState onNewSuite={vi.fn()} />,
-      {
-        wrapper: ({ children }: { children: React.ReactNode }) => (
-          <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-        ),
-      },
-    );
+    render(<SuiteEmptyState onNewSuite={vi.fn()} />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+      ),
+    });
 
     expect(
-      screen.getByText("Select a run plan from the sidebar or create a new one"),
+      screen.getByText(
+        "Select a run plan from the sidebar or create a new one",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -352,14 +356,11 @@ describe("<SuiteEmptyState/>", () => {
       const user = userEvent.setup();
       const onNewSuite = vi.fn();
 
-      render(
-        <SuiteEmptyState onNewSuite={onNewSuite} />,
-        {
-          wrapper: ({ children }: { children: React.ReactNode }) => (
-            <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-          ),
-        },
-      );
+      render(<SuiteEmptyState onNewSuite={onNewSuite} />, {
+        wrapper: ({ children }: { children: React.ReactNode }) => (
+          <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+        ),
+      });
 
       await user.click(screen.getByText("New Run Plan"));
       expect(onNewSuite).toHaveBeenCalledOnce();

@@ -1,5 +1,5 @@
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
-import { LuBot, LuSparkles, LuTerminal } from "react-icons/lu";
+import { LuBot, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 
@@ -77,23 +77,32 @@ export function OnboardAgentPill({
       <Menu.Trigger asChild>
         <chakra.button
           type="button"
+          /* It opens a menu — it does not fire a prompt like the asks beside
+             it do. Announce that, and show it (the caret below). */
+          aria-haspopup="menu"
           display="inline-flex"
           alignItems="center"
           gap={2}
           whiteSpace="nowrap"
           borderWidth="1px"
-          borderColor={prominent ? "orange.emphasized" : "border.muted"}
+          borderColor={prominent ? "orange.emphasized" : "border.emphasized"}
           borderRadius="full"
-          background={prominent ? "orange.subtle" : "bg.surface"}
+          /* A DIFFERENT SHADE on purpose. The asks around this are borrowable
+             questions on the panel's translucent chip surface; this is the one
+             control that goes and does something — it hands you a prompt to
+             take away, or a link to follow. Sitting it on the solid raised
+             surface, a step darker than the chips, is what says "not one of
+             those" before the caret confirms it. */
+          background={prominent ? "orange.subtle" : "bg.muted"}
           paddingLeft={prominent ? 4 : 3}
           paddingRight="4px"
           paddingY={prominent ? "5px" : "3px"}
-          boxShadow={prominent ? "xs" : undefined}
+          boxShadow={prominent ? "xs" : "2xs"}
           cursor="pointer"
           transition="border-color 130ms ease, background 130ms ease"
           _hover={{
             borderColor: prominent ? "orange.solid" : "border.emphasized",
-            background: prominent ? "orange.muted" : "bg.muted",
+            background: prominent ? "orange.muted" : "bg.emphasized",
           }}
         >
           <chakra.span
@@ -113,7 +122,9 @@ export function OnboardAgentPill({
                 key={i}
                 boxSize="18px"
                 borderRadius="5px"
-                background="bg.muted"
+                /* The pill's own ground went a step darker, so the tiles take
+                   the raised surface to stay legible against it. */
+                background="bg.surface"
                 borderWidth="1px"
                 borderColor="border.muted"
                 display="grid"
@@ -124,6 +135,18 @@ export function OnboardAgentPill({
               </Box>
             ))}
           </HStack>
+          {/* The caret is the interaction, stated. An ask fires the moment you
+              click it; this one opens and asks you to choose a route, and a
+              control should look like what it does before you touch it. */}
+          <Box
+            aria-hidden
+            display="grid"
+            color="fg.subtle"
+            paddingRight="3px"
+            flexShrink={0}
+          >
+            <LuChevronDown size={13} />
+          </Box>
         </chakra.button>
       </Menu.Trigger>
       <Menu.Content minWidth="280px" padding={1}>

@@ -1,4 +1,4 @@
-import type { LangyMessagePart } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
+import type { LangyMessagePart } from "@langwatch/langy";
 
 export type MessageRole = "user" | "assistant" | "tool" | "system";
 

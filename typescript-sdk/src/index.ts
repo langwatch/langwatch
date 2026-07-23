@@ -46,7 +46,7 @@ export {
 export type {
   CliHandledError as LangWatchHandledErrorShape,
   CliHandledErrorReason as LangWatchHandledErrorReason,
-} from "@langwatch/cli-cards/handled-error";
+} from "@langwatch/langy/cards/handled-error";
 
 // Experiments API exports
 export {

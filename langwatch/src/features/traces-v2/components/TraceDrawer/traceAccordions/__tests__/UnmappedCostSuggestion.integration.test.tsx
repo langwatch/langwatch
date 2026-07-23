@@ -40,6 +40,13 @@ vi.mock("../../../../hooks/useTraceResources", () => ({
   useTraceResources: () => ({ bySpanId: {}, isLoading: false }),
 }));
 
+// SpanAccordions joins log content onto spans via a tRPC query; this test
+// renders without that provider, so stub the hook to the no-logs state.
+// Log enrichment is out of scope for the cost suggestion.
+vi.mock("../../../../hooks/useSpanLogs", () => ({
+  useSpanLogs: () => ({ logsBySpanId: new Map(), isLoading: false }),
+}));
+
 // RedactedField (wrapping the IO viewers) reads field-redaction status via a
 // tRPC query; this test renders without that provider, so stub the hook to the
 // not-redacted passthrough — redaction is out of scope for the cost suggestion.

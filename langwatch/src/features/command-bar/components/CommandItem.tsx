@@ -48,8 +48,8 @@ export function CommandItem({
       cursor="pointer"
       borderRadius="lg"
       marginX={{ base: 2, md: 2.5 }}
-      bg={isSelected ? "bg.emphasized" : "transparent"}
-      _hover={{ bg: "bg.muted" }}
+      bg={isSelected ? "bg.emphasized/60" : "transparent"}
+      _hover={{ bg: "bg.emphasized/80" }}
       onClick={() => onSelect(item)}
       onMouseEnter={() => onMouseEnter(index)}
       gap={3.5}
