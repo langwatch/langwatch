@@ -342,6 +342,23 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
+	// A Langy turn's model call belongs INSIDE the turn's trace. When the call
+	// arrived WITHOUT the turn's traceparent (a relay gap, or a call outside
+	// any turn), this span rooted a standalone trace that duplicates the turn
+	// in the customer's trace explorer; the worker's own spans already show
+	// the call, so the copy adds nothing but a second row with the same cost.
+	// Drop it, errors included: the turn span carries the failure. A Langy
+	// call is recognized by its mirror tier, which the control plane resolves
+	// to non-skip ONLY for Langy virtual keys, so ordinary gateway traffic
+	// (playground, customer API keys) never carries one, so its standalone
+	// root, the only trace such traffic has, is untouched. attrDrop sits
+	// outermost in the export chain, so the unjoinable span's mirror copy is
+	// suppressed with it.
+	if tier := params.MirrorTier; (tier == mirrorTierContent || tier == mirrorTierStructural) &&
+		TraceParent(ctx) == "" {
+		span.SetAttributes(attrDrop.Bool(true))
+	}
+
 	span.End()
 }
 

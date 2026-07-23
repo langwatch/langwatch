@@ -427,6 +427,7 @@ export class RecordSpanCommand
 
   private static readonly RESERVED_ATTR_PASSTHROUGH = new Set<string>([
     "langwatch.reserved.causality_depth",
+    "langwatch.reserved.skip_token_accumulation",
   ]);
 
   /**
@@ -445,10 +446,17 @@ export class RecordSpanCommand
    *     loops (post-2026-05-11 incident). Stripping it here would
    *     silently disable the loop-prevention guard in production.
    *
+   *   - `langwatch.reserved.skip_token_accumulation`, stamped by the
+   *     Langy telemetry relay on mediated worker model-call spans, whose
+   *     usage the gateway's own gen_ai span in the same trace already
+   *     meters. The trace-summary fold reads it to count that usage once.
+   *     Stripping it would double every Langy turn's token/cost totals.
+   *
    * If a customer SDK does manage to set one of these from outside,
-   * worst case is a one-shot eval-skip on their own trace — bounded
-   * impact, and bypassing requires knowing internal attribute names.
-   * Far preferable to silently breaking loop prevention.
+   * worst case is a one-shot eval-skip or an undercounted total on their
+   * own trace: bounded impact, and bypassing requires knowing internal
+   * attribute names. Far preferable to silently breaking the dependent
+   * behavior.
    */
   private static stripReservedAttributes(
     span: OtlpSpan,

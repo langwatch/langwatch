@@ -16,6 +16,7 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 	"github.com/langwatch/langwatch/services/langyagent/internal/telemetry"
+	langyotel "github.com/langwatch/langwatch/services/langyagent/otel"
 )
 
 // errStreamConsumerCrashed unblocks the handler when the SSE stream goroutine
@@ -246,21 +247,26 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	// Pin the turn's trace context on the worker's telemetry-relay entry BEFORE
 	// the prompt is posted, so every span the worker exports during this turn —
 	// and every mediated LLM call it makes — is stitched under this turn's trace.
-	// With telemetry off this is the remote (control-plane) span context; still
-	// valid, still the right parent.
+	// With telemetry off this is the remote (control-plane) span context. When
+	// even that is absent (noop tracers on both processes, dev without an OTLP
+	// endpoint), the turn MINTS its identity: without one, worker spans keep
+	// their own trace ids, the customer turn root is never forwarded, and the
+	// gateway's gen_ai span roots a standalone trace duplicating the turn.
 	start := time.Now()
 	// How the turn ended, when it ended in an error: set by every failing
 	// branch below, read by the deferred customer turn-span forward so the
 	// customer trace shows the failure (status + message), and mirrored onto
 	// the internal turn span. Nil means the turn completed (or handed off).
 	var failure *domain.TurnFailure
-	if sc := turnSpan.SpanContext(); sc.IsValid() {
-		worker.SetTurnTraceContext(sc)
-		// The customer's copy of the turn span, emitted when the turn ends —
-		// the real root under which the worker's re-parented spans and the
-		// gateway's retold LLM spans already sit.
-		defer func() { worker.ForwardTurnSpan(sc, start, time.Now(), failure) }()
+	sc := turnSpan.SpanContext()
+	if !sc.IsValid() {
+		sc = langyotel.MintSpanContext()
 	}
+	worker.SetTurnTraceContext(sc)
+	// The customer's copy of the turn span, emitted when the turn ends:
+	// the real root under which the worker's re-parented spans and the
+	// gateway's retold LLM spans already sit.
+	defer func() { worker.ForwardTurnSpan(sc, start, time.Now(), failure) }()
 
 	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
 	// the turn still runs + finalizes, it just has no live edge.

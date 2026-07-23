@@ -625,6 +625,10 @@ func (r *Relay) handleTraces(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	ReparentTraces(td, conversationID, entry.info.ActorUserID, turn)
+	// The gateway's gen_ai span is the meter for every mediated LLM call; the
+	// worker SDK's model-call spans repeat the same usage and would double the
+	// trace totals without the dedup stamp.
+	StampMediatedUsageDedup(td)
 	// Codex turns run on the user's ChatGPT plan, not a paid API key: mark the
 	// relayed model-call spans bundled so cost tracking never bills them as
 	// API spend. The manager-held model id is the only trusted codex signal

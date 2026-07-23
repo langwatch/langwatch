@@ -124,9 +124,10 @@ func TestMirrorCopy_Attribution(t *testing.T) {
 			"a prompt-injectable worker must not brand the mirror as platform_internal")
 	})
 
-	t.Run("labels and groups the trace as langy", func(t *testing.T) {
-		tags, _ := str(res, "tag.tags")
-		assert.Contains(t, tags, "langy")
+	t.Run("groups the trace by conversation without a langy label", func(t *testing.T) {
+		_, hasTags := res.Get("tag.tags")
+		assert.False(t, hasTags,
+			"the origin stamp is the Langy signal; a label repeating it is duplicate noise")
 		thread, _ := str(res, "langwatch.thread.id")
 		assert.Equal(t, "conv-1", thread)
 	})
@@ -194,6 +195,19 @@ func TestMirrorCopy_Tiers(t *testing.T) {
 			chat, _ := spanByName(out, "ai.streamText")
 			model, _ := str(chat.Attributes(), "gen_ai.request.model")
 			assert.Equal(t, "openai/gpt-5-mini", model)
+		})
+
+		t.Run("marks worker model-call spans as redundant usage copies", func(t *testing.T) {
+			// The gateway's mirror leg delivers its own gen_ai span per call, so
+			// it is the meter in the mirror project too; the worker span's
+			// usage must not double the mirrored turn's totals.
+			chat, _ := spanByName(out, "ai.streamText")
+			skip, ok := str(chat.Attributes(), "langwatch.reserved.skip_token_accumulation")
+			require.True(t, ok, "model-call span must carry the dedup stamp")
+			assert.Equal(t, "true", skip)
+			tool, _ := spanByName(out, "ai.toolCall")
+			_, stamped := tool.Attributes().Get("langwatch.reserved.skip_token_accumulation")
+			assert.False(t, stamped, "tool spans carry no usage and must not be stamped")
 		})
 	})
 

@@ -111,6 +111,11 @@ func emitOne(t *testing.T, mirror MirrorConfig, params domain.AITraceParams) *ca
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
+	// A mirrored (Langy) call always arrives with the turn's traceparent in
+	// real traffic; the relay stamps it. Without one, EndSpan drops the span
+	// as an unjoinable duplicate instead of exporting it (the Langy drop
+	// guard), which is its own test, not this fixture's subject.
+	ctx = WithTraceParent(ctx, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
 	spanCtx, _ := e.BeginSpan(ctx, "proj-customer", domain.RequestTypeChat)
 	e.EndSpan(spanCtx, params)
 	require.NoError(t, e.tp.ForceFlush(context.Background()))

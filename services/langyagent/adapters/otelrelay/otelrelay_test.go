@@ -454,6 +454,51 @@ func TestRelayTracesCodexNonBillable(t *testing.T) {
 			t.Error("an API-key turn must never carry the bundled flag, even worker-forged")
 		}
 	})
+
+	// Every worker LLM call is mediated, so the gateway's gen_ai span in the
+	// same trace is the meter; the worker SDK's model-call span repeats the
+	// usage and must be excluded from the trace totals (while its per-span
+	// detail stays visible). Applies to EVERY provider, not just codex.
+	//
+	// @scenario "A turn's usage is counted once across the worker and gateway views"
+	t.Run("marks worker model-call spans as redundant usage copies", func(t *testing.T) {
+		td := post(t, "openai/gpt-5-mini", codexBatch(false))
+		spans := td.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
+		model, tool := spans.At(0), spans.At(1)
+		if v, ok := model.Attributes().Get("langwatch.reserved.skip_token_accumulation"); !ok || v.Str() != "true" {
+			t.Errorf("model-call span must carry skip_token_accumulation=true (the gateway span is the meter), got %v", v.Str())
+		}
+		if _, ok := tool.Attributes().Get("langwatch.reserved.skip_token_accumulation"); ok {
+			t.Error("tool spans carry no usage and must not be stamped")
+		}
+	})
+
+	// The REAL wire shape: opencode's Vercel AI SDK spans carry ai.model.id /
+	// ai.model.provider, never the gen_ai.* names (those appear only after
+	// ingest canonicalisation). A key list matching only gen_ai.* silently
+	// no-ops on every real batch, verified live before this fixture existed.
+	t.Run("matches the ai.model wire shape opencode actually exports", func(t *testing.T) {
+		td := ptrace.NewTraces()
+		ss := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty()
+		model := ss.Spans().AppendEmpty()
+		model.SetName("ai.streamText.doStream")
+		model.SetSpanID(pcommon.SpanID{3, 3, 3, 3, 3, 3, 3, 3})
+		model.Attributes().PutStr("ai.model.id", "gpt-5-mini")
+		model.Attributes().PutStr("ai.model.provider", "openai.responses")
+		payload, err := (&ptrace.ProtoMarshaler{}).MarshalTraces(td)
+		if err != nil {
+			t.Fatalf("marshal fixture: %v", err)
+		}
+
+		out := post(t, "openai_codex/gpt-5-mini", payload)
+		span := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0)
+		if v, ok := span.Attributes().Get("langwatch.reserved.skip_token_accumulation"); !ok || v.Str() != "true" {
+			t.Errorf("wire-shape model span must carry the dedup stamp, got %v", v.Str())
+		}
+		if v, ok := span.Attributes().Get("langwatch.cost.non_billable"); !ok || v.Str() != "true" {
+			t.Errorf("wire-shape model span on a codex turn must carry the bundled flag, got %v", v.Str())
+		}
+	})
 }
 
 func TestPathSignal(t *testing.T) {

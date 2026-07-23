@@ -92,6 +92,7 @@ func MirrorCopy(td ptrace.Traces, p MirrorParams) ptrace.Traces {
 				attrs := span.Attributes()
 				stripMirrorForgedOrigin(attrs)
 				substituteTrustedModel(attrs, p.TrustedModel)
+				stampMirrorUsageDedup(attrs)
 				if !p.IncludeContent {
 					stripContent(attrs)
 				}
@@ -153,8 +154,9 @@ func forEachMirrorSpan(td ptrace.Traces, fn func(ptrace.Span)) {
 //     worker must not choose the provenance marker);
 //   - replaces a platform-impersonating service.name with "langy", leaving a
 //     legitimate worker service.name ("opencode") untouched;
-//   - labels the trace "langy" (tag.tags) and groups it by conversation
-//     (langwatch.thread.id);
+//   - groups the trace by conversation (langwatch.thread.id). Its Langy
+//     provenance is the origin stamp alone; no label repeats it. A worker-set
+//     tag.tags rides through deduplicated to its leading copy;
 //   - stamps the SOURCE tenant (organization + project) for per-customer
 //     attribution — mirror-only, never on the customer's own trace.
 func stampMirrorResource(attrs pcommon.Map, p MirrorParams) {
@@ -168,13 +170,8 @@ func stampMirrorResource(attrs pcommon.Map, p MirrorParams) {
 
 	tags := firstMirrorValue(attrs, mirrorTagsKey)
 	removeAllMirror(attrs, mirrorTagsKey)
-	switch {
-	case tags == "":
-		attrs.PutStr(mirrorTagsKey, langyLabel)
-	case mirrorTagsContain(tags, langyLabel):
+	if tags != "" {
 		attrs.PutStr(mirrorTagsKey, tags)
-	default:
-		attrs.PutStr(mirrorTagsKey, tags+","+langyLabel)
 	}
 
 	removeAllMirror(attrs, mirrorThreadKey)
@@ -211,6 +208,32 @@ func substituteTrustedModel(attrs pcommon.Map, trustedModel string) {
 	}
 }
 
+// mirrorModelSignalKeys mirror otelrelay's genAIModelSignalKeys: the span
+// attributes that mark a worker span as a model call. The ai.model.* pair is
+// the shape opencode's Vercel AI SDK spans carry on the wire.
+var mirrorModelSignalKeys = []string{
+	"gen_ai.provider.name",
+	"gen_ai.request.model",
+	"gen_ai.response.model",
+	"ai.model",
+	"ai.model.id",
+	"ai.model.provider",
+}
+
+// stampMirrorUsageDedup marks a worker model-call span as a redundant usage
+// copy, the same stamp the customer forward applies (otelrelay
+// StampMediatedUsageDedup): the gateway's mirror leg delivers its own gen_ai
+// span for every mediated call, so it is the meter in the mirror project too;
+// without the stamp the mirrored turn's totals count every call twice.
+func stampMirrorUsageDedup(attrs pcommon.Map) {
+	for _, key := range mirrorModelSignalKeys {
+		if _, ok := attrs.Get(key); ok {
+			attrs.PutStr(mirrorSkipTokenAccumulationKey, "true")
+			return
+		}
+	}
+}
+
 // stripContent removes exactly the content-carrier keys for the structural
 // tier. Every removal sweeps ALL entries for the key (the worker writes its own
 // OTLP and may repeat a key), so a duplicated content attribute cannot ride
@@ -234,7 +257,10 @@ const (
 	mirrorPlatformService = "langy"
 	mirrorTagsKey         = "tag.tags"
 	mirrorThreadKey       = "langwatch.thread.id"
-	langyLabel            = "langy"
+	// mirrorSkipTokenAccumulationKey mirrors otelrelay's dedup stamp: the
+	// ingest's trace fold skips marked spans when summing usage, so the
+	// gateway's gen_ai copy meters the mirrored turn once.
+	mirrorSkipTokenAccumulationKey = "langwatch.reserved.skip_token_accumulation"
 	// Source-tenant attribution keys (ADR-053 Track A: organization + project
 	// identifiers). The same key convention the gateway's own tracer uses
 	// (services/aigateway/adapters/gatewaytracer/attrs.go); on the mirror they
@@ -260,13 +286,4 @@ func firstMirrorValue(attrs pcommon.Map, key string) string {
 		return v.AsString()
 	}
 	return ""
-}
-
-func mirrorTagsContain(csv, tag string) bool {
-	for _, t := range strings.Split(csv, ",") {
-		if strings.TrimSpace(t) == tag {
-			return true
-		}
-	}
-	return false
 }

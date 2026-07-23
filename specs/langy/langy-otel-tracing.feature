@@ -1,7 +1,7 @@
 Feature: Langy agent activity is traced into the user's project
   As a LangWatch user running Langy
   I want Langy's agent activity (LLM calls, tool calls) captured as traces
-  So that I can observe and debug what Langy did, in my own project, tagged "langy"
+  So that I can observe and debug what Langy did, in my own project, attributed to Langy
 
   # Part of epic #4528 (issue #4536), reworked for host-mediated telemetry.
   #
@@ -60,14 +60,14 @@ Feature: Langy agent activity is traced into the user's project
     When the manager forwards a worker span batch
     Then it POSTs OTLP protobuf to "<LANGWATCH_ENDPOINT>/api/otel/v1/traces"
     And it authenticates with the conversation's session key as a Bearer token
-    And the resource attributes include "tag.tags=langy"
     And the resource attributes include "langwatch.thread.id=<conversationId>"
+    And the trace's origin resolves to Langy without a "langy" label repeating it
 
   Scenario: A span batch with no turn in flight still reaches the project
     Given no turn trace context has been recorded for the conversation yet
     When the worker exports a span batch
     Then the batch is forwarded without re-parenting
-    And the resource attributes still tag it "langy" with the conversation's thread id
+    And the resource attributes still group it under the conversation's thread id
 
   Scenario: An unknown routing token is rejected
     When a span batch is posted to the loopback endpoint with an unknown token
@@ -237,7 +237,30 @@ Feature: Langy agent activity is traced into the user's project
   Scenario: A Langy chat produces a trace in the user's project
     When I send a message to Langy in my project
     Then a trace appears in that same project
-    And the trace's labels contain "langy"
+    And the trace shows Langy as its origin
+    And the trace carries no "langy" label repeating the origin
+
+  Scenario: A Langy turn is one trace with the model call inside it
+    When I send a message to Langy in my project
+    Then the turn appears as a single trace in my project
+    And the model call the gateway served for the turn appears inside that trace
+    And no separate gateway-origin trace duplicates the turn's model call
+
+  Scenario: Gateway traffic outside a Langy turn keeps its own trace
+    Given I call the AI gateway directly with my own key, outside any Langy turn
+    When the call completes
+    Then the call appears as its own trace with origin "Gateway"
+
+  Scenario: A turn stays one trace even when the manager runs without its own telemetry
+    Given the manager runs with its own telemetry export disabled
+    When I send a message to Langy in my project
+    Then the turn still appears as a single trace with the model call inside it
+
+  Scenario: A turn's usage is counted once across the worker and gateway views
+    Given a turn whose model call is served through the gateway
+    When the turn's trace appears in my project
+    Then the trace's token and cost totals count the model call once
+    And the agent's activity and the gateway's metered call both remain visible as spans
 
   Scenario: Turns of one conversation are grouped together
     Given a Langy conversation with id "conv-123"
@@ -250,9 +273,9 @@ Feature: Langy agent activity is traced into the user's project
   # ============================================================================
 
   Scenario: tag.tags in resource attributes becomes trace labels
-    Given an OTLP trace whose resource attributes include "tag.tags=langy"
+    Given an OTLP trace whose resource attributes include "tag.tags=checkout-flow"
     When the trace is ingested at /api/otel/v1/traces
-    Then the stored trace's labels contain "langy"
+    Then the stored trace's labels contain "checkout-flow"
 
   Scenario: langwatch.thread.id in resource attributes becomes thread_id
     Given an OTLP trace whose resource attributes include "langwatch.thread.id=conv-123"
