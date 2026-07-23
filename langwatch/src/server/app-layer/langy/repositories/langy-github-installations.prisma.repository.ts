@@ -115,7 +115,7 @@ export class PrismaLangyGithubInstallationsRepository
 
   async insertOrGetExisting(
     input: UpsertLangyGithubInstallationInput,
-  ): Promise<{ inserted: boolean; row: LangyGithubInstallationRow }> {
+  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }> {
     try {
       const created = await this.prisma.langyGithubInstallation.create({
         data: {
@@ -129,7 +129,7 @@ export class PrismaLangyGithubInstallationsRepository
           suspendedAt: null,
         },
       });
-      return { inserted: true, row: toRow(created) };
+      return { wasInserted: true, row: toRow(created) };
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -141,7 +141,7 @@ export class PrismaLangyGithubInstallationsRepository
         const existing = await this.prisma.langyGithubInstallation.findUnique(
           { where: { installationId: input.installationId } },
         );
-        if (existing) return { inserted: false, row: toRow(existing) };
+        if (existing) return { wasInserted: false, row: toRow(existing) };
       }
       throw error;
     }

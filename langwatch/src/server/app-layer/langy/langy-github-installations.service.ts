@@ -157,8 +157,8 @@ export class LangyGithubInstallationsService {
     // concurrent `/setup` calls racing for the same fresh installation id can
     // never both observe "unclaimed". Whichever loses the race always sees
     // the winner's committed org here.
-    const { inserted, row } = await this.repo.insertOrGetExisting(input);
-    if (!inserted) {
+    const { wasInserted, row } = await this.repo.insertOrGetExisting(input);
+    if (!wasInserted) {
       if (row.organizationId !== organizationId) {
         throw new LangyGithubInstallationConflictError({
           installationId: details.installationId,

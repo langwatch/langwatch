@@ -59,7 +59,7 @@ export interface LangyGithubInstallationsRepository {
    */
   insertOrGetExisting(
     input: UpsertLangyGithubInstallationInput,
-  ): Promise<{ inserted: boolean; row: LangyGithubInstallationRow }>;
+  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }>;
 
   setRepositories(params: {
     installationId: string;
@@ -92,10 +92,10 @@ export class NullLangyGithubInstallationsRepository
   async upsert(): Promise<void> {}
   async insertOrGetExisting(
     input: UpsertLangyGithubInstallationInput,
-  ): Promise<{ inserted: boolean; row: LangyGithubInstallationRow }> {
+  ): Promise<{ wasInserted: boolean; row: LangyGithubInstallationRow }> {
     const now = new Date();
     return {
-      inserted: true,
+      wasInserted: true,
       row: { ...input, suspendedAt: null, createdAt: now, updatedAt: now },
     };
   }

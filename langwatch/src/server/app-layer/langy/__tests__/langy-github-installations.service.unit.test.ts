@@ -45,7 +45,7 @@ function makeRepo(
     insertOrGetExisting: vi.fn(
       async (input: UpsertLangyGithubInstallationInput) => {
         const existing = byId.get(input.installationId);
-        if (existing) return { inserted: false, row: existing };
+        if (existing) return { wasInserted: false, row: existing };
         const created: LangyGithubInstallationRow = {
           ...input,
           suspendedAt: null,
@@ -53,7 +53,7 @@ function makeRepo(
           updatedAt: new Date(),
         };
         byId.set(input.installationId, created);
-        return { inserted: true, row: created };
+        return { wasInserted: true, row: created };
       },
     ),
     setRepositories: vi.fn(async () => {}),

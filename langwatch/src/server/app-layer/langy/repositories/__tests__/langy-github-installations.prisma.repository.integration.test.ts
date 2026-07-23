@@ -52,7 +52,7 @@ afterEach(async () => {
 
 describe("PrismaLangyGithubInstallationsRepository.insertOrGetExisting", () => {
   describe("when the installation id is fresh", () => {
-    it("inserts and reports inserted: true", async () => {
+    it("inserts and reports wasInserted: true", async () => {
       const installationId = `${namespace}-fresh`;
       const orgId = `${namespace}-org-a`;
 
@@ -60,7 +60,7 @@ describe("PrismaLangyGithubInstallationsRepository.insertOrGetExisting", () => {
         input(installationId, orgId),
       );
 
-      expect(result.inserted).toBe(true);
+      expect(result.wasInserted).toBe(true);
       expect(result.row.organizationId).toBe(orgId);
     });
   });
@@ -76,8 +76,8 @@ describe("PrismaLangyGithubInstallationsRepository.insertOrGetExisting", () => {
         repository.insertOrGetExisting(input(installationId, orgB)),
       ]);
 
-      const inserted = [resultA, resultB].filter((r) => r.inserted);
-      const conflicted = [resultA, resultB].filter((r) => !r.inserted);
+      const inserted = [resultA, resultB].filter((r) => r.wasInserted);
+      const conflicted = [resultA, resultB].filter((r) => !r.wasInserted);
       expect(inserted).toHaveLength(1);
       expect(conflicted).toHaveLength(1);
       // The loser's "existing" read is the winner's committed row — never a
@@ -95,7 +95,7 @@ describe("PrismaLangyGithubInstallationsRepository.insertOrGetExisting", () => {
   });
 
   describe("when the installation id already exists", () => {
-    it("reports inserted: false with the existing row, and never overwrites it", async () => {
+    it("reports wasInserted: false with the existing row, and never overwrites it", async () => {
       const installationId = `${namespace}-existing`;
       const orgA = `${namespace}-org-a`;
       const orgB = `${namespace}-org-b`;
@@ -105,7 +105,7 @@ describe("PrismaLangyGithubInstallationsRepository.insertOrGetExisting", () => {
         input(installationId, orgB),
       );
 
-      expect(result.inserted).toBe(false);
+      expect(result.wasInserted).toBe(false);
       expect(result.row.organizationId).toBe(orgA);
       const stored = await prisma.langyGithubInstallation.findUnique({
         where: { installationId },
