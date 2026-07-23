@@ -19,9 +19,13 @@ import {
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
 import { gqJobsDroppedTotal, gqJobsRetriedTotal } from "../metrics";
-import { incompressible, InMemoryObjectStore } from "./blobTestDoubles";
+import {
+  incompressible,
+  InMemoryObjectStore,
+  PerUriTransientFailureStore,
+} from "./blobTestDoubles";
 
-// Skip outside testcontainers (e.g. plain unit runs) — mirrors the other
+// Skip outside testcontainers (e.g. plain unit runs) -- mirrors the other
 // groupQueue integration suites (groupQueue.decodeDrop/gq2).
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ||
@@ -34,7 +38,7 @@ type TestPayload = {
   id: string;
   groupId: string;
   value: string;
-  // Caller-controlled routing fields (allowed through the __* guard — see
+  // Caller-controlled routing fields (allowed through the __* guard -- see
   // groupQueue.gq2.integration.test.ts). Optional so plain sends still work.
   __pipelineName?: string;
   __jobType?: string;
@@ -42,7 +46,7 @@ type TestPayload = {
 };
 
 // Tenant prefix for groupIds so GQ2 (content-addressed, tenant-namespaced)
-// offload activates — see jobEnvelope.ts's projectIdFor / tenantIdFromGroupId.
+// offload activates -- see jobEnvelope.ts's projectIdFor / tenantIdFromGroupId.
 const TENANT = createTenantId("proj1");
 const STORAGE_DESTINATION = async () =>
   ({ kind: "s3" as const, bucket: "test-bucket" });
@@ -69,7 +73,7 @@ describe.skipIf(!hasTestcontainers)(
 
     afterEach(async () => {
       await Promise.all(queues.map((q) => q.close().catch(() => {})));
-      // Scoped to this suite's hash-tagged namespace — never a global
+      // Scoped to this suite's hash-tagged namespace -- never a global
       // flushall, which would race with parallel integration suites on the
       // shared Redis (see groupQueue.gq2.integration.test.ts).
       const keys = await redis.keys("{test/gqrestage/*");
@@ -124,7 +128,7 @@ describe.skipIf(!hasTestcontainers)(
     }
 
     /**
-     * Sum of `gq_jobs_dropped_total` for `reason: "body_unreadable"` — the
+     * Sum of `gq_jobs_dropped_total` for `reason: "body_unreadable"` -- the
      * reason parseDrainedPayload records when a sibling's blob is corrupt.
      *
      * With the fix: the corrupted sibling B is dropped exactly once (by
@@ -133,7 +137,7 @@ describe.skipIf(!hasTestcontainers)(
      * at exactly 1.
      *
      * Without the fix: B is re-staged on every retry cycle, re-dispatched
-     * on the next drain, and re-dropped — the counter climbs by 1 per
+     * on the next drain, and re-dropped -- the counter climbs by 1 per
      * retry. With a retryable handler error and a 4s wait window, the
      * exponential backoff (500ms, 1s, 2s, 4s) lets ~3-4 retry cycles
      * surface, so the counter climbs to 2-4.
@@ -145,7 +149,7 @@ describe.skipIf(!hasTestcontainers)(
         .reduce((sum, d) => sum + d.value, 0);
     }
 
-    /** Sum of `gq_jobs_retried_total` for this queue — guards the test
+    /** Sum of `gq_jobs_retried_total` for this queue -- guards the test
      * against an inverted predicate (`if (!sibling.dropped) continue;`)
      * that would skip ALL siblings: with such a regression, the dispatched
      * job A still retries but C is never re-staged, so retriedTotal stays
@@ -197,17 +201,17 @@ describe.skipIf(!hasTestcontainers)(
          * @scenario restageDrainedSiblings skips a sibling already dropped via
          * parseDrainedPayload, so the dropped job is not resurrected into the
          * ready queue (#5857). Without the fix, the dropped sibling is
-         * re-staged, re-dispatched, and re-dropped on the next drain — a
+         * re-staged, re-dispatched, and re-dropped on the next drain -- a
          * resurrection loop that increments gq_jobs_dropped_total repeatedly
          * for the same logical job.
          *
          * The handler throws a plain Error (retryable) rather than a
          * ValidationError (non-retryable) so the dispatched job A drives the
-         * retry path — not handleExhaustedRetries→restageAndBlock. A
+         * retry path -- not handleExhaustedRetries->restageAndBlock. A
          * non-retryable error blocks the group on the first failure, so B
          * never gets re-dispatched and the counter stays at 1 even on the
          * buggy code (false green). A retryable error keeps the group
-         * unblocked: each retry re-drains whatever is in the ready zset —
+         * unblocked: each retry re-drains whatever is in the ready zset --
          * with the bug B is in the zset (re-staged), so it is re-drained and
          * re-dropped; with the fix B was skipped, so only A and C retry.
          */
@@ -217,7 +221,7 @@ describe.skipIf(!hasTestcontainers)(
           const objectStore = new InMemoryObjectStore();
 
           // Stage three jobs in the same group: A (dispatched, lowest score),
-          // B (will be corrupted → dropped by parseDrainedPayload), C (healthy
+          // B (will be corrupted -> dropped by parseDrainedPayload), C (healthy
           // sibling, highest score). Staging is sequential so each send
           // produces a strictly-later dispatch score, which makes A the
           // dispatched job and B/C the drained siblings on the first claim.
@@ -234,7 +238,7 @@ describe.skipIf(!hasTestcontainers)(
 
           // Corrupt B's blob (the SECOND uri in insertion order). The body
           // is present but unreadable, so parseDrainedPayload routes it to
-          // recordDrop with reason "body_unreadable" — NOT TransientBlobStoreError
+          // recordDrop with reason "body_unreadable" -- NOT TransientBlobStoreError
           // (which would re-throw and take the restage-all path at line 895)
           // and NOT PayloadTooLargeError (which would re-throw and park the
           // group at line 913). This is the only drop path that leaves the
@@ -246,16 +250,16 @@ describe.skipIf(!hasTestcontainers)(
 
           // processBatch throws a *retryable* plain Error so the dispatched
           // job A drives the retry path (retryRestage + backoff) rather than
-          // handleExhaustedRetries→restageAndBlock. The group stays
+          // handleExhaustedRetries->restageAndBlock. The group stays
           // unblocked, so each retry re-dispatches A and re-drains whatever
           // is in the ready zset. restageDrainedSiblings still runs on
-          // every catch (the [B, C] sibling batch) — that is the call site
+          // every catch (the [B, C] sibling batch) -- that is the call site
           // under test (groupQueue.ts line ~1078).
           //
           // seenPayloads records every payload observed by either handler
           // across both processing paths. Used below to assert healthy
           // sibling C is re-dispatched at least once after the initial
-          // batch — guarding against an inverted predicate that skips
+          // batch -- guarding against an inverted predicate that skips
           // ALL siblings (e.g. an unconditional `continue;`), which would
           // leave A retrying alone (so retriedCount > 0 still passes)
           // while C is silently lost.
@@ -274,7 +278,7 @@ describe.skipIf(!hasTestcontainers)(
           });
           await consumer.waitUntilReady();
 
-          // Wait for B's first drop (parseDrainedPayload fails → recordDrop
+          // Wait for B's first drop (parseDrainedPayload fails -> recordDrop
           // with reason "body_unreadable"). This is the only drop the fix
           // permits; every subsequent drop would be a resurrection.
           await vi.waitFor(
@@ -285,7 +289,7 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           // Wait long enough for the retry loop to surface any resurrection.
-          // Backoff schedule (shared.ts): 500ms → 1s → 2s → 4s. A 4s wait
+          // Backoff schedule (shared.ts): 500ms -> 1s -> 2s -> 4s. A 4s wait
           // covers ~3 retry cycles beyond the initial drop. With the bug,
           // each cycle re-drains B and re-drops it (counter climbs to 2-4).
           // With the fix, B was skipped by restageDrainedSiblings, so it is
@@ -300,7 +304,7 @@ describe.skipIf(!hasTestcontainers)(
           // test exercised the catch block at line ~1078, not the
           // exhausted/dead-letter branch). Without this assertion, an
           // inverted predicate (`if (!sibling.dropped) continue;`) that
-          // skips ALL siblings — including healthy C — would still pass the
+          // skips ALL siblings -- including healthy C -- would still pass the
           // drop-count assertion above while silently breaking healthy
           // re-dispatch. A non-zero retry count proves the dispatched job A
           // cycled through retryRestage, which only happens when the catch
@@ -308,8 +312,8 @@ describe.skipIf(!hasTestcontainers)(
           expect(await retriedCount(name)).toBeGreaterThan(0);
 
           // Functional correctness guard: healthy sibling C must be
-          // observed by the handler at least twice — once in the initial
-          // batch (A,C), and at least once more in a retry batch (A,C) —
+          // observed by the handler at least twice -- once in the initial
+          // batch (A,C), and at least once more in a retry batch (A,C) --
           // proving restageDrainedSiblings actually re-staged C. The
           // retriedCount assertion above only proves A cycled through
           // retryRestage; an unconditional `continue;` (or any predicate
@@ -319,6 +323,139 @@ describe.skipIf(!hasTestcontainers)(
           // re-dispatch across both processing paths.
           const cAppearances = seenPayloads.filter((p) => p.id === "C").length;
           expect(cAppearances).toBeGreaterThanOrEqual(2);
+        });
+
+        /**
+         * @scenario restageDrainedSiblings must await every parse result
+         * before re-throwing a transient sibling rejection, so a sibling
+         * whose body is genuinely corrupt gets its `recordDrop` marker
+         * recorded before the transient sibling's rejection short-circuits
+         * the parse (#5883 P1). Without `Promise.allSettled`, the transient
+         * rejection races ahead of the corrupt sibling's drop marker:
+         * `restageDrainedSiblings` then sees the corrupt sibling as
+         * still-pending, re-stages it, and the next drain re-dispatches and
+         * re-drops it -- a resurrection loop identical to the one above,
+         * but triggered by a *different* sibling's failure.
+         *
+         * Setup: A (dispatched, healthy), B (transient failure on first
+         * drain only -- `failureCounts.set(bUri, 1)`), C (corrupt -> dropped
+         * by parseDrainedPayload on first drain). The handler throws a
+         * plain retryable Error so the dispatched job A drives the retry
+         * path (not handleExhaustedRetries->restageAndBlock).
+         *
+         * With the fix: the first drain settles all three parses. C's drop
+         * is recorded before B's TransientBlobStoreError is re-thrown, so
+         * restageDrainedSiblings skips C on every subsequent retry. B's
+         * transient failure resolves on retry (failureCounts now 0), so B
+         * is re-staged, re-parsed, and reaches processBatch.
+         *
+         * Without the fix: Promise.all short-circuits on B's transient
+         * rejection before C's recordDrop runs. restageDrainedSiblings
+         * sees no dropped marker for C, re-stages it, the next drain
+         * re-dispatches and re-drops C -- the body_unreadable counter
+         * climbs past 1 within the 4s retry window.
+         */
+        it("marks the corrupt sibling as dropped before re-throwing a transient sibling rejection", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/restage-skip-mixed`;
+          const objectStore = new PerUriTransientFailureStore();
+
+          await stageOffloadedBatch({
+            name,
+            groupId,
+            objectStore,
+            jobs: [
+              { id: "A", value: OFFLOADABLE_S3_VALUE() },
+              { id: "B", value: OFFLOADABLE_S3_VALUE() },
+              { id: "C", value: OFFLOADABLE_S3_VALUE() },
+            ],
+          });
+
+          const uris = [...objectStore.store.keys()];
+          expect(uris.length).toBe(3);
+          // uris[0] = A (dispatched, healthy -- no injection needed);
+          // uris[1] = B (transient failure x1); uris[2] = C (corrupt -> drop).
+          const bUri = uris[1]!;
+          const cUri = uris[2]!;
+
+          // B fails transiently exactly once on the first drain.
+          // `tieredBlobStore` wraps the non-missing error as
+          // `TransientBlobStoreError`, which `parseDrainedPayload` re-throws
+          // (taking the restage-all path) -- distinct from C's corrupt-body
+          // error, which routes to `recordDrop("body_unreadable")`. On
+          // retry, `failureCounts[bUri]` is 0 so B parses normally.
+          objectStore.failureCounts.set(bUri, 1);
+
+          // C's body is present but unreadable -- same drop path the existing
+          // test exercises. The race we're guarding against: if B's
+          // transient rejection short-circuits Promise.all before C's
+          // `recordDrop` runs, restageDrainedSiblings won't see C's dropped
+          // marker and will re-stage C, leading to a re-dispatch and
+          // re-drop on the next drain.
+          objectStore.store.set(cUri, Buffer.from("not a valid gzip body"));
+
+          // seenPayloads records every payload that reached either handler
+          // across all processing paths. Used below to assert B (transient)
+          // is eventually parsed and reaches processBatch after its
+          // transient failure resolves -- guarding against a regression that
+          // drops B along with C (e.g. a too-aggressive catch that drops all
+          // siblings on any error), which would silently lose the
+          // recoverable sibling while still passing the drop-count assertion.
+          const seenPayloads: TestPayload[] = [];
+          const consumer = newQueue({
+            name,
+            processFn: async (payload) => {
+              seenPayloads.push(payload);
+            },
+            processBatch: async (payloads) => {
+              seenPayloads.push(...payloads);
+              throw new Error("handler blew up");
+            },
+            consumerEnabled: true,
+            objectStore,
+          });
+          await consumer.waitUntilReady();
+
+          // Wait for C's first drop (corrupt -> body_unreadable). This is
+          // the only drop the fix permits; every subsequent drop would be a
+          // resurrection caused by B's transient rejection racing C's
+          // recordDrop.
+          await vi.waitFor(
+            async () => {
+              expect(await bodyUnreadableDropCount(name)).toBeGreaterThanOrEqual(1);
+            },
+            { timeout: 15000, interval: 100 },
+          );
+
+          // Wait long enough for the retry loop to surface any
+          // resurrection. Backoff schedule (shared.ts): 500ms -> 1s -> 2s -> 4s.
+          // A 4s wait covers ~3 retry cycles beyond the initial drop. With
+          // the bug (Promise.all), each cycle re-drains C and re-drops it
+          // (counter climbs to 2-4). With the fix (Promise.allSettled), C
+          // was marked dropped before B's transient rejection was
+          // re-thrown, so restageDrainedSiblings skips C on every retry
+          // (counter = 1).
+          await new Promise((resolve) => setTimeout(resolve, 4000));
+
+          // The fix's invariant: C was dropped exactly once. With the bug,
+          // the counter climbs past 1 within the 4s window.
+          expect(await bodyUnreadableDropCount(name)).toBe(1);
+
+          // Positive-direction guard: the retry path actually ran (so the
+          // test exercised the catch block that calls restageDrainedSiblings,
+          // not the exhausted/dead-letter branch). Without this assertion, a
+          // regression that drops B along with C (and thus never retries)
+          // would still pass the drop-count assertion.
+          expect(await retriedCount(name)).toBeGreaterThan(0);
+
+          // B's transient failure resolved on retry (failureCounts now 0),
+          // so B must be observed by the handler at least once across all
+          // retries -- proving the recoverable sibling was not permanently
+          // lost. A regression that drops B along with C would leave B
+          // absent from seenPayloads while still passing the drop-count
+          // assertion above.
+          const bAppearances = seenPayloads.filter((p) => p.id === "B").length;
+          expect(bAppearances).toBeGreaterThanOrEqual(1);
         });
       });
     });
