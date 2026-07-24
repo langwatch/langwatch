@@ -377,7 +377,10 @@ export function buildProgram(): Command {
       )
       .option("--email <address>", "optional contact email for follow-up")
       .option("--endpoint <url>", "override the LangWatch endpoint")
-      .option("--dry-run", "print the redacted payload without sending anything")
+      .option(
+        "--dry-run",
+        "print the redacted payload without sending anything (no approval needed)",
+      )
       .addHelpText(
         "after",
         [
@@ -400,7 +403,8 @@ export function buildProgram(): Command {
           ...SESSION_REDACTION_SUMMARY.map((line) => `    - ${line}`),
           "  Audit the exact rules (short, readable regexes):",
           `    ${REDACTION_AUDIT_URL}`,
-          "  Preview precisely what would be sent with --dry-run.",
+          "  Preview precisely what would be sent with --dry-run: it sends nothing,",
+          "  so it needs no approval and is the right first step before asking.",
           "",
           "Consent:",
           "  Always ask the user before sending, then pass --user-approved.",

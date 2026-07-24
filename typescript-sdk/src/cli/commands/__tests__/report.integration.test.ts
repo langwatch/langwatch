@@ -178,6 +178,16 @@ describe("langwatch report", () => {
   });
 
   describe("when using --dry-run", () => {
+    it("needs no user approval, because nothing is sent", async () => {
+      const result = (await reportCommand({
+        endpoint,
+        summary: "previewing before asking the user",
+        dryRun: true,
+      })) as { data: { dryRun: boolean } };
+      expect(received).toHaveLength(0);
+      expect(result.data.dryRun).toBe(true);
+    });
+
     it("returns the redacted payload without sending anything", async () => {
       const result = (await reportCommand({
         userApproved: true,

@@ -49,7 +49,9 @@ export const detectAgent = (
 export const reportCommand = async (
   options: ReportCommandOptions,
 ): Promise<CommandResult | void> => {
-  if (!options.userApproved) {
+  // A dry run never sends anything, so it needs no approval: it exists
+  // precisely so the agent can show the user the payload BEFORE asking.
+  if (!options.userApproved && !options.dryRun) {
     throw new Error(
       [
         "This sends a report to the LangWatch team, so the user must approve it first.",
@@ -58,6 +60,7 @@ export const reportCommand = async (
         "transcript) to LangWatch to help them fix it?\" If they agree, re-run with",
         "--user-approved. API keys, secrets, emails and phone numbers are redacted",
         `locally before anything is sent; audit the exact rules at ${REDACTION_AUDIT_URL}`,
+        "Preview the exact redacted payload first with --dry-run (no approval needed).",
       ].join("\n"),
     );
   }
