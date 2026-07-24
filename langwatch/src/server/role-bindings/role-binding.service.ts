@@ -134,7 +134,7 @@ export class RoleBindingService {
         ],
       },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, image: true } },
         group: { select: { id: true, name: true, scimSource: true } },
         customRole: { select: { id: true, name: true } },
       },
@@ -196,6 +196,7 @@ export class RoleBindingService {
       userId: b.userId,
       userName: b.user?.name ?? null,
       userEmail: b.user?.email ?? null,
+      userImage: b.user?.image ?? null,
       groupId: b.groupId,
       groupName: b.group?.name ?? null,
       groupScimSource: b.group?.scimSource ?? null,

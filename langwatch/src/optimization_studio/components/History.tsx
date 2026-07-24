@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   type BoxProps,
   Button,
@@ -12,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { UserAvatar } from "~/components/UserAvatar";
 import { type UseFormReturn, FormProvider, useForm } from "react-hook-form";
 
 import { HistoryIcon } from "../../components/icons/History";
@@ -246,18 +246,15 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                     )}
                   </HStack>
                   <HStack fontSize="12px">
-                    <Avatar.Root
+                    <UserAvatar
                       size="2xs"
                       backgroundColor="orange.400"
                       color="white"
                       width="16px"
                       height="16px"
-                    >
-                      <Avatar.Fallback
-                        name={version.author?.name ?? ""}
-                        fontSize="6.4px"
-                      />
-                    </Avatar.Root>
+                      name={version.author?.name ?? ""}
+                      image={version.author?.image}
+                    />
                     {version.author?.name}
                     {/* {" · "}
                     <Tooltip

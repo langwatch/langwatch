@@ -34,6 +34,7 @@ import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
+import { app as userAvatarApp } from "../app/api/user-avatar/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as authApp } from "./routes/auth";
@@ -141,6 +142,7 @@ export function createApiRouter() {
   api.route("/", teamsApp);
   api.route("/", tracesApp);
   api.route("/", triggersApp);
+  api.route("/", userAvatarApp); // /api/user-avatar/:projectId/:id — user avatars
   api.route("/", workflowsCrudApp); // CRUD — complements workflowsApp (code-completion, post_event)
 
   api.route("/", gatewayInternalApp);

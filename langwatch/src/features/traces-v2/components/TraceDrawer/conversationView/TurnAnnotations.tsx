@@ -15,6 +15,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { forwardRef, useState } from "react";
+import { UserAvatar } from "~/components/UserAvatar";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { Popover } from "~/components/ui/popover";
@@ -319,13 +320,13 @@ export function TurnAnnotationBadges({
                   _hover={canEdit ? { bg: "bg.muted" } : undefined}
                 >
                   <HStack gap={2} align="start">
-                    <Avatar.Root
+                    <UserAvatar
                       size="xs"
                       background="gray.solid"
                       color="white"
-                    >
-                      <Avatar.Fallback name={a.user?.name ?? a.email ?? "?"} />
-                    </Avatar.Root>
+                      name={a.user?.name ?? a.email ?? "?"}
+                      image={a.user?.image}
+                    />
                     <VStack align="start" gap={0} flex={1} minWidth={0}>
                       <HStack gap={1.5} width="full">
                         <Text textStyle="2xs" fontWeight="600">
