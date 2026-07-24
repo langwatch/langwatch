@@ -39,6 +39,15 @@ type Server struct {
 	Addr                string `env:"ADDR"`
 	GracefulSeconds     int    `env:"GRACEFUL_SECONDS"`
 	MaxRequestBodyBytes int64  `env:"MAX_REQUEST_BODY_BYTES"`
+	// DrainDelaySeconds is how long a service waits, after flipping /readyz
+	// to draining but before it stops accepting new connections, for a load
+	// balancer to actually notice and stop routing traffic here. Consumed
+	// directly by pkg/lifecycle.WithDrainDelay by services that opt in —
+	// setting it here alone does nothing; a service's serve.go must read it
+	// and pass it through. 0 is a valid, explicit "no delay" for services
+	// that don't set this field at all; pkg/lifecycle's own 3s default only
+	// applies when a service never calls WithDrainDelay in the first place.
+	DrainDelaySeconds int `env:"DRAIN_DELAY_SECONDS"`
 }
 
 // ListenAndServe starts the server and handles graceful shutdown on SIGTERM/SIGINT.

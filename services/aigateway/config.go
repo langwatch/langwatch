@@ -92,8 +92,14 @@ func defaultConfig() Config {
 	return Config{
 		Environment: "local",
 		Server: config.Server{
-			Addr:                ":5563",
-			GracefulSeconds:     10,
+			Addr:            ":5563",
+			GracefulSeconds: 10,
+			// Matches pkg/lifecycle's own defaultDrainDelay so boot behavior
+			// is unchanged for anyone not overriding it — this field exists
+			// so the gateway chart can actually configure it (previously
+			// impossible: nothing wired shutdown.preDrainWait to an env var,
+			// and serve.go never called lifecycle.WithDrainDelay at all).
+			DrainDelaySeconds:   3,
 			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
 		},
 		NonStreamingHeartbeatIntervalSeconds: int64(config.DefaultNonStreamingHeartbeatInterval / time.Second),

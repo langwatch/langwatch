@@ -21,6 +21,11 @@ data:
   OTEL_OTLP_ENDPOINT: {{ .Values.otel.endpoint | quote }}
   {{- end }}
   SERVER_MAX_REQUEST_BODY_BYTES: {{ printf "%d" (int64 .Values.security.maxRequestBodyBytes) | quote }}
+  # Previously declared in values.yaml but never reached the container —
+  # shutdown.preDrainWaitSeconds/timeoutSeconds looked configurable but did
+  # nothing. Now actually wired to the fields serve.go reads.
+  SERVER_DRAIN_DELAY_SECONDS: {{ .Values.shutdown.preDrainWaitSeconds | quote }}
+  SERVER_GRACEFUL_SECONDS: {{ .Values.shutdown.timeoutSeconds | quote }}
   BLOCK_LOCAL_HTTP_CALLS: {{ .Values.security.blockLocalHTTPCalls | quote }}
   REQUIRE_HTTPS_CUSTOM_ENDPOINTS: {{ .Values.security.requireHTTPSCustomEndpoints | quote }}
   ALLOWED_PROXY_HOSTS: {{ join "," .Values.security.allowedProxyHosts | quote }}
