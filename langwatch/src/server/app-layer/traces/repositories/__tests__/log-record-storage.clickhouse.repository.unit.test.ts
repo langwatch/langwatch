@@ -4,7 +4,7 @@ import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trac
 import {
   CLAUDE_CODE_KIND_ATTR,
   CLAUDE_CODE_LOG_RETENTION_DAYS,
-} from "../../claude-code-log-to-span";
+} from "~/server/event-sourcing/pipelines/trace-processing/claude-code-log-to-span";
 import { LogRecordStorageClickHouseRepository } from "../log-record-storage.clickhouse.repository";
 
 const makeRecord = (

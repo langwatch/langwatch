@@ -29,7 +29,7 @@ import {
 // Mock leanForProjection
 // ---------------------------------------------------------------------------
 
-vi.mock("~/server/app-layer/traces/lean-for-projection", () => ({
+vi.mock("~/server/event-sourcing/pipelines/trace-processing/lean-for-projection", () => ({
   leanForProjection: vi.fn((event: Event) => ({
     ...event,
     // Marker so tests can verify dispatch received the leaned shape
@@ -41,7 +41,7 @@ vi.mock("~/server/app-layer/traces/lean-for-projection", () => ({
 }));
 
 // Pull the mock handle so we can assert call counts and override behavior
-import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
+import { leanForProjection } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 const leanMock = vi.mocked(leanForProjection);
 
 // ---------------------------------------------------------------------------

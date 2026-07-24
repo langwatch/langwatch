@@ -12,7 +12,7 @@ import type {
 import { applyStateEvent } from "../projections/stateProjectionExecutor";
 import type { ReplayEvent } from "./replayEventLoader";
 import type { Event } from "../domain/types";
-import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
+import { leanForProjection } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 

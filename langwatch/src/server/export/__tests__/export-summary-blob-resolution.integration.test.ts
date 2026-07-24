@@ -45,7 +45,7 @@ import {
 import {
   EVENTREF_ATTR_PREFIX,
   IO_PREVIEW_BYTES,
-} from "~/server/app-layer/traces/lean-for-projection";
+} from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import {
   startTestContainers,
   stopTestContainers,

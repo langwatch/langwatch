@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CLAUDE_CODE_KIND_ATTR,
   CLAUDE_CODE_LOG_RETENTION_DAYS,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
+} from "~/server/event-sourcing/pipelines/trace-processing/claude-code-log-to-span";
 import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
 import { CanonicalLogRecordClickHouseRepository } from "../canonical-log-record.clickhouse.repository";
 

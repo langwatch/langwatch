@@ -50,7 +50,7 @@ import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import { EVENTREF_ATTR_PREFIX } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import {
   type NormalizedSpan,

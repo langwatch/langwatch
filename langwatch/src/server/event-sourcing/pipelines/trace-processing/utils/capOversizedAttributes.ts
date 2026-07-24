@@ -59,7 +59,7 @@ export const DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES = 256 * 1024;
 
 /**
  * Preview budget for IO attributes (see `IO_ATTRIBUTE_KEYS`). Matches
- * `IO_PREVIEW_BYTES` in `~/server/app-layer/traces/lean-for-projection.ts`
+ * `IO_PREVIEW_BYTES` in `~/server/event-sourcing/pipelines/trace-processing/lean-for-projection.ts`
  * (ADR-022) — the post-persistence "lean" pass — so a reader sees the same
  * amount of context regardless of which cap fired.
  */

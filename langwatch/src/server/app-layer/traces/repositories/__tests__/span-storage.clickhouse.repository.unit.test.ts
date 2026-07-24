@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import { EVENTREF_ATTR_PREFIX } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import {
   deserializeAttributes,
   mapSpanSummaryRow,

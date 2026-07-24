@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeLogsToSpans,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
+} from "~/server/event-sourcing/pipelines/trace-processing/claude-code-log-to-span";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
 import type {
   NormalizedAttributes,

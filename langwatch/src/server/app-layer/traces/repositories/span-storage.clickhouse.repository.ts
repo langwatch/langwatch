@@ -14,7 +14,7 @@ import {
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "@langwatch/contracts/tracer";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import { EVENTREF_ATTR_PREFIX } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { SpanInsertData } from "~/server/domain/traces/types";
 import type {

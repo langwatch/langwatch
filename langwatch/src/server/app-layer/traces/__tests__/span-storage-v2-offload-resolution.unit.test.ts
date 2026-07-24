@@ -38,7 +38,7 @@ vi.mock("@langwatch/observability", () => ({
 
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import { EVENTREF_ATTR_PREFIX } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";

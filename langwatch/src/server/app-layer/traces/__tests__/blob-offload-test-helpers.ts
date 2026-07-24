@@ -7,7 +7,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { expect } from "vitest";
-import { IO_PREVIEW_BYTES } from "~/server/app-layer/traces/lean-for-projection";
+import { IO_PREVIEW_BYTES } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import type { Event } from "~/server/event-sourcing";
 
 export const AGGREGATE_TYPE = "trace";

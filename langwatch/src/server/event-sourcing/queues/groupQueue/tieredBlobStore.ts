@@ -3,7 +3,7 @@ import type { Readable } from "node:stream";
 
 import type { Logger } from "@langwatch/observability";
 
-import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
+import { COMMAND_INLINE_THRESHOLD } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";

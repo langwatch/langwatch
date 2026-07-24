@@ -22,7 +22,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
+import { leanForProjection } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import {
   getTestClickHouseClient,

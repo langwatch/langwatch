@@ -59,7 +59,7 @@ import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
   EVENTREF_ATTR_PREFIX,
   leanForProjection,
-} from "~/server/app-layer/traces/lean-for-projection";
+} from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";

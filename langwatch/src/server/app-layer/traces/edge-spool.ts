@@ -14,7 +14,7 @@
 
 import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { BlobStore } from "./blob-store.service";
-import { COMMAND_INLINE_THRESHOLD } from "./lean-for-projection";
+import { COMMAND_INLINE_THRESHOLD } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 
 /** Logger interface used by maybeSpool for the fail-open warn. */
 export interface SpoolLogger {

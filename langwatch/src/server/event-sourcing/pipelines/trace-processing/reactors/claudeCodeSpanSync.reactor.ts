@@ -6,7 +6,7 @@ import {
   CLAUDE_TURN_LOG_CAP,
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeTurnToSpans,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
+} from "~/server/event-sourcing/pipelines/trace-processing/claude-code-log-to-span";
 import type { StoredLogRecordRow } from "~/server/event-sourcing/ports/log-record-storage.repository";
 import type {
   OtlpKeyValue,

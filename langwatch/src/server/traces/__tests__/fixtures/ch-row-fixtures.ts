@@ -11,7 +11,7 @@
  * file keeps its own copies (per Metz-Beck: duplication over wrong abstraction).
  */
 
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import { EVENTREF_ATTR_PREFIX } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 
 /**
  * Options for {@link makeSummaryRow}.

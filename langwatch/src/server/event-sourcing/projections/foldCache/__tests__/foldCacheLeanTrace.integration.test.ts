@@ -27,7 +27,7 @@ import { describe, expect, it } from "vitest";
 import {
   IO_PREVIEW_BYTES,
   leanForProjection,
-} from "~/server/app-layer/traces/lean-for-projection";
+} from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { Event } from "~/server/event-sourcing";
 import { createTenantId } from "~/server/event-sourcing";

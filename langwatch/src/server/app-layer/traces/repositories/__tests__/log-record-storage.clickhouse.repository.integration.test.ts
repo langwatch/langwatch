@@ -14,7 +14,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { CLAUDE_CODE_KIND_ATTR } from "../../claude-code-log-to-span";
+import { CLAUDE_CODE_KIND_ATTR } from "~/server/event-sourcing/pipelines/trace-processing/claude-code-log-to-span";
 import { LogRecordStorageClickHouseRepository } from "../log-record-storage.clickhouse.repository";
 
 let ch: ClickHouseClient;

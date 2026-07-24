@@ -37,7 +37,7 @@ import {
   TRACE_MEDIA_PURPOSE,
 } from "../../app-layer/traces/edge-media-extraction";
 import { maybeSpool } from "../../app-layer/traces/edge-spool";
-import { COMMAND_INLINE_THRESHOLD } from "../../app-layer/traces/lean-for-projection";
+import { COMMAND_INLINE_THRESHOLD } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import {
   startTestContainers,
   stopTestContainers,

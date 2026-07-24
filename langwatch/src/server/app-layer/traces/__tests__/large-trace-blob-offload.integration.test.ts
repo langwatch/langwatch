@@ -31,7 +31,7 @@ import {
   EVENTREF_ATTR_PREFIX,
   IO_PREVIEW_BYTES,
   leanForProjection,
-} from "~/server/app-layer/traces/lean-for-projection";
+} from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import type { Event } from "~/server/event-sourcing";
 import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";

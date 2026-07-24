@@ -3,7 +3,7 @@ import type {
   CanonicalLogRecord,
   LogTraceContribution,
 } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
-import { IO_PREVIEW_BYTES } from "../lean-for-projection";
+import { IO_PREVIEW_BYTES } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import {
   type LogRequestCollectionResult,
   LogRequestCollectionService,

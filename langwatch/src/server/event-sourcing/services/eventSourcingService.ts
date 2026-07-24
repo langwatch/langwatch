@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
+import { leanForProjection } from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
 import {
   eventSourcingStoreDurationHistogram,

@@ -25,7 +25,7 @@ import type { BlobStorePort } from "~/server/domain/traces/blob-store.port";
 import {
   resolveClaudeLogVisibilityDeadlineMs,
   resolveClaudeTurnLogCap,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
+} from "~/server/event-sourcing/pipelines/trace-processing/claude-code-log-to-span";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
   createDatasetNormalizeHandler,

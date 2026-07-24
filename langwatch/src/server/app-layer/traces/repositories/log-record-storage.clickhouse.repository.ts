@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   CLAUDE_CODE_KIND_ATTR,
   CLAUDE_CODE_LOG_RETENTION_DAYS,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
+} from "~/server/event-sourcing/pipelines/trace-processing/claude-code-log-to-span";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";

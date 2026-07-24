@@ -14,7 +14,7 @@ import {
   leanForProjection,
   IO_PREVIEW_BYTES,
   EVENTREF_ATTR_PREFIX,
-} from "../lean-for-projection";
+} from "~/server/event-sourcing/pipelines/trace-processing/lean-for-projection";
 import {
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   IO_ATTRIBUTE_KEYS,

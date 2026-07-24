@@ -74,7 +74,7 @@ import type {
   OtlpKeyValue,
   OtlpResource,
   OtlpSpan,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   buildInputMessagesFromRequestBody,

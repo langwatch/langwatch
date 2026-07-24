@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   type ClaudeCodeLogRecordInput,
   convertClaudeCodeLogsToSpans,
@@ -7,7 +7,7 @@ import {
   convertClaudeCodeTurnToSpans,
   isClaudeCodeConvertibleLog,
   isClaudeCodeToolLog,
-} from "../claude-code-log-to-span";
+} from "~/server/event-sourcing/pipelines/trace-processing/claude-code-log-to-span";
 
 const TRACE = "a3c6656cf433e97549f654034be02955";
 
