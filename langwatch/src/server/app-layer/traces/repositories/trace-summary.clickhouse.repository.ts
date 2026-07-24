@@ -12,7 +12,10 @@ import {
 } from "../../clients/clickhouse/windowed-read";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
-import type { TraceSummaryRepository } from "./trace-summary.repository";
+import type {
+  FindByTraceIdOptions,
+  TraceSummaryRepository,
+} from "./trace-summary.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
 
