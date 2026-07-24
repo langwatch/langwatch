@@ -14,11 +14,11 @@
 export const AVATAR_OUTPUT_SIZE = 256;
 
 /**
- * Reject absurdly large source files before decoding them into an <img> — the
- * output is always tiny after resize, but decoding a 50 MB source still costs
- * memory. This bounds the *source*, not the (much smaller) upload.
+ * Max size of the image file a user may pick. Enforced client-side so the user
+ * gets immediate "too large" feedback; the server applies the same 1 MB ceiling
+ * on the (post-resize) payload as a backstop. Kept in sync with AVATAR_MAX_BYTES.
  */
-export const AVATAR_MAX_SOURCE_BYTES = 15 * 1024 * 1024;
+export const AVATAR_MAX_SOURCE_BYTES = 1 * 1024 * 1024;
 
 export class AvatarImageError extends Error {
   constructor(message: string) {

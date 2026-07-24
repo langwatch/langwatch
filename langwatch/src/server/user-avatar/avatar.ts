@@ -21,11 +21,12 @@ export const AVATAR_PURPOSE = "user_avatar";
 export const AVATAR_OWNER_KIND = "user";
 
 /**
- * Max accepted avatar payload, server-side. The client crops + downscales to a
- * small square before upload, so a real avatar is a few KB–tens of KB; 2 MB is
- * generous headroom that still rejects an un-resized full-resolution photo.
+ * Hard cap on the bytes an avatar upload may take, server-side. The client
+ * crops + downscales to a small square first, so a real avatar is only a few
+ * KB–tens of KB; 1 MB is the ceiling we accept (and the same limit the client
+ * enforces on the picked file — see AVATAR_MAX_SOURCE_BYTES).
  */
-export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+export const AVATAR_MAX_BYTES = 1 * 1024 * 1024;
 
 /**
  * Image types we accept on upload. Every entry must also be readback-safe

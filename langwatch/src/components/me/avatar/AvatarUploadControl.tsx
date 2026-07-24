@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
 import { toaster } from "~/components/ui/toaster";
@@ -8,7 +9,9 @@ import { AvatarImageError, processAvatarImage } from "./processAvatarImage";
 
 /**
  * Profile-settings control to upload, preview, and remove the user's own avatar
- * photo. The photo flows to every avatar surface via `User.image`.
+ * photo. The avatar itself is the edit affordance — a pencil badge sits on the
+ * photo and clicking it opens the file picker. The photo flows to every avatar
+ * surface via `User.image`.
  *
  * `organizationId` scopes the personal-workspace the photo is stored under.
  *
@@ -78,25 +81,64 @@ export function AvatarUploadControl({
     }
   };
 
+  const openPicker = () => {
+    if (!busy) fileInputRef.current?.click();
+  };
+
   return (
     <HStack gap={4} align="center">
-      <UserAvatar
-        name={name}
-        image={preview ?? currentImage}
-        size="xl"
-        borderWidth="1px"
-        borderColor="border.muted"
+      {/* The photo IS the edit control — a pencil badge overlays it. */}
+      <Box
+        position="relative"
+        role="button"
+        tabIndex={busy ? -1 : 0}
+        aria-label={currentImage ? "Change photo" : "Upload photo"}
+        cursor={busy ? "default" : "pointer"}
+        transition="opacity 0.15s"
+        _hover={busy ? undefined : { opacity: 0.85 }}
+        onClick={openPicker}
+        onKeyDown={(e) => {
+          if (!busy && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            openPicker();
+          }
+        }}
+      >
+        <UserAvatar
+          name={name}
+          image={preview ?? currentImage}
+          size="xl"
+          borderWidth="1px"
+          borderColor="border.muted"
+        />
+        <Box
+          position="absolute"
+          bottom="0"
+          right="0"
+          width="24px"
+          height="24px"
+          bg="blue.500"
+          color="white"
+          borderRadius="full"
+          borderWidth="2px"
+          borderColor="bg.surface"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Pencil size={12} />
+        </Box>
+      </Box>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        style={{ display: "none" }}
+        onChange={(e) => void onFilePicked(e.target.files?.[0])}
       />
 
       <VStack align="start" gap={2}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          style={{ display: "none" }}
-          onChange={(e) => void onFilePicked(e.target.files?.[0])}
-        />
-
         {preview ? (
           <HStack gap={2}>
             <Button
@@ -119,36 +161,23 @@ export function AvatarUploadControl({
             </Button>
           </HStack>
         ) : (
-          <HStack gap={2}>
+          currentImage && (
             <Button
               size="sm"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              loading={processing}
+              variant="ghost"
+              colorPalette="red"
+              onClick={() => removeAvatar.mutate({})}
+              loading={removeAvatar.isPending}
               disabled={busy}
             >
-              {currentImage ? "Change photo" : "Upload photo"}
+              Remove
             </Button>
-            {currentImage && (
-              <Button
-                size="sm"
-                variant="ghost"
-                colorPalette="red"
-                onClick={() => removeAvatar.mutate({})}
-                loading={removeAvatar.isPending}
-                disabled={busy}
-              >
-                Remove
-              </Button>
-            )}
-          </HStack>
+          )
         )}
 
-        <Box>
-          <Text fontSize="xs" color="fg.muted">
-            PNG, JPG, WEBP or GIF. Cropped to a square.
-          </Text>
-        </Box>
+        <Text fontSize="xs" color="fg.muted">
+          PNG, JPG, WEBP or GIF, up to 1 MB. Cropped to a square.
+        </Text>
       </VStack>
     </HStack>
   );
