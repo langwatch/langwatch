@@ -137,6 +137,9 @@ describe("codingAgentLogFactsDispatch", () => {
         "0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c",
       );
       expect(contribution!.facts["event.sequence"]).toBe(7);
+      expect(contribution!.facts["organization.id"]).toBe(
+        "b3d7a45e-1189-4e0f-8b7a-2c3d4e5f6a7b",
+      );
       expect(contribution!.facts["terminal.type"]).toBe("non-interactive");
       expect(contribution!.facts["service.version"]).toBe("1.1.4173");
     });

@@ -202,6 +202,10 @@ export class CodingAgentSessionFoldProjection
     const next = applyLogToCodingAgentSession({
       state,
       attributes: data.facts,
+      // The contribution's own label, not the folded (first-writer-wins)
+      // state's — the logs-only gate must reflect what THIS record is.
+      agent: data.agent,
+      occurredAtMs: data.timeUnixMs,
     });
     return this.withContributionIdentity(
       { ...state, ...next },

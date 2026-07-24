@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   detectCodingAgent,
   isCodingAgentMetricName,
+  mergeAliasTables,
   normalizeEventName,
   normalizeMetricName,
   normalizeTokenType,
@@ -141,6 +142,49 @@ describe("normalizeEventName", () => {
       expect(normalizeEventName("session.created")).toBe("session_created");
       expect(normalizeEventName("session.idle")).toBe("session_idle");
       expect(normalizeEventName("session.error")).toBe("session_error");
+    });
+  });
+
+  describe("given each agent's vendor-specific event spellings", () => {
+    /**
+     * These aliases live on the agent definitions (agents/*.ts) since the
+     * registry refactor; each is a REAL wire value, so a typo'd key or a
+     * broken registry merge would silently stop mapping a real event.
+     */
+    it("still lands them on the shared facts through the registry merge", () => {
+      expect(normalizeEventName("codex.sandbox_outcome")).toBe("tool_result");
+      expect(
+        normalizeEventName("github.copilot.session_compaction_complete"),
+      ).toBe("compaction");
+      expect(normalizeEventName("github.copilot.skill_invoked")).toBe(
+        "skill_activated",
+      );
+      expect(normalizeEventName("gemini_cli.tool_call")).toBe("tool_result");
+      expect(normalizeEventName("gemini_cli.chat_compression")).toBe(
+        "compaction",
+      );
+      expect(normalizeMetricName("codex.turn.token_usage")).toBe("token_usage");
+      expect(normalizeMetricName("gemini_cli.lines.changed")).toBe(
+        "lines_of_code",
+      );
+    });
+  });
+
+  describe("given two tables that disagree on one alias", () => {
+    it("refuses to merge them, so a wiring bug fails at module load", () => {
+      expect(() =>
+        mergeAliasTables({ tool_call: "tool_result" }, [
+          { tool_call: "compaction" },
+        ]),
+      ).toThrow(/Conflicting coding-agent alias "tool_call"/);
+    });
+
+    it("accepts a duplicate that agrees — same spelling, same fact", () => {
+      expect(
+        mergeAliasTables({ tool_call: "tool_result" }, [
+          { tool_call: "tool_result" },
+        ]),
+      ).toEqual({ tool_call: "tool_result" });
     });
   });
 

@@ -369,10 +369,82 @@ function withIdentity(
     entrypoint: state.entrypoint ?? str(attrs["app.entrypoint"]),
     // Claude stamps user identity on log events, not spans; other agents send
     // none at all, so a session they produce honestly keeps null here.
-    // `user.id` only — it is the provider's opaque hash. `user.email` also
-    // rides those events but is raw human identity, and this value lands
-    // verbatim in a durable row.
-    userId: state.userId ?? str(attrs["user.id"]),
+    // Opaque provider ids only — Claude Code's `user.id` hash, or Cowork's
+    // account UUID / tagged account id. `user.email` also rides those events
+    // but is raw human identity, and this value lands verbatim in a durable
+    // row, so it is deliberately never read.
+    userId:
+      state.userId ??
+      str(attrs["user.id"]) ??
+      str(attrs["user.account_uuid"]) ??
+      str(attrs["user.account_id"]),
+  };
+}
+
+/**
+ * Fold one model call into the session, from whichever signal carries it.
+ *
+ * Claude Code reports the call on the `claude_code.llm_request` SPAN; a
+ * logs-only agent (Cowork) reports the same facts — model, tokens, cache
+ * buckets, attempt, duration — on its `api_request` EVENT. One fold, two
+ * carriers, so the vocabularies cannot drift. The caller gates which carrier
+ * counts for its agent (span-bearing agents fold spans, logs-only agents
+ * fold events) — folding both would double every call.
+ */
+function foldModelCall(
+  next: CodingAgentSessionData,
+  attrs: Record<string, unknown>,
+  fallbackDurationMs: number,
+): CodingAgentSessionData {
+  const agentId = str(attrs.agent_id);
+  if (agentId !== null) Object.assign(next, seenSubAgent(next, agentId));
+  const stopReason = str(attrs.stop_reason);
+  const ttft = num(attrs.ttft_ms);
+  const model = str(attrs.model) ?? str(attrs["gen_ai.request.model"]);
+  const requestId = str(attrs.request_id);
+
+  const cacheReadTokens = num(attrs.cache_read_tokens);
+  const cacheCreationTokens = num(attrs.cache_creation_tokens);
+  const contextTokens = cacheReadTokens + cacheCreationTokens;
+  // The first call is never a "rebuild" — there is nothing to reuse yet,
+  // so a cold cache isn't the session's fault. `previousCallContextTokens`
+  // starts at 0, which doubles as that gate.
+  const isRebuild =
+    next.previousCallContextTokens > 0 &&
+    cacheCreationTokens >= CACHE_REBUILD_MIN_TOKENS &&
+    cacheCreationTokens / next.previousCallContextTokens >=
+      CACHE_REBUILD_RATIO_THRESHOLD;
+
+  return {
+    ...next,
+    modelCalls: next.modelCalls + 1,
+    modelCallMs: next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
+    ttftMsTotal: next.ttftMsTotal + ttft,
+    ttftSamples: next.ttftSamples + (ttft > 0 ? 1 : 0),
+    // Attempts includes the first try, so attempts > modelCalls means the
+    // session paid for retries somewhere.
+    attempts: next.attempts + Math.max(1, num(attrs.attempt)),
+    inputTokens: next.inputTokens + num(attrs.input_tokens),
+    outputTokens: next.outputTokens + num(attrs.output_tokens),
+    cacheReadTokens: next.cacheReadTokens + cacheReadTokens,
+    cacheCreationTokens: next.cacheCreationTokens + cacheCreationTokens,
+    peakContextTokens: Math.max(next.peakContextTokens, contextTokens),
+    cacheRebuildCount: next.cacheRebuildCount + (isRebuild ? 1 : 0),
+    largestCacheRebuildTokens: isRebuild
+      ? Math.max(next.largestCacheRebuildTokens, cacheCreationTokens)
+      : next.largestCacheRebuildTokens,
+    previousCallContextTokens: contextTokens,
+    models: model !== null ? addToBoundedSet(next.models, model) : next.models,
+    // The pointer back to the body that ended the session. Last call wins.
+    finalRequestId: requestId ?? next.finalRequestId,
+    // Only the LAST call's stop reason is the session's: the earlier ones all
+    // stop on `tool_use` by definition, since that is what drove the loop on.
+    ...(stopReason !== null
+      ? {
+          stopReason,
+          truncated: TRUNCATING_STOP_REASONS.has(stopReason),
+        }
+      : {}),
   };
 }
 
@@ -399,58 +471,7 @@ export function applySpanToCodingAgentSession({
   const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
 
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
-    const next = withIdentity(state, attrs);
-    const agentId = str(attrs.agent_id);
-    if (agentId !== null) Object.assign(next, seenSubAgent(next, agentId));
-    const stopReason = str(attrs.stop_reason);
-    const ttft = num(attrs.ttft_ms);
-    const model = str(attrs.model) ?? str(attrs["gen_ai.request.model"]);
-    const requestId = str(attrs.request_id);
-
-    const cacheReadTokens = num(attrs.cache_read_tokens);
-    const cacheCreationTokens = num(attrs.cache_creation_tokens);
-    const contextTokens = cacheReadTokens + cacheCreationTokens;
-    // The first call is never a "rebuild" — there is nothing to reuse yet,
-    // so a cold cache isn't the session's fault. `previousCallContextTokens`
-    // starts at 0, which doubles as that gate.
-    const isRebuild =
-      next.previousCallContextTokens > 0 &&
-      cacheCreationTokens >= CACHE_REBUILD_MIN_TOKENS &&
-      cacheCreationTokens / next.previousCallContextTokens >=
-        CACHE_REBUILD_RATIO_THRESHOLD;
-
-    return {
-      ...next,
-      modelCalls: next.modelCalls + 1,
-      modelCallMs: next.modelCallMs + (num(attrs.duration_ms) || durationMs),
-      ttftMsTotal: next.ttftMsTotal + ttft,
-      ttftSamples: next.ttftSamples + (ttft > 0 ? 1 : 0),
-      // Attempts includes the first try, so attempts > modelCalls means the
-      // session paid for retries somewhere.
-      attempts: next.attempts + Math.max(1, num(attrs.attempt)),
-      inputTokens: next.inputTokens + num(attrs.input_tokens),
-      outputTokens: next.outputTokens + num(attrs.output_tokens),
-      cacheReadTokens: next.cacheReadTokens + cacheReadTokens,
-      cacheCreationTokens: next.cacheCreationTokens + cacheCreationTokens,
-      peakContextTokens: Math.max(next.peakContextTokens, contextTokens),
-      cacheRebuildCount: next.cacheRebuildCount + (isRebuild ? 1 : 0),
-      largestCacheRebuildTokens: isRebuild
-        ? Math.max(next.largestCacheRebuildTokens, cacheCreationTokens)
-        : next.largestCacheRebuildTokens,
-      previousCallContextTokens: contextTokens,
-      models:
-        model !== null ? addToBoundedSet(next.models, model) : next.models,
-      // The pointer back to the body that ended the session. Last call wins.
-      finalRequestId: requestId ?? next.finalRequestId,
-      // Only the LAST call's stop reason is the session's: the earlier ones all
-      // stop on `tool_use` by definition, since that is what drove the loop on.
-      ...(stopReason !== null
-        ? {
-            stopReason,
-            truncated: TRUNCATING_STOP_REASONS.has(stopReason),
-          }
-        : {}),
-    };
+    return foldModelCall(withIdentity(state, attrs), attrs, durationMs);
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
@@ -479,10 +500,36 @@ export function applySpanToCodingAgentSession({
 
   if (span.name !== CLAUDE.SPAN.TOOL) return state;
 
-  const next = withIdentity(state, attrs);
+  return foldToolInvocation(withIdentity(state, attrs), {
+    attrs,
+    failed: span.statusCode === SPAN_STATUS_ERROR,
+    toolMs: num(attrs.duration_ms) || durationMs,
+    startedAtMs: span.startTimeUnixMs,
+  });
+}
+
+/**
+ * Fold one tool invocation into the session, from whichever signal carries
+ * it. Span-bearing agents report it on the `claude_code.tool` SPAN; a
+ * logs-only agent (Cowork) reports the same facts — tool name, success,
+ * duration, sizes — on its `tool_result` EVENT. The caller gates which
+ * carrier counts for its agent, so an agent with both never double-counts.
+ */
+function foldToolInvocation(
+  next: CodingAgentSessionData,
+  {
+    attrs,
+    failed,
+    toolMs,
+    startedAtMs,
+  }: {
+    attrs: Record<string, unknown>;
+    failed: boolean;
+    toolMs: number;
+    startedAtMs: number;
+  },
+): CodingAgentSessionData {
   const toolName = str(attrs.tool_name);
-  const failed = span.statusCode === SPAN_STATUS_ERROR;
-  const toolMs = num(attrs.duration_ms) || durationMs;
 
   const withTool: CodingAgentSessionData = {
     ...next,
@@ -511,7 +558,7 @@ export function applySpanToCodingAgentSession({
   if (toolAgentId === null) {
     withTool.steps = appendStep(next.steps, {
       name: toolName,
-      startedAtMs: span.startTimeUnixMs,
+      startedAtMs,
       failed,
     });
   }
@@ -549,21 +596,44 @@ export function applySpanToCodingAgentSession({
 }
 
 /**
+ * Agents whose telemetry is events-only: no spans arrive, so the facts that
+ * span-bearing agents fold from spans (model calls, tokens, tool runs) fold
+ * from their LOG events instead. Membership is the double-count gate — an
+ * agent listed here must never also emit the equivalent spans into this
+ * pipeline, or every call would fold twice.
+ */
+const LOGS_ONLY_AGENTS: ReadonlySet<string> = new Set(["claude_cowork"]);
+
+/**
  * Fold one LOG record's facts into the session.
  *
  * These are the facts with NO span: the tool the user denied (it never ran), the
  * model call that failed and was retried (a failed call has no successful span),
  * the authoritative cost, the compaction, the hook that blocked an action.
+ * For a logs-only agent (`LOGS_ONLY_AGENTS`) the log is ALSO the carrier of
+ * everything spans normally carry, so its `api_request` folds the model call
+ * and its `tool_result` folds the tool invocation.
  */
 export function applyLogToCodingAgentSession({
   state,
   attributes,
+  agent,
+  occurredAtMs,
 }: {
   state: CodingAgentSessionData;
   /** The contribution's lifted scalar facts — raw wire keys. */
   attributes: Record<string, unknown>;
+  /**
+   * The CONTRIBUTION's detected agent — deliberately not the folded state's,
+   * which is first-writer-wins and could have been established by a
+   * differently-labeled signal. Gates the logs-only folding below.
+   */
+  agent?: string;
+  /** The record's own time, for step placement on logs-only folds. */
+  occurredAtMs?: number;
 }): CodingAgentSessionData {
   const attrs = attributes;
+  const logsOnly = agent !== undefined && LOGS_ONLY_AGENTS.has(agent);
   // Normalize the agent's spelling into one vocabulary before matching. Claude
   // Code and Codex namespace their event names (`claude_code.tool_result`,
   // `codex.tool_result`); opencode sends a bare `tool_result` and dots its
@@ -595,14 +665,18 @@ export function applyLogToCodingAgentSession({
         responseChars: base.responseChars + num(attrs.response_length),
       };
 
-    case CLAUDE.EVENT.API_REQUEST:
+    case CLAUDE.EVENT.API_REQUEST: {
       // The authoritative cost: the agent reports what it was actually billed,
       // which no span carries.
-      return { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
+      const withCost = { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
+      // For a logs-only agent this event IS the model call — the same facts
+      // the llm_request span carries for Claude Code fold from here instead.
+      return logsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
+    }
 
     case CLAUDE.EVENT.TOOL_RESULT: {
       const errorType = str(attrs.error_type);
-      return {
+      const withBytes = {
         ...base,
         // Bytes of tool OUTPUT fed back into the context — the usual cause of a
         // session bloating its way into a compaction.
@@ -614,6 +688,16 @@ export function applyLogToCodingAgentSession({
             ? bump(base.errorTypes, errorType)
             : base.errorTypes,
       };
+      // For a logs-only agent this event IS the tool run — name, duration,
+      // outcome — which span-bearing agents fold from the tool span.
+      return logsOnly
+        ? foldToolInvocation(withBytes, {
+            attrs,
+            failed: scalarStr(attrs.success) === "false",
+            toolMs: num(attrs.duration_ms),
+            startedAtMs: occurredAtMs ?? 0,
+          })
+        : withBytes;
     }
 
     case CLAUDE.EVENT.TOOL_DECISION: {

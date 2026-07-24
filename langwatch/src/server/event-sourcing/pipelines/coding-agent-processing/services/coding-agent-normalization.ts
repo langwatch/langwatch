@@ -177,8 +177,11 @@ const BASE_METRIC_ALIASES: Readonly<Record<string, CodingAgentMetric>> = {
   "tool.call.count": "tool_call",
 };
 
-/** Base table + every registered agent's aliases, collisions rejected. */
-function mergeAliasTables<Value>(
+/**
+ * Base table + every registered agent's aliases, collisions rejected.
+ * Exported for the unit suite, which proves the collision guard fires.
+ */
+export function mergeAliasTables<Value>(
   base: Readonly<Record<string, Value>>,
   perAgent: ReadonlyArray<Readonly<Record<string, Value>> | undefined>,
 ): Readonly<Record<string, Value>> {

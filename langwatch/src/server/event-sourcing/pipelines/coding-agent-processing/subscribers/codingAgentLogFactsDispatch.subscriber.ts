@@ -44,8 +44,18 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
         attributes["event.name"] = record.eventName;
       }
 
-      // Parsed before the gate: Cowork's events reuse Claude Code's scope and
-      // names, so resource-level service.name is what identifies them.
+      // Two-phase detection, so an ordinary application log costs one cheap
+      // name/scope check and never a resource-attributes parse. Cowork's
+      // events reuse Claude Code's runtime (anthropic scope, claude_code
+      // event names), so they PASS this gate as claude_code; the resource
+      // parse below then supplies the service.name that relabels them
+      // claude_cowork at the contribution.
+      const facts = liftCodingAgentLogFacts({
+        scopeName: record.scopeName,
+        attributes,
+      });
+      if (facts === null) return;
+
       const resourceAttributes = parseFlatAttributes(
         record.resourceAttributesFlatJson,
       );
@@ -54,13 +64,6 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
         typeof rawServiceName === "string" && rawServiceName.length > 0
           ? rawServiceName
           : null;
-
-      const facts = liftCodingAgentLogFacts({
-        scopeName: record.scopeName,
-        attributes,
-        serviceName,
-      });
-      if (facts === null) return;
 
       const serviceVersion = resourceAttributes?.["service.version"];
       if (typeof serviceVersion === "string" && serviceVersion.length > 0) {

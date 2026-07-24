@@ -53,7 +53,7 @@ Feature: Coding-agent sessions
     Then it appears as a single-trace session of its own
 
   Scenario: a Cowork session is an agent session
-    When Claude Cowork sends its session telemetry as events with a session id and no spans
+    When Claude Cowork exports its session telemetry as events only, under one session id
     Then the session appears with its turns, tool activity, costs and token totals
     And the session is identified as Cowork
 

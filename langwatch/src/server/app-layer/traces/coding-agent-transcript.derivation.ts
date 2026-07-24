@@ -121,6 +121,11 @@ export interface CodingAgentTranscript {
 export interface TranscriptLogRecord {
   timestampMs: number;
   attributes: Record<string, unknown>;
+  /**
+   * Resource-level service.name, when the caller has it. The only signal
+   * that separates Cowork from the Claude Code runtime it reuses.
+   */
+  serviceName?: string | null;
 }
 
 const MODEL_CALL_SPAN_NAMES = new Set([
@@ -578,7 +583,10 @@ function detectAgentFrom({
   logs: TranscriptLogRecord[];
 }): CodingAgent {
   for (const span of spans) {
-    const agent = detectCodingAgent({ recordName: span.name });
+    const agent = detectCodingAgent({
+      recordName: span.name,
+      serviceName: span.serviceName,
+    });
     if (agent !== "unknown") return agent;
     // opencode's spans are named by the Vercel AI SDK (`ai.streamText`), so
     // the name carries no agent; its request-header attributes do.
@@ -596,6 +604,7 @@ function detectAgentFrom({
   for (const log of logs) {
     const agent = detectCodingAgent({
       recordName: readString(log.attributes, "event.name"),
+      serviceName: log.serviceName,
     });
     if (agent !== "unknown") return agent;
   }
