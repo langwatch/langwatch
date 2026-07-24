@@ -24,6 +24,7 @@ import {
   type ConfidenceInterval,
   type JudgeAnnotationPair,
 } from "./batch-evaluation-results/computeConfusionMatrix";
+import type { JudgeAnnotationCoverage } from "./batch-evaluation-results/buildJudgeAnnotationPairs";
 import type { BatchResultRow } from "./batch-evaluation-results/types";
 import { useDrawer } from "~/hooks/useDrawer";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
@@ -33,12 +34,9 @@ export type ConfusionMatrixDrawerProps = {
   evaluatorId: string;
   evaluatorName: string;
   targetId: string;
-  pairs: JudgeAnnotationPair[];
-  coverage: {
-    totalRows: number;
-    annotatedRows: number;
-    conflictingRows: number;
-  };
+  /** Names the target this view scores, for the header. */
+  targetName?: string;
+  coverage: JudgeAnnotationCoverage;
   rows: BatchResultRow[];
 };
 
@@ -76,8 +74,8 @@ const formatPercent = (value: number | null): string =>
 
 export function ConfusionMatrixDrawer({
   evaluatorName,
+  targetName,
   targetId,
-  pairs,
   coverage,
   rows,
 }: ConfusionMatrixDrawerProps) {
@@ -91,8 +89,9 @@ export function ConfusionMatrixDrawer({
   // complexProps, a module-level store that does not. On that path the props
   // arrive undefined, so normalise here and explain the situation below
   // rather than throwing inside computeConfusionMatrix.
-  const hasData = Array.isArray(pairs) && Array.isArray(rows) && !!coverage;
-  const safePairs = hasData ? pairs : EMPTY_PAIRS;
+  const hasData =
+    !!coverage && Array.isArray(coverage.pairs) && Array.isArray(rows);
+  const safePairs = hasData ? coverage.pairs : EMPTY_PAIRS;
   const safeRows = hasData ? rows : EMPTY_ROWS;
 
   const metrics = useMemo(
@@ -126,7 +125,8 @@ export function ConfusionMatrixDrawer({
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
-            {evaluatorName ?? "Judge"} — agreement with reviewers
+            {evaluatorName ?? "Judge"} vs reviewers
+            {targetName ? ` — ${targetName}` : ""}
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>
@@ -443,7 +443,7 @@ function AgreementBar({
             top={0}
             bottom={0}
             width={asWidth(chance)}
-            bg="rgba(148, 163, 184, 0.28)"
+            bg="bg.emphasized"
           />
         ) : null}
 
@@ -455,7 +455,7 @@ function AgreementBar({
             bottom="7px"
             insetStart={asWidth(interval.lower)}
             width={asWidth(interval.upper - interval.lower)}
-            bg="rgba(59, 130, 246, 0.28)"
+            bg="blue.muted"
             borderRadius="sm"
           />
         ) : null}
@@ -467,7 +467,7 @@ function AgreementBar({
             bottom={0}
             insetStart={asWidth(chance)}
             width="2px"
-            bg="rgba(100, 116, 139, 0.9)"
+            bg="border.emphasized"
           />
         ) : null}
 
@@ -477,7 +477,7 @@ function AgreementBar({
           bottom={0}
           insetStart={asWidth(accuracy)}
           width="3px"
-          bg="rgb(37, 99, 235)"
+          bg="blue.solid"
         />
       </Box>
 
@@ -517,7 +517,7 @@ function MatrixCell({
       onClick={onClick}
       padding={3}
       textAlign="center"
-      bg={isError ? "rgba(239, 68, 68, 0.14)" : "bg"}
+      bg={isError ? "red.subtle" : "bg"}
       cursor="pointer"
       outline={selected ? "2px solid" : "none"}
       outlineColor="border.emphasized"

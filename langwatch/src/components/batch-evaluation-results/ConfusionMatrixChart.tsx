@@ -18,20 +18,17 @@ import { useDrawer } from "~/hooks/useDrawer";
 import {
   computeConfusionMatrix,
   kappaAgreementLabel,
-  type JudgeAnnotationPair,
 } from "./computeConfusionMatrix";
+import type { JudgeAnnotationCoverage } from "./buildJudgeAnnotationPairs";
 import type { BatchResultRow } from "./types";
 
 export type ConfusionMatrixChartProps = {
   evaluatorId: string;
   evaluatorName: string;
   targetId: string;
-  pairs: JudgeAnnotationPair[];
-  coverage: {
-    totalRows: number;
-    annotatedRows: number;
-    conflictingRows: number;
-  };
+  /** Names the target this card scores, so sibling cards are tellable apart. */
+  targetName: string;
+  coverage: JudgeAnnotationCoverage;
   rows: BatchResultRow[];
   /** Matched to the sibling cost/latency/win-rate charts in ComparisonCharts. */
   chartHeight: number;
@@ -45,18 +42,19 @@ export type ConfusionMatrixChartProps = {
  * almost no information anyway. Only the two error cells get a color; the
  * two agreement cells stay neutral regardless of their count.
  */
-const ERROR_RGB = "239, 68, 68";
+const ERROR_CELL_BG = "red.subtle";
 
 export function ConfusionMatrixChart({
   evaluatorId,
   evaluatorName,
   targetId,
-  pairs,
+  targetName,
   coverage,
   rows,
   chartHeight,
 }: ConfusionMatrixChartProps) {
   const { openDrawer } = useDrawer();
+  const pairs = coverage.pairs;
   const metrics = computeConfusionMatrix(pairs);
   const total = Math.max(1, metrics.total);
 
@@ -80,7 +78,7 @@ export function ConfusionMatrixChart({
       evaluatorId,
       evaluatorName,
       targetId,
-      pairs,
+      targetName,
       coverage,
       rows,
     });
@@ -168,7 +166,7 @@ export function ConfusionMatrixChart({
               flexDirection="column"
               justifyContent="center"
               alignItems="center"
-              bg={c.isError ? `rgba(${ERROR_RGB}, 0.16)` : "bg.muted"}
+              bg={c.isError ? ERROR_CELL_BG : "bg.muted"}
             >
               <Text fontSize="md" fontWeight="bold">
                 {c.value}
