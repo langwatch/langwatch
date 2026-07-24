@@ -786,6 +786,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         return;
       }
       this.inFlightStrikeGroups.add(groupId);
+
+      // close() may have flipped shutdownRequested and taken its sweep snapshot
+      // during the recordClaimStrike await above — before this group was in the
+      // set, so the sweep would miss it and an abandoned drain would leave the
+      // strike behind: exactly the false worker-death this guard must not book.
+      // Re-check on the synchronous heels of the add (no await between them, so
+      // close() cannot interleave here) and clear our own strike if the shutdown
+      // began mid-claim. The add and this check are jointly exhaustive: either
+      // close()'s snapshot already saw the group and swept it, or it did not and
+      // we clear it here.
+      if (this.shutdownRequested) {
+        this.inFlightStrikeGroups.delete(groupId);
+        await this.scripts.clearClaimStrikes(groupId).catch(() => {
+          // Protective accounting only; the strike key's TTL bounds a failed clear.
+        });
+      }
     }
 
     try {

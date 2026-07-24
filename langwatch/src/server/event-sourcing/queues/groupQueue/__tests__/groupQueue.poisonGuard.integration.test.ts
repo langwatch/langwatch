@@ -275,6 +275,103 @@ describe.skipIf(!hasTestcontainers)(
           expect(await blockedMembers(name)).not.toContain("slow");
         });
       });
+
+      describe("when close() takes its sweep snapshot before the claim finishes recording", () => {
+        /** @scenario graceful shutdown mid-job does not count as a poison strike */
+        it("clears the strike via the post-claim recheck even though the sweep missed the group", async () => {
+          let releaseStrike!: () => void;
+          const strikeGate = new Promise<void>((resolve) => {
+            releaseStrike = resolve;
+          });
+          let signalStrikeRecorded!: () => void;
+          const strikeRecorded = new Promise<void>((resolve) => {
+            signalStrikeRecorded = resolve;
+          });
+          let releaseHandler!: () => void;
+          const handlerGate = new Promise<void>((resolve) => {
+            releaseHandler = resolve;
+          });
+          let signalHandlerEntered!: () => void;
+          const handlerEntered = new Promise<void>((resolve) => {
+            signalHandlerEntered = resolve;
+          });
+
+          const { queue, name } = createQueue(async () => {
+            signalHandlerEntered();
+            await handlerGate;
+          });
+          await queue.waitUntilReady();
+
+          const internals = queue as unknown as {
+            scripts: {
+              recordClaimStrike: (groupId: string) => Promise<number>;
+            };
+            drainAndDisconnect: () => Promise<void>;
+          };
+
+          // Park the claim AFTER its strike lands in Redis but BEFORE
+          // processWithRetries adds the group to the in-flight set, so close()'s
+          // sweep snapshot runs against a set that does not yet hold the group.
+          const realRecordStrike =
+            internals.scripts.recordClaimStrike.bind(internals.scripts);
+          let gatedOnce = false;
+          vi.spyOn(internals.scripts, "recordClaimStrike").mockImplementation(
+            async (groupId: string) => {
+              const strikes = await realRecordStrike(groupId);
+              if (groupId === "raced" && !gatedOnce) {
+                gatedOnce = true;
+                signalStrikeRecorded();
+                await strikeGate;
+              }
+              return strikes;
+            },
+          );
+
+          // drainAndDisconnect() is invoked synchronously right after the sweep
+          // snapshot, so this fires only once close() has provably passed it -
+          // with the group still unswept.
+          let signalDrainReached!: () => void;
+          const drainReached = new Promise<void>((resolve) => {
+            signalDrainReached = resolve;
+          });
+          const realDrain = internals.drainAndDisconnect.bind(internals);
+          internals.drainAndDisconnect = () => {
+            signalDrainReached();
+            return realDrain();
+          };
+
+          await queue.send({ id: "job-1", groupId: "raced", value: "x" });
+          await strikeRecorded;
+          // The strike a hard death would leave behind is present in Redis.
+          expect(await redis.get(strikesKey(name, "raced"))).toBe("1");
+
+          // Begin the shutdown: it flips shutdownRequested synchronously, then
+          // snapshots the still-group-less in-flight set before the drain.
+          const closing = queue.close();
+          await drainReached;
+
+          // Let the claim finish - it adds the group to the set now, after the
+          // sweep already ran, then runs the shutdown recheck.
+          releaseStrike();
+          await handlerEntered;
+
+          // The recheck cleared the strike while the handler is still in flight,
+          // so a drain the budget abandons leaves nothing behind. Without it the
+          // strike would survive until the finally the abandon path never runs.
+          await vi.waitFor(
+            async () => {
+              expect(await redis.get(strikesKey(name, "raced"))).toBeNull();
+            },
+            { timeout: 5000, interval: 50 },
+          );
+
+          releaseHandler();
+          await closing;
+
+          // The group was never mistaken for poison.
+          expect(await blockedMembers(name)).not.toContain("raced");
+        });
+      });
     });
 
     describe("given the failure-streak quarantine breaker", () => {
