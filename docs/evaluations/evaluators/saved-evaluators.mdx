@@ -1,0 +1,280 @@
+---
+title: Saved Evaluators
+sidebarTitle: Saved Evaluators
+description: Create reusable evaluator configurations on the platform and use them across experiments, monitors, and guardrails.
+---
+
+Saved evaluators are pre-configured evaluation setups that you create on the LangWatch platform. Once saved, you can reuse them anywhere—in experiments, monitors, guardrails, or via the API—without reconfiguring settings each time.
+
+<Info>
+**When to use Saved Evaluators:**
+- You want to reuse the same evaluation configuration across multiple places
+- You prefer configuring evaluators via UI rather than code
+- You want non-technical team members to create and manage evaluations
+- You need consistent evaluation settings across your team
+
+**See also:**
+- [Built-in Evaluators](/evaluations/evaluators/built-in-evaluators) - Use evaluators directly without platform setup
+- [Custom Scoring](/evaluations/evaluators/custom-scoring) - Send scores from your own evaluation logic
+</Info>
+
+## Creating a Saved Evaluator
+
+### Via the Platform UI
+
+1. Go to **Evaluations** in your LangWatch project
+2. Click **New Evaluator**
+3. Select the evaluator type (e.g., LLM Boolean, PII Detection)
+4. Configure the settings (model, prompt, thresholds, etc.)
+5. Give it a descriptive name and save
+
+{/* TODO: Add screenshot of saved evaluator creation UI */}
+
+### Via the Evaluators Page
+
+You can also manage saved evaluators from the dedicated Evaluators page at `/{project}/evaluators`.
+
+## Using Saved Evaluators
+
+Saved evaluators are referenced using the `evaluators/{slug}` format, where `{slug}` is the unique identifier assigned when you create the evaluator.
+
+### Finding Your Evaluator Slug
+
+1. Go to your saved evaluator on the platform
+2. Click the **⋮** menu → **Use via API**
+3. Copy the slug from the code examples
+
+### In Experiments
+
+<CodeGroup>
+```python Python
+import langwatch
+
+df = langwatch.datasets.get_dataset("my-dataset").to_pandas()
+
+experiment = langwatch.experiment.init("my-experiment")
+
+for index, row in experiment.loop(df.iterrows()):
+    output = my_llm(row["input"])
+
+    # Use your saved evaluator
+    experiment.evaluate(
+        "evaluators/my-tone-checker",  # Your saved evaluator slug
+        index=index,
+        data={
+            "input": row["input"],
+            "output": output,
+        },
+    )
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+const dataset = await langwatch.datasets.get("my-dataset");
+const experiment = await langwatch.experiments.init("my-experiment");
+
+await experiment.run(
+  dataset.entries.map((e) => e.entry),
+  async ({ item, index }) => {
+    const output = await myLLM(item.input);
+
+    // Use your saved evaluator
+    await experiment.evaluate("evaluators/my-tone-checker", {
+      index,
+      data: {
+        input: item.input,
+        output: output,
+      },
+    });
+  },
+  { concurrency: 4 }
+);
+```
+</CodeGroup>
+
+### In Online Evaluation
+
+<CodeGroup>
+```python Python
+import langwatch
+
+@langwatch.span()
+def my_llm_step(user_input: str):
+    output = my_llm(user_input)
+
+    # Use your saved evaluator
+    result = langwatch.evaluation.evaluate(
+        "evaluators/my-tone-checker",  # Your saved evaluator slug
+        name="Tone Check",
+        data={
+            "input": user_input,
+            "output": output,
+        },
+    )
+
+    return output
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+async function myLLMStep(userInput: string): Promise<string> {
+  const output = await myLLM(userInput);
+
+  // Use your saved evaluator
+  const result = await langwatch.evaluations.evaluate("evaluators/my-tone-checker", {
+    name: "Tone Check",
+    data: {
+      input: userInput,
+      output: output,
+    },
+  });
+
+  return output;
+}
+```
+</CodeGroup>
+
+### As Guardrails
+
+<CodeGroup>
+```python Python
+import langwatch
+
+@langwatch.span()
+def my_llm_step(user_input: str):
+    # Use your saved evaluator as a guardrail
+    guardrail = langwatch.evaluation.evaluate(
+        "evaluators/my-safety-check",  # Your saved evaluator slug
+        name="Safety Check",
+        data={"input": user_input},
+        as_guardrail=True,
+    )
+
+    if not guardrail.passed:
+        return "I can't help with that request."
+
+    return my_llm(user_input)
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+async function myLLMStep(userInput: string): Promise<string> {
+  // Use your saved evaluator as a guardrail
+  const guardrail = await langwatch.evaluations.evaluate("evaluators/my-safety-check", {
+    name: "Safety Check",
+    data: { input: userInput },
+    asGuardrail: true,
+  });
+
+  if (!guardrail.passed) {
+    return "I can't help with that request.";
+  }
+
+  return await myLLM(userInput);
+}
+```
+</CodeGroup>
+
+### Via cURL
+
+```bash
+# Set your API key
+API_KEY="$LANGWATCH_API_KEY"
+
+# Call your saved evaluator
+curl -X POST "https://app.langwatch.ai/api/evaluations/evaluators/my-tone-checker/evaluate" \
+     -H "X-Auth-Token: $API_KEY" \
+     -H "Content-Type: application/json" \
+     -d @- <<EOF
+{
+  "name": "Tone Check",
+  "data": {
+    "input": "your input text",
+    "output": "your output text"
+  }
+}
+EOF
+```
+
+## Saved vs Built-in Evaluators
+
+| Aspect | Built-in Evaluators | Saved Evaluators |
+|--------|---------------------|------------------|
+| **Slug format** | `provider/evaluator` (e.g., `ragas/faithfulness`) | `evaluators/{slug}` (e.g., `evaluators/my-checker`) |
+| **Configuration** | In code via `settings` parameter | Pre-configured on platform |
+| **Reusability** | Copy settings across code | Reference by slug anywhere |
+| **Management** | In codebase | In LangWatch platform UI |
+| **Team access** | Developers only | Anyone with platform access |
+
+## Best Practices
+
+### Naming Conventions
+
+Use descriptive, consistent names for your saved evaluators:
+
+- ✅ `tone-checker-formal`
+- ✅ `pii-detection-strict`
+- ✅ `answer-quality-v2`
+- ❌ `test1`
+- ❌ `my-evaluator`
+
+### When to Save an Evaluator
+
+Save an evaluator when you:
+- Use the same configuration in multiple places
+- Want to manage settings from the UI
+- Need non-developers to configure evaluations
+- Want to version control evaluation criteria separately from code
+
+### Overriding Settings
+
+You can override saved evaluator settings at runtime:
+
+```python
+experiment.evaluate(
+    "evaluators/my-llm-judge",
+    index=index,
+    data={...},
+    settings={
+        "model": "openai/gpt-4o",  # Override the saved model
+    },
+)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Built-in Evaluators"
+    description="Use evaluators directly without platform setup."
+    icon="bolt"
+    href="/evaluations/evaluators/built-in-evaluators"
+  />
+  <Card
+    title="Custom Scoring"
+    description="Send scores from your own evaluation logic."
+    icon="code"
+    href="/evaluations/evaluators/custom-scoring"
+  />
+  <Card
+    title="Evaluators List"
+    description="Browse all available evaluator types."
+    icon="list"
+    href="/evaluations/evaluators/list"
+  />
+  <Card
+    title="Experiments"
+    description="Run batch evaluations with your saved evaluators."
+    icon="flask"
+    href="/evaluations/experiments/overview"
+  />
+</CardGroup>

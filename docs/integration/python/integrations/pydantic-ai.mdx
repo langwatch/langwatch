@@ -1,0 +1,52 @@
+---
+title: PydanticAI Instrumentation
+sidebarTitle: PydanticAI
+description: Connect PydanticAI applications to LangWatch using the Python SDK to trace calls, debug structured outputs, and improve AI agent evaluations.
+keywords: pydantic-ai, pydanticai, instrumentation, langwatch, python, tracing
+---
+
+LangWatch integrates with PydanticAI through its built-in OpenTelemetry support to capture traces of agent runs and model interactions.
+
+## Installation
+
+<CodeGroup>
+```bash pip
+pip install langwatch pydantic-ai
+```
+
+```bash uv
+uv add langwatch pydantic-ai
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Initialize LangWatch and create your PydanticAI agent. PydanticAI's built-in OpenTelemetry support will automatically send traces to LangWatch.
+
+```python
+from pydantic_ai import Agent
+import langwatch
+
+langwatch.setup()
+
+agent = Agent(
+    "openai:gpt-5",
+    instructions="Be funny, but not too funny.",
+)
+
+if __name__ == "__main__":
+    result = agent.run_sync("Tell me a joke")
+    print(result.output)
+```
+
+LangWatch automatically captures all PydanticAI agent runs and model interactions through PydanticAI's built-in OpenTelemetry support. Use `@langwatch.trace()` decorators to add custom traces and metadata as needed.
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your PydanticAI applications

@@ -1,0 +1,27 @@
+# Code-block sandbox dependencies.
+#
+# This is the curated, fixed set of Python packages available to user code
+# inside a Studio code block. It is installed into BOTH the self-hosted
+# Docker image and the production Lambda artifact so the two behave
+# identically, and it is published in the docs as "what you can import in a
+# code block".
+#
+# Deliberately small and fixed. The old langwatch_nlp image leaked its
+# entire dependency tree (litellm, dspy, fastapi, torch, boto3, ...) into
+# user code by accident; that is not a contract and is not carried here.
+#
+# Adding to this list grows every deployable artifact (and the Lambda zip
+# is bounded at 250MB unzipped), so additions need a real usage signal.
+# Right-sized against a production import histogram of real code blocks.
+
+# HTTP clients (the two most-reached-for utilities).
+requests
+httpx
+
+# Data modelling / validation, ubiquitous in user code.
+pydantic
+
+# The LangWatch Python SDK, so code blocks can fetch prompts, datasets, and
+# emit traces. Pulls pydantic + httpx (already here) + otel + python-liquid;
+# it does NOT require pandas/numpy.
+langwatch

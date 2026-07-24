@@ -1,0 +1,87 @@
+---
+title: Azure OpenAI Integration
+sidebarTitle: Go
+description: Instrument Azure OpenAI API calls in Go using LangWatch to monitor model usage, latency, and AI agent evaluation metrics.
+icon: golang
+keywords: go, golang, azure, azure openai, instrumentation, langwatch, openai-compatible
+---
+
+LangWatch supports tracing Azure OpenAI API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to your Azure endpoint.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+```
+
+## Usage
+
+<Info>
+Set `LANGWATCH_API_KEY`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_ENDPOINT` environment variables before running.
+</Info>
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	"github.com/openai/openai-go"
+	oaioption "github.com/openai/openai-go/option"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Set up LangWatch exporter
+	exporter, err := langwatch.NewDefaultExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+
+	// Create Azure OpenAI client
+	client := openai.NewClient(
+		oaioption.WithAPIKey(os.Getenv("AZURE_OPENAI_API_KEY")),
+		oaioption.WithBaseURL(os.Getenv("AZURE_OPENAI_ENDPOINT")),
+		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithCaptureInput(),
+			otelopenai.WithCaptureOutput(),
+			otelopenai.WithGenAISystem("azure"),
+		)),
+	)
+
+	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT5,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("You are a helpful assistant."),
+			openai.UserMessage("Hello, Azure OpenAI!"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("Chat completion failed: %v", err)
+	}
+
+	log.Printf("Response: %s", response.Choices[0].Message.Content)
+}
+```
+
+Set `AZURE_OPENAI_ENDPOINT` to your Azure OpenAI resource endpoint URL (e.g., `https://your-resource.openai.azure.com/openai/deployments/your-deployment`).
+
+<Warning>
+The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+</Warning>
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Azure OpenAI applications

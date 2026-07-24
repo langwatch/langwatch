@@ -1,0 +1,106 @@
+id: no-form-watch-in-child
+snapshots:
+  ? |
+    const Child = ({ form }: Props) => {
+      const name = form.watch("name");
+      return <input value={name} />;
+    };
+  : labels:
+    - source: form.watch("name")
+      style: primary
+      start: 52
+      end: 70
+    - source: form
+      style: secondary
+      start: 17
+      end: 21
+    - source: '({ form }: Props)'
+      style: secondary
+      start: 14
+      end: 31
+    - source: |-
+        ({ form }: Props) => {
+          const name = form.watch("name");
+          return <input value={name} />;
+        }
+      style: secondary
+      start: 14
+      end: 106
+  ? |
+    function Child(form: UseFormReturn<Values>) {
+      const all = form.watch();
+      return <div>{all.name}</div>;
+    }
+  : labels:
+    - source: form.watch()
+      style: primary
+      start: 60
+      end: 72
+    - source: form
+      style: secondary
+      start: 15
+      end: 19
+    - source: '(form: UseFormReturn<Values>)'
+      style: secondary
+      start: 14
+      end: 43
+    - source: |-
+        function Child(form: UseFormReturn<Values>) {
+          const all = form.watch();
+          return <div>{all.name}</div>;
+        }
+      style: secondary
+      start: 0
+      end: 107
+  ? |
+    function Child({ form }: Props) {
+      const all = form.watch();
+      return <input value={all.name} />;
+    }
+  : labels:
+    - source: form.watch()
+      style: primary
+      start: 48
+      end: 60
+    - source: form
+      style: secondary
+      start: 17
+      end: 21
+    - source: '({ form }: Props)'
+      style: secondary
+      start: 14
+      end: 31
+    - source: |-
+        function Child({ form }: Props) {
+          const all = form.watch();
+          return <input value={all.name} />;
+        }
+      style: secondary
+      start: 0
+      end: 100
+  ? |
+    function Child({ form }: Props) {
+      const name = form.watch("name");
+      return <input value={name} />;
+    }
+  : labels:
+    - source: form.watch("name")
+      style: primary
+      start: 49
+      end: 67
+    - source: form
+      style: secondary
+      start: 17
+      end: 21
+    - source: '({ form }: Props)'
+      style: secondary
+      start: 14
+      end: 31
+    - source: |-
+        function Child({ form }: Props) {
+          const name = form.watch("name");
+          return <input value={name} />;
+        }
+      style: secondary
+      start: 0
+      end: 103

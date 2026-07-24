@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Test artifacts
+test-results/
+playwright-report/
+
+# Auth state (contains session tokens)
+.auth/
+
+# OS files
+.DS_Store

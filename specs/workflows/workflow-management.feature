@@ -1,0 +1,86 @@
+Feature: Workflow Management UI
+  As a LangWatch user
+  I want to manage my workflows through the UI
+  So that I can organize and maintain my workflow library
+
+  # All scenarios in this file describe a delete-confirmation dialog
+  # interaction on the WorkflowCard. They need a JSDOM/component test
+  # for the confirmation dialog (no such test file exists today —
+  # `CascadeArchiveDialog.test.tsx` covers a different surface).
+  # The behavioral piece (delete mutation success/failure) is covered
+  # by the Workflow REST API tests in
+  # `langwatch/src/app/api/workflows/__tests__/`.
+
+  Background:
+    Given I am authenticated as a project member
+    And the project has existing workflows
+
+  # ============================================================================
+  # Workflow Deletion
+  # ============================================================================
+
+  @unit @unimplemented
+  Scenario: Delete confirmation dialog captures keyboard input
+    Given I am on the workflows page
+    And I open the workflow card menu
+    When I click "Delete"
+    And I type "d" in the confirmation input
+    Then the input should contain "d"
+    And I should remain on the workflows page
+    And no navigation should occur
+
+  @unit @unimplemented
+  Scenario: Delete confirmation dialog allows full text entry
+    Given I am on the workflows page
+    And I open the workflow card menu
+    And I click "Delete"
+    When I type "delete" in the confirmation input
+    Then the input should contain "delete"
+    And the Delete button should be enabled
+    And I should remain on the workflows page
+
+  @unit @unimplemented
+  Scenario: Delete confirmation dialog Enter key submits when valid
+    Given I am on the workflows page
+    And I open the workflow card menu
+    And I click "Delete"
+    And I have typed "delete" in the confirmation input
+    When I press Enter
+    Then the workflow should be deleted
+    And the dialog should close
+
+  @unit @unimplemented
+  Scenario: Delete confirmation dialog Enter key does nothing when invalid
+    Given I am on the workflows page
+    And I open the workflow card menu
+    And I click "Delete"
+    And I have typed "del" in the confirmation input
+    When I press Enter
+    Then the workflow should not be deleted
+    And the dialog should remain open
+
+  @unit @unimplemented
+  Scenario: Delete confirmation dialog keyboard events do not propagate
+    Given I am on the workflows page
+    And the WorkflowCard is wrapped in a navigation Link
+    And I open the delete confirmation dialog
+    When I interact with the confirmation input using keyboard
+    Then keyboard events should not bubble to the parent Link
+    And no navigation should be triggered
+
+  # ============================================================================
+  # Version description autogeneration
+  # ============================================================================
+
+  # Customer context: while publishing an evaluator, the AI description
+  # autogen failed and an error toast appeared mid-flow, reading as if
+  # the publish itself had failed and needing to be explained away. The
+  # autogen only prefills a field the user can type into either way.
+
+  @unit @unimplemented
+  Scenario: Version description autogen failure falls back silently
+    Given I commit a new workflow version
+    And the AI description autogeneration fails
+    Then no error toast is shown
+    And the description falls back to "autosaved" or stays empty for manual input
+    And the commit proceeds normally

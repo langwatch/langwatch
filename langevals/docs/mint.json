@@ -1,0 +1,99 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "LangEvals",
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#025875",
+    "light": "#f2a65a",
+    "dark": "#ed8926",
+    "anchors": {
+      "from": "#ed8926",
+      "to": "#ed8926"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "llms.txt",
+      "url": "https://docs.langwatch.ai/llms.txt"
+    },
+    {
+      "name": "Support",
+      "url": "/support#email-support"
+    },
+    {
+      "name": "Dashboard",
+      "url": "https://app.langwatch.ai"
+    }
+  ],
+  "topbarCtaButton": {
+    "type": "github",
+    "url": "https://github.com/langwatch/langevals"
+  },
+  "anchors": [
+    {
+      "name": "GitHub Repo",
+      "icon": "github",
+      "url": "https://github.com/langwatch/langevals"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Documentation",
+      "pages": [
+        "documentation/introduction",
+        "documentation/evaluators",
+        "documentation/unit-tests",
+        "documentation/API-example",
+        "how-to-choose-your-evaluator",
+        {
+          "group": "Modular Architecture",
+          "pages": ["documentation/modular-architecture/contributing"]
+        }
+      ]
+    },
+    {
+      "group": "Tutorials",
+      "pages": [
+        "tutorials/extensive-unit-testing",
+        "tutorials/rag-evaluation",
+        "tutorials/ci-cd-pipeline-evaluation"
+      ]
+    },
+    {
+      "group": "API Endpoints",
+      "pages": [
+        "api-reference/endpoint/lingua-language-detection",
+        "api-reference/endpoint/openai-moderation",
+        "api-reference/endpoint/google-cloud-dlp-pii-detection",
+        "api-reference/endpoint/content-safety",
+        "api-reference/endpoint/azure-jailbreak-detection",
+        "api-reference/endpoint/azure-prompt-injection-detection",
+        "api-reference/endpoint/competitor-detection-llm",
+        "api-reference/endpoint/competitor-blocklist",
+        "api-reference/endpoint/off-topic-detection",
+        "api-reference/endpoint/ragas-answer-relevancy",
+        "api-reference/endpoint/ragas-context-precision",
+        "api-reference/endpoint/ragas-context-recall",
+        "api-reference/endpoint/ragas-context-relevancy",
+        "api-reference/endpoint/ragas-context-utilization",
+        "api-reference/endpoint/ragas-faithfulness",
+        "api-reference/endpoint/haystack-faithfulness",
+        "api-reference/endpoint/llm-boolean-evaluator",
+        "api-reference/endpoint/llm-score-evaluator",
+        "api-reference/endpoint/llm-basic-evaluator",
+        "api-reference/endpoint/llm-similarity-evaluator",
+        "api-reference/endpoint/llama-guard"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/langwatch/langevals",
+    "website": "https://langwatch.ai",
+    "x-twitter": "https://x.com/langwatchai",
+    "linkedin": "https://www.linkedin.com/company/langwatch/",
+    "youtube": "https://www.youtube.com/@LangWatch"
+  },
+  "modeToggle": {
+    "default": "light"
+  }
+}

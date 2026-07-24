@@ -1,0 +1,26 @@
+---
+title: 'Overview'
+description: 'Learn how annotations enhance trace review, labeling, and evaluation workflows for more reliable AI agent testing.'
+---
+
+## Intro
+
+With the Annotations API, you can annotate traces with additional information. This is useful if you want to add additional information to a trace, such as a comment or a thumbs up/down reaction.
+
+## Authentication
+
+To make a call to the Annotations API, you will need to pass through your LangWatch API key in the header as `X-Auth-Token`. Your API key can be found on the setup page under settings.
+
+
+#### Allowed Methods
+
+- `GET /api/annotations` - Get a list of annotations
+- `GET /api/annotations/:id` - Get a single annotation
+- `DELETE /api/annotations/:id` - Delete a single annotation
+- `PATCH /api/annotations/:id` - Update a single annotation
+- `GET /api/annotations/trace/:id` - Get the annotations for a single trace
+- `POST /api/annotations/trace/:id` - Create annotations for traces to support domain labeling, evaluation scoring, and agent testing workflows.
+
+
+
+

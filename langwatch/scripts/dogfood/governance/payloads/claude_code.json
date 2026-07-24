@@ -1,0 +1,40 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "claude-code" } },
+          { "key": "service.version", "value": { "stringValue": "0.0.0-dogfood" } },
+          { "key": "claude.code.session_id", "value": { "stringValue": "ses_dogfood_claude_code_0001" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "claude-code.tool.message", "version": "0.0.0" },
+          "spans": [
+            {
+              "traceId": "00000000000000000000000000000000",
+              "spanId": "0000000000000000",
+              "name": "claude-code.completion",
+              "kind": 1,
+              "startTimeUnixNano": "1715175600000000000",
+              "endTimeUnixNano": "1715175601250000000",
+              "attributes": [
+                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
+                { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet-4.6" } },
+                { "key": "gen_ai.response.model", "value": { "stringValue": "claude-sonnet-4.6" } },
+                { "key": "gen_ai.request.max_tokens", "value": { "intValue": "1024" } },
+                { "key": "gen_ai.usage.input_tokens", "value": { "intValue": "187" } },
+                { "key": "gen_ai.usage.output_tokens", "value": { "intValue": "53" } },
+                { "key": "claude.code.session_id", "value": { "stringValue": "ses_dogfood_claude_code_0001" } },
+                { "key": "claude.code.tool.name", "value": { "stringValue": "Bash" } }
+              ],
+              "status": { "code": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

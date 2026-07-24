@@ -1,0 +1,112 @@
+---
+title: Members & invites
+description: Add people to your organization, assign organization roles, scope team memberships, manage invite requests, and self-service per-user sign-in methods. Lives at /settings/members + /settings/authentication.
+sidebarTitle: Members & invites
+---
+
+The members surface at `/settings/members` is the admin entry point for everything **about who is in your org**: existing members and their roles, pending invites, invite requests waiting for admin approval, and removal flows. Per-user account self-service (change password, sign-in method status, optional add-method when allowed) lives at `/settings/authentication`, the same URL used by the legacy non-governance LLMOps shell, so existing bookmarks and muscle memory keep working.
+
+<Info>**Pairs with:** [Roles & permissions](/ai-governance/roles-and-permissions) (the role catalog and what each org-level role can do) and [Audit log](/ai-governance/audit-log) (every invite, role change, and removal records a row).</Info>
+
+<Note>**Permissions**: `/settings/members` requires `organization:manage` (admins). Members navigating here directly see an "Access Restricted" panel. The underlying tRPC procedures (`organization.getAllOrganizationMembers`, `organization.createInvites`, `organization.deleteMember`, `organization.updateMemberRole`) are also gated server-side.</Note>
+
+## What admins see at `/settings/members`
+
+Three sections, top to bottom.
+
+### Organization Members
+
+A table of every active member. Columns:
+
+| Column | What it shows |
+|---|---|
+| **Name** | Display name + avatar |
+| **Email** | The address they sign in with |
+| **Access** | Per-team role chips, `ADMIN on Marketing`, `MEMBER on Engineering`, etc. Stacks vertically when a user is on multiple teams. |
+| (overflow menu) | Per-row actions: Change role, Remove from org, View access breakdown. |
+
+The table reflects every `OrganizationUser` row plus their `TeamUser` rows. Personal-workspace teams owned by other users are hidden from non-admin viewers (a privacy boundary documented in [Workspaces](/ai-governance/workspaces#personal-workspace-privacy)).
+
+### Invites
+
+Pending invitations the admin sent that haven't been accepted yet. Columns: Email, Status, Role, Teams, (revoke action).
+
+`Status` is one of:
+
+- `INVITED`, invite link sent, not yet accepted.
+- `WAITING_APPROVAL`, invite request created by a member (not an admin) via the [self-service request flow](#self-service-invite-requests-non-admin-flow); waiting for an admin to approve.
+- `EXPIRED`, invite token timed out (24h default).
+
+Click a row to copy the invite link or revoke it.
+
+### Invite Requests (when applicable)
+
+When a non-admin member proposes a new invite via `createInviteRequest`, the row lands in this section instead of **Invites**. Admins see who requested the invite, for whom, with what proposed role + team(s), and can **Approve** (issues the actual invite) or **Reject** (deletes the request).
+
+## Adding a single member
+
+The fast path:
+
+1. Click **+ Add members** at the top right of the table.
+2. In the upsert drawer, type one or more emails (comma-separated).
+3. Pick the **Organization role**: `Admin`, `Member`, or `External`. See [Roles & permissions](/ai-governance/roles-and-permissions) for what each grants.
+4. Optionally tick **Lite Member** for users who should only see projects they're explicitly invited to (no cost visibility).
+5. Under **Team Assignments**, pick which teams + which team-level role per team (`Admin`, `Member`, `Viewer` per team). One row per team; click **+ Add team** to scope to multiple teams.
+6. Click **Send invites**.
+
+What happens next:
+
+- Each email gets a one-click accept link (token TTL 24h, configurable per-org).
+- A row appears under **Invites** with status `INVITED`.
+- The audit log records `organization.createInvites` with the invite's ID as the target, see [Audit log](/ai-governance/audit-log) for how to read this back.
+
+When the invitee clicks the link they land on `/auth/signin`, sign in via your company SSO (or email + password if your deployment runs the open-core flow), and end up on `/me` with their assigned org role + team memberships pre-applied. From there, point them at the [developer walkthrough](/ai-governance/getting-started-developer).
+
+## Bulk invites
+
+The same drawer accepts comma-separated emails. Each email gets its own invite row + audit log entry. Bulk creates respect the org's [seat limit](/ai-governance/control-plane#seat-limits): once the limit hits, the bulk action returns `LimitExceededError` and emits a `usageLimits.notify` event.
+
+## Self-service invite requests (non-admin flow)
+
+Some orgs let members propose invites without granting them `organization:manage`. This is the `createInviteRequest` flow, different from the admin `createInvites`:
+
+- **Permission**: `organization:view` (which all members have by default).
+- **Role**: restricted to `MEMBER` or `EXTERNAL` only, never `ADMIN`. Self-service can't escalate privilege.
+- **Status**: lands as `WAITING_APPROVAL` until an admin approves it via `approveInvite`.
+
+If your org doesn't want this surface, omit the **Request invite** UI element, there's no separate gate to disable. The procedure is always reachable but produces a request, not an invite.
+
+## Changing a member's role
+
+From the **Organization Members** table, click the overflow menu next to a row → **Change role**. Pick a new org role, optionally adjust team-level roles. Click **Save**.
+
+The change is immediate. The audit log records `organization.updateMemberRole` and `team.updateMemberRole` (one row per affected team) so you can reconstruct the timeline of who held what role on what date.
+
+Caveats:
+
+- You can't demote yourself if you're the last admin, the form returns `LAST_ADMIN_PROTECTED`.
+- You can't elevate an `EXTERNAL` user past `MEMBER` without first removing the External lite-member flag.
+- Role changes don't break existing sessions; they take effect on the next request the user makes (the permission resolver is per-request, not session-cached beyond the JWT TTL).
+
+## Removing a member
+
+Overflow menu → **Remove from org**. The user loses every team membership, every role binding, and every Personal Virtual Key they minted (revoked on the gateway via the same RBAC chain). Their existing audit log rows stay, removal doesn't rewrite history.
+
+## Per-user sign-in methods at `/settings/authentication`
+
+What the user controls about their own account lives at `/settings/authentication`, the same URL used by both the governance/Personal-Workspace shell and the legacy non-governance LLMOps shell. The page renders one of three shapes depending on how your org is configured:
+
+- **Email + password**: single Change Password row. The default shape for self-hosted Apache 2.0 deployments + dev orgs without an SSO enforced.
+- **SSO enforced**: *"You sign in via your company's SSO provider"* status row, no add-method affordance. The right shape for almost every enterprise deployment, since most orgs lock down to a single SSO provider.
+- **Auth0 + no enforced SSO (rare)**: linked OAuth providers list (Google, GitHub, Microsoft) with an optional Link-another button. Only relevant when the deployment is on Auth0 *and* the admin hasn't enforced one provider.
+
+The page is per-user. There's no admin gate, every member of the org can manage their own credentials here. Admins don't manage other users' sign-in methods from this page; user-account-management is by-design self-service.
+
+Org-level SSO configuration (IdP metadata, SAML cert, SCIM provisioning) is **separate** from this page, it lives at `/settings/governance/scim-provisioning` (admin-only) and the SSO-provider env config in your deployment's helm values, `.env`.
+
+## Where to next
+
+- **Self-service for me**: [/settings/authentication](#per-user-sign-in-methods-at-settingsauthentication) (this page) and [Sessions](/ai-governance/personal-portal/sessions).
+- **Org SSO + SCIM auto-provisioning**: `/settings/governance/scim-provisioning` (admin-only).
+- **Role catalog**: [Roles & permissions](/ai-governance/roles-and-permissions).
+- **Audit who did what when**: [Audit log](/ai-governance/audit-log).

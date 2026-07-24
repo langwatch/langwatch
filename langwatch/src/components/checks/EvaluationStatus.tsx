@@ -1,0 +1,54 @@
+import { CheckCircle, Clock, MinusCircle, XCircle } from "react-feather";
+import type { ElasticSearchEvaluation } from "../../server/tracer/types";
+
+export function CheckStatusIcon({
+  check,
+}: {
+  check: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">;
+}) {
+  const iconMap: Record<ElasticSearchEvaluation["status"], React.FC> = {
+    scheduled: Clock,
+    in_progress: Clock,
+    error: XCircle, // CloseIcon?
+    skipped: MinusCircle,
+    processed: evaluationPassed(check) === false ? XCircle : CheckCircle,
+  };
+
+  const Icon = iconMap[check.status] || Clock;
+
+  return <Icon />;
+}
+
+export const evaluationStatusColor = (
+  check: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">,
+) => {
+  const colorMap: Record<ElasticSearchEvaluation["status"], string> = {
+    scheduled: "status.pending",
+    in_progress: "status.pending",
+    error: "status.error",
+    skipped: "status.warning",
+    processed:
+      evaluationPassed(check) === false ? "status.error" : "status.success",
+  };
+
+  return colorMap[check.status];
+};
+
+export const evaluationPassed = (
+  evaluation: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">,
+) => {
+  if (evaluation.status !== "processed") {
+    return undefined;
+  }
+
+  if (evaluation.passed !== undefined && evaluation.passed !== null) {
+    return evaluation.passed;
+  }
+
+  // TODO: replace this heuristic of .score != 0 with proper threshold definitions on the evaluators
+  if (evaluation.score && evaluation.score < 0.3) {
+    return false;
+  }
+
+  return true;
+};

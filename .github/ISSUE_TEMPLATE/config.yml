@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://docs.langwatch.ai
+    about: Check our docs for help
+  - name: 💬 Discord Community
+    url: https://discord.gg/langwatch
+    about: Join our community for discussions

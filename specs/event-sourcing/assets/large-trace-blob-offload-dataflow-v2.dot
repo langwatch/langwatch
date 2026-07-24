@@ -1,0 +1,102 @@
+digraph G {
+  rankdir=TB;
+  bgcolor="white";
+  node [fontname="Helvetica", fontsize=11, shape=box, style="filled,rounded", margin="0.18,0.10"];
+  edge [fontname="Helvetica", fontsize=9, color="#333", arrowsize=0.7];
+
+  labelloc=t;
+  label=<<B>ADR-022 — event_log as source of truth · S3 as transient spool</B><BR/><FONT POINT-SIZE="10">Issue #4215 — supersedes ADR-021 edge-permanent-S3 design</FONT>>;
+  fontsize=13;
+
+  // ============== WRITE PATH ==============
+  subgraph cluster_write {
+    label=<<B>WRITE PATH (edge → durable)</B>>;
+    style="rounded,dashed";
+    color="#888";
+    fontsize=11;
+
+    edge_in [label="OTLP collector\n(edge)", fillcolor="#cfe8ff"];
+    size_check [label="size > 256 KB?", shape=diamond, fillcolor="#ffe6b3", height=0.4];
+    spool_put [label="S3 PUT (spool)\n— transient, 24h lifecycle —", fillcolor="#ffd699"];
+
+    cmd_queue [label="Command queue\n(GroupQueueProcessor / Redis)\npayload: inline data  OR  {spoolRef}", fillcolor="#ffcccc"];
+
+    worker [label="recordSpan worker\n• if spoolRef: S3 GET → reconstitute\n• stripReservedAttributes\n• PII / cost / token estimation", fillcolor="#e0e0e0"];
+
+    event_log [label=< <B>event_log (CH)</B><BR/>FULL content · ZSTD(3)<BR/><I>single source of truth</I> >, fillcolor="#b3e6b3", shape=cylinder, height=0.6];
+
+    spool_delete [label="best-effort S3 DELETE\n(spool cleanup)", fillcolor="#ffd699", shape=note];
+
+    edge_in -> size_check;
+    size_check -> cmd_queue [label="≤ 256 KB"];
+    size_check -> spool_put [label="> 256 KB"];
+    spool_put -> cmd_queue [label="{spoolRef}"];
+    cmd_queue -> worker;
+    worker -> event_log [label="storeEvents()", penwidth=2];
+    event_log -> spool_delete [label="on success", style=dashed, color="#999"];
+  }
+
+  // ============== INTERPOSITION + DISPATCH ==============
+  subgraph cluster_dispatch {
+    label=<<B>DISPATCH (event_log → projections)</B>>;
+    style="rounded,dashed";
+    color="#888";
+    fontsize=11;
+
+    interpose [label=< <B>Interposition</B><BR/>leanForProjection(event)<BR/>IO attrs &gt; 32 KB → preview + eventref >, fillcolor="#d9c2f0"];
+    proj_queue [label="Projection queue\n(GroupQueueProcessor / Redis)\npayload: LEAN events", fillcolor="#ffcccc"];
+
+    interpose -> proj_queue [label="router.dispatch()", penwidth=2];
+  }
+
+  event_log -> interpose [label="enrichedEvents", penwidth=2];
+
+  // ============== PROJECTIONS (CH read models) ==============
+  subgraph cluster_proj {
+    label=<<B>PROJECTIONS (CH read models)</B>>;
+    style="rounded,dashed";
+    color="#888";
+    fontsize=11;
+
+    fold_p [label="fold projection\n→ trace_summaries", fillcolor="#b3e6b3", shape=cylinder, height=0.5];
+    map_p [label="map projection\n→ stored_spans", fillcolor="#b3e6b3", shape=cylinder, height=0.5];
+    reactors [label="reactors\n(EvaluationTrigger, etc.)", fillcolor="#cce0cc"];
+  }
+
+  proj_queue -> fold_p [label="lean event"];
+  proj_queue -> map_p [label="lean event"];
+  proj_queue -> reactors [label="{event, foldState}"];
+
+  // ============== READS ==============
+  subgraph cluster_reads {
+    label=<<B>READS</B>>;
+    style="rounded,dashed";
+    color="#888";
+    fontsize=11;
+
+    user_list [label="list / search /\ndetail-collapsed", fillcolor="#cfe8ff", shape=oval];
+    user_full [label="detail-full /\nonline eval", fillcolor="#cfe8ff", shape=oval];
+    replay_node [label="replay\n(operational)", fillcolor="#cfe8ff", shape=oval];
+  }
+
+  user_list -> fold_p [label="ILIKE on preview (fast)", color="#1e88e5", style=bold];
+  user_list -> map_p [label="lean attrs (fast)", color="#1e88e5", style=bold];
+  user_full -> event_log [label="SELECT by EventId\nextract field from JSON\n(slower, opt-in)", color="#1e88e5", style=bold];
+  replay_node -> event_log [label="loadEvents", color="#1e88e5", style=bold];
+  replay_node -> interpose [label="leanForProjection(event)\n(SAME utility — single source of truth\nfor lean shape; live = replay)", color="#9c27b0", style=dashed, fontcolor="#9c27b0"];
+
+  // ============== LEGEND ==============
+  subgraph cluster_legend {
+    label=<<B>Properties</B>>;
+    style="rounded";
+    fontsize=10;
+    color="#666";
+
+    note_durable [label="event_log is the single source of truth.\nFull content lives there, ZSTD-compressed.\nS3 holds only transient spools (delete on success,\n24h lifecycle safety net).", fillcolor="#eef", shape=note];
+    note_lean [label="leanForProjection() is the ONE place where\nlean shape is defined. Live ingestion and replay\nBOTH apply it before invoking projection handlers,\nso projection state is path-independent.", fillcolor="#eef", shape=note];
+    note_search [label="Search & list use the preview in projections (fast).\nFull-content search requires a JOIN to event_log\n(slower, opt-in).", fillcolor="#eef", shape=note];
+
+    note_durable -> note_lean [style=invis];
+    note_lean -> note_search [style=invis];
+  }
+}

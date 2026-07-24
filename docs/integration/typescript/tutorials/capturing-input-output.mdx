@@ -1,0 +1,384 @@
+---
+title: Capturing and Mapping Inputs & Outputs
+sidebarTitle: TypeScript/JS
+icon: square-js
+description: Learn how to control the capture and structure of input and output data for traces and spans with the LangWatch TypeScript SDK.
+keywords: langwatch, typescript, javascript, input, output, capture, mapping, data, tracing, spans, observability
+---
+
+Effectively capturing the inputs and outputs of your LLM application's operations is crucial for observability. LangWatch provides flexible ways to manage this data, whether you prefer automatic capture or explicit control to map complex objects, format data, or redact sensitive information.
+
+This tutorial covers how to:
+*   Understand automatic input/output capture.
+*   Explicitly set inputs and outputs for traces and spans.
+*   Dynamically update this data on active traces/spans.
+*   Handle different data formats, especially for chat messages.
+
+## Automatic Input and Output Capture
+
+By default, when you use `tracer.withActiveSpan()` or `tracer.startActiveSpan()`, the SDK attempts to automatically capture:
+
+*   **Inputs**: The arguments passed to the function within the span context.
+*   **Outputs**: The value returned by the function within the span context.
+
+This behavior can be controlled using the data capture configuration in your observability setup.
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+// Setup observability with data capture configuration
+setupObservability({
+  dataCapture: "all", // Capture both input and output (default)
+});
+
+const tracer = getLangWatchTracer("input-output-example");
+
+// Automatic capture example
+await tracer.withActiveSpan("GreetUser", async (span) => {
+  // Function arguments and return value will be automatically captured
+  const name = "Alice";
+  const greeting = "Hello";
+  
+  span.setAttributes({ operation: "greeting" });
+  return `${greeting}, ${name}!`;
+});
+
+// Disable automatic capture for sensitive operations
+await tracer.withActiveSpan("SensitiveOperation", async (span) => {
+  // Inputs and outputs for this span will not be automatically captured
+  // You might explicitly set a sanitized version if needed
+  console.log("Processing sensitive data...");
+  return { status: "processed" };
+}, { dataCapture: "none" });
+```
+
+<Note>
+  Refer to the API reference for [`getLangWatchTracer()`](/integration/typescript/reference#getlangwatchtracer) and [`LangWatchTracer`](/integration/typescript/reference#langwatchtracer) for more details on data capture configuration.
+</Note>
+
+## Explicitly Setting Inputs and Outputs
+
+You often need more control over what data is recorded. You can explicitly set inputs and outputs using the `setInput()` and `setOutput()` methods on span objects.
+
+This is useful for:
+*   Capturing only specific parts of complex objects.
+*   Formatting data in a more readable or structured way (e.g., as a list of `ChatMessage` objects).
+*   Redacting sensitive information before it's sent to LangWatch.
+*   Providing inputs/outputs when automatic capture is disabled.
+
+### At Span Creation
+
+When using `tracer.withActiveSpan()` or `tracer.startActiveSpan()`, you can set inputs and outputs directly on the span object.
+
+<CodeGroup>
+```typescript Trace with explicit input/output
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+// Setup observability
+setupObservability();
+
+const tracer = getLangWatchTracer("input-output-example");
+
+await tracer.withActiveSpan("UserIntentProcessing", async (span) => {
+  // Set explicit input for the span
+  span.setInput("json", {
+    user_query: "Book a flight to London"
+  });
+
+  // raw_query_data might be large or contain sensitive info
+  // The setInput() call above provides a clean version
+  const rawQueryData = { query: "Book a flight to London", user_id: "123" };
+  
+  const intent = "book_flight";
+  const entities = { destination: "London" };
+
+  // Explicitly set the output for the span
+  span.setOutput("json", {
+    intent,
+    entities
+  });
+
+  return { status: "success", intent }; // Actual function return
+});
+```
+
+```typescript Span with explicit input/output
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+// Setup observability
+setupObservability();
+
+const tracer = getLangWatchTracer("chatbot-example");
+
+await tracer.withActiveSpan("ChatbotInteraction", async (span) => {
+  const userMessage = { role: "user", content: "What is LangWatch?" };
+
+  // Create a child span for LLM call
+  await tracer.withActiveSpan("LLMCall", async (llmSpan) => {
+    llmSpan.setType("llm");
+    llmSpan.setRequestModel("gpt-5-mini");
+    
+    // Set input as chat messages
+    llmSpan.setInput("chat_messages", [userMessage]);
+
+    // Simulate LLM call
+    const assistantResponseContent = "LangWatch helps you monitor your LLM applications.";
+    const assistantMessage = { role: "assistant", content: assistantResponseContent };
+
+    // Set output on the span object
+    llmSpan.setOutput("chat_messages", [assistantMessage]);
+  });
+
+  console.log("Chat finished.");
+});
+```
+</CodeGroup>
+
+### Dynamically Updating Inputs and Outputs
+
+You can modify the input or output of an active span using its `setInput()` and `setOutput()` methods. This is particularly useful when the input/output data is determined or refined during the operation.
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+// Setup observability
+setupObservability();
+
+const tracer = getLangWatchTracer("pipeline-example");
+
+await tracer.withActiveSpan("DataTransformationPipeline", async (span) => {
+  // Initial input is automatically captured if dataCapture is enabled
+
+  await tracer.withActiveSpan("Step1_CleanData", async (step1Span) => {
+    // Suppose initial_data is complex, we want to record a summary as input
+    const initialData = { a: 1, b: null, c: 3 };
+    step1Span.setInput("json", { data_keys: Object.keys(initialData) });
+    
+    const cleanedData = Object.fromEntries(
+      Object.entries(initialData).filter(([_, v]) => v !== null)
+    );
+    
+    step1Span.setOutput("json", { cleaned_item_count: Object.keys(cleanedData).length });
+  });
+
+  // ... further steps ...
+
+  // Update the root span's output for the entire trace
+  const finalResult = { status: "completed", items_processed: 2 };
+  span.setOutput("json", finalResult);
+
+  return finalResult;
+});
+```
+
+<Note>
+  The `setInput()` and `setOutput()` methods on `LangWatchSpan` objects are versatile and support multiple data types. See the reference for [`LangWatchSpan` methods](/integration/typescript/reference#langwatchspan).
+</Note>
+
+## Handling Different Data Formats
+
+LangWatch can store various types of input and output data:
+
+*   **Strings**: Simple text using `"text"` type.
+*   **Objects**: Automatically serialized as JSON using `"json"` type. This is useful for structured data.
+*   **Chat Messages**: Arrays of chat message objects using `"chat_messages"` type. This ensures proper display and analysis in the LangWatch UI.
+*   **Raw Data**: Any data type using `"raw"` type.
+*   **Lists**: Arrays of structured data using `"list"` type.
+
+### Capturing Chat Messages
+
+For LLM interactions, structure your inputs and outputs as chat messages using the `"chat_messages"` type.
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+// Setup observability
+setupObservability();
+
+const tracer = getLangWatchTracer("advanced-chat-example");
+
+await tracer.withActiveSpan("AdvancedChat", async (span) => {
+  const messages = [
+    { role: "system", content: "You are a helpful assistant." },
+    { role: "user", content: "What is the weather in London?" }
+  ];
+
+  let assistantResponseWithTool: any;
+
+  await tracer.withActiveSpan("GetWeatherToolCall", async (llmSpan) => {
+    llmSpan.setType("llm");
+    llmSpan.setRequestModel("gpt-5-mini");
+    llmSpan.setInput("chat_messages", messages);
+
+    // Simulate model deciding to call a tool
+    const toolCallId = "call_abc123";
+    assistantResponseWithTool = {
+      role: "assistant",
+      tool_calls: [
+        {
+          id: toolCallId,
+          type: "function",
+          function: {
+            name: "get_weather",
+            arguments: JSON.stringify({ location: "London" })
+          }
+        }
+      ]
+    };
+    
+    llmSpan.setOutput("chat_messages", [assistantResponseWithTool]);
+  });
+
+  // Simulate tool execution
+  await tracer.withActiveSpan("RunGetWeatherTool", async (toolSpan) => {
+    toolSpan.setType("tool");
+    
+    const toolInput = {
+      tool_name: "get_weather",
+      arguments: { location: "London" }
+    };
+    toolSpan.setInput("json", toolInput);
+
+    const toolResultContent = JSON.stringify({
+      temperature: "15C",
+      condition: "Cloudy"
+    });
+    toolSpan.setOutput("text", toolResultContent);
+
+    // Prepare message for next LLM call
+    const toolResponseMessage = {
+      role: "tool",
+      tool_call_id: "call_abc123",
+      name: "get_weather",
+      content: toolResultContent
+    };
+    
+    messages.push(assistantResponseWithTool); // Assistant's decision to call tool
+    messages.push(toolResponseMessage);       // Tool's response
+  });
+
+  await tracer.withActiveSpan("FinalLLMResponse", async (finalLlmSpan) => {
+    finalLlmSpan.setType("llm");
+    finalLlmSpan.setRequestModel("gpt-5-mini");
+    finalLlmSpan.setInput("chat_messages", messages);
+
+    const finalAssistantContent = "The weather in London is 15°C and cloudy.";
+    const finalAssistantMessage = {
+      role: "assistant",
+      content: finalAssistantContent
+    };
+    
+    finalLlmSpan.setOutput("chat_messages", [finalAssistantMessage]);
+  });
+});
+```
+
+<Note>
+  For the detailed structure of chat messages and other related types, please refer to the [Core Data Types section in the API Reference](/integration/typescript/reference#core-data-types).
+</Note>
+
+## Data Capture Configuration
+
+You can control automatic data capture at different levels:
+
+### Global Configuration
+
+Set the default data capture behavior for your entire application:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+
+// Setup with different capture modes
+setupObservability({
+  dataCapture: "all", // Capture both input and output (default)
+  // dataCapture: "none", // Capture nothing
+  // dataCapture: "input", // Capture only inputs
+  // dataCapture: "output", // Capture only outputs
+});
+```
+
+## Use Cases and Best Practices
+
+*   **Redacting Sensitive Information**: If your function arguments or return values contain sensitive data (PII, API keys), disable automatic capture and explicitly set sanitized versions using `setInput()` and `setOutput()`.
+*   **Mapping Complex Objects**: If your inputs/outputs are complex JavaScript objects, map them to a simplified object or string representation for clearer display in LangWatch.
+*   **Improving Readability**: For long text inputs/outputs (e.g., full documents), consider capturing a summary or metadata instead of the entire content to reduce noise, unless the full content is essential for debugging or evaluating.
+*   **Error Handling**: Use try-catch blocks within spans to capture error information and set appropriate outputs.
+*   **Clearing Captured Data**: You can set `input` or `output` to `null` or an empty object via the `setInput()` or `setOutput()` methods to remove previously captured data if it's no longer relevant.
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+// Setup observability
+setupObservability();
+
+const tracer = getLangWatchTracer("redaction-example");
+
+await tracer.withActiveSpan("DataRedactionExample", async (span) => {
+  // user_profile might contain PII
+  const userProfile = {
+    id: "user_xyz",
+    email: "test@example.com",
+    name: "Sensitive Name"
+  };
+
+  // Update the input to a redacted version
+  const redactedInput = {
+    user_id: userProfile.id,
+    has_email: "email" in userProfile
+  };
+  span.setInput("json", redactedInput);
+
+  // Process data...
+  const result = {
+    status: "processed",
+    user_id: userProfile.id
+  };
+  span.setOutput("json", result);
+  
+  return result; // Actual function return can still be the full data
+});
+```
+
+### Error Handling Example
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+// Setup observability
+setupObservability();
+
+const tracer = getLangWatchTracer("error-handling-example");
+
+await tracer.withActiveSpan("RiskyOperation", async (span) => {
+  try {
+    span.setInput("json", { operation: "data_processing" });
+    
+    // Simulate a risky operation that might fail
+    const result = await processData();
+    
+    span.setOutput("json", { status: "success", result });
+    return result;
+  } catch (error) {
+    // Capture error information in the span
+    span.setOutput("json", { 
+      status: "error", 
+      error_message: error instanceof Error ? error.message : String(error),
+      error_type: error instanceof Error ? error.constructor.name : typeof error
+    });
+    
+    // Re-throw the error (withActiveSpan will automatically mark the span as ERROR)
+    throw error;
+  }
+});
+```
+
+## Conclusion
+
+Controlling how inputs and outputs are captured in LangWatch allows you to tailor the observability data to your specific needs. By using data capture configuration, explicit `setInput()` and `setOutput()` methods, and appropriate data formatting (especially `"chat_messages"` for conversations), you can ensure that your traces provide clear, relevant, and secure insights into your LLM application's behavior.

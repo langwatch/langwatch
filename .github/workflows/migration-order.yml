@@ -1,0 +1,141 @@
+name: migration-order
+
+# Fails a PR that adds a migration numbered below one already on the base branch,
+# and comments with the rename that fixes it.
+#
+# Migrations run in key order — Prisma by timestamp, ClickHouse by goose sequence
+# number. Goose only runs migrations above the version a database is already on,
+# so a migration that merges with a lower number never runs there at all. The
+# window opens whenever a branch sits open long enough for another migration to
+# merge ahead of it, which is why the comparison is against the *tip* of the base
+# branch and not the merge base.
+#
+# This workflow executes `go run` on code checked out from the PR head, so the
+# trigger must stay `pull_request` — never `pull_request_target`, whose writable
+# token and secrets would turn that into a pwn request. Fork PRs run with a
+# read-only token, which is why the comment step is skipped for them.
+#
+# The check runs on head pushes only: when the base branch moves, an open PR
+# keeps its last verdict until it next syncs. Requiring branches to be up to
+# date before merging into main is what closes that window.
+#
+# Spec: specs/ci/migration-order.feature
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: migration-order-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  migration-order:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The PR head itself, not the merge commit actions/checkout defaults to.
+      # A merge commit already carries the base branch's migrations, which is the
+      # very thing this check is comparing the branch against.
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch base branch
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+      - name: Setup Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # -json always exits 0, so the comment gets posted before the check fails.
+      - name: Check migration order
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: go run ./cmd/migrationorder -base "origin/${BASE_REF}" -json > findings.json
+
+      # Fork PRs get a read-only GITHUB_TOKEN, so the POST would 403. The check
+      # below still fails them — they just read the reason in the job log.
+      - name: Comment with the fix
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { readFileSync } = require("node:fs");
+
+            const MARKER = "<!-- migration-order -->";
+            const raw = JSON.parse(readFileSync("findings.json", "utf8"));
+            if (!Array.isArray(raw)) throw new Error("findings.json is not an array");
+
+            // Entry names are chosen by the PR under review: strip backticks so
+            // they cannot break out of the markdown, and flatten the fix to one
+            // line so it cannot close its own fence.
+            const text = (value) => String(value ?? "").replaceAll("`", "'");
+            const line = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+            const findings = raw.map((f) => ({
+              set: text(f.set),
+              entry: text(f.entry),
+              problem: text(f.problem),
+              fix: line(f.fix),
+            }));
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.user?.login === "github-actions[bot]" && c.body?.startsWith(MARKER)
+            );
+
+            // Fixed. Take the comment down rather than leave a stale warning.
+            if (findings.length === 0) {
+              if (existing) {
+                await github.rest.issues.deleteComment({ owner, repo, comment_id: existing.id });
+              }
+              return;
+            }
+
+            const body = [
+              MARKER,
+              `### Migrations are out of order with \`${pr.base.ref}\``,
+              "",
+              ...findings.flatMap((f) => [
+                `**${f.set}: ${f.entry}** ${f.problem}`,
+                ...(f.fix ? ["", "```bash", f.fix, "```"] : []),
+                "",
+              ]),
+              "Migrations run in the order their names sort. A migration numbered below one that " +
+                "already merged is skipped outright on any database that has run the newer one, so it " +
+                "passes locally and never runs in production.",
+            ].join("\n");
+
+            // Edited in place when nothing changed, so a push does not re-notify
+            // everyone with a comment they have already read.
+            if (existing) {
+              if (existing.body !== body) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              }
+              return;
+            }
+            await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+
+      - name: Fail if out of order
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: go run ./cmd/migrationorder -base "origin/${BASE_REF}"

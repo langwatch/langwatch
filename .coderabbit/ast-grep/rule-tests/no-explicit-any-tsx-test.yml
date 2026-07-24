@@ -1,0 +1,7 @@
+id: no-explicit-any-tsx
+valid:
+  - "const C = (p: Props) => <div>{p.name}</div>;"
+  - "const v: unknown = 1;"
+invalid:
+  - "const C = (p: any) => <div>{p.name}</div>;"
+  - "const handler = (e: any): void => { e.preventDefault(); };"

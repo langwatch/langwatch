@@ -1,0 +1,142 @@
+---
+title: Quick Start
+mode: "wide"
+---
+
+import AgentReportNotice from "/snippets/agent-report-notice.mdx";
+
+<Tip>
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+</Tip>
+
+LangWatch helps you understand every user interaction (**Thread**), each individual AI task (**Trace**), and all the underlying steps (**Span**) involved. We've made getting started super smooth.
+
+Let's get cracking.
+
+<Steps>
+  <Step title="Create your LangWatch account">
+    Head over to [app.langwatch.ai](https://app.langwatch.ai) and sign up. Create your first organization and project.
+  </Step>
+
+  <Step title="Get your API key">
+    You have two options:
+
+    **Option A: CLI login (recommended for local development)**
+
+    ```bash
+    npx langwatch login
+    ```
+
+    This opens your browser to authenticate and adds `LANGWATCH_API_KEY` to your local `.env` file.
+
+    **Option B: Create a key manually**
+
+    Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create an API key. See the [API Keys guide](/platform/api-keys) for details on personal vs service keys.
+
+    ```bash .env
+    LANGWATCH_API_KEY="sk-lw-..."
+    LANGWATCH_PROJECT_ID="your-project-id"
+    ```
+
+    <Note>
+      Keys created from **Settings → API Keys** (both personal and service) require `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to. You can find the project ID in your project settings or URL.
+    </Note>
+  </Step>
+
+  <Step title="Let LangWatch MCP do the rest for you (Optional)">
+    Install the [LangWatch MCP Server](/integration/mcp) and ask your coding assistant (Cursor, Claude Code, Codex, etc.) to instrument your codebase with LangWatch, OR keep following the steps below to instrument your codebase manually.
+
+    Add the LangWatch MCP to your editor. Under the `mcpServers` object of your editor's MCP settings file, add an entry named `langwatch` with these fields:
+
+    - `command`: `npx`
+    - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+
+    See [LangWatch MCP](/integration/mcp) for per-editor instructions and the API key field.
+
+    Then ask your coding assistant to instrument your codebase with LangWatch:
+
+    ```plaintext
+    "Instrument my codebase with LangWatch"
+    ```
+  </Step>
+
+  <Step title="Install the LangWatch SDK">
+    We have official SDKs for Python and Node.js ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
+
+    <CodeGroup>
+```bash Python
+pip install langwatch
+# or
+uv add langwatch
+```
+```bash JavaScript
+npm install langwatch @vercel/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
+```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Add LangWatch to your project">
+    Time to connect LangWatch. Initialize the SDK within your project. Here's how you can set it up:
+
+    <CodeGroup>
+```python Python
+import langwatch
+import os
+from langwatch.instrumentors import OpenAIInstrumentor
+
+langwatch.setup(
+    api_key=os.getenv("LANGWATCH_API_KEY"), # Your LangWatch API key
+    project_id=os.getenv("LANGWATCH_PROJECT_ID"), # Required for service API keys
+    instrumentors=[OpenAIInstrumentor()] # Add the instrumentor for your LLM
+)
+```
+```javascript JavaScript
+// ./next.config.js - Enable the Next.js instrumentation hook
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  experimental: {
+    instrumentationHook: true,
+  },
+};
+
+module.exports = nextConfig;
+
+// ./src/instrumentation.ts - Configure LangWatch export
+import { registerOTel } from '@vercel/otel';
+import { LangWatchExporter } from 'langwatch';
+
+export function register() {
+  registerOTel({
+    serviceName: 'your-app-name', // Give your service a clear name
+    traceExporter: new LangWatchExporter({
+      apiKey: process.env.LANGWATCH_API_KEY, // Your LangWatch API key
+      projectId: process.env.LANGWATCH_PROJECT_ID, // Required for service API keys
+    })
+  });
+}
+
+// ./src/index.ts - Enable telemetry where needed
+const result = await generateText({
+  model: openai('gpt-5'),
+  prompt: 'How many calories do I burn jumping to conclusions?',
+  experimental_telemetry: {
+    isEnabled: true, // Ensure telemetry is active for relevant operations
+  },
+});
+```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Start observing!">
+    You're all set! Jump into your LangWatch dashboard to see your data flowing in. You'll find **Traces** (individual AI tasks) and their detailed **Spans** (the steps within), all organized into **Threads** (complete user sessions). Start exploring and use **User IDs** or custom **Labels** to dive deeper!
+
+    <img src="/images/llm-observability/quick-start/setup-monitor.webp" />
+  </Step>
+</Steps>
+
+## Next steps
+
+- **Need org-wide controls?** See [AI Governance](/ai-governance/overview) for per-user workspaces, anomaly detection, OCSF/SIEM export, and ingestion sources for non-gateway telemetry, paired with the AI Gateway data plane.
+- **Routing every LLM call through a single endpoint?** See [AI Gateway](/ai-gateway/overview): virtual keys, budgets, fallback chains, guardrails.
+
+<AgentReportNotice />

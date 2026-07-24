@@ -1,0 +1,419 @@
+---
+title: Ingestion Templates
+description: Connect Claude Code, Cursor, and other tool-specific telemetry to your personal LangWatch workspace with a write-only ingestion key, traces auto-shaped via platform-published OTTL transforms.
+---
+
+
+# Ingestion Templates
+
+> **Status:** v1, push-mode templates only. OAuth-redirect and pull-mode (S3, API) shapes are reserved for a future iteration.
+
+LangWatch's **Ingestion Templates** let you connect tool-specific telemetry sources
+(Claude Code on Anthropic 20x, Cursor, Claude cowork, …) to your **personal workspace**
+without LangWatch ever participating in the upstream tool's authentication.
+
+You install a template, paste an **ingestion key** into your tool's OTLP exporter, and
+traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
+tokens, and model populated automatically. An ingestion key is just an
+[API key](/platform/api-keys) (`sk-lw-…`) scoped to one project with a write-only,
+ingest-only role: it can create traces and nothing else, so it's safe to spray into an
+agent's environment.
+
+---
+
+## Why ingestion templates exist
+
+If your tool has a LangWatch virtual key, the AI Gateway proxies the request and we ingest
+canonical traces from the gateway response. Done.
+
+But many tools don't fit that path:
+
+- **Subscription-bound tools**: Claude Code on Anthropic 20x, GitHub Copilot, etc. The user
+  has no API key the gateway can proxy through; the tool authenticates client-side with the
+  upstream provider.
+- **Native-OTLP tools**: Cursor, Claude cowork, Continue.dev, Aider, Cline. They already
+  emit OpenTelemetry traces locally; what they need is a place to ship them.
+
+For these, the user holds the upstream credential locally; LangWatch only needs to know
+**where to send the OTLP** and **which template the trace references** so it gets the
+right `langwatch.source` provenance and lands in the right personal project.
+
+That's an Ingestion Template:
+
+- **Admin/platform side:** a curated catalog row (slug, source identifier, credential
+  schema, optional `ottlRules`). Platform-published rows ship empty `ottlRules` —
+  Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*` canonical
+  spans natively, so no transform is needed for the common case. **Org admins can clone
+  a platform-default template into an org-authored template** and author OTTL via the
+  OttlEditor at `/settings/governance/tool-catalog → Ingestion Templates → Clone to
+  customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
+  internal IDE wrapper, a custom Cursor build, etc). Platform rows are read-only —
+  admins click **Clone to customise** which calls
+  `ingestionTemplates.cloneFromPlatform`, then **Edit OTTL** on the new org-authored
+  row to refine the rules.
+- **User side:** an ingestion key (`sk-lw-…`) scoped to your personal project with a
+  write-only, ingest-only role. You paste that key into your tool's OTLP exporter; the
+  tool ships, the receiver verifies the key, ceilings it to ingest-only, lands the trace
+  in the key's bound project, and applies the referenced template's OTTL (empty for
+  platform defaults, admin-authored for org forks) when the key carries a `templateId`.
+
+Credential is scope. Payload is advisory. The receiver attribution path is identical to
+gateway-VK ingest; the source-shape OTTL is org-customizable for admins who need it.
+
+---
+
+## Worked example: connect Claude Code on Anthropic 20x
+
+This walks through the whole flow end-to-end. By the end you'll have a Claude Code
+trace visible at `/me/traces` with `gen_ai.usage.*`, `gen_ai.response.model`, and
+`langwatch.cost.usd` populated.
+
+> **Before you start:** you need a LangWatch account. If you're brand new, start with the
+> [getting started guide](/ai-governance/getting-started-developer) and then sign in to
+> LangWatch. First-time sign-in completes onboarding and lands you on your **personal
+> workspace** (`/me`). On self-hosted instances the same path works against your own
+> deployment's host.
+
+### Step 1: open the catalog
+
+Navigate to `/me` and scroll to the **Trace Ingest** section (or jump straight to
+`/me#trace-ingest`).
+
+![/me Trace Ingest section, 4 tiles populated](/images/ai-governance/post-bypass/10-me-trace-ingest-scrolled.png)
+
+You'll see four tiles: **Claude Code**, **Cursor**, **Claude cowork**, and the
+**Raw OTLP (advanced)** discovery card. The first three are tool-specific templates; the
+fourth is for ad-hoc/custom telemetry.
+
+### Step 2: install the Claude Code template
+
+Click **Install** on the Claude Code tile. A drawer slides in headed
+**Connect Claude Code, auto-shaped**, with the subcopy *"Traces normalized into
+gen_ai.\* canonical. Cost/tokens/model populated automatically by the receiver."*
+
+![Install drawer, Connect Claude Code](/images/ai-governance/post-bypass/11-claude-code-install-drawer.png)
+
+The drawer shows:
+
+- **OTLP endpoint**: read-only, copyable.
+- **Ingestion key**: `sk-lw-…` issued one-time, with a Show/Hide toggle. Copy it
+  while it's visible; after you dismiss the drawer it's masked to its first
+  characters.
+- **Snippet preview**: pre-wired environment variables for Claude Code:
+  ```bash
+  export OTEL_EXPORTER_OTLP_ENDPOINT="https://app.langwatch.ai/api/otel"
+  export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer sk-lw-<your-key>"
+  ```
+  (Self-hosted: replace the host with your LangWatch base URL. The drawer always
+  shows the correct endpoint for your instance.)
+
+Copy the snippet, then click **Mark installed**. The tile flips to a green-checked state
+with a **View traces →** deep-link.
+
+<Note>
+The key is shown one-time. If you lose it, **rotate** the ingestion key from the tile to
+mint a new one. The previous key is revoked immediately when you rotate (hard-cut v1).
+</Note>
+
+### Step 3: fire your first Claude Code action
+
+Open a new terminal so the env vars take effect, then run Claude Code as you normally
+would. As soon as Claude Code completes its first action, OpenTelemetry exports the span
+to your LangWatch personal workspace.
+
+### Step 4: see the trace at /me/traces
+
+Click **View traces →** on the tile, or navigate directly to `/me/traces`.
+
+![/me/traces, Claude Code traces with tokens + model populated](/images/ai-governance/post-bypass/12-traces-populated.png)
+
+Open the trace. You should see:
+
+- `gen_ai.system = "anthropic"`
+- `gen_ai.request.model = "claude-3-5-sonnet"` (or whichever model you ran)
+- `gen_ai.usage.input_tokens`, emitted directly by Claude Code's OTel exporter
+  (Claude Code is gen_ai-canonical natively; v1 templates apply no OTTL transform).
+- `gen_ai.usage.output_tokens`, same.
+- `langwatch.cost.usd`, derived by the receiver's `canonicalCostExtractor` from the
+  upstream-emitted `gen_ai.usage.*` + `gen_ai.response.model`.
+- `langwatch.user.id`, `langwatch.project.id`, `langwatch.template.id`,
+  `langwatch.api_key.id`, `langwatch.source = "claude_code"`, all receiver-stamped
+  post-auth (authoritative attribution + template provenance), with
+  `langwatch.origin = "coding_agent"` (derived from the source: a CLI coding
+  assistant becomes `coding_agent`, any other ingest source becomes `ai_tool`).
+
+That's it. From here, every Claude Code action you run flows into your personal workspace
+shaped correctly, same as if you'd been running through the gateway VK path.
+
+---
+
+## Under the hood
+
+This section is for engineering leads, security reviewers who want to understand the
+trust model and the request flow. End users can skip ahead to [Raw OTLP fallback](#raw-otlp-fallback).
+
+### Anatomy of an Ingestion Template
+
+An `IngestionTemplate` row has:
+
+- `slug` (e.g. `claude_code`), referenced by an ingestion key via its `templateId`.
+- `sourceType` (e.g. `claude_code`), which upstream tool this template parses.
+- `credentialSchema` (closed enum, v1: `null`, `static_api_key`, `agent_id`), what
+  fields the install drawer captures from the user.
+- `ottlRules`, an optional OTTL transform applied to the span before the receiver's
+  authoritative re-stamp pass. **Platform-default templates ship empty `ottlRules`**
+  because Claude Code, Cursor, and Claude cowork all emit OpenTelemetry `gen_ai.*`
+  canonical spans natively, there is nothing to reshape for the common case. **Org
+  admins can fork a platform-default template into an org-authored template and author
+  OTTL via the OttlEditor** in `/settings/governance/tool-catalog → Ingestion
+  Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
+  upstream-tool quirks (an internal IDE wrapper, a custom Cursor build, a corporate
+  Claude Code variant) without filing a request for a platform change.
+- `organizationId`, `NULL` for platform-published templates (visible everywhere); set
+  for org-authored templates (visible only to that org). Forks created via "Edit OTTL"
+  land here.
+
+### credentialSchema shapes
+
+| schema           | what the install drawer captures               | covers v1                          |
+|------------------|------------------------------------------------|------------------------------------|
+| `null`           | nothing, drawer auto-mints the ingestion key   | claude_code, cursor, claude_cowork, raw_otlp_advanced |
+| `static_api_key` | one labeled API key field                      | (deferred to v1.1+)                |
+| `agent_id`       | a labeled agent-identifier text input          | (deferred to v1.1+)                |
+
+`oauth_redirect` and `s3_bucket` are reserved for a future iteration, those require
+upstream OAuth refresh, polling, watermark infrastructure that isn't in the v1 push-only
+shape.
+
+### Receiver resolution flow
+
+When your tool emits an OTLP payload with `Authorization: Bearer sk-lw-<key>`, the
+receiver:
+
+1. **Prefix-discriminates** the bearer, `sk-lw-*` → ApiKey verification path.
+2. **Verifies** the key (HMAC + pepper) and resolves the `ApiKey` row, the same path
+   any SDK or management key takes.
+3. **Ceilings to ingest-only.** An ingestion key carries a write-only, ingest-only role
+   that grants `traces:create` and nothing else, so the receiver rejects any non-ingest
+   operation regardless of what the payload claims.
+4. **Sets `tenantId`** to the key's bound project, credential-as-scope. This is
+   authoritative.
+5. **Applies `template.ottlRules`** under a snapshot+restore principal-field guard, but
+   only when the ingestion key carries a `templateId`. For platform-default templates
+   the rules are empty so this step is a no-op; for org-authored forks the admin's OTTL
+   runs here under the protection lists below. A key with no `templateId` skips OTTL
+   entirely and lands raw.
+6. **Post-auth re-stamps** the closed `protectedTemplateAttributeKeys` (and, for
+   org-authored OTTL, the tier-of-trust additions covering cost, tokens, model) as
+   receiver-authoritative, including `langwatch.api_key.id` and
+   `langwatch.origin` provenance (derived from the key's source: `coding_agent`
+   for a CLI assistant, `ai_tool` otherwise). If the OTTL tried to write any of those
+   keys, the original value is restored and an audit row
+   `gateway.template_ottl_protected_field_attempt` fires with the rejected-key list.
+7. **Hands off** to the trace pipeline, same path as every other ingest source from
+   here.
+
+The ingest-only ceiling at step 3 and the principal-field guard at step 6 are the
+load-bearing security primitives.
+
+### What the principal-field guard protects
+
+The `protectedTemplateAttributeKeys` closed list:
+
+- The `protectedAttributeKeys` from the base OTTL guard (B6), all attribution
+  shapes: `langwatch.user.id`, `langwatch.team.id`, `langwatch.organization.id`,
+  `langwatch.project.id`, `langwatch.tenant.id`, virtual-key shapes,
+  ingestion-source shapes, governance shapes.
+- `langwatch.template.id`, receiver-stamped provenance.
+- `langwatch.api_key.id`, receiver-stamped provenance (the ingestion key that landed
+  the trace).
+- `langwatch.origin`, receiver-stamped provenance (`coding_agent` for a CLI
+  assistant, `ai_tool` for any other ingest source).
+- `langwatch.source`, receiver-stamped provenance (used for tile filtering at
+  `/me/traces`).
+
+Notably **not** in the list:
+
+- `langwatch.cost.usd`, `.input`, `.output`
+- `gen_ai.usage.input_tokens`, `.output_tokens`, `.total_tokens`
+- `gen_ai.response.model`
+
+For **platform-default templates** these stay receiver-derived (cost via
+`canonicalCostExtractor` reading upstream-emitted `gen_ai.usage.*`). Platform-default
+templates ship empty `ottlRules`, so the protected list is dormant on this path.
+
+For **org-authored templates** (forks created via the OttlEditor) the receiver
+applies a **tier-of-trust** addition: the org-authored OTTL is allowed to reshape
+upstream-specific attrs into the canonical keys (that's the template's whole job),
+but `langwatch.cost.usd*`, `gen_ai.usage.*`, and `gen_ai.response.model` are pinned
+to receiver-authoritative values via `canonicalCostExtractor` to prevent within-org
+cost-attribution forgery.
+
+See [Security model recap](#security-model-recap) below for the per-tier trust
+boundary articulation.
+
+---
+
+## Raw OTLP fallback
+
+If you have a custom telemetry pipeline, your own spans, your own normalisation, your
+own cost calculations, you don't want a template's OTTL rewriting your shape. Use the
+**Raw OTLP (advanced)** card on `/me` Trace Ingest instead.
+
+The card deep-links to the **Personal OTLP Endpoint** panel at `/me/settings#otlp`,
+which surfaces your personal-project's existing OTLP endpoint and API key for ad-hoc /
+custom telemetry. No template OTTL is applied; your spans land at `/me/traces` exactly
+as you emit them.
+
+![Personal OTLP Endpoint panel on /me/settings](/images/ai-governance/post-bypass/04-me-settings.png)
+
+### When to choose Raw OTLP vs a template
+
+| You should pick                             | When                                                                                  |
+|---------------------------------------------|---------------------------------------------------------------------------------------|
+| Claude Code, Cursor, Claude cowork tile   | You run that tool and want LangWatch's catalog OTTL to normalise the spans for you.   |
+| Raw OTLP (advanced)                         | You have a custom pipeline, or your spans already follow `gen_ai.*` conventions, or you want to keep your own field shapes. |
+
+You can also surface the same endpoint + token from `/me/settings → Personal OTLP Endpoint`
+without going through the catalog tile.
+
+---
+
+## Security model recap
+
+For security reviewers evaluating the feature.
+
+### Trust boundary
+
+- **Credential = scope.** The `sk-lw-*` ingestion key authoritatively determines which
+  project a trace lands in, and its write-only ingest-only role caps it to
+  `traces:create`. Payload-level claims about user, team, org, project attribution are
+  advisory and re-stamped post-OTTL.
+- **Cross-project guard at mint** is structural: the install drawer (and the
+  `langwatch <tool>` CLI) mints the key against the user's resolved personal project;
+  the caller never picks the target project. Minting a key into someone else's project
+  is unrepresentable.
+- **Cross-project guard at receive** is the ingest-only ceiling plus the post-OTTL
+  principal-field re-stamp. Forge attempts emit
+  `gateway.template_ottl_protected_field_attempt` audit rows.
+
+### Trust boundary: two tiers
+
+LangWatch v1 ships two distinct template tiers with different trust contracts:
+
+**Tier 1, Platform-default templates** (`organizationId IS NULL`). Empty `ottlRules`.
+Cost, tokens, model values come directly from the upstream tool's OTel exporter
+(Claude Code, Cursor, and Claude cowork all emit `gen_ai.*` canonical natively), and the
+receiver derives `langwatch.cost.usd` from those upstream-emitted values via
+`canonicalCostExtractor`. Trust here rides on **upstream-tool correctness**: we trust
+Claude Code, Cursor, and Claude cowork to populate `gen_ai.usage.*` correctly per the
+OTel semantic-conventions spec.
+
+**Tier 2, Org-authored templates** (`organizationId NOT NULL`, forked from a tier-1
+template via the OttlEditor at `/settings/governance/tool-catalog → Ingestion
+Templates → Edit OTTL`). Admins author OTTL to adapt a template to their org's
+upstream-tool quirks. Trust here rides on **org-admin review at save time**: the
+admin who clicks "Save & validate" is accepting within-org responsibility for the
+transform's correctness. Three protection layers prevent admin OTTL from being
+weaponized against the org or other orgs:
+
+1. The `protectedTemplateAttributeKeys` guard at receive time (attribution +
+   provenance, admin OTTL cannot rewrite who/where/which-template a trace came from).
+2. A tier-2 superset that adds `langwatch.cost.usd*`, `gen_ai.usage.*`, and
+   `gen_ai.response.model` to the protected set so admin OTTL cannot forge cost-
+   attribution within the org.
+3. Static analysis at save time, the OttlEditor's "Save & validate" step rejects
+   OTTL that would write any protected key BEFORE the rules are persisted, with an
+   inline error pointing at the offending line.
+
+Cross-org cost integrity is structurally protected on both tiers by the attribution-keys
+re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org-B.
+
+Concretely, before each tile flips to green-checked we run a **two-track dogfood
+discipline**: (a) a fixture-track verification, canned OTLP payloads emitted via
+`scripts/dogfood/emit-otlp.sh`, including forge-attempt regressions against both the
+base and tier-2 protected lists, and (b) a real-user track, admin publishes via
+`/settings/governance/tool-catalog`, a real user installs via `/me`, the real upstream
+tool emits a real trace, and the result is verified end-to-end with cross-user isolation.
+Per-template rituals live at `langwatch/ee/governance/ingestion-templates/<slug>/dogfood.md`.
+
+### What is audited
+
+State-change rows only, per-trace activity is tracked via the ingestion key's
+`lastUsedAt`, not via audit volume.
+
+| Event                                                       | When fires                                                |
+|-------------------------------------------------------------|-----------------------------------------------------------|
+| `gateway.ingestion_key.minted`                              | User installs a template (mints an ingestion key) via the catalog tile |
+| `gateway.ingestion_key.revoked`                             | User uninstalls / rotates an ingestion key                |
+| `gateway.template_ottl_protected_field_attempt`             | Template OTTL tried to rewrite a protected attribution / provenance field |
+| `gateway.ingestion_template.updated`                        | (v2 surface) Admin edits a template's OTTL                |
+
+All state-change rows mirror to the `governance_ocsf_events` ClickHouse table for
+SOC2, ISO27001 evidence collection.
+
+### What is not audited
+
+- Per-trace landings (volume reasons; the ingestion key's `lastUsedAt` carries the
+  activity signal)
+- Key rotation content (the new key's minted/revoked lifecycle is the audit signal)
+- Credential-content edits on `static_api_key`, `agent_id` templates (PII boundary,
+  matches the existing API-key edit pattern)
+
+---
+
+## Frequently asked questions
+
+### Does LangWatch see my Anthropic OAuth token?
+
+No. Claude Code holds your Anthropic OAuth session locally; LangWatch never participates
+in that flow. The only credential LangWatch holds is the ingestion key (`sk-lw-…`) we
+mint for you, which is scoped to your personal project and write-only.
+
+### What happens if I rotate the ingestion key?
+
+Hard-cut v1: the previous key is revoked immediately. Update your tool's
+`OTEL_EXPORTER_OTLP_HEADERS` with the new key before continuing. (A grace-period
+rotation lands in a future iteration if SOC2 review requests.)
+
+### Can my org admin see my personal-workspace traces?
+
+No, not via this feature. Personal-project traces are scoped to your personal project; the
+  admin's drill-in path (governance dashboards) requires the explicit drill-in flow
+  described in the governance dashboard docs and is logged + persistent-banner'd.
+Templates do not change that.
+
+### What if my tool isn't in the catalog?
+
+For this iteration we ship 3 tool-specific templates (Claude Code, Cursor, Claude cowork)
+plus the Raw OTLP (advanced) fallback. If your tool emits OTLP natively, the Raw OTLP
+fallback works today. If you'd like a custom template for another tool, file a request on
+[GitHub Issues](https://github.com/langwatch/langwatch/issues/new?labels=ingestion-template-request)
+and we'll evaluate.
+
+---
+
+## Verifying the contract
+
+The full admin OTTL authoring flow has a Playwright real-user dogfood at
+`langwatch/e2e/admin-ottl-dogfood.ts` (~30s loop), 8 steps end-to-end:
+navigate → list 3 platform rows → View OTTL drawer → Clone-to-customise →
+Save OTTL → list 4 rows → Edit OTTL → Archive. Pairs with the
+service-level integration test at
+`langwatch/ee/governance/services/__tests__/ingestionTemplate.authoring.integration.test.ts`
+and the wire-level REST integration test at
+`langwatch/src/app/api/governance/__tests__/governance-rest-api.integration.test.ts`.
+
+If you're touching the IngestionTemplatesEditor surface, the OttlEditor
+component, or the IngestionTemplateService, run the dogfood + both
+integration tests locally as a regression playbook before opening a PR.
+
+## Related
+
+- [Personal Workspace](/ai-governance/personal-portal/end-user): broader personal-workspace
+  feature surface (Datasets, Evaluations, Annotations, Automations).
+- [Personas](/ai-governance/personas): how admin drill-in works (and why it doesn't see personal-workspace traces by default).
+- [Governance REST API](/ai-governance/api): the same IngestionTemplate surface, exposed
+  over Hono REST/JSON for agentic workflows.
+- `specs/ai-gateway/governance/ingestion-templates-catalog.feature` and siblings, the
+  BDD specs that lock this feature's behaviour.

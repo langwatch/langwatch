@@ -1,0 +1,76 @@
+---
+title: Data Retention
+description: Control how long LangWatch keeps your event data before it's deleted.
+keywords: data retention, retention policy, delete data, ttl, retention period, enterprise, self-hosting
+---
+
+With LangWatch's Data Retention controls, you decide how long your event data is kept before it's automatically deleted. Retention applies to the events LangWatch ingests — the spans within your traces and your scenario runs — along with their associated data.
+
+You can tighten or extend retention per scope, giving teams that handle sensitive data full control over how long it lives in LangWatch.
+
+<Note>
+  Configuring data retention requires an **Enterprise plan**. On other plans, every project uses the platform default window. See the [pricing page](/pricing) for how extended retention is billed.
+</Note>
+
+## How it works
+
+Retention is configured with **retention policies**. Each policy has two parts:
+
+- **Scope** — the level the policy applies to. Policies cascade most-specific-first, so a more specific scope overrides a broader one:
+  - **Organization** — the default that applies to every project in the org.
+  - **Team** — overrides the organization default for projects in that team.
+  - **Project** — overrides both the team and organization defaults for that project only.
+- **Retention period** — how long data is kept before deletion.
+
+Retention periods range from a few weeks up to several years, set in weeks, months, or years. Periods always round to whole weeks, because deletion is partition-aligned (see [How deletion works](#how-deletion-works)).
+
+<Note>
+  When you retain data longer than your plan's included window, the additional storage is billed at **€3 per extra GB** — you only pay for what you actually store.
+</Note>
+
+## Configuration
+
+Organization owners and administrators manage policies under **Settings → Data Retention** at [app.langwatch.ai/settings/data-retention](https://app.langwatch.ai/settings/data-retention).
+
+To add a scoped policy:
+
+<Steps>
+  <Step title="Open the drawer">
+    Click **Add retention policy**.
+  </Step>
+  <Step title="Choose a scope">
+    Pick the organization, a team, or a single project. A more specific scope overrides the broader defaults.
+  </Step>
+  <Step title="Pick a retention period">
+    Choose one of the preset windows or enter a custom value in weeks, months, or years.
+  </Step>
+  <Step title="Create">
+    Click **Create** to save the policy.
+  </Step>
+</Steps>
+
+### Applying the change to existing data
+
+When you create or update a policy, you choose whether it applies only going forward or also to data you've already stored:
+
+- **Off** — the new retention applies to newly ingested data only.
+- **On** (*"Apply this change to existing data"*) — LangWatch rewrites the scope's existing rows so the new retention takes effect immediately, not just for new ingestion. Data that is already older than the new window is removed on the next cleanup.
+
+## How deletion works
+
+LangWatch periodically removes any events that fall outside the configured retention window. Because retention is partition-aligned, data is cleaned up in whole-week partitions rather than row-by-row at the exact second it expires.
+
+A few things to keep in mind:
+
+<Warning>
+  **Deletion is permanent.** Once data is removed it cannot be recovered. If you need to keep data beyond your retention window, export it before it expires.
+</Warning>
+
+- **Retention applies to the underlying data, regardless of references.** If another object — for example a dataset or an evaluation — references an event that has since been deleted, that reference will point to data that no longer exists.
+- **More specific scopes override broader ones.** A project with its own policy ignores the team and organization defaults; a team policy overrides the organization default.
+
+## Self-hosted and hybrid instances
+
+Data Retention works the same way on self-hosted deployments, with deletion running against your own storage. Make sure the LangWatch service has permission to delete objects from the storage bucket it manages.
+
+If you use versioned object storage, removing an object leaves earlier versions and delete markers in place — clean these up manually or with a storage lifecycle rule. See the [self-hosting docs](/self-hosting/overview) for setup details.

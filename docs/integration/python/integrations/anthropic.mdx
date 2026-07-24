@@ -1,0 +1,66 @@
+---
+title: Anthropic Instrumentation
+sidebarTitle: Python
+description: Instrument Anthropic API calls with LangWatch’s Python SDK to trace usage, debug issues, and support AI agent testing.
+icon: python
+keywords: anthropic, claude, instrumentation, openinference, langwatch, python
+---
+
+LangWatch integrates with Anthropic through OpenInference instrumentation to capture detailed information about your Claude API calls.
+
+## Installation
+
+<CodeGroup>
+```bash pip
+pip install langwatch anthropic openinference-instrumentation-anthropic
+```
+
+```bash uv
+uv add langwatch anthropic openinference-instrumentation-anthropic
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Use the OpenInference instrumentation for Anthropic by passing `AnthropicInstrumentor` to `langwatch.setup()`.
+
+```python
+import langwatch
+from anthropic import Anthropic
+import os
+
+from openinference.instrumentation.anthropic import AnthropicInstrumentor
+
+langwatch.setup(instrumentors=[AnthropicInstrumentor()])
+
+client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+
+@langwatch.trace(name="Anthropic Call with Community Instrumentor")
+def generate_text_with_community_instrumentor(prompt: str):
+    response = client.messages.create(
+        model="claude-sonnet-4-5-20250929",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text
+
+
+if __name__ == "__main__":
+    user_query = "Tell me a joke"
+    response = generate_text_with_community_instrumentor(user_query)
+    print(f"User: {user_query}")
+    print(f"AI: {response}")
+```
+
+The `AnthropicInstrumentor` automatically captures all Anthropic API calls globally once instrumented. Use `@langwatch.trace()` to create a parent trace under which API calls will be nested.
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Anthropic applications

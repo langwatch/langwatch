@@ -1,0 +1,191 @@
+from typing import Optional
+import contextvars
+import litellm
+import numpy as np
+from scipy.spatial.distance import cdist
+import concurrent.futures
+
+from langevals_topic_clustering.types import Trace, TraceWithEmbeddings
+from langevals_topic_clustering._logger import get_logger
+
+logger = get_logger("topic_clustering.utils")
+
+
+def calculate_centroid_and_distance(samples) -> tuple[np.ndarray, float]:
+    centroid = np.mean([np.array(item["embeddings"]) for item in samples], axis=0)
+    distances = cdist(
+        [np.array(item["embeddings"]) for item in samples],
+        np.array([centroid]),
+        "cosine",
+    ).flatten()
+    p95_distance = np.percentile(distances, 95).astype(float)
+
+    return centroid, p95_distance
+
+
+def normalize_embedding_dimensions(
+    embedding: list[float], target_dim: int = 1536
+) -> list[float]:
+    if len(embedding) == target_dim:
+        return embedding
+
+    if len(embedding) < target_dim:
+        return embedding + [0.0] * (target_dim - len(embedding))
+
+    return embedding[:target_dim]
+
+
+def _generate_single_embedding(
+    text: str,
+    embeddings_litellm_params: dict[str, str],
+    dimensions: int
+) -> Optional[list[float]]:
+    """Generate embedding for a single text item with proper error handling."""
+    try:
+        text_to_embed = text if text else "<empty>"
+        response = litellm.embedding(
+            **embeddings_litellm_params,  # type: ignore
+            input=text_to_embed,
+        )
+        return normalize_embedding_dimensions(
+            response.data[0]["embedding"],
+            target_dim=dimensions,
+        )
+    except Exception as e:
+        logger.warning("Error generating single embedding", error=str(e), text_preview=text[:100])
+        raise e  # Re-raise the exception to be handled by the caller
+
+
+def generate_embeddings_threaded(
+    texts: list[str],
+    embeddings_litellm_params: dict[str, str],
+    max_workers: int = 8
+) -> list[Optional[list[float]]]:
+    """Generate embeddings in parallel using ThreadPoolExecutor."""
+    dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
+    params_copy = embeddings_litellm_params.copy()
+    if "dimensions" in params_copy:
+        del params_copy["dimensions"]
+
+    embeddings: list[Optional[list[float]]] = []
+    errors = 0
+    last_error: Optional[Exception] = None
+
+    # Process in smaller chunks to handle errors properly
+    chunk_size = 20
+    total_chunks = (len(texts) + chunk_size - 1) // chunk_size
+    logger.info("Generating embeddings (threaded)", text_count=len(texts), chunk_count=total_chunks)
+
+    for chunk_idx, i in enumerate(range(0, len(texts), chunk_size)):
+        chunk = texts[i:i + chunk_size]
+        futures = []
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks, propagating log context to threads
+            for text in chunk:
+                ctx = contextvars.copy_context()
+                futures.append(executor.submit(ctx.run, _generate_single_embedding, text, params_copy, dimensions))
+
+            # Process results as they complete
+            for future in futures:
+                try:
+                    result = future.result()
+                    embeddings.append(result)
+                except Exception as e:
+                    embeddings.append(None)
+                    errors += 1
+                    last_error = e
+                    logger.warning("Error generating embedding", error=str(e))
+                    if errors >= 3:
+                        logger.error("Too many errors generating embeddings, reraising", error_count=errors)
+                        raise e
+
+        if (chunk_idx + 1) % 5 == 0 or chunk_idx == total_chunks - 1:
+            logger.info("Embeddings progress (threaded)", chunks_processed=chunk_idx + 1, total_chunks=total_chunks)
+
+    if last_error and errors == len(texts):
+        logger.error("All embeddings failed to generate, reraising last error", error_count=errors, error=str(last_error))
+        raise last_error
+
+    return embeddings
+
+
+def generate_embeddings(
+    texts: list[str], embeddings_litellm_params: dict[str, str], batch_size: int = 20
+) -> list[Optional[list[float]]]:
+    embeddings = []
+    errors = 0
+    last_error: Optional[Exception] = None
+    batches = list(range(0, len(texts), batch_size))
+    total_batches = len(batches)
+
+    dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
+    params_copy = embeddings_litellm_params.copy()
+    if "dimensions" in params_copy:
+        # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
+        del params_copy["dimensions"]
+
+    logger.info("Generating embeddings", text_count=len(texts), batch_count=total_batches)
+
+    for batch_idx, i in enumerate(batches):
+        batch = [t if t else "<empty>" for t in texts[i : i + batch_size]]
+        try:
+            response = litellm.embedding(
+                **params_copy,  # type: ignore
+                input=batch if batch_size > 1 else batch[0],
+            )
+            embeddings += [
+                normalize_embedding_dimensions(
+                    item["embedding"],
+                    target_dim=dimensions,
+                )
+                for item in response.data
+            ]
+        except Exception as e:
+            if batch_size > 1:
+                # Don't fallback for auth errors — same key will fail for every individual request
+                if isinstance(e, litellm.exceptions.AuthenticationError):
+                    logger.warning("Embedding authentication failed, not retrying", error=str(e))
+                    raise
+                # For other errors, fall back to threaded implementation
+                logger.info("Batch embedding failed, falling back to threaded implementation")
+                return generate_embeddings_threaded(texts, embeddings_litellm_params)
+
+            embeddings += [None] * batch_size
+
+            errors += 1
+            last_error = e
+            logger.warning("Error generating embeddings", error=str(e), batch_preview=batch[:3])
+            if errors >= 3:
+                logger.error("Too many errors generating embeddings, reraising", error_count=errors)
+                raise e
+
+        # Log progress every 5 batches or at the end
+        if (batch_idx + 1) % 5 == 0 or batch_idx == total_batches - 1:
+            logger.info("Embeddings progress", batches_processed=batch_idx + 1, total_batches=total_batches, embeddings_generated=len(embeddings), total_texts=len(texts))
+
+    if last_error and errors == len(batches):
+        logger.error("All embeddings failed to generate, reraising last error", error_count=errors, error=str(last_error))
+        raise last_error
+
+    return embeddings
+
+
+def fill_embeddings(
+    traces: list[Trace], embeddings_litellm_params: dict[str, str]
+) -> list[TraceWithEmbeddings]:
+    traces_ = [t for t in traces if t["input"] and len(t["input"].strip()) > 0]
+    embeddings = generate_embeddings(
+        [t["input"] for t in traces_], embeddings_litellm_params
+    )
+    return [
+        TraceWithEmbeddings(
+            trace_id=trace["trace_id"],
+            input=trace["input"],
+            embeddings=embedding,
+            topic_id=trace["topic_id"],
+            subtopic_id=trace["subtopic_id"],
+        )
+        for trace, embedding in zip(traces_, embeddings)
+        if embedding is not None
+    ]

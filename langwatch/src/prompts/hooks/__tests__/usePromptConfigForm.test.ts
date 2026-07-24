@@ -1,0 +1,92 @@
+/* eslint-disable @typescript-eslint/no-empty-function */
+import { describe, expect, it, vi } from "vitest";
+import { formSchema } from "~/prompts";
+import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { salvageValidData } from "~/utils/zodSalvage";
+
+/**
+ * Tests for usePromptConfigForm's data salvage logic.
+ *
+ * Note: We test the salvageValidData utility directly rather than rendering
+ * the React hook, as the hook's primary responsibility is data parsing,
+ * which is delegated to salvageValidData. This avoids needing jsdom/DOM env.
+ *
+ * IMPORTANT: The hook uses instance-level refs for sync flags (disableOnChangeRef,
+ * disableNodeSyncRef) to prevent cross-instance interference. Previously these
+ * were module-level variables which caused bugs in multi-tab scenarios.
+ */
+describe("usePromptConfigForm", () => {
+  describe("when initialConfigValues are valid", () => {
+    it("parses and uses the provided values", () => {
+      const defaults = buildDefaultFormValues();
+      const initialValues = {
+        handle: "test-handle",
+        scope: "PROJECT" as const,
+        version: {
+          configData: {
+            messages: [
+              { role: "system" as const, content: "Test prompt" },
+              { role: "user" as const, content: "{{input}}" },
+            ],
+            inputs: [{ identifier: "input", type: "str" as const }],
+            outputs: [{ identifier: "output", type: "str" as const }],
+          },
+        },
+      };
+
+      const result = salvageValidData(formSchema, initialValues, defaults);
+
+      expect(result.handle).toBe("test-handle");
+      expect(result.version.configData.messages).toHaveLength(2);
+      expect(result.version.configData.messages[0]?.content).toBe(
+        "Test prompt",
+      );
+    });
+  });
+
+  describe("when initialConfigValues are corrupted", () => {
+    it("salvages valid parts and uses defaults for invalid parts", () => {
+      const consoleWarnSpy = vi
+        .spyOn(console, "warn")
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
+
+      const defaults = buildDefaultFormValues();
+      const corruptedValues = {
+        handle: "valid-handle", // This should be salvaged
+        // Missing required field: scope
+        version: {
+          configData: {
+            messages: [
+              { role: "system" as const, content: "Valid prompt text" },
+              { role: "user" as const, content: "{{input}}" },
+            ], // This should be salvaged
+            inputs: [{ identifier: "", type: "str" }], // Empty identifier - invalid
+            outputs: [{ identifier: "output", type: "str" }], // Valid - should be salvaged
+          },
+        },
+      };
+
+      const result = salvageValidData(formSchema, corruptedValues, defaults);
+
+      // Should not crash
+      expect(result.scope).toBeDefined();
+
+      // Should salvage valid parts
+      expect(result.handle).toBe("valid-handle");
+      expect(result.version.configData.messages).toHaveLength(2);
+      expect(result.version.configData.messages[0]?.content).toBe(
+        "Valid prompt text",
+      );
+      expect(result.version.configData.outputs).toHaveLength(1);
+      expect(result.version.configData.outputs[0]?.identifier).toBe("output");
+
+      // Should use defaults for invalid/missing parts
+      expect(result.version.configData.llm).toBeDefined();
+      expect(result.version.configData.inputs).toBeDefined();
+
+      consoleWarnSpy.mockRestore();
+    });
+  });
+});

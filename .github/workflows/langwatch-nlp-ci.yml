@@ -1,0 +1,75 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection requires `langwatch-nlp-complete`.
+#
+# nlpgo is the sole NLP engine: the self-hosted `langwatch_nlp` image is
+# built Go-only from Dockerfile.langwatch_nlp (a subcommand of the
+# cmd/service monobinary). The Go source itself (build/test/lint/vet for
+# services/nlpgo) is covered by go-ci.yaml; this workflow is the PR-time
+# smoke check that the published image actually builds.
+name: langwatch-nlp-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'Dockerfile.langwatch_nlp'
+              - 'services/nlpgo/**'
+              - 'cmd/service/**'
+              - 'pkg/**'
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/langwatch-nlp-ci.yml'
+
+  docker-build:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build Docker image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.langwatch_nlp
+          push: false
+          tags: langwatch/langwatch_nlp:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  langwatch-nlp-complete:
+    needs: [changes, docker-build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: docker-build

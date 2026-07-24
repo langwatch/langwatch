@@ -1,0 +1,230 @@
+Feature: Onboarding Flow
+  As a new user setting up LangWatch
+  I want to configure a model provider during onboarding
+  So that I can start using LangWatch immediately
+
+  # All scenarios describe the onboarding flow UI for configuring a model
+  # provider (form + redirect after save). Need a JSDOM render of
+  # `OnboardingFlow` + Next.js router mock to assert redirect targets
+  # ("/@project/online-evaluations", "/@project/prompts"). The form's
+  # validation/save mechanics overlap with credential-validation.feature.
+  # Aspirational pending an onboarding-flow test harness.
+
+  Background:
+    Given I am a new user going through onboarding
+    And I am on the model provider setup step
+
+  @visual
+  Scenario: Onboarding model provider form layout
+    When I am on the model provider setup step
+    Then I see a provider selector
+    And I see credential input fields
+    And I see a model selector
+    And I see a "Save" button
+
+  @visual
+  Scenario: Loading state during save
+    Given I clicked "Save"
+    When the save is in progress
+    Then the "Save" button shows a loading indicator
+    And the button is disabled
+
+  @integration @unimplemented
+  Scenario: Credential input persists during typing
+    Given I am configuring the "openai" provider in onboarding
+    When I type "s" in the "OPENAI_API_KEY" field
+    Then the field shows "s"
+    When I type "k" in the field
+    Then the field shows "sk"
+    When I continue typing "test123"
+    Then the field shows "sktest123"
+    And my input is not lost or reset
+
+  @integration @unimplemented
+  Scenario: Save provider configuration in onboarding
+    Given I am configuring the "openai" provider in onboarding
+    When I enter "sk-test123" in the "OPENAI_API_KEY" field
+    And I select "openai/gpt-4o" as the default model
+    And I click "Save"
+    Then the provider is saved
+    And I am redirected to the next step
+
+  @integration @unimplemented
+  Scenario: Redirect to evaluations after saving in evaluations onboarding
+    Given I am in the evaluations onboarding flow
+    And I am configuring a model provider
+    When I complete the provider configuration
+    And I click "Save"
+    Then I am redirected to "/@project/online-evaluations"
+
+  @integration @unimplemented
+  Scenario: Redirect to prompts after saving in prompts onboarding
+    Given I am in the prompts onboarding flow
+    And I am configuring a model provider
+    When I complete the provider configuration
+    And I click "Save"
+    Then I am redirected to "/@project/prompts"
+
+  @integration @unimplemented
+  Scenario: Form validation works in onboarding context
+    Given I am configuring the "openai" provider in onboarding
+    When I leave the required "OPENAI_API_KEY" field empty
+    And I click "Save"
+    Then I see a validation error
+    And the provider is not saved
+    And I am not redirected
+
+  @integration @unimplemented
+  Scenario: Select default model in onboarding
+    Given I am configuring the "openai" provider in onboarding
+    When I enter valid API credentials
+    And I select "openai/gpt-4o" from the model selector
+    And I click "Save"
+    Then the default model is set to "openai/gpt-4o"
+    And the provider is saved
+
+  @integration @unimplemented
+  Scenario: Handle OpenAI-specific validation in onboarding
+    Given I am configuring the "openai" provider in onboarding
+    When I enter only a base URL without an API key
+    And the base URL is not the default OpenAI URL
+    And I click "Save"
+    Then the provider is saved (base URL only is valid for OpenAI)
+
+  @integration @unimplemented
+  Scenario: Show OpenAI validation error when using default URL without key
+    Given I am configuring the "openai" provider in onboarding
+    When I enter the default OpenAI base URL
+    And I do not enter an API key
+    And I click "Save"
+    Then I see an error: "API Key is required when using the default OpenAI base URL"
+    And the provider is not saved
+
+  @integration @unimplemented
+  Scenario: Clear OpenAI validation error when user starts typing
+    Given I am configuring the "openai" provider in onboarding
+    And I see an OpenAI validation error
+    When I start typing in the "OPENAI_API_KEY" field
+    Then the validation error is cleared
+
+  @integration @unimplemented
+  Scenario: Show loading state while saving in onboarding
+    Given I am configuring a model provider in onboarding
+    When I click "Save"
+    Then the "Save" button shows a loading state
+    And the button is disabled during save
+
+  @integration @unimplemented
+  Scenario: Handle save errors gracefully in onboarding
+    Given I am configuring a model provider in onboarding
+    When I enter invalid configuration
+    And I click "Save"
+    And the save fails
+    Then I see an error message
+    And I remain on the onboarding step
+    And I can correct the configuration and try again
+
+  # API Key Validation Scenarios
+
+  @integration @unimplemented
+  Scenario: Validate API key before saving in onboarding
+    Given I am configuring the "openai" provider in onboarding
+    When I enter an invalid API key "sk-invalid"
+    And I click "Save"
+    Then the API key is validated against the provider API
+    And I see an API key validation error
+    And the provider is not saved
+
+  @integration @unimplemented
+  Scenario: Validate env var API key in onboarding
+    Given I am configuring a provider that uses environment variables
+    And the provider is enabled via env vars with no stored customKeys
+    When I click "Save"
+    Then the env var API key is validated against the provider API
+    And if valid, the provider is saved
+    And if invalid, I see a validation error
+
+  @integration @unimplemented
+  Scenario: Validate manually-entered API key when env vars are configured
+    Given I am configuring a provider that uses environment variables
+    And the API key field shows "HAS_KEY••••••••••••••••••••••••"
+    When I enter a new API key "sk-invalid-key" replacing the masked value
+    And I click "Save"
+    Then the new API key is validated
+    And I see an API key validation error
+    And the provider is not saved
+
+  @integration @unimplemented
+  Scenario: Clear API key validation error when user modifies field
+    Given I am configuring the "openai" provider in onboarding
+    And I see an API key validation error
+    When I start typing in the "OPENAI_API_KEY" field
+    Then the API key validation error is cleared
+
+  @visual
+  # no test
+  Scenario: Show API key validation error in onboarding form
+    Given an API key validation error occurred
+    When I am on the model provider setup step
+    Then I see the error message below the credential fields
+    And the error is styled as an error message
+
+  @visual
+  # no test
+  Scenario: Show loading state during API key validation
+    Given I clicked "Save"
+    When the API key is being validated
+    Then the "Save" button shows a loading indicator
+    And the button is disabled during validation
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Provider seed plan
+  # ────────────────────────────────────────────────────────────────────────────
+  # buildSeedPlanForProvider runs at onboarding time when the user
+  # enables a provider for the first time; the returned plan becomes
+  # the ModelDefaultConfig JSON that lands at org scope. Each provider
+  # has its own quirks.
+
+  @integration
+  Scenario: OpenAI seed plan uses latest aliases
+    Given OpenAI is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT is openai/latest
+    And FAST is openai/latest-mini
+    And EMBEDDINGS resolves to the latest text-embedding-N
+    # The alias strings expand to the catalog's current flagship /
+    # mini at read time so a newer model release lifts every seeded
+    # org without a config rewrite.
+
+  @integration
+  Scenario: Anthropic seed plan uses latest aliases
+    Given Anthropic is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT is anthropic/latest
+    And FAST is anthropic/latest-mini
+
+  @integration
+  Scenario: Anthropic seed plan omits EMBEDDINGS
+    Given Anthropic is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then EMBEDDINGS stays absent so the cascade walks up to a sibling
+         provider that does ship an embedding API
+
+  @integration
+  Scenario: Gemini seed plan uses latest aliases
+    Given Gemini is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then DEFAULT is gemini/latest
+    And FAST is gemini/latest-mini
+    And EMBEDDINGS resolves to a gemini-embedding model
+
+  @integration
+  Scenario: Voyage seed plan populates only EMBEDDINGS
+    Given Voyage is the provider being enabled at onboarding
+    When the seed plan is computed
+    Then EMBEDDINGS resolves to voyage-3.5
+    And DEFAULT stays absent
+    And FAST stays absent
+    # Voyage is embedding-only. The cascade walks up for DEFAULT and
+    # FAST so an Anthropic+Voyage org has Anthropic chat + Voyage
+    # embeddings without falling through to OpenAI.

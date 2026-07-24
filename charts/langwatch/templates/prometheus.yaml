@@ -1,0 +1,83 @@
+{{- if .Values.prometheus.chartManaged }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-prometheus-config
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: {{ .Values.prometheus.server.global.scrape_interval | default "15s" }}
+      evaluation_interval: {{ .Values.prometheus.server.global.evaluation_interval | default "15s" }}
+
+    scrape_configs:
+      - job_name: 'langwatch'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - {{ .Release.Namespace }}
+        metrics_path: '/metrics'
+        scheme: http
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            replacement: $1:5560
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+        {{- if include "langwatch.metricsApiKey" . }}
+        bearer_token: {{ include "langwatch.metricsApiKey" . }}
+        {{- end }}
+
+      - job_name: 'langwatch-workers'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - {{ .Release.Namespace }}
+        metrics_path: '/metrics'
+        scheme: http
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            replacement: $1:2999
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+        {{- if include "langwatch.metricsApiKey" . }}
+        bearer_token: {{ include "langwatch.metricsApiKey" . }}
+        {{- end }}
+
+      - job_name: 'kubernetes-cadvisor'
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+{{- end }}

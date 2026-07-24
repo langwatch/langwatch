@@ -1,0 +1,18 @@
+# Service for the LangWatch Evaluations component
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-langevals
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-langevals
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.langevals.service.type }}
+  ports:
+    - port: {{ .Values.langevals.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-langevals
+    app.kubernetes.io/instance: {{ .Release.Name }}

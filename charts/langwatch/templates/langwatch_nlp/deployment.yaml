@@ -1,0 +1,157 @@
+# Deployment for the LangWatch NLP service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-langwatch-nlp
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+    {{- with .Values.langwatch_nlp.deployment.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.langwatch_nlp.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.langwatch_nlp.replicaCount }}
+  {{- if .Values.langwatch_nlp.deployment.strategy }}
+  strategy: 
+    {{- toYaml .Values.langwatch_nlp.deployment.strategy | nindent 8 }}
+  {{- end }}
+  {{- if hasKey (default (dict) .Values.langwatch_nlp.deployment) "revisionHistoryLimit" }}
+  revisionHistoryLimit: {{ .Values.langwatch_nlp.deployment.revisionHistoryLimit }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- if .Values.langwatch_nlp.pod.labels }}
+        {{- toYaml .Values.langwatch_nlp.pod.labels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- with (coalesce .Values.langwatch_nlp.pod.annotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      # The NLP service does not call the Kubernetes API, so don't mount the SA token.
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
+      {{- with (coalesce .Values.langwatch_nlp.podSecurityContext .Values.global.podSecurityContext)}}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
+      {{- with (coalesce .Values.langwatch_nlp.nodeSelector .Values.global.scheduling.nodeSelector)}}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Tolerations - https://kubespec.dev/v1/Pod#spec.tolerations
+      {{- with (coalesce .Values.langwatch_nlp.tolerations .Values.global.scheduling.tolerations)}}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Affinity - https://kubespec.dev/v1/Pod#spec.affinity
+      {{- with (coalesce .Values.langwatch_nlp.affinity .Values.global.scheduling.affinity)}}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Topology spread constraints - https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+      {{- with (coalesce .Values.langwatch_nlp.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints)}}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      initContainers:
+        {{- with .Values.langwatch_nlp.extraInitContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
+      containers:
+        {{- with .Values.langwatch_nlp.extraContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: {{ .Release.Name }}-langwatch-nlp
+          securityContext:
+            {{- toYaml (coalesce .Values.langwatch_nlp.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+          image: "{{ .Values.images.langwatch_nlp.repository }}:{{ .Values.images.langwatch_nlp.tag }}"
+          imagePullPolicy: "{{ .Values.images.langwatch_nlp.pullPolicy }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.langwatch_nlp.service.port }}
+              protocol: TCP
+
+          # Environment variables for the NLP service (Go binary).
+          env:
+            # Bind address for the Go HTTP server. Kept in lockstep with the
+            # Service port so dialers (app -> langwatch-nlp:port) always reach
+            # the listener even when the port is overridden.
+            - name: SERVER_ADDR
+              value: ":{{ .Values.langwatch_nlp.service.port }}"
+            # Universal LangWatch app URL. nlpgo reads this for OTel export and
+            # as the evaluator / agent-workflow callback base URL (it falls back
+            # to LANGWATCH_ENDPOINT when NLPGO_ENGINE_LANGWATCH_BASE_URL is unset).
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.langwatch_nlp.upstreams.langwatch.scheme | default "http" }}://{{ .Values.langwatch_nlp.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.langwatch_nlp.upstreams.langwatch.port | default 5560 }}
+
+            {{- with .Values.langwatch_nlp.extraEnvs}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+          {{- if .Values.langwatch_nlp.extraLifecycle}}
+          lifecycle:
+            {{- with .Values.langwatch_nlp.extraLifecycle}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.langwatch_nlp.resources | nindent 12 }}
+          # The Go service exposes /startupz, /readyz and /healthz. The static
+          # binary boots in milliseconds, so probes can start almost immediately.
+          startupProbe:
+            httpGet:
+              path: /startupz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+          volumeMounts:
+            {{- with .Values.langwatch_nlp.extraVolumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: log-dir
+              mountPath: /var/log
+      volumes:
+        {{- with .Values.langwatch_nlp.extraVolumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: tmp-dir
+          emptyDir: {}
+        - name: log-dir
+          emptyDir: {}

@@ -1,0 +1,239 @@
+---
+title: Evaluators Overview
+sidebarTitle: Overview
+description: Understand evaluators - the scoring functions that assess your LLM outputs for quality, safety, and correctness.
+---
+
+<Tip>
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+</Tip>
+
+Evaluators are scoring functions that assess the quality of your LLM's outputs. They're the building blocks for [experiments](/evaluations/experiments/overview), [online evaluation](/evaluations/online-evaluation/overview), and [guardrails](/evaluations/guardrails/overview).
+
+## Choose Your Approach
+
+There are three ways to evaluate your LLM outputs with LangWatch:
+
+<CardGroup cols={3}>
+  <Card title="Built-in Evaluators" icon="bolt" href="/evaluations/evaluators/built-in-evaluators">
+    Use LangWatch's library of evaluators directly in your code.
+  </Card>
+  <Card title="Saved Evaluators" icon="bookmark" href="/evaluations/evaluators/saved-evaluators">
+    Create reusable evaluator configs on the platform.
+  </Card>
+  <Card title="Custom Scoring" icon="code" href="/evaluations/evaluators/custom-scoring">
+    Send scores from your own evaluation logic.
+  </Card>
+</CardGroup>
+
+### Which should I use?
+
+| Approach | Slug Format | Best For |
+|----------|-------------|----------|
+| **Built-in Evaluators** | `provider/evaluator` (e.g., `ragas/faithfulness`) | Quick setup, standard evaluation methods |
+| **Saved Evaluators** | `evaluators/{slug}` (e.g., `evaluators/my-checker`) | Team collaboration, UI-based configuration |
+| **Custom Scoring** | N/A - you send the score directly | Proprietary logic, domain-specific metrics |
+
+<Accordion title="Decision flowchart">
+```
+Do you have your own evaluation logic?
+├─ Yes → Use Custom Scoring
+└─ No → Do you want to configure via UI and reuse?
+         ├─ Yes → Use Saved Evaluators
+         └─ No → Use Built-in Evaluators
+```
+</Accordion>
+
+## What is an Evaluator?
+
+An evaluator takes inputs (like the user question, LLM response, and optionally context or expected output) and returns a score indicating quality along some dimension.
+
+```
+Input + Output + Context → Evaluator → Score
+                                        ↓
+                              passed: true/false
+                              score: 0.0 - 1.0
+                              details: "explanation"
+```
+
+## Built-in Evaluator Categories
+
+LangWatch provides a library of ready-to-use evaluators:
+
+| Category | Examples | Use Case |
+|----------|----------|----------|
+| **RAG Quality** | Faithfulness, Context Precision, Context Recall | Evaluate retrieval-augmented generation |
+| **Safety** | PII Detection, Jailbreak Detection, Content Moderation | Detect harmful content |
+| **Correctness** | Exact Match, LLM Answer Match, Factual Match | Check answer accuracy |
+| **Format** | Valid JSON, Valid Format, SQL Query Equivalence | Validate output structure |
+| **Custom Criteria** | LLM-as-Judge (Boolean, Score, Category) | Custom evaluation prompts |
+
+[Browse all evaluators →](/evaluations/evaluators/list)
+
+## Quick Examples
+
+### Using a Built-in Evaluator
+
+```python
+import langwatch
+
+# Use directly by slug
+langwatch.evaluation.evaluate(
+    "ragas/faithfulness",  # Built-in evaluator
+    name="Faithfulness Check",
+    data={
+        "input": user_input,
+        "output": response,
+        "contexts": contexts,
+    },
+)
+```
+
+### Using a Saved Evaluator
+
+```python
+import langwatch
+
+# Use your saved evaluator by its slug
+langwatch.evaluation.evaluate(
+    "evaluators/my-tone-checker",  # Saved on platform
+    name="Tone Check",
+    data={
+        "input": user_input,
+        "output": response,
+    },
+)
+```
+
+### Sending Custom Scores
+
+```python
+import langwatch
+
+# Run your own logic and send the result
+score = my_custom_evaluator(input, output)
+
+langwatch.get_current_span().add_evaluation(
+    name="my_custom_metric",
+    passed=score > 0.7,
+    score=score,
+)
+```
+
+## Using Evaluators
+
+### In Experiments
+
+Run evaluators on each row of your test dataset for batch evaluation:
+
+```python
+experiment = langwatch.experiment.init("my-experiment")
+
+for idx, row in experiment.loop(df.iterrows()):
+    response = my_llm(row["input"])
+
+    experiment.evaluate(
+        "ragas/faithfulness",
+        index=idx,
+        data={
+            "input": row["input"],
+            "output": response,
+            "contexts": row["contexts"],
+        },
+    )
+```
+
+[Learn more about experiments →](/evaluations/experiments/overview)
+
+### In Online Evaluation (Monitors)
+
+Run evaluators automatically on production traces:
+
+1. Create a monitor in LangWatch
+2. Select evaluators to run
+3. Configure when to trigger (all traces, sampled, filtered)
+4. Scores appear on traces and dashboards
+
+[Learn more about online evaluation →](/evaluations/online-evaluation/overview)
+
+### As Guardrails
+
+Use evaluators to block harmful content in real-time:
+
+```python
+guardrail = langwatch.evaluation.evaluate(
+    "azure/jailbreak",
+    name="Jailbreak Detection",
+    data={"input": user_input},
+    as_guardrail=True,
+)
+
+if not guardrail.passed:
+    return "I can't help with that request."
+```
+
+[Learn more about guardrails →](/evaluations/guardrails/overview)
+
+## Evaluator Inputs
+
+Different evaluators require different inputs:
+
+| Input | Description | Example Evaluators |
+|-------|-------------|-------------------|
+| `input` | User question/prompt | Jailbreak Detection, Off-Topic |
+| `output` | LLM response | PII Detection, Valid Format |
+| `contexts` | Retrieved documents | Faithfulness, Context Precision |
+| `expected_output` | Ground truth answer | Answer Correctness, Exact Match |
+| `conversation` | Full conversation history | Conversation Relevancy |
+
+Check each evaluator's documentation for required and optional inputs.
+
+## The `name` Parameter
+
+<Warning>
+**Important:** Always provide a descriptive `name` when running evaluators. This helps identify evaluation results in Analytics and traces.
+</Warning>
+
+```python
+# Good - descriptive name
+langwatch.evaluation.evaluate(
+    "langevals/llm_category",
+    name="Answer Completeness Check",  # Descriptive!
+    data={...},
+)
+
+# Bad - no name, hard to track
+langwatch.evaluation.evaluate(
+    "langevals/llm_category",
+    data={...},
+)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Built-in Evaluators"
+    description="Use LangWatch's evaluator library directly."
+    icon="bolt"
+    href="/evaluations/evaluators/built-in-evaluators"
+  />
+  <Card
+    title="Saved Evaluators"
+    description="Create and reuse evaluator configurations."
+    icon="bookmark"
+    href="/evaluations/evaluators/saved-evaluators"
+  />
+  <Card
+    title="Custom Scoring"
+    description="Send scores from your own evaluation logic."
+    icon="code"
+    href="/evaluations/evaluators/custom-scoring"
+  />
+  <Card
+    title="Evaluators List"
+    description="Browse all available evaluators."
+    icon="list"
+    href="/evaluations/evaluators/list"
+  />
+</CardGroup>

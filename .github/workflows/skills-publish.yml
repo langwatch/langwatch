@@ -1,0 +1,72 @@
+name: skills-publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'skills/*/SKILL.mdx'
+      - 'skills/recipes/*/SKILL.mdx'
+      - 'skills/_shared/*.mdx'
+      - 'skills/_lib/**'
+      - 'skills/_publish/**'
+      - 'skills/version.txt'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat skills/version.txt)" >> $GITHUB_OUTPUT
+
+      - name: Checkout skills repo
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: langwatch/skills
+          path: _skills-publish
+          token: ${{ secrets.SKILLS_PUBLISH_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Install skill tooling
+        working-directory: skills
+        # `--ignore-scripts` skips devDep postinstalls (notably node-pty's
+        # rebuild on linux-x64, which needs node-gyp / python and isn't
+        # installed on ubuntu-latest by default). Publish only needs to run
+        # `pnpm sync` (TS transformer over MDX), which doesn't touch any of
+        # the native deps node-pty pulls in.
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Sync skills
+        working-directory: skills
+        run: pnpm sync ../_skills-publish
+
+      - name: Commit and push
+        run: |
+          if [ ! -d _skills-publish/.git ]; then
+            echo "::error::_skills-publish/.git missing — sync likely wiped the checkout. Refusing to commit into the wrong repo."
+            exit 1
+          fi
+          cd _skills-publish
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+            exit 0
+          fi
+          VERSION="${{ steps.version.outputs.version }}"
+          git commit -m "chore: sync skills v${VERSION} from langwatch/langwatch"
+          git tag "v${VERSION}" || true
+          git push
+          git push --tags || true

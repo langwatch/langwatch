@@ -1,0 +1,39 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "claude-cowork" } },
+          { "key": "service.version", "value": { "stringValue": "0.0.0-dogfood" } },
+          { "key": "claude.cowork.session_id", "value": { "stringValue": "ses_dogfood_claude_cowork_0001" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "claude-cowork.session.message", "version": "0.0.0" },
+          "spans": [
+            {
+              "traceId": "00000000000000000000000000000000",
+              "spanId": "0000000000000000",
+              "name": "claude-cowork.completion",
+              "kind": 1,
+              "startTimeUnixNano": "1715175600000000000",
+              "endTimeUnixNano": "1715175601500000000",
+              "attributes": [
+                { "key": "gen_ai.system", "value": { "stringValue": "anthropic" } },
+                { "key": "gen_ai.operation.name", "value": { "stringValue": "chat" } },
+                { "key": "gen_ai.request.model", "value": { "stringValue": "claude-sonnet-4.6" } },
+                { "key": "gen_ai.response.model", "value": { "stringValue": "claude-sonnet-4.6" } },
+                { "key": "gen_ai.usage.input_tokens", "value": { "intValue": "256" } },
+                { "key": "gen_ai.usage.output_tokens", "value": { "intValue": "92" } },
+                { "key": "claude.cowork.session_id", "value": { "stringValue": "ses_dogfood_claude_cowork_0001" } },
+                { "key": "claude.cowork.collaborator_count", "value": { "intValue": "2" } }
+              ],
+              "status": { "code": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+export { DatasetsFacade } from "./datasets.facade";
+export { DatasetService } from "./dataset.service";
+export { DatasetError, DatasetNotFoundError, DatasetApiError, DatasetValidationError, DatasetPlanLimitError } from "./errors";
+export type {
+  Dataset,
+  DatasetEntry,
+  DatasetMetadata,
+  DatasetColumnType,
+  DatasetListItem,
+  Pagination,
+  PaginatedResponse,
+  GetDatasetOptions,
+  GetDatasetApiResponse,
+  ListDatasetsOptions,
+  ListDatasetsApiResponse,
+  ListRecordsOptions,
+  ListRecordsApiResponse,
+  CreateDatasetOptions,
+  UpdateDatasetOptions,
+  CreateFromUploadResponse,
+  BatchCreateRecordsResponse,
+  DeleteRecordsResponse,
+  UploadResponse,
+  DatasetRecordResponse,
+} from "./types";

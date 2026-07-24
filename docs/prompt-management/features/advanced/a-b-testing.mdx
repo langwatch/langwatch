@@ -1,0 +1,203 @@
+---
+title: "A/B Testing"
+description: "Implement A/B testing for prompts in LangWatch to compare performance, measure regressions, and improve AI agent evaluations."
+---
+
+LangWatch enables A/B testing by allowing you to create different versions of your prompts and randomly alternate between them. Your application can test different prompt variants while LangWatch tracks performance metrics for each version.
+
+## How It Works
+
+1. **Create variants** as different versions of the same prompt
+2. **Switch between versions** at runtime with an A/B testing strategy
+3. **Track performance** using LangWatch's built-in analytics
+4. **Compare results** to see which version performs better
+
+## Implementation
+
+### Create Prompt Variants
+
+Create different versions of your prompt for testing:
+
+<Tabs>
+  <Tab title="TypeScript SDK">
+    ```typescript
+    import { LangWatch } from "langwatch";
+
+    const langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY
+    });
+
+    // Create base prompt
+    const basePrompt = await langwatch.prompts.create({
+      handle: "customer-support-bot",
+      scope: "PROJECT",
+      prompt: "You are a helpful customer support agent. Help with: {{input}}",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "response", type: "str" }],
+      model: "openai/gpt-4o-mini"
+    });
+
+    // Create variant A (friendly tone) - captures version number
+    const variantA = await langwatch.prompts.update("customer-support-bot", {
+      prompt: "You are a friendly and empathetic customer support agent. Use a warm, helpful tone. Help with: {{input}}"
+    });
+
+    // Create variant B (professional tone) - captures version number
+    const variantB = await langwatch.prompts.update("customer-support-bot", {
+      prompt: "You are a professional and efficient customer support agent. Be concise and solution-focused. Help with: {{input}}"
+    });
+
+    // Store version numbers for A/B testing
+    const versions = {
+      base: basePrompt.version,
+      friendly: variantA.version,
+      professional: variantB.version
+    };
+
+    console.log("Version numbers:", versions);
+    ```
+
+  </Tab>
+
+  <Tab title="Python SDK">
+    ```python
+    import langwatch
+
+    # Create base prompt
+    base_prompt = langwatch.prompts.create(
+        handle="customer-support-bot",
+        scope="PROJECT",
+        prompt="You are a helpful customer support agent. Help with: {{input}}",
+        inputs=[{"identifier": "input", "type": "str"}],
+        outputs=[{"identifier": "response", "type": "str"}]
+    )
+
+    # Create variant A (friendly tone) - captures version number
+    variant_a = langwatch.prompts.update(
+        "customer-support-bot",
+        scope="PROJECT",
+        prompt="You are a friendly and empathetic customer support agent. Use a warm, helpful tone. Help with: {{input}}"
+    )
+
+    # Create variant B (professional tone) - captures version number
+    variant_b = langwatch.prompts.update(
+        "customer-support-bot",
+        scope="PROJECT",
+        prompt="You are a professional and efficient customer support agent. Be concise and solution-focused. Help with: {{input}}"
+    )
+
+    # Store version numbers for A/B testing
+    versions = {
+        "base": base_prompt.version,
+        "friendly": variant_a.version,
+        "professional": variant_b.version
+    }
+
+    print("Version numbers:", versions)
+    ```
+
+  </Tab>
+</Tabs>
+
+### Run A/B Tests
+
+Use the captured version numbers to switch between prompt versions at runtime (random sampling):
+
+<Tabs>
+  <Tab title="TypeScript SDK">
+    ```typescript
+    async function generateResponse(userInput: string) {
+      // Use the captured version numbers
+      const versions = {
+        base: 1,
+        friendly: 2,
+        professional: 3
+      };
+      
+      // Randomly select a variant
+      const variants = [
+        { version: versions.base, description: "Base version" },
+        { version: versions.friendly, description: "Friendly tone" },
+        { version: versions.professional, description: "Professional tone" }
+      ];
+      
+      const randomVariant = variants[Math.floor(Math.random() * variants.length)];
+      
+      // Fetch the selected prompt version
+      const prompt = await langwatch.prompts.get("customer-support-bot", {
+        version: randomVariant.version
+      });
+      
+      // Compile and use the prompt
+      const compiledPrompt = prompt.compile({ input: userInput });
+      
+      // Use with your LLM client
+      const result = await generateText({
+        model: openai(prompt.model.replace("openai/", "")),
+        messages: compiledPrompt.messages
+      });
+      
+      return {
+        response: result.text,
+        version: randomVariant.version,
+        description: randomVariant.description
+      };
+    }
+    ```
+  </Tab>
+
+  <Tab title="Python SDK">
+    ```python
+    import random
+
+    def generate_response(user_input):
+        # Use the captured version numbers
+        versions = {
+            "base": 1,
+            "friendly": 2,
+            "professional": 3
+        }
+
+        # Randomly select a variant
+        variants = [
+            {"version": versions["base"], "description": "Base version"},
+            {"version": versions["friendly"], "description": "Friendly tone"},
+            {"version": versions["professional"], "description": "Professional tone"}
+        ]
+
+        random_variant = random.choice(variants)
+
+        # Fetch the selected prompt version
+        prompt = langwatch.prompts.get("customer-support-bot", version=random_variant["version"])
+
+        # Compile and use the prompt
+        compiled_prompt = prompt.compile(input=user_input)
+
+        # Use with your LLM client
+        response = completion(
+            model=prompt.model,
+            messages=compiled_prompt.messages
+        )
+
+        return {
+            "response": response.choices[0].message.content,
+            "version": random_variant["version"],
+            "description": random_variant["description"]
+        }
+    ```
+
+  </Tab>
+</Tabs>
+
+## Track Performance
+
+LangWatch automatically tracks performance metrics for each prompt version:
+
+- **Response latency** - Which version is faster?
+- **Token usage** - Which version is more efficient?
+- **Cost per request** - Which version is more cost-effective?
+- **Quality scores** - Which version produces better responses?
+
+## Analyze Results
+
+Compare metrics between versions in the LangWatch UI to see which variant performs better. Use this data to make informed decisions about which prompt version to use in production.

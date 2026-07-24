@@ -1,0 +1,80 @@
+---
+title: OpenAI
+sidebarTitle: TypeScript/JS
+description: Follow the LangWatch OpenAI TypeScript integration guide to trace LLM calls and support agent testing workflows.
+icon: square-js
+keywords: openai, langwatch, typescript, javascript, sdk, instrumentation
+---
+
+import TypeScriptIntro from "/snippets/typescript-intro.mdx";
+
+<TypeScriptIntro />
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm i langwatch openai
+```
+
+```bash pnpm
+pnpm add langwatch openai
+```
+
+```bash yarn
+yarn add langwatch openai
+```
+
+```bash bun
+bun add langwatch openai
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Set up observability and use `withActiveSpan` to capture your OpenAI calls:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+import { OpenAI } from "openai";
+
+setupObservability({ serviceName: "<project_name>" });
+
+const tracer = getLangWatchTracer("<project_name>");
+
+async function main(message: string): Promise<string> {
+  const openai = new OpenAI();
+
+  return await tracer.withActiveSpan("main", async span => {
+    span.setInput(message);
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [{ role: "user", content: message }],
+    });
+
+    const text = response.choices[0].message.content as string;
+    span.setOutput(text);
+    return text;
+  });
+}
+
+console.log(await main("Hey, tell me a joke"));
+```
+
+The `withActiveSpan` method automatically creates the span, handles errors, and ends the span when the function completes.
+
+import TypeScriptSharedSpanExcepEval from "/snippets/typescript-shared-span-excep-eval.mdx";
+
+<TypeScriptSharedSpanExcepEval />
+
+## Related
+
+- [Capturing RAG](/integration/typescript/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your OpenAI applications

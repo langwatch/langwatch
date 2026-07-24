@@ -1,0 +1,130 @@
+image:
+  repository: langwatch/clickhouse-serverless
+  tag: "0.2.0"  # x-release-please-version
+  pullPolicy: IfNotPresent
+
+# Primary inputs — the image auto-tunes all ClickHouse parameters from these
+cpu: 2
+memory: "4Gi"
+replicas: 1  # 1 = standalone MergeTree, 3+ = ReplicatedMergeTree + Keeper (must be odd)
+clusterName: langwatch  # ClickHouse cluster name used in macros and remote_servers
+
+storage:
+  size: 50Gi
+  storageClass: ""
+
+# S3-compatible object storage — shared by cold storage and backups
+objectStorage:
+  bucket: ""
+  region: ""
+  endpoint: ""                     # e.g. https://s3.us-east-1.amazonaws.com/bucket/
+  useEnvironmentCredentials: true   # IRSA / workload identity / pod SA
+  credentials:
+    secretKeyRef:
+      name: ""                     # K8s secret with S3 access key + secret key
+      accessKeyId: "accessKey"
+      secretAccessKey: "secretKey"
+
+# Cold storage: tiered hot→cold data movement (requires objectStorage)
+cold:
+  enabled: false
+  defaultTtlDays: 49  # App-side TTL before data moves to cold (must be divisible by 7)
+
+# Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
+backup:
+  enabled: false
+  database: "langwatch"
+  user: "default"  # ClickHouse user for backup/restore operations
+  # Resource requests + limits for the backup/restore Job containers.
+  # Both are required by clusters that enforce a "limits and requests must
+  # be set" policy (Gatekeeper/Kyverno) — a Job without them is denied.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  full:
+    schedule: "0 */12 * * *"       # every 12 hours
+  incremental:
+    schedule: "0 * * * *"          # every hour
+
+# Authentication
+auth:
+  password: ""         # Used as autogen seed when autogen.enabled=true and this is unset
+  clusterSecret: ""    # Used as autogen seed when autogen.enabled=true and this is unset
+  existingSecret: ""   # Operator-owned Secret name. Required when autogen.enabled=false.
+  secretKeys:
+    passwordKey: "password"
+    clusterSecretKey: "clusterSecret"
+
+# Chart-managed Secret materialisation. Default false matches the prod-safe
+# behaviour of the parent langwatch chart's autogen.enabled.
+#
+# autogen.enabled=true: the chart renders the credentials Secret on first
+# install via the lookup-or-rand pattern (subsequent helm upgrades reuse the
+# existing keys verbatim, so ClickHouse pods don't roll). Convenient for
+# stock installs and dev quickstart.
+#
+# autogen.enabled=false: the chart does NOT render a Secret. The operator
+# pre-creates a Secret out-of-band and points auth.existingSecret at it.
+# This is the only mode that is drift-free under GitOps controllers whose
+# render step has no cluster access (ArgoCD's repo-server returns nil from
+# helm lookup every sync, so the autogen path would rotate credentials on
+# every reconcile). The preflight Job validates the configured keys exist
+# before pods roll.
+#
+# Either way, when both flags are unset the chart-time validator fails with
+# a clear message instructing the operator to pick one path.
+autogen:
+  enabled: false
+
+# Preflight Job that runs pre-install + pre-upgrade and verifies the
+# operator-owned Secret has every key the StatefulSet mounts. Only renders
+# when autogen.enabled=false and auth.existingSecret is set (when the chart
+# materialises the Secret there is nothing to validate ahead of time).
+#
+# Image needs sh + kubectl + jq. alpine/k8s ships all three. The script
+# does a single `kubectl get -o json` per Secret + `jq` lookups so dotted
+# operator-configured key names resolve correctly. registry.k8s.io/kubectl
+# is distroless and has no /bin/sh; bitnami/kubectl has /bin/sh but no jq.
+# A startup guard inside the Job fails fast if jq is missing from the image.
+preflight:
+  enabled: true
+  image: alpine/k8s:1.30.0
+  imagePullPolicy: IfNotPresent
+  activeDeadlineSeconds: 60
+
+# Advanced: override any computed value (applied last)
+env: {}
+
+# Keeper resources (only used when replicas > 1)
+keeper:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  storage:
+    size: 10Gi
+    storageClass: ""  # defaults to parent storage.storageClass
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  name: ""  # defaults to <fullname>
+  automountServiceAccountToken: false
+  annotations: {}  # e.g. eks.amazonaws.com/role-arn: arn:aws:iam::role/my-role (for IRSA)
+
+# Pod-level settings
+imagePullSecrets: []
+podAnnotations: {}
+
+# Scheduling
+scheduling:
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []

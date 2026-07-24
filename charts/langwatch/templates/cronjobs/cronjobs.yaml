@@ -1,0 +1,121 @@
+{{- if .Values.cronjobs.enabled }}
+{{- $root := . }}
+{{- range $jobName, $jobConfig := .Values.cronjobs.jobs }}
+{{- if $jobConfig.enabled }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+  labels:
+    app.kubernetes.io/name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+    app.kubernetes.io/instance: {{ $root.Release.Name }}
+    {{- include "langwatch.labels" $root | nindent 4 }}
+    {{- if $root.Values.cronjobs.labels }}
+    {{- toYaml $root.Values.cronjobs.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if $root.Values.cronjobs.cronjob.annotations }}
+    {{- toYaml $root.Values.cronjobs.cronjob.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  schedule: {{ $jobConfig.schedule | quote }}
+  concurrencyPolicy: Replace
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+        app.kubernetes.io/instance: {{ $root.Release.Name }}
+        {{- if $root.Values.cronjobs.job.labels }}
+        {{- toYaml $root.Values.cronjobs.job.labels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if $root.Values.cronjobs.job.annotations }}
+        {{- toYaml $root.Values.cronjobs.job.annotations | nindent 8 }}
+        {{- end }}
+    spec:
+      template:
+        metadata:
+          labels:
+            app: langwatch-cronjob
+            app.kubernetes.io/name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+            app.kubernetes.io/instance: {{ $root.Release.Name }}
+            {{- if $root.Values.cronjobs.pod.labels }}
+            {{- toYaml $root.Values.cronjobs.pod.labels | nindent 8 }}
+            {{- end }}
+          annotations:
+            {{- if $root.Values.cronjobs.pod.annotations }}
+            {{- toYaml $root.Values.cronjobs.pod.annotations | nindent 8 }}
+            {{- end }}
+        spec:
+          # The cron pod only curls the app over HTTP; it never calls the
+          # Kubernetes API, so don't mount the SA token.
+          automountServiceAccountToken: {{ $root.Values.global.automountServiceAccountToken }}
+          # Pod security context
+          {{- with (coalesce $root.Values.cronjobs.podSecurityContext $root.Values.global.podSecurityContext) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          # Node selection
+          {{- with (coalesce $root.Values.cronjobs.nodeSelector $root.Values.global.scheduling.nodeSelector) }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (coalesce $root.Values.cronjobs.affinity $root.Values.global.scheduling.affinity) }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (coalesce $root.Values.cronjobs.tolerations $root.Values.global.scheduling.tolerations) }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (coalesce $root.Values.cronjobs.topologySpreadConstraints $root.Values.global.scheduling.topologySpreadConstraints) }}
+          topologySpreadConstraints:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+            - name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
+              securityContext:
+                {{- toYaml (coalesce $root.Values.cronjobs.containerSecurityContext $root.Values.global.containerSecurityContext) | nindent 16 }}
+              image: "{{ $root.Values.cronjobs.image.repository }}:{{ $root.Values.cronjobs.image.tag }}"
+              imagePullPolicy: {{ $root.Values.cronjobs.image.pullPolicy }}
+              env:
+                - name: CRON_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "langwatch.appSecretName" $root }}
+                      key: {{ $root.Values.secrets.secretKeys.cronApiKey | default "cronApiKey" }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  curl --retry 5 --retry-delay 10 --retry-connrefused -i \
+                    -H "Authorization: Bearer ${CRON_API_KEY}" \
+                    -X GET \
+                    http://{{ $root.Release.Name }}-app:{{ $root.Values.app.service.port }}{{ $jobConfig.endpoint }}
+
+              {{- if $root.Values.cronjobs.extraLifecycle}}
+              lifecycle:
+                {{- with $root.Values.cronjobs.extraLifecycle}}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              {{- end }}
+              resources:
+                {{- toYaml $root.Values.cronjobs.resources | nindent 16 }}
+              volumeMounts:
+                {{- with $root.Values.cronjobs.extraVolumeMounts}}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+                - name: tmp-dir
+                  mountPath: /tmp
+          volumes:
+            {{- with $root.Values.cronjobs.extraVolumes}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: tmp-dir
+              emptyDir: {}
+          restartPolicy: OnFailure
+{{- end }}
+{{- end }}
+{{- end }}

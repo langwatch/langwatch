@@ -1,0 +1,17 @@
+id: no-form-disable-on-isvalid
+message: >
+  Submit button is disabled based on form validity — pre-disabling is silent
+  and frustrating. Disable ONLY while the request is in flight
+  (`disabled={mutation.isPending}` is the canonical shape). Surface
+  validation errors inline (Field.ErrorText) or via toast in the submit
+  handler. See `dev/docs/design/guidelines.md` § 6 and ADR-018.
+severity: warning
+language: Tsx
+rule:
+  kind: jsx_attribute
+  regex: '^disabled=\{[^}]*(isValid|formState\.isValid)'
+files:
+  - "langwatch/src/**/*.tsx"
+ignores:
+  - "**/*.test.tsx"
+  - "**/*.spec.tsx"

@@ -1,0 +1,182 @@
+---
+title: Routing policies
+description: Decouple the credential from the provider chain — admins publish routing policies once, virtual keys reference them by ID.
+sidebarTitle: Routing policies
+---
+
+A **routing policy** answers: "when one of my organization's users
+wants to call a model, which providers can serve it, in what order,
+under what allowlist?"
+
+Until v1.x, this was embedded in every virtual key's config — every
+service VK had its own copy of "Anthropic primary, OpenAI fallback,
+allow these models." That worked for service VKs created by hand.
+It does not scale to a thousand personal VKs, where the answer is
+the same for every dev.
+
+Routing policies pull that decision out of the credential. A VK
+references a policy by ID; the policy holds the strategy.
+
+## Shape
+
+```ts
+RoutingPolicy {
+  id:             string
+  organizationId: string
+  scope:          'organization' | 'team' | 'project'
+  scopeId:        string
+  name:           string             // unique within (org, scope, scopeId)
+  description?:   string
+  providerCredentialIds: string[]    // ordered preference
+  modelAllowlist?:        string[]   // glob-supported, e.g. "claude-3-5-*"
+  strategy:               'priority' | 'cost' | 'latency' | 'round_robin'
+  isDefault:              boolean    // exactly one default per (org, scope, scopeId)
+}
+```
+
+## Strategy variants
+
+<Tabs>
+  <Tab title="priority (default)">
+    Try `providerCredentialIds[0]` first. On retryable error, try
+    `[1]`, then `[2]`, …. This matches the v1 fallback chain
+    semantics.
+
+    Use when: you have a clearly-preferred provider (Anthropic
+    native), and want a cheaper/legacy provider as backup
+    (Bedrock, in case Anthropic 5xx's).
+  </Tab>
+  <Tab title="cost">
+    For every request, pick the provider with the lowest
+    LangWatch-tracked unit cost for the resolved model.
+
+    Use when: providers serve overlapping models (gpt-4o-mini on
+    OpenAI vs Azure OpenAI) and you want the cheaper one
+    automatically.
+  </Tab>
+  <Tab title="latency">
+    Pick the provider with the lowest p50 latency for this model
+    over the last 5 minutes.
+
+    Use when: latency-sensitive workloads (interactive completions),
+    multiple equivalent providers.
+  </Tab>
+  <Tab title="round_robin">
+    Round-robin across providers per request. Within a request,
+    fallback works as `priority` if a provider errors.
+
+    Use when: load-balancing identical providers (e.g. multiple
+    Bedrock regions) for throughput.
+  </Tab>
+</Tabs>
+
+All strategies still respect the model-aware filter: providers that
+can't serve the resolved model are excluded before the strategy
+runs.
+
+## Cascading defaults
+
+The gateway resolves a VK's effective policy at issuance time using
+the most-specific `isDefault=true` policy:
+
+```
+PROJECT default  >  TEAM default  >  ORG default
+```
+
+Concretely: when a personal VK is auto-issued for a user (member of
+some team in their org), the gateway picks:
+
+1. Is there a `PROJECT`-scoped default for their personal project?
+   No — personal projects don't carry their own routing policies.
+2. Is there a `TEAM`-scoped default for the user's team? Maybe.
+3. If not, fall back to the `ORG`-scoped default for their
+   organization.
+
+Override at the team level by creating a `TEAM`-scoped policy and
+marking it default. Members of that team automatically inherit it
+without their VK changing.
+
+## Model allowlist
+
+`modelAllowlist` is an array of glob patterns. Empty/absent =
+all models allowed. Each pattern supports `*` wildcards:
+
+```js
+["claude-3-5-*", "gpt-4o*", "gemini-2.5-flash"]
+// Allows claude-3-5-sonnet, claude-3-5-haiku, gpt-4o, gpt-4o-mini,
+// gemini-2.5-flash. Denies gpt-3.5-turbo, claude-3-opus, etc.
+```
+
+Allowlists compose with the gateway's per-VK `models_allowed`
+config — a request must satisfy both to be allowed.
+
+## Model-aware dispatch
+
+A VK that can use Anthropic + OpenAI + Gemini behind it doesn't
+waste fallback budget when the user asks for an OpenAI-only model.
+The gateway dispatcher filters the credential chain to providers
+that can serve the resolved model **before** applying the
+strategy:
+
+- Resolved provider explicit (e.g. `anthropic/claude-3-5-sonnet`):
+  filter to matching providers.
+- Resolved provider implicit (`gpt-4o-mini`): infer from the model
+  name prefix (`gpt-`, `o[1|3|4]-` → OpenAI; `claude-` → Anthropic;
+  `gemini-` → Gemini) and filter accordingly.
+- Filter empties the chain (e.g. user asked for a Bedrock-only
+  model but the policy doesn't include Bedrock): fall back to
+  trying the original chain so the user gets a clear Bifrost
+  "model not available" error rather than an opaque "no providers".
+
+For the rationale and the curated prefix table, see the
+implementation in `services/aigateway/app/eligible.go`.
+
+## Manage via the UI
+
+**AI Gateway → Routing Policies** lists all policies in your
+org. Click **New policy** to create one; the drawer lets you:
+
+- Pick the scope (Organization / Team / Project).
+- Drag-reorder provider credentials (the drag-handle is the order in
+  the resolved chain).
+- Add allowlist patterns one at a time.
+- Pick a strategy.
+- Mark as default (atomically swaps any current default at that
+  scope; warns if you're about to override).
+
+## Manage via tRPC
+
+```ts
+// List policies in scope
+trpc.routingPolicy.list.useQuery({
+  organizationId,
+  scope: 'organization', // optional filter
+});
+
+// Create
+trpc.routingPolicy.create.useMutation();
+
+// Update
+trpc.routingPolicy.update.useMutation();
+
+// Atomic default swap (also un-marks any sibling default)
+trpc.routingPolicy.setDefault.useMutation();
+```
+
+Auth: `routing_policy:manage` permission for create/update/delete;
+`routing_policy:view` to list. Both are part of the standard
+`organization:admin` role.
+
+## Migration from embedded VK config
+
+Existing service VKs continue to work. Their `routingPolicyId` is
+`null`, so the gateway uses the legacy embedded `config.fallback`
+chain. To migrate a VK to a policy:
+
+1. Create a `RoutingPolicy` matching the VK's existing config.
+2. Update the VK's `routingPolicyId` to the new policy ID.
+3. Verify with `langwatch claude` that requests still route
+   correctly.
+
+The recommended path for new VKs is to always reference a policy.
+Embedding config inline is supported but considered legacy.

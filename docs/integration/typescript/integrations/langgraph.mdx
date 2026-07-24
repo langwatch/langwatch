@@ -1,0 +1,90 @@
+---
+title: LangGraph Instrumentation
+sidebarTitle: TypeScript/JS
+description: Instrument LangGraph applications with the LangWatch TypeScript SDK for deep observability and agent testing workflows.
+icon: square-js
+keywords: langgraph, instrumentation, callback, langwatch, typescript, tracing, state graph, workflow
+---
+
+LangWatch integrates with LangGraph to provide detailed observability into your state graphs, node executions, and workflow patterns.
+
+## Installation
+
+<CodeGroup>
+```bash npm
+npm i langwatch @langchain/openai @langchain/core @langchain/langgraph zod
+```
+
+```bash pnpm
+pnpm add langwatch @langchain/openai @langchain/core @langchain/langgraph zod
+```
+
+```bash yarn
+yarn add langwatch @langchain/openai @langchain/core @langchain/langgraph zod
+```
+
+```bash bun
+bun add langwatch @langchain/openai @langchain/core @langchain/langgraph zod
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Use `LangWatchCallbackHandler` with your LangGraph state graph to capture node executions and workflow patterns.
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
+import { ChatOpenAI } from "@langchain/openai";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { StateGraph, START, END } from "@langchain/langgraph";
+import { MemorySaver } from "@langchain/langgraph";
+import { z } from "zod";
+
+setupObservability({ serviceName: "<project_name>" });
+
+const GraphState = z.object({
+  question: z.string(),
+  final_answer: z.string().default(""),
+});
+type GraphStateType = z.infer<typeof GraphState>;
+
+async function main(message: string): Promise<string> {
+  const llm = new ChatOpenAI({ model: "gpt-5" });
+
+  const generate = async (state: GraphStateType) => {
+    const result = await llm.invoke([
+      new SystemMessage("You are a helpful assistant."),
+      new HumanMessage(state.question),
+    ]);
+    return { final_answer: result.content as string };
+  };
+
+  const app = new StateGraph(GraphState)
+    .addNode("generate", generate)
+    .addEdge(START, "generate")
+    .addEdge("generate", END)
+    .compile({ checkpointer: new MemorySaver() })
+    .withConfig({ callbacks: [new LangWatchCallbackHandler()] });
+
+  const out = await app.invoke(
+    { question: message },
+    { configurable: { thread_id: crypto.randomUUID() } },
+  );
+  return out.final_answer;
+}
+
+console.log(await main("Hey, tell me a joke"));
+```
+
+The `LangWatchCallbackHandler` captures LangGraph node executions and workflow patterns. Pass the callback handler to your compiled graph via `withConfig()`.
+
+## Related
+
+- [Capturing RAG](/integration/typescript/tutorials/capturing-rag) - Learn how to capture RAG data from LangChain retrievers and tools
+- [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your LangGraph applications

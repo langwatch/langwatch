@@ -1,0 +1,118 @@
+---
+title: Annotations
+description: Use annotations in LangWatch for expert labeling, trace review, and structured evaluation workflows for AI agent testing.
+---
+
+# Create annotations on messages
+
+With annotations, you can add additional information to messages. This can be useful to comment on or add any other information that you want to add to a message for further analysis.
+
+We have also implemented the option to add a scoring system for each annotation, more information about this can be found in the [Annotation Scoring](/features/annotations#annotation-scoring) section
+
+If you want to add an annotation to a queue, you can do so by clicking on the add to queue button to send the messages to the queue for later analysis. You can create queues and add members to them on the the main annotations page. More information about this can be found in the [Annotation Queues](/features/annotations#annotation-queues) section.
+
+
+
+## Usage
+
+To create an annotation, follow these steps:
+
+1) Click the message you want to annotate on and a [Trace](/concepts#traces) details drawer will open.
+2) On the top right, click the annotation button.
+3) Here you will be able to add a comment, a link or any other information that you want to add to the message.
+
+<Frame>
+<img className="block" src="/images/annotations-trace.png" alt="LangWatch" />
+</Frame>
+
+Once you have created an annotation, you will see it next to to the message.
+
+<Frame>
+<img className="block" src="/images/annotations-comment.png" alt="LangWatch" />
+</Frame>
+
+# Annotation Queues
+
+To get started with annotation queues, follow these steps:
+
+1) Go to the annotations page.
+2) Click the plus button to create a new queue.
+3) Add a name for your queue, description, members and click on the "Save" button.
+
+<Frame>
+<img className="block" src="/images/annotations-create-queue.png" alt="LangWatch" />
+</Frame>
+
+Once you have created your queue, you will be able to select this when creating an annotation and send the messages to the queue or directly to a project member for later analysis.
+
+<Frame>
+<img className="block" src="/images/annotation-add-to-queue.png" alt="LangWatch" />
+</Frame>
+
+Once you add an item to the queue, you can view it in the annotations section, whether it's in a queue or sent directly to you.
+
+<Frame>
+<img className="block" src="/images/annotation-queues.png" alt="LangWatch" />
+</Frame>
+
+When clicking on a queue item, you will be directed to the message where you can add an annotation. Once happy with your annotation, you can click on the "Done" button and move on to the next item.
+
+<Frame>
+<img className="block" src="/images/annotation-queue-items.png" alt="LangWatch" />
+</Frame>
+
+Once you’ve completed the final item in the queue, you’ll see that all tasks are done. That’s it! Happy annotating!
+
+<Frame>
+<img className="block" src="/images/annotation-queue-items-complete.png" alt="LangWatch" />
+</Frame>
+
+
+# Annotation Scoring
+
+We have developed a customized scoring system for each annotation. To get started, you will need to create your scores on the settings page.
+
+There are two types of score data you can choose from:
+
+- **Checkbox**: To add multiple selectable options.
+- **Multiple Choice**: To add a single selectable option.
+
+
+<Frame>
+<img className="block" src="/images/annotation-add-score.png" alt="LangWatch" />
+</Frame>
+
+After you have created your scores, you can activate or deactivate them on the settings page.
+
+<Frame>
+<img className="block" src="/images/annotation-view-scores.png" alt="LangWatch" />
+</Frame>
+
+Once your scores are activated, you will see them in the annotations tab. For each annotation you create, the score options will be available, allowing you to add more detailed information to your annotations.
+When annotating a message, you will see the score options below the comment input. Once you have added a score, you will be asked for an optional reason for the score.
+
+<div style={{ display: 'flex', gap: '20px' }}>
+  <Frame caption="Score selection">
+  <img className="block" src="/images/annotation-score-selection.png" alt="LangWatch" />
+  </Frame>
+  <Frame caption="Score reason">
+  <img className="block" src="/images/annotation-score-reason.png" alt="LangWatch" />
+  </Frame>
+</div>
+
+Thats it! You can now annotate messages and add your custom score metrics to them.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

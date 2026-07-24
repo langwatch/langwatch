@@ -1,0 +1,46 @@
+---
+title: Tracking Tool Calls
+sidebarTitle: TypeScript/JS
+description: Track tool calls in TypeScript/JavaScript agent applications with LangWatch to improve debugging and evaluation completeness.
+icon: square-js
+keywords: langwatch, typescript, javascript, tools, agent, tracking, instrumentation
+---
+
+<Note>
+Most agent frameworks automatically track tool calls for you. If you're using [LangChain, LangGraph, Mastra, or other supported frameworks](/integration/overview#frameworks), tool calls are already being captured automatically. You only need manual instrumentation for custom tools or unsupported frameworks.
+</Note>
+
+## Manual Tool Tracking
+
+If you have custom tools that aren't automatically tracked, you can manually instrument them by setting the span type to `"tool"`:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+setupObservability();
+
+const tracer = getLangWatchTracer("agent-service");
+
+const agentCall = async (query: string): Promise<string> => {
+  return await tracer.withActiveSpan("AgentCall", async (span) => {
+    // Your agent logic here
+    const result = await myCustomTool(query);
+    return result;
+  });
+};
+
+const myCustomTool = async (query: string): Promise<string> => {
+  return await tracer.withActiveSpan("MyCustomTool", async (span) => {
+    span.setType("tool");
+
+    // Your custom tool implementation
+    const result = `Tool result for: ${query}`;
+    return result;
+  });
+};
+
+await agentCall("What's the weather?");
+```
+
+This will display the tool call with a tool icon in the trace visualization and include it in tool call analytics in the LangWatch dashboard.

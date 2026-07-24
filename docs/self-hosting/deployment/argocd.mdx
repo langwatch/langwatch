@@ -1,0 +1,181 @@
+---
+title: ArgoCD
+description: "Deploy the LangWatch Helm chart via ArgoCD with operator-managed secrets and no GitOps-specific workarounds"
+---
+
+This page is the getting-started guide for installing the LangWatch Helm chart through ArgoCD. With the current chart release there is no ArgoCD-specific configuration to remember: gateway-auth follows the same operator-pre-create pattern that the app, database, and Redis Secrets already use, so an ordinary Argo Application manifest is enough.
+
+If you are not on ArgoCD, the [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) guide is what you want.
+
+## Prerequisites
+
+- An ArgoCD installation, version 2.6+ (for [multiple sources](https://argo-cd.readthedocs.io/en/stable/operator-manual/application.yaml/#multiple-sources) when you keep production values in a separate config repo; the single-source pattern below works on any modern Argo)
+- A Kubernetes cluster that meets the [Helm chart prerequisites](/self-hosting/deployment/kubernetes-helm#prerequisites)
+- A namespace for LangWatch (the manifest below creates one with `CreateNamespace=true`)
+
+## Quick start
+
+The langwatch chart needs one operator-managed Secret (`langwatch-app-secrets`) in your target namespace before the first sync. It holds the app keys + the AI gateway shared-auth keys; both `langwatch-app` and the gateway pod mount from the same Secret. This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses, and it is what makes the ArgoCD path trivial: the chart never renders this Secret, so Argo has nothing to reconcile and nothing rotates on subsequent syncs.
+
+Create the namespace and the Secret:
+
+```bash
+kubectl create namespace langwatch
+
+kubectl -n langwatch create secret generic langwatch-app-secrets \
+  --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
+  --from-literal=cronApiKey="$(openssl rand -hex 32)" \
+  --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
+  --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
+  --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+```
+
+If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
+
+Then apply the Application manifest:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: langwatch
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: langwatch
+  source:
+    repoURL: https://langwatch.github.io/langwatch
+    chart: langwatch
+    targetRevision: 3.3.0
+    helm:
+      releaseName: langwatch
+      values: |
+        autogen:
+          enabled: false
+        secrets:
+          existingSecret: langwatch-app-secrets
+        # Add your other overrides here. See "Production overrides" below.
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+```
+
+If you change the release name or set `autogen.secretNames.app` to a non-default value, also set `gateway.secrets.existingSecretName` to the same Secret name (the chart fails fast at render time if it does not match).
+
+Apply:
+
+```bash
+kubectl apply -f langwatch-application.yaml
+argocd app sync langwatch
+```
+
+Verify:
+
+```bash
+kubectl -n langwatch get pods
+kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
+# Open http://localhost:5560
+```
+
+The preflight Job (mapped from Helm's `pre-install` + `pre-upgrade` hooks to ArgoCD's `PreSync` phase) validates that every required key is present on the Secret before pods roll, so a missing or misspelled key fails the sync with a clear list of what is missing rather than crashlooping pods opaquely.
+
+## Production overrides
+
+The `values:` block in the manifest above accepts the same overrides as a direct `helm install`. For sizing, ingress, external databases, replicated ClickHouse, and the rest of the production checklist, follow the [Kubernetes (Helm) production guide](/self-hosting/deployment/kubernetes-helm#production-deployment) and either paste the values into the `helm.values` field, or use ArgoCD's [multiple sources](https://argo-cd.readthedocs.io/en/stable/operator-manual/application.yaml/#multiple-sources) pattern (ArgoCD 2.6+) to keep the chart reference while pulling values from your config repo:
+
+```yaml
+spec:
+  sources:
+    - repoURL: https://langwatch.github.io/langwatch
+      chart: langwatch
+      targetRevision: 3.3.0
+      helm:
+        releaseName: langwatch
+        valueFiles:
+          - $values/langwatch/values-production.yaml
+    - repoURL: https://github.com/your-org/your-config-repo
+      targetRevision: main
+      ref: values
+```
+
+The `ref: values` source is value-only (no manifests rendered) and the `$values/...` path in `valueFiles` resolves into that source's checkout. Inlining the values directly in `helm.values` from the quick-start manifest is also fine if you prefer to keep everything in one place.
+
+Topic-specific configuration pages:
+
+- [Sizing and scaling](/self-hosting/configuration/sizing-and-scaling) for replica counts, CPU/memory, and the size overlays the chart ships
+- [Environment variables](/self-hosting/configuration/environment-variables) for the full list of app/worker/gateway env vars
+- [SSO](/self-hosting/configuration/sso) for OIDC / SAML wiring
+- [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and PostgreSQL backups
+- [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm) for per-environment gateway tuning if you enable the gateway sub-chart
+
+## Operator-managed Secrets via External Secrets / Sealed Secrets / Vault
+
+Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`). The preflight Job runs as an ArgoCD `PreSync` hook (mapped automatically from Helm's `pre-install` + `pre-upgrade` hooks, see the [ArgoCD Helm hooks docs](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/#helm-hooks)) so a Secret that has not landed in time fails the sync with a clear missing-keys error.
+
+The preflight Job runs during ArgoCD's `PreSync` phase, which Argo completes in full before any `Sync` phase manifest is applied. A regular `ExternalSecret` / `SealedSecret` / `vaultauth` resource is a `Sync`-phase manifest by default, so a `sync-wave` annotation on it cannot pull it ahead of the preflight, even at wave `-1000`. Pick one of:
+
+- Materialise the Secret from a **separate ArgoCD Application** that you sync first (app-of-apps or explicit ordering between Applications). This is the cleanest path for `ExternalSecret`-based stacks.
+- Annotate the operator-rendered Secret as a `PreSync` hook on this Application (`argocd.argoproj.io/hook: PreSync` plus a `sync-wave` lower than `-5`, since the preflight's Helm `pre-upgrade` hook lands at wave `-5`). Works if the operator supports being a hook resource.
+- Pre-create the Secret with `kubectl` before the first sync (or before the operator's first reconcile). This is the one-shot path the quick-start uses.
+
+## Reinstall and ownership
+
+When you use the operator-managed pattern from the quick-start (`autogen.enabled=false`, the Secret created by you), the Secret lifecycle is entirely yours. `argocd app delete` leaves the Secret alone (the chart never owned it), and a fresh `argocd app create` re-syncs cleanly without any ownership handoff.
+
+## Smoke test
+
+After the first sync completes, verify the pods are running on the credentials you provided:
+
+```bash
+kubectl -n langwatch get pods -l 'app.kubernetes.io/component in (app, gateway)' -o wide
+argocd app diff langwatch
+```
+
+`argocd app diff` should show no diff against the live cluster. To confirm subsequent reconciles do not roll the gateway pods, capture the Secret's `resourceVersion` and trigger a sync:
+
+```bash
+RV1=$(kubectl -n langwatch get secret langwatch-app-secrets -o jsonpath='{.metadata.resourceVersion}')
+argocd app sync langwatch
+sleep 10
+RV2=$(kubectl -n langwatch get secret langwatch-app-secrets -o jsonpath='{.metadata.resourceVersion}')
+[ "$RV1" = "$RV2" ] && echo OK || echo "ROTATED: $RV1 -> $RV2"
+```
+
+The two `resourceVersion` values should be identical because the chart no longer renders the Secret on the operator-managed path.
+
+## Legacy: autogen.enabled=true under ArgoCD
+
+If you set `autogen.enabled=true` in your Argo Application values, the chart materialises the Secret itself using helm's `lookup`-or-`randAlphaNum` pattern. Under direct `helm upgrade` that pattern is idempotent: the lookup reads existing values from the live cluster and the manifest reuses them verbatim. Under ArgoCD it is NOT idempotent: the argocd-repo-server has no cluster access (by design, it is a sandboxed renderer), so `lookup` returns nil on every sync and the chart emits a fresh random pair every render. Without mitigation, every Argo sync rotates the credentials and rolls both app + gateway pods.
+
+The mitigation is the same trio that earlier chart versions required from the start: `ignoreDifferences` on the Secret's `/data` (Argo excludes it from the diff), `RespectIgnoreDifferences=true` in `syncOptions` (the sync operation itself omits the ignored field), and `ServerSideApply=true` (server-side apply honors `RespectIgnoreDifferences` reliably; client-side apply does not). Drop any one of the three and an ordinary sync rotates the live Secret. `argocd app sync --force` and `replace: true` bypass `RespectIgnoreDifferences` and rotate regardless.
+
+```yaml
+spec:
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: langwatch-app-secrets
+      jsonPointers:
+        - /data
+```
+
+The recommended path is to flip `autogen.enabled` to `false`, pre-create the Secret per the quick-start above, and remove the `ignoreDifferences` block entirely. The legacy path is preserved here for installs that need zero pre-install steps and are willing to apply the trio.
+
+## Reference
+
+- Chart template comment: `charts/langwatch/templates/app/secrets.yaml` documents the per-key lookup-or-rand shape inline.
+- Chart values: `charts/langwatch/values.yaml` sections `secrets`, `gateway.secrets`, `autogen`, `preflight`.
+- Helper that enforces app+gateway Secret-name consistency: `charts/langwatch/templates/_helpers.tpl` defines `langwatch.appSecretName` and `langwatch.validateSecrets`.
+- Postmortem driving the original chart change: [PR #4423](https://github.com/langwatch/langwatch/pull/4423).
+- Single-secret collapse (this page's current shape): [PR #4440](https://github.com/langwatch/langwatch/pull/4440).

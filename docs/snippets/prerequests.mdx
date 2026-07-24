@@ -1,0 +1,47 @@
+#### Prerequisites
+
+- Create an API key from [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys). See the [API Keys guide](/platform/api-keys) for details.
+
+#### Installation
+
+```sh
+pip install langwatch
+```
+
+#### Configuration
+
+Ensure `LANGWATCH_API_KEY` is set:
+
+<Tabs>
+<Tab title="Environment variable">
+```bash
+export LANGWATCH_API_KEY='your_api_key_here'
+export LANGWATCH_PROJECT_ID='your_project_id_here'
+```
+</Tab>
+<Tab title="Runtime">
+You can set `LANGWATCH_API_KEY` globally at runtime:
+
+```python
+import langwatch
+import os
+
+langwatch.api_key = os.getenv("LANGWATCH_API_KEY")
+```
+
+Or on the specific trace being tracked:
+
+```python
+import langwatch
+import os
+
+@langwatch.trace(api_key=os.getenv("LANGWATCH_API_KEY"))
+def main():
+    ...
+```
+</Tab>
+</Tabs>
+
+<Note>
+  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set `LANGWATCH_PROJECT_ID` so the SDK knows which project to send traces to. You can find the project ID in your project settings. Project API keys obtained from the project settings page already have the project context built in.
+</Note>

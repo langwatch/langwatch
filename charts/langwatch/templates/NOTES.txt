@@ -1,0 +1,195 @@
+LangWatch {{ .Chart.AppVersion }} has been deployed to namespace {{ .Release.Namespace }}.
+
+──────────────────────────────────────────────────────────────────────
+1. Reach the UI
+──────────────────────────────────────────────────────────────────────
+{{- if .Values.ingress.enabled }}
+Once DNS is pointing at your ingress, your team reaches LangWatch at:
+
+  https://{{ .Values.ingress.host | default "<your-ingress-host>" }}
+
+{{- else }}
+Ingress is disabled. Port-forward to reach the UI from your laptop:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ .Release.Name }}-app 5560:{{ .Values.app.service.port | default 5560 }}
+  open http://localhost:5560
+
+{{- end }}
+The first user to sign in becomes the bootstrap organization admin
+and claims the `Organization`. Plan to do this from a trusted
+workstation before sharing the URL widely.
+
+──────────────────────────────────────────────────────────────────────
+2. Wire up at least one Model Provider
+──────────────────────────────────────────────────────────────────────
+The AI Gateway needs at least one Anthropic / OpenAI / Bedrock / etc.
+credential before any virtual key can route traffic. As the bootstrap
+admin:
+
+  • Open  https://<your-host>/settings/model-providers
+  • Click "Add provider", pick Anthropic / OpenAI / etc.
+  • Paste your provider API key and save.
+
+The credential is stored encrypted (per-deployment KMS / `LW_VK_PEPPER`)
+and never re-displayed. Rotate via the same screen.
+
+──────────────────────────────────────────────────────────────────────
+3. Publish a default RoutingPolicy (recommended)
+──────────────────────────────────────────────────────────────────────
+RoutingPolicies turn "click a button, get a key" into a one-step UX
+for end users. Every personal `langwatch login` issues a virtual key
+bound to the org-default policy — no per-user provider chain config.
+
+  • Open  https://<your-host>/settings/routing-policies
+  • Click "New policy", scope = Organization
+  • Pick the providers you want personal keys to consume,
+    in your preferred fallback order
+  • Mark "Set as default for this scope"
+
+If no policy is published, end-users can still authenticate but their
+keys cannot route until one exists. The CLI surfaces a clear error
+in that state.
+
+──────────────────────────────────────────────────────────────────────
+4. Tell your devs to install the CLI
+──────────────────────────────────────────────────────────────────────
+Once steps 1-3 are done, share the install command with your team:
+
+  npx langwatch@latest login --device --url https://{{ .Values.ingress.host | default "<your-host>" }}
+
+Then in any terminal:
+
+  langwatch claude     # Claude Code with org-managed keys
+  langwatch codex      # Codex CLI
+  langwatch cursor     # Cursor
+  langwatch shell      # Subshell with ANTHROPIC_BASE_URL etc. preloaded
+
+Per-user identity comes from your SSO; spend / quota live under each
+dev's Personal Workspace at https://<your-host>/me .
+
+──────────────────────────────────────────────────────────────────────
+5. Helpful next steps
+──────────────────────────────────────────────────────────────────────
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+  • AI Gateway pod:
+      kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name={{ .Release.Name }}-gateway
+  • Healthcheck (in-cluster):
+      curl http://{{ .Release.Name }}-gateway/healthz
+{{- end }}
+  • Self-host docs:
+      https://docs.langwatch.ai/self-hosting/
+  • Personal-keys onboarding walkthrough:
+      https://docs.langwatch.ai/ai-gateway/governance/admin-setup
+  • Troubleshooting:
+      https://docs.langwatch.ai/self-hosting/troubleshooting
+
+──────────────────────────────────────────────────────────────────────
+{{- if not (and .Values.gateway .Values.gateway.chartManaged) }}
+
+NOTE: gateway.chartManaged=false — the AI Gateway pod was not
+deployed by this chart. Personal keys + virtual-key proxying
+require a running gateway. Either flip gateway.chartManaged=true
+on a `helm upgrade` or run the gateway out-of-band per
+docs/ai-gateway/self-hosting/helm.
+
+{{- end }}
+
+──────────────────────────────────────────────────────────────────────
+6. Dataset object storage
+──────────────────────────────────────────────────────────────────────
+Datasets store their content as chunked JSONL in object storage, and a
+WRITABLE backend is REQUIRED: every dataset create writes to it, with no
+database fallback (ADR-032 "born-on-storage"). The chart configures a
+backend for you:
+
+  • Default (no S3): a local-filesystem PVC is provisioned
+    ({{ .Values.app.storedObjects.localFilesystem.path }},
+    {{ .Values.app.storedObjects.localFilesystem.size | default "10Gi" }})
+    and mounted into the app, the worker (which runs dataset
+    normalization), and the dataset-migration Job — they all read and write
+    the SAME chunks (LANGWATCH_LOCAL_STORAGE_PATH), so a fresh install works
+    without S3. Because these separate pods share one ReadWriteOnce volume,
+    every dataset pod must run on a SINGLE NODE: the chart refuses
+    replicaCount > 1 and co-locates the worker / migration Job with the app
+    pod via a default podAffinity. Fine for a hobby / single-node install;
+    bytes survive pod restarts. For anything bigger, enable
+    app.dataplane (S3).
+
+    Operational notes for this mode:
+      • The PVC uses the cluster's DEFAULT StorageClass (or
+        app.storedObjects.localFilesystem.storageClassName). On bare-metal
+        clusters with no default StorageClass the PVC — and every pod
+        mounting it — stays Pending: install a provisioner (e.g.
+        local-path-provisioner) or set storageClassName explicitly.
+      • App and worker Deployments default to a kill-then-start rollout
+        (RollingUpdate with maxSurge=0/maxUnavailable=1) so upgrades
+        release the shared volume before new pods schedule (a surged pod
+        wedges Pending on an RWO multi-attach error on multi-node
+        clusters). Expect a brief downtime per upgrade; set app/workers
+        deployment.strategy explicitly to override. Zero-downtime
+        upgrades require S3-backed stored objects instead of local-FS.
+      • GitOps (ArgoCD / Flux): the dataset-migration hook maps to a
+        PostSync hook, which already waits for the rollout to be healthy;
+        plain Helm should upgrade with --wait when crossing the ADR-032
+        boundary (see the migration Job template header).
+
+  • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
+    Then configure these on the bucket and deployment, or uploads and
+    large datasets will not work:
+
+      • Bucket CORS: allow PUT from the app origin. The browser uploads
+        files straight to the bucket via a presigned PUT, so a missing
+        CORS rule fails the direct upload (small files fall back to a
+        backend upload; large files cannot).
+
+      • Lifecycle TTL on the staging/ prefix: expire un-finalized uploads
+        (e.g. 1-7 days) so abandoned uploads are reaped automatically.
+
+      • Worker + Redis (event sourcing): dataset normalization runs
+        off-request on the worker via the Redis-backed queue. Without a
+        worker and Redis, normalization falls back to running in the
+        request — fine for a single small pod, but a multi-pod S3
+        deployment must run the worker so uploads are processed
+        off-request.
+
+──────────────────────────────────────────────────────────────────────
+7. Required Secrets — check before upgrading
+──────────────────────────────────────────────────────────────────────
+Each chart bump may introduce new required keys on the umbrella's app
+Secret. When upgrading, verify these are present in the Secret the app
++ gateway pods mount, otherwise the pods crashloop at boot with a
+CreateContainerConfigError that hides the missing key behind a generic
+message.
+
+  {{ include "langwatch.appSecretName" . }} keys (always required):
+    - credentialsEncryptionKey
+    - cronApiKey
+    - nextAuthSecret
+    - virtualKeyPepper
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+    - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
+    - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
+{{- end }}
+
+  When autogen.enabled=true the chart materialises this Secret on
+  first install via per-key lookup-or-rand and heals missing keys
+  on subsequent renders. When autogen.enabled=false the operator
+  pre-creates the Secret out-of-band and the preflight Job validates
+  the required keys are present before pods roll. The
+  operator-provided path is the only one that works cleanly under
+  GitOps controllers whose render step has no cluster access (ArgoCD
+  repo-server, etc.) because the chart never renders the Secret for
+  the controller to reconcile against. See
+  docs/self-hosting/deployment/argocd.mdx for the full guide.
+
+  Pre-create command for the operator-provided path:
+
+    kubectl -n {{ .Release.Namespace }} create secret generic {{ include "langwatch.appSecretName" . }} \
+      --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
+      --from-literal=cronApiKey="$(openssl rand -hex 32)" \
+      --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
+      --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
+{{- if and .Values.gateway .Values.gateway.chartManaged }}
+      --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+{{- end }}

@@ -1,0 +1,40 @@
+# Trims mcp-server/ for the @langwatch/server tarball. langwatch's
+# pnpm-workspace.yaml lists `../mcp-server` as a workspace package, and
+# langwatch/src imports from "@langwatch/mcp-server/create-mcp-server"
+# (resolved to ./dist/create-mcp-server.js via the package's exports
+# map). Ship pre-built dist/ + the .d.ts shims in src/ — tests, build
+# config, and dev tooling stay out.
+#
+# Same gotcha as elsewhere: when an .npmignore exists at this level,
+# npm/pnpm IGNORE the sibling .gitignore — re-state the broad excludes.
+
+# Heavy non-runtime trees.
+node_modules/
+.pnpm-store/
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Tests + test config.
+tests/
+__tests__/
+vitest.config.js
+vitest.config.ts
+
+# Build tooling (we ship the prebuilt dist/, no build step at install).
+tsup.config.ts
+build.js
+Dockerfile
+
+# Source maps (large, not needed at runtime).
+**/*.map
+**/*.tsbuildinfo
+
+# Editor + OS detritus.
+.DS_Store
+.vscode/
+.idea/
+
+# Local secrets / env.
+.env
+.env*.local

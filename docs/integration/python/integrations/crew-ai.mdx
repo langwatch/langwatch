@@ -1,0 +1,220 @@
+---
+title: CrewAI
+description: Integrate the CrewAI Python SDK with LangWatch to trace multi-agent workflows, debug failures, and support systematic AI agent testing.
+keywords: crewai, python, sdk, instrumentation, opentelemetry, langwatch, tracing
+---
+
+LangWatch does not have a built-in auto-tracking integration for CrewAI. However, you can use community-provided instrumentors to integrate CrewAI with LangWatch.
+
+## Community Instrumentors
+
+There are two main community instrumentors available for CrewAI:
+
+<CodeGroup>
+<CodeGroupItem title="OpenLLMetry">
+OpenLLMetry provides an OpenTelemetry-based instrumentation package for CrewAI.
+
+You can find more details and installation instructions on their GitHub repository:
+[traceloop/openllmetry/packages/opentelemetry-instrumentation-crewai](https://github.com/traceloop/openllmetry/tree/main/packages/opentelemetry-instrumentation-crewai)
+</CodeGroupItem>
+
+<CodeGroupItem title="OpenInference">
+OpenInference, by Arize AI, also offers an instrumentation solution for CrewAI, compatible with OpenTelemetry.
+
+For more information and setup guides, please visit their GitHub repository:
+[Arize-ai/openinference/python/instrumentation/openinference-instrumentation-crewai](https://github.com/Arize-ai/openinference/tree/main/python/instrumentation/openinference-instrumentation-crewai)
+</CodeGroupItem>
+</CodeGroup>
+
+To use these instrumentors with LangWatch, you would typically configure them to export telemetry data via OpenTelemetry, which LangWatch can then ingest.
+
+## Integrating Community Instrumentors with LangWatch
+
+Community-provided OpenTelemetry instrumentors for CrewAI, like those from OpenLLMetry or OpenInference, allow you to automatically capture detailed trace data from your CrewAI agents and tasks. LangWatch can seamlessly integrate with these instrumentors.
+
+There are two main ways to integrate these:
+
+### 1. Via `langwatch.setup()`
+
+You can pass an instance of the CrewAI instrumentor to the `instrumentors` list in the `langwatch.setup()` call. LangWatch will then manage the lifecycle of this instrumentor.
+
+<CodeGroup>
+
+```python openinference_setup.py
+import langwatch
+from crewai import Agent, Task, Crew
+import os
+from openinference.instrumentation.crewai import CrewAIInstrumentor # Assuming this is the correct import
+
+# Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
+langwatch.setup(
+    instrumentors=[CrewAIInstrumentor()]
+)
+
+# Define your CrewAI agents and tasks
+researcher = Agent(
+  role='Senior Researcher',
+  goal='Discover new insights on AI',
+  backstory='A seasoned researcher with a knack for uncovering hidden gems.'
+)
+writer = Agent(
+  role='Expert Writer',
+  goal='Craft compelling content on AI discoveries',
+  backstory='A wordsmith who can make complex AI topics accessible and engaging.'
+)
+
+task1 = Task(description='Investigate the latest advancements in LLM prompting techniques.', agent=researcher)
+task2 = Task(description='Write a blog post summarizing the findings.', agent=writer)
+
+# Create and run the crew
+crew = Crew(
+  agents=[researcher, writer],
+  tasks=[task1, task2],
+  verbose=2
+)
+
+@langwatch.trace(name="CrewAI Execution with OpenInference")
+def run_crewai_process_oi():
+    result = crew.kickoff()
+    return result
+
+if __name__ == "__main__":
+    print("Running CrewAI process with OpenInference...")
+    output = run_crewai_process_oi()
+    print("\n\nCrewAI Process Output:")
+    print(output)
+```
+
+```python openllmetry_setup.py
+import langwatch
+from crewai import Agent, Task, Crew
+import os
+from opentelemetry_instrumentation_crewai import CrewAIInstrumentor # Assuming this is the correct import
+
+# Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
+langwatch.setup(
+    instrumentors=[CrewAIInstrumentor()]
+)
+
+# Define your CrewAI agents and tasks
+researcher = Agent(
+  role='Senior Researcher',
+  goal='Discover new insights on AI',
+  backstory='A seasoned researcher with a knack for uncovering hidden gems.'
+)
+writer = Agent(
+  role='Expert Writer',
+  goal='Craft compelling content on AI discoveries',
+  backstory='A wordsmith who can make complex AI topics accessible and engaging.'
+)
+
+task1 = Task(description='Investigate the latest advancements in LLM prompting techniques.', agent=researcher)
+task2 = Task(description='Write a blog post summarizing the findings.', agent=writer)
+
+# Create and run the crew
+crew = Crew(
+  agents=[researcher, writer],
+  tasks=[task1, task2],
+  verbose=2
+)
+
+@langwatch.trace(name="CrewAI Execution with OpenLLMetry")
+def run_crewai_process_ollm():
+    result = crew.kickoff()
+    return result
+
+if __name__ == "__main__":
+    print("Running CrewAI process with OpenLLMetry...")
+    output = run_crewai_process_ollm()
+    print("\n\nCrewAI Process Output:")
+    print(output)
+```
+
+</CodeGroup>
+
+<Note>
+  Ensure you have the respective community instrumentation library installed:
+  - For OpenLLMetry: `pip install opentelemetry-instrumentation-crewai`
+  - For OpenInference: `pip install openinference-instrumentation-crewai`
+  Consult the specific library's documentation for the exact package name and instrumentor class if the above assumptions are incorrect.
+</Note>
+
+### 2. Direct Instrumentation
+
+If you have an existing OpenTelemetry `TracerProvider` configured in your application (or if LangWatch is configured to use the global provider), you can use the community instrumentor's `instrument()` method directly. LangWatch will automatically pick up the spans generated by these instrumentors as long as its exporter is part of the active `TracerProvider`.
+
+<CodeGroup>
+
+```python openinference_direct.py
+import langwatch
+from crewai import Agent, Task, Crew
+import os
+from openinference.instrumentation.crewai import CrewAIInstrumentor # Assuming this is the correct import
+# from opentelemetry.sdk.trace import TracerProvider # If managing your own provider
+# from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter # If managing your own provider
+
+langwatch.setup()
+
+# Instrument CrewAI directly using OpenInference
+CrewAIInstrumentor().instrument()
+
+planner = Agent(
+  role='Event Planner',
+  goal='Plan an engaging tech conference',
+  backstory='An experienced planner with a passion for technology events.'
+)
+task_planner = Task(description='Outline the agenda for a 3-day AI conference.', agent=planner)
+conference_crew = Crew(agents=[planner], tasks=[task_planner])
+
+@langwatch.trace(name="CrewAI Direct Instrumentation with OpenInference")
+def plan_conference_oi():
+    agenda = conference_crew.kickoff()
+    return agenda
+
+if __name__ == "__main__":
+    print("Planning conference with OpenInference (direct)...")
+    conference_agenda = plan_conference_oi()
+    print("\n\nConference Agenda:")
+    print(conference_agenda)
+```
+
+```python openllmetry_direct.py
+import langwatch
+from crewai import Agent, Task, Crew
+import os
+from opentelemetry_instrumentation_crewai import CrewAIInstrumentor # Assuming this is the correct import
+# from opentelemetry.sdk.trace import TracerProvider # If managing your own provider
+# from opentelemetry.sdk.trace.export import SimpleSpanProcessor, ConsoleSpanExporter # If managing your own provider
+
+langwatch.setup()
+
+# Instrument CrewAI directly using OpenLLMetry
+CrewAIInstrumentor().instrument()
+
+planner = Agent(
+  role='Event Planner',
+  goal='Plan an engaging tech conference',
+  backstory='An experienced planner with a passion for technology events.'
+)
+task_planner = Task(description='Outline the agenda for a 3-day AI conference.', agent=planner)
+conference_crew = Crew(agents=[planner], tasks=[task_planner])
+
+@langwatch.trace(name="CrewAI Direct Instrumentation with OpenLLMetry")
+def plan_conference_ollm():
+    agenda = conference_crew.kickoff()
+    return agenda
+
+if __name__ == "__main__":
+    print("Planning conference with OpenLLMetry (direct)...")
+    conference_agenda = plan_conference_ollm()
+    print("\n\nConference Agenda:")
+    print(conference_agenda)
+```
+
+</CodeGroup>
+
+### Key points for community instrumentors:
+-   These instrumentors typically patch CrewAI at a global level or integrate deeply with its execution flow, meaning all CrewAI operations (agents, tasks, tools) should be captured once instrumented.
+-   If using `langwatch.setup(instrumentors=[...])`, LangWatch handles the setup and lifecycle of the instrumentor.
+-   If instrumenting directly (e.g., `CrewAIInstrumentor().instrument()`), ensure that the `TracerProvider` used by the instrumentor is the same one LangWatch is exporting from. This usually means LangWatch is configured to use an existing global provider or one you explicitly pass to `langwatch.setup()`.
+-   Always refer to the specific documentation of the community instrumentor (OpenLLMetry or OpenInference) for the most accurate and up-to-date installation and usage instructions, including the correct class names for instrumentors and any specific setup requirements.

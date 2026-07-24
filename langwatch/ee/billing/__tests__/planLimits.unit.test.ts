@@ -1,0 +1,19 @@
+import { describe, expect, it } from "vitest";
+import { PLAN_LIMITS } from "../planLimits";
+import { PlanTypes } from "../planTypes";
+
+describe("PLAN_LIMITS", () => {
+  describe("when checking critical plan-specific fields", () => {
+    it("sets PRO maxProjects to 9999", () => {
+      expect(PLAN_LIMITS[PlanTypes.PRO].maxProjects).toBe(9999);
+    });
+
+    it("sets ENTERPRISE maxProjects to 9999", () => {
+      expect(PLAN_LIMITS[PlanTypes.ENTERPRISE].maxProjects).toBe(9999);
+    });
+
+    it("sets FREE maxProjects to 2", () => {
+      expect(PLAN_LIMITS[PlanTypes.FREE].maxProjects).toBe(2);
+    });
+  });
+});

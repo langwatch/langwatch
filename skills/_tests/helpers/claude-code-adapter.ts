@@ -1,0 +1,387 @@
+import {
+	type AgentAdapter,
+	AgentRole,
+	type ScenarioExecutionStateLike,
+} from "@langwatch/scenario";
+import chalk from "chalk";
+import { execSync, spawn } from "child_process";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { inlineMdx } from "../../_lib/mdx-inline.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Scenario set ID for all skill scenario tests. Keeps these runs grouped together
+ * in the LangWatch UI and separate from the `default` set, where scenarios that
+ * the skills themselves create at runtime end up.
+ */
+export const SKILL_TESTS_SET_ID = "skill-tests";
+
+const skillTestWorkRoot = path.resolve(
+	__dirname,
+	"../../../.claude/tmp/skill-tests",
+);
+
+export function createSkillTestWorkDir(prefix: string): string {
+	fs.mkdirSync(skillTestWorkRoot, { recursive: true });
+	return fs.mkdtempSync(path.join(skillTestWorkRoot, prefix));
+}
+
+export function removeSkillTestWorkDir(workingDirectory: string): void {
+	const resolvedDirectory = path.resolve(workingDirectory);
+	if (!resolvedDirectory.startsWith(`${skillTestWorkRoot}${path.sep}`)) {
+		throw new Error(`Test workspace must stay inside ${skillTestWorkRoot}`);
+	}
+	if (process.env.KEEP_SKILL_TEST_WORKDIR === "1") {
+		console.log(`[skill dogfood] preserved workdir: ${resolvedDirectory}`);
+		return;
+	}
+
+	fs.rmSync(resolvedDirectory, { recursive: true, force: true });
+}
+
+export function copyFixtureToWorkDir({
+	fixtureSubpath,
+	workingDirectory,
+}: {
+	fixtureSubpath: string;
+	workingDirectory: string;
+}): void {
+	const fixtureRoot = path.resolve(__dirname, "../fixtures");
+	const sourcePath = path.resolve(fixtureRoot, fixtureSubpath);
+	if (!sourcePath.startsWith(`${fixtureRoot}${path.sep}`)) {
+		throw new Error(`Fixture path must stay inside ${fixtureRoot}`);
+	}
+
+	fs.cpSync(sourcePath, workingDirectory, { recursive: true });
+}
+
+/**
+ * Inline a SKILL.mdx (resolving its `_shared/*.mdx` imports) and write it as
+ * SKILL.md into a `.skills/<dir>/` folder under the agent's working directory.
+ * `skillSubpath` is relative to `skills/`, e.g. `"tracing"` or
+ * `"recipes/debug-instrumentation"`. `installAs` defaults to the basename of
+ * `skillSubpath` and controls the directory the agent sees under `.skills/`.
+ *
+ * This mirrors what sync.ts does for langwatch/skills publishes, so scenario
+ * tests exercise the same self-contained markdown that real consumers receive.
+ */
+export function installSkillToWorkDir({
+	workingDirectory,
+	skillSubpath,
+	installAs,
+}: {
+	workingDirectory: string;
+	skillSubpath: string;
+	installAs?: string;
+}): void {
+	const sourcePath = path.resolve(
+		__dirname,
+		"../..",
+		skillSubpath,
+		"SKILL.mdx",
+	);
+	const skillName = installAs ?? path.basename(skillSubpath);
+	const skillDir = path.join(workingDirectory, ".skills", skillName);
+	fs.mkdirSync(skillDir, { recursive: true });
+	fs.writeFileSync(path.join(skillDir, "SKILL.md"), inlineMdx(sourcePath));
+}
+
+const cliDistPath = path.resolve(
+	__dirname,
+	"../../../typescript-sdk/dist/cli/index.js",
+);
+
+/**
+ * Sets up a local `langwatch` CLI wrapper in the temp folder's bin/ directory.
+ * Always called from createClaudeCodeAgent so the spawned Claude Code session
+ * sees the locally-built CLI (with `docs`, `scenario-docs`, etc.) on PATH
+ * instead of any globally-installed npm version. Skill scenario tests rely on
+ * the new CLI commands being available. This is non-optional.
+ */
+export function setupLocalCli(workingDirectory: string): void {
+	if (!fs.existsSync(cliDistPath)) {
+		throw new Error(
+			`Local langwatch CLI not built at ${cliDistPath}. ` +
+				`Run \`pnpm build\` inside typescript-sdk/ before running scenario tests.`,
+		);
+	}
+
+	const binDir = path.join(workingDirectory, "bin");
+	fs.mkdirSync(binDir, { recursive: true });
+
+	const wrapperScript = `#!/usr/bin/env bash
+exec node "${cliDistPath}" "$@"
+`;
+	const wrapperPath = path.join(binDir, "langwatch");
+	fs.writeFileSync(wrapperPath, wrapperScript, { mode: 0o755 });
+}
+
+export function ensureClaudeSkillInstructions(workingDirectory: string): void {
+	const skillsDir = path.join(workingDirectory, ".skills");
+	if (!fs.existsSync(skillsDir)) return;
+
+	const skillPaths = fs
+		.readdirSync(skillsDir, { withFileTypes: true })
+		.filter(
+			(entry) =>
+				entry.isDirectory() &&
+				fs.existsSync(path.join(skillsDir, entry.name, "SKILL.md")),
+		)
+		.map((entry) => `.skills/${entry.name}/SKILL.md`);
+	if (skillPaths.length === 0) return;
+
+	const claudeMdPath = path.join(workingDirectory, "CLAUDE.md");
+	const existingInstructions = fs.existsSync(claudeMdPath)
+		? fs.readFileSync(claudeMdPath, "utf8")
+		: "";
+	const missingSkillPaths = skillPaths.filter(
+		(skillPath) => !existingInstructions.includes(skillPath),
+	);
+	if (missingSkillPaths.length === 0) return;
+
+	const separator =
+		existingInstructions.length > 0 && !existingInstructions.endsWith("\n")
+			? "\n"
+			: "";
+	fs.appendFileSync(
+		claudeMdPath,
+		`${separator}Read and follow the instructions in ${missingSkillPaths.join(
+			" and ",
+		)} before doing anything else.\n`,
+	);
+}
+
+/**
+ * Creates a Claude Code agent adapter for use with @langwatch/scenario.
+ *
+ * Spawns Claude Code via child_process.spawn. Skills are CLI-only, and the locally
+ * built `langwatch` CLI is always wired onto PATH so the agent can use
+ * `langwatch docs`, `langwatch scenario-docs`, and every platform command.
+ * No MCP server is configured; skills must work end-to-end through the CLI.
+ *
+ * @param workingDirectory - The directory to run Claude Code in
+ * @param skillPath - Optional path to a SKILL.md to copy into the working directory
+ * @param cleanEnv - When true, strips LANGWATCH_API_KEY, OPENAI_API_KEY, and
+ *   ANTHROPIC_API_KEY from the spawned process environment. Use this to test
+ *   cold-start flows where the agent must discover keys from .env files.
+ * @param omitEnvKeys - Additional variables to keep in the test process but
+ *   remove from Claude Code, such as a provider key used only by the judge.
+ */
+export function createClaudeCodeAgent({
+	workingDirectory,
+	skillPath,
+	cleanEnv,
+	omitEnvKeys = [],
+}: {
+	workingDirectory: string;
+	skillPath?: string;
+	cleanEnv?: boolean;
+	omitEnvKeys?: string[];
+}): AgentAdapter {
+	setupLocalCli(workingDirectory);
+	if (skillPath) {
+		const skillName = path.basename(path.dirname(skillPath));
+		const skillDir = path.join(workingDirectory, ".skills", skillName);
+		fs.mkdirSync(skillDir, { recursive: true });
+		fs.copyFileSync(skillPath, path.join(skillDir, "SKILL.md"));
+	}
+
+	// Claude Code does not auto-discover .skills/ in arbitrary directories.
+	// Preserve any existing CLAUDE.md and append only missing skill references.
+	ensureClaudeSkillInstructions(workingDirectory);
+
+	return {
+		role: AgentRole.AGENT,
+		call: async (state) => {
+			// Render each turn as plain text. Anthropic-format messages can have
+			// `content` as an array of blocks (text, tool_use, tool_result, image,
+			// …). String-interpolating that array yields `[object Object]`, which
+			// the next Claude Code session then sees as the previous turn, making
+			// multi-turn scenarios appear garbled to the agent. Flatten content
+			// blocks down to readable text instead.
+			const renderContent = (content: unknown): string => {
+				if (typeof content === "string") return content;
+				if (!Array.isArray(content)) {
+					try {
+						return JSON.stringify(content);
+					} catch {
+						return String(content);
+					}
+				}
+				return content
+					.map((block: any) => {
+						if (block == null) return "";
+						if (typeof block === "string") return block;
+						switch (block.type) {
+							case "text":
+								return block.text ?? "";
+							case "tool_use": {
+								const input =
+									block.input != null ? JSON.stringify(block.input) : "";
+								return `[tool_use ${block.name ?? "?"}(${input})]`;
+							}
+							case "tool_result": {
+								const inner =
+									typeof block.content === "string"
+										? block.content
+										: Array.isArray(block.content)
+											? renderContent(block.content)
+											: JSON.stringify(block.content ?? "");
+								return `[tool_result] ${inner}`;
+							}
+							case "image":
+								return "[image omitted]";
+							default:
+								try {
+									return JSON.stringify(block);
+								} catch {
+									return String(block);
+								}
+						}
+					})
+					.filter(Boolean)
+					.join("\n");
+			};
+
+			const formattedMessages = state.messages
+				.map((message) => `${message.role}: ${renderContent(message.content)}`)
+				.join("\n\n");
+
+			return new Promise<string>((resolve, reject) => {
+				const claudeBin =
+					process.env.CLAUDE_BIN ||
+					execSync("which claude", { encoding: "utf8" }).trim();
+
+				const args = [
+					"--output-format",
+					"stream-json",
+					"-p",
+					"--dangerously-skip-permissions",
+					"--verbose",
+					formattedMessages,
+				];
+
+				console.log(chalk.blue("Starting claude in:"), workingDirectory);
+
+				const omittedKeys = new Set(omitEnvKeys);
+				if (cleanEnv) {
+					omittedKeys.add("LANGWATCH_API_KEY");
+					omittedKeys.add("OPENAI_API_KEY");
+					omittedKeys.add("ANTHROPIC_API_KEY");
+				}
+				const envVars =
+					omittedKeys.size > 0
+						? Object.fromEntries(
+								Object.entries(process.env).filter(
+									([key]) => !omittedKeys.has(key),
+								),
+							)
+						: process.env;
+
+				// Prepend the local bin/ wrapper (created by setupLocalCli) so Claude
+				// uses the locally-built `langwatch` CLI with the latest commands.
+				const localBinDir = path.join(workingDirectory, "bin");
+				const pathPrefix = `${localBinDir}:${envVars.PATH ?? ""}`;
+
+				const child = spawn(claudeBin, args, {
+					cwd: workingDirectory,
+					env: { ...envVars, FORCE_COLOR: "0", PATH: pathPrefix },
+					stdio: ["ignore", "pipe", "pipe"],
+				});
+
+				let output = "";
+
+				child.stdout.on("data", (data: Buffer) => {
+					const text = data.toString();
+					console.log(chalk.cyan("Claude Code:"), text);
+					output += text;
+				});
+
+				child.stderr.on("data", (data: Buffer) => {
+					console.log(chalk.yellow("Claude Code stderr:"), data.toString());
+				});
+
+				child.on("close", (exitCode) => {
+					if (exitCode === 0) {
+						const messages: any = output
+							.split("\n")
+							.map((line) => {
+								try {
+									return JSON.parse(line.trim());
+								} catch {
+									return null;
+								}
+							})
+							.filter((message) => message !== null && "message" in message)
+							.map((message) => message.message);
+						console.log("messages", JSON.stringify(messages, undefined, 2));
+
+						resolve(messages);
+					} else {
+						reject(new Error(`Command failed with exit code ${exitCode}`));
+					}
+				});
+
+				child.on("error", (err) => {
+					reject(err);
+				});
+			});
+		},
+	};
+}
+
+/**
+ * Asserts that the agent actually read the SKILL.md file during execution.
+ * Checks the conversation messages for evidence of a Read tool call on
+ * a .skills/ directory file or explicit SKILL.md content references.
+ */
+export function assertSkillWasRead(
+	state: ScenarioExecutionStateLike,
+	skillName: string,
+): void {
+	const allContent = state.messages
+		.map((m) =>
+			typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+		)
+		.join("\n");
+
+	const hasSkillRead =
+		allContent.includes("SKILL.md") ||
+		allContent.includes(`.skills/${skillName}`) ||
+		allContent.includes(`skills/${skillName}`);
+
+	if (!hasSkillRead) {
+		throw new Error(
+			`Expected agent to read the ${skillName} SKILL.md file, but found no evidence ` +
+				`of reading .skills/${skillName}/SKILL.md in the conversation. ` +
+				`The agent may have ignored the skill and hallucinated instructions.`,
+		);
+	}
+}
+
+/**
+ * Fixes Anthropic tool use format in message state so it is compatible
+ * with the Vercel AI SDK judge agent.
+ *
+ * Anthropic returns tool_use content blocks that the Vercel AI SDK does
+ * not understand. This converts non-text blocks to text blocks containing
+ * the JSON representation.
+ */
+export function toolCallFix(state: ScenarioExecutionStateLike): void {
+	state.messages.forEach((message) => {
+		if (Array.isArray(message.content)) {
+			message.content.forEach((content, index) => {
+				if (content.type !== "text") {
+					(message.content as any)[index] = {
+						type: "text",
+						text: JSON.stringify(content),
+					};
+				}
+			});
+		}
+	});
+}

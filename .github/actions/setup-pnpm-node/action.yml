@@ -1,0 +1,50 @@
+# Shared pnpm + Node setup for TypeScript/JavaScript workflows.
+# Centralizes the pnpm version, Node version, and cache strategy so
+# version bumps happen in one place.
+#
+# Usage:
+#   - uses: ./.github/actions/setup-pnpm-node
+#     with:
+#       cache-dependency-path: "langwatch/pnpm-lock.yaml"
+#       # optional: set install-dir to also run `pnpm install --frozen-lockfile`
+#       install-dir: langwatch
+name: setup-pnpm-node
+description: Set up pnpm + Node 24 with pnpm-store caching.
+inputs:
+  cache-dependency-path:
+    description: Path(s) to pnpm-lock.yaml file(s). Multiline strings supported.
+    required: true
+  install-dir:
+    description: Working directory to run `pnpm install --frozen-lockfile` in. Omit to skip install.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+      with:
+        version: 10.24.0
+
+    - name: Setup Node
+      uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+      with:
+        node-version: 24
+        cache: "pnpm"
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    # node-gyp is no longer bundled on PATH under Node-24 + npm-11, so any
+    # native-module install lifecycle script (e.g. node-pty's prebuild fallback
+    # in mcp-server) ELIFECYCLEs with "sh: 1: node-gyp: not found". Install it
+    # globally so spawned scripts can resolve it via PATH.
+    - name: Install node-gyp
+      if: inputs.install-dir != ''
+      shell: bash
+      run: npm install -g node-gyp@latest
+
+    - name: Install dependencies
+      if: inputs.install-dir != ''
+      shell: bash
+      working-directory: ${{ inputs.install-dir }}
+      run: CI=true pnpm install --frozen-lockfile

@@ -1,0 +1,55 @@
+import { Button, type ButtonProps } from "@chakra-ui/react";
+import { CopyIcon } from "lucide-react";
+import { toaster } from "./ui/toaster";
+
+interface CopyButtonProps extends Omit<
+  ButtonProps,
+  "value" | "label" | "onClick"
+> {
+  value: string;
+  label: string;
+}
+
+export function CopyButton(props: CopyButtonProps) {
+  const { value, label, ...rest } = props;
+
+  return (
+    <Button
+      variant="ghost"
+      data-variant="ghost"
+      size="sm"
+      cursor="pointer"
+      onClick={(event) => {
+        if (!value) return;
+        event.stopPropagation();
+
+        if (!navigator.clipboard) {
+          toaster.create({
+            title: `Your browser does not support clipboard access, please copy the prompt ID manually`,
+            type: "error",
+            duration: 2000,
+            meta: {
+              closable: true,
+            },
+          });
+          return;
+        }
+
+        void (async () => {
+          await navigator.clipboard.writeText(value);
+          toaster.create({
+            title: `${label} copied to your clipboard`,
+            type: "success",
+            duration: 2000,
+            meta: {
+              closable: true,
+            },
+          });
+        })();
+      }}
+      {...rest}
+    >
+      <CopyIcon width={14} height={14} />
+    </Button>
+  );
+}

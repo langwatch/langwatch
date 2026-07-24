@@ -1,0 +1,20 @@
+id: no-explicit-any-ts
+snapshots:
+  'const x: any = readJson();':
+    labels:
+    - source: any
+      style: primary
+      start: 9
+      end: 12
+  const y = value as any;:
+    labels:
+    - source: any
+      style: primary
+      start: 19
+      end: 22
+  'function f(a: any) { return a; }':
+    labels:
+    - source: any
+      style: primary
+      start: 14
+      end: 17

@@ -1,0 +1,162 @@
+---
+title: From zero to first detected anomaly (admin)
+description: A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, watch their first request land, and write the spend-spike rule that catches the next outlier. Each step links into the deeper admin docs.
+sidebarTitle: First 30 minutes (admin)
+---
+
+You are an org admin standing in front of a fresh LangWatch deployment. By the end of this page you will have:
+
+- Published a default [Routing Policy](/ai-gateway/governance/routing-policies) so developers can sign in via `langwatch login`.
+- Configured an [Ingestion Source](/ai-governance/ingestion-sources/index) that lands telemetry from your gateway (or any OTLP-compatible upstream) in the unified trace store.
+- Imported the [AI Tools Portal](/ai-governance/personal-portal/admin-catalog#starter-pack) starter pack so every developer's `/me` page renders a real catalog instead of an empty state.
+- Invited a colleague through `/settings/members`, watched their first request land in `/governance`, and written a [`spend_spike`](/ai-governance/anomaly-rules) rule that will alert when their daily spend doubles.
+
+If you are a developer trying to *use* the org as a developer (not configure it), jump to the [developer walkthrough](/ai-governance/getting-started-developer) instead.
+
+<Info>**Pairs with:** [Overview](/ai-governance/overview) for the bigger picture (license tiers, two personas, mermaid architecture) and [Control plane & integration tiers](/ai-governance/control-plane) for the navigation map across surfaces.</Info>
+
+## Step 1: Sign in as the first admin
+
+Open your LangWatch deployment in a browser. The first user to sign in becomes the **organization admin** automatically (the `ADMIN` org role plus an org-scoped `RoleBinding`).
+
+After sign-in you'll land on `/governance` (the org governance home, see the [control-plane page](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) for how the daily-use vs admin-authoring split works).
+
+## Step 2: Publish your first Routing Policy
+
+[Routing Policies](/ai-gateway/governance/routing-policies) are the gateway's per-virtual-key behaviour bundle: which providers to try first, what fallback chain to follow on outage, what models are allowed, what tools `policy_rules` denies. Every Personal Virtual Key minted on first developer sign-in binds to your org's **default** routing policy, so without a default policy, `langwatch login` returns:
+
+```
+HTTP 409, error: "no_default_routing_policy"
+Ask your admin to publish a default routing policy at Settings → Routing Policies.
+```
+
+Publish at least one policy *before* opening CLI sign-in to your team:
+
+1. Navigate to **Settings → Routing Policies** (`/settings/routing-policies`).
+2. Click **+ New routing policy**.
+3. Pick a recommended starter shape, for most orgs, "Anthropic primary, OpenAI fallback, prompt caching on" works on day one.
+4. Tick **Mark as default** before saving.
+
+The same chain controls cost, latency, fallback, and prompt caching across every CLI your developers use later. The full reference (provider order, fallback semantics, model aliasing, `policy_rules.tools.deny`) lives in [Routing Policies](/ai-gateway/governance/routing-policies).
+
+## Step 3: Stand up an Ingestion Source
+
+[Ingestion Sources](/ai-governance/ingestion-sources/index) are how telemetry from anything outside the gateway lands in your unified trace store: another team's OTLP collector, a Workato webhook, an S3 NDJSON drop, or Microsoft Copilot Studio audit logs.
+
+For a brand-new org, the cheapest first source is `otel_generic`, it's available on the **Apache 2.0** open-core floor (no Enterprise license required) and accepts any OTLP/HTTP push:
+
+1. Navigate to **Settings → AI Governance → Ingestion Sources** (`/settings/governance/ingestion-sources`).
+2. Click **+ New source**, pick **Generic OTLP (`otel_generic`)**, fill the form, choose `thirty_days` retention.
+3. The backend mints a `lw_is_<base64url>` ingest secret and shows it **once** in a one-time-reveal modal, copy it now. The list endpoint never returns it again.
+4. Paste the secret into the upstream platform's OTLP exporter as `Authorization: Bearer lw_is_<secret>`. The receiver endpoint is on the same host as the rest of LangWatch.
+
+The source flips to `active` on the first received event. The full per-platform setup (Cowork, Workato, S3, Copilot Studio, OpenAI/Anthropic compliance APIs) lives in [Ingestion Sources](/ai-governance/ingestion-sources/index): most are available on Enterprise plans.
+
+If no upstream is ready yet, skip this step. Your gateway itself is an implicit source: every Personal VK developer makes adds spans to the same trace store via the gateway's own pipeline.
+
+## Step 4: Import the AI Tools Portal starter pack
+
+The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/settings/governance/tool-catalog` shows you a one-click **Import starter pack** CTA on first visit:
+
+1. Navigate to **Settings → AI Governance → Tool catalog** (`/settings/governance/tool-catalog`).
+2. Click **Import starter pack**.
+
+What you get out of the box:
+
+- **Coding assistants**: Claude Code, Copilot, Cursor, Codex.
+- **Model providers**: OpenAI, Anthropic, Bedrock, Gemini.
+- **External tools**: empty (admins fill these in per-org with internal links).
+
+Every entry is editable, reorderable, and scopeable to specific teams afterward. The starter pack is a sensible default, you can publish a tighter catalog manually if your org's allowed-AI list is narrower.
+
+The full editor reference (three tile classes, the upsert drawer, scope binding, archive vs disable) lives in [AI Tools Portal, admin catalog](/ai-governance/personal-portal/admin-catalog).
+
+## Step 5: Invite a developer
+
+A LangWatch org with one admin is not a particularly useful org. Invite a colleague:
+
+1. Navigate to **Settings → Members** (`/settings/members`).
+2. Click **+ Add members**.
+3. Type their email, pick a role (`Member` for most cases, `Admin` if they should help configure the org), and pick which teams they belong to.
+4. Click **Send invites**.
+
+The colleague receives an email with a one-click accept link. After they sign in via your company SSO they appear in the **Organization Members** list with their assigned role.
+
+Once invited, point them at the [developer walkthrough](/ai-governance/getting-started-developer) and they're 5 minutes from a working Claude Code session through the gateway.
+
+## Step 6: Watch the first telemetry land
+
+After your colleague runs `langwatch login` and makes one Claude Code request, two surfaces should update within seconds:
+
+- **`/governance`**, the [governance home](/ai-governance/control-plane#daily-use-surfaces-vs-admin-authoring-surfaces) shows org-wide spend, anomalies, ingestion-source health, per-user breakdown.
+- **`/settings/audit-log`**, the [audit log](/ai-governance/audit-log) records every governance mutation (member invited, routing policy published, ingestion source created, virtual key minted, budget created…) with timestamp, actor, target kind, target ID, and IP.
+
+If you don't see the request, the [CLI debug commands](/ai-governance/cli-debug) take 30 seconds to localise the problem:
+
+```bash
+# Org setup state, should show 'Governance active: yes'
+langwatch governance status
+
+# Real-time event stream from a specific source
+langwatch ingest tail <sourceId> --follow
+
+# 24h / 7d / 30d health for one source
+langwatch ingest health <sourceId>
+```
+
+## Step 7: Set an org-wide budget ceiling
+
+Budgets are the gateway's hard cost gate. With a default routing policy in place, you can attach budgets at four scopes: **organization**, **team**, **project**, and **principal**. Org-wide is the broadest safety net, set this first if your org doesn't yet have per-team budgets dialled in.
+
+1. Navigate to **Gateway → Budgets** under any project (`/<project>/gateway/budgets`).
+2. Click **+ New budget**.
+3. Pick **Organization, all AI spend** in the Scope dropdown. The picker also offers Team, Project, and Principal scopes for narrower caps.
+4. Pick a window (`Per calendar month` is the default), a USD limit, and an `On breach` action (`Block` rejects requests at the limit, `Warn` tags responses but keeps serving).
+5. Click **Create budget**.
+
+The budget is enforced by the gateway data plane on every request. The audit log records both a `gatewayBudgets.create` row (the tRPC mutation) and a `gateway.budget.created` row (the gateway domain event), both stamped with the same target ID for cross-system correlation.
+
+The deep reference for budget shape, fallback semantics, and the WARN response tag header lives in [Budgets](/ai-gateway/budgets).
+
+## Step 8: Write your first anomaly rule
+
+Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The reactor evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) is honest about which is which).
+
+Write a starter `spend_spike` rule:
+
+1. Navigate to **Settings → AI Governance → Anomaly Rules** (`/settings/governance/anomaly-rules`).
+2. Click **+ New anomaly rule**.
+3. Fill in:
+   - **Name**: `Daily spend doubles vs last week`
+   - **Severity**: `warning`
+   - **Rule type**: `spend_spike`
+   - **Scope**: `organization`
+   - **Threshold config**:
+     ```json
+     {
+       "windowSec": 86400,
+       "baselineOffsetSec": 604800,
+       "ratioVsBaseline": 2.0,
+       "minBaselineUsd": 1.0
+     }
+     ```
+4. Click **Create rule**.
+
+The reactor will start evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the reactor writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
+
+## Where to next
+
+- **Tighten the privacy posture**: [No-spy mode](/ai-governance/no-spy-mode) drops conversational content (prompts, completions, system messages) from spans before they hit ClickHouse. Three modes (`full`, `strip_io`, `strip_all`); the metadata for cost attribution + governance + debugging-by-shape stays.
+- **Export to your SIEM**: every event is OCSF v1.1 mapped and replayable to a downstream SIEM (Splunk, Datadog, Sentinel) via the OCSF read API. See [Compliance architecture](/ai-governance/compliance-architecture).
+- **Ingest from another platform**: the [Ingestion Sources index](/ai-governance/ingestion-sources/index) has per-platform setup guides for Cowork, Workato, S3 NDJSON, Microsoft Copilot Studio, OpenAI/Anthropic compliance APIs.
+- **Delegate admin authority without giving full admin**: [RBAC roles](/ai-gateway/rbac) lets you build custom roles that grant specific governance permissions (e.g. `aiTools:manage` only) without `organization:manage`.
+
+## Common first-day errors
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
+| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/settings/governance/tool-catalog` → **Import starter pack**. |
+| Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver--at-a-glance): three rows are setup-contract-only as of this release. |
+| `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing--the-setup-state-signal) hasn't tripped yet | Need any 3 of 5: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2–7 above, you'll have 4. |
+| Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |

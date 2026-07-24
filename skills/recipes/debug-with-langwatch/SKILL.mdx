@@ -1,0 +1,97 @@
+---
+name: debug-with-langwatch
+description: Root-cause production errors and misbehaving agent runs with LangWatch. Finds errored traces, inspects spans, checks monitor and evaluator scores, then narrows to a root cause. Use when something is failing or misbehaving in production — errors, bad answers, latency spikes.
+license: MIT
+compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`. Works with any coding agent.
+metadata:
+  category: recipe
+---
+
+import CliSetup from '../../_shared/cli-setup.mdx'
+
+# Debug Production Issues with LangWatch
+
+A structured diagnostic workflow: errored traces → span inspection → monitor/evaluator scores → root cause. Work the steps in order; each narrows the search space for the next.
+
+If traces themselves look broken (empty inputs/outputs, disconnected spans), switch to the `debug-instrumentation` recipe instead — that is an instrumentation problem, not an application problem.
+
+## Prerequisites
+
+<CliSetup />
+
+## Step 0: Point the CLI at the Right Project
+
+```bash
+langwatch status
+```
+
+A fast sanity check that the API key, endpoint, and project are the ones you mean to debug. Fix auth first (see the `setup-lw` recipe) — every later step reads from this project.
+
+## Step 1: Find the Errored Traces
+
+```bash
+langwatch trace search --limit 25 -o json
+langwatch trace search -q "timeout" --start-date 2026-01-01 -o json
+```
+
+- `--start-date`/`--end-date` bound the window (ISO strings or epoch ms; default is the last 24h).
+- `-q` does a text search — the error message, a user id, a thread id.
+- The result is `{ "traces": [...], "pagination": { "totalHits": N } }`. Pull fields out with `--jq` instead of reading the whole payload:
+
+```bash
+langwatch trace search --limit 50 -o json --jq ".traces[].traceId"
+langwatch trace search -q "refund" -o json --jq ".traces | length"
+```
+
+Look for: traces with error statuses, empty or truncated outputs, outliers in latency or cost, and repeats of the same failure across users/threads (a pattern, not a one-off).
+
+## Step 2: Inspect the Failing Spans
+
+```bash
+langwatch trace get <traceId>            # human-readable digest
+langwatch trace get <traceId> -o json    # full span hierarchy
+```
+
+Read the span tree top-down:
+
+- **Which span failed?** The error is usually in one span (an LLM call, a tool call), not the whole trace. Note its input — a bad input upstream often explains a failure downstream.
+- **What did the model see?** Check the prompt/messages on the failing LLM span. Missing context, truncated history, and stale retrieved documents are the usual suspects.
+- **Retries and timeouts:** repeated identical spans suggest retry loops; a long-running span before the failure suggests a timeout.
+
+## Step 3: Check Monitors and Evaluator Scores
+
+Production quality signals live in monitors (online evaluation) and their evaluators:
+
+```bash
+langwatch monitor list -o json           # which monitors exist, are they enabled/firing?
+langwatch monitor get <id> -o json       # one monitor's config and recent state
+langwatch evaluator list -o json         # the evaluators the monitors run
+```
+
+- A firing monitor names the failure mode (toxicity, hallucination, PII) — corroborate it against the spans from Step 2.
+- No monitor for the failure mode you found? That is a gap worth closing once the root cause is fixed (`langwatch monitor create`).
+
+For a quantitative view of the blast radius:
+
+```bash
+langwatch analytics query -m trace-count -a sum --group-by metadata.model -o json
+```
+
+## Step 4: Root Cause and Verify
+
+1. Form a hypothesis from the failing span's input + the monitor's failure mode: prompt change, model change, bad retrieval, code regression. `git log` on the agent's code and prompts tells you what changed when the failures started.
+2. Apply the fix (prompt, code, or configuration).
+3. Generate fresh traffic, then re-run Step 1: the errored traces should stop appearing.
+4. If the failure was a regression, add a scenario so it stays fixed — the `scenarios` skill covers this.
+
+## Discovery
+
+The full command surface, with per-command usage hints, is one command away:
+
+```bash
+langwatch commands -o json     # machine-readable catalog of every command
+langwatch help-tree            # compact annotated tree (fits in context)
+langwatch <group> --help       # flags for one group
+```
+
+Pass `--agent` to any command for compact single-line JSON with colour and spinners off (auto-detected under most coding agents).

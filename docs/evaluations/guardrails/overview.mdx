@@ -1,0 +1,226 @@
+---
+title: Guardrails Overview
+sidebarTitle: Overview
+description: Block or modify harmful LLM responses in real-time to enforce safety and policy constraints.
+---
+
+<Tip>
+  **Let your agent set this up.** [Copy the evaluations prompt](/skills/code-prompts#set-up-evaluations) into your coding agent to get started automatically.
+</Tip>
+
+Guardrails are evaluators that run in real-time and **act** on the results - blocking, modifying, or rejecting responses that violate your safety or policy rules. Unlike [monitors](/evaluations/online-evaluation/overview) which only measure and alert, guardrails actively prevent harmful content from reaching users.
+
+## Guardrails vs Monitors
+
+| Guardrails | Monitors |
+|------------|----------|
+| **Block** harmful content | **Measure** quality metrics |
+| Run **synchronously** during request | Run **asynchronously** after response |
+| Return errors or safe responses | Feed dashboards and alerts |
+| Add latency to requests | No impact on response time |
+| For **enforcement** | For **observability** |
+
+<Info>
+Use guardrails when you need to **prevent** something from happening. Use monitors when you need to **observe** what's happening.
+</Info>
+
+## Common Guardrail Use Cases
+
+| Use Case | Evaluator | Action |
+|----------|-----------|--------|
+| Block jailbreak attempts | Azure Jailbreak Detection | Reject input |
+| Prevent PII exposure | Presidio PII Detection | Block or redact response |
+| Enforce content policy | OpenAI Moderation | Return safe response |
+| Block competitor mentions | Competitor Blocklist | Modify or reject |
+| Ensure valid output format | Valid Format Evaluator | Retry or reject |
+
+## How Guardrails Work
+
+```
+User Input → Guardrail Check → [Pass] → LLM → Response → Guardrail Check → [Pass] → User
+                    ↓                                           ↓
+               [Fail] → Return Error                     [Fail] → Return Safe Response
+```
+
+Guardrails can run at two points:
+1. **Input guardrails** - Check user input before calling your LLM
+2. **Output guardrails** - Check LLM response before sending to user
+
+## Getting Started
+
+<CardGroup cols={2}>
+  <Card
+    title="Code Integration"
+    description="Add guardrails to your application with a few lines of code."
+    icon="code"
+    href="/evaluations/guardrails/code-integration"
+  />
+  <Card
+    title="Available Evaluators"
+    description="Browse evaluators that work well as guardrails."
+    icon="list"
+    href="/evaluations/evaluators/list"
+  />
+</CardGroup>
+
+## Quick Example
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+@langwatch.trace()
+def my_chatbot(user_input):
+    # Input guardrail - check for jailbreak attempts
+    jailbreak_check = langwatch.evaluation.evaluate(
+        "azure/jailbreak",
+        name="Jailbreak Detection",
+        as_guardrail=True,
+        data={"input": user_input},
+    )
+    
+    if not jailbreak_check.passed:
+        return "I'm sorry, I can't help with that request."
+    
+    # Generate response
+    response = call_llm(user_input)
+    
+    # Output guardrail - check for PII
+    pii_check = langwatch.evaluation.evaluate(
+        "presidio/pii_detection",
+        name="PII Check",
+        as_guardrail=True,
+        data={"output": response},
+    )
+    
+    if not pii_check.passed:
+        return "I apologize, but I cannot share that information."
+    
+    return response
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+async function myChatbot(userInput: string): Promise<string> {
+  // Input guardrail - check for jailbreak attempts
+  const jailbreakCheck = await langwatch.evaluations.evaluate("azure/jailbreak", {
+    name: "Jailbreak Detection",
+    asGuardrail: true,
+    data: { input: userInput },
+  });
+  
+  if (!jailbreakCheck.passed) {
+    return "I'm sorry, I can't help with that request.";
+  }
+  
+  // Generate response
+  const response = await callLLM(userInput);
+  
+  // Output guardrail - check for PII
+  const piiCheck = await langwatch.evaluations.evaluate("presidio/pii_detection", {
+    name: "PII Check",
+    asGuardrail: true,
+    data: { output: response },
+  });
+  
+  if (!piiCheck.passed) {
+    return "I apologize, but I cannot share that information.";
+  }
+  
+  return response;
+}
+```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+### 1. Layer your guardrails
+
+Use multiple guardrails for defense in depth:
+
+```python
+# Layer 1: Block malicious input
+jailbreak = evaluate("azure/jailbreak", as_guardrail=True, input=user_input)
+
+# Layer 2: Content moderation
+moderation = evaluate("openai/moderation", as_guardrail=True, input=user_input)
+
+# Layer 3: Check output before sending
+pii = evaluate("presidio/pii_detection", as_guardrail=True, output=response)
+```
+
+### 2. Provide helpful error messages
+
+Don't just block - guide users toward acceptable behavior:
+
+```python
+if not guardrail.passed:
+    if guardrail.details:
+        return f"I can't help with that because: {guardrail.details}"
+    return "I'm not able to assist with that request. Could you rephrase?"
+```
+
+### 3. Log guardrail triggers
+
+Track when guardrails fire for monitoring and improvement:
+
+```python
+if not guardrail.passed:
+    langwatch.get_current_trace().update(
+        metadata={"guardrail_triggered": guardrail.name}
+    )
+```
+
+### 4. Consider latency
+
+Guardrails add latency. For time-sensitive applications:
+- Use fast evaluators (regex, blocklists) for input checks
+- Save heavier evaluators (LLM-based) for output checks
+- Run multiple guardrails in parallel when possible
+
+## Recommended Evaluators for Guardrails
+
+| Evaluator | Best For | Latency |
+|-----------|----------|---------|
+| Azure Jailbreak Detection | Blocking prompt injection | Fast |
+| Azure Prompt Shield | Blocking prompt attacks | Fast |
+| Presidio PII Detection | Blocking PII exposure | Fast |
+| OpenAI Moderation | Content policy enforcement | Fast |
+| Competitor Blocklist | Blocking competitor mentions | Very Fast |
+| Valid Format | Ensuring structured output | Very Fast |
+| LLM-as-Judge Boolean | Custom policy checks | Slower |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Code Integration"
+    description="Detailed guide to implementing guardrails in your code."
+    icon="code"
+    href="/evaluations/guardrails/code-integration"
+  />
+  <Card
+    title="Evaluators List"
+    description="Browse all available evaluators."
+    icon="list"
+    href="/evaluations/evaluators/list"
+  />
+  <Card
+    title="Online Evaluation"
+    description="Set up monitors for observability."
+    icon="chart-line"
+    href="/evaluations/online-evaluation/overview"
+  />
+  <Card
+    title="Python Integration"
+    description="Full Python SDK documentation."
+    icon="python"
+    href="/integration/python/guide"
+  />
+</CardGroup>

@@ -1,0 +1,7 @@
+id: no-localhost-fallback-tsx
+valid:
+  - 'const C = () => { const u = env.URL ?? getDefault(); return <a href={u} />; };'
+  - 'const C = () => { const u = env.URL ?? "https://app.example.com"; return <a href={u} />; };'
+invalid:
+  - 'const C = () => { const u = env.URL ?? "http://localhost:3000"; return <a href={u} />; };'
+  - 'const C = () => { const u = env.URL ?? `https://localhost:${p}`; return <a href={u} />; };'

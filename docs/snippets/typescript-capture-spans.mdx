@@ -1,0 +1,40 @@
+```typescript
+// before the function starts
+const span = trace.startSpan({
+  name: "weather_function",
+  input: {
+    type: "json",
+    value: {
+      city: "Tokyo",
+    },
+  },
+});
+
+// ...after the function ends
+span.end({
+  output: {
+    type: "json",
+    value: {
+      weather: "sunny",
+    },
+  },
+});
+```
+
+You can also nest spans one inside the other, capturing your pipeline structure, for example:
+
+```typescript
+const span = trace.startSpan({
+  name: "pipeline",
+});
+
+const nestedSpan = span.startSpan({
+  name: "nested_pipeline",
+});
+
+nestedSpan.end()
+
+span.end()
+```
+
+Both LLM and RAG spans can also be nested like any arbritary span.

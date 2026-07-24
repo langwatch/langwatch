@@ -1,0 +1,138 @@
+@integration
+Feature: Pending Mappings Validation
+  As a user
+  I want clear feedback when mappings are incomplete
+  So that I can complete them before saving my online evaluation
+
+  # All 13 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md mostly
+  # KEEP-need-test-added against OnlineEvaluationDrawer.tsx + EvaluatorMappingsSection.tsx:
+  # - "All fields auto-mapped - can save immediately": KEEP (autoInferMappings +
+  #   canSave + no warning banner all implemented at OnlineEvaluationDrawer.tsx:111,1150,1468).
+  # - "Some fields cannot be auto-mapped - editor opens": UPDATE per manifest
+  #   (pending highlight + "Required" placeholder exist; editor-auto-open not verified).
+  # - "User closes editor without completing mappings": KEEP (warning banner at
+  #   OnlineEvaluationDrawer.tsx:1150-1158).
+  # - "Click warning banner to re-open editor": KEEP (onClick handler at line 1167).
+  # - "Thread level always opens editor": DELETE per manifest (contradicts code:
+  #   AUTO_INFER_MAPPINGS auto-maps input→traces at thread level).
+  # - "Cannot save with pending mappings": KEEP (canSave disables Save line 1468).
+  # - "Save button enables after completing mappings": KEEP (reactive missingMappingIds
+  #   via useMemo).
+  # - "Multiple pending fields": KEEP (pluralization at OnlineEvaluationDrawer.tsx:1156-1158).
+  # - "Remove evaluator clears pending state": KEEP (selectedEvaluator===null short-circuits).
+  # - "Change evaluator resets mappings": KEEP (autoInferMappings re-runs on evaluator change).
+  # - "Evaluator with no required fields": KEEP (mappingValidation returns isValid:true line 366).
+  # - "Optional fields not required for save": KEEP (mappingValidation.ts:194 excludes optional).
+  # - "Visual distinction between required and optional pending fields": UPDATE per manifest
+  #   (optional fields aren't tracked in missingMappings at all; spec premise doesn't match impl).
+  # Aspirational pending DELETE/UPDATE rewrites + KEEP test additions tracked in PR #3458.
+
+  Background:
+    Given I am creating an online evaluation
+    And trace level is selected
+
+  @unimplemented
+  Scenario: All fields auto-mapped - can save immediately
+    Given I selected evaluator "Exact Match" requiring "input", "output"
+    When the evaluator is selected
+    Then "input" should be auto-mapped to trace.input
+    And "output" should be auto-mapped to trace.output
+    And no pending mapping warning should show
+    And the Save button should be enabled
+
+  @unimplemented
+  Scenario: Some fields cannot be auto-mapped - editor opens
+    Given I selected evaluator "Custom Eval" requiring "custom_field"
+    And "custom_field" cannot be auto-mapped from trace
+    When the evaluator is selected
+    Then the evaluator editor drawer should open automatically
+    And "custom_field" should be highlighted as pending
+    And the mapping input should have yellow/orange border
+    And the placeholder should say "Required"
+
+  @unimplemented
+  Scenario: User closes editor without completing mappings
+    Given the evaluator editor is open with pending mappings
+    When I close the editor without mapping "custom_field"
+    Then I should return to the online evaluation drawer
+    And a warning banner should appear below the evaluator box
+    And the warning should say "1 field needs mapping"
+    And the warning should be clickable
+
+  @unimplemented
+  Scenario: Click warning banner to re-open editor
+    Given a warning banner is shown for pending mappings
+    When I click the warning banner
+    Then the evaluator editor should re-open
+    And the pending field should still be highlighted
+
+  @unimplemented
+  Scenario: Thread level always opens editor
+    Given I have an evaluator with auto-mappable fields "input", "output"
+    And I have selected it at trace level (auto-mapped)
+    When I switch to "Thread" level
+    Then the evaluator editor should open automatically
+    Because thread mappings cannot be auto-inferred
+    And the mapping sources should now show thread options
+
+  @unimplemented
+  Scenario: Cannot save with pending mappings
+    Given I have pending mappings for "expected_output"
+    Then the Save button should be disabled
+    When I hover over the Save button
+    Then a tooltip should explain "Complete all mappings first"
+
+  @unimplemented
+  Scenario: Save button enables after completing mappings
+    Given I have pending mappings for "expected_output"
+    And the Save button is disabled
+    When I open the editor and map "expected_output"
+    And I close the editor
+    Then the warning banner should disappear
+    And the Save button should be enabled
+
+  @unimplemented
+  Scenario: Multiple pending fields
+    Given I selected an evaluator requiring "field1", "field2", "field3"
+    And only "field1" can be auto-mapped
+    When the evaluator is selected
+    Then the editor should open
+    And "field2" and "field3" should be highlighted as pending
+    And the warning should say "2 fields need mapping"
+
+  @unimplemented
+  Scenario: Remove evaluator clears pending state
+    Given I have an evaluator with pending mappings
+    When I remove the evaluator from the selection box
+    Then the pending mapping warning should disappear
+    And the Save button should be disabled (no evaluator selected)
+
+  @unimplemented
+  Scenario: Change evaluator resets mappings
+    Given I have evaluator A with complete mappings
+    When I select evaluator B which has different required fields
+    Then mappings should be reset
+    And auto-inference should run for evaluator B
+    And pending mappings should be recalculated
+
+  @unimplemented
+  Scenario: Evaluator with no required fields
+    Given I select an evaluator with no required or optional fields
+    Then no mappings UI should be shown
+    And no editor should open automatically
+    And the Save button should be enabled
+
+  @unimplemented
+  Scenario: Optional fields not required for save
+    Given I select an evaluator with required field "input" and optional field "metadata"
+    And "input" is auto-mapped
+    And "metadata" is not mapped
+    Then the Save button should still be enabled
+    Because optional fields don't block saving
+
+  @unimplemented
+  Scenario: Visual distinction between required and optional pending fields
+    Given an evaluator has required field "input" pending
+    And optional field "extra_context" pending
+    Then "input" should have a warning highlight (orange)
+    And "extra_context" should have a subtle highlight or none

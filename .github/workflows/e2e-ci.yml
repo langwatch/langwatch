@@ -1,0 +1,303 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# `e2e-complete` is NOT required in branch protection (e2e is slow and
+# flaky) but follows the same pattern for consistency — if anything in
+# this workflow ever becomes a required check, the pattern is already
+# in place.
+name: e2e-ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+  # Optional: run nightly for regression detection
+  # schedule:
+  #   - cron: '0 6 * * *'  # 6 AM UTC daily
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'langwatch/**'
+              - 'python-sdk/**'
+              - 'agentic-e2e-tests/**'
+              - '.github/workflows/e2e-ci.yml'
+
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # App configuration
+      DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
+      IS_OPENSEARCH: "true"
+      REDIS_URL: "redis://localhost:6380"
+      LANGWATCH_NLP_SERVICE: "http://localhost:5563"
+      LANGEVALS_ENDPOINT: "http://localhost:5564"
+      NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
+      NEXTAUTH_URL: "http://localhost:5570"
+      API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
+      # Trust the in-repo TEST license keypair so the members suite
+      # (agentic-e2e-tests/tests/members/steps.ts withEnterpriseLicense()) can
+      # activate a test ENTERPRISE license and exercise member-invitation flows
+      # above the free-tier maxMembers=1 cap. Public key only (safe to commit) — matches
+      # TEST_PUBLIC_KEY in langwatch/ee/licensing/__tests__/fixtures/testKeys.ts.
+      # Must be on the app process env before `pnpm start` boots — constants.ts
+      # resolves PUBLIC_KEY from this var once at module load. gitleaks:allow
+      LANGWATCH_LICENSE_PUBLIC_KEY: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApmJ61eRR1wxrapjipSmN
+        IqYMJPmbonA1d6XV51kdnVs/MdNrrdoWIal6TDt2lHvbAbrEalqR7h+vQzBBZ4St
+        ZPqBzTIHQwu3Wjlj7Fj7IeVUiJnRg60W+u9DmYXUeFBlZFMHxV3nNVqedwDcFpV/
+        IrAMmSe3QeTqBztcDMBxu5luA4DMU5Hi6kp4qcHDoCCiEH4a6ZZkPdNC+xpFdW41
+        75BwdKBKnyOZrUvyPaKrxInra7z+9YQKiggRciQvCNxc76Ef4DLGkTIf36Cvm7XL
+        m0gqlJm89dYcRBaDVGFTnb98BM7SrAIg117yjuuw5o/RmSlKq9/Klkz0QsXYF9Zj
+        iQIDAQAB
+        -----END PUBLIC KEY-----
+      # AI Gateway data-plane secrets (shared by control plane + Go gateway).
+      # The gateway validates these as required; without them `make service
+      # svc=aigateway` crash-loops. Test-only values, 32+ chars.
+      LW_GATEWAY_INTERNAL_SECRET: "e2e-gateway-internal-secret-000000000000000000000000000000000000"
+      LW_GATEWAY_JWT_SECRET: "e2e-gateway-jwt-secret-00000000000000000000000000000000000000000"
+      LW_VIRTUAL_KEY_PEPPER: "e2e-virtual-key-pepper-00000000000000000000000000000000000000000"
+      SKIP_ENV_VALIDATION: "true"
+      OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED: "1"
+      NODE_ENV: "development"
+      # Test runner configuration
+      BASE_URL: "http://localhost:5570"
+      CI: "true"
+
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+        options: >-
+          --health-cmd "pg_isready -U prisma"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.10.2.65
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      opensearch:
+        image: langwatch/opensearch-lite:latest
+        ports:
+          - 9201:9200
+        env:
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: "true"
+          OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
+          cluster.routing.allocation.disk.threshold_enabled: "false"
+          bootstrap.memory_lock: "false"
+          node.store.allow_mmap: "false"
+        options: >-
+          --health-cmd "curl -s http://localhost:9200 || exit 1"
+          --health-interval 30s
+          --health-timeout 30s
+          --health-retries 3
+
+      # NOTE: langwatch_nlp is intentionally NOT a service container here.
+      # The langwatch app auto-starts its own nlpgo binary on :5563
+      # (visible as "✓ nlpgo: auto-start on :5563" in startup logs).
+      # Adding a Docker service container on port 5563 causes an
+      # "address already in use" conflict that crash-loops the app.
+      # LANGWATCH_NLP_SERVICE=http://localhost:5563 is set in the env
+      # section above and the app's own nlpgo binary satisfies it.
+
+      langevals:
+        image: langwatch/langevals:latest
+        ports:
+          - 5564:5562
+        env:
+          DISABLE_EVALUATORS_PRELOAD: "true"
+        options: >-
+          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5562/healthcheck')\" || exit 1"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 12
+          --health-start-period 30s
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 10.24.0
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+          cache-dependency-path: |
+            langwatch/pnpm-lock.yaml
+            agentic-e2e-tests/pnpm-lock.yaml
+            mcp-server/pnpm-lock.yaml
+
+      # start.sh auto-starts the aigateway + nlpgo Go services via
+      # `go run ./cmd/service`. Without a Go toolchain + warm caches, both
+      # lanes cold-download the toolchain and the full module graph while
+      # tsx is booting the API server — starving it past global-setup's
+      # 60s readiness window on the 2-core runner (intermittent
+      # "API not ready ... backend never served publicEnv" failures).
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # Compile the service dispatcher (imports both aigateway and nlpgo)
+      # up front so the auto-start lanes' `go run` during `pnpm start` is a
+      # warm-cache no-op and the API lane keeps the CPU while it boots.
+      - name: Pre-build Go services
+        run: go build -o /dev/null ./cmd/service
+
+      # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
+      # its postinstall always falls back to `node-gyp rebuild`. With
+      # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
+      # by default — install it globally before any install that hits
+      # mcp-server's onlyBuiltDependencies allowlist.
+      - name: Install node-gyp (for node-pty postinstall)
+        run: npm install -g node-gyp@12.3.0
+
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
+
+      - name: Install app dependencies
+        working-directory: langwatch
+        run: CI=true pnpm install --frozen-lockfile
+
+      # `--ignore-workspace` because agentic-e2e-tests sits one level under
+      # the repo-root pnpm-workspace.yaml introduced by the @langwatch/server
+      # CLI in packages/. Without the flag, pnpm walks up, finds the root
+      # workspace, scopes the install to `packages/*` only, and never lands
+      # @playwright/test in agentic-e2e-tests/node_modules — the next step
+      # then fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command
+      # "playwright" not found`. agentic-e2e-tests is intentionally a
+      # standalone pnpm project (see its self-contained pnpm-lock.yaml).
+      - name: Install E2E test dependencies
+        working-directory: agentic-e2e-tests
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      # No Playwright browser/ffmpeg download: the tests launch the runner's
+      # preinstalled Google Chrome via channel (E2E_BROWSER_CHANNEL below) and
+      # video recording is off in CI, so no ffmpeg binary is needed.
+
+      - name: Prepare files
+        working-directory: langwatch
+        run: pnpm start:prepare:files
+
+      - name: Install goose
+        run: bash .github/scripts/install-goose.sh
+
+      - name: Setup database
+        working-directory: langwatch
+        run: pnpm prisma:migrate
+
+      - name: Setup ClickHouse
+        working-directory: langwatch
+        run: pnpm clickhouse:migrate
+
+      - name: Build app
+        working-directory: langwatch
+        run: NODE_ENV=test pnpm build
+
+      - name: Run E2E tests
+        env:
+          # Migrations already ran in earlier steps; skip them during pnpm start
+          SKIP_PRISMA_MIGRATE: "true"
+          SKIP_CLICKHOUSE_MIGRATE: "true"
+          # Launch the runner's preinstalled Google Chrome (no browser download)
+          E2E_BROWSER_CHANNEL: chrome
+        run: |
+          # Start the app in background
+          cd langwatch && PORT=5570 pnpm start &
+          APP_PID=$!
+
+          # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)
+          sleep 5
+
+          # Run tests from the self-contained e2e package
+          cd agentic-e2e-tests && pnpm test
+          TEST_EXIT=$?
+
+          # Cleanup
+          kill $APP_PID || true
+          exit $TEST_EXIT
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: agentic-e2e-tests/playwright-report/
+          retention-days: 7
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results
+          path: agentic-e2e-tests/test-results/
+          retention-days: 7
+
+      - name: Notify Slack on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/notify-slack-job-failure.sh e2e
+
+  e2e-complete:
+    needs: [changes, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: e2e

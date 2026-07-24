@@ -1,0 +1,58 @@
+---
+title: 'Overview'
+description: 'Create, list, update, and archive LangWatch teams programmatically. Designed for automated provisioning and cleanup of team structures.'
+---
+
+## Intro
+
+The Teams API lets you manage LangWatch teams via REST. Teams are organizational units that group projects and members together.
+
+This API is designed for service-to-service automation (e.g. provisioning team structures for new departments, cleaning up orphaned teams from test runs), not for end-user access.
+
+## Authentication
+
+The Teams API requires an **organization-level API key** with `team:manage` permission (created in Settings > API Keys). Pass it as a Bearer token:
+
+```
+Authorization: Bearer sk-lw-<id>_<secret>
+```
+
+Project API keys (`X-Auth-Token`) cannot be used here — they lack organization context.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/teams` | List all teams in the organization |
+| `POST` | `/api/teams` | Create a new team |
+| `GET` | `/api/teams/{id}` | Get team details |
+| `PATCH` | `/api/teams/{id}` | Update a team |
+| `DELETE` | `/api/teams/{id}` | Archive a team (soft-delete) |
+| `GET` | `/api/teams/{id}/members` | List team members |
+| `POST` | `/api/teams/{id}/members` | Add a member to the team |
+| `DELETE` | `/api/teams/{id}/members/{userId}` | Remove a member from the team |
+| `GET` | `/api/teams/{id}/projects` | List projects in the team |
+
+## Soft Delete
+
+`DELETE` does not permanently remove a team. It sets an `archivedAt` timestamp, making the team invisible to list and get operations. Archived teams can still be referenced in historical data (e.g. past project associations).
+
+## Typical Flow
+
+1. Create an admin API key in Settings > API Keys with `team:manage` permission
+2. Call `POST /api/teams` with a team name
+3. Use the returned team `id` when creating projects via the Projects API, or later move an existing project by updating its `teamId`
+
+```bash
+# Create team
+curl -X POST https://app.langwatch.ai/api/teams \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Engineering"}'
+
+# Use team ID to create a project
+curl -X POST https://app.langwatch.ai/api/projects \
+  -H "Authorization: Bearer sk-lw-..." \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Project", "teamId": "<team_id>", "language": "python", "framework": "langchain"}'
+```

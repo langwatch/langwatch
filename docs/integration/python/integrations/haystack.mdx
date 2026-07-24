@@ -1,0 +1,58 @@
+---
+title: Haystack Instrumentation
+sidebarTitle: Haystack
+description: Learn how to instrument Haystack pipelines with LangWatch using community OpenTelemetry instrumentors.
+keywords: haystack, deepset, instrumentation, openinference, langwatch, python
+---
+
+LangWatch integrates with Haystack through OpenInference instrumentation to capture traces from your Haystack pipelines and components.
+
+## Installation
+
+<CodeGroup>
+```bash pip
+pip install langwatch openinference-instrumentation-haystack haystack-ai
+```
+
+```bash uv
+uv add langwatch openinference-instrumentation-haystack haystack-ai
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Use the OpenInference instrumentation for Haystack by passing `HaystackInstrumentor` to `langwatch.setup()`.
+
+```python
+import os
+import langwatch
+
+from haystack.components.agents import Agent
+from haystack.components.generators.chat import OpenAIChatGenerator
+from haystack.dataclasses import ChatMessage
+from openinference.instrumentation.haystack import HaystackInstrumentor
+
+langwatch.setup(instrumentors=[HaystackInstrumentor()])
+
+basic_agent = Agent(
+    chat_generator=OpenAIChatGenerator(model="gpt-4o-mini"),
+    system_prompt="You are a helpful web agent.",
+    tools=[],
+)
+
+result = basic_agent.run(messages=[ChatMessage.from_user("Tell me a joke")])
+
+print(result["last_message"].text)
+```
+
+The `HaystackInstrumentor` automatically captures Haystack pipeline operations, component executions, and model interactions. Use `@langwatch.trace()` to create a parent trace under which Haystack operations will be nested.
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Haystack applications

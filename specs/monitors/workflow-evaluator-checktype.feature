@@ -1,0 +1,130 @@
+@integration
+Feature: Correct checkType for workflow evaluators in monitors
+  As a user creating online evaluations
+  I want workflow evaluators to save with correct checkType
+  So that they execute properly at runtime
+
+  # All 10 @unimplemented scenarios remain unbound — per AUDIT_MANIFEST.md all
+  # KEEP-need-test-added against OnlineEvaluationDrawer.tsx + evaluationsWorker.ts:
+  # - "Workflow evaluator saves with workflow checkType" (drawer:979)
+  # - "Workflow evaluator does NOT save as langevals/basic" (drawer:979-981)
+  # - "Built-in evaluator saves with correct evaluator type" (drawer:981)
+  # - "Different built-in evaluators save correct types" (parametric variant)
+  # - "Editing workflow monitor preserves checkType" (monitors.ts:228)
+  # - "Editing built-in monitor preserves checkType" (same router update path)
+  # - "Monitor with workflow checkType uses evaluatorId for execution" (worker:110-124)
+  # - "Monitor with built-in checkType uses checkType for execution" (worker:412)
+  # - "Workflow evaluator config remains empty" (drawer:982)
+  # - "Built-in evaluator config contains evaluatorType" (drawer:973-981)
+  # All implementations exist; integration tests pending in PR #3458.
+
+  Background:
+    Given I am logged in to a project
+    And I have a workflow evaluator "Custom Scorer"
+    And I have a built-in evaluator "Exact Match" (langevals/exact_match)
+
+  # ============================================================================
+  # Workflow evaluator checkType
+  # ============================================================================
+
+  @unimplemented
+  Scenario: Workflow evaluator saves with "workflow" checkType
+    Given the online evaluation drawer is open
+    When I select workflow evaluator "Custom Scorer"
+    And I configure the required mappings
+    And I enter a name for the monitor
+    And I click Save
+    Then the monitor should be created successfully
+    And the monitor checkType should be "workflow"
+    And the monitor evaluatorId should reference "Custom Scorer"
+
+  @unimplemented
+  Scenario: Workflow evaluator does NOT save as "langevals/basic"
+    Given the online evaluation drawer is open
+    When I select workflow evaluator "Custom Scorer"
+    And I save the monitor
+    Then the monitor checkType should NOT be "langevals/basic"
+    And the monitor checkType should be "workflow"
+
+  # ============================================================================
+  # Built-in evaluator checkType (unchanged behavior)
+  # ============================================================================
+
+  @unimplemented
+  Scenario: Built-in evaluator saves with correct evaluator type
+    Given the online evaluation drawer is open
+    When I select built-in evaluator "Exact Match"
+    And I configure mappings and name
+    And I click Save
+    Then the monitor checkType should be "langevals/exact_match"
+    And the monitor evaluatorId should reference "Exact Match"
+
+  @unimplemented
+  Scenario: Different built-in evaluators save correct types
+    Given I create monitors with different evaluators:
+      | evaluator          | expected_checkType        |
+      | LLM Boolean        | langevals/llm_boolean     |
+      | Semantic Similarity| langevals/semantic_similarity |
+      | Azure Content Safety| azure/content_safety     |
+    Then each monitor should have the correct checkType
+
+  # ============================================================================
+  # Editing existing monitors
+  # ============================================================================
+
+  @unimplemented
+  Scenario: Editing workflow monitor preserves checkType
+    Given I have an existing monitor with workflow evaluator
+    And the monitor has checkType "workflow"
+    When I edit the monitor and change the name
+    And I click Save
+    Then the checkType should still be "workflow"
+    And no data should be lost
+
+  @unimplemented
+  Scenario: Editing built-in monitor preserves checkType
+    Given I have an existing monitor with built-in evaluator
+    And the monitor has checkType "langevals/exact_match"
+    When I edit the monitor and change the sampling
+    And I click Save
+    Then the checkType should still be "langevals/exact_match"
+
+  # ============================================================================
+  # Monitor execution (backend consideration)
+  # ============================================================================
+
+  @unimplemented
+  Scenario: Monitor with workflow checkType uses evaluatorId for execution
+    Given I have a monitor with:
+      | checkType   | workflow    |
+      | evaluatorId | eval_123    |
+    When the monitor is triggered by a trace
+    Then the system should look up evaluator "eval_123"
+    And execute the linked workflow
+
+  @unimplemented
+  Scenario: Monitor with built-in checkType uses checkType for execution
+    Given I have a monitor with:
+      | checkType   | langevals/exact_match |
+      | evaluatorId | eval_456              |
+    When the monitor is triggered by a trace
+    Then the system should execute "langevals/exact_match" evaluator
+    And use settings from evaluator "eval_456"
+
+  # ============================================================================
+  # Database integrity
+  # ============================================================================
+
+  @unimplemented
+  Scenario: Workflow evaluator config remains empty
+    Given I create a monitor with workflow evaluator
+    Then the evaluator config should be {}
+    And the workflowId should be set on the evaluator
+    And the monitor checkType should be "workflow"
+
+  @unimplemented
+  Scenario: Built-in evaluator config contains evaluatorType
+    Given I create a monitor with built-in evaluator "Exact Match"
+    Then the evaluator config should contain evaluatorType "langevals/exact_match"
+    And the evaluator config should contain settings
+    And the monitor checkType should match config.evaluatorType

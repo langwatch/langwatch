@@ -1,0 +1,57 @@
+---
+title: LangEvals
+sidebarTitle: Introduction
+---
+
+<div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
+  <div>
+  <a href="https://github.com/langwatch/langevals/tree/main/python-sdk" target="_blank">
+    <img src="https://img.shields.io/badge/repo-langevals-blue?style=flat&logo=Github" noZoom alt="LangEvals Repo" />
+  </a>
+  </div>
+
+  <div>
+  <a href="https://pypi.org/project/langevals/" target="_blank">
+    <img src="https://img.shields.io/pypi/v/langevals?color=007EC6" noZoom alt="LangEvals version" />
+  </a>
+  </div>
+</div>
+
+[LangEvals](https://github.com/langwatch/langevals) is the standalone LLM evaluations framework that powers [LangWatch](https://github.com/langwatch/langwatch) evaluations.
+
+LangEvals integrates many APIs and other open-source evaluators under the same interface, to be used locally as a library.
+
+It can be used in notebooks for **exploration**, in pytest for writting **unit tests** or as a server API for **live-evaluations** and **guardrails**.
+LangEvals is modular, including 20+ evaluators such as Ragas for RAG quality, OpenAI Moderation and Azure Jailbreak detection for safety and many others under the same interface.
+
+<CardGroup>
+
+<Card title="Quickstart" icon="stars" href="./quickstart">
+  Start evaluating your LLMs in a few lines of code.
+</Card>
+
+<Card
+  title="Evaluators"
+  icon="ballot-check"
+  href="./evaluators"
+>
+  Learn how to use our evaluators and how to make yours.
+</Card>
+
+<Card
+  title="PyTest Integration"
+  icon="vial"
+  href="./unit-tests"
+>
+  Create comprehensive testing with extensive edge-case coverage.
+</Card>
+
+<Card
+  title="Tutorials"
+  icon="chalkboard-user"
+  href="/langevals/tutorials/extensive-unit-testing"
+>
+  Learn how to evaluate your AI application from our own use cases.
+</Card>
+
+</CardGroup>

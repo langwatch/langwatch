@@ -1,0 +1,103 @@
+---
+title: Departments
+description: A single-valued accounting dimension for attributing AI spend across people, teams, and projects, including personal AI use. Separate from RBAC; pure accounting.
+sidebarTitle: Departments
+---
+
+A **department** is an accounting label for spend. You name departments (Engineering, Marketing, ...) once, assign people, teams, and projects to them, and spend rolls up by department across the whole org, including each person's personal AI use.
+
+Departments answer a question the team and per-user views cannot: *"are Marketing people spending more than Engineering people, including their personal AI use?"*. Teams are a many-to-many access construct (a person can be in several), so they are a poor single attribution key, and RBAC roles answer authorization, not accounting. A department is single-valued per person per org, so every dollar lands in exactly one bucket.
+
+<Info>**Pairs with:** [Governance dashboard](/ai-governance/governance-dashboard) for the **Spend by department** card, [Members & invites](/ai-governance/members-and-invites) and [Workspaces & access](/ai-governance/workspaces) for where you assign them, and [Roles & permissions](/ai-governance/roles-and-permissions) for why departments are *not* access control.</Info>
+
+<Note>**Departments are pure accounting.** They never grant or restrict access. Assigning someone to "Engineering" changes how their spend is attributed, nothing else.</Note>
+
+## How spend is attributed
+
+Every trace that hits the gateway resolves to exactly one department, picked by this precedence:
+
+1. **The principal user's department.** If the trace has a principal user and that user is assigned to a department, it wins.
+2. **The user's team department (inherited).** If the principal user has no own department, the department of their team is used.
+3. **The project's department.** A trace with no principal user (an autonomous agent) attributes to the department of the project it ran in.
+4. **Unassigned.** If none of the above resolve, the trace rolls up under **Unassigned**.
+
+The principal user's department always wins over the project's, and a trace is counted once. So a developer's personal AI use and the autonomous agents their team builds can land in the same department.
+
+## Where you assign departments
+
+An org can have tens of thousands of members, so assignment lives on the pages that already paginate the org chart, not as one flat list:
+
+| Surface | What you assign | Where |
+|---|---|---|
+| **People** | A member's department. Their spend, including personal AI use, rolls up to it. | [Members page](/ai-governance/members-and-invites), per row |
+| **Teams** | A team's department. The default its members and projects inherit when they have none of their own. | Teams page, per row |
+| **Projects** | A project's department. Agent spend with no human principal rolls up here. | Project settings |
+
+The **departments page** itself only creates, renames, and archives departments, and links out to those surfaces. It never renders a per-person assignment list, so it stays usable in a large org.
+
+<Frame caption="On the members page each person carries a Department column. The picker assigns that member's spend, including their personal AI use, to a department.">
+  ![Members department assignment](/images/ai-governance/departments/members-assignment.png)
+</Frame>
+
+<Frame caption="On the teams page each team row carries the same picker. A team's department is the default its members and projects inherit when they have none of their own.">
+  ![Teams department assignment](/images/ai-governance/departments/teams-assignment.png)
+</Frame>
+
+### Managing departments
+
+Open the departments page under **Settings → AI Governance → Departments** to:
+
+- **Create** a department by name (Engineering, Marketing, ...).
+- **Edit** a department's name.
+- **Archive** a department you no longer use.
+
+It belongs to your organization; a member of another org never sees it.
+
+<Frame caption="The departments page lists each department with a kebab menu for Edit and Archive. The page only creates, renames, and archives; it never renders a per-person assignment list.">
+  ![Departments page](/images/ai-governance/departments/departments-page.png)
+</Frame>
+
+<Frame caption="Edit opens a drawer with a single Name field. Saving renames the department and the list updates in place.">
+  ![Edit department drawer](/images/ai-governance/departments/department-edit-drawer.png)
+</Frame>
+
+## SCIM auto-assignment
+
+For organizations that provision identities through SCIM, assignment is automatic. The SCIM 2.0 Enterprise User extension carries a standard `costCenter` attribute, so an IdP (Okta, Entra ID, ...) can drive department membership the same way it drives department or division. Manual per-row assignment is the fallback for orgs without SCIM.
+
+| IdP action | Result in LangWatch |
+|---|---|
+| Provisions a user whose `costCenter` is `Engineering` | The user's membership carries department "Engineering" |
+| Provisions a user whose `costCenter` is a name that does not exist yet | The department is **created on first use** and the user is assigned to it |
+| Updates a user's `costCenter` from `Engineering` to `Marketing` | The assignment is **replaced**, not added; the user carries "Marketing" |
+| Removes a user's `costCenter` attribute | The user is unassigned; their spend rolls up under **Unassigned** |
+
+## Archiving
+
+Archiving a department is non-destructive:
+
+- It no longer appears in the assignment picker on the members, teams, and project surfaces.
+- Spend previously attributed to it rolls up under **Unassigned** rather than disappearing.
+
+Assignments are never nulled on archive. The rollup maps a stored department back to a name through the active departments only, so an archived department's spend resolves as Unassigned without any backfill. Reusing an archived department's name for a new active one is allowed.
+
+## Spend by department on the dashboard
+
+The [governance dashboard](/ai-governance/governance-dashboard) renders a **Spend by department** card. Each department's total includes spend from personal projects, team projects, and agent projects attributed to it, aggregated across **every project in the org**.
+
+This is the cross-org view: the card is not limited to a single governance ingestion project, so a fully active org with no dedicated ingestion source still sees real numbers. The Marketing-versus-Engineering comparison reads from departments, not from RBAC roles or team-membership counts.
+
+Every underlying query is tenant-isolated: a department rollup for your org contains zero spend from any other org.
+
+## Permissions
+
+- Creating, renaming, and archiving departments requires `organization:manage` (granted to ADMIN by default).
+- Assigning people, teams, and projects to a department happens on the respective surfaces under the same admin permission.
+- Departments never appear in any access-control decision. They are an accounting dimension only.
+
+## Where to next
+
+- **See the rollup:** [Governance dashboard](/ai-governance/governance-dashboard).
+- **Assign people:** [Members & invites](/ai-governance/members-and-invites).
+- **Understand access vs accounting:** [Roles & permissions](/ai-governance/roles-and-permissions).
+- **Provision via SCIM:** [Workspaces & access](/ai-governance/workspaces).

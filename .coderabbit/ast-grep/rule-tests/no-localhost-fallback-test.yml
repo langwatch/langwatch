@@ -1,0 +1,9 @@
+id: no-localhost-fallback-ts
+valid:
+  - 'const url = env.API_URL ?? getDefaultUrl();'
+  - 'const url = env.API_URL ?? "https://api.example.com";'
+  - 'const port = env.PORT ?? 3000;'
+invalid:
+  - 'const url = env.API_URL ?? "http://localhost:3000";'
+  - 'const url = env.API_URL ?? "https://localhost";'
+  - 'const url = env.API_URL ?? `http://localhost:${port}/api`;'

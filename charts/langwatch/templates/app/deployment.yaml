@@ -1,0 +1,360 @@
+{{- include "langwatch.validateSecrets" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-app
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-app
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+    {{- if .Values.app.deployment.labels }}
+    {{- toYaml .Values.app.deployment.labels | nindent 4 }}
+    {{- end }}
+  {{- with .Values.app.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  {{- if .Values.app.deployment.strategy }}
+  strategy:
+    {{- toYaml .Values.app.deployment.strategy | nindent 8 }}
+  {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+  {{/* Default kill-then-start under local-FS: the pod holds the RWO
+       stored-objects PVC, and the k8s default RollingUpdate (25% surge) starts
+       the new pod BEFORE the old one releases the volume — on a multi-node
+       cluster the new pod can land on another node and wedge Pending on a
+       multi-attach error (the scheduler does not avoid RWO conflicts for CSI
+       volumes). maxSurge=0/maxUnavailable=1 at replicas=1 behaves exactly like
+       Recreate (old pod terminates and releases the volume before the new one
+       schedules), at the cost of a brief downtime — honest for the
+       single-replica local-FS tier.
+
+       Deliberately NOT `type: Recreate`: switching a live Deployment from the
+       k8s-defaulted RollingUpdate to Recreate requires DELETING the live
+       `rollingUpdate` struct, and Helm's 3-way merge cannot emit that deletion
+       when the previous release's manifest never had a `strategy` key (the
+       pre-#5083 chart) — the API then rejects the patch with
+       "spec.strategy.rollingUpdate: Forbidden: may not be specified when
+       strategy `type` is 'Recreate'", failing every upgrade across this
+       boundary. Setting maxSurge/maxUnavailable only UPDATES existing fields,
+       which the merge applies cleanly. An explicit app.deployment.strategy
+       overrides this. */}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  {{- end }}
+  {{- if hasKey (default (dict) .Values.app.deployment) "revisionHistoryLimit" }}
+  revisionHistoryLimit: {{ .Values.app.deployment.revisionHistoryLimit }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-app
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-app
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- if .Values.app.pod.labels }}
+        {{- toYaml .Values.app.pod.labels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- with (coalesce .Values.app.pod.annotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.app.telemetry.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.app.service.port }}"
+        {{- end }}
+    spec:
+      # The app does not call the Kubernetes API, so don't mount the SA token.
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
+      {{- with (coalesce .Values.app.podSecurityContext .Values.global.podSecurityContext)}}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
+      {{- with (coalesce .Values.app.nodeSelector .Values.global.scheduling.nodeSelector)}}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Tolerations - https://kubespec.dev/v1/Pod#spec.tolerations
+      {{- with (coalesce .Values.app.tolerations .Values.global.scheduling.tolerations)}}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Affinity - https://kubespec.dev/v1/Pod#spec.affinity
+      {{- with (coalesce .Values.app.affinity .Values.global.scheduling.affinity)}}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Topology spread constraints - https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+      {{- with (coalesce .Values.app.topologySpreadConstraints .Values.global.scheduling.topologySpreadConstraints)}}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      initContainers:
+        {{- with .Values.app.extraInitContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        # Fix permissions for Next.js cache/static directories when running as non-root
+        - name: fix-nextjs-permissions
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          command: ['sh', '-c']
+          args:
+            - |
+              cp -r /app/langwatch/.next/* /next-tmp/ 2>/dev/null || true
+              echo "Copied .next contents to writable volume"
+          volumeMounts:
+            - name: next-dir
+              mountPath: /next-tmp
+          securityContext:
+            runAsUser: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        {{- with .Values.app.extraContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: {{ .Release.Name }}-app
+          securityContext:
+            {{- toYaml (coalesce .Values.app.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.app.service.port }}
+              protocol: TCP
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+
+            # Names this process in telemetry. It becomes the OTel resource
+            # `service.name` and the `service` field on every stdout log line,
+            # which log shipping promotes to the Loki `service_name` label.
+            # Set per role so app / workers / cronjobs stay distinguishable —
+            # unset, all three collapse onto the same code default.
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.app.otel.serviceName | default "langwatch-app" | quote }}
+
+            - name: NEXTAUTH_URL
+              value: {{ .Values.app.http.publicUrl | default .Values.app.http.baseHost | default "http://localhost:5560" }}
+            - name: NEXTAUTH_URL_INTERNAL
+              value: "http://localhost:{{ .Values.app.service.port | default 5560 }}"
+
+            # Internal platform-API base URL that in-pod scenario/simulation
+            # runners call back to. Post-#3541 the app boot-validates it as a
+            # required URL. On the app pod the app IS local, so self-reference
+            # over localhost (like NEXTAUTH_URL_INTERNAL) — no Service/DNS hop.
+            # Workers/nlp are separate pods and use the app's service DNS
+            # instead. Override only if in-pod runners must reach the app
+            # through a different URL.
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.app.http.langwatchEndpoint | default (printf "http://localhost:%v" (.Values.app.service.port | default 5560)) | quote }}
+
+            # Cron API key
+            {{- if .Values.app.cronApiKey.secretKeyRef.name }}
+            - name: CRON_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.cronApiKey.secretKeyRef.name }}
+                  key: {{ .Values.app.cronApiKey.secretKeyRef.key }}
+            {{- else if .Values.secrets.existingSecret }}
+            - name: CRON_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.secretKeys.cronApiKey | default "cronApiKey" }}
+            {{- else if .Values.autogen.enabled }}
+            - name: CRON_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: cronApiKey
+            {{- end }}
+
+            # Email configuration
+            {{- if .Values.app.email.enabled }}
+            - name: EMAIL_DEFAULT_FROM
+              value: {{ .Values.app.email.defaultFrom | quote }}
+            - name: EMAIL_PROVIDER
+              value: {{ .Values.app.email.provider | quote }}
+            {{- if eq .Values.app.email.provider "sendgrid" }}
+            {{- include "langwatch.secretOrValue" (dict "envName" "SENDGRID_API_KEY" "fieldValues" .Values.app.email.providers.sendgrid.apiKey) | nindent 12 }}
+            {{- end }}
+            {{- end }}
+
+            # AI Gateway virtual-key pepper (control-plane only).
+            # The gateway pod must NEVER receive this value — it is used here
+            # in src/server/gateway/virtualKey.crypto.ts to hash incoming VK
+            # plaintext against the stored digest.
+            {{- if .Values.app.virtualKeyPepper.secretKeyRef.name }}
+            - name: LW_VIRTUAL_KEY_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.virtualKeyPepper.secretKeyRef.name }}
+                  key: {{ .Values.app.virtualKeyPepper.secretKeyRef.key }}
+            {{- else if .Values.secrets.existingSecret }}
+            - name: LW_VIRTUAL_KEY_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.secretKeys.virtualKeyPepper | default "virtualKeyPepper" }}
+            {{- else if .Values.autogen.enabled }}
+            - name: LW_VIRTUAL_KEY_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: virtualKeyPepper
+            {{- end }}
+
+            # AI Gateway shared auth — HMAC internal-call signing + per-request
+            # JWT issuance. langwatch-app and the gateway pod mount these from
+            # the SAME Secret (the app Secret — secrets.existingSecret when
+            # operator-provided, autogen.secretNames.app when chart-rendered).
+            # Rotating either value requires rolling both Deployments.
+            {{- if .Values.gateway.chartManaged }}
+            - name: LW_GATEWAY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: LW_GATEWAY_INTERNAL_SECRET
+            - name: LW_GATEWAY_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: LW_GATEWAY_JWT_SECRET
+            {{- end }}
+
+            # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
+            # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
+            # against the same Secret. Subchart values key read via index (aliased subchart).
+            {{- if (index .Values "langyagent").chartManaged }}
+            - name: OPENCODE_AGENT_URL
+              value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
+            - name: LANGY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default "langwatch-langyagent-auth" }}
+                  key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+            {{- end }}
+
+            # LW_GATEWAY_PUBLIC_URL — the externally-reachable AI Gateway URL
+            # the control plane hands to CLI users (langwatch claude/codex/
+            # cursor) at login. Without it the CLI falls back to
+            # http://localhost:5563, which a developer laptop can't reach
+            # against a remote cluster. Prefer the explicit gateway.publicUrl
+            # knob; otherwise derive it from an operator-set gateway ingress
+            # host (the SaaS default host is skipped so a self-host install
+            # never silently points at gateway.langwatch.ai).
+            {{- $gwPublic := .Values.gateway.publicUrl | default "" }}
+            {{- if not $gwPublic }}
+            {{- $gwIngress := .Values.gateway.ingress | default dict }}
+            {{- $gwHost := $gwIngress.host | default "" }}
+            {{- if and $gwIngress.enabled $gwHost (ne $gwHost "gateway.langwatch.ai") }}
+            {{- $scheme := "http" }}
+            {{- if and $gwIngress.tls $gwIngress.tls.enabled }}{{- $scheme = "https" }}{{- end }}
+            {{- $gwPublic = printf "%s://%s" $scheme $gwHost }}
+            {{- end }}
+            {{- end }}
+            {{- if $gwPublic }}
+            - name: LW_GATEWAY_PUBLIC_URL
+              value: {{ $gwPublic | quote }}
+            {{- end }}
+
+            # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
+            # every app-image consumer needs it, see _helpers.tpl)
+            - name: NEXTAUTH_PROVIDER
+              value: {{ .Values.app.nextAuth.provider | quote }}
+
+            # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github, gitlab, google, okta)
+            {{- $oauthProviders := list
+              (dict "key" "auth0"   "prefix" "AUTH0"    "fields" (list "clientId" "clientSecret" "issuer"))
+              (dict "key" "azureAd" "prefix" "AZURE_AD" "fields" (list "clientId" "clientSecret" "tenantId"))
+              (dict "key" "cognito" "prefix" "COGNITO"  "fields" (list "clientId" "clientSecret" "issuer"))
+              (dict "key" "github"  "prefix" "GITHUB"   "fields" (list "clientId" "clientSecret"))
+              (dict "key" "gitlab"  "prefix" "GITLAB"   "fields" (list "clientId" "clientSecret"))
+              (dict "key" "google"  "prefix" "GOOGLE"   "fields" (list "clientId" "clientSecret"))
+              (dict "key" "okta"    "prefix" "OKTA"     "fields" (list "clientId" "clientSecret" "issuer"))
+            }}
+            {{- range $provider := $oauthProviders }}
+            {{- $providerValues := index $.Values.app.nextAuth.providers $provider.key }}
+            {{- range $field := $provider.fields }}
+            {{- $fieldValues := index $providerValues $field }}
+            {{- $envName := printf "%s_%s" $provider.prefix (include "langwatch.envSuffix" $field) }}
+            {{- include "langwatch.secretOrValue" (dict "envName" $envName "fieldValues" $fieldValues) | nindent 12 }}
+            {{- end }}
+            {{- end }}
+
+            {{- with .Values.app.extraEnvs}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+          {{- if .Values.app.extraLifecycle}}
+          lifecycle:
+            {{- with .Values.app.extraLifecycle}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+          volumeMounts:
+            {{- with .Values.app.extraVolumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: next-dir
+              mountPath: /app/langwatch/.next
+            {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+            # Stored-objects local-FS mount — renders ONLY when local-FS is
+            # the active backend (dataplane disabled). Single-replica only
+            # (the chart refuses to render when replicaCount > 1). PVC-backed
+            # so bytes survive pod restarts; without this they'd land on the
+            # container's ephemeral writable layer and disappear on every
+            # rollout.
+            - name: stored-objects-data
+              mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
+            {{- end }}
+
+      volumes:
+        {{- with .Values.app.extraVolumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: tmp-dir
+          emptyDir: {}
+        - name: next-dir
+          emptyDir: {}
+        {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+        - name: stored-objects-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-stored-objects
+        {{- end }}

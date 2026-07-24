@@ -1,0 +1,60 @@
+{
+  "numTotalTestSuites": 3,
+  "numPassedTestSuites": 1,
+  "numFailedTestSuites": 2,
+  "numTotalTests": 5,
+  "numPassedTests": 2,
+  "numFailedTests": 3,
+  "success": false,
+  "testResults": [
+    {
+      "name": "/home/runner/work/langwatch/langwatch/langwatch/src/server/api/__tests__/traces.test.ts",
+      "status": "failed",
+      "assertionResults": [
+        {
+          "status": "passed",
+          "title": "returns traces for project",
+          "failureMessages": []
+        },
+        {
+          "status": "failed",
+          "title": "filters by date range",
+          "failureMessages": [
+            "AssertionError: expected 0 to equal 3\n  at Object.<anonymous> (/home/runner/work/langwatch/langwatch/langwatch/src/server/api/__tests__/traces.test.ts:42:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "/home/runner/work/langwatch/langwatch/langwatch/src/components/__tests__/TraceDetails.test.tsx",
+      "status": "failed",
+      "assertionResults": [
+        {
+          "status": "failed",
+          "title": "renders span list",
+          "failureMessages": [
+            "Error: Unable to find an element with the text: /span list/\n  at getByText (/home/runner/work/langwatch/langwatch/langwatch/node_modules/@testing-library/dom/src/queries/text.ts:55:7)"
+          ]
+        },
+        {
+          "status": "failed",
+          "title": "shows error state",
+          "failureMessages": [
+            "AssertionError: expected false to be true\n  at Object.<anonymous> (/home/runner/work/langwatch/langwatch/langwatch/src/components/__tests__/TraceDetails.test.tsx:88:5)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "/home/runner/work/langwatch/langwatch/langwatch/src/utils/__tests__/formatters.test.ts",
+      "status": "passed",
+      "assertionResults": [
+        {
+          "status": "passed",
+          "title": "formats timestamps",
+          "failureMessages": []
+        }
+      ]
+    }
+  ]
+}

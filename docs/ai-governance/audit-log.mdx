@@ -1,0 +1,80 @@
+---
+title: Audit log
+description: Every governance and gateway mutation in one append-only log. Timestamp, actor, action, target kind + ID, project context, IP, and error, searchable by user, action, project, and date range. Lives at /settings/audit-log.
+sidebarTitle: Audit log
+---
+
+The audit log is the immutable record of every state-changing action in your LangWatch organization, who did what to which resource, when, from where. It lives at `/settings/audit-log` and shows up in the **Settings → Teams & Access** sidebar group.
+
+<Info>**Pairs with:** [Compliance architecture](/ai-governance/compliance-architecture) (the OCSF v1.1 export consumes the same event stream), [CLI debug](/ai-governance/cli-debug) (`langwatch governance status` mirrors the same setup-state signals the audit log records on first activation), and [Ingestion sources](/ai-governance/ingestion-sources) (S3 audit log feeds from external SaaS platforms, Workato, Copilot Studio, Anthropic Compliance, land here as OTel-shaped events through the same pipeline, so a single audit log query covers in-platform mutations *and* third-party-tool activity in one place).</Info>
+
+<Note>**Permission required**: the audit log surface is gated to `organization:manage` (admins). Members on the org see an "Access Restricted" panel when they navigate here directly. The underlying tRPC procedure is also gated server-side, so direct API calls return UNAUTHORIZED for non-admins.</Note>
+
+## What lands in the log
+
+Two streams write into the same `AuditLog` table, the audit log lists them interleaved by timestamp.
+
+| Stream | Source | Examples |
+|---|---|---|
+| **Platform** (control plane) | tRPC mutations on the Next.js app | `organization.createInvites`, `gatewayBudgets.create`, `ingestionSources.rotate`, `team.update`, `roleBinding.assignToUser`, `virtualKeys.create` |
+| **Gateway** (data plane) | Domain events emitted by the Go AI Gateway | `gateway.budget.created`, `gateway.virtualKey.minted`, `gateway.routingPolicy.applied` |
+
+A single user action often produces both: creating a Gateway Budget through the admin UI writes a `gatewayBudgets.create` Platform row *and* a `gateway.budget.created` Gateway row, both stamped with the same `targetId` so you can correlate them in the same view.
+
+## Columns
+
+Each row shows:
+
+| Column | Source | Notes |
+|---|---|---|
+| **Timestamp** | wall-clock at the time of the mutation | rendered with relative-age helper (`3 minutes ago`) plus the full local timestamp |
+| **Source** | Either `Platform` or `Gateway` chip | discriminator across the two streams |
+| **User** | Display name + email of the caller | empty for system-emitted gateway events with no human actor |
+| **Action** | Dotted action path (`organization.createInvites`) | exactly the tRPC procedure name or the Gateway domain event name |
+| **Target** | Two-line cell, kind on top, ID below | e.g. `budget`, `_pE3XIGR7XOoUwH8G3mcB` |
+| **Project** | Project name when the action was project-scoped | empty for org-level mutations |
+| **IP address** | Caller IP when present | omitted for server-side, scheduled jobs |
+| **Error** | Exception class + message when the action failed | empty for successful mutations |
+
+The Target column is populated by a recursive walker that handles every shape a tRPC mutation might return: a direct `{id}`, a wrapped `{source: {id}}`, an array of created entities (`[{invite: {id}}, ...]` for bulk-create like `organization.createInvites`), or a wrapped array. Walking depth is capped to surface the entity ID without leaking nested unrelated IDs.
+
+## Filtering
+
+Four filters across the top of the table:
+
+- **Search by User**: name or email substring match.
+- **Filter by Action**: substring match against the action path. Type `createInvites` to pin every invite-creation row across the org's history. The URL updates to `/settings/audit-log?actionFilter=<value>&pageOffset=0` so any filtered view is bookmarkable.
+- **Project**: dropdown of every project in the org plus an "All Projects" option. When two projects share the same display name (e.g. two users' "Personal Workspace"), the dropdown automatically appends a parent-team suffix (`Personal Workspace · Alice's Workspace`, `Personal Workspace · Bob's Workspace`) so they're disambiguated visually.
+- **Select Date**: preset windows (`Last 30 days`, `Last 7 days`, custom range).
+
+The four filters compose with AND. Pagination is below the table; **Items per page** can be set to 10, 25, 50, 100, 250.
+
+## Export
+
+**Export CSV** at the top right downloads the currently filtered view as a CSV. The CSV preserves every column shown in the table (plus a few rarely-rendered ones, `requestId`, `domainErrorCode`) so it round-trips into spreadsheets, BI tools, or your SIEM if you'd rather not wire the [OCSF API](/ai-governance/compliance-architecture) just to dump a quick incident timeline.
+
+## Retention
+
+Audit log retention follows the [governance retention class](/ai-gateway/governance/retention) configured for the organization:
+
+- `thirty_days`, Apache 2.0 floor; rows older than 30d are dropped.
+- `one_year`, Enterprise.
+- `seven_years`, Enterprise. Recommended for SOC 2, ISO 27001, and HIPAA orgs that need a multi-year audit trail.
+
+Retention applies to the underlying ClickHouse partition; the Postgres `AuditLog` mirror table retains forever for fast UI lookups against the most recent ~year. The full retention model is described in [Compliance architecture](/ai-governance/compliance-architecture).
+
+## Common admin questions
+
+| Question | Where to look |
+|---|---|
+| Who invited the new contractor account? | Filter `Action: organization.createInvites`, scan **Target** for the invite ID, click into **Members → Invites** for the email. |
+| When did the budget for project Foo get raised? | Filter `Action: gatewayBudgets.update` + Project = Foo. The diff between two rows is the change. |
+| Why did the gateway start blocking requests? | Filter `Source: Gateway` + `Action: gateway.budget.breached`. Each breach event carries the budget ID. |
+| Did anyone touch SSO config last weekend? | Filter `Action: organization.update` + date range. SSO provider field changes appear in the diff payload. |
+| Was the rotation of the `lw_is_*` ingest secret recorded? | Filter `Action: ingestionSources.rotate`. The Target ID is the IngestionSource ID. |
+
+## Where to next
+
+- **Forward to your SIEM**: every row is OCSF v1.1 mapped and replayable via the cron-pull API. See [Compliance architecture](/ai-governance/compliance-architecture).
+- **Detect patterns automatically**: [Anomaly Rules](/ai-governance/anomaly-rules) operate on the same event stream and fire `AnomalyAlert` rows when thresholds are crossed.
+- **Programmatic reads**: the underlying tRPC procedure is `organization.getAuditLogs` (admin-only). The CSV export uses the same procedure with no pagination.

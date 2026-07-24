@@ -1,0 +1,10 @@
+{
+  "lockfileVersion": 1,
+  "prompts": {
+    "agent/performance": {
+      "version": 1,
+      "versionId": "prompt_version_Q6pQJaC-UBIT-u6-f-ZTW",
+      "materialized": "prompts/agent/performance.prompt.yaml"
+    }
+  }
+}

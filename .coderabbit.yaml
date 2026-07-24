@@ -1,0 +1,453 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+# Docs: https://docs.coderabbit.ai/reference/configuration
+#
+# Issue #3754. The investigation produced four flips off the original ACs:
+#  (1) AC1 split — YAML alone is advisory; branch-protection lives in AC1b.
+#  (2) AC3 deterministic rules move to ast-grep / semgrep; path_instructions
+#      keeps only judgment rules.
+#  (3) AC5 leaves CodeRabbit entirely (path_instructions cannot see PR
+#      descriptions). It now lives in .github/workflows/deployment-impact-check.yml.
+#  (4) Phased rollout — mode:warning for sprint 1, per-rule promotion to error
+#      after baseline is verifiably clean for that rule.
+#
+# All path_instructions below say "flag only newly added or modified lines" —
+# the baseline has 527 `any`s, 5 CH migrations with $CLICKHOUSE_DATABASE, etc.
+# Without that framing every PR touching legacy files gets spammed.
+
+language: en
+early_access: false
+tone_instructions: >
+  Be terse and concrete. Quote the rule that was violated. Cite the file and
+  line. Skip platitudes ("consider", "you might want to"). When unsure,
+  recommend the safer option and say so.
+
+reviews:
+  profile: assertive
+  # request_changes_workflow: false disables CodeRabbit's approval verdicts —
+  # both the automatic post-resolution Approve and the manual @coderabbitai
+  # approve command require this to be true. CodeRabbit's reviews land as
+  # COMMENTED, so they cannot satisfy the required_approving_review_count gate;
+  # a human must still approve. (PR #4672 merged on CR's approval alone before
+  # this was set.)
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+
+  # Phased rollout. Promote individual checks to mode:error in follow-up PRs
+  # after baseline is clean for that check.
+  pre_merge_checks:
+    title:
+      mode: warning
+    description:
+      mode: warning
+    docstrings:
+      mode: warning
+
+  tools:
+    # Secrets / API keys (Betterleaks-backed; v2 schema preserves the key name).
+    gitleaks:
+      enabled: true
+    # Pattern-based PII / unsafe-code rules. CR does not autoload community
+    # packs — the ruleset lives at .semgrep/langwatch.yml in this repo.
+    semgrep:
+      enabled: true
+      config_file: .semgrep/langwatch.yml
+    # Deterministic syntactic rules (AC3) — see .coderabbit/ast-grep/rules/.
+    ast-grep:
+      essential_rules: true
+      rule_dirs:
+        - .coderabbit/ast-grep/rules
+
+  path_instructions:
+    # ── AC4: structural ${...} guard ───────────────────────────────────────
+    # PR #3476 leaked a literal "${HOME/workspace/orchard-codex/contracts}"
+    # directory into main. path_filters can't exclude these (exclusion skips
+    # the files entirely and path_instructions never fire — fa3bbc7ef on this
+    # branch's history fixed exactly that). Positive fail-rule on a permissive
+    # glob is the working form.
+    - path: "**/*"
+      instructions: |
+        FAIL the review (request changes) when any newly added or renamed
+        file path contains an unexpanded shell variable segment such as
+        "${HOME...", "${VAR...", or any path segment starting with "${".
+        These are bugs from broken env-var expansion, never intentional
+        content. This rule applies to path names only — file contents are
+        not in scope here.
+
+    # ── AC2: PII rules (judgment-level — patterns are in .semgrep) ────────
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines in this PR. Do NOT flag
+        pre-existing code unless it is part of the diff.
+
+        FAIL when logging, analytics, or telemetry calls (console.*,
+        logger.*, posthog.*, Sentry.*, captureException, track, identify)
+        include user-identifying fields — email, phone, name, IP, userId,
+        projectSlug, organizationId, apiKey, token — without an explicit
+        redaction wrapper (`redact(...)`, `hashEmail(...)`, masking) or a
+        comment marking it as intentional.
+
+        FAIL when a new HTTP endpoint or tRPC procedure returns PII without
+        both: (a) an explicit auth check (`ctx.session.user` consulted) and
+        (b) an audit-log write (`auditLog.create` or equivalent).
+
+    - path: "**/*.{py,go,ts,tsx,js,jsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when adding a new `print`, `console.log`, `fmt.Print*`,
+        `log.Info*`, or analytics call that emits a raw request body, full
+        headers map, raw cookie, or `Authorization` header. Log only the
+        fields needed for debugging, redact the rest.
+
+    # ── AC3: layering / convention rules (judgment, not syntax) ────────────
+    # Syntactic checks (no `any`, inline import(), form.watch() in child,
+    # export * from re-export shims) live in .coderabbit/ast-grep/rules/.
+    # ClickHouse fully-qualified table names live in .semgrep/langwatch.yml.
+    # path_instructions only carries the judgment calls.
+    #
+    # NOTE: each layering/convention rule below is in its own path_instructions
+    # block. Smoke testing (#4166) showed that bundling 4 unrelated FAIL
+    # conditions under one block caused CR to surface only 1 of them. Smaller
+    # focused blocks fire reliably.
+
+    # tRPC Zod gating — every router/procedure path.
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a tRPC router/procedure is declared without an explicit
+        `.input(z.object({...}))` or equivalent Zod schema — including
+        procedures with no input (use `z.void()` or `z.object({})`).
+
+    # Service→UI layering guard. Glob scoped to the layers that must NOT
+    # import from UI. Smoke PR caught the violation as part of a generic
+    # comment, not surfaced under this rule — narrowing the glob makes CR
+    # consult this block only on those files, raising firing reliability.
+    - path: "langwatch/src/{server,services}/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when this file imports from `~/components`, `~/components/...`,
+        or any `langwatch/src/components/**` path. Server-layer code and
+        service-layer code must not depend on UI components. Allowed
+        dependency direction is UI → services and UI → server; the reverse
+        (server or service code importing UI) is never allowed.
+
+    # Class component ban — restrict to component-bearing surface to keep
+    # this from getting noisy on non-component files.
+    - path: "langwatch/src/**/*.tsx"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a new React component is declared as a class component
+        (`class X extends React.Component`, `class X extends Component`).
+        Use function components + hooks instead.
+
+    # Localhost-fallback judgment fallback (the ast-grep rule covers the
+    # syntactic shapes; this catches creative variations the syntactic
+    # rule misses).
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when code adds a default fallback URL of the form
+        `?? "http://localhost..."` or `?? "https://..."` (including
+        template-literal variants like `?? \`http://localhost:${...}\``).
+        Required env vars must be validated through the Zod env schema and
+        consumed without fallbacks.
+
+    - path: "langwatch/package.json"
+      instructions: |
+        FAIL when newly added dependencies include `jest`, `@types/jest`,
+        `babel-jest`, `ts-jest`, or jest plugins. Use Vitest. Pre-existing
+        jest dependencies are out of scope here — promotion of this rule
+        depends on a separate jest → vitest migration.
+
+    - path: "langwatch/src/server/{repositories,services}/**/*.{ts,tsx}"
+      instructions: |
+        Repository methods (under `langwatch/src/server/repositories/**`)
+        must be named `findAll` / `findById` / `findBy*` / `create` / `update`
+        / `delete`. Service methods (under `langwatch/src/server/services/**`)
+        must be named `getAll` / `getById` / `getBy*` / `create` / `update`
+        / `delete`. FAIL when a NEW repository method uses a `get*` prefix
+        or a NEW service method uses a `find*` prefix.
+
+    - path: "{cmd,pkg,internal,services}/**/*.go"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a Hono or chi route handler reaches directly into a
+        repository (`*Repository`/`*Repo` struct) instead of going through
+        a service layer. Hono/chi routes call services; services call
+        repositories.
+
+    - path: "**/migrations/**/*.{sql,ts,go}"
+      instructions: |
+        Migrations must be reversible: include a `down`/`Down` step that
+        actually undoes the `up` step, or include a comment block beginning
+        `IRREVERSIBLE:` explaining why (data-destructive, schema-only, etc.).
+        FAIL when neither is present.
+
+    # ── House-style rules sourced from dev/docs/best_practices/ ────────────
+    # Cite the source doc in your comment so authors can read the rationale.
+
+    # react.md: hooks must not return JSX. Hooks return state + callbacks;
+    # the consumer renders. JSX-returning hooks couple rendering to logic
+    # and hide the component tree.
+    - path: "langwatch/src/**/hooks/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a hook function (name starts with `use`) returns JSX.
+        Hooks return state and callbacks; consumers render. Cite
+        `dev/docs/best_practices/react.md` § Hooks.
+
+    # react.md: hook files should be .ts, not .tsx. A .tsx hook file means
+    # the hook returns JSX — same anti-pattern as above.
+    - path: "langwatch/src/**/hooks/**/use*.tsx"
+      instructions: |
+        FAIL: hook files must be `.ts`, not `.tsx`. A `.tsx` hook file is
+        a smell — the JSX belongs in the consumer component. Move the JSX
+        out and rename to `.ts`. See `dev/docs/best_practices/react.md`.
+
+    # typescript.md: exhaustive switches need a `never` check in default.
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW `switch` over a discriminated-union or enum type
+        lacks an exhaustiveness check in the `default:` case. The check
+        must assign the scrutinee to a `never`-typed variable
+        (`const _exhaustive: never = x;` or `assertNever(x);`). Without it,
+        adding a new variant later silently falls through. See
+        `dev/docs/best_practices/typescript.md` § Exhaustive switches.
+
+    # typescript.md: named params for 2+ args on exported functions.
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW exported function takes 2+ positional parameters
+        of the same primitive type (string, string, string) or where the
+        call site is non-obvious (`(scenarioId, target, setId)`). Use
+        object-destructuring instead: `({ scenarioId, target, setId })`.
+        Two-parameter functions where the types differ obviously
+        (e.g., `(id: string, options: { ... })`) are fine. See
+        `dev/docs/best_practices/typescript.md` § Named parameters.
+
+    # soft-delete-vs-archive.md: archivedAt, not deletedAt.
+    - path: "langwatch/{prisma/schema.prisma,src/server/**/*.{ts,tsx}}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW Prisma model field, repository method, or service
+        method introduces `deletedAt` for soft-delete semantics. The
+        house pattern is `archivedAt DateTime?` with a `findAll` that
+        filters `archivedAt IS NULL` by default, plus
+        `find*IncludingArchived` variants for the cases that need them.
+        Existing `deletedAt` fields are out of scope here (migration is
+        tracked in #1889). See
+        `dev/docs/best_practices/soft-delete-vs-archive.md`.
+
+    # ksuids.md: user-facing IDs use KSUIDs at the service/repository layer.
+    - path: "langwatch/src/server/{repositories,services}/**/*.ts"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW repository or service `create` method writes a
+        user-facing entity (one that shows up in URLs, API responses,
+        exports, or webhooks) using a Prisma default id
+        (`@default(nanoid())`, `@default(cuid())`, `@default(uuid())`)
+        instead of generating a prefixed KSUID via
+        `generate(KSUID_RESOURCES.X).toString()`. Internal join tables
+        (`*Scope`, `*Link`) may keep Prisma defaults. See
+        `dev/docs/best_practices/ksuids.md`.
+
+    # clickhouse-queries.md anti-pattern 1: ORDER BY <version> DESC LIMIT 1.
+    - path: "langwatch/src/server/clickhouse/**/*.{ts,sql}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW ClickHouse query selects heavy columns (Messages,
+        ComputedInput, Inputs, Details, SpanAttributes, RoleCosts,
+        Metadata) AND uses one of these anti-patterns:
+
+          (a) `ORDER BY <Version|UpdatedAt> DESC LIMIT 1` to pick the
+              latest version. Use the IN-tuple dedup pattern instead.
+          (b) `LIMIT 1 BY <key>` over heavy columns. Move the dedup into
+              a lightweight inner subquery (key columns only) and select
+              heavy columns in the outer query.
+
+        Cite `dev/docs/best_practices/clickhouse-queries.md` § Deduplication.
+
+    # design/guidelines.md §6: form Save button disables only on isPending,
+    # never on !form.formState.isValid. Pre-disabling is silent and
+    # frustrating; validation errors must surface inline or via toast.
+    - path: "langwatch/src/**/*.tsx"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW submit button uses `disabled={!form.formState.isValid}`,
+        `disabled={!isValid}`, `disabled={!formState.isValid}`, or any
+        variant that disables the button based on validity state.
+        Submit buttons disable ONLY while a request is in flight
+        (`disabled={mutation.isPending}` is the canonical shape).
+        Validation errors must surface inline (Field.ErrorText) or via
+        toast in the submit handler. See
+        `dev/docs/design/guidelines.md` § 6 and ADR-018.
+
+    # design/guidelines.md §3: prefer Drawer wrapper, not raw Chakra Modal.
+    # Biome's noRestrictedImports already bans @chakra-ui/react Dialog/Drawer/
+    # Modal — this catches the path_instructions side (new code introducing
+    # modal-style flows that should use Dialog wrapper).
+    - path: "langwatch/src/**/*.tsx"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when NEW resource creation, editing, or selection flows are
+        wired through a Dialog-style modal instead of a Drawer (e.g.,
+        adding a new "Create X" form behind a centered modal). Drawers
+        maintain context by keeping the underlying page visible.
+        Confirmation prompts (delete, discard) and simple alerts may
+        stay as Dialogs. See `dev/docs/design/guidelines.md` § 3.
+
+    # ── AC7: SOLID / Clean Code / KISS / YAGNI / Boy Scout ─────────────────
+    # Principle-level checks. Each FAIL is one specific, observable failure
+    # mode — not vibes-based "this looks SOLID-y" judgement. All flag only
+    # newly added or modified lines.
+    - path: "**/*.{ts,tsx,js,jsx,py,go,rs}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        # SRP (Single Responsibility)
+        FAIL when a NEW file exceeds 300 source lines (excluding blank lines
+        and comments). Long files are SRP-violation evidence. Exception:
+        generated files, schema/migration files, fixture/snapshot files,
+        lockfiles.
+
+        FAIL when a NEW exported function exceeds 60 source lines or has
+        cyclomatic complexity > 10. Long functions mix abstraction levels.
+
+        FAIL when a NEW class or struct exposes methods spanning more than
+        one obvious concern (e.g., HTTP handling + persistence + email
+        sending). Name the responsibilities you see.
+
+        # DIP (Dependency Inversion) + dependency direction
+        FAIL when a higher-level module imports a lower-level concrete
+        implementation directly where an interface/port exists. Example:
+        a service importing a concrete `*Repository` class when a repository
+        interface is defined.
+
+        FAIL when the dependency direction crosses layer boundaries the
+        wrong way (UI → server is allowed, server → UI is not; domain →
+        infrastructure is not allowed; tests → src is allowed, src → tests
+        is not).
+
+        # OCP / ISP — flag, do not fail
+        Comment (do not fail) when a `switch`/`if-else` chain on a type
+        discriminator is added and a polymorphic alternative is plausible.
+
+        # Clean Code — naming
+        FAIL when a NEW public symbol (exported function, class, type,
+        const) uses a vague name: `data`, `info`, `value`, `item`, `obj`,
+        `tmp`, `temp`, `util`, `helper`, `manager`, `handler` (alone, not
+        as a suffix), or single-letter identifiers outside loop/lambda
+        context. Quote the name.
+
+        FAIL when a NEW boolean variable, parameter, or property is named
+        without an `is`/`has`/`should`/`can`/`will` prefix (or domain
+        equivalent like `enabled`, `visible`). Example: `loading: boolean`
+        should be `isLoading`.
+
+        # Clean Code — comments
+        FAIL when a NEW comment restates what the code already says (e.g.,
+        `// increment counter` above `counter++`). Comments must explain
+        *why*, not *what*.
+
+        FAIL when a NEW doc-comment block is purely decorative (only
+        contains the symbol name, type, or auto-generated boilerplate).
+
+        # KISS / YAGNI
+        FAIL when a NEW abstraction (interface, factory, strategy, adapter)
+        has exactly one implementation in this diff AND there is no caller
+        already using the abstraction. That is speculative — inline the
+        implementation until a second caller exists.
+
+        FAIL when a NEW configuration flag, env var, or feature toggle is
+        added without at least one referenced consumer in the same PR.
+
+        FAIL when NEW code is added behind `if (false)`,
+        `if (process.env.UNDEFINED_FLAG)`, or commented-out blocks "for
+        later." Delete it — git remembers.
+
+        # Boy Scout (do not fail — comment only)
+        Comment when a file is touched and contains adjacent in-file smells
+        that could be fixed in the same commit (dead imports, commented-out
+        code, obvious typos in identifiers, unused exports reachable in the
+        diff context). Cite the line and the smell — the author decides
+        whether to fix or note as out of scope.
+
+        # Done-means-verified
+        Comment when a PR description claims a behavior is "verified" /
+        "tested" / "works" but the diff contains no corresponding test, no
+        command output, and no screenshot. Quote the claim and ask for
+        evidence.
+
+    # ── AC8: BDD/TDD + public-API docs ─────────────────────────────────────
+    - path: "langwatch/src/**/*.{ts,tsx}"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW exported function, class, or hook is added without
+        either: (a) a corresponding new or updated test file under
+        `**/__tests__/**` or `**/*.{test,spec}.{ts,tsx}`, or (b) an explicit
+        `// no-test:` justification comment naming the reason (e.g., pure
+        re-export, type-only file, framework boilerplate).
+
+        FAIL when a NEW exported function or class lacks a JSDoc/TSDoc
+        comment block. The block must contain at least one sentence of
+        purpose (not just `@param`/`@returns`). Internal/non-exported
+        symbols are exempt.
+
+    - path: "{cmd,pkg,internal,services}/**/*.go"
+      instructions: |
+        Flag ONLY on newly added or modified lines.
+
+        FAIL when a NEW exported (capitalised) Go function, type, or method
+        lacks a doc-comment starting with the symbol name (Go convention).
+
+        FAIL when NEW Go production code is added under `cmd/`, `pkg/`,
+        `internal/`, or `services/` without a corresponding `_test.go`
+        test, or without a `// no-test:` justification comment.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  # Capture house-style markers deterministically. Cheap, single-line addition.
+  # Includes best_practices (TypeScript, React, ClickHouse, KSUIDs, repository
+  # pattern, soft-delete, etc.), design system (Chakra wrappers, drawer
+  # preference, form submit-then-surface), and ADRs (RBAC, event sourcing,
+  # logging, repository-service layering, form validation, etc.) so CR can
+  # cite the source in its review comments.
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - "**/CLAUDE.md"
+      - "AGENTS.md"
+      - "dev/docs/best_practices/**/*.md"
+      - "dev/docs/design/**/*.md"
+      - "dev/docs/adr/**/*.md"
+      - "docs/adr/**/*.md"
+  # Off per #3754 non-goals.
+  learnings:
+    scope: local
+  issues:
+    scope: local

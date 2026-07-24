@@ -1,0 +1,165 @@
+---
+title: Evaluating an AI Coach with LLM-as-a-Judge
+description: Evaluate AI coaching systems using LangWatch with LLM-as-a-Judge scoring to measure quality and consistency in agent behavior.
+keywords: AI coach, evaluation, LangWatch, AI therapist, AI Leadership
+---
+
+This guide demonstrates how to build a robust evaluation pipeline for a sophisticated conversational AI, like an AI coach. Since coaching quality is subjective, we'll use a panel of specialized LLM-as-a-Judge evaluators to score different aspects of the conversation.
+
+We'll use LangWatch to orchestrate this evaluation, track the boolean (pass/fail) outputs from each judge, and compare them against an expert-annotated dataset.
+
+### **1. The Scenario**
+Our AI coach needs to hold nuanced, reflective conversations. We want to verify that its responses adhere to our desired coaching methodology. For example, we want it to ask open-ended questions but avoid giving direct advice or repeating itself.
+
+* **Input**: The user's message and the full conversation_history.
+* **Output**: The AI coach's response.
+* **Evaluation**: A set of boolean judgments on the quality and style of the response.
+
+### **2. Setup and Data Preparation**
+Our evaluation dataset is key. It contains not only the conversation turns but also the expected outcomes for each of our custom judges. These ground truth labels are typically annotated by domain experts.
+
+```python
+import langwatch
+import pandas as pd
+import json
+
+# Authenticate with LangWatch
+langwatch.login()
+
+# Create a sample evaluation dataset (or load one from [LangWatch Datasets](https://docs.langwatch.ai/evaluations/experiments/sdk#use-langwatch-datasets)). In a real workflow, you would load this
+# from a CSV or directly from LangWatch Datasets.
+data = [
+    {
+        "input": "I feel stuck in my career and don't know what to do next.",
+        "output": "That sounds challenging. What's one small step you think you could explore this week?",
+        "conversation_history": "[]", # Start of conversation
+        "expected_did_ask_question": True,
+        "expected_did_not_loop": True,
+    },
+    {
+        "input": "I'm not sure. I guess I could update my resume.",
+        "output": "That sounds like a good starting point. What's one small step you could take to begin?",
+        "conversation_history": json.dumps([
+            {"role": "user", "content": "I feel stuck in my career and don't know what to do next."},
+            {"role": "assistant", "content": "That sounds challenging. What's one small step you think you could explore this week?"}
+        ]),
+        # This output is repetitive, so we expect the 'looping' judge to fail.
+        "expected_did_ask_question": True,
+        "expected_did_not_loop": False,
+    },
+]
+df = pd.DataFrame(data)
+print("Sample evaluation data:")
+print(df)
+```
+
+### **3. Defining the Custom LLM Judges**
+Each "judge" is a function that calls an LLM with a specific prompt, asking it to evaluate one aspect of the AI's response. It takes the conversation context and returns a simple boolean.
+
+Here are two example judges:
+
+```python
+from pydantic import BaseModel
+from openai import OpenAI
+
+class JudgeAnswer(BaseModel):
+    result: bool
+
+def run_stacking_judge_llm(model_output: str) -> JudgeAnswer:
+    """LLM judge: Does the response include an open-ended question?"""
+    prompt = "You are an evaluator checking whether the AI coach response includes at least one open-ended question "
+
+    response = client.responses.parse(
+        model="gpt-5",
+        instructions=prompt,
+        response_format=JudgeAnswer,
+        input={"role": "user", "content": f"AI Response: {model_output}"},
+    )
+    return response.output
+
+# This judge needs the full conversation history to detect repetition.
+def run_looping_judge_llm(model_output: str, history_json: str) -> bool:
+    """LLM judge: Is the response a repetition of the previous assistant message?"""
+    prompt = "You are an evaluator checking for repetition in an AI coach's behavior. "
+
+    conversation_history = json.loads(history_json)
+    messages = [{"role": "user", "content": f"Response: {model_output}"}]
+    if conversation_history:
+        messages.append({
+            "role": "user",
+            "content": f"Previous conversation:\n{json.dumps(conversation_history, indent=2)}"
+        })
+
+    response = client.responses.parse(
+        model="gpt-5",
+        instructions=prompt,
+        response_format=JudgeAnswer,
+        input=messages,
+    )
+    return response.output
+```
+
+### **4. Implementing the Evaluation Script**
+Now we'll use LangWatch to run our judges against the dataset and log the results. We'll use `evaluation.submit()` to run the evaluations in parallel, which is highly effective when running multiple independent judges per data sample.
+
+```python
+# Initialize a new evaluation run in LangWatch
+evaluation = langwatch.experiment.init("ai-coach-quality-v3-run-001")
+
+# Use evaluation.loop() with evaluation.submit() for parallel execution.
+# This speeds things up, as each judge can run independently.
+for idx, row in evaluation.loop(df.iterrows(), threads=4):
+
+    # Define a function to evaluate a single row from the dataset
+    def evaluate_sample(index, data_row):
+        # --- Run our custom judges ---
+        actual_did_ask_question = run_stacking_judge(data_row["output"])
+        actual_did_not_loop = run_looping_judge(data_row["output"], data_row["conversation_history"])
+
+        # --- Log the result for the 'Stacking Judge' ---
+        stacking_judge_passed = (actual_did_ask_question == data_row["expected_did_ask_question"])
+        evaluation.log(
+            "stacking_judge_passed",
+            index=index,
+            passed=stacking_judge_passed,
+            data={
+                "input": data_row["input"],
+                "output": data_row["output"],
+                "actual_value": actual_did_ask_question,
+                "expected_value": data_row["expected_did_ask_question"],
+            }
+        )
+
+        # --- Log the result for the 'Looping Judge' ---
+        looping_judge_passed = (actual_did_not_loop == data_row["expected_did_not_loop"])
+        evaluation.log(
+            "looping_judge_passed",
+            index=index,
+            passed=looping_judge_passed,
+            data={
+                "input": data_row["input"],
+                "output": data_row["output"],
+                "actual_value": actual_did_not_loop,
+                "expected_value": data_row["expected_did_not_loop"],
+                "conversation_history": data_row["conversation_history"],
+            }
+        )
+
+    # Submit the function to run in a separate thread
+    evaluation.submit(evaluate_sample, idx, row)
+
+print("\nEvaluation complete! Check your results in the LangWatch dashboard.")
+```
+
+### **5. Analyzing the Results in LangWatch**
+This script produces a detailed, multi-faceted evaluation of your AI coach. In the LangWatch dashboard, you can:
+
+* **See an Overview**: Get an aggregate pass/fail rate for each judge (e.g., `stacking_judge_passed`, `looping_judge_passed`) across your entire dataset.
+* **Filter for Failures**: Instantly isolate all conversation turns where a specific judge failed. For example, you can view all samples where `looping_judge_passed` was False to understand why your model is getting repetitive.
+* **Compare Runs**: Easily compare results from `ai-coach-quality-v3-run-001` against future runs to track the impact of your changes and prevent regressions.
+
+### **6. Conclusion**
+
+By implementing this evaluation framework with LangWatch, you can systematically improve the quality and consistency of your AI coaching conversations. The combination of specialized LLM judges and ground truth annotations provides a robust way to measure and enhance key aspects of coaching interactions, from question quality to conversational flow. This approach ensures your AI coach maintains high standards of engagement and effectiveness as it scales to serve more users.
+
+For more examples of building and evaluating conversational AI, explore [Scenarios](https://langwatch.ai/scenario/).

@@ -1,0 +1,514 @@
+"""
+Tests for LocalPromptLoader functionality.
+"""
+
+import json
+import tempfile
+import warnings
+from pathlib import Path
+
+import pytest
+
+from langwatch.prompts.local_loader import LocalPromptLoader
+
+
+def test_load_prompt_from_local_files():
+    """
+    GIVEN local prompt files exist in CLI format
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should return a properly formatted PromptData
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        # Create prompts-lock.json
+        lock = {
+            "prompts": {
+                "my-prompt": {
+                    "version": 0,
+                    "versionId": "local",
+                    "materialized": "prompts/my-prompt.prompt.yaml",
+                }
+            }
+        }
+        (temp_path / "prompts-lock.json").write_text(json.dumps(lock))
+
+        # Create the prompt file
+        prompts_dir = temp_path / "prompts"
+        prompts_dir.mkdir()
+
+        prompt_content = """model: openai/gpt-4
+modelParameters:
+  temperature: 0.7
+messages:
+  - role: system
+    content: You are a helpful assistant.
+  - role: user
+    content: "{{input}}"
+"""
+        (prompts_dir / "my-prompt.prompt.yaml").write_text(prompt_content)
+
+        # Test the loader
+        loader = LocalPromptLoader(temp_path)
+        result = loader.load_prompt("my-prompt")
+
+    # Verify the result
+    assert result is not None
+    assert result.handle == "my-prompt"
+    assert result.model == "openai/gpt-4"
+    assert len(result.messages) == 2
+    assert result.messages[0].role == "system"
+    assert result.messages[0].content == "You are a helpful assistant."
+    assert result.messages[1].role == "user"
+    assert result.messages[1].content == "{{input}}"
+
+
+def test_load_prompt_with_response_format():
+    """
+    GIVEN a local prompt file with response_format
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should parse response_format into a ResponseFormat model
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        lock = {
+            "prompts": {
+                "my-prompt": {
+                    "version": 0,
+                    "versionId": "local",
+                    "materialized": "prompts/my-prompt.prompt.yaml",
+                }
+            }
+        }
+        (temp_path / "prompts-lock.json").write_text(json.dumps(lock))
+
+        prompts_dir = temp_path / "prompts"
+        prompts_dir.mkdir()
+
+        prompt_content = """model: openai/gpt-4
+messages:
+  - role: system
+    content: You are a helpful assistant.
+response_format:
+  name: my_schema
+  schema:
+    type: object
+    properties:
+      answer:
+        type: string
+"""
+        (prompts_dir / "my-prompt.prompt.yaml").write_text(prompt_content)
+
+        loader = LocalPromptLoader(temp_path)
+        result = loader.load_prompt("my-prompt")
+
+    assert result is not None
+    assert result.response_format is not None
+    assert result.response_format.type == "json_schema"
+    assert result.response_format.json_schema["name"] == "my_schema"
+    assert result.response_format.json_schema["schema"]["type"] == "object"
+
+
+def test_load_prompt_returns_none_when_no_prompts_json():
+    """
+    GIVEN no prompts.json file exists
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should return None
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        loader = LocalPromptLoader(Path(temp_dir))
+        result = loader.load_prompt("nonexistent-prompt")
+        assert result is None
+
+
+def test_load_prompt_returns_none_when_prompt_not_in_config():
+    """
+    GIVEN prompts.json exists but doesn't contain the requested prompt
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should return None
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json without the requested prompt
+        config = {"prompts": {"other-prompt": "file:prompts/other-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        loader = LocalPromptLoader(temp_path)
+        result = loader.load_prompt("my-prompt")
+        assert result is None
+
+
+def test_load_prompt_returns_none_when_no_lock_file():
+    """
+    GIVEN prompts.json exists but no prompts-lock.json
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should return None
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        loader = LocalPromptLoader(temp_path)
+        result = loader.load_prompt("my-prompt")
+        assert result is None
+
+
+def test_load_prompt_returns_none_when_prompt_file_missing():
+    """
+    GIVEN prompts.json and prompts-lock.json exist but actual prompt file is missing
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should return None
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        # Create prompts-lock.json
+        lock = {
+            "prompts": {
+                "my-prompt": {
+                    "version": 0,
+                    "versionId": "local",
+                    "materialized": "prompts/my-prompt.prompt.yaml",
+                }
+            }
+        }
+        (temp_path / "prompts-lock.json").write_text(json.dumps(lock))
+
+        # Don't create the actual prompt file
+
+        loader = LocalPromptLoader(temp_path)
+        result = loader.load_prompt("my-prompt")
+        assert result is None
+
+
+def test_load_prompt_handles_yaml_parsing_errors():
+    """
+    GIVEN local files exist but prompt YAML is malformed
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should return None (graceful fallback) and issue a warning
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        # Create prompts-lock.json
+        lock = {
+            "prompts": {
+                "my-prompt": {
+                    "version": 0,
+                    "versionId": "local",
+                    "materialized": "prompts/my-prompt.prompt.yaml",
+                }
+            }
+        }
+        (temp_path / "prompts-lock.json").write_text(json.dumps(lock))
+
+        # Create malformed YAML file
+        prompts_dir = temp_path / "prompts"
+        prompts_dir.mkdir()
+        (prompts_dir / "my-prompt.prompt.yaml").write_text("invalid: yaml: content: [")
+
+        loader = LocalPromptLoader(temp_path)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = loader.load_prompt("my-prompt")
+
+            assert result is None
+            assert len(w) == 1
+            assert "Failed to parse prompt file" in str(w[0].message)
+            assert "my-prompt" in str(w[0].message)
+
+
+def test_load_prompt_warns_when_lock_file_missing():
+    """
+    GIVEN prompts.json exists but prompts-lock.json is missing
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should return None and warn the user to run 'langwatch prompt pull'
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        # Don't create prompts-lock.json
+
+        loader = LocalPromptLoader(temp_path)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = loader.load_prompt("my-prompt")
+
+            assert result is None
+            assert len(w) == 1
+            assert "prompts-lock.json not found" in str(w[0].message)
+            assert "langwatch prompt pull" in str(w[0].message)
+
+
+def test_load_prompt_warns_when_prompt_file_missing():
+    """
+    GIVEN prompts.json and prompts-lock.json exist but actual prompt file is missing
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it should return None and warn the user to run 'langwatch prompt pull'
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        # Create prompts-lock.json
+        lock = {
+            "prompts": {
+                "my-prompt": {
+                    "version": 0,
+                    "versionId": "local",
+                    "materialized": "prompts/my-prompt.prompt.yaml",
+                }
+            }
+        }
+        (temp_path / "prompts-lock.json").write_text(json.dumps(lock))
+
+        # Don't create the actual prompt file
+
+        loader = LocalPromptLoader(temp_path)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = loader.load_prompt("my-prompt")
+
+            assert result is None
+            assert len(w) == 1
+            assert "Prompt file not found" in str(w[0].message)
+            assert "langwatch prompt pull" in str(w[0].message)
+
+
+def test_load_prompt_warns_once_when_no_base_path_and_no_prompts_json(monkeypatch):
+    """
+    GIVEN no base_path is configured (using cwd) and prompts.json doesn't exist
+    WHEN LocalPromptLoader.load_prompt() is called multiple times
+    THEN it warns once about configuring prompts_path via langwatch.setup()
+    """
+    # Reset the warning flag and cache before test
+    LocalPromptLoader._warned_no_prompts_path = False
+    LocalPromptLoader._cached_project_root = None
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir).resolve()
+        # Point the project-root walk at a controlled location. Without this
+        # mock, `_find_project_root` walks up from cwd through shared dirs
+        # like /tmp or /var/folders and can trip over leaked prompts.json
+        # files from earlier runs on developer machines.
+        monkeypatch.setattr(
+            LocalPromptLoader, "_find_project_root", classmethod(lambda cls: temp_path)
+        )
+
+        loader = LocalPromptLoader()
+
+        try:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+
+                # First call should warn
+                result1 = loader.load_prompt("my-prompt")
+                assert result1 is None
+
+                # Second call should NOT warn again
+                result2 = loader.load_prompt("another-prompt")
+                assert result2 is None
+
+                # Only one warning should have been issued
+                prompts_path_warnings = [
+                    warning
+                    for warning in w
+                    if "langwatch.setup(prompts_path=" in str(warning.message)
+                ]
+                assert len(prompts_path_warnings) == 1
+                assert "No prompts.json found" in str(prompts_path_warnings[0].message)
+        finally:
+            # Reset for other tests
+            LocalPromptLoader._warned_no_prompts_path = False
+            LocalPromptLoader._cached_project_root = None
+
+
+def test_load_prompt_does_not_warn_when_base_path_explicitly_set():
+    """
+    GIVEN base_path is explicitly configured but prompts.json doesn't exist
+    WHEN LocalPromptLoader.load_prompt() is called
+    THEN it does NOT warn about langwatch.setup(prompts_path=...)
+    """
+    # Reset the warning flag before test
+    LocalPromptLoader._warned_no_prompts_path = False
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create loader with explicit base_path (no prompts.json in temp_dir)
+        loader = LocalPromptLoader(Path(temp_dir))
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+
+            result = loader.load_prompt("my-prompt")
+            assert result is None
+
+            # No warning about prompts_path should be issued when path is explicit
+            prompts_path_warnings = [
+                warning
+                for warning in w
+                if "langwatch.setup(prompts_path=" in str(warning.message)
+            ]
+            assert len(prompts_path_warnings) == 0
+
+
+def test_find_project_root_walks_up_directory_tree():
+    """
+    GIVEN prompts.json exists in a parent directory
+    AND cwd is a nested subdirectory
+    WHEN LocalPromptLoader resolves the base path
+    THEN it finds prompts.json by walking up the directory tree
+    """
+    import os
+
+    # Reset cache before test
+    LocalPromptLoader._cached_project_root = None
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json in the root of temp_dir
+        config = {"prompts": {"my-prompt": "file:prompts/my-prompt.prompt.yaml"}}
+        (temp_path / "prompts.json").write_text(json.dumps(config))
+
+        # Create prompts-lock.json
+        lock = {
+            "prompts": {
+                "my-prompt": {
+                    "version": 1,
+                    "versionId": "v1",
+                    "materialized": "prompts/my-prompt.prompt.yaml",
+                }
+            }
+        }
+        (temp_path / "prompts-lock.json").write_text(json.dumps(lock))
+
+        # Create the prompt file
+        prompts_dir = temp_path / "prompts"
+        prompts_dir.mkdir()
+        prompt_content = """model: openai/gpt-4
+messages:
+  - role: system
+    content: Found via walk-up
+"""
+        (prompts_dir / "my-prompt.prompt.yaml").write_text(prompt_content)
+
+        # Create a deeply nested subdirectory and cd into it
+        nested_dir = temp_path / "src" / "app" / "services"
+        nested_dir.mkdir(parents=True)
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(nested_dir)
+
+            # Create loader without explicit base_path
+            loader = LocalPromptLoader()
+
+            # Should find prompts.json in the parent directory
+            result = loader.load_prompt("my-prompt")
+
+            assert result is not None
+            assert result.handle == "my-prompt"
+            assert result.model == "openai/gpt-4"
+            assert result.messages[0].content == "Found via walk-up"
+        finally:
+            os.chdir(original_cwd)
+            LocalPromptLoader._cached_project_root = None
+
+
+def test_find_project_root_caches_result():
+    """
+    GIVEN prompts.json exists in a parent directory
+    WHEN _find_project_root is called multiple times
+    THEN it returns the cached result without re-traversing
+    """
+    import os
+
+    # Reset cache before test
+    LocalPromptLoader._cached_project_root = None
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create prompts.json
+        (temp_path / "prompts.json").write_text(json.dumps({"prompts": {}}))
+
+        nested_dir = temp_path / "sub" / "dir"
+        nested_dir.mkdir(parents=True)
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(nested_dir)
+
+            root1 = LocalPromptLoader._find_project_root()
+            root2 = LocalPromptLoader._find_project_root()
+
+            assert root1 == root2
+            assert root1 == temp_path.resolve()
+        finally:
+            os.chdir(original_cwd)
+            LocalPromptLoader._cached_project_root = None
+
+
+def test_find_project_root_falls_back_to_cwd(monkeypatch):
+    """
+    GIVEN no prompts.json exists anywhere in the directory tree
+    WHEN _find_project_root is called
+    THEN it falls back to cwd
+    """
+    # Reset cache before test
+    LocalPromptLoader._cached_project_root = None
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir).resolve()
+
+        # Pretend the process is running in our clean sandbox.
+        monkeypatch.setattr(Path, "cwd", classmethod(lambda cls: temp_path))
+
+        # Isolate the walk-up from real filesystem state. Developer machines
+        # (and occasionally CI runners) can accumulate stray `/tmp/prompts.json`
+        # or similar leaks from earlier runs, which would cause this test to
+        # return the leak's parent directory instead of falling back to cwd.
+        real_exists = Path.exists
+
+        def isolated_exists(self, *args, **kwargs):
+            if self.name == "prompts.json":
+                return False
+            return real_exists(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "exists", isolated_exists)
+
+        try:
+            root = LocalPromptLoader._find_project_root()
+            assert root == temp_path
+        finally:
+            LocalPromptLoader._cached_project_root = None

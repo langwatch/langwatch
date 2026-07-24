@@ -1,0 +1,10 @@
+.files/
+.chainlit/
+.env
+.ruff_cache/
+.vscode/
+chainlit.md
+__pycache__
+dist/
+local_cache/
+.tmp/
