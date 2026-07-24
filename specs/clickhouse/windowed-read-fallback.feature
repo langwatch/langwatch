@@ -21,18 +21,25 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
     And it is recorded as having answered inside the window
 
   Scenario: a windowed read that misses widens, and the widening is recorded
-    Given the caller allows the read to widen when the window misses
-    And the answer lies outside the scoped window
+    Given the caller allows the read to widen within a bounded look-back when the window misses
+    And the answer lies outside the scoped window but inside the look-back
     When the read runs
     Then the window misses and the read widens to find the answer
+    And the widened read stays inside its bounded look-back, it does not scan without limit
     And the widening is recorded as an outcome distinct from an in-window answer
 
   Scenario: a widen that still finds nothing is recorded as an empty widen
-    Given the caller allows the read to widen when the window misses
+    Given the caller allows the read to widen within a bounded look-back when the window misses
     And there is no answer inside or outside the window
     When the read runs
-    Then the read widens and still finds nothing
+    Then the read widens within its look-back and still finds nothing
     And the empty widen is recorded as its own outcome, not a silent miss
+
+  Scenario: a read that fails is recorded as a failure, not lost
+    Given a read whose attempt fails outright
+    When the read runs
+    Then the failure is surfaced to the caller
+    And the failure is recorded as its own outcome, so failed reads are never invisible
 
   Scenario: a caller that forbids widening stays bounded on a miss
     Given the caller declares the scoped window authoritative

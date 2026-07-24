@@ -239,4 +239,66 @@ describe("queryWindowed", () => {
       }
     });
   });
+
+  describe("given an attempt that throws", () => {
+    it("records an error outcome and rethrows when the hinted attempt fails", async () => {
+      const before = await outcomeCount("error");
+      const run = vi.fn(async () => {
+        throw new Error("clickhouse down");
+      });
+
+      await expect(
+        queryWindowed({
+          table: TABLE,
+          hintMs: 1_000_000,
+          fallback: "unbounded",
+          isEmpty: (rows: string[]) => rows.length === 0,
+          run,
+        }),
+      ).rejects.toThrow("clickhouse down");
+      expect(run).toHaveBeenCalledTimes(1);
+      expect(await outcomeCount("error")).toBe(before + 1);
+    });
+
+    it("records exactly one error outcome when the widened attempt fails", async () => {
+      const beforeError = await outcomeCount("error");
+      const beforeHit = await outcomeCount("hit");
+      let call = 0;
+      const run = vi.fn(async () => {
+        if (call++ === 0) return [] as string[];
+        throw new Error("widen failed");
+      });
+
+      await expect(
+        queryWindowed({
+          table: TABLE,
+          hintMs: 1_000_000,
+          fallback: "unbounded",
+          isEmpty: (rows: string[]) => rows.length === 0,
+          run,
+        }),
+      ).rejects.toThrow("widen failed");
+      expect(run).toHaveBeenCalledTimes(2);
+      expect(await outcomeCount("error")).toBe(beforeError + 1);
+      expect(await outcomeCount("hit")).toBe(beforeHit);
+    });
+
+    it("records an error outcome when the unwindowed attempt fails", async () => {
+      const before = await outcomeCount("error");
+      const run = vi.fn(async () => {
+        throw new Error("no luck");
+      });
+
+      await expect(
+        queryWindowed({
+          table: TABLE,
+          hintMs: null,
+          fallback: "unbounded",
+          isEmpty: (rows: string[]) => rows.length === 0,
+          run,
+        }),
+      ).rejects.toThrow("no luck");
+      expect(await outcomeCount("error")).toBe(before + 1);
+    });
+  });
 });

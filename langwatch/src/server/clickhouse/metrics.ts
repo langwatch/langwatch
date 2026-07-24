@@ -48,6 +48,7 @@ export const incrementClickHouseQueryCount = (
 //   unbounded_hit   - hinted window empty; unbounded re-scan found rows
 //   unbounded_empty - hinted window empty; unbounded re-scan also empty
 //   unwindowed      - no hint; ran the fallback window directly
+//   error           - an attempt threw; the read failed rather than resolved
 // Exists to size how often reads fall off the cheap path before a rate limit is
 // chosen for the expensive ones.
 export type WindowedReadOutcome =
@@ -56,7 +57,8 @@ export type WindowedReadOutcome =
   | "widened_empty"
   | "unbounded_hit"
   | "unbounded_empty"
-  | "unwindowed";
+  | "unwindowed"
+  | "error";
 
 register.removeSingleMetric("clickhouse_windowed_read_total");
 const clickhouseWindowedReadTotal = new Counter({

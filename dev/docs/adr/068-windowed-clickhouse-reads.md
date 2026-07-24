@@ -104,6 +104,7 @@ what happened:
 | `unbounded_hit` | a policy-unbounded widen answered (distinguished from a bounded widen) |
 | `unbounded_empty` | a policy-unbounded widen found nothing |
 | `unwindowed` | the read ran with no hint at all |
+| `error` | an attempt threw; the read failed rather than resolved (rethrown to the caller) |
 
 This is the load-bearing half of the change and the reason it ships now:
 **before we rate-limit the fallback, we must be able to see it.** Today three of

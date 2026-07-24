@@ -100,6 +100,8 @@ function fallbackFragment(
  *       - Empty and allowed to widen: re-run with the fallback window. Outcome
  *         `unbounded_{hit,empty}` for `"unbounded"`, `widened_{hit,empty}` for a
  *         lookback frame.
+ *   - Any attempt that throws: outcome `error`, and the error is rethrown —
+ *     every logical read emits exactly one outcome, failures included.
  *
  * The caller's `run` closure issues each attempt against its own resilient
  * client, so retries and error translation apply per attempt.
@@ -110,31 +112,43 @@ export async function queryWindowed<T>(
   const { table, hintMs, fallback, isEmpty, run } = opts;
   const windowMs = opts.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
 
-  if (hintMs === null) {
-    const result = await run(fallbackFragment(fallback, windowMs));
-    incrementWindowedReadCount(table, "unwindowed");
-    return result;
-  }
+  try {
+    if (hintMs === null) {
+      const result = await run(fallbackFragment(fallback, windowMs));
+      incrementWindowedReadCount(table, "unwindowed");
+      return result;
+    }
 
-  const hinted = await run(windowFragment(hintMs - windowMs, hintMs + windowMs));
-
-  // `none` treats the hinted window as authoritative (empty means genuinely
-  // absent within the window), so it never widens. A non-empty hinted read on
-  // any fallback likewise needs no widening. Both stayed cheap: count as `hit`.
-  if (fallback === "none" || !isEmpty(hinted)) {
-    incrementWindowedReadCount(table, "hit");
-    return hinted;
-  }
-
-  const widened = await run(fallbackFragment(fallback, windowMs));
-  const empty = isEmpty(widened);
-  if (fallback === "unbounded") {
-    incrementWindowedReadCount(
-      table,
-      empty ? "unbounded_empty" : "unbounded_hit",
+    const hinted = await run(
+      windowFragment(hintMs - windowMs, hintMs + windowMs),
     );
-  } else {
-    incrementWindowedReadCount(table, empty ? "widened_empty" : "widened_hit");
+
+    // `none` treats the hinted window as authoritative (empty means genuinely
+    // absent within the window), so it never widens. A non-empty hinted read on
+    // any fallback likewise needs no widening. Both stayed cheap: count as `hit`.
+    if (fallback === "none" || !isEmpty(hinted)) {
+      incrementWindowedReadCount(table, "hit");
+      return hinted;
+    }
+
+    const widened = await run(fallbackFragment(fallback, windowMs));
+    const isWidenedEmpty = isEmpty(widened);
+    if (fallback === "unbounded") {
+      incrementWindowedReadCount(
+        table,
+        isWidenedEmpty ? "unbounded_empty" : "unbounded_hit",
+      );
+    } else {
+      incrementWindowedReadCount(
+        table,
+        isWidenedEmpty ? "widened_empty" : "widened_hit",
+      );
+    }
+    return widened;
+  } catch (error) {
+    // A failed attempt still emits exactly one outcome — the future limiter's
+    // baseline must see failures, not undercount them as absent reads.
+    incrementWindowedReadCount(table, "error");
+    throw error;
   }
-  return widened;
 }
