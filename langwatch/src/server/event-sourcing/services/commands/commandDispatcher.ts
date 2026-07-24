@@ -101,7 +101,7 @@ function validateHandlerEvents(
       const validationError =
         parseResult.success === false
           ? `Validation errors: ${parseResult.error.issues
-              .map((issue: any) => `${issue.path.join(".")}: ${issue.message}`)
+              .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
               .join(", ")}`
           : "Unknown validation error";
 

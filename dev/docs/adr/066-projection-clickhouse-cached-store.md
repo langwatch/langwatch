@@ -2,7 +2,9 @@
 
 **Date:** 2026-07-23
 
-**Status:** Accepted (shipped with this ADR's PR train: Pillar 1 adopter #1 — `codingAgentSession` read-back store, migration 00053; Pillar 2 adopter #1 — `recordTriggerMatch` append coalescing on the count+byte-bounded drain; the durable dedup watermark — migration 00054. Remaining follow-ups are tracked in *Adopters & sequencing*.)
+**Status:** Accepted
+
+**Shipped** with this ADR's PR train: Pillar 1 adopter #1 — `codingAgentSession` read-back store, migration 00053; Pillar 2 adopter #1 — `recordTriggerMatch` append coalescing on the count+byte-bounded drain; the durable dedup watermark — migration 00054. Remaining follow-ups are tracked in *Adopters & sequencing*.
 
 **Re-affirms & hardens:** [ADR-007](./007-event-sourcing-architecture.md) §"Fold Projections", §"No Checkpoints" ("fold state = stored data"; "`store.get()` loads last state").
 

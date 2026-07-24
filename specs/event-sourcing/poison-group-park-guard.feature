@@ -114,10 +114,10 @@ Feature: GroupQueue poison-group park guard
   Scenario: an oversized coalesced sibling parks the group without losing the batch
     Given a group whose dispatched job is small but a staged sibling exceeds the decode-side cap
     When a worker claims the group and coalesces a batch
-    Then the oversized sibling stays out of the batch, because it exceeds the batch's byte budget
+    Then the oversized sibling is never folded into the batch
     And the batch's other work completes normally instead of being held behind the poison
-    And when the oversized job's own turn comes, the group is moved to the blocked set without JSON-parsing it
-    And the stored group error explains it was parked unparsed
+    And when the oversized sibling's own turn comes, the group is moved to the blocked set without JSON-parsing it
+    And the stored group error explains why it was parked
 
   Scenario: the poison guard is disabled by setting the strike threshold to 0
     Given the strike-threshold kill switch is set to 0

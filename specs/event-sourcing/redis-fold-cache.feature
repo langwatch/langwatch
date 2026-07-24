@@ -75,6 +75,10 @@ Feature: Redis write-through cache for fold state
     And the fold is not failed, because the state is durable
     And the read is counted, because the record of applied events went with it
 
+  # The scenario below documents the measured limit of cache-only folds — it is
+  # not accepted retry behaviour. A fold that persists its applied-event set
+  # durably next to its state keeps exact dedup across cache loss instead
+  # (fold-read-back-store.feature).
   Scenario: Losing the cached entry loses the protection
     Given a fold that keeps its applied-event set in the cache entry only
     And a fold job failed after its state was stored
@@ -82,3 +86,4 @@ Feature: Redis write-through cache for fold state
     When the job is retried with the same events
     Then the events are applied again
     And the aggregate over-counts, as it did before the record existed
+    And the re-application is measured, not silent

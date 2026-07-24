@@ -42,4 +42,4 @@ Feature: High-fan-in producers coalesce their event-log appends
   Scenario: an un-coalesced high-fan-in producer is visible, not silent
     Given a high-fan-in producer that does not coalesce its appends
     When its pipeline starts
-    Then the gap is recorded with enough detail to find and close it
+    Then an operator-visible record names the producer and the coalescing coverage it lacks
