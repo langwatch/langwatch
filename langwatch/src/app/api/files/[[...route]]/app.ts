@@ -6,7 +6,11 @@ import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors
 import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
-import { isReadbackSafe } from "~/server/stored-objects/safe-media-types";
+import {
+  safeMediaType,
+  sanitizeFilenameSegment,
+  STORED_OBJECT_RESPONSE_BASE_HEADERS as FILES_RESPONSE_BASE_HEADERS,
+} from "~/server/stored-objects/media-response";
 import {
   resolveStoredObjectOwner,
   StoredObjectOwnerLookupUnavailableError,
@@ -25,27 +29,6 @@ const secured = createServiceApp<{ Variables: DualAuthVariables }>({
 });
 
 /**
- * Resolves the Content-Type header for a stored-object response.
- *
- * Returns the requested mediaType when it is in the shared SAFE_MEDIA_TYPES
- * allowlist (see `safe-media-types.ts`). Anything else is coerced to
- * application/octet-stream to neutralize MIME sniffing and stored-XSS
- * primitives (an attacker can't trick a browser into interpreting their
- * payload as text/html or application/javascript).
- *
- * The allowlist is the single source of truth shared with the ingest-path
- * extractor — widen it in safe-media-types.ts and both surfaces update.
- */
-function safeMediaType(mediaType: string): string {
-  return isReadbackSafe(mediaType) ? mediaType : "application/octet-stream";
-}
-
-function sanitizeFilenameSegment(id: string): string {
-  // RFC 6266 — keep ASCII, replace anything else with _; quote with double quotes.
-  return id.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 128);
-}
-
-/**
  * Per-project rate limit on the read endpoint.
  *
  * 120 requests / minute / project covers the realistic in-app render
@@ -55,17 +38,6 @@ function sanitizeFilenameSegment(id: string): string {
  */
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
 const FILES_RATE_LIMIT_MAX = 120;
-
-/**
- * Common headers we attach to every files-route response. Static — never
- * vary by row, never echo user content. See AC9 + AC11 + the
- * security-reviewer pass on PR #4058.
- */
-const FILES_RESPONSE_BASE_HEADERS: Readonly<Record<string, string>> = {
-  "X-Content-Type-Options": "nosniff",
-  "Content-Security-Policy": "default-src 'none'; sandbox",
-  "Referrer-Policy": "no-referrer",
-};
 
 function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {

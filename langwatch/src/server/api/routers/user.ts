@@ -23,6 +23,8 @@ import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRe
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
+import { AvatarValidationError } from "~/server/user-avatar/avatar";
+import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
@@ -478,6 +480,72 @@ export const userRouter = createTRPCRouter({
       }
 
       await UserService.create(ctx.prisma).reactivate({ id: input.userId });
+      return { success: true };
+    }),
+
+  /**
+   * Uploads and sets the caller's own avatar photo. The image is stored in the
+   * S3-backed object store (owned by the user, under their personal workspace)
+   * and its serve URL is written to `User.image`, the field every avatar
+   * surface resolves through. `organizationId` scopes the personal-workspace
+   * resolution and is membership-checked below.
+   *
+   * Spec: specs/settings/user-avatar.feature
+   */
+  setAvatar: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        // A base64 image data URL (`data:image/...;base64,...`) produced by the
+        // client crop/resize step. Validated + decoded in UserAvatarService.
+        imageDataUrl: z.string().min(1),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .mutation(async ({ ctx, input }) => {
+      // Throttle uploads per user — each writes bytes to object storage and
+      // updates the row; mirrors the changePassword budget shape.
+      const limit = await rateLimit({
+        key: `user.setAvatar:${ctx.session.user.id}`,
+        windowSeconds: 60,
+        max: 10,
+      });
+      if (!limit.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many avatar updates. Please try again shortly.",
+        });
+      }
+
+      try {
+        return await new UserAvatarService(ctx.prisma).setAvatar({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+          imageDataUrl: input.imageDataUrl,
+          displayName: ctx.session.user.name,
+          displayEmail: ctx.session.user.email,
+        });
+      } catch (err) {
+        if (err instanceof AvatarValidationError) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
+        }
+        throw err;
+      }
+    }),
+
+  /**
+   * Clears the caller's uploaded avatar so surfaces fall back to their SSO
+   * photo (if any) and then their initials.
+   *
+   * Spec: specs/settings/user-avatar.feature
+   */
+  removeAvatar: protectedProcedure
+    .input(z.object({}))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx }) => {
+      await new UserAvatarService(ctx.prisma).removeAvatar({
+        userId: ctx.session.user.id,
+      });
       return { success: true };
     }),
 
