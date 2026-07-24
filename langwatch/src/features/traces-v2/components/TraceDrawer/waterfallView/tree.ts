@@ -65,10 +65,13 @@ export function groupSiblings(
   for (const child of children) {
     // toolName joins the key so a turn's tools fold per TOOL (Bash ×5,
     // Read ×3), not into one anonymous claude_code.tool ×12 — the whole
-    // point of naming tool rows.
-    const key = `${child.span.name}::${child.span.type ?? "span"}::${
-      child.span.toolName ?? ""
-    }`;
+    // point of naming tool rows. JSON-encoded: names/types are arbitrary
+    // telemetry (rust `tokio::task` style), so delimiter joins can alias.
+    const key = JSON.stringify([
+      child.span.name,
+      child.span.type ?? "span",
+      child.span.toolName ?? "",
+    ]);
     if (!nameGroups.has(key)) {
       nameGroups.set(key, []);
       order.push(key);
@@ -111,7 +114,9 @@ export function groupSiblings(
  * `groupSiblings` folds by (name, type, toolName) plus the parent, so
  * expansion state and React keys can never collide across distinct
  * groups — two tool groups under one parent share `name` and differ
- * only by `toolName`.
+ * only by `toolName`. JSON-encoded rather than delimiter-joined:
+ * span names and types are arbitrary telemetry, so any in-band
+ * separator could alias two distinct tuples.
  */
 export function siblingGroupKey(group: {
   parentSpanId: string | null;
@@ -119,9 +124,12 @@ export function siblingGroupKey(group: {
   type: string;
   toolName: string | null;
 }): string {
-  return `${group.parentSpanId}::${group.name}::${group.type}::${
-    group.toolName ?? ""
-  }`;
+  return JSON.stringify([
+    group.parentSpanId,
+    group.name,
+    group.type,
+    group.toolName ?? "",
+  ]);
 }
 
 export function flattenTree(

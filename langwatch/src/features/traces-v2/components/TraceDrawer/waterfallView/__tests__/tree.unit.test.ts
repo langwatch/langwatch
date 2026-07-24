@@ -4,6 +4,7 @@ import {
   buildTree,
   countDescendants,
   flattenTree,
+  groupSiblings,
   shouldShowTimeline,
   siblingGroupKey,
 } from "../tree";
@@ -122,6 +123,54 @@ describe("siblingGroupKey", () => {
       expect(siblingGroupKey(base)).not.toBe(
         siblingGroupKey({ ...base, type: "span" }),
       );
+    });
+  });
+
+  describe("given field values that contain the old '::' separator", () => {
+    it("keeps tuples with shifted boundaries distinct (rust-style span names)", () => {
+      // Under delimiter joining both of these flattened to
+      // "p::n::t::tool::" — structural encoding keeps them apart.
+      const a = siblingGroupKey({
+        parentSpanId: "p",
+        name: "n::t",
+        type: "tool",
+        toolName: null,
+      });
+      const b = siblingGroupKey({
+        parentSpanId: "p::n",
+        name: "t",
+        type: "tool",
+        toolName: null,
+      });
+      expect(a).not.toBe(b);
+    });
+  });
+});
+
+describe("groupSiblings", () => {
+  describe("given sibling names/types that alias under '::' joining", () => {
+    it("folds them into two distinct groups, not one merged group", () => {
+      // Old flat keys were both "a::b::span::".
+      const nodes = [
+        ...Array.from({ length: SIBLING_GROUP_THRESHOLD + 1 }, (_, i) => ({
+          ...makeSpan(`x-${i}`, "root", i),
+          name: "a::b",
+          type: "span",
+        })),
+        ...Array.from({ length: SIBLING_GROUP_THRESHOLD + 1 }, (_, i) => ({
+          ...makeSpan(`y-${i}`, "root", i + 20),
+          name: "a",
+          type: "b::span",
+        })),
+      ].map((span) => ({ span, children: [], depth: 1, isOrphaned: false }));
+
+      const groups = groupSiblings(nodes).filter(
+        (r): r is SiblingGroup => "kind" in r && r.kind === "group",
+      );
+      expect(groups.map((g) => [g.name, g.type])).toEqual([
+        ["a::b", "span"],
+        ["a", "b::span"],
+      ]);
     });
   });
 });

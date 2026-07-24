@@ -30,7 +30,7 @@ function group(over: Partial<SiblingGroup> = {}): SiblingGroup {
 }
 
 const baseProps = {
-  groupKey: "root::Bash::tool::",
+  groupKey: JSON.stringify(["root", "Bash", "tool", ""]),
   isExpanded: false,
   onToggle: vi.fn(),
 };
