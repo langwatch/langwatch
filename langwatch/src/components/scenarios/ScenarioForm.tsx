@@ -1,7 +1,23 @@
-import { Field, Input, Text, Textarea, VStack } from "@chakra-ui/react";
+import {
+  Accordion,
+  Button,
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ChevronDown, ShieldAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { Controller, type UseFormReturn, useForm } from "react-hook-form";
+import {
+  Controller,
+  type UseFormReturn,
+  useForm,
+  useWatch,
+} from "react-hook-form";
 import { z } from "zod";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
@@ -15,6 +31,18 @@ export const scenarioFormSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  // Red-team configuration. Null strategy = a standard scenario; the form
+  // shows the attack section only once a strategy is picked.
+  redTeamStrategy: z.enum(["goat", "crescendo"]).nullish(),
+  redTeamTarget: z.string().nullish(),
+  redTeamTotalTurns: z.number().int().min(1).max(50).nullish(),
+  redTeamConfig: z
+    .object({
+      successScore: z.number().min(0).max(10).optional(),
+      successConfirmTurns: z.number().int().min(1).optional(),
+      injectionProbability: z.number().min(0).max(1).optional(),
+    })
+    .nullish(),
 });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
@@ -30,14 +58,75 @@ export interface ScenarioInitialData {
 type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
   formRef?: (form: UseFormReturn<ScenarioFormData>) => void;
+  /** Opens the attack configuration. Omit to hide the type selector entirely. */
+  onConfigureRedTeam?: () => void;
+  /** Clears the attack configuration, returning to a standard scenario. */
+  onClearRedTeam?: () => void;
 };
+
+/**
+ * Standard vs red team. Picking "Red team" opens the attack configuration
+ * straight away, because a red-team scenario without an objective has nothing
+ * to run.
+ */
+function ScenarioTypeSelector({
+  isRedTeam,
+  onSelectStandard,
+  onSelectRedTeam,
+  summary,
+}: {
+  isRedTeam: boolean;
+  onSelectStandard?: () => void;
+  onSelectRedTeam: () => void;
+  summary: string | null;
+}) {
+  return (
+    <VStack align="stretch" gap={2}>
+      <SectionHeader>Type</SectionHeader>
+      <HStack gap={2}>
+        <Button
+          size="sm"
+          variant={isRedTeam ? "outline" : "solid"}
+          onClick={onSelectStandard}
+          flex={1}
+        >
+          Standard
+        </Button>
+        <Button
+          size="sm"
+          variant={isRedTeam ? "solid" : "outline"}
+          colorPalette={isRedTeam ? "orange" : undefined}
+          onClick={onSelectRedTeam}
+          flex={1}
+        >
+          <ShieldAlert size={14} /> Red team
+        </Button>
+      </HStack>
+      {isRedTeam && (
+        <HStack justify="space-between" gap={2}>
+          <Text textStyle="xs" color="fg.muted" truncate>
+            {summary ?? "No attack configured yet"}
+          </Text>
+          <Button size="xs" variant="ghost" onClick={onSelectRedTeam}>
+            Edit attack
+          </Button>
+        </HStack>
+      )}
+    </VStack>
+  );
+}
 
 /**
  * Pure UI form for creating/editing scenarios.
  * Matches the design mockup layout.
  * Submit is handled externally via formRef.
  */
-export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
+export function ScenarioForm({
+  defaultValues,
+  formRef,
+  onConfigureRedTeam,
+  onClearRedTeam,
+}: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
     defaultValues: {
       name: "",
@@ -55,6 +144,23 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     reset,
     formState: { errors },
   } = form;
+
+  // useWatch, not form.watch: this component receives `form` from its own
+  // useForm here, but the same rule applies for re-render correctness inside
+  // the nested selector.
+  const redTeamStrategy = useWatch({ control, name: "redTeamStrategy" });
+  const redTeamTarget = useWatch({ control, name: "redTeamTarget" });
+  const redTeamTotalTurns = useWatch({ control, name: "redTeamTotalTurns" });
+
+  const redTeamSummary = redTeamStrategy
+    ? [
+        redTeamStrategy === "goat" ? "GOAT" : "Crescendo",
+        redTeamTotalTurns ? `${redTeamTotalTurns} turns` : null,
+        redTeamTarget ? `"${redTeamTarget}"` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
 
   // Expose form to parent
   useEffect(() => {
@@ -88,6 +194,18 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
 
   return (
     <VStack align="stretch" gap={6}>
+      {/* TYPE Section — a red-team scenario is still a scenario; only who
+          drives the conversation changes, so this is a mode on the same form
+          rather than a separate creation flow. */}
+      {onConfigureRedTeam && (
+        <ScenarioTypeSelector
+          isRedTeam={!!redTeamStrategy}
+          onSelectStandard={onClearRedTeam}
+          onSelectRedTeam={onConfigureRedTeam}
+          summary={redTeamSummary}
+        />
+      )}
+
       {/* SCENARIO Section */}
       <VStack align="stretch" gap={3}>
         {/* Name */}

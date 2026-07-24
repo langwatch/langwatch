@@ -1911,6 +1911,19 @@ model Scenario {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @default(now()) @updatedAt
 
+  // Optional adversarial (red-team) configuration. When redTeamStrategy is
+  // null this is a standard scenario. simulatorModel above doubles as the
+  // attacker model, so no separate model column is needed.
+  // See specs/scenarios/red-team-scenarios.feature.
+  redTeamStrategy   String? // "goat" | "crescendo"
+  redTeamTarget     String? // the attack objective
+  redTeamTotalTurns Int?
+  // Secondary tuning knobs that map 1:1 onto SDK options with their own
+  // defaults (successScore, successConfirmTurns, injectionProbability). A bag
+  // rather than columns: the UI keeps them behind an "Advanced" disclosure,
+  // and a wide mostly-null column set would earn nothing.
+  redTeamConfig     Json?
+
   @@index([projectId])
 }
 

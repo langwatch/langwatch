@@ -33,7 +33,7 @@ import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
 import { createAdapter } from "./serialized-adapter.registry";
 import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
 import { createTraceApiSpanQuery } from "./trace-api-span-query";
-import type { ChildProcessJobData } from "./types";
+import { RED_TEAM_DEFAULT_TURNS, type ChildProcessJobData } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
 
@@ -159,6 +159,11 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     bridgeTraceIdFromAdapterToJudge({ adapter, judge: remoteSpanJudge });
   }
 
+  // A red-team attacker IS a user simulator (it extends the same adapter), so
+  // it drops straight into the simulator slot and everything downstream — the
+  // judge, the criteria, the reporting — stays exactly as it is.
+  const redTeam = buildRedTeamAgent({ scenario, model: simulatorModel });
+
   const result = await ScenarioRunner.run(
     {
       id: scenario.id,
@@ -167,9 +172,15 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       setId: context.setId,
       agents: [
         adapter,
-        ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+        redTeam?.agent ??
+          ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
         judgeAgent,
       ],
+      // The attacker's turn budget and the run's own turn ceiling are separate
+      // settings, and the ceiling defaults to 10. Without raising it here, a
+      // 30-turn attack is silently cut off at turn 10 and under-tests the
+      // agent while still reporting a verdict.
+      ...(redTeam ? { maxTurns: redTeam.totalTurns } : {}),
       verbose,
       metadata: {
         langwatch: {
@@ -210,6 +221,39 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
     outputResult.reasoning = result.reasoning;
   }
   process.stdout.write(JSON.stringify(outputResult) + "\n");
+}
+
+/**
+ * Builds the adversarial attacker for a red-team scenario, or null for a
+ * standard one.
+ *
+ * Returns the turn budget alongside the agent because the caller must apply
+ * it to the run's own `maxTurns` as well: the two are independent settings and
+ * the run-level ceiling would otherwise truncate the attack.
+ */
+function buildRedTeamAgent({
+  scenario,
+  model,
+}: {
+  scenario: ChildProcessJobData["scenario"];
+  model: ReturnType<typeof createModelFromParams>;
+}): { agent: ScenarioRunner.UserSimulatorAgentAdapter; totalTurns: number } | null {
+  if (!scenario.redTeamStrategy || !scenario.redTeamTarget) return null;
+
+  const totalTurns = scenario.redTeamTotalTurns ?? RED_TEAM_DEFAULT_TURNS;
+  const config = {
+    target: scenario.redTeamTarget,
+    totalTurns,
+    model,
+    ...(scenario.redTeamConfig ?? {}),
+  };
+
+  const agent =
+    scenario.redTeamStrategy === "goat"
+      ? ScenarioRunner.redTeamGoat(config)
+      : ScenarioRunner.redTeamCrescendo(config);
+
+  return { agent, totalTurns };
 }
 
 /**

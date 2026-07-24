@@ -48,6 +48,12 @@ describe("prefetchScenarioData", () => {
     situation: "User asks a question",
     criteria: ["Must respond politely"],
     labels: [],
+    // A standard scenario carries no attack config; the prefetcher normalizes
+    // the absent columns to null so the child process needs no DB read.
+    redTeamStrategy: null,
+    redTeamTarget: null,
+    redTeamTotalTurns: null,
+    redTeamConfig: null,
   };
 
   const defaultProject = {

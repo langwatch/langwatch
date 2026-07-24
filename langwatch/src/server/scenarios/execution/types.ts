@@ -209,12 +209,34 @@ export type LiteLLMParams = z.infer<typeof LiteLLMParamsSchema>;
 // ============================================================================
 
 /** Scenario definition - what to test */
+/** Adversarial attack strategies a red-team scenario can run. */
+export const RED_TEAM_STRATEGIES = ["goat", "crescendo"] as const;
+export const RedTeamStrategySchema = z.enum(RED_TEAM_STRATEGIES);
+export type RedTeamStrategyName = z.infer<typeof RedTeamStrategySchema>;
+
+/** Upper bound on attacker turns. Each turn is a model call on both sides. */
+export const RED_TEAM_MAX_TURNS = 50;
+export const RED_TEAM_DEFAULT_TURNS = 30;
+
+/** Optional tuning knobs, all with SDK-supplied defaults. */
+export const RedTeamConfigSchema = z.object({
+  successScore: z.number().min(0).max(10).optional(),
+  successConfirmTurns: z.number().int().min(1).optional(),
+  injectionProbability: z.number().min(0).max(1).optional(),
+});
+export type RedTeamConfig = z.infer<typeof RedTeamConfigSchema>;
+
 export const ScenarioConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  // Present only for red-team scenarios; null/absent means a standard run.
+  redTeamStrategy: RedTeamStrategySchema.nullish(),
+  redTeamTarget: z.string().nullish(),
+  redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
+  redTeamConfig: RedTeamConfigSchema.nullish(),
 });
 export type ScenarioConfig = z.infer<typeof ScenarioConfigSchema>;
 

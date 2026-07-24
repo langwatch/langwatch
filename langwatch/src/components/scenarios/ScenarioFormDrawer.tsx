@@ -39,6 +39,7 @@ import { Drawer } from "../ui/drawer";
 import { TagList } from "../ui/TagList";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
+import { RedTeamConfigDrawer } from "./RedTeamConfigDrawer";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import {
   ScenarioForm,
@@ -120,6 +121,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
+  const [redTeamDrawerOpen, setRedTeamDrawerOpen] = useState(false);
 
   // Run-model dialog: after a target is picked in Save and Run, the user
   // confirms which user-simulator and judge models to run with. null = follow
@@ -502,10 +504,26 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // Use initial data from complexProps (new scenario from modal) or from DB (editing)
   const initialFormData =
     props.initialFormData ?? complexPropsData.initialFormData;
-  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
-    () => scenario ?? initialFormData ?? undefined,
-    [scenario, initialFormData],
-  );
+  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => {
+    if (scenario) {
+      // The Prisma row types redTeamConfig as JsonValue; narrow it to the
+      // form's shape (an unparseable value simply means "no advanced knobs").
+      const { redTeamConfig, redTeamStrategy, ...rest } = scenario;
+      return {
+        ...rest,
+        redTeamStrategy:
+          redTeamStrategy === "goat" || redTeamStrategy === "crescendo"
+            ? redTeamStrategy
+            : null,
+        redTeamConfig:
+          redTeamConfig && typeof redTeamConfig === "object" &&
+          !Array.isArray(redTeamConfig)
+            ? (redTeamConfig as ScenarioFormData["redTeamConfig"])
+            : null,
+      };
+    }
+    return initialFormData ?? undefined;
+  }, [scenario, initialFormData]);
 
   return (
     <Drawer.Root
@@ -534,6 +552,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
                 formRef={setFormRef}
+                onConfigureRedTeam={() => setRedTeamDrawerOpen(true)}
+                onClearRedTeam={() => {
+                  formInstance?.setValue("redTeamStrategy", null);
+                  formInstance?.setValue("redTeamTarget", null);
+                  formInstance?.setValue("redTeamTotalTurns", null);
+                  formInstance?.setValue("redTeamConfig", null);
+                }}
               />
             </GridItem>
             {/* Right: Help Sidebar */}
@@ -582,6 +607,27 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           clearFlowCallbacks();
         }}
       />
+
+      {/* Red Team attack configuration — nested, edits the form in memory */}
+      {formInstance && (
+        <RedTeamConfigDrawer
+          open={redTeamDrawerOpen}
+          onClose={() => setRedTeamDrawerOpen(false)}
+          value={{
+            redTeamStrategy: formInstance.getValues("redTeamStrategy") ?? null,
+            redTeamTarget: formInstance.getValues("redTeamTarget") ?? null,
+            redTeamTotalTurns:
+              formInstance.getValues("redTeamTotalTurns") ?? null,
+            redTeamConfig: formInstance.getValues("redTeamConfig") ?? null,
+          }}
+          onSave={(next) => {
+            formInstance.setValue("redTeamStrategy", next.redTeamStrategy);
+            formInstance.setValue("redTeamTarget", next.redTeamTarget);
+            formInstance.setValue("redTeamTotalTurns", next.redTeamTotalTurns);
+            formInstance.setValue("redTeamConfig", next.redTeamConfig);
+          }}
+        />
+      )}
 
       {/* Prompt Creation Drawer */}
       <PromptEditorDrawer

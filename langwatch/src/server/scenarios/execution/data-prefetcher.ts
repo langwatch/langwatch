@@ -51,6 +51,8 @@ import {
   type TargetAdapterData,
   type TargetConfig,
   type WorkflowAgentData,
+  RedTeamConfigSchema,
+  RedTeamStrategySchema,
 } from "./types";
 
 // ============================================================================
@@ -69,6 +71,11 @@ export interface ScenarioFetcher {
     simulatorModel?: string | null;
     /** Per-scenario judge model override (null = use default). */
     judgeModel?: string | null;
+    /** Red-team attack config; null strategy = a standard scenario. */
+    redTeamStrategy?: string | null;
+    redTeamTarget?: string | null;
+    redTeamTotalTurns?: number | null;
+    redTeamConfig?: unknown;
   } | null>;
 }
 
@@ -419,10 +426,28 @@ async function fetchScenario(
       situation: scenario.situation,
       criteria: scenario.criteria,
       labels: scenario.labels,
+      // Passthrough so the child process can build the attacker without a
+      // second DB read; absent on a standard scenario.
+      redTeamStrategy: parseRedTeamStrategy(scenario.redTeamStrategy),
+      redTeamTarget: scenario.redTeamTarget ?? null,
+      redTeamTotalTurns: scenario.redTeamTotalTurns ?? null,
+      redTeamConfig: RedTeamConfigSchema.nullish().catch(null).parse(
+        scenario.redTeamConfig,
+      ),
     },
     simulatorModel: scenario.simulatorModel ?? null,
     judgeModel: scenario.judgeModel ?? null,
   };
+}
+
+/**
+ * A stored strategy that is not one we know about is treated as "no red
+ * team" rather than crashing the run: the column is a plain string, so an
+ * older or hand-edited row must not take the pipeline down.
+ */
+function parseRedTeamStrategy(value: string | null | undefined) {
+  const parsed = RedTeamStrategySchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 type FetchProjectResult =
