@@ -14,9 +14,10 @@
 import { Box, Grid, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { LuMaximize2 } from "react-icons/lu";
 
-import { setComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import {
   computeConfusionMatrix,
+  kappaAgreementLabel,
   type JudgeAnnotationPair,
 } from "./computeConfusionMatrix";
 import type { BatchResultRow } from "./types";
@@ -58,6 +59,10 @@ export function ConfusionMatrixChart({
   const { openDrawer } = useDrawer();
   const metrics = computeConfusionMatrix(pairs);
   const total = Math.max(1, metrics.total);
+
+  /** Below this, agreement is barely distinguishable from guessing. */
+  const isNearChance =
+    metrics.cohensKappa !== null && metrics.cohensKappa < 0.2;
 
   const cells = [
     { key: "tp", label: "TP", value: metrics.truePositive, isError: false },
@@ -118,9 +123,34 @@ export function ConfusionMatrixChart({
       </HStack>
       <VStack align="stretch" gap={2}>
         <HStack justify="space-between" align="baseline">
-          <Text fontSize="2xl" fontWeight="bold" lineHeight="1">
-            {Math.round(metrics.accuracy * 100)}%
-          </Text>
+          <HStack gap={2} align="baseline">
+            <Text fontSize="2xl" fontWeight="bold" lineHeight="1">
+              {Math.round(metrics.accuracy * 100)}%
+            </Text>
+            {/* Carried on the card, not buried in the drawer: accuracy alone
+                cannot distinguish a judge that agrees from one that just
+                matches the base rate, so a near-chance kappa is flagged
+                right where the accuracy is read. */}
+            <Text
+              fontSize="xs"
+              fontWeight="semibold"
+              color={isNearChance ? "orange.fg" : "fg.muted"}
+              title={
+                metrics.cohensKappa === null
+                  ? "Cohen's kappa is undefined here — one label was used throughout"
+                  : `Cohen's kappa ${metrics.cohensKappa.toFixed(
+                      2,
+                    )} — ${kappaAgreementLabel(
+                      metrics.cohensKappa,
+                    )} agreement once chance is subtracted`
+              }
+            >
+              κ{" "}
+              {metrics.cohensKappa === null
+                ? "—"
+                : metrics.cohensKappa.toFixed(2)}
+            </Text>
+          </HStack>
           <Text fontSize="2xs" color="fg.muted">
             accuracy · {pairs.length} of {coverage.totalRows} rows
           </Text>

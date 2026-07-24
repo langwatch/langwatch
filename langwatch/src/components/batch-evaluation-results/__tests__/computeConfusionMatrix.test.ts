@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   computeConfusionMatrix,
+  kappaAgreementLabel,
+  wilsonInterval,
+  type ConfusionMatrixCounts,
   type JudgeAnnotationPair,
 } from "../computeConfusionMatrix";
 
@@ -128,6 +131,171 @@ describe("computeConfusionMatrix", () => {
 
     it("reports a 0% false positive rate", () => {
       expect(computeConfusionMatrix(pairs).falsePositiveRate).toBe(0);
+    });
+  });
+});
+
+/** Builds pairs matching an exact quadrant layout, for readable arrange steps. */
+const pairsFromCounts = ({
+  truePositive,
+  falsePositive,
+  falseNegative,
+  trueNegative,
+}: ConfusionMatrixCounts): JudgeAnnotationPair[] => {
+  const quadrants: [number, boolean, boolean][] = [
+    [truePositive, true, true],
+    [falsePositive, true, false],
+    [falseNegative, false, true],
+    [trueNegative, false, false],
+  ];
+  let rowIndex = 0;
+  return quadrants.flatMap(([count, predicted, actual]) =>
+    Array.from({ length: count }, () => ({
+      rowIndex: rowIndex++,
+      predicted,
+      actual,
+    })),
+  );
+};
+
+describe("wilsonInterval", () => {
+  describe("given no trials", () => {
+    it("returns null rather than an interval over nothing", () => {
+      expect(wilsonInterval({ successes: 0, trials: 0 })).toBeNull();
+    });
+  });
+
+  describe("given 8 successes out of 10", () => {
+    it("matches the published Wilson score bounds", () => {
+      const interval = wilsonInterval({ successes: 8, trials: 10 });
+      expect(interval?.lower).toBeCloseTo(0.4901, 3);
+      expect(interval?.upper).toBeCloseTo(0.9433, 3);
+    });
+  });
+
+  describe("when every trial succeeded", () => {
+    // The whole reason Wilson is used instead of the textbook Wald
+    // interval: at p=1 Wald collapses to zero width and claims perfect
+    // certainty from 5 samples. Wilson still admits the rate could
+    // plausibly be as low as ~57%.
+    it("does not claim certainty from a small perfect run", () => {
+      const interval = wilsonInterval({ successes: 5, trials: 5 });
+      expect(interval?.lower).toBeCloseTo(0.5655, 3);
+      expect(interval?.upper).toBe(1);
+    });
+  });
+
+  describe("when no trial succeeded", () => {
+    it("stays within [0, 1] instead of going negative", () => {
+      const interval = wilsonInterval({ successes: 0, trials: 5 });
+      expect(interval?.lower).toBeCloseTo(0, 10);
+      expect(interval!.lower).toBeGreaterThanOrEqual(0);
+      expect(interval?.upper).toBeCloseTo(0.4345, 3);
+    });
+  });
+});
+
+describe("computeConfusionMatrix statistical honesty", () => {
+  describe("given a small sample", () => {
+    const pairs = pairsFromCounts({
+      truePositive: 3,
+      falsePositive: 1,
+      falseNegative: 1,
+      trueNegative: 3,
+    });
+
+    it("reports an accuracy interval wide enough to show the sample is thin", () => {
+      const result = computeConfusionMatrix(pairs);
+      expect(result.accuracy).toBeCloseTo(0.75, 5);
+      // 75% from 8 rows is anywhere from 41% to 93% — the point
+      // estimate alone reads as far more settled than it is.
+      expect(result.accuracyInterval?.lower).toBeCloseTo(0.4092, 3);
+      expect(result.accuracyInterval?.upper).toBeCloseTo(0.9285, 3);
+    });
+  });
+
+  describe("given no pairs at all", () => {
+    it("returns no interval and no kappa", () => {
+      const result = computeConfusionMatrix([]);
+      expect(result.accuracyInterval).toBeNull();
+      expect(result.cohensKappa).toBeNull();
+      expect(result.prevalence).toBeNull();
+    });
+  });
+
+  describe("when the judge always says pass and most rows really are passes", () => {
+    // The failure this metric exists to catch: a judge that has learned
+    // nothing still scores 90% accuracy purely off the base rate.
+    const pairs = pairsFromCounts({
+      truePositive: 9,
+      falsePositive: 1,
+      falseNegative: 0,
+      trueNegative: 0,
+    });
+
+    it("scores high accuracy", () => {
+      expect(computeConfusionMatrix(pairs).accuracy).toBeCloseTo(0.9, 5);
+    });
+
+    it("scores zero kappa, exposing that accuracy as chance", () => {
+      expect(computeConfusionMatrix(pairs).cohensKappa).toBeCloseTo(0, 5);
+    });
+
+    it("reports the prevalence that explains the inflated accuracy", () => {
+      expect(computeConfusionMatrix(pairs).prevalence).toBeCloseTo(0.9, 5);
+    });
+  });
+
+  describe("when judge and reviewer agree on every row", () => {
+    it("scores kappa of 1", () => {
+      const pairs = pairsFromCounts({
+        truePositive: 5,
+        falsePositive: 0,
+        falseNegative: 0,
+        trueNegative: 5,
+      });
+      expect(computeConfusionMatrix(pairs).cohensKappa).toBeCloseTo(1, 5);
+    });
+  });
+
+  describe("when judge and reviewer disagree on every row", () => {
+    it("scores negative kappa, meaning worse than guessing", () => {
+      const pairs = pairsFromCounts({
+        truePositive: 0,
+        falsePositive: 5,
+        falseNegative: 5,
+        trueNegative: 0,
+      });
+      expect(computeConfusionMatrix(pairs).cohensKappa).toBeCloseTo(-1, 5);
+    });
+  });
+
+  describe("when both judge and reviewer marked every row the same way", () => {
+    // Chance agreement is 100%, so the correction divides by zero —
+    // kappa genuinely is not defined here, and saying "1.0" would lie.
+    it("returns null kappa rather than a fabricated perfect score", () => {
+      const pairs = pairsFromCounts({
+        truePositive: 10,
+        falsePositive: 0,
+        falseNegative: 0,
+        trueNegative: 0,
+      });
+      const result = computeConfusionMatrix(pairs);
+      expect(result.accuracy).toBe(1);
+      expect(result.cohensKappa).toBeNull();
+    });
+  });
+});
+
+describe("kappaAgreementLabel", () => {
+  describe("given kappa values across the Landis & Koch bands", () => {
+    it("labels each band", () => {
+      expect(kappaAgreementLabel(-0.2)).toBe("none");
+      expect(kappaAgreementLabel(0.1)).toBe("slight");
+      expect(kappaAgreementLabel(0.3)).toBe("fair");
+      expect(kappaAgreementLabel(0.5)).toBe("moderate");
+      expect(kappaAgreementLabel(0.7)).toBe("substantial");
+      expect(kappaAgreementLabel(0.9)).toBe("almost perfect");
     });
   });
 });

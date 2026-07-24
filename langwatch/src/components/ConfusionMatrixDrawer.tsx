@@ -20,6 +20,8 @@ import { useMemo, useState } from "react";
 
 import {
   computeConfusionMatrix,
+  kappaAgreementLabel,
+  type ConfidenceInterval,
   type JudgeAnnotationPair,
 } from "./batch-evaluation-results/computeConfusionMatrix";
 import type { BatchResultRow } from "./batch-evaluation-results/types";
@@ -202,14 +204,57 @@ export function ConfusionMatrixDrawer({
               />
             </Grid>
 
+            <HStack gap={10} align="start" flexWrap="wrap">
+              <VStack gap={0} align="start">
+                <Text fontSize="3xl" fontWeight="bold" lineHeight="1.1">
+                  {formatPercent(metrics.accuracy)}
+                </Text>
+                <Text fontSize="xs" fontWeight="semibold">
+                  Accuracy
+                </Text>
+                <Text fontSize="2xs" color="fg.muted">
+                  {metrics.accuracyInterval
+                    ? `95% CI ${formatPercent(
+                        metrics.accuracyInterval.lower,
+                      )}–${formatPercent(metrics.accuracyInterval.upper)}`
+                    : "—"}
+                </Text>
+              </VStack>
+
+              <VStack gap={0} align="start">
+                <Text fontSize="3xl" fontWeight="bold" lineHeight="1.1">
+                  {metrics.cohensKappa === null
+                    ? "—"
+                    : metrics.cohensKappa.toFixed(2)}
+                </Text>
+                <Text fontSize="xs" fontWeight="semibold">
+                  Cohen&apos;s κ
+                </Text>
+                <Text fontSize="2xs" color="fg.muted">
+                  {metrics.cohensKappa === null
+                    ? "undefined — one label used throughout"
+                    : `${kappaAgreementLabel(metrics.cohensKappa)} agreement`}
+                </Text>
+              </VStack>
+            </HStack>
+
+            <AgreementBar
+              accuracy={metrics.accuracy}
+              interval={metrics.accuracyInterval}
+              chance={metrics.chanceAgreement}
+            />
+
             <HStack gap={6} flexWrap="wrap">
-              <Metric label="Accuracy" value={formatPercent(metrics.accuracy)} />
               <Metric label="Precision" value={formatPercent(metrics.precision)} />
               <Metric label="Recall" value={formatPercent(metrics.recall)} />
               <Metric label="F1" value={formatPercent(metrics.f1)} />
               <Metric
                 label="False Positive Rate"
                 value={formatPercent(metrics.falsePositiveRate)}
+              />
+              <Metric
+                label="Reviewer pass rate"
+                value={formatPercent(metrics.prevalence)}
               />
             </HStack>
 
@@ -259,6 +304,117 @@ export function ConfusionMatrixDrawer({
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/**
+ * Plots accuracy against the agreement chance alone would have produced.
+ *
+ * This is the visual form of the kappa argument. A judge scoring 90% on a
+ * set that is 90% passes has done nothing, and a bare "90%" hides that
+ * completely — here the shaded floor swallows the marker and the point is
+ * immediate. The confidence band is drawn at the same scale so a thin
+ * sample reads as a wide, hesitant smear rather than a crisp number.
+ */
+function AgreementBar({
+  accuracy,
+  interval,
+  chance,
+}: {
+  accuracy: number;
+  interval: ConfidenceInterval | null;
+  chance: number | null;
+}) {
+  const asWidth = (value: number) => `${Math.min(100, value * 100)}%`;
+  const clearsChance = chance !== null && accuracy > chance;
+
+  return (
+    <Box>
+      <HStack justify="space-between" marginBottom={1.5}>
+        <Text fontSize="xs" fontWeight="semibold">
+          Is this better than chance?
+        </Text>
+        {chance !== null ? (
+          <Text
+            fontSize="2xs"
+            fontWeight="semibold"
+            color={clearsChance ? "green.fg" : "orange.fg"}
+          >
+            {clearsChance
+              ? `+${Math.round((accuracy - chance) * 100)} pts over chance`
+              : "at or below chance"}
+          </Text>
+        ) : null}
+      </HStack>
+
+      <Box
+        position="relative"
+        height="30px"
+        bg="bg.muted"
+        borderRadius="sm"
+        borderWidth="1px"
+        borderColor="border"
+        overflow="hidden"
+      >
+        {/* Everything left of this line is free — a judge gets it for
+            nothing by matching the base rate. */}
+        {chance !== null ? (
+          <Box
+            position="absolute"
+            insetStart={0}
+            top={0}
+            bottom={0}
+            width={asWidth(chance)}
+            bg="rgba(148, 163, 184, 0.28)"
+          />
+        ) : null}
+
+        {/* Plausible range for the true accuracy, not just the point estimate. */}
+        {interval ? (
+          <Box
+            position="absolute"
+            top="7px"
+            bottom="7px"
+            insetStart={asWidth(interval.lower)}
+            width={asWidth(interval.upper - interval.lower)}
+            bg="rgba(59, 130, 246, 0.28)"
+            borderRadius="sm"
+          />
+        ) : null}
+
+        {chance !== null ? (
+          <Box
+            position="absolute"
+            top={0}
+            bottom={0}
+            insetStart={asWidth(chance)}
+            width="2px"
+            bg="rgba(100, 116, 139, 0.9)"
+          />
+        ) : null}
+
+        <Box
+          position="absolute"
+          top={0}
+          bottom={0}
+          insetStart={asWidth(accuracy)}
+          width="3px"
+          bg="rgb(37, 99, 235)"
+        />
+      </Box>
+
+      <HStack justify="space-between" marginTop={1}>
+        <Text fontSize="2xs" color="fg.muted">
+          0%
+        </Text>
+        <Text fontSize="2xs" color="fg.muted">
+          chance {formatPercent(chance)} · observed {formatPercent(accuracy)}
+        </Text>
+        <Text fontSize="2xs" color="fg.muted">
+          100%
+        </Text>
+      </HStack>
+    </Box>
   );
 }
 
