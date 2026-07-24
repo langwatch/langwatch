@@ -24,7 +24,7 @@ import type {
 const logger = createLogger("langwatch:langy:github-installations");
 
 /** The token + acting identity a turn hands to the worker for a bot-authored PR. */
-export interface LangyGithubTurnToken {
+interface LangyGithubTurnToken {
   token: string;
   /** Stable key for the token's repository/permission scope — folded into the
    * worker credential signature so a scope change re-warms the worker. */
@@ -33,7 +33,7 @@ export interface LangyGithubTurnToken {
 }
 
 /** A recognised installation webhook action. */
-export type LangyGithubWebhookAction =
+type LangyGithubWebhookAction =
   | "created"
   | "deleted"
   | "suspend"

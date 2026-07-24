@@ -53,10 +53,6 @@ import type {
   LangyConversationRepository,
   LangyConversationRow,
 } from "./repositories/langy-conversation.repository";
-import {
-  type LangyMessageRepository,
-  NullLangyMessageRepository,
-} from "./repositories/langy-message.repository";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
 
@@ -67,7 +63,7 @@ export type { LangyConversationRepository as LangyConversationReadRepository } f
  * lower bound is what lets ClickHouse prune weekly partitions instead of
  * cold-scanning a long conversation's whole history on every tail fetch.
  */
-export interface LangyConversationEventsReader {
+interface LangyConversationEventsReader {
   getEventsOccurredSince(
     aggregateId: string,
     context: { tenantId: TenantId },
@@ -150,7 +146,7 @@ export type ConversationDetail = ConversationListItem & {
   eventCursor: LangyEventCursor | null;
 };
 
-export interface ConversationListPage {
+interface ConversationListPage {
   items: ConversationListItem[];
   nextCursor: LangyConversationListCursor | null;
 }
@@ -234,7 +230,6 @@ export class LangyConversationService {
   constructor(
     private readonly repository: LangyConversationRepository,
     private readonly commands: LangyConversationCommands,
-    private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
     private readonly events: LangyConversationEventsReader | null = null,
   ) {}
 
@@ -1101,9 +1096,8 @@ export class LangyConversationService {
   static create(
     commands: LangyConversationCommands,
     repository: LangyConversationRepository,
-    messages?: LangyMessageRepository,
     events?: LangyConversationEventsReader | null,
   ): LangyConversationService {
-    return new LangyConversationService(repository, commands, messages, events);
+    return new LangyConversationService(repository, commands, events);
   }
 }

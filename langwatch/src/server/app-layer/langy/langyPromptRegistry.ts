@@ -49,7 +49,7 @@ export const LANGY_PROMPT_HANDLES = {
   turnOverride: "langy-turn-override",
 } as const;
 
-export type LangyPromptHandle =
+type LangyPromptHandle =
   (typeof LANGY_PROMPT_HANDLES)[keyof typeof LANGY_PROMPT_HANDLES];
 
 /**
@@ -96,7 +96,7 @@ export const LANGY_TURN_OVERRIDE_FALLBACK = [
   "after an action it carries what the reader might want next, or nothing at all.",
 ].join(" ");
 
-export interface ResolveLangyPromptParams {
+interface ResolveLangyPromptParams {
   /** Only the read method is required — keeps this trivially fakeable in tests. */
   promptService: Pick<PromptService, "getPromptByIdOrHandle">;
   /** The project that HOLDS the Langy registry rows (the internal system project). */
@@ -109,7 +109,7 @@ export interface ResolveLangyPromptParams {
   tag?: string;
 }
 
-export interface ResolvedLangyPrompt {
+interface ResolvedLangyPrompt {
   text: string;
   source: "registry" | "fallback";
 }

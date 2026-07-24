@@ -76,7 +76,7 @@ export type LangyStreamEntry =
   | { type: "error"; error: string };
 
 /** An entry paired with the Redis stream id it was read at. */
-export interface LangyStreamRead {
+interface LangyStreamRead {
   id: string;
   entry: LangyStreamEntry;
 }

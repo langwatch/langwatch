@@ -127,7 +127,7 @@ export interface LangyRelayConversations {
   }): Promise<void>;
 }
 
-export interface LangyTurnRelayDeps {
+interface LangyTurnRelayDeps {
   conversations: LangyRelayConversations;
   buffer: LangyRelayBuffer;
   /**
@@ -163,14 +163,14 @@ export interface LangyTurnRelayDeps {
   logger?: { warn(o: unknown, m: string): void; debug?(o: unknown, m: string): void };
 }
 
-export type LangyRelayRejection =
+type LangyRelayRejection =
   | "malformed-envelope"
   | "no-run-token"
   | "bad-signature"
   | "wrong-turn"
   | "invalid-payload";
 
-export type LangyRelayOutcome =
+type LangyRelayOutcome =
   | { status: "applied" }
   | { status: "terminal" }
   | { status: "duplicate" }

@@ -154,7 +154,7 @@ export class LangyGithubRepoNotAccessibleError extends HandledError {
  * through to a bare `Error` and the user got "Something went wrong" plus a trace
  * id — for a failure we can name exactly.
  */
-export class LangyWorkerSpawnFailedError extends HandledError {
+class LangyWorkerSpawnFailedError extends HandledError {
   declare readonly code: "langy_worker_spawn_failed";
 
   constructor() {
@@ -224,7 +224,7 @@ export class LangyAgentErroredError extends HandledError {
 }
 
 /** The turn blew the `AGENT_CHAT_TIMEOUT_MS` budget (AbortSignal.timeout). */
-export class LangyTurnTimeoutError extends HandledError {
+class LangyTurnTimeoutError extends HandledError {
   declare readonly code: "langy_turn_timeout";
 
   constructor(timeoutMs: number) {

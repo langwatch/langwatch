@@ -16,7 +16,7 @@ export const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 // Tolerated forward clock skew between the signing and verifying hosts. A
 // payload "issued" further in the future than this is rejected — it can only
 // come from a skewed signer or someone replaying across a clock rollback.
-export const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
+const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
 
 export type GithubOauthStatePayload = {
   userId: string;

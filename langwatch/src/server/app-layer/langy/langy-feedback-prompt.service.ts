@@ -21,7 +21,7 @@ export interface LangyFeedbackPromptRedis {
 }
 
 /** Never under a conversation's first answer. */
-export const FEEDBACK_MIN_ANSWERS = 2;
+const FEEDBACK_MIN_ANSWERS = 2;
 /** Quiet period once an ask has been shown, rated or not. */
 export const FEEDBACK_QUIET_PERIOD_MS = 3 * 24 * 60 * 60 * 1000;
 /**

@@ -38,7 +38,7 @@ export const AGENT_DISPATCH_TIMEOUT_MS = 60_000;
  * covers 503/at-capacity, transport failures, and any other non-2xx — the
  * heartbeat-aware liveness subscriber is the backstop.
  */
-export type LangyDispatchOutcome =
+type LangyDispatchOutcome =
   | "accepted"
   | "busy"
   | "credentialsRequired"

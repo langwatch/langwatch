@@ -237,7 +237,6 @@ describe(
       const conversations = new LangyConversationService(
         new PrismaLangyConversationRepository(prisma),
         {} as never,
-        undefined,
         eventsReader,
       );
       appHolder.current = { broadcast, langy: { conversations } };

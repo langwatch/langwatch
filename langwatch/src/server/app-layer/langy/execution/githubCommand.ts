@@ -69,7 +69,7 @@ export type GithubProgressEvent = {
  * should say it is under way) and `end` when it settles. Most steps are instant
  * enough to need only an `end`.
  */
-export interface GithubStep {
+interface GithubStep {
   begin?: GithubProgressStage;
   end: GithubProgressStage;
   detail?: string;

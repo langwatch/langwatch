@@ -11,7 +11,7 @@ export type {
 } from "./repositories/langy-message.repository";
 export type { MessageRole } from "./repositories/langy-message.repository";
 
-export interface LangyMessageRecord {
+interface LangyMessageRecord {
   id: string;
   role: LangyMessageRow["role"];
   content: string;

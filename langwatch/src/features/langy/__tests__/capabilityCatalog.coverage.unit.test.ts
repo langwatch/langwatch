@@ -18,7 +18,7 @@ import {
 } from "../components/capabilities/capabilityCatalog";
 import {
   SURFACE_LABEL,
-  SURFACE_PATH,
+  SURFACE_ROUTE_CONFIG,
 } from "../components/capabilities/capabilityRegistry";
 
 const CLI_PROGRAM_PATH = fileURLToPath(
@@ -174,11 +174,12 @@ describe("the capability catalog, given the CLI's real command tree", () => {
     it("resolves each entry's surface to a label and a path", () => {
       const broken = Object.entries(CAPABILITY_CATALOG).filter(
         ([, entry]) =>
-          !SURFACE_LABEL[entry.surface] || !SURFACE_PATH[entry.surface],
+          !SURFACE_LABEL[entry.surface] ||
+          !SURFACE_ROUTE_CONFIG[entry.surface]?.path,
       );
       expect(
         broken.map(([resource, entry]) => `${resource} -> ${entry.surface}`),
-        "Catalog entries pointing at a surface with no SURFACE_LABEL / SURFACE_PATH row.",
+        "Catalog entries pointing at a surface with no SURFACE_LABEL / SURFACE_ROUTE_CONFIG row.",
       ).toEqual([]);
     });
 

@@ -136,7 +136,10 @@ type SurfaceRouteConfig = {
 const nestedResourceHref = (base: string, resourceId: string) =>
   `${base}/${encodeURIComponent(resourceId)}`;
 
-const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
+export const SURFACE_ROUTE_CONFIG: Record<
+  CapabilitySurface,
+  SurfaceRouteConfig
+> = {
   traces: { path: "messages", resourceHref: nestedResourceHref },
   analytics: { path: "analytics" },
   experiments: { path: "experiments", resourceHref: nestedResourceHref },
@@ -190,14 +193,6 @@ const SURFACE_ROUTE_CONFIG: Record<CapabilitySurface, SurfaceRouteConfig> = {
   gateway: { path: "settings", deepLink: false },
   platform: { path: "settings", deepLink: false },
 };
-
-/** Project-relative base path for each surface's index page. */
-export const SURFACE_PATH = Object.fromEntries(
-  Object.entries(SURFACE_ROUTE_CONFIG).map(([surface, config]) => [
-    surface,
-    config.path,
-  ]),
-) as Record<CapabilitySurface, string>;
 
 /**
  * Build a project-scoped deep link to a surface, optionally targeting one

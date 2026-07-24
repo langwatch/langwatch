@@ -13,7 +13,7 @@ const logger = createLogger("langwatch:langy:virtual-key");
  * appears in customer-facing listings (purpose USER filter), so nothing in
  * the UI keys on this.
  */
-export const LANGY_VK_DISPLAY_NAME = "Langy";
+const LANGY_VK_DISPLAY_NAME = "Langy";
 
 /**
  * Idempotently provision a Langy VirtualKey for a project + persist its

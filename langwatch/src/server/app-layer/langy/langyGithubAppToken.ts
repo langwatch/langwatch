@@ -44,7 +44,7 @@ export const LANGY_INSTALLATION_PERMISSIONS = {
   pull_requests: "write",
 } as const;
 
-export interface GithubInstallationToken {
+interface GithubInstallationToken {
   token: string;
   /** ISO-8601 expiry GitHub returned (fixed ~1h out). */
   expiresAt: string;
@@ -52,7 +52,7 @@ export interface GithubInstallationToken {
   repositorySelection?: string;
 }
 
-export interface GithubInstallationDetails {
+interface GithubInstallationDetails {
   installationId: string;
   accountLogin: string;
   accountType: string;
@@ -81,7 +81,7 @@ export interface RedisLike {
   ): Promise<number | string | null>;
 }
 
-export interface MintInstallationTokenArgs {
+interface MintInstallationTokenArgs {
   installationId: string;
   /** Numeric repository ids to scope to (≤500). Omit for the full installation. */
   repositoryIds?: string[];

@@ -24,7 +24,7 @@ export interface LangyFrameDedupRedis {
 /** Default: a turn's frames all land well inside an hour. */
 const SEEN_TTL_SECONDS = 3600;
 
-export interface LangyFrameDedup {
+interface LangyFrameDedup {
   /**
    * Reserve a frameNonce for a turn. Returns true if it was UNSEEN (fresh — apply
    * the frame), false if already present (a replay/redelivery — drop it).

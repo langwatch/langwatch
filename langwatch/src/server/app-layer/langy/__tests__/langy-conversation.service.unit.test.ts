@@ -747,7 +747,6 @@ describe("LangyConversationService", () => {
         const svc = new LangyConversationService(
           makeRepo(),
           makeCommands(),
-          undefined,
           events,
         );
         await expect(
@@ -782,7 +781,6 @@ describe("LangyConversationService", () => {
         const svc = new LangyConversationService(
           visibleRepo(),
           makeCommands(),
-          undefined,
           makeEvents([
             plainTurnEvent({ id: "e1", createdAt: 100 }),
             plainTurnEvent({ id: "e2", createdAt: 200 }),
@@ -808,7 +806,6 @@ describe("LangyConversationService", () => {
         const svc = new LangyConversationService(
           visibleRepo(),
           makeCommands(),
-          undefined,
           events,
         );
         const acceptedAt = REHYDRATION_WINDOW_MS + 5_000;
@@ -843,7 +840,6 @@ describe("LangyConversationService", () => {
         const svc = new LangyConversationService(
           visibleRepo(),
           makeCommands(),
-          undefined,
           makeEvents([
             plainTurnEvent({ id: "2AAa", createdAt: 100 }),
             plainTurnEvent({ id: "2AAb", createdAt: 100 }),
@@ -866,7 +862,6 @@ describe("LangyConversationService", () => {
         const svc = new LangyConversationService(
           visibleRepo(),
           makeCommands(),
-          undefined,
           makeEvents([
             plainTurnEvent({
               id: "e1",
@@ -895,7 +890,6 @@ describe("LangyConversationService", () => {
         const svc = new LangyConversationService(
           visibleRepo(),
           makeCommands(),
-          undefined,
           makeEvents([plainTurnEvent({ id: "e1", createdAt: 100 })]),
         );
         const result = await svc.getEventsAfter({
@@ -925,7 +919,6 @@ describe("LangyConversationService", () => {
         const svc = new LangyConversationService(
           visibleRepo(),
           makeCommands(),
-          undefined,
           makeEvents(events),
         );
         const result = await svc.getEventsAfter({

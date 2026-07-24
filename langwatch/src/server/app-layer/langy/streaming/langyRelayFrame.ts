@@ -64,7 +64,7 @@ const receivedDomainErrorSchema = herrEnvelopeWireSchema.transform((body) =>
 );
 
 /** A tool call the agent ran, in the compact shape the durable final carries. */
-export const langyRelayToolCallSchema = z.object({
+const langyRelayToolCallSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   input: z.unknown().optional(),

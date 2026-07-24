@@ -18,7 +18,7 @@
  * Fail-closed: an unparseable payload, or one missing the owner identity, is
  * treated as NOT visible. Nothing leaks when we cannot prove access.
  */
-export interface LangyConversationUpdateAuthFields {
+interface LangyConversationUpdateAuthFields {
   /** The conversation owner's user id (operational `UserId`). */
   ownerUserId?: unknown;
   /** Whether the conversation has been shared with the project (`IsShared`). */

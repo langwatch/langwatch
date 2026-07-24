@@ -136,7 +136,7 @@ export async function mintLangySessionApiKeyForUser({
 }
 
 /** Outcome of a system revocation. `refused` means "that was not ours to touch". */
-export type LangySessionKeyRevocation =
+type LangySessionKeyRevocation =
   | "revoked"
   | "already_revoked"
   | "not_found"

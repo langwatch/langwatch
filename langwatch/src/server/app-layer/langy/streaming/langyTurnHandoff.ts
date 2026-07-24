@@ -64,13 +64,13 @@ export interface LangyTurnHandoff {
 }
 
 /** Minimal Redis surface. Injected so unit tests need no live server. */
-export interface LangyHandoffRedis {
+interface LangyHandoffRedis {
   set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
   get(key: string): Promise<string | null>;
 }
 
 /** TTL for a stashed handoff. Matches the stream buffer window (ADR-044). */
-export const LANGY_HANDOFF_TTL_SECONDS = 300;
+const LANGY_HANDOFF_TTL_SECONDS = 300;
 
 function handoffKey(conversationId: string, turnId: string): string {
   return `langy:handoff:{${conversationId}}:${turnId}`;

@@ -116,7 +116,7 @@ export function langyTurnIdentity(input: {
  * the turn-scoped cap note) or, on a fresh session's first post, the
  * manager-folded history seed; everything after it is the user speaking.
  */
-export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
+const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
 
 /**
  * Compose the turn's user-message prompt.
@@ -135,7 +135,7 @@ export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
  * turns for provider prompt caching to read the prefix instead of re-writing
  * it (see the composition site in `startConversationTurn`).
  */
-export function composeLangyTurnPrompt({
+function composeLangyTurnPrompt({
   contextBlock,
   capNote,
   hasHistorySeed,

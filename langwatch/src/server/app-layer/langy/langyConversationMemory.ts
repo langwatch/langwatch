@@ -78,7 +78,7 @@ import type { LangyMessageRow } from "./repositories/langy-message.repository";
 /** More entries than a follow-up could plausibly mean, and a bounded prompt. */
 export const MAX_MEMORY_ENTRIES = 10;
 /** Enough ids for "the first one" / "the last one" without becoming an export. */
-export const MAX_MEMORY_IDS_PER_ENTRY = 5;
+const MAX_MEMORY_IDS_PER_ENTRY = 5;
 /** A resource id is a KSUID or a slug; this is far above either. */
 const MAX_MEMORY_ID_LENGTH = 200;
 /** `resource` and `verb` are CLI nouns and verbs, not prose. */
@@ -89,7 +89,7 @@ const MAX_MEMORY_TERM_LENGTH = 64;
  * against. Sanitised at construction, so a rendered entry can never carry a
  * newline into the system block.
  */
-export interface LangyConversationMemoryEntry {
+interface LangyConversationMemoryEntry {
   /** The CLI resource noun: `scenario`, `dataset`, `trace`, … */
   resource: string;
   /** What was done to it: `create`, `run`, `search`, … */

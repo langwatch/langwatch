@@ -29,7 +29,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 /** The stable identity every frame is bound to. */
-export interface LangyFrameIdentity {
+interface LangyFrameIdentity {
   projectId: string;
   userId: string;
   conversationId: string;

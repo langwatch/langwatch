@@ -41,9 +41,9 @@
  */
 
 /** Long enough to outlive the token buffer's replay window; short enough to be transient. */
-export const LANGY_TURN_ACCESS_TTL_SECONDS = 300;
+const LANGY_TURN_ACCESS_TTL_SECONDS = 300;
 
-export interface LangyTurnAccess {
+interface LangyTurnAccess {
   projectId: string;
   conversationId: string;
   turnId: string;

@@ -1011,7 +1011,6 @@ export function initializeDefaultApp(options?: {
   const langyConversations = LangyConversationService.create(
     commands.langy,
     langyConversationRepository,
-    langyMessageRepository,
     es.getEventStore<LangyConversationProcessingEvent>() ?? null,
   );
   const langyMessages = new LangyMessageService(
