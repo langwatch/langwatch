@@ -64,8 +64,8 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           paddingY={3}
           gap={3}
           flexWrap="nowrap"
-          bg="bg.panel/70"
-          backdropFilter="blur(12px) saturate(140%)"
+          bg="color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 70%), transparent)"
+          backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
           borderWidth="1px"
           borderColor="border.muted"
           data-testid="run-row-header"
@@ -154,8 +154,8 @@ function RunRowData({
           className="group"
           aria-expanded={isExpanded}
           aria-label={`Run from ${timeAgo ?? "unknown time"}`}
-          bg="bg.panel/70"
-          backdropFilter="blur(12px) saturate(140%)"
+          bg="color-mix(in srgb, var(--chakra-colors-bg-panel) var(--lw-panel-alpha, 70%), transparent)"
+          backdropFilter="var(--lw-backdrop-blur, blur(12px) saturate(140%))"
           borderWidth="1px"
           borderColor="border.muted"
           transition="border-color 0.15s ease"

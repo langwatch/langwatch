@@ -106,6 +106,24 @@ describe("Dialog backdrop", () => {
     });
   });
 
+  describe("when rendering the backdrop's blur", () => {
+    /** @scenario "Blur effects turn off when the device can't keep a smooth frame rate" */
+    it("references the shared --lw-backdrop-blur CSS variable instead of a hardcoded value", () => {
+      renderOpenDialog();
+
+      // This backdrop covers the full viewport behind every dialog in the
+      // app (see src/components/ui/dialog.tsx) -- if its blur is ever
+      // hardcoded again instead of routed through --lw-backdrop-blur,
+      // reduced-graphics mode would still pay for a full-screen blur on
+      // every dialog open, silently defeating the fix everywhere dialogs
+      // are used.
+      const injectedCss = Array.from(document.querySelectorAll("style"))
+        .map((s) => s.innerHTML)
+        .join("\n");
+      expect(injectedCss).toContain("--lw-backdrop-blur");
+    });
+  });
+
   describe("when consumers reach for the Dialog namespace", () => {
     /** @scenario Dialog.Backdrop is not exposed as a public sub-component */
     it("does not expose a Backdrop sub-component", () => {

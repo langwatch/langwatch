@@ -8,6 +8,7 @@ import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { SessionProvider } from "~/utils/auth-client";
 import { ExtraFooterComponents } from "../ee/saas/ExtraFooterComponents";
 import { ColorModeProvider } from "./components/ui/color-mode";
+import { GraphicsQualityProvider } from "./components/GraphicsQualityProvider";
 import { Toaster } from "./components/ui/toaster";
 import { CommandBarProvider } from "./features/command-bar";
 import { useAttributionCapture } from "./hooks/useAttributionCapture";
@@ -32,7 +33,9 @@ export function OuterProviders({ children }: { children: ReactNode }) {
     <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <TRPCProvider>
         <ChakraProvider value={system}>
-          <ColorModeProvider>{children}</ColorModeProvider>
+          <ColorModeProvider>
+            <GraphicsQualityProvider>{children}</GraphicsQualityProvider>
+          </ColorModeProvider>
         </ChakraProvider>
       </TRPCProvider>
     </SessionProvider>
