@@ -10,11 +10,12 @@ export interface FindByTraceIdOptions {
   occurredAtMs?: number;
 
   /**
-   * An explicit time bound for the first read attempt, used verbatim — the
-   * caller declared the width (the fold's `options.readWindow`). Takes
-   * precedence over `occurredAtMs`, which exists for callers that only hold a
-   * point-in-time hint and want the repository to widen it. Miss handling is
-   * identical for both: the trace's real OccurredAt bounds a retry.
+   * An explicit time bound, applied verbatim with NO internal miss fallback —
+   * the caller declared the width (the fold's `options.readWindow`) and owns
+   * the retry (the fold executor re-reads without the window on a miss).
+   * Takes precedence over `occurredAtMs`, which exists for callers that only
+   * hold a point-in-time hint and want the repository to widen it AND recover
+   * a miss itself (resolve the trace's real OccurredAt, bound a retry).
    */
   window?: { fromMs: number; toMs: number };
 }

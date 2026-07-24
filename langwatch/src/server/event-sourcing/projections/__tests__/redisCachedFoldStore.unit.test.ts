@@ -162,6 +162,28 @@ describe("RedisCachedFoldStore", () => {
     });
   });
 
+  describe("given the executor's read-window fallback re-reads", () => {
+    describe("when the context carries bypassReadCache", () => {
+      it("goes straight to the durable tier without touching Redis", async () => {
+        const redis = createRedis();
+        const { store, inner } = createStore(redis);
+        // A cached entry exists — the bypass must skip it anyway: the retry
+        // only happens because the windowed attempt just consulted the cache.
+        await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
+        redis.get.mockClear();
+
+        const result = await store.get("agg-1", {
+          ...CONTEXT,
+          bypassReadCache: true,
+        });
+
+        expect(redis.get).not.toHaveBeenCalled();
+        expect(result).toEqual({ count: 1, UpdatedAt: 100 });
+        expect(inner.calls.get).toEqual(["agg-1"]);
+      });
+    });
+  });
+
   describe("given Redis is unreachable", () => {
     describe("when the fold reads state", () => {
       it("falls through to the durable store rather than failing the fold", async () => {

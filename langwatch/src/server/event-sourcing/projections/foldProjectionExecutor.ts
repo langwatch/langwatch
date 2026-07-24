@@ -25,6 +25,12 @@ const logger = createLogger("langwatch:event-sourcing:fold-executor");
  */
 const MAX_LOGGED_EVENT_IDS = 10;
 
+/**
+ * Projections that already warned about a read-window recovery this process.
+ * Bounded by the number of registered projections; see the warn site.
+ */
+const readWindowRecoveryWarned = new Set<string>();
+
 function compareFoldEvents<State, E extends Event>(
   projection: FoldProjectionDefinition<State, E>,
   a: E,
@@ -178,14 +184,24 @@ export class FoldProjectionExecutor {
       return windowed;
     }
 
-    const { readWindow: _readWindow, ...unwindowedContext } = context;
-    const unwindowed = await read(unwindowedContext);
+    // The retry drops the window and bypasses the read cache: the windowed
+    // attempt consulted the cache moments ago, so a second cache read is a
+    // guaranteed miss that would only skew the cache metrics.
+    const { readWindow: _readWindow, ...rest } = context;
+    const unwindowed = await read({ ...rest, bypassReadCache: true });
     incrementEsFoldReadWindowFallbackTotal(
       projectionName,
       unwindowed.state !== null ? "recovered" : "absent",
     );
     if (unwindowed.state !== null) {
-      logger.warn(
+      // A chronically-wrong width would otherwise warn per event; the metric's
+      // `recovered` counter is the ongoing signal, so warn once per projection
+      // per process and drop to debug after that.
+      const level = readWindowRecoveryWarned.has(projectionName)
+        ? ("debug" as const)
+        : ("warn" as const);
+      readWindowRecoveryWarned.add(projectionName);
+      logger[level](
         {
           projection: projectionName,
           tenantId: String(context.tenantId),

@@ -53,6 +53,17 @@ export interface ProjectionStoreContext {
   readWindow?: ReadTimeWindow;
 
   /**
+   * Skip the read cache for this read and go straight to the durable tier.
+   *
+   * Set by the executor on its read-window fallback: the retry runs moments
+   * after the windowed attempt already consulted the cache, so re-reading
+   * Redis is a guaranteed second miss that would double-count the cache (and
+   * dedup-unavailable) metrics and waste a round-trip. Stores without a cache
+   * tier ignore it.
+   */
+  bypassReadCache?: boolean;
+
+  /**
    * Resolved retention policy for the tenant. Absent/null means the resolver
    * could not produce a value (no resolver wired, or project unresolvable); the
    * write path then stamps PLATFORM_DEFAULT_RETENTION_DAYS, NOT indefinite —

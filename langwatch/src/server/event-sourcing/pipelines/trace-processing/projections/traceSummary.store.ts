@@ -76,10 +76,11 @@ export class TraceSummaryStore
     // `context.readWindow` — computed by the executor from the fold's declared
     // `options.readWindow` — bounds this read so trace_summaries (partitioned
     // by toYearWeek(OccurredAt)) prunes partitions instead of cold-scanning
-    // them all (incl. S3 tier). Passed through verbatim; on a windowed miss
-    // the repository resolves the trace's real OccurredAt to bound a retry,
-    // and the executor additionally retries without the window, so
-    // correctness never depends on the width.
+    // them all (incl. S3 tier). Passed through verbatim, and the repository
+    // applies it verbatim (no internal fallback on this path): the EXECUTOR
+    // retries a windowed miss without the window, which lands on the
+    // repository's resolve-OccurredAt path — so correctness never depends on
+    // the width, and no layer runs a second recovery ladder.
     return await this.repo.findByTraceId(
       String(context.tenantId),
       aggregateId,

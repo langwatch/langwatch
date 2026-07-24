@@ -109,6 +109,9 @@ describe("FoldProjectionExecutor declared read window", () => {
       const retryContext = (store.get as ReturnType<typeof vi.fn>).mock
         .calls[1]![1] as ProjectionStoreContext;
       expect(retryContext.readWindow).toBeUndefined();
+      // The windowed attempt consulted the cache moments ago — the retry
+      // goes straight to the durable tier.
+      expect(retryContext.bypassReadCache).toBe(true);
       // The recovered row is folded onto — not replaced by a batch on init().
       expect(state.count).toBe(8);
       expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");

@@ -22,6 +22,7 @@ Feature: Fold read windows are declared, not hand-rolled
     And an aggregate whose committed row sits outside that window
     When its next event is folded
     Then the platform retries the read once without the window
+    And the retry does not consult the read cache again
     And the recovered state is folded onto, not replaced
     And the recovery is counted so a drifting window is visible
 
