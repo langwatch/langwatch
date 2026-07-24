@@ -298,7 +298,7 @@ export class TeamService {
               ...principalInOrganizationWhere(organizationId),
             },
             include: {
-              user: { select: { id: true, name: true, email: true } },
+              user: { select: { id: true, name: true, email: true, image: true } },
               group: { select: { id: true, name: true, scimSource: true } },
               apiKey: { select: { id: true, name: true } },
               customRole: { select: { id: true, name: true } },
@@ -313,7 +313,7 @@ export class TeamService {
                   ...principalInOrganizationWhere(organizationId),
                 },
                 include: {
-                  user: { select: { id: true, name: true, email: true } },
+                  user: { select: { id: true, name: true, email: true, image: true } },
                   group: { select: { id: true, name: true, scimSource: true } },
                   apiKey: { select: { id: true, name: true } },
                   customRole: { select: { id: true, name: true } },
@@ -342,7 +342,7 @@ export class TeamService {
                 group: { organizationId },
                 user: { orgMemberships: { some: { organizationId } } },
               },
-              include: { user: { select: { id: true, name: true, email: true } } },
+              include: { user: { select: { id: true, name: true, email: true, image: true } } },
             })
           : [];
 
@@ -380,6 +380,7 @@ export class TeamService {
               viaGroupName: b.group?.name ?? null,
               name: gm.user.name ?? gm.user.email ?? "Unknown",
               email: gm.user.email ?? null,
+              image: gm.user.image ?? null,
               role: b.role,
               customRoleId: b.customRoleId,
               customRoleName: b.customRole?.name ?? null,
@@ -395,6 +396,7 @@ export class TeamService {
             viaGroupName: null as string | null,
             name: b.user?.name ?? b.user?.email ?? b.apiKey?.name ?? "Unknown",
             email: b.user?.email ?? null,
+            image: b.user?.image ?? null,
             role: b.role,
             customRoleId: b.customRoleId,
             customRoleName: b.customRole?.name ?? null,
@@ -419,6 +421,7 @@ export class TeamService {
           userId: string;
           name: string;
           email: string | null;
+          image: string | null;
           role: TeamUserRole;
           customRoleId: string | null;
           customRoleName: string | null;
@@ -438,6 +441,7 @@ export class TeamService {
               userId: b.userId,
               name: b.user?.name ?? b.userId,
               email: b.user?.email ?? null,
+              image: b.user?.image ?? null,
               role: b.role,
               customRoleId: b.customRoleId,
               customRoleName: b.customRole?.name ?? null,
@@ -455,6 +459,7 @@ export class TeamService {
           viaGroupName: string | null;
           name: string;
           email: string | null;
+          image: string | null;
           role: TeamUserRole;
           customRoleId: string | null;
           customRoleName: string | null;
@@ -470,6 +475,7 @@ export class TeamService {
             viaGroupName: m.viaGroupName,
             name: m.name,
             email: m.email,
+            image: m.image,
             role: m.role,
             customRoleId: m.customRoleId,
             customRoleName: m.customRoleName,
@@ -507,6 +513,7 @@ export class TeamService {
               viaGroupName: b.groupId ? b.group?.name ?? null : null,
               name: b.user?.name ?? b.group?.name ?? b.apiKey?.name ?? "Unknown",
               email: b.user?.email ?? null,
+              image: b.user?.image ?? null,
               role: b.role,
               customRoleId: b.customRoleId,
               customRoleName: b.customRole?.name ?? null,
