@@ -6,15 +6,15 @@ import type {
   OtlpInstrumentationScope,
   OtlpResource,
   OtlpSpan,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import type {
   NormalizedAttributes,
   NormalizedEvent,
   NormalizedSpan,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/spans";
-import { IdUtils } from "../../event-sourcing/pipelines/trace-processing/utils/id.utils";
-import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
-import { EventUtils } from "../../event-sourcing/utils/event.utils";
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
+import { TraceRequestUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { CanonicalizeSpanAttributesService } from "~/server/event-sourcing/pipelines/trace-processing/canonicalisation";
 import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 

@@ -8,7 +8,7 @@ import {
   createCostEnrichmentDeps,
   OtlpSpanCostEnrichmentService,
 } from "~/server/app-layer/traces/span-cost-enrichment.service";
-import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
+import { OtlpSpanPiiRedactionService } from "~/server/event-sourcing/pipelines/trace-processing/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
 import {
   applyOtlpSpanContentDrop,

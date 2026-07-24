@@ -12,7 +12,7 @@ import {
   piiRedactionLevelSchema,
   type RecordMetricCorrelationCommandData,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
+import { OtlpSpanPiiRedactionService } from "~/server/event-sourcing/pipelines/trace-processing/span-pii-redaction.service";
 
 export interface MetricRequestCollectionDeps {
   recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;

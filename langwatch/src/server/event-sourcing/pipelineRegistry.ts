@@ -60,7 +60,7 @@ import type { TraceAnalyticsRepository } from "~/server/event-sourcing/ports/tra
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
-import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
+import { TraceReadDerivationService } from "~/server/event-sourcing/pipelines/trace-processing/trace-read-derivation.service";
 import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
 import type { TraceSummaryData } from "../domain/traces/types";
 import type { TriggerPort } from "~/server/domain/automations/trigger.port";

@@ -9,7 +9,7 @@ import type { EvaluationRunPort } from "~/server/domain/evaluations/evaluation-r
 import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
+import { TraceReadDerivationService } from "~/server/event-sourcing/pipelines/trace-processing/trace-read-derivation.service";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";

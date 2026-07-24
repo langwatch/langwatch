@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PIICheckOptions } from "~/server/tracer/collector/piiCheck";
-import type { PIIRedactionLevel } from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type {
   OtlpKeyValue,
   OtlpResource,
   OtlpSpan,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   type BatchClearPIIFunction,
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,
   OtlpSpanPiiRedactionService,
-} from "../span-pii-redaction.service";
+} from "~/server/event-sourcing/pipelines/trace-processing/span-pii-redaction.service";
 
 vi.mock("~/server/tracer/collector/piiCheck", () => ({
   batchPresidioClearPII: vi.fn(),

@@ -2,7 +2,7 @@ import { CanonicalizeSpanAttributesService } from "~/server/event-sourcing/pipel
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
-} from "~/server/app-layer/traces/span-normalization.service";
+} from "~/server/event-sourcing/pipelines/trace-processing/span-normalization.service";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {
   AbstractFoldProjection,

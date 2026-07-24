@@ -9,12 +9,12 @@ import {
 import type {
   OtlpKeyValue,
   OtlpSpan,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   type BatchClearPIIFunction,
   type DataPrivacyResolver,
   OtlpSpanPiiRedactionService,
-} from "../span-pii-redaction.service";
+} from "~/server/event-sourcing/pipelines/trace-processing/span-pii-redaction.service";
 
 // The PII analysis service is the one true external boundary; everything else
 // (the redaction engines, the routing) is exercised for real. The feature flag

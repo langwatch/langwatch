@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TraceReadDerivationService,
   type NormalizedSpanReader,
-} from "../trace-read-derivation.service";
+} from "~/server/event-sourcing/pipelines/trace-processing/trace-read-derivation.service";
 
 /**
  * Counts how many times each underlying span read is issued. The derivations

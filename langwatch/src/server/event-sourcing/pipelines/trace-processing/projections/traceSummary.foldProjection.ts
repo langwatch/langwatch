@@ -3,7 +3,7 @@ import { ATTR_KEYS } from "~/server/domain/traces/canonicalisation-constants";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
-} from "~/server/app-layer/traces/span-normalization.service";
+} from "~/server/event-sourcing/pipelines/trace-processing/span-normalization.service";
 import { TraceIOExtractionService } from "~/server/event-sourcing/pipelines/trace-processing/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import {

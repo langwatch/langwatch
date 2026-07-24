@@ -33,7 +33,7 @@ vi.mock("~/server/app-layer/automations/graph-trigger-heartbeat", () => ({
   defaultGraphTriggerHeartbeatDeps: vi.fn(() => ({ deps: true })),
 }));
 
-vi.mock("~/server/app-layer/traces/trace-read-derivation.service", () => ({
+vi.mock("~/server/event-sourcing/pipelines/trace-processing/trace-read-derivation.service", () => ({
   TraceReadDerivationService: class {
     deriveEvents = vi.fn().mockResolvedValue([]);
   },
