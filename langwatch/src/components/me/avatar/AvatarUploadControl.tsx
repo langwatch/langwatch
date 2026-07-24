@@ -50,8 +50,8 @@ function AvatarEditButton({
         position="absolute"
         bottom="0"
         right="0"
-        width="24px"
-        height="24px"
+        width="18px"
+        height="18px"
         bg="blue.500"
         color="white"
         borderRadius="full"
@@ -61,7 +61,7 @@ function AvatarEditButton({
         alignItems="center"
         justifyContent="center"
       >
-        <Pencil size={12} />
+        <Pencil size={9} />
       </Box>
     </Box>
   );
