@@ -20,6 +20,7 @@ const driverGet = vi.fn();
 const driverPut = vi.fn();
 const driverDelete = vi.fn();
 const driverExists = vi.fn();
+const driverHead = vi.fn();
 const driverConstructorCalls: unknown[] = [];
 vi.mock("~/server/stored-objects/azure-blob-driver", () => ({
   AzureBlobDriver: class {
@@ -30,6 +31,7 @@ vi.mock("~/server/stored-objects/azure-blob-driver", () => ({
     put = driverPut;
     delete = driverDelete;
     exists = driverExists;
+    head = driverHead;
   },
 }));
 
@@ -237,7 +239,7 @@ describe("AzureDatasetStorage", () => {
       });
 
       it("headStagedObjectSize throws StagedUploadNotFoundError", async () => {
-        driverGet.mockRejectedValueOnce(
+        driverHead.mockRejectedValueOnce(
           new ObjectNotFoundError("azure-blob://lwacct/lw-container/staging/p1/missing"),
         );
 
@@ -266,17 +268,26 @@ describe("AzureDatasetStorage", () => {
     });
   });
 
-  describe("given AZURE_BLOB_ACCOUNT_KEY is not set", () => {
-    it("throws rather than constructing an unauthenticated driver", async () => {
-      delete mockEnv.AZURE_BLOB_ACCOUNT_KEY;
+  describe("given the resolver already validated the azure config", () => {
+    it("constructs the driver from the resolver-guaranteed key without re-validating", async () => {
+      // Single source of truth: resolveProjectStorageDestination throws
+      // AzureBackendMisconfiguredError for any missing var BEFORE a
+      // kind === "azure" destination can exist, so this class must not
+      // carry a second validation site that drifts (PR #6092 review,
+      // concern 5). The fail-loud contract itself is pinned by the
+      // Scenario Outline in project-storage-destination.unit.test.ts.
+      driverPut.mockResolvedValue(undefined);
 
-      await expect(
-        new AzureDatasetStorage().writeChunks({
-          projectId: "p1",
-          datasetId: "d1",
-          records: [{ a: 1 }],
-        }),
-      ).rejects.toThrow(/AZURE_BLOB_ACCOUNT_KEY/);
+      await new AzureDatasetStorage().writeChunks({
+        projectId: "p1",
+        datasetId: "d1",
+        records: [{ a: 1 }],
+      });
+
+      expect(driverConstructorCalls.at(-1)).toMatchObject({
+        accountName: "lwacct",
+        accountKey: mockEnv.AZURE_BLOB_ACCOUNT_KEY,
+      });
     });
   });
 

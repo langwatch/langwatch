@@ -179,7 +179,11 @@ describe("AzureBlobDriver", () => {
       const headers = init.headers as Record<string, string>;
       expect(headers["x-ms-blob-type"]).toBe("BlockBlob");
       expect(headers["Content-Type"]).toBe("image/png");
-      expect(headers["Content-Length"]).toBe(String(bytes.length));
+      // Content-Length must NOT be set manually: undici computes it from the
+      // body and rejects a user-supplied duplicate (InvalidArgumentError).
+      // The SharedKey signature still covers the byte length, which matches
+      // what undici puts on the wire.
+      expect(headers["Content-Length"]).toBeUndefined();
       expect(headers.Authorization).toMatch(
         new RegExp(`^SharedKey ${ACCOUNT_NAME}:`),
       );

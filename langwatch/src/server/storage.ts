@@ -115,22 +115,31 @@ export const createS3Client = async (projectId: string) => {
   // "langwatch" bucket to avoid silently rebinding to /var/lib/langwatch.
   const destination = await resolveProjectStorageDestination(projectId);
 
-  // This factory only ever speaks the S3 wire protocol. An azure
-  // destination means STORED_OBJECTS_BACKEND=azure is configured for this
-  // project — inventing an S3 client against the hardcoded "langwatch"
-  // bucket here would silently write bytes nobody reads back (the azure
-  // destination is what the read path resolves against). Fail loud instead;
-  // callers on the S3-only legacy path (StorageService, S3DatasetStorage)
-  // must route azure destinations through the Azure dataset/stored-objects
-  // storage implementations instead.
+  // This factory only ever speaks the S3 wire protocol, and it serves two
+  // different kinds of caller: URI-driven readers (S3Driver — bucket comes
+  // from the persisted s3:// URI) and legacy bucket+key surfaces (the edge
+  // spool, payload staging, legacy dataset JSON) that read back exactly
+  // what they wrote. An azure destination (STORED_OBJECTS_BACKEND=azure)
+  // must therefore NOT blanket-throw here: a deployment migrating S3→Azure
+  // keeps legacy s3:// URIs and spool refs that must stay readable and
+  // deletable. While S3_BUCKET_NAME is still configured, the legacy
+  // surfaces keep using it — each one reads what it writes, so nothing is
+  // silently lost. Only when the install is azure-only (no S3 bucket at
+  // all) do we fail loud: there is no legacy S3 data to read, and
+  // inventing a client against the hardcoded "langwatch" fallback would
+  // silently write bytes nobody reads back.
+  let s3Bucket: string;
   if (destination.kind === "azure") {
-    throw new Error(
-      `createS3Client cannot serve project ${projectId}: the resolved storage destination is the azure backend (STORED_OBJECTS_BACKEND=azure), not S3. Use AzureDatasetStorage / the stored-objects Azure driver instead of the legacy S3 client factory.`,
-    );
+    const legacyBucket = env.S3_BUCKET_NAME?.trim();
+    if (!legacyBucket) {
+      throw new Error(
+        `createS3Client cannot serve project ${projectId}: the resolved storage destination is the azure backend (STORED_OBJECTS_BACKEND=azure) and no S3_BUCKET_NAME is configured. Legacy S3 surfaces (spool, staging, legacy datasets) are unavailable on an azure-only install — use the Azure dataset/stored-objects storage implementations instead.`,
+      );
+    }
+    s3Bucket = legacyBucket;
+  } else {
+    s3Bucket = destination.kind === "s3" ? destination.bucket : "langwatch";
   }
-
-  const s3Bucket =
-    destination.kind === "s3" ? destination.bucket : "langwatch";
 
   // Endpoint + credentials still come from the BYOC config (per-project)
   // or env (global). The resolver above only commits to the bucket

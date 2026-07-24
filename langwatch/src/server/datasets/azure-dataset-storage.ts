@@ -19,6 +19,10 @@
 import type { Readable } from "node:stream";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
+import {
+  streamToBuffer,
+  StreamTooLargeError,
+} from "~/utils/streamToBuffer";
 import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
 import { ObjectNotFoundError } from "~/server/stored-objects/errors";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
@@ -49,18 +53,14 @@ type ResolvedAzureConfig = {
   container: string;
 };
 
-/** Buffers a Readable fully. Used for staged uploads, which are already size-capped by the caller. */
-async function streamToBuffer(stream: Readable): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Buffer));
-  }
-  return Buffer.concat(chunks);
-}
-
-/** Reads a Readable fully as a utf-8 string (chunk objects are JSONL text). */
+/**
+ * Reads a Readable fully as a utf-8 string (chunk objects are JSONL text).
+ * Capped at CHUNK_MAX_BYTES — chunks are written under that bound by
+ * `toJsonlChunks`, so anything larger is a tampered or corrupted object and
+ * must not be allowed to exhaust the heap.
+ */
 async function streamToString(stream: Readable): Promise<string> {
-  return (await streamToBuffer(stream)).toString("utf-8");
+  return (await streamToBuffer(stream, CHUNK_MAX_BYTES)).toString("utf-8");
 }
 
 export class AzureDatasetStorage implements DatasetStorage {
@@ -89,14 +89,13 @@ export class AzureDatasetStorage implements DatasetStorage {
         `AzureDatasetStorage invoked for project ${projectId} whose resolved storage destination is "${destination.kind}", not azure.`,
       );
     }
-    if (!env.AZURE_BLOB_ACCOUNT_KEY) {
-      throw new Error(
-        "AZURE_BLOB_ACCOUNT_KEY is not set — required to authenticate the azure dataset storage backend.",
-      );
-    }
+    // Invariant: a kind === "azure" destination is only ever returned after
+    // resolveProjectStorageDestination validated ACCOUNT_NAME / ACCOUNT_KEY /
+    // CONTAINER (AzureBackendMisconfiguredError names any missing var).
+    // Re-validating here would be a second source of truth that drifts.
     const driver = new AzureBlobDriver({
       accountName: destination.accountName,
-      accountKey: env.AZURE_BLOB_ACCOUNT_KEY,
+      accountKey: env.AZURE_BLOB_ACCOUNT_KEY!,
       endpointBaseUrl: env.AZURE_BLOB_ENDPOINT,
     });
     return {
@@ -280,8 +279,9 @@ export class AzureDatasetStorage implements DatasetStorage {
   /**
    * Deposits a staged upload from a byte stream, server-side — the same-origin
    * `/direct-upload/staging/:uploadId` route calls this (parity with
-   * `LocalDatasetStorage.putStaged`). `maxBytes` bounds the buffer so an authed
-   * client can't exceed the cap before the finalize HEAD would reject it.
+   * `LocalDatasetStorage.putStaged`). `maxBytes` is enforced mid-stream: the
+   * shared `streamToBuffer` destroys the stream the moment the cap is
+   * exceeded, so an authed client can't fill the heap before the check runs.
    */
   async putStaged({
     projectId,
@@ -296,9 +296,14 @@ export class AzureDatasetStorage implements DatasetStorage {
   }): Promise<void> {
     assertKeyWithinProject(projectId, key);
     const { driver, accountName, container } = await this.config(projectId);
-    const buffer = await streamToBuffer(body);
-    if (maxBytes != null && buffer.length > maxBytes) {
-      throw new UploadTooLargeError();
+    let buffer: Buffer;
+    try {
+      buffer = await streamToBuffer(body, maxBytes);
+    } catch (error: unknown) {
+      if (error instanceof StreamTooLargeError) {
+        throw new UploadTooLargeError();
+      }
+      throw error;
     }
     const uri = this.uriFor({ accountName, container, key });
     await driver.put(uri, buffer, "application/octet-stream");
@@ -315,16 +320,17 @@ export class AzureDatasetStorage implements DatasetStorage {
     assertKeyWithinProject(projectId, key);
     const { driver, accountName, container } = await this.config(projectId);
     const uri = this.uriFor({ accountName, container, key });
-    let bytes: Buffer;
     try {
-      bytes = await streamToBuffer(await driver.get(uri));
+      // Signed HEAD — Content-Length only, never the body. Downloading the
+      // staged upload to measure it would defeat the size cap this method
+      // exists to enforce (review finding on PR #6092).
+      return await driver.head(uri);
     } catch (error: unknown) {
       if (error instanceof ObjectNotFoundError) {
         throw new StagedUploadNotFoundError();
       }
       throw error;
     }
-    return bytes.length;
   }
 
   async deleteStaged({

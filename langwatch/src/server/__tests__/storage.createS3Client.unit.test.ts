@@ -247,8 +247,7 @@ describe("region resolution — non-AWS endpoint (BYOC/R2/MinIO)", () => {
 describe("given the resolved destination is azure", () => {
   beforeEach(resetS3Env);
 
-  /** @scenario "The legacy S3 client factory refuses an azure destination instead of inventing a bucket" */
-  it("throws a configuration error identifying the azure backend instead of falling back to the langwatch bucket", async () => {
+  async function importWithAzureDestination() {
     vi.resetModules();
     vi.doMock("../stored-objects/project-storage-destination", () => ({
       resolveProjectStorageDestination: vi.fn(async () => ({
@@ -260,16 +259,48 @@ describe("given the resolved destination is azure", () => {
     vi.doMock("../dataplane-s3", () => ({
       getS3ConfigForProject: vi.fn(async () => null),
     }));
-
     const { createS3Client: createS3ClientFresh } = await import("../storage");
+    return createS3ClientFresh;
+  }
 
-    await expect(createS3ClientFresh("test-project")).rejects.toThrow(
-      /azure/i,
-    );
-    expect(s3ClientConstructorCalls).toHaveLength(0);
-
+  function unmockAzureDestination() {
     vi.doUnmock("../stored-objects/project-storage-destination");
     vi.doUnmock("../dataplane-s3");
+  }
+
+  describe("when no S3_BUCKET_NAME is configured (azure-only install)", () => {
+    /** @scenario "The legacy S3 client factory refuses an azure destination instead of inventing a bucket" */
+    it("throws a configuration error identifying the azure backend instead of falling back to the langwatch bucket", async () => {
+      const createS3ClientFresh = await importWithAzureDestination();
+
+      await expect(createS3ClientFresh("test-project")).rejects.toThrow(
+        /azure/i,
+      );
+      expect(s3ClientConstructorCalls).toHaveLength(0);
+
+      unmockAzureDestination();
+    });
+  });
+
+  describe("when S3_BUCKET_NAME is still configured (S3→Azure migration)", () => {
+    /** @scenario "The legacy S3 client factory refuses an azure destination instead of inventing a bucket" */
+    it("keeps serving the legacy S3 bucket so pre-migration s3:// URIs, spool refs, and staged payloads stay readable", async () => {
+      process.env.S3_BUCKET_NAME = "legacy-bucket";
+      const createS3ClientFresh = await importWithAzureDestination();
+
+      const { s3Bucket } = await createS3ClientFresh("test-project");
+
+      // Legacy read paths (S3Driver.get on persisted s3:// URIs, the edge
+      // spool's bucket+key reads, staged-payload fetches) must keep working
+      // during a migration — blanket-throwing here would strand every
+      // pre-migration object (PR #6092 review, concern 1).
+      expect(s3Bucket).toBe("legacy-bucket");
+      expect(s3ClientConstructorCalls).toHaveLength(1);
+      // The hardcoded "langwatch" fallback is still never invented for azure.
+      expect(s3Bucket).not.toBe("langwatch");
+
+      unmockAzureDestination();
+    });
   });
 });
 

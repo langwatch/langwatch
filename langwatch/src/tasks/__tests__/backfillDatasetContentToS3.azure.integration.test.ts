@@ -105,13 +105,18 @@ describe("migrateDatasetToS3 onto the Azure Blob backend", () => {
         },
       });
       const entries = [{ a: 1 }, { a: 2 }, { a: 3 }];
-      for (const entry of entries) {
+      // Distinct createdAt per row: the production read order is
+      // [createdAt asc, id asc], and rows created in the same millisecond
+      // with random ids would come back in nondeterministic order.
+      const baseTime = Date.now();
+      for (const [i, entry] of entries.entries()) {
         await prisma.datasetRecord.create({
           data: {
             id: `record_${nanoid()}`,
             datasetId: dataset.id,
             projectId: project.id,
             entry,
+            createdAt: new Date(baseTime + i * 1000),
           },
         });
       }

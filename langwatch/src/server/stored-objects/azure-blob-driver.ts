@@ -358,6 +358,48 @@ export class AzureBlobDriver implements StorageDriver {
   }
 
   /**
+   * Returns the blob's size in bytes from a signed HEAD — Content-Length
+   * without transferring the body. NOT part of the `StorageDriver`
+   * interface; used by `AzureDatasetStorage.headStagedObjectSize` to
+   * enforce the finalize size cap without downloading the staged upload.
+   *
+   * @throws ObjectNotFoundError when the blob does not exist.
+   */
+  async head(uri: string): Promise<number> {
+    const { container, blobPath } = parseAzureBlobUri(uri);
+
+    const { endpoint, headers } = this.signedRequest({
+      method: "HEAD",
+      container,
+      blobPath,
+      contentLength: "",
+      contentType: "",
+      extraHeaders: {},
+    });
+
+    const response = await fetch(`${endpoint}/${container}/${blobPath}`, {
+      method: "HEAD",
+      headers,
+    });
+
+    if (response.status === 404) {
+      throw new ObjectNotFoundError(uri);
+    }
+    if (!response.ok) {
+      throw new Error(
+        `Azure Blob HEAD failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText}`,
+      );
+    }
+    const contentLength = Number(response.headers.get("content-length"));
+    if (!Number.isFinite(contentLength) || contentLength < 0) {
+      throw new Error(
+        `Azure Blob HEAD returned no usable Content-Length for ${redactStorageUri(uri)}`,
+      );
+    }
+    return contentLength;
+  }
+
+  /**
    * Idempotently creates a container. NOT part of the `StorageDriver`
    * interface (get/put/delete/exists) — production deployments provision
    * their container out-of-band (Terraform/Helm/portal), same as an S3
