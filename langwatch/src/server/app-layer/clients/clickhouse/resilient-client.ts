@@ -10,6 +10,17 @@ import {
   TRANSIENT_NETWORK_CODES,
   translateClickHouseQueryError,
 } from "./translate-query-error";
+import { queryWindowed } from "./windowed-read";
+
+/**
+ * A resilient ClickHouse client: a {@link ClickHouseClient} whose `query`/`insert`
+ * carry retry + error translation, plus {@link queryWindowed} for the
+ * partition-pruning-window-with-fallback read pattern. Repositories resolve one
+ * of these and call `queryWindowed` without a cast.
+ */
+export type ResilientClickHouseClient = ClickHouseClient & {
+  queryWindowed: typeof queryWindowed;
+};
 
 const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
@@ -375,8 +386,8 @@ export function createResilientClickHouseClient({
   maxRetries?: number;
   baseDelayMs?: number;
   maxDelayMs?: number;
-}): ClickHouseClient {
-  const wrapper = Object.create(client) as ClickHouseClient;
+}): ResilientClickHouseClient {
+  const wrapper = Object.create(client) as ResilientClickHouseClient;
 
   wrapper.query = async (params) => {
     const cleanedParams = stripLangwatchSettings(params as Record<string, unknown>);
@@ -433,6 +444,11 @@ export function createResilientClickHouseClient({
       throw error;
     }
   };
+
+  // Orchestration only — the caller's `run` closure issues each attempt through
+  // this same wrapper's `query`, so retry + error translation apply per windowed
+  // attempt. Assigned by reference to preserve the generic signature.
+  wrapper.queryWindowed = queryWindowed;
 
   return wrapper;
 }

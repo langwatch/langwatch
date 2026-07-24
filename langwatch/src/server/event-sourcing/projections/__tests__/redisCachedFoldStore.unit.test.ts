@@ -1,9 +1,26 @@
 import { register } from "prom-client";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../domain/tenantId";
 import type { FoldProjectionStore } from "../foldProjection.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
 import { RedisCachedFoldStore } from "../redisCachedFoldStore";
+
+// Capture the wrapper's own logger so the TTL-floor clamp can be asserted to
+// warn (once), while leaving every other observability export intact.
+const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@langwatch/observability")>();
+  return {
+    ...actual,
+    createLogger: () => ({
+      warn: warnSpy,
+      error: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    }),
+  };
+});
 
 interface TestState {
   count: number;
@@ -207,9 +224,14 @@ describe("RedisCachedFoldStore", () => {
     });
   });
 
-  describe("given a fold applied events", () => {
+  // Since ADR-066 the executor (`FoldProjectionExecutor.appliedIdsForCommit`)
+  // decides the applied-event-id set at commit — union on a retry, reset on a
+  // fresh delivery — and stamps it on the context. This tier is a dumb
+  // read/write cache: it persists that set verbatim and no longer re-reads the
+  // cache to re-merge, so a store issues no Redis GET.
+  describe("given the context carries an applied-event-id set", () => {
     describe("when the state is stored", () => {
-      it("records their ids so a redelivery can be recognised", async () => {
+      it("persists the set verbatim so a redelivery can be recognised", async () => {
         const redis = createRedis();
         const { store } = createStore(redis);
 
@@ -221,63 +243,36 @@ describe("RedisCachedFoldStore", () => {
         const cached = await store.getWithApplied("agg-1", CONTEXT);
         expect(cached?.appliedEventIds).toEqual(["e1", "e2"]);
       });
-    });
 
-    describe("when a later fold step is a fresh delivery", () => {
-      it("replaces the ids, since the previous batch must have acked", async () => {
+      it("does not re-read the cache to re-merge, even on a retry", async () => {
         const redis = createRedis();
         const { store } = createStore(redis);
 
-        await store.store(
-          { count: 5, UpdatedAt: 200 },
-          { ...CONTEXT, appliedEventIds: ["e1"], deliveryAttempt: 1 },
-        );
-        await store.store(
-          { count: 6, UpdatedAt: 201 },
-          { ...CONTEXT, appliedEventIds: ["e2"], deliveryAttempt: 1 },
-        );
-
-        // The queue holds one active batch per group, so a fresh delivery
-        // implies the previous one completed — e1 can never come back, and
-        // keeping it is what let the set grow without bound.
-        const cached = await store.getWithApplied("agg-1", CONTEXT);
-        expect(cached?.appliedEventIds).toEqual(["e2"]);
-      });
-    });
-
-    describe("when a later fold step is a retry of the same chain", () => {
-      it("accumulates, because the earlier events can still be redelivered", async () => {
-        const redis = createRedis();
-        const { store } = createStore(redis);
-
-        await store.store(
-          { count: 5, UpdatedAt: 200 },
-          { ...CONTEXT, appliedEventIds: ["e1"], deliveryAttempt: 1 },
-        );
+        // The executor has already merged the retry's set into the context; the
+        // wrapper must persist it as given and issue no GET of its own (the
+        // redundant read-back ADR-066 removed).
         await store.store(
           { count: 6, UpdatedAt: 201 },
-          { ...CONTEXT, appliedEventIds: ["e2"], deliveryAttempt: 2 },
+          { ...CONTEXT, appliedEventIds: ["e1", "e2"], deliveryAttempt: 2 },
         );
+
+        expect(redis.get).not.toHaveBeenCalled();
+        expect(redis.set).toHaveBeenCalledTimes(1);
 
         const cached = await store.getWithApplied("agg-1", CONTEXT);
         expect(cached?.appliedEventIds).toEqual(["e1", "e2"]);
       });
 
-      it("does not record the same event twice", async () => {
+      it("records an empty set when the context carries none", async () => {
         const redis = createRedis();
         const { store } = createStore(redis);
 
-        await store.store(
-          { count: 5, UpdatedAt: 200 },
-          { ...CONTEXT, appliedEventIds: ["e1"], deliveryAttempt: 1 },
-        );
-        await store.store(
-          { count: 5, UpdatedAt: 201 },
-          { ...CONTEXT, appliedEventIds: ["e1"], deliveryAttempt: 2 },
-        );
+        // The replay path stores without stamping a set; absent is persisted as
+        // empty, matching that path's prior result.
+        await store.store({ count: 5, UpdatedAt: 200 }, CONTEXT);
 
         const cached = await store.getWithApplied("agg-1", CONTEXT);
-        expect(cached?.appliedEventIds).toEqual(["e1"]);
+        expect(cached?.appliedEventIds).toEqual([]);
       });
     });
   });
@@ -372,4 +367,87 @@ describe("RedisCachedFoldStore", () => {
     });
   });
 
+  // The TTL is a correctness invariant (ADR-066): a cache miss is authoritative
+  // only because the entry has outlived the ClickHouse replication lag, so an
+  // operator override must never take it below the floor. `resolveFoldCacheTtl`
+  // runs at construction; a fresh module is loaded per case so the once-per-
+  // process clamp warning can be observed.
+  describe("given LANGWATCH_FOLD_CACHE_TTL_SECONDS", () => {
+    const ENV = "LANGWATCH_FOLD_CACHE_TTL_SECONDS";
+    let original: string | undefined;
+
+    beforeEach(() => {
+      original = process.env[ENV];
+      warnSpy.mockClear();
+      vi.resetModules();
+    });
+
+    afterEach(() => {
+      if (original === undefined) delete process.env[ENV];
+      else process.env[ENV] = original;
+    });
+
+    async function freshStore(redis: ReturnType<typeof createRedis>) {
+      const { RedisCachedFoldStore: Fresh } = await import(
+        "../redisCachedFoldStore"
+      );
+      return new Fresh<TestState>(createInnerStore().store, redis as never, {
+        keyPrefix: "test_table",
+      });
+    }
+
+    async function ttlWrittenBy(redis: ReturnType<typeof createRedis>) {
+      const store = await freshStore(redis);
+      await store.store({ count: 1, UpdatedAt: 1 }, CONTEXT);
+      return redis.values.get(CACHE_KEY)?.ttlSeconds;
+    }
+
+    describe("when the override is below the replication-lag floor", () => {
+      it("clamps the effective TTL up to the floor and warns", async () => {
+        process.env[ENV] = "60";
+        const redis = createRedis();
+
+        // The write lands at the floor, not the configured 60 — the clamp acted.
+        expect(await ttlWrittenBy(redis)).toBe(300);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it("warns only once even when several stores resolve a clamped TTL", async () => {
+        process.env[ENV] = "30";
+        const { RedisCachedFoldStore: Fresh } = await import(
+          "../redisCachedFoldStore"
+        );
+
+        new Fresh<TestState>(createInnerStore().store, createRedis() as never, {
+          keyPrefix: "test_table",
+        });
+        new Fresh<TestState>(createInnerStore().store, createRedis() as never, {
+          keyPrefix: "test_table",
+        });
+
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the override is above the floor", () => {
+      it("honours the configured value and does not warn", async () => {
+        process.env[ENV] = "600";
+        const redis = createRedis();
+
+        // Above the floor is passed through untouched — the override is respected.
+        expect(await ttlWrittenBy(redis)).toBe(600);
+        expect(warnSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the override is unset", () => {
+      it("falls back to the default without warning", async () => {
+        delete process.env[ENV];
+        const redis = createRedis();
+
+        expect(await ttlWrittenBy(redis)).toBe(300);
+        expect(warnSpy).not.toHaveBeenCalled();
+      });
+    });
+  });
 });
