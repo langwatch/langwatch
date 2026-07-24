@@ -8,7 +8,7 @@ import { getAnalyticsService } from "~/server/app-layer/analytics";
 import type { EvaluationRunPort } from "~/server/domain/evaluations/evaluation-run.port";
 import type { ProjectServicePort } from "~/server/domain/projects/project-service.port";
 import type { TraceSummaryRepository } from "~/server/event-sourcing/ports/trace-summary.repository";
-import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import type { NormalizedSpanReader } from "~/server/event-sourcing/pipelines/trace-processing/trace-read-derivation.service";
 import { TraceReadDerivationService } from "~/server/event-sourcing/pipelines/trace-processing/trace-read-derivation.service";
 import type { TraceSummaryData } from "~/server/domain/traces/types";
 import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
@@ -81,7 +81,7 @@ export function buildAutomationDispatchPorts({
   emailSuppressions: EmailSuppressionService;
   projects: ProjectServicePort;
   evaluations: { runs: EvaluationRunPort };
-  traces: { spans: SpanStorageService };
+  traces: { spans: NormalizedSpanReader };
   traceSummaryRepository: TraceSummaryRepository;
 }): AutomationDispatchPorts {
   // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
