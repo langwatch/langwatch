@@ -1,6 +1,6 @@
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import type { CodingAgent } from "~/server/event-sourcing/pipelines/coding-agent-processing/agents/_types";
 import {
-  type CodingAgent,
   detectCodingAgent,
   normalizeEventName,
   parseMcpToolName,

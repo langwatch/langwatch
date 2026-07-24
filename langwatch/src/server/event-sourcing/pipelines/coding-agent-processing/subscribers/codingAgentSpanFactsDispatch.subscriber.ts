@@ -82,6 +82,10 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         agent: detectCodingAgent({
           recordName: span.name,
           scopeName: span.instrumentationScope.name,
+          serviceName:
+            typeof span.resourceAttributes["service.name"] === "string"
+              ? (span.resourceAttributes["service.name"] as string)
+              : null,
         }),
         occurredAt: event.occurredAt,
         traceId: span.traceId,

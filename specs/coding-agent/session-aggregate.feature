@@ -51,3 +51,12 @@ Feature: Coding-agent sessions
   Scenario: a session without a session id is not lost
     When a coding-agent trace arrives whose telemetry carries no session id
     Then it appears as a single-trace session of its own
+
+  Scenario: a Cowork session is an agent session
+    When Claude Cowork sends its session telemetry as events with a session id and no spans
+    Then the session appears with its turns, tool activity, costs and token totals
+    And the session is identified as Cowork
+
+  Scenario: Cowork telemetry that shares Claude Code's event vocabulary is still Cowork
+    When a session's events carry Claude Code's event names but declare the Cowork service
+    Then the session is identified as Cowork, not Claude Code

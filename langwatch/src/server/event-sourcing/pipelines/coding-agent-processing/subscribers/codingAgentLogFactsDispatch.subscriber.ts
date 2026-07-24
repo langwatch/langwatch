@@ -44,15 +44,24 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
         attributes["event.name"] = record.eventName;
       }
 
-      const facts = liftCodingAgentLogFacts({
-        scopeName: record.scopeName,
-        attributes,
-      });
-      if (facts === null) return;
-
+      // Parsed before the gate: Cowork's events reuse Claude Code's scope and
+      // names, so resource-level service.name is what identifies them.
       const resourceAttributes = parseFlatAttributes(
         record.resourceAttributesFlatJson,
       );
+      const rawServiceName = resourceAttributes?.["service.name"];
+      const serviceName =
+        typeof rawServiceName === "string" && rawServiceName.length > 0
+          ? rawServiceName
+          : null;
+
+      const facts = liftCodingAgentLogFacts({
+        scopeName: record.scopeName,
+        attributes,
+        serviceName,
+      });
+      if (facts === null) return;
+
       const serviceVersion = resourceAttributes?.["service.version"];
       if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
         facts["service.version"] = serviceVersion;
@@ -81,6 +90,7 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
             typeof attributes["event.name"] === "string"
               ? (attributes["event.name"] as string)
               : null,
+          serviceName,
         }),
         occurredAt: record.occurredAt,
         recordId: record.recordId,

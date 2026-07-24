@@ -58,6 +58,43 @@ describe("detectCodingAgent", () => {
     });
   });
 
+  describe("given a Cowork record", () => {
+    /**
+     * Cowork is the Claude desktop runtime working in a VM: its events reuse
+     * Claude Code's vocabulary and scope, and only the resource-level
+     * `service.name: cowork` (its docs' Service information table) names it.
+     * The service signal must beat the anthropic-scope fallback.
+     */
+    it("is named by its service, not its runtime's scope", () => {
+      expect(
+        detectCodingAgent({
+          scopeName: "com.anthropic.claude_code.events",
+          recordName: "claude_code.user_prompt",
+          serviceName: "cowork",
+        }),
+      ).toBe("claude_cowork");
+    });
+
+    it("is recognised from the service alone when events arrive bare", () => {
+      expect(
+        detectCodingAgent({
+          recordName: "user_prompt",
+          serviceName: "cowork",
+        }),
+      ).toBe("claude_cowork");
+    });
+
+    it("does not claim Claude Code sessions, which carry no cowork service", () => {
+      expect(
+        detectCodingAgent({
+          scopeName: "com.anthropic.claude_code.events",
+          recordName: "claude_code.user_prompt",
+          serviceName: "claude-code",
+        }),
+      ).toBe("claude_code");
+    });
+  });
+
   describe("given something that is not a coding agent", () => {
     it("says so, rather than guessing", () => {
       expect(detectCodingAgent({ recordName: "openai.chat" })).toBe("unknown");
