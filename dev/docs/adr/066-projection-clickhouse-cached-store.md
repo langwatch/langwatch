@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-23
 
-**Status:** Accepted (Pillar 1 first adopter — `codingAgentSession` read-back store, migration 00053 — shipped in this PR; Pillar 2 append coalescing and the durable dedup watermark remain follow-ups)
+**Status:** Accepted (shipped with this ADR's PR train: Pillar 1 adopter #1 — `codingAgentSession` read-back store, migration 00053; Pillar 2 adopter #1 — `recordTriggerMatch` append coalescing on the count+byte-bounded drain; the durable dedup watermark — migration 00054. Remaining follow-ups are tracked in *Adopters & sequencing*.)
 
 **Re-affirms & hardens:** [ADR-007](./007-event-sourcing-architecture.md) §"Fold Projections", §"No Checkpoints" ("fold state = stored data"; "`store.get()` loads last state").
 
@@ -32,7 +32,7 @@ Underneath the incident is a design smell: the cache and the ClickHouse store we
 
 ### The same table was overwhelmed from the *other* side too
 
-`event_log` did not part-buildup from the fold refolds alone. The other heavy contributor was **producer-side**: a hot automation trigger firing tens of thousands of times minted **one tiny `async_insert` into `event_log` per match** (`recordTriggerMatch` has no coalescing — it appends one `TRIGGER_MATCH_RECORDED` event per match). Tens of thousands of individual inserts feed exactly the small-parts explosion that starves merges.
+`event_log` did not part-buildup from the fold refolds alone. The other heavy contributor was **producer-side**: a hot automation trigger firing tens of thousands of times minted **one tiny `async_insert` into `event_log` per match** (`recordTriggerMatch` had no coalescing at the time — one `TRIGGER_MATCH_RECORDED` append per match). Tens of thousands of individual inserts feed exactly the small-parts explosion that starves merges.
 
 So the outage had one shape from two directions:
 
@@ -85,7 +85,7 @@ Pillar 1 stops the *reads*. It does nothing for the *writes*, and the writes wer
 
 **A command that appends one `event_log` event per item, at high fan-in, MUST coalesce its appends into batched inserts** — N items become one `INSERT` of N rows, not N inserts of one row. `event_log` inserts already use `async_insert: 1, wait_for_async_insert: 1`; batching at the producer is what keeps each flush from becoming its own part.
 
-- The trigger of this ADR's incident, `recordTriggerMatch`, appends one `TRIGGER_MATCH_RECORDED` per match with no coalescing (`serializeByAggregate: true` only, no `coalesceMaxBatch`). A hot trigger firing 27k times is 27k inserts. It is both a *victim* of the `event_log` stall (its jobs can't commit) and a *contributor* to it.
+- The trigger of this ADR's incident, `recordTriggerMatch`, appended one `TRIGGER_MATCH_RECORDED` per match with no coalescing (`serializeByAggregate: true` only, no `coalesceMaxBatch`). A hot trigger firing 27k times was 27k inserts — both a *victim* of the `event_log` stall (its jobs couldn't commit) and a *contributor* to it. It is now Pillar 2's first adopter: `coalesceMaxBatch: TRIGGER_MATCH_COALESCE_MAX_BATCH` on the count+byte-bounded drain.
 - The queue substrate already supports coalescing (`coalesceMaxBatch` / `processBatch` on the GroupQueue — the same mechanism the fold side uses). Producers this hot opt into it; the batched handler stores one multi-row insert per drained batch.
 - **Coalescing bounds by event count AND byte size, whichever is reached first.** A fixed event count alone is the wrong bound: small events under-fill a batch (still one insert per few items), and large events over-fill it (a single insert that blows past `async_insert_max_data_size` and becomes an oversized part). The group drain therefore takes *up to N events* **and** *up to M bytes* — it sums each drained job's staged size and stops at either limit, so the coalesced insert size is predictable and stays inside the async-insert flush budget. A single job larger than M bytes is still taken alone (never deadlocked). This bound lives in the drain itself, so every coalescing consumer — folds and producers — gets it for free. (For blob-offloaded payloads the staged size is the descriptor, not the full body; high-fan-in producers emit small inline events, so the proxy is accurate where it matters, and the envelope's recorded size is the refinement if a large-event fold ever needs exactness.)
 - This is **not** the fold store — a producer has no read-modify-write state to read back. It is the write-side sibling of the same principle: keep `event_log` off the per-item hot path.
@@ -137,15 +137,15 @@ Independently of the store: fix the **session = traceId fallback** so one large 
 
 | Component | Kind | Lever |
 |---|---|---|
-| `recordTriggerMatch` command | producer — one `TRIGGER_MATCH_RECORDED` per match, no coalescing | **Pillar 2 adopter #1** — append coalescing |
+| `recordTriggerMatch` command | producer — one `TRIGGER_MATCH_RECORDED` per match (un-coalesced at incident time) | **Pillar 2 adopter #1 — shipped** (append coalescing on the count+byte-bounded drain) |
 | `triggerSettlement` | ADR-052 process manager, Postgres outbox state | None — evolves state incrementally from a PM store, never refolds `event_log`; its backlog is pure `event_log`-stall *symptom*, not a cause |
 
 ## Adopters & sequencing
 
 1. **Now (relief):** `refoldOnOutOfOrder: false` on `codingAgentSession` — safe today (order-insensitive derivation), stops the replay storm. Small standalone PR.
 2. **Pillar 1, first adopter:** `codingAgentSession` → lossless read-back store (kills `refoldOnStoreMiss` on the hot path). The concrete shape is in *"codingAgentSession decomposition"* below. Then roll the same pattern to any other lossy-row fold. Migration is per-fold: until the last lossy-row fold adopts read-back (ADR-034's slim analytics folds are the remaining users), `refoldOnStoreMiss` / `refoldOnOutOfOrder` stay in the executor for those folds — the Rules below bind a fold from the moment it adopts, and the flags (with their executor support) are deleted with the final adopter.
-3. **Pillar 2, first adopter:** append coalescing for `recordTriggerMatch`; audit other high-fan-in `event_log` producers and coalesce them.
-4. **Durable dedup watermark** in fold state — closes the cold idempotency hole so "throw-and-retry" is truly idempotent even across cache loss (the applied-event-id set is cache-only today).
+3. **Pillar 2, first adopter — shipped:** append coalescing for `recordTriggerMatch` (`processCommandBatch` → one multi-row insert; the drain bounds by count AND bytes for every coalescing consumer). **Remaining:** audit other high-fan-in `event_log` producers and coalesce them — serialized command producers registering without coalescing are logged at registration, so the gaps are enumerable.
+4. **Durable dedup watermark — shipped:** the applied-event-id set persists next to the state row (`AppliedEventIds`, migration 00054) and the executor commits the union of the loaded set and the fresh ids on retries, so "throw-and-retry" stays idempotent across cache loss for read-back folds. Folds without a durable set keep the cache-only behaviour.
 
 ## codingAgentSession decomposition (Pillar 1 adopter #1)
 
@@ -187,7 +187,7 @@ Recorded here so the application-side and server-side levers are visible togethe
 - Projection state tables are ReplacingMergeTree keyed by `(TenantId, aggregate)` + a monotonic version; reads select the latest version (`FINAL`/`argMax`) with LazilyRead `LIMIT 1` discipline.
 - `store()` writes ClickHouse first (throws on failure), then Redis. A cache-write failure is logged, never thrown — ClickHouse already holds the durable state.
 - Folds declare their ordering contract. `event_log` is never read on the delivery path — only by the replay tool, for version migration or recovery.
-- Redelivery dedup travels with the state (applied-event-id set, reset on each fresh delivery, bounded to the in-flight batch).
+- Redelivery dedup travels with the state (applied-event-id set, reset on each fresh delivery, bounded to the in-flight batch) — and, for read-back folds, persists durably next to the state row (migration 00054), so it survives cache loss.
 - **High-fan-in `event_log` producers coalesce their appends** — a batched multi-row insert per drained batch, not one insert per item. A producer where a single aggregate can mint events faster than they drain, and does not coalesce, is a part-buildup regression. Any cap on coalescing coverage is logged, not silent.
 
 ## References
