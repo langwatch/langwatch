@@ -203,8 +203,8 @@ describe("better-auth config", () => {
     // `overrideUserInfoOnSignIn: true`). Lock that no provider ever does — the
     // check is name-agnostic so any future override/update-user-info flag set to
     // `true` trips it. Spec: specs/settings/user-avatar.feature
-    const overrideFlags = (config: Record<string, unknown>): string[] =>
-      Object.entries(config)
+    const overrideFlags = (config: unknown): string[] =>
+      Object.entries(config as Record<string, unknown>)
         .filter(([k, v]) => /override|updateuserinfo/i.test(k) && v === true)
         .map(([k]) => k);
 
@@ -246,7 +246,7 @@ describe("better-auth config", () => {
       } as Parameters<typeof buildSocialProviders>[0]);
       const built = Object.values(providers);
       expect(built).toHaveLength(1);
-      expect(overrideFlags(built[0] as Record<string, unknown>)).toEqual([]);
+      expect(overrideFlags(built[0])).toEqual([]);
     });
 
     it("generic-oauth (auth0/okta) never overwrites profile info on sign-in", async () => {
@@ -263,7 +263,7 @@ describe("better-auth config", () => {
       });
       expect(configs.length).toBeGreaterThan(0);
       for (const config of configs) {
-        expect(overrideFlags(config as Record<string, unknown>)).toEqual([]);
+        expect(overrideFlags(config)).toEqual([]);
       }
     });
   });

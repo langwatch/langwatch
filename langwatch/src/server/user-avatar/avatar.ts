@@ -14,10 +14,10 @@
  * Spec: specs/settings/user-avatar.feature
  */
 
-/** stored_objects.purpose tag for user avatars. */
+/** The stored-object "purpose" tag for user avatars. */
 export const AVATAR_PURPOSE = "user_avatar";
 
-/** stored_objects.owner_kind for user avatars — the owner is a User, not a project. */
+/** The stored-object owner kind for user avatars — the owner is a User, not a project. */
 export const AVATAR_OWNER_KIND = "user";
 
 /**
