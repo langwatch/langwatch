@@ -221,23 +221,27 @@ func TestDBReset(t *testing.T) {
 			if err := o.DBReset(context.Background(), params, "demo"); err != nil {
 				t.Fatalf("DBReset: %v", err)
 			}
-			if len(sup.shells) != 4 {
-				t.Fatalf("shells = %v, want prepare, seed, sample-traces, realistic-platform", sup.shells)
+			if len(sup.shells) != 5 {
+				t.Fatalf("shells = %v, want prepare, seed, retention, sample-traces, realistic-platform", sup.shells)
 			}
-			if !strings.Contains(sup.shells[2], "seed:sample-traces") {
-				t.Fatalf("shells = %v, want seed:sample-traces third", sup.shells)
+			// Retention is pinned first so nothing lands under the 7-day default.
+			if !strings.Contains(sup.shells[2], "seed:retention") {
+				t.Fatalf("shells = %v, want seed:retention third", sup.shells)
 			}
-			if !strings.Contains(sup.shells[3], "seed:realistic-platform") {
-				t.Fatalf("shells = %v, want seed:realistic-platform fourth", sup.shells)
+			if !strings.Contains(sup.shells[3], "seed:sample-traces") {
+				t.Fatalf("shells = %v, want seed:sample-traces fourth", sup.shells)
 			}
-			joined := strings.Join(sup.envs[2], " ")
+			if !strings.Contains(sup.shells[4], "seed:realistic-platform") {
+				t.Fatalf("shells = %v, want seed:realistic-platform fifth", sup.shells)
+			}
+			joined := strings.Join(sup.envs[3], " ")
 			if !strings.Contains(joined, "HAVEN_SEED_ENDPOINT=http://127.0.0.1:5560") {
-				t.Errorf("traces env should point at the app's loopback port, got %v", sup.envs[2])
+				t.Errorf("traces env should point at the app's loopback port, got %v", sup.envs[3])
 			}
 			if !strings.Contains(joined, "HAVEN_SEED_LANGWATCH_API_KEY=sk-lw-local-development-key") {
-				t.Errorf("traces env should carry the local ingestion key, got %v", sup.envs[2])
+				t.Errorf("traces env should carry the local ingestion key, got %v", sup.envs[3])
 			}
-			if strings.Join(sup.envs[3], " ") != joined {
+			if strings.Join(sup.envs[4], " ") != joined {
 				t.Errorf("platform seed should receive the same isolated stack overlay")
 			}
 		})
@@ -357,12 +361,18 @@ func TestDBSeed(t *testing.T) {
 		sys := &portSystem{fakeSystem: fakeSystem{alive: map[int]bool{42: true}}, portsUp: map[int]bool{5560: true}}
 		o := dbOrchestrator(sup, liveStackStore(), sys, &fakeDBServer{}, &fakeDBServer{})
 
-		t.Run("when seeding, the sample traces are ingested without the platform layer", func(t *testing.T) {
+		t.Run("when seeding, retention is pinned before the sample traces are ingested", func(t *testing.T) {
 			if err := o.DBSeed(context.Background(), params, "traces"); err != nil {
 				t.Fatalf("DBSeed: %v", err)
 			}
-			if len(sup.shells) != 2 || !strings.Contains(sup.shells[1], "seed:sample-traces") {
-				t.Fatalf("shells = %v, want seed then sample-traces only", sup.shells)
+			if len(sup.shells) != 3 {
+				t.Fatalf("shells = %v, want seed, retention, sample-traces", sup.shells)
+			}
+			if !strings.Contains(sup.shells[1], "seed:retention") {
+				t.Fatalf("shells = %v, want seed:retention second", sup.shells)
+			}
+			if !strings.Contains(sup.shells[2], "seed:sample-traces") {
+				t.Fatalf("shells = %v, want seed:sample-traces third", sup.shells)
 			}
 		})
 	})

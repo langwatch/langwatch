@@ -76,7 +76,55 @@ export const DEFAULT_RETENTION_DAYS = MIN_RETENTION_DAYS;
  * grandfathers data that predates the column. Must stay a whole number of weeks
  * (weekly partition key).
  */
-export const PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+const PRODUCTION_PLATFORM_DEFAULT_RETENTION_DAYS = 49;
+
+/**
+ * Resolve the platform retention default, honouring a local-dev override.
+ *
+ * `LANGWATCH_DEFAULT_RETENTION_DAYS` lets a local stack (haven pins it to 7) run
+ * with a tiny default so ClickHouse stays small. It is a DEV-ONLY affordance:
+ * shrinking the platform default in production would silently expire customer
+ * data, so if the var is set while `NODE_ENV=production` we fail loud at module
+ * load rather than honour it. The value must be a positive whole number of weeks
+ * (the weekly partition key), enforced the same way `retentionDaysSchema` does.
+ *
+ * Takes its environment as an argument (defaulting to `process.env`) so the
+ * branches are unit-testable without reloading the module.
+ */
+export function resolvePlatformDefaultRetentionDays(
+  env: {
+    LANGWATCH_DEFAULT_RETENTION_DAYS?: string;
+    NODE_ENV?: string;
+  } = process.env,
+): number {
+  const raw = env.LANGWATCH_DEFAULT_RETENTION_DAYS;
+  if (raw == null || raw === "") {
+    return PRODUCTION_PLATFORM_DEFAULT_RETENTION_DAYS;
+  }
+  if (env.NODE_ENV === "production") {
+    throw new Error(
+      "LANGWATCH_DEFAULT_RETENTION_DAYS must not be set in production: the platform retention default is fixed at " +
+        `${PRODUCTION_PLATFORM_DEFAULT_RETENTION_DAYS} days, and lowering it would silently expire customer data. ` +
+        "Configure per-tenant retention through RetentionPolicy overrides instead.",
+    );
+  }
+  const days = Number(raw);
+  if (!Number.isInteger(days) || days <= 0 || days % RETENTION_WEEK_DAYS !== 0) {
+    throw new Error(
+      `LANGWATCH_DEFAULT_RETENTION_DAYS=${raw} is invalid: it must be a positive whole number of weeks ` +
+        `(a multiple of ${RETENTION_WEEK_DAYS}) so it aligns with the weekly partition key.`,
+    );
+  }
+  return days;
+}
+
+/**
+ * The platform retention default, fixed at 49 days in production and overridable
+ * only by a local-dev stack via `LANGWATCH_DEFAULT_RETENTION_DAYS` (see
+ * `resolvePlatformDefaultRetentionDays`). Read once at module load.
+ */
+export const PLATFORM_DEFAULT_RETENTION_DAYS =
+  resolvePlatformDefaultRetentionDays();
 
 /**
  * The ClickHouse `_retention_days` column DEFAULT (migration 00032): the value

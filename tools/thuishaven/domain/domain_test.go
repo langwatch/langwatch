@@ -254,6 +254,17 @@ func TestOverlayEmitsHavenSeedLangwatchAPIKey(t *testing.T) {
 	}
 }
 
+// @scenario "haven pins the seven-day default for every dev stack"
+func TestOverlayPinsTheSevenDayRetentionDefault(t *testing.T) {
+	st := Stack{Slug: "portless", APIPort: 1, Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}}}
+	if got := valueOf(st.OverlayEnv(), "LANGWATCH_DEFAULT_RETENTION_DAYS"); got != "7" {
+		t.Errorf("LANGWATCH_DEFAULT_RETENTION_DAYS = %q, want 7 (a week; whole weeks align the partition key)", got)
+	}
+	if DefaultRetentionDays%7 != 0 {
+		t.Errorf("DefaultRetentionDays = %d is not a whole number of weeks", DefaultRetentionDays)
+	}
+}
+
 // TestOverlayNeverEmitsLangwatchApiKey is the watertight guard: haven must NEVER put
 // LANGWATCH_API_KEY (the langwatch SDK's own key contract) into a platform child's env.
 // A platform process that saw it would self-instrument into its own trace ingest — a

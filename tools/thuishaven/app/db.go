@@ -29,18 +29,27 @@ type seedPreset struct {
 	summary string
 }
 
+// seedRetentionStep pins the local-dev org's data retention to two years,
+// partition-aligned, before any data lands. A dev stack keeps only 7 days by
+// default (DefaultRetentionDays in the overlay), so a preset that loads data —
+// especially the backdated mass history — has to raise retention first or its
+// rows would be written pre-expired. Runs first in every data-loading preset;
+// unseeded presets (onboarding/bare) keep the tiny default.
+const seedRetentionStep = "seed:retention"
+
 // seedPresets is the registry of variants, shared by `db seed` and `db reset`.
 var seedPresets = map[string]seedPreset{
-	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{"seed:sample-traces", "seed:realistic-platform"}, summary: "past onboarding + sample traces + realistic platform data"},
-	"traces":          {ingest: []string{"seed:sample-traces"}, summary: "the deterministic sample traces on top of the stable identity"},
+	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform"}, summary: "past onboarding + sample traces + realistic platform data"},
+	"traces":          {ingest: []string{seedRetentionStep, "seed:sample-traces"}, summary: "the deterministic sample traces on top of the stable identity"},
 	"onboarding":      {env: []string{"HAVEN_SEED_FIRST_MESSAGE=0"}, summary: "a fresh onboarding journey (first-trace flag cleared)"},
 	"post-onboarding": {env: []string{"HAVEN_SEED_FIRST_MESSAGE=1"}, summary: "past onboarding, no demo content"},
 	"bare":            {env: []string{"HAVEN_SEED_MODEL_PROVIDERS=0", "HAVEN_SEED_FEATURE_FLAGS=0"}, summary: "identity only — no env-derived providers, stock feature flags"},
 	// mass: a superset of demo — months of coherent, backdated activity.
 	// Event-sourced products are seeded through their event logs (replayed by
 	// the projection workers); traces backdate through the collector inside
-	// its 31-day window. HAVEN_SEED_MONTHS tunes the window (default 3).
-	"mass": {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{"seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated traces, runs, and metric series (HAVEN_SEED_MONTHS, default 3)"},
+	// its 31-day window and, older than that, through recordSpan commands.
+	// HAVEN_SEED_MONTHS tunes the window (default 3).
+	"mass": {env: []string{"HAVEN_SEED_PRESET=demo"}, ingest: []string{seedRetentionStep, "seed:sample-traces", "seed:realistic-platform", "seed:mass"}, summary: "demo plus months of backdated traces, runs, and metric series (HAVEN_SEED_MONTHS, default 3)"},
 }
 
 // SeedPresetNames lists the registry for errors and help, sorted.
