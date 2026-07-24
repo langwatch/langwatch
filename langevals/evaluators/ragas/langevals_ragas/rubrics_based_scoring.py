@@ -117,6 +117,6 @@ class RagasRubricsBasedScoringEvaluator(
 
         return RagasResult(
             score=score,
-            cost=cost,
+            cost=cost.money,
             details=breakdown.feedback if breakdown else None,
         )

@@ -110,6 +110,6 @@ class RagasResponseRelevancyEvaluator(
 
         return RagasResult(
             score=score,
-            cost=cost,
+            cost=cost.money,
             details=f"Questions generated from output:\n\n{generated_questions}\n\nSimilarity to original question: {breakdown['similarity']}\nEvasive answer: {any_noncommittal}",
         )

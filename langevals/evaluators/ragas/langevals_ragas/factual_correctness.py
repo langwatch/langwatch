@@ -132,6 +132,6 @@ class RagasFactualCorrectnessEvaluator(
 
         return RagasResult(
             score=score,
-            cost=cost,
+            cost=cost.money,
             details=details if details else None,
         )

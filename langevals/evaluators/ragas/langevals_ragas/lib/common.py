@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from dataclasses import dataclass
 import os
 from typing import List, Optional
 from langevals_core.base_evaluator import (
@@ -103,11 +104,24 @@ def check_max_tokens(
     return None
 
 
+@dataclass
+class CapturedCost:
+    """Mutable holder for the cost captured by :func:`capture_cost`.
+
+    The cost can only be computed on teardown — after the ``with`` block has run
+    the evaluation and the token usage is known — so callers read ``.money``
+    *after* the block. ``money`` is ``None`` when the model's price is unknown
+    (see :func:`capture_cost`).
+    """
+
+    money: Optional[Money]
+
+
 @contextmanager
 def capture_cost(llm: LangchainLLMWrapper):
     with get_openai_callback() as cb:
-        money = Money(amount=0, currency="USD")
-        yield money
+        captured = CapturedCost(money=Money(amount=0, currency="USD"))
+        yield captured
 
         prompt_tokens = cb.prompt_tokens
         completion_tokens = cb.completion_tokens
@@ -118,13 +132,14 @@ def capture_cost(llm: LangchainLLMWrapper):
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
             )
-            money.amount = prompt_cost + completion_cost
+            captured.money = Money(amount=prompt_cost + completion_cost, currency="USD")
         except Exception as e:
             if "This model isn't mapped yet" in str(e):
-                # TODO: we need to pass in user cost mapping here
-                # TODO: actually yield None somehow here, because we don't want to store this value as 0
-                return None
+                # litellm has no price for this model, so the cost is genuinely
+                # unknown. Report it as None rather than a misleading $0, which
+                # would understate evaluation spend in cost dashboards.
+                # TODO: pass in a user-provided cost mapping here to price
+                # otherwise-unmapped models.
+                captured.money = None
             else:
                 raise e
-
-        return money
