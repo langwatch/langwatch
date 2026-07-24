@@ -320,7 +320,7 @@ export const SpanTabBar = memo(function SpanTabBar({
         menuContent: (
           <HStack gap={1.5}>
             <Text truncate maxWidth="200px">
-              {selectedSpan.name ?? selectedSpan.spanId}
+              {spanTabLabel(selectedSpan)}
             </Text>
           </HStack>
         ),
@@ -497,7 +497,13 @@ function SpanTab({
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   return (
     <Tooltip
-      content={`${spanTabLabel(span)} · ${span.spanId}`}
+      content={
+        // spanTabLabel already falls back to the span id for nameless
+        // spans — appending it again would read `id · id`.
+        span.name
+          ? `${spanTabLabel(span)} · ${span.spanId}`
+          : spanTabLabel(span)
+      }
       positioning={{ placement: "bottom" }}
       openDelay={400}
     >

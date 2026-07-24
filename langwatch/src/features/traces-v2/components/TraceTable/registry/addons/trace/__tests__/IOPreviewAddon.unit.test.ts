@@ -55,24 +55,30 @@ describe("ioPreviewWillRenderFor", () => {
   });
 
   describe("given a row missing one side", () => {
-    it("renders when only input is present (the preview shows a missing-output placeholder)", () => {
-      expect(
-        ioPreviewWillRenderFor(row({ input: "hi", output: null }), false),
-      ).toBe(true);
+    describe("when only the input is present", () => {
+      it("renders (the preview shows a missing-output placeholder)", () => {
+        expect(
+          ioPreviewWillRenderFor(row({ input: "hi", output: null }), false),
+        ).toBe(true);
+      });
     });
 
-    it("renders when only output is present", () => {
-      expect(
-        ioPreviewWillRenderFor(row({ input: null, output: "hello" }), false),
-      ).toBe(true);
+    describe("when only the output is present", () => {
+      it("renders", () => {
+        expect(
+          ioPreviewWillRenderFor(row({ input: null, output: "hello" }), false),
+        ).toBe(true);
+      });
     });
   });
 
   describe("given a row with neither side", () => {
-    it("skips when both are null", () => {
-      expect(
-        ioPreviewWillRenderFor(row({ input: null, output: null }), false),
-      ).toBe(false);
+    describe("when the addon evaluates eligibility", () => {
+      it("skips the row", () => {
+        expect(
+          ioPreviewWillRenderFor(row({ input: null, output: null }), false),
+        ).toBe(false);
+      });
     });
   });
 });

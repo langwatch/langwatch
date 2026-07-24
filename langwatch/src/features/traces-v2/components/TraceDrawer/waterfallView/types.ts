@@ -55,6 +55,19 @@ export type FlatRow = { kind: "span"; node: WaterfallTreeNode } | SiblingGroup;
 export const ROW_HEIGHT = 28;
 export const LLM_ROW_HEIGHT = 40;
 export const GROUP_ROW_HEIGHT = 36;
+
+/**
+ * LLM spans (second line: model) and named tool spans (second line: tool)
+ * render as two-line rows at `LLM_ROW_HEIGHT`. The virtualizer's height
+ * estimator and `TreeRow`'s rendering must agree on this predicate or
+ * rows overlap.
+ */
+export function isTwoLineSpan(
+  span: Pick<SpanTreeNode, "type" | "model" | "toolName">,
+): boolean {
+  return (span.type === "llm" && span.model != null) || span.toolName != null;
+}
+
 export const INDENT_PX = 20;
 export const MIN_TREE_WIDTH = 200;
 export const DEFAULT_TREE_PCT = 0.38;

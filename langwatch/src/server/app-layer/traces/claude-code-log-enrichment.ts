@@ -224,12 +224,12 @@ export function mapSpansToClaudeToolRefs(spans: Span[]): ClaudeToolSpanRef[] {
  * must apply even when the trace has zero logs.
  */
 export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
-  let changed = false;
+  let hasChanged = false;
   const next = spans.map((span) => {
     if (span.input != null) return span;
     const prompt = readStringParam(span.params, SPAN_USER_PROMPT_KEY);
     if (prompt === null) return span;
-    changed = true;
+    hasChanged = true;
     return {
       ...span,
       input: {
@@ -240,7 +240,7 @@ export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
   });
   // Identity-preserving on no-op so callers' referential contracts (and
   // memoized readers) see an untouched trace as the SAME array.
-  return changed ? next : spans;
+  return hasChanged ? next : spans;
 }
 
 /**

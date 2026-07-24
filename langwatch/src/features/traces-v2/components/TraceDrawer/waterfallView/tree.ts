@@ -13,7 +13,9 @@ import {
  * show it" so a wide drawer doesn't flash collapsed-then-expanded on mount.
  */
 export function shouldShowTimeline(containerWidthPx: number): boolean {
-  return containerWidthPx === 0 || containerWidthPx >= COLLAPSE_TIMELINE_BELOW_PX;
+  return (
+    containerWidthPx === 0 || containerWidthPx >= COLLAPSE_TIMELINE_BELOW_PX
+  );
 }
 
 export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
@@ -104,6 +106,24 @@ export function groupSiblings(
   return result;
 }
 
+/**
+ * Canonical identity for a sibling group. Includes every field
+ * `groupSiblings` folds by (name, type, toolName) plus the parent, so
+ * expansion state and React keys can never collide across distinct
+ * groups — two tool groups under one parent share `name` and differ
+ * only by `toolName`.
+ */
+export function siblingGroupKey(group: {
+  parentSpanId: string | null;
+  name: string;
+  type: string;
+  toolName: string | null;
+}): string {
+  return `${group.parentSpanId}::${group.name}::${group.type}::${
+    group.toolName ?? ""
+  }`;
+}
+
 export function flattenTree(
   nodes: WaterfallTreeNode[],
   collapsedIds: Set<string>,
@@ -117,9 +137,7 @@ export function flattenTree(
 
     for (const item of items) {
       if ("kind" in item && item.kind === "group") {
-        const groupKey = `${item.parentSpanId}::${item.name}::${
-          item.toolName ?? ""
-        }`;
+        const groupKey = siblingGroupKey(item);
         result.push(item);
         if (expandedGroups.has(groupKey)) {
           for (const span of item.spans) {

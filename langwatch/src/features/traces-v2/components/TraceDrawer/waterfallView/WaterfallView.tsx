@@ -23,11 +23,13 @@ import {
   getTimeMarkers,
   getTraceRange,
   shouldShowTimeline,
+  siblingGroupKey,
 } from "./tree";
 import {
   DEFAULT_TREE_PCT,
   GROUP_ROW_HEIGHT,
   INDENT_PX,
+  isTwoLineSpan,
   LLM_ROW_HEIGHT,
   MIN_TREE_WIDTH,
   ROW_HEIGHT,
@@ -329,8 +331,7 @@ export const WaterfallView = memo(function WaterfallView({
       const row = flatRows[index];
       if (!row) return ROW_HEIGHT;
       if (row.kind === "group") return GROUP_ROW_HEIGHT;
-      const isLlm = row.node.span.type === "llm" && row.node.span.model != null;
-      return isLlm ? LLM_ROW_HEIGHT : ROW_HEIGHT;
+      return isTwoLineSpan(row.node.span) ? LLM_ROW_HEIGHT : ROW_HEIGHT;
     },
     [flatRows],
   );
@@ -527,12 +528,10 @@ export const WaterfallView = memo(function WaterfallView({
               const i = virtualRow.index;
 
               if (row.kind === "group") {
-                const groupKey = `${row.parentSpanId}::${row.name}::${
-                  row.toolName ?? ""
-                }`;
+                const groupKey = siblingGroupKey(row);
                 return (
                   <Box
-                    key={`group-${row.parentSpanId}-${row.name}`}
+                    key={`group-${groupKey}`}
                     position="absolute"
                     top={0}
                     left={0}
@@ -743,7 +742,7 @@ export const WaterfallView = memo(function WaterfallView({
                   if (row.kind === "group") {
                     return (
                       <Box
-                        key={`group-tl-${row.parentSpanId}-${row.name}`}
+                        key={`group-tl-${siblingGroupKey(row)}`}
                         position="absolute"
                         top={0}
                         left={0}

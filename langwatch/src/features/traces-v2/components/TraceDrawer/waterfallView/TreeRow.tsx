@@ -24,6 +24,7 @@ import { TipCell } from "./TipCell";
 import {
   getSpanPalette,
   INDENT_PX,
+  isTwoLineSpan,
   LLM_ROW_HEIGHT,
   ROW_HEIGHT,
   SPAN_TYPE_ICONS,
@@ -103,7 +104,8 @@ export const TreeRow = memo(function TreeRow({
   // second line names WHICH tool ran (WebSearch, Read, Bash...), because a
   // wall of identical `claude_code.tool` rows was unreadable.
   const isNamedTool = !isLlm && span.toolName != null;
-  const rowH = isLlm || isNamedTool ? LLM_ROW_HEIGHT : ROW_HEIGHT;
+  // Same predicate the virtualizer's estimator uses — they must agree.
+  const rowH = isTwoLineSpan(span) ? LLM_ROW_HEIGHT : ROW_HEIGHT;
   // A skill run (a `Skill` tool span) gets the sparkles glyph + purple chip so
   // it stands out from ordinary tool spans in the tree — the waterfall node
   // carries no input, so this flags the invocation without naming the skill
