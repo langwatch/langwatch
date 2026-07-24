@@ -323,7 +323,12 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 	entries, err := selectEvaluationEntries(req.Workflow, req.EvaluateOn, req.DatasetEntry)
 	if err != nil {
 		emit(ctx, out, workflowErrorEvent(req, traceID, err.Error(), true))
-		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
+		// requireEnd=false: the evaluation `done` frame wraps a throwaway
+		// empty runState (per-row results went to the batch POST, not
+		// here), so its result is always {} by design — not the
+		// missing-End symptom #3198 targets. Each per-row Execute() is a
+		// full execute_flow and already carries the End-node guard.
+		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started, false))
 		return
 	}
 	total := len(entries)
@@ -442,11 +447,13 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 		// Don't emit a success state after the cancellation error
 		// (CodeRabbit major on PR #3607: producing two terminal
 		// states for one run confuses Studio's reducer).
-		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
+		// requireEnd=false — evaluation done frame, see kickoff comment.
+		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started, false))
 		return
 	}
 	emit(ctx, out, workflowSuccessEvent(req, traceID, newRunState(req.Workflow), started, true))
-	emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
+	// requireEnd=false — evaluation done frame, see kickoff comment.
+	emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started, false))
 }
 
 // selectEvaluationEntries materializes the workflow's Entry node dataset
