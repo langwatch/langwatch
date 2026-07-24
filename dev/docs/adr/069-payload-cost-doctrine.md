@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Shipping with this ADR (phase 1):** enqueue-time filtering and enqueue-time projection on the event-subscriber contract, adopted by the coding-agent span-facts subscriber — the deferred ADR-066 scope-table item ("move the coding-agent-name gate before enqueue"), shipped, plus the projection that goes with it. Phases 2–4 are sequenced follow-ups (below), not built here.
+**Shipping with this ADR (phase 1):** enqueue-time filtering on the event-subscriber contract, adopted by the coding-agent span-facts subscriber — the deferred ADR-066 scope-table item ("move the coding-agent-name gate before enqueue"), shipped. The enqueue-time *projection* that would also lift the derived slice at the seam is deliberately deferred to phase 2 (see Sequencing for why the seam is the wrong place for it). Phases 2–4 are sequenced follow-ups (below), not built here.
 
 **Builds on:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the same economics, one plane over. ADR-066 took `event_log` off the per-item hot path; this ADR takes bulk payloads off the per-item *scheduling* plane. Its scope table already named this ADR's phase 1 and deferred it.
 
@@ -113,27 +113,42 @@ Ordered by leverage: each phase dissolves the largest remaining share of the
 incident class, and each later phase depends on what the earlier ones make
 visible.
 
-1. **Phase 1 — invariant 4 (ships with this ADR).** The event-subscriber
-   contract gains two enqueue-time options: a *filter* (evaluated at routing
-   time, before a job is staged — `false` means no job is ever minted; the
-   predicate must be cheap and total, because a throw fails the routing attempt
-   into its retry path) and a *projection* (applied at staging — the staged job
-   carries the derived slice instead of the full event, with the subscriber's
-   per-key serialization, dedup window, and retry semantics unchanged). The
-   coding-agent span-facts subscriber adopts both: the name gate moves from the
-   handler to the filter seam, and the normalization + fact-lifting moves from
-   the handler to the projection, shrinking the staged payload from the full
-   span to the ~2 KB of derived facts and the handler to "send the command".
-   Jobs staged by the previous build still carry the full event, so the handler
-   recognizes both shapes for the transition window and processes pre-upgrade
-   jobs exactly as before. Enqueue outcomes (filtered / projected / staged
-   whole) are counted, following the existing event-sourcing metric
-   conventions — minimal, but enough to see the seam working.
+1. **Phase 1 — invariant 4, the filter half (ships with this ADR).** The
+   event-subscriber contract gains one enqueue-time option: a *filter*,
+   evaluated at routing time, before a job is staged — `false` means no job is
+   ever minted. The coding-agent span-facts subscriber adopts it: the name gate
+   moves from the handler to the filter seam, so a span from any other trace
+   never mints a job. This is the half of invariant 4 that dissolves the
+   observed incident — the 578-deep group formed because a *non-agent* project
+   minted a `codingAgentSpanFactsDispatch` job for every span it ingested, and
+   the filter makes those jobs not exist. Enqueue outcomes (filtered / staged)
+   are counted, following the existing event-sourcing metric conventions —
+   minimal, but enough to see the seam working.
+
+   The *projection* half — lifting the derived slice at the seam so the staged
+   job carries ~2 KB instead of the full span — is **not** shipped here, by
+   design. The enqueue seam runs on the shared routing-dispatch path: a throw
+   there fails the whole event's fan-out (fold, state, every subscriber) into a
+   routing retry, so only *cheap and total* work belongs on it. A filter is
+   both. The span projection is neither — it runs the full canonicalisation
+   registry and can throw on malformed span data — so moving it to the seam
+   would widen a poison span's blast radius from one isolated subscriber lane to
+   the entire fan-out. The normalization therefore stays in the subscriber's own
+   consumer lane (where a bad span retries only that job), and the
+   slice-on-the-wire optimization folds into phase 2, where the event carries a
+   cost-honest claim-check natively (invariant 1) and no per-subscriber
+   projection hook is needed at all. Filtering alone bounds the matched payloads
+   by real coding-agent volume, which is not the runaway the non-agent flood
+   was.
 2. **Phase 2 — invariants 1 + 2.** Blob references carry the payload's true
    byte size (and decode-expansion hint where known), and the remaining
    holding stages — per-job dispatch in flight, retry buffers — get byte
    bounds. Honest sizes come first within the phase: a byte bound over stub
-   sizes is the blindness the Context describes.
+   sizes is the blindness the Context describes. This is also where the matched
+   coding-agent span stops riding whole: with the event carrying a cost-honest
+   claim-check, the subscriber reads the slice from the reference instead of the
+   full payload — the slice-on-the-wire win phase 1 deferred, landed on the
+   right substrate instead of on the routing-dispatch seam.
 3. **Phase 3 — invariant 3.** The per-process memory grant pool.
    **Precondition: phase 2** — a grant is taken against a declared cost, so
    costs must be honest before a pool can budget them.
@@ -166,11 +181,13 @@ visible.
 
 ## Consequences
 
-- **The current driver class dissolves structurally.** Non-matching events
-  never become jobs, and matching events travel as their derived slice — the
-  578-deep group of multi-MB payloads has no mechanism left to form. This is
-  the same shape of claim ADR-066 made for refolds: not "tuned smaller", but
-  "no configuration surface on which to recur".
+- **The observed driver dissolves structurally.** Non-matching events never
+  become jobs — the 578-deep group formed from a non-agent project's spans, and
+  it now has no mechanism to form. This is the same shape of claim ADR-066 made
+  for refolds: not "tuned smaller", but "no configuration surface on which to
+  recur". Matched spans still travel as full payloads until phase 2 replaces
+  them with claim-checks; that residual is bounded by real coding-agent volume,
+  not by all-project span volume.
 - **The platform gains a cost vocabulary.** "How many bytes is this job, and
   who granted them?" becomes an answerable question, which is what phases 2–4
   are built on — and what alerting can finally be written against, instead of
@@ -179,11 +196,12 @@ visible.
   to; a backlog is durable and visible where an OOM kill was lossy and
   post-hoc. Operators watch depth and grant saturation, not allocator
   folklore.
-- **The subscriber contract grows a seam authors must respect.** A filter must
-  be cheap and total — a throw fails the routing attempt into its retry path,
-  loudly, never a silent drop — and a projection puts a second payload shape
-  on the wire for the mixed-deploy window. Both are contract, spec-pinned, not
-  convention.
+- **The subscriber contract grows a seam authors must respect.** A filter runs
+  on the shared routing-dispatch path, so it must be cheap and total — a throw
+  fails the routing attempt into its retry path, loudly, never a silent drop,
+  but it fails the whole fan-out, so anything data-dependent or expensive stays
+  in the subscriber's own consumer lane. That boundary is contract, spec-pinned,
+  not convention.
 - **Phases 2–4 are real, sequenced work.** Until phase 2 lands, byte budgets
   remain stub-blind and the non-drain stages remain count-bounded; until
   phase 3, memory is still discovered rather than granted. The sequencing
