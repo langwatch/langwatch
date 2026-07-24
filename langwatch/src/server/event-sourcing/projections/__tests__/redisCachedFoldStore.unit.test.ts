@@ -104,7 +104,7 @@ function createStore<
   >,
 >(
   redis: ReturnType<typeof createRedis>,
-  inner: Inner = createInnerStore() as Inner,
+  inner: Inner = createInnerStore() as unknown as Inner,
 ) {
   return {
     inner,
