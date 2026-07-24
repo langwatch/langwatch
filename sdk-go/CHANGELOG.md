@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/langwatch/langwatch/compare/sdk-go@v0.3.0...sdk-go@v0.3.1) (2026-07-24)
+
+
+### Miscellaneous
+
+* **deps:** bump the go_modules group across 4 directories with 2 updates ([#5252](https://github.com/langwatch/langwatch/issues/5252)) ([75b37f6](https://github.com/langwatch/langwatch/commit/75b37f6cea648203bb7f9554b1517ea702e98484))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/sdk-go@v0.2.0...sdk-go@v0.3.0) (2026-05-13)
 
 
