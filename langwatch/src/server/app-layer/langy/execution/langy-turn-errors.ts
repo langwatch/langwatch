@@ -223,6 +223,31 @@ export class LangyAgentErroredError extends HandledError {
   }
 }
 
+/**
+ * The manager's step-limit gate (services/langyagent/app/steplimitgate.go)
+ * stopped the turn: it settled more tool calls than any turn should need — a
+ * loop, classically re-running a command a 401/403 already refused (the very
+ * thing AGENTS.md rules 16 and 29 tell the agent not to do). Terminal with a
+ * manual retry: a fresh turn, now carrying the pre-flight access note, usually
+ * behaves — but an auto-retry would just walk back into the same loop.
+ */
+export class LangyTurnStepLimitError extends HandledError {
+  declare readonly code: "langy_turn_step_limit";
+
+  constructor() {
+    super(
+      "langy_turn_step_limit",
+      "agent exceeded the per-turn tool-call limit",
+      {
+        // 508 Loop Detected — the one HTTP status that names exactly this.
+        httpStatus: 508,
+        ...remediation("langy_turn_step_limit"),
+      },
+    );
+    this.name = "LangyTurnStepLimitError";
+  }
+}
+
 /** The turn blew the `AGENT_CHAT_TIMEOUT_MS` budget (AbortSignal.timeout). */
 export class LangyTurnTimeoutError extends HandledError {
   declare readonly code: "langy_turn_timeout";
@@ -337,6 +362,9 @@ export function langyAgentErrorFromFrame(frame: string): Error {
       return new LangyGithubNotConnectedError();
     case "langy_github_repo_not_accessible":
       return new LangyGithubRepoNotAccessibleError();
+    // The manager's step-limit gate (steplimitgate.go) stopped a looping turn.
+    case "langy_turn_step_limit":
+      return new LangyTurnStepLimitError();
   }
   // The manager also surfaces its typed `herr` CODES on this frame, e.g.
   // `worker_spawn_failed (map[message:...])`. Match on the code prefix, not the

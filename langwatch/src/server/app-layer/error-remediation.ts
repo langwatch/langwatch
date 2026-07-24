@@ -263,6 +263,11 @@ const registry = {
   langy_worker_restarting: {
     tips: ["An update interrupted this reply — resend the message"],
   },
+  langy_turn_step_limit: {
+    tips: [
+      "The turn ran too many commands without finishing and was stopped to avoid a loop — retry, and if it repeats, narrow or rephrase the ask",
+    ],
+  },
 } as const satisfies Record<string, RemediationEntry>;
 
 export type RemediationCode = keyof typeof registry;
