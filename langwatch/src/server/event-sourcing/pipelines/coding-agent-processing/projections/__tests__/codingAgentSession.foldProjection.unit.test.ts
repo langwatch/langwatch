@@ -17,8 +17,10 @@ import type {
   SpanFactsContributedEvent,
 } from "../../schemas/events";
 import {
+  CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
+  codingAgentSessionStateFromRow,
   projectCodingAgentSessionToRow,
 } from "../codingAgentSession.foldProjection";
 
@@ -463,6 +465,84 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(row.sessionKeySource).toBe("provider");
       expect(row.traceIds).toEqual([TRACE_A]);
       expect(row.inputTokens).toBe(10);
+    });
+  });
+});
+
+describe("read-back losslessness (ADR-066)", () => {
+  describe("when a folded session is projected to a row and rebuilt", () => {
+    /**
+     * The outage fix depends on this exactly: store.get() reads working state
+     * back by decoding the row, instead of replaying event_log. If any field the
+     * fold needs fails to round-trip, a cache miss would silently fold onto
+     * partial state — so this asserts the WHOLE state survives, and calls out the
+     * previously-lossy bookkeeping fields by name.
+     */
+    it("recovers the identical working state, including the bookkeeping the old row dropped", () => {
+      const projection = makeProjection();
+      let state = projection.init();
+
+      // A model call: tokens, a sub-agent id (the dedup set), the previous-call
+      // context that drives cache-rebuild detection, the final request id.
+      state = projection.apply(
+        state,
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-1",
+          startMs: 1_000,
+          endMs: 2_000,
+          facts: {
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_read_tokens: 800,
+            cache_creation_tokens: 200,
+            agent_id: "sub-agent-1",
+            request_id: "req_final",
+            stop_reason: "end_turn",
+          },
+        }),
+      );
+      // A tool span: a step that carries its own start time (the parallel array
+      // the 3-tuple row column used to drop).
+      state = projection.apply(
+        state,
+        spanFactsEvent({
+          name: "claude_code.tool",
+          spanId: "tool-1",
+          startMs: 3_000,
+          endMs: 3_500,
+          facts: { tool_name: "Read", file_path: "/a.ts" },
+        }),
+      );
+      // A metric contribution: a converged unit in metricSeries + a metric-fed
+      // field recomputed from it.
+      state = projection.apply(
+        state,
+        metricFactsEvent({
+          seriesId: "loc-added",
+          metricName: "claude_code.lines_of_code.count",
+          attributes: { type: "added" },
+          value: 42,
+        }),
+      );
+
+      // The fields the pre-ADR-066 row could not represent are actually populated.
+      expect(state.subAgentIds).toEqual(["sub-agent-1"]);
+      expect(state.previousCallContextTokens).toBe(1_000);
+      expect(state.steps[0]?.startedAtMs).toBe(3_000);
+      expect(Object.keys(state.metricSeries)).toContain("loc-added");
+      expect(state.linesAdded).toBe(42);
+
+      const row = projectCodingAgentSessionToRow({
+        state,
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+
+      const decoded = codingAgentSessionStateFromRow(row);
+
+      expect(decoded).toEqual(state);
     });
   });
 });
