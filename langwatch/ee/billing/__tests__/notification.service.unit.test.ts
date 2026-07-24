@@ -279,7 +279,7 @@ describe("NotificationService", () => {
         const blocks = vi.mocked(mockSlackSend).mock.calls[0]?.[0]?.blocks;
         const allText = JSON.stringify(blocks);
         expect(allText).toContain("*Traces/month:* Unlimited");
-        expect(allText).not.toContain("999,999,999");
+        expect(allText).not.toContain(UNLIMITED_MESSAGES.toLocaleString());
       });
     });
 

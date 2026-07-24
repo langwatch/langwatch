@@ -317,8 +317,8 @@ describe("UsageService", () => {
       });
     });
 
-    describe("when org is on the ENTERPRISE subscription plan", () => {
-      it("never blocks ingestion and skips the usage count entirely", async () => {
+    describe("when org is on the ENTERPRISE plan with no message-cap override", () => {
+      it("does not block ingestion and skips the usage count entirely", async () => {
         vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
           "org-123",
         );
@@ -331,6 +331,30 @@ describe("UsageService", () => {
         expect(result.exceeded).toBe(false);
         expect(mockTraceUsageService.getCountByProjects).not.toHaveBeenCalled();
         expect(mockEventUsageService.getCountByProjects).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when an ENTERPRISE org has a message-cap override at the cap", () => {
+      it("enforces the overridden limit", async () => {
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
+          "org-123",
+        );
+        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
+        // The plan provider merges Subscription.maxMessagesPerMonth over the
+        // plan defaults; checkLimit only sees the resolved plan.
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
+          maxMessagesPerMonth: 500_000,
+        });
+        mockTraceUsageService.getCountByProjects.mockResolvedValue([
+          { projectId: "proj-1", count: 500_000 },
+        ]);
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(true);
+        expect(result.maxMessagesPerMonth).toBe(500_000);
+        expect(result.planName).toBe("Enterprise");
       });
     });
 
