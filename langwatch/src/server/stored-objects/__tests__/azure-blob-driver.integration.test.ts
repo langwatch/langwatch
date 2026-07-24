@@ -152,6 +152,7 @@ afterAll(async () => {
 
 describe("AzureBlobDriver against a real Azurite emulator (path-style addressing)", () => {
   describe("given real bytes", () => {
+    /** @scenario "Scenario media round-trips through Azure Blob when azure is the configured backend" */
     it("round-trips put/get/exists/delete through Azurite with a correctly signed path-style request", async () => {
       const bytes = Buffer.from("azurite round-trip payload", "utf8");
       const uri = mintAzureBlobUri({

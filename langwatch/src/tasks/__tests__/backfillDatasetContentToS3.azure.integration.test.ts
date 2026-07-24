@@ -94,6 +94,7 @@ afterEach(async () => {
 
 describe("migrateDatasetToS3 onto the Azure Blob backend", () => {
   describe("given a dataset whose content still lives in the postgres layout", () => {
+    /** @scenario "The dataset-content backfill task migrates a postgres-layout dataset onto azure" */
     it("writes chunked JSONL to Azure Blob and flips contentLayout to chunked", async () => {
       const dataset = await prisma.dataset.create({
         data: {

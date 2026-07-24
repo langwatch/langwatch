@@ -283,7 +283,7 @@ describe("given the resolved destination is azure", () => {
   });
 
   describe("when S3_BUCKET_NAME is still configured (S3→Azure migration)", () => {
-    /** @scenario "The legacy S3 client factory refuses an azure destination instead of inventing a bucket" */
+    /** @scenario "Legacy S3 surfaces keep working during an S3-to-Azure migration" */
     it("keeps serving the legacy S3 bucket so pre-migration s3:// URIs, spool refs, and staged payloads stay readable", async () => {
       process.env.S3_BUCKET_NAME = "legacy-bucket";
       const createS3ClientFresh = await importWithAzureDestination();
