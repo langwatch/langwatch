@@ -45,7 +45,7 @@
  * entirely (no point spending rAF/setTimeout cycles on a measurement that
  * would just be discarded); "auto" is today's probe-driven behavior.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { GraphicsQualityContext } from "~/hooks/useGraphicsQuality";
 import { useGraphicsQualityOverrideStore } from "~/stores/graphicsQualityOverrideStore";
 import { evaluateFpsSample } from "~/utils/evaluateFpsSample";
@@ -172,8 +172,13 @@ export function GraphicsQualityProvider({
     hiddenRetryMs,
   ]);
 
+  // Stable identity so a consumer of useGraphicsQuality() only re-renders
+  // when reducedGraphics actually changes — not on every provider render
+  // (e.g. an override change that leaves reducedGraphics the same).
+  const contextValue = useMemo(() => ({ reducedGraphics }), [reducedGraphics]);
+
   return (
-    <GraphicsQualityContext value={{ reducedGraphics }}>
+    <GraphicsQualityContext value={contextValue}>
       {children}
     </GraphicsQualityContext>
   );
