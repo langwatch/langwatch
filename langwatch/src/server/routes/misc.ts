@@ -660,34 +660,15 @@ secured
     authMiddleware,
     requireWorkflowsManage,
     async (c) => {
-      const workflowId = c.req.param("workflowId");
-      const versionId = c.req.param("versionId");
-
-      const contentType = c.req.header("content-type");
-      if (!contentType?.includes("application/json")) {
-        return c.json({ message: "Invalid body, expecting json" }, 400);
-      }
-
-      const project = c.get("project");
-
-      let body: Record<string, any>;
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ message: "Invalid body" }, 400);
-      }
-
-      try {
-        const result = await runWorkflowFn(
-          workflowId,
-          project.id,
-          body,
-          versionId,
-        );
-        return c.json(result);
-      } catch (error) {
-        return c.json({ message: (error as Error).message }, 500);
-      }
+      // Delegates to the same handler as POST /workflows/:workflowId/:versionId/run
+      // (below) — this route used to duplicate that logic with its own
+      // catch-and-flatten-to-500, which had drifted to disagree with the
+      // canonical route on the status code for identical failures.
+      return handleWorkflowRun(
+        c,
+        c.req.param("workflowId"),
+        c.req.param("versionId"),
+      );
     },
   );
 
@@ -1019,12 +1000,12 @@ async function handleWorkflowRun(
     return c.json({ message: "Invalid body" }, 400);
   }
 
-  try {
-    const result = await runWorkflowFn(workflowId, project.id, body, versionId);
-    return c.json(result);
-  } catch (error) {
-    return c.json({ message: (error as Error).message }, 500);
-  }
+  // Let errors propagate to the app's onError(handleError) middleware — it
+  // already knows how to map HandledError subclasses (e.g. runWorkflow's
+  // NotFoundError/ValidationError) to the right status code. Catching here
+  // and hard-coding 500 was masking those as raw 500s regardless of type.
+  const result = await runWorkflowFn(workflowId, project.id, body, versionId);
+  return c.json(result);
 }
 
 // =============================================
