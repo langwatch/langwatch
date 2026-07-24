@@ -5,6 +5,28 @@ export const SPAN_RECEIVED_EVENT_VERSIONS = [
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 ] as const;
 
+/**
+ * The claim-check twin of `span_received` (ADR-069): staged onto a
+ * subscriber's queue in place of the full event, carrying only the span's
+ * identity — the payload stays in its canonical store and the handler reads
+ * it back from there. It is never appended to the event log, which is why it
+ * is deliberately absent from TRACE_PROCESSING_EVENT_TYPES: it exists only
+ * between the routing seam and the subscriber that opted into it.
+ *
+ * The versions array is load-bearing: a consumer parses a reference by
+ * version, and a version it does not know fails loudly into the queue's
+ * retry rather than half-parsing. Bump the date and append here whenever the
+ * reference's shape — or the contract of the store it resolves through —
+ * changes incompatibly.
+ */
+export const SPAN_REFERENCED_EVENT_TYPE =
+  "lw.obs.trace.span_referenced" as const;
+export const SPAN_REFERENCED_EVENT_VERSION_LATEST = "2026-07-24" as const;
+
+export const SPAN_REFERENCED_EVENT_VERSIONS = [
+  SPAN_REFERENCED_EVENT_VERSION_LATEST,
+] as const;
+
 export const TOPIC_ASSIGNED_EVENT_TYPE = "lw.obs.trace.topic_assigned" as const;
 export const TOPIC_ASSIGNED_EVENT_VERSION_LATEST = "2025-02-01" as const;
 

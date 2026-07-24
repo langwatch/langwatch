@@ -12,6 +12,9 @@ import {
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_REFERENCED_EVENT_TYPE,
+  SPAN_REFERENCED_EVENT_VERSION_LATEST,
+  SPAN_REFERENCED_EVENT_VERSIONS,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_MAX_LENGTH,
@@ -61,6 +64,83 @@ export function isSpanReceivedEvent(
   event: TraceProcessingEvent,
 ): event is SpanReceivedEvent {
   return event.type === SPAN_RECEIVED_EVENT_TYPE;
+}
+
+/**
+ * The claim-check twin of `span_received` (ADR-069): the routing seam stages
+ * this in place of the full event for a subscriber that opted in, and the
+ * handler reads the span back from its canonical store. Never appended to the
+ * event log — see the constant's docblock for the versioning contract.
+ */
+export const spanReferencedEventDataSchema = z.object({
+  traceId: z.string(),
+  spanId: z.string(),
+  /** The raw wire span name, mirrored so gates and debugging never need the store. */
+  spanName: z.string(),
+});
+
+export const spanReferencedEventSchema = EventSchema.extend({
+  type: z.literal(SPAN_REFERENCED_EVENT_TYPE),
+  version: z.enum(SPAN_REFERENCED_EVENT_VERSIONS),
+  data: spanReferencedEventDataSchema,
+});
+
+export type SpanReferencedEventData = z.infer<
+  typeof spanReferencedEventDataSchema
+>;
+export type SpanReferencedEvent = z.infer<typeof spanReferencedEventSchema>;
+
+/**
+ * Discriminate-then-validate read of a staged payload.
+ *
+ * Returns `null` when the payload does not even claim to be a span reference
+ * (the caller falls through to its full-event path). But once the payload
+ * claims the type, a shape or version this build cannot read THROWS into the
+ * queue's retry — falling through would let a mixed-deploy job be mistaken
+ * for another kind of payload and silently no-op.
+ */
+export function parseSpanReferencedEvent(
+  value: unknown,
+): SpanReferencedEvent | null {
+  if (typeof value !== "object" || value === null) return null;
+  if (
+    (value as { type?: unknown }).type !== SPAN_REFERENCED_EVENT_TYPE
+  ) {
+    return null;
+  }
+  return spanReferencedEventSchema.parse(value);
+}
+
+/**
+ * Builds the staged reference for a matched `span_received` event, mirroring
+ * the envelope fields the scheduler orders, groups, and dedups by (same id,
+ * aggregate, tenant, occurredAt). Total by construction: a span missing the
+ * identity a reference needs stages the full event unchanged instead — the
+ * pre-reference behavior, never a reference that could not resolve.
+ */
+export function makeSpanReferencedEvent(
+  event: SpanReceivedEvent,
+): SpanReferencedEvent | SpanReceivedEvent {
+  const span = event.data.span as { spanId?: unknown; name?: unknown };
+  if (typeof span.spanId !== "string" || span.spanId.length === 0) {
+    return event;
+  }
+  return {
+    id: event.id,
+    version: SPAN_REFERENCED_EVENT_VERSION_LATEST,
+    aggregateId: event.aggregateId,
+    aggregateType: event.aggregateType,
+    tenantId: event.tenantId,
+    createdAt: event.createdAt,
+    occurredAt: event.occurredAt,
+    type: SPAN_REFERENCED_EVENT_TYPE,
+    data: {
+      traceId: String(event.aggregateId),
+      spanId: span.spanId,
+      spanName: typeof span.name === "string" ? span.name : "",
+    },
+    metadata: event.metadata,
+  };
 }
 
 /**

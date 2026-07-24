@@ -139,6 +139,18 @@ export class SpanStorageService {
    * `resolveOffloadedTraces` path as `getSpansByTraceId` so that sibling
    * eventref pointers on the same trace are also resolved consistently.
    */
+  /**
+   * Claim-check resolution read (ADR-069): one canonical span by identity for
+   * internal derivation consumers (the coding-agent facts lift). Deliberately
+   * ungated and unresolved: the consumers lift scalar span attributes only —
+   * never offloaded bodies — and run server-side, so neither the visibility
+   * gate nor blob resolution applies. A `null` means "not readable yet";
+   * callers on a queue retry into it rather than treating it as absence.
+   */
+  async getNormalizedSpanById(params: BySpanId): Promise<NormalizedSpan | null> {
+    return this.repository.getNormalizedSpanById(params);
+  }
+
   async getSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
     const gateOne = (span: Span | null): Span | null =>
       span

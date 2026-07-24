@@ -8,9 +8,16 @@
  * @see specs/coding-agent/session-aggregate.feature
  */
 import { describe, expect, it } from "vitest";
+import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import { createTenantId } from "~/server/event-sourcing";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../../trace-processing/schemas/constants";
-import type { TraceProcessingEvent } from "../../../trace-processing/schemas/events";
+import {
+  makeSpanReferencedEvent,
+  type SpanReceivedEvent,
+  type TraceProcessingEvent,
+} from "../../../trace-processing/schemas/events";
+import type { NormalizedSpan } from "../../../trace-processing/schemas/spans";
 import type { ContributeSpanFactsCommandData } from "../../schemas/commands";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../codingAgentSpanFactsDispatch.subscriber";
 
@@ -66,14 +73,40 @@ function rawSpanEvent({
   } as unknown as TraceProcessingEvent;
 }
 
-function makeSubscriber() {
+/** The same normalization the platform runs — builds expected store rows. */
+const normalization = new SpanNormalizationPipelineService(
+  new CanonicalizeSpanAttributesService(),
+);
+
+function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
+  return normalization.normalizeSpanReceived(
+    event.tenantId,
+    event.data.span,
+    event.data.resource,
+    event.data.instrumentationScope,
+  );
+}
+
+function makeSubscriber(
+  spanStore: (params: {
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+    occurredAtMs?: number;
+  }) => Promise<NormalizedSpan | null> = async () => null,
+) {
   const dispatched: ContributeSpanFactsCommandData[] = [];
+  const reads: Array<{ traceId: string; spanId: string }> = [];
   const subscriber = createCodingAgentSpanFactsDispatchSubscriber({
     contributeSpanFacts: async (data) => {
       dispatched.push(data);
     },
+    getNormalizedSpanById: async (params) => {
+      reads.push({ traceId: params.traceId, spanId: params.spanId });
+      return spanStore(params);
+    },
   });
-  return { subscriber, dispatched };
+  return { subscriber, dispatched, reads };
 }
 
 const context = { tenantId: "tenant-1", aggregateId: TRACE_ID };
@@ -217,6 +250,125 @@ describe("codingAgentSpanFactsDispatch", () => {
         expect(dedup.makeId(event)).toBe(
           `coding-agent-span-facts:tenant-1:${TRACE_ID}:tool-dedup`,
         );
+      });
+    });
+
+    describe("when keying a claim-check job", () => {
+      /** @scenario a matched event's heavy payload travels as a claim-check, not inline */
+      it("derives the identical key from the reference shape", () => {
+        const { subscriber } = makeSubscriber();
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-dedup",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+
+        const dedup = subscriber.options?.deduplication;
+        if (dedup === undefined || dedup === "aggregate") {
+          throw new Error("expected a custom deduplication config");
+        }
+
+        expect(
+          dedup.makeId(
+            makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          ),
+        ).toBe(dedup.makeId(event));
+      });
+    });
+  });
+
+  describe("given a claim-check staged job (ADR-069)", () => {
+    describe("when the referenced span is readable in the store", () => {
+      /** @scenario a matched event's heavy payload travels as a claim-check, not inline */
+      it("lifts the identical command the full-event path produces", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-ref",
+          attributes: {
+            "gen_ai.conversation.id": "sess-ref",
+            input_tokens: 42,
+            stop_reason: "end_turn",
+          },
+        }) as SpanReceivedEvent;
+
+        const fullPath = makeSubscriber();
+        await fullPath.subscriber.handle(event, context);
+
+        const refPath = makeSubscriber(async () => normalizedFrom(event));
+        await refPath.subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(refPath.dispatched).toHaveLength(1);
+        expect(refPath.dispatched[0]).toEqual(fullPath.dispatched[0]);
+        expect(refPath.reads).toEqual([
+          { traceId: TRACE_ID, spanId: "llm-ref" },
+        ]);
+        // The full-event path never touches the store.
+        expect(fullPath.reads).toHaveLength(0);
+      });
+    });
+
+    describe("when the referenced span is not readable yet", () => {
+      /** @scenario a reference that cannot be resolved yet retries, never drops */
+      it("throws into the queue's retry instead of dropping silently", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-late",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const { subscriber, dispatched } = makeSubscriber(async () => null);
+
+        await expect(
+          subscriber.handle(
+            makeSpanReferencedEvent(event) as TraceProcessingEvent,
+            context,
+          ),
+        ).rejects.toThrow(/not readable yet/);
+        expect(dispatched).toHaveLength(0);
+      });
+    });
+
+    describe("when the reference carries a version this build does not know", () => {
+      /** @scenario a reference this build cannot read fails loudly, never half-parses */
+      it("throws into the queue's retry instead of no-opping as another shape", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-vnext",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const future = {
+          ...makeSpanReferencedEvent(event),
+          version: "2199-01-01",
+        };
+        const { subscriber, dispatched } = makeSubscriber(async () =>
+          normalizedFrom(event),
+        );
+
+        await expect(
+          subscriber.handle(future as TraceProcessingEvent, context),
+        ).rejects.toThrow();
+        expect(dispatched).toHaveLength(0);
+      });
+    });
+
+    describe("when the matched span has no span id to reference", () => {
+      /** @scenario an event that cannot be referenced stages whole */
+      it("stages the full event unchanged and the handler processes it as before", async () => {
+        const event = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+
+        const staged = makeSpanReferencedEvent(event);
+        expect(staged).toBe(event);
+
+        const { subscriber, dispatched, reads } = makeSubscriber();
+        await subscriber.handle(staged as TraceProcessingEvent, context);
+        expect(dispatched).toHaveLength(1);
+        expect(reads).toHaveLength(0);
       });
     });
   });

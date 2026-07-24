@@ -213,6 +213,18 @@ export interface SpanStorageRepository {
     } & OccurredAtHint,
   ): Promise<Span | null>;
   /**
+   * Claim-check resolution read (ADR-069): one canonical span by identity,
+   * windowed by the reference's occurredAt hint with no unbounded fallback —
+   * a miss stays cheap because the caller retries via the queue.
+   */
+  getNormalizedSpanById(
+    params: {
+      tenantId: string;
+      traceId: string;
+      spanId: string;
+    } & OccurredAtHint,
+  ): Promise<NormalizedSpan | null>;
+  /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
    * trace-detail read, derived from the spans' OTel events. Events-only
    * (ARRAY JOIN over the `Events.*` columns, no heavy span attribute scan),
@@ -334,6 +346,16 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     } & OccurredAtHint,
   ): Promise<NormalizedSpan[]> {
     return [];
+  }
+
+  async getNormalizedSpanById(
+    _params: {
+      tenantId: string;
+      traceId: string;
+      spanId: string;
+    } & OccurredAtHint,
+  ): Promise<NormalizedSpan | null> {
+    return null;
   }
 
   async getSpanByIds(
