@@ -1,9 +1,18 @@
 import { createServer, type Server } from "node:http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { requestPublicJson, resolvePublicDestination } from "../public-http-request.js";
+import {
+  headersForRedirect,
+  requestPublicJson,
+  resolvePublicDestination,
+} from "../public-http-request.js";
 
 describe("public HTTP request security", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** @scenario Running an HTTP agent rejects unsafe destinations */
   it.each([
     "http://127.0.0.1/secrets",
     "http://2130706433/secrets",
@@ -31,6 +40,44 @@ describe("public HTTP request security", () => {
     ).resolves.toMatchObject({
       address: "93.184.216.34",
       family: 4,
+    });
+  });
+
+  it("bounds DNS resolution time", async () => {
+    vi.useFakeTimers();
+    const resolution = resolvePublicDestination(
+      "https://agent.example/run",
+      () => new Promise(() => undefined)
+    );
+    const rejection = expect(resolution).rejects.toThrow(
+      /destination could not be resolved/
+    );
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    await rejection;
+  });
+
+  /** @scenario HTTP agent redirects are revalidated */
+  it("rejects private redirect targets and strips cross-origin secrets", async () => {
+    await expect(
+      resolvePublicDestination("http://127.0.0.1/redirect-target")
+    ).rejects.toThrow(/globally routable public addresses/);
+
+    expect(
+      headersForRedirect(
+        {
+          Authorization: "Bearer secret",
+          Cookie: "session=secret",
+          "Content-Type": "application/json",
+          "X-Api-Key": "secret",
+          "X-Request-Id": "request-1",
+        },
+        true
+      )
+    ).toEqual({
+      "Content-Type": "application/json",
+      "X-Request-Id": "request-1",
     });
   });
 

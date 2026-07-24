@@ -9,6 +9,16 @@ const MAX_REDIRECTS = 5;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const SENSITIVE_REDIRECT_HEADERS = new Set([
+  "authorization",
+  "cookie",
+  "cookie2",
+  "proxy-authorization",
+  "x-api-key",
+  "api-key",
+  "x-auth-token",
+  "x-access-token",
+]);
 
 type DnsResolver = (hostname: string, options: { all: true; verbatim: true }) => Promise<ResolvedAddress[]>;
 
@@ -37,6 +47,37 @@ function assertPublicAddress(address: string): void {
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error("request timed out")), timeoutMs);
+        timeout.unref();
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+export function headersForRedirect(
+  headers: Record<string, string> | undefined,
+  crossOrigin: boolean
+): Record<string, string> | undefined {
+  if (!headers || !crossOrigin) {
+    return headers;
+  }
+
+  const safeHeaders = Object.fromEntries(
+    Object.entries(headers).filter(([name]) => !SENSITIVE_REDIRECT_HEADERS.has(name.toLowerCase()))
+  );
+  return Object.keys(safeHeaders).length > 0 ? safeHeaders : undefined;
+}
+
 export async function resolvePublicDestination(
   input: string,
   resolver: DnsResolver = dnsLookup
@@ -61,7 +102,10 @@ export async function resolvePublicDestination(
 
   let addresses: ResolvedAddress[];
   try {
-    addresses = await resolver(hostname, { all: true, verbatim: true });
+    addresses = await withTimeout(
+      resolver(hostname, { all: true, verbatim: true }),
+      REQUEST_TIMEOUT_MS
+    );
   } catch {
     throw new Error("HTTP agent destination could not be resolved");
   }
@@ -164,14 +208,19 @@ export async function requestPublicJson(
       throw new Error(`HTTP agent returned too many redirects`);
     }
     const redirectUrl = new URL(response.location, destination.url);
+    const redirectHeaders = headersForRedirect(
+      options.headers,
+      redirectUrl.origin !== destination.url.origin
+    );
     const preserveBody = response.statusCode === 307 || response.statusCode === 308;
     return requestPublicJson(
       redirectUrl.toString(),
       preserveBody
-        ? options
+        ? { ...options, headers: redirectHeaders }
         : {
             ...options,
             body: undefined,
+            headers: redirectHeaders,
             method: "GET",
           },
       redirectCount + 1

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildSecurityHeaders } from "./securityHeaders";
 
 describe("buildSecurityHeaders", () => {
+  /** @scenario Production HTTP responses include the Permissions-Policy header */
   it("disables unused browser capabilities in production", () => {
     const headers = buildSecurityHeaders({
       dev: false,

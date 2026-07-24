@@ -12,6 +12,7 @@ const MCP_HEADERS = {
 
 describe("MCP documentation fetch security", () => {
   describe("URL validation", () => {
+    /** @scenario A documentation tool accepts its own trusted HTTPS pages */
     it.each([
       ["langwatch" as const, undefined, "https://langwatch.ai/docs/llms.txt"],
       ["scenario" as const, undefined, "https://langwatch.ai/scenario/llms.txt"],
@@ -26,6 +27,8 @@ describe("MCP documentation fetch security", () => {
       expect(resolveDocumentationUrl(kind, input).toString()).toBe(expected);
     });
 
+    /** @scenario A documentation tool rejects non-HTTPS and untrusted hosts */
+    /** @scenario A documentation tool rejects a trusted host outside its namespace */
     it.each([
       ["langwatch" as const, "http://169.254.169.254/latest/meta-data/"],
       ["langwatch" as const, "https://langwatch.ai.attacker.example/docs/x"],
@@ -42,10 +45,13 @@ describe("MCP documentation fetch security", () => {
     });
   });
 
-  it("disables redirects on trusted documentation fetches", async () => {
+  /** @scenario Documentation fetches do not follow redirects */
+  it("disables redirects and bounds trusted documentation fetches", async () => {
     let receivedRedirectMode: RequestRedirect | undefined;
+    let receivedSignal: AbortSignal | null | undefined;
     const fetchForTest: typeof fetch = async (_input, init) => {
       receivedRedirectMode = init?.redirect;
+      receivedSignal = init?.signal;
       return new Response("# documentation");
     };
 
@@ -53,6 +59,7 @@ describe("MCP documentation fetch security", () => {
 
     expect(text).toBe("# documentation");
     expect(receivedRedirectMode).toBe("error");
+    expect(receivedSignal).toBeInstanceOf(AbortSignal);
   });
 
   it("rejects non-document responses from the trusted origin", async () => {

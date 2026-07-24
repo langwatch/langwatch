@@ -672,7 +672,10 @@ describe("All MCP tools integration", () => {
       expect(text).toContain("Integration Guide");
       expect(mockFetch).toHaveBeenCalledWith(
         new URL("https://langwatch.ai/docs/integration.md"),
-        { redirect: "error" },
+        {
+          redirect: "error",
+          signal: expect.any(AbortSignal),
+        },
       );
     });
   });

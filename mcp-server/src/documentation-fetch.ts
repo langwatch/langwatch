@@ -2,6 +2,7 @@ export type DocumentationKind = "langwatch" | "scenario";
 
 const TRUSTED_DOCUMENTATION_ORIGIN = "https://langwatch.ai";
 const MAX_DOCUMENTATION_BYTES = 2 * 1024 * 1024;
+const DOCUMENTATION_TIMEOUT_MS = 30_000;
 const DOCUMENTATION_CONTENT_TYPES = new Set(["text/markdown", "text/plain"]);
 
 const DOCUMENTATION_CONFIG: Record<DocumentationKind, { defaultPath: string; namespace: string }> = {
@@ -69,7 +70,10 @@ export async function fetchDocumentation(
   fetchImplementation: typeof fetch = fetch
 ): Promise<string> {
   const url = resolveDocumentationUrl(kind, input);
-  const response = await fetchImplementation(url, { redirect: "error" });
+  const response = await fetchImplementation(url, {
+    redirect: "error",
+    signal: AbortSignal.timeout(DOCUMENTATION_TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new Error(`Documentation request failed with status ${response.status}`);
   }
