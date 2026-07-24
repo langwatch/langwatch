@@ -232,6 +232,51 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("given a graceful shutdown with a job in flight", () => {
+      describe("when close() begins while the handler is still running", () => {
+        /** @scenario graceful shutdown mid-job does not count as a poison strike */
+        it("sweeps the group's claim strike while the job is still in flight", async () => {
+          let releaseHandler!: () => void;
+          const handlerGate = new Promise<void>((resolve) => {
+            releaseHandler = resolve;
+          });
+          let signalEntered!: () => void;
+          const handlerEntered = new Promise<void>((resolve) => {
+            signalEntered = resolve;
+          });
+          const { queue, name } = createQueue(async () => {
+            signalEntered();
+            await handlerGate;
+          });
+          await queue.waitUntilReady();
+
+          await queue.send({ id: "job-1", groupId: "slow", value: "x" });
+          await handlerEntered;
+
+          // The claim recorded its strike before the handler ran — this is
+          // the strike a hard death would leave behind.
+          expect(await redis.get(strikesKey(name, "slow"))).toBe("1");
+
+          // Begin the graceful shutdown WITHOUT waiting for the drain: the
+          // sweep must clear the strike while the job is still in flight, so
+          // even a drain the budget abandons leaves nothing behind.
+          const closing = queue.close();
+          await vi.waitFor(
+            async () => {
+              expect(await redis.get(strikesKey(name, "slow"))).toBeNull();
+            },
+            { timeout: 5000, interval: 50 },
+          );
+
+          releaseHandler();
+          await closing;
+
+          // The group was never mistaken for poison.
+          expect(await blockedMembers(name)).not.toContain("slow");
+        });
+      });
+    });
+
     describe("given the failure-streak quarantine breaker", () => {
       const failStreakKey = (name: string, groupId: string) =>
         `${name}:gq:group:${groupId}:failstreak`;
