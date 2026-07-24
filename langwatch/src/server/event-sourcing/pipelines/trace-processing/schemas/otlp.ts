@@ -136,18 +136,26 @@ const STATUS_CODE_SET = {
   2: true,
 } as const satisfies Record<EStatusCode, true>;
 
-// OTLP span kind can be either numeric (from binary format) or string (from JSON format)
-export const eSpanKindSchema = z.union([
-  z.nativeEnum(ESpanKind),
-  z.enum([
-    "SPAN_KIND_UNSPECIFIED",
-    "SPAN_KIND_INTERNAL",
-    "SPAN_KIND_SERVER",
-    "SPAN_KIND_CLIENT",
-    "SPAN_KIND_PRODUCER",
-    "SPAN_KIND_CONSUMER",
-  ]),
-]);
+// OTLP span kind can be either numeric (from binary format) or string (from JSON format).
+// Per OTLP semantics, an omitted `kind` field decodes to SPAN_KIND_UNSPECIFIED (0)
+// on the wire — both protobuf (default for unset enum field) and JSON (default
+// per the OTLP HTTP spec). Without this default, a span that legitimately omits
+// `kind` fails schema validation and is dropped silently, even though the
+// caller sent a structurally valid span (see #5898 — "edge-omitted-kind"
+// reproducer returned HTTP 200 with the span missing).
+export const eSpanKindSchema = z
+  .union([
+    z.nativeEnum(ESpanKind),
+    z.enum([
+      "SPAN_KIND_UNSPECIFIED",
+      "SPAN_KIND_INTERNAL",
+      "SPAN_KIND_SERVER",
+      "SPAN_KIND_CLIENT",
+      "SPAN_KIND_PRODUCER",
+      "SPAN_KIND_CONSUMER",
+    ]),
+  ])
+  .default(ESpanKind.SPAN_KIND_UNSPECIFIED);
 
 export const eStatusCodeSchema = z
   .number()
