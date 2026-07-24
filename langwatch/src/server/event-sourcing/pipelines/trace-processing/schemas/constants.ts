@@ -124,6 +124,20 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
 export type TraceProcessingEventType =
   (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
 
+/**
+ * Staging-only event types (ADR-069): valid Event brands that travel between
+ * the routing seam and a subscriber's queue but are NEVER appended to the
+ * event log — which is why they stay out of TRACE_PROCESSING_EVENT_TYPES. They
+ * are registered as type identifiers (see typeIdentifiers.ts) solely so a
+ * `stage` hook can return them as well-typed Events.
+ */
+export const TRACE_PROCESSING_STAGING_EVENT_TYPES = [
+  SPAN_REFERENCED_EVENT_TYPE,
+] as const;
+
+export type TraceProcessingStagingEventType =
+  (typeof TRACE_PROCESSING_STAGING_EVENT_TYPES)[number];
+
 export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
 export const ASSIGN_TOPIC_COMMAND_TYPE = "lw.obs.trace.assign_topic" as const;
 export const RECORD_LOG_CONTRIBUTION_COMMAND_TYPE =

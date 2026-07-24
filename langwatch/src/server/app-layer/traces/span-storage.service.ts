@@ -131,15 +131,6 @@ export class SpanStorageService {
   }
 
   /**
-   * Returns a single span by its ID, resolving any ADR-022 offloaded eventref
-   * pointers when `blobResolutionDeps` were supplied at construction.
-   *
-   * Resolution fetches normalized spans for the whole trace and isolates the
-   * requested span after resolution — this reuses the same
-   * `resolveOffloadedTraces` path as `getSpansByTraceId` so that sibling
-   * eventref pointers on the same trace are also resolved consistently.
-   */
-  /**
    * Claim-check resolution read (ADR-069): one canonical span by identity for
    * internal derivation consumers (the coding-agent facts lift). Deliberately
    * ungated and unresolved: the consumers lift scalar span attributes only —
@@ -151,6 +142,15 @@ export class SpanStorageService {
     return this.repository.getNormalizedSpanById(params);
   }
 
+  /**
+   * Returns a single span by its ID, resolving any ADR-022 offloaded eventref
+   * pointers when `blobResolutionDeps` were supplied at construction.
+   *
+   * Resolution fetches normalized spans for the whole trace and isolates the
+   * requested span after resolution — this reuses the same
+   * `resolveOffloadedTraces` path as `getSpansByTraceId` so that sibling
+   * eventref pointers on the same trace are also resolved consistently.
+   */
   async getSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
     const gateOne = (span: Span | null): Span | null =>
       span
