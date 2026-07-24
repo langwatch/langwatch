@@ -1,6 +1,6 @@
 import type { AgentReport } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import { app } from "~/server/routes/agent-reports";
 import {
@@ -207,19 +207,28 @@ describe("agent reports intake", () => {
     /** @scenario "Missing Slack configuration never blocks intake" */
     it("stores the report without attempting a Slack call", async () => {
       // The default notifier reads SLACK_AGENT_REPORTS_BOT_TOKEN, unset in
-      // tests, and returns without any network call.
-      const { id } = await submitAgentReport({
-        input: {
-          source: "cli",
-          kind: "summary",
-          title: `${testNamespace} no slack configured`,
-          summary: "stored fine",
-        },
-        callerKey: `noslack-${testNamespace}`,
-      });
-      trackReport(id);
-      const stored = await prisma.agentReport.findUnique({ where: { id } });
-      expect(stored?.title).toBe(`${testNamespace} no slack configured`);
+      // tests, and returns before touching any transport.
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      try {
+        const { id } = await submitAgentReport({
+          input: {
+            source: "cli",
+            kind: "summary",
+            title: `${testNamespace} no slack configured`,
+            summary: "stored fine",
+          },
+          callerKey: `noslack-${testNamespace}`,
+        });
+        trackReport(id);
+        const stored = await prisma.agentReport.findUnique({ where: { id } });
+        expect(stored?.title).toBe(`${testNamespace} no slack configured`);
+        const slackCalls = fetchSpy.mock.calls.filter((call) =>
+          String(call[0]).includes("slack.com"),
+        );
+        expect(slackCalls).toHaveLength(0);
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 

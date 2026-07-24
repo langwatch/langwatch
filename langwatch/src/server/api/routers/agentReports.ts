@@ -41,7 +41,13 @@ export const agentReportsRouter = createTRPCRouter({
       await auditLog({
         userId: user.id,
         action: "agentReports.getAll",
-        args: input,
+        // Never the raw search text: contact searches are email addresses,
+        // and audit rows outlive the inbox.
+        args: {
+          page: input.page,
+          pageSize: input.pageSize,
+          hasSearch: Boolean(input.search),
+        },
         targetKind: "agentReport",
       });
       return getAllAgentReports(input);

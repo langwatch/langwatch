@@ -140,8 +140,8 @@ export const reportCommand = async (
   }
 
   const rawTitle =
-    options.title?.trim() ??
-    summary?.trim().split("\n")[0]?.slice(0, 200) ??
+    options.title?.trim() ||
+    summary?.trim().split("\n")[0]?.slice(0, 200) ||
     "Session report";
   const titleResult = redactReportText({ text: rawTitle, envValues });
   redactedCount += titleResult.redactedCount;
