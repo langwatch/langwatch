@@ -758,8 +758,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * the process is about to exit on purpose, and dying with that job in
    * flight must not read as the job killing the worker. Pre-shutdown strikes
    * are swept in {@link close} while the event loop is provably alive. A group
-   * already at the threshold is therefore not parked during the drain either —
-   * its intact strike count parks it on the next boot's claim instead.
+   * already at the threshold is therefore parked at most one claim early: a
+   * claim that begins after the shutdown records no strike and parks on the next
+   * boot's claim instead, while a claim already awaiting its strike record when
+   * the shutdown flips can still cross the threshold and park during the drain —
+   * but only on its real prior-death strikes, never on a shutdown-born one.
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
