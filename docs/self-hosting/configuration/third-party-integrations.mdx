@@ -15,7 +15,7 @@ Email is used for alerts, team invitations, password resets, and system notifica
 app:
   email:
     enabled: true
-    defaultFrom: "langwatch@yourcompany.com"
+    defaultFrom: langwatch@yourcompany.com
     provider: sendgrid
     providers:
       sendgrid:
@@ -55,7 +55,7 @@ Capture application errors and exceptions for debugging.
 app:
   extraEnvs:
     - name: SENTRY_DSN
-      value: "https://examplePublicKey@o0.ingest.sentry.io/0"
+      value: https://examplePublicKey@o0.ingest.sentry.io/0
 ```
 
 ## Usage Analytics
