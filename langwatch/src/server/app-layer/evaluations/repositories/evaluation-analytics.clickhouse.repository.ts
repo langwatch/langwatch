@@ -1,5 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import {
+  asNullableNumber,
+  asNullableString,
+  asNumber,
+  asStringArray,
+  asStringMap,
+} from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
@@ -273,39 +280,11 @@ export class EvaluationAnalyticsClickHouseRepository
   }
 }
 
-const asNumber = (value: unknown): number => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-};
-
-const asNullableNumber = (value: unknown): number | null => {
-  if (value === null || value === undefined) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-};
-
 /** Epoch-ms read-back column: "0" (or absent) reads back as null. */
 const asNullableMs = (value: unknown): number | null => {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : null;
 };
-
-const asStringArray = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? value.filter((v): v is string => typeof v === "string")
-    : [];
-
-const asStringMap = (value: unknown): Record<string, string> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? Object.fromEntries(
-        Object.entries(value as Record<string, unknown>)
-          .filter(([, v]) => typeof v === "string")
-          .map(([k, v]) => [k, v as string]),
-      )
-    : {};
-
-const asNullableString = (value: unknown): string | null =>
-  typeof value === "string" && value.length > 0 ? value : null;
 
 const asNullableBool = (value: unknown): boolean | null =>
   value === null || value === undefined ? null : Boolean(value);

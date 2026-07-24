@@ -397,6 +397,16 @@ export function projectAnalyticsStateToRow({
  * A pre-migration row (00055 columns absent) decodes with documented defaults —
  * spanCount 0, empty annotation set, no root claimed, checkpoint 0 — and never
  * refolds.
+ *
+ * Caveat (pre-00055 rows only): `hasAnnotation` and a user-overridden trace name
+ * are re-derived at write time from `annotationIds` / `traceNameUserOverridden`,
+ * whose columns did not exist before 00055. A pre-00055 row supplies their
+ * empty/false default here, so a later NON-annotation (resp. non-rename) event
+ * arriving after a cache miss recomputes the flag from that default and
+ * downgrades it — it does not self-heal, since read-back never replays
+ * `event_log`. The edge is narrow (an annotation add/remove re-derives the flag
+ * correctly, and topic/late events on an already-annotated pre-00055 trace are
+ * rare); accepted rather than papered over with a synthetic annotation id.
  */
 export function traceAnalyticsStateFromRow(
   row: TraceAnalyticsRow,
@@ -435,6 +445,9 @@ export function traceAnalyticsStateFromRow(
     tokensPerSecond: row.tokensPerSecond,
     containsErrorStatus: row.hasError,
 
+    // Pre-00055 rows carried HasAnnotation without this id set, so it reads back
+    // empty and the derived flag can downgrade on a post-miss rewrite — see the
+    // pre-00055 caveat in this function's doc comment.
     annotationIds: row.annotationIds,
     attributes,
 
