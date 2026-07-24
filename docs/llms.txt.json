@@ -31,7 +31,10 @@
     "user-events/*.mdx",
     "self-hosting/*.mdx",
     "hybrid-setup/*.mdx",
-    "api-reference/**/*.mdx"
+    "api-reference/**/*.mdx",
+    "support.mdx"
   ],
-  "excludePaths": ["**/node_modules/**"]
+  "excludePaths": [
+    "**/node_modules/**"
+  ]
 }
