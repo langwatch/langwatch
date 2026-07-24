@@ -93,8 +93,7 @@ const CARD_REGEX = /(?<![\d.-])\d(?:[ -]?\d){12,18}(?![\d.-])/g;
 const IPV4_REGEX =
   /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g;
 
-const countDigits = (value: string): number =>
-  value.replace(/\D/g, "").length;
+const countDigits = (value: string): number => value.replace(/\D/g, "").length;
 
 /** Luhn checksum, the self-verification every real card number carries. */
 function passesLuhn(digits: string): boolean {
@@ -255,7 +254,11 @@ function redactJsonValue(
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value)) {
-      if (isSensitiveAttributeKey(key) && entry !== null && entry !== undefined) {
+      if (
+        isSensitiveAttributeKey(key) &&
+        entry !== null &&
+        entry !== undefined
+      ) {
         out[key] = SECRET_MARKER;
         count.redacted++;
         continue;

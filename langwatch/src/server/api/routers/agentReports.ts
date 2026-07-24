@@ -1,10 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import {
   getAgentReportById,
   getAllAgentReports,
 } from "~/server/app-layer/agent-reports/agent-report.service";
+import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -15,7 +15,10 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
  */
 const requireAdmin = (user: { email?: string | null }) => {
   if (!checkIsAdmin(user)) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Admin access required",
+    });
   }
 };
 

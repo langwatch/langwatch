@@ -1,6 +1,3 @@
-import { describe, expect, it } from "vitest";
-import { PRESIDIO_STRICT_ENTITIES } from "../../../tracer/collector/piiCheck";
-import { ESSENTIAL_PII_ENTITIES } from "../essentialPii";
 import {
   findRedactionMarkers,
   formatPiiMarker,
@@ -9,6 +6,9 @@ import {
   REDACTION_MARKER_ENTITIES,
   SECRET_MARKER_ENTITY,
 } from "@langwatch/redaction";
+import { describe, expect, it } from "vitest";
+import { PRESIDIO_STRICT_ENTITIES } from "../../../tracer/collector/piiCheck";
+import { ESSENTIAL_PII_ENTITIES } from "../essentialPii";
 
 describe("redaction markers", () => {
   describe("when the engine entity lists change", () => {

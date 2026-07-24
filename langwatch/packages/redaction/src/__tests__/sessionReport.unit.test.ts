@@ -82,7 +82,9 @@ describe("redactReportText", () => {
 
   describe("when the text contains personal data", () => {
     it("redacts email addresses", () => {
-      const result = redactReportText({ text: "contact me at jane.doe@acme.com please" });
+      const result = redactReportText({
+        text: "contact me at jane.doe@acme.com please",
+      });
       expect(result.text).toBe("contact me at [EMAIL_ADDRESS] please");
     });
 
@@ -143,7 +145,9 @@ describe("redactReportText", () => {
       const filler = "x".repeat(300_000);
       const text = `${filler}\nkey sk-proj-abcdefghijklmnopqrstuvwxyz123456 end`;
       const result = redactReportText({ text });
-      expect(result.text).not.toContain("sk-proj-abcdefghijklmnopqrstuvwxyz123456");
+      expect(result.text).not.toContain(
+        "sk-proj-abcdefghijklmnopqrstuvwxyz123456",
+      );
       expect(result.text).toContain("[SECRET]");
     });
   });
@@ -153,7 +157,9 @@ describe("redactSessionJsonl", () => {
   describe("given a transcript with JSON lines", () => {
     it("scrubs whole values under sensitive keys", () => {
       const jsonl = JSON.stringify({
-        request: { headers: { authorization: "Basic dXNlcjpwYXNz", accept: "*/*" } },
+        request: {
+          headers: { authorization: "Basic dXNlcjpwYXNz", accept: "*/*" },
+        },
       });
       const result = redactSessionJsonl({ jsonl });
       const parsed = JSON.parse(result.text) as {
@@ -165,18 +171,27 @@ describe("redactSessionJsonl", () => {
 
     it("pattern-redacts strings while preserving the structure", () => {
       const jsonl = [
-        JSON.stringify({ role: "user", content: "my key is sk-proj-abcdefghijklmnopqrstuvwxyz123456" }),
-        JSON.stringify({ role: "assistant", content: "ok, email jane@acme.com" }),
+        JSON.stringify({
+          role: "user",
+          content: "my key is sk-proj-abcdefghijklmnopqrstuvwxyz123456",
+        }),
+        JSON.stringify({
+          role: "assistant",
+          content: "ok, email jane@acme.com",
+        }),
       ].join("\n");
       const result = redactSessionJsonl({ jsonl });
-      const lines = result.text.split("\n").map((l) => JSON.parse(l) as { content: string });
+      const lines = result.text
+        .split("\n")
+        .map((l) => JSON.parse(l) as { content: string });
       expect(lines[0]?.content).toBe("my key is [SECRET]");
       expect(lines[1]?.content).toBe("ok, email [EMAIL_ADDRESS]");
       expect(result.redactedCount).toBe(2);
     });
 
     it("redacts lines that fail to parse as plain text", () => {
-      const jsonl = "not json but has sk-proj-abcdefghijklmnopqrstuvwxyz123456 inside";
+      const jsonl =
+        "not json but has sk-proj-abcdefghijklmnopqrstuvwxyz123456 inside";
       const result = redactSessionJsonl({ jsonl });
       expect(result.text).toBe("not json but has [SECRET] inside");
     });
@@ -192,14 +207,20 @@ describe("redactSessionJsonl", () => {
 describe("truncateJsonlToByteBudget", () => {
   describe("given a transcript under the budget", () => {
     it("returns it untouched", () => {
-      const result = truncateJsonlToByteBudget({ jsonl: "a\nb\nc", maxBytes: 100 });
+      const result = truncateJsonlToByteBudget({
+        jsonl: "a\nb\nc",
+        maxBytes: 100,
+      });
       expect(result).toEqual({ text: "a\nb\nc", truncated: false });
     });
   });
 
   describe("given a transcript over the budget", () => {
     it("keeps only the most recent whole lines and flags truncation", () => {
-      const lines = Array.from({ length: 100 }, (_, i) => `line-${i}-${"y".repeat(50)}`);
+      const lines = Array.from(
+        { length: 100 },
+        (_, i) => `line-${i}-${"y".repeat(50)}`,
+      );
       const result = truncateJsonlToByteBudget({
         jsonl: lines.join("\n"),
         maxBytes: 300,

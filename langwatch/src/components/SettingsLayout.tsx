@@ -86,7 +86,7 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
-  const { project, hasPermission } = useOrganizationTeamProject({
+  const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const publicEnv = usePublicEnv();

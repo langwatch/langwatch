@@ -142,9 +142,7 @@ describe("AgentReportsView", () => {
           screen.getByText("the docs pointed to a removed endpoint"),
         ).toBeInTheDocument();
       });
-      expect(
-        screen.getByText(/my key \[SECRET\] failed/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/my key \[SECRET\] failed/)).toBeInTheDocument();
       expect(screen.getByText("Download .jsonl")).toBeInTheDocument();
     });
   });

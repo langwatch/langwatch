@@ -13,8 +13,8 @@ import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
-import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { submitAgentReport } from "~/server/app-layer/agent-reports/agent-report.service";
 
 const secured = createServiceApp({ basePath: "/api/agent-reports" });
@@ -33,7 +33,10 @@ const agentReportBodySchema = z
     contactEmail: z.string().max(320).optional(),
     cliVersion: z.string().max(50).optional(),
     metadata: z
-      .record(z.string().max(200), z.union([z.string().max(2000), z.number(), z.boolean()]))
+      .record(
+        z.string().max(200),
+        z.union([z.string().max(2000), z.number(), z.boolean()]),
+      )
       .optional(),
   })
   .refine(

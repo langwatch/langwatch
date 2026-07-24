@@ -15,11 +15,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  BackofficeTable,
-  EmptyCell,
-  formatDateTime,
-} from "../BackofficeTable";
+import { BackofficeTable, EmptyCell, formatDateTime } from "../BackofficeTable";
 
 const PAGE_SIZE = 25;
 
@@ -118,21 +114,19 @@ export default function AgentReportsView() {
                 </Table.Cell>
                 <Table.Cell>
                   <Badge
-                    colorPalette={report.kind === "full_session" ? "purple" : "gray"}
+                    colorPalette={
+                      report.kind === "full_session" ? "purple" : "gray"
+                    }
                   >
                     {kindLabel[report.kind] ?? report.kind}
                   </Badge>
                 </Table.Cell>
-                <Table.Cell>
-                  {report.agent ?? <EmptyCell />}
-                </Table.Cell>
+                <Table.Cell>{report.agent ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{report.source}</Table.Cell>
                 <Table.Cell>
                   {report.linkedProjectId ?? <EmptyCell />}
                 </Table.Cell>
-                <Table.Cell>
-                  {report.contactEmail ?? <EmptyCell />}
-                </Table.Cell>
+                <Table.Cell>{report.contactEmail ?? <EmptyCell />}</Table.Cell>
               </Table.Row>
             ))}
           </Table.Body>
@@ -248,7 +242,11 @@ function AgentReportDrawer({
                 <Box>
                   <HStack marginBottom={2}>
                     <Text fontWeight="semibold">Session transcript</Text>
-                    <Button size="xs" variant="outline" onClick={copyTranscript}>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      onClick={copyTranscript}
+                    >
                       <Copy size={12} /> Copy
                     </Button>
                     <Button

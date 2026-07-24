@@ -104,7 +104,10 @@ export async function submitAgentReport({
     await notify({ report });
   } catch (error) {
     // The alert is best-effort; intake already succeeded.
-    logger.warn({ error, reportId: report.id }, "agent report Slack alert failed");
+    logger.warn(
+      { error, reportId: report.id },
+      "agent report Slack alert failed",
+    );
   }
 
   return { id: report.id };
@@ -130,7 +133,10 @@ async function resolveLinkedProjectId({
     });
     return resolved?.project.id ?? null;
   } catch (error) {
-    logger.warn({ error }, "agent report project linkage failed, storing unlinked");
+    logger.warn(
+      { error },
+      "agent report project linkage failed, storing unlinked",
+    );
     return null;
   }
 }
