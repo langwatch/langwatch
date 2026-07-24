@@ -9,8 +9,6 @@
  */
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "~/server/event-sourcing";
-import type { Event } from "../../../../domain/types";
-import { makeStagedProjection } from "../../../../subscribers/stagedProjection";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../../trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "../../../trace-processing/schemas/events";
 import type { ContributeSpanFactsCommandData } from "../../schemas/commands";
@@ -158,7 +156,13 @@ describe("codingAgentSpanFactsDispatch", () => {
   });
 
   describe("when a span from an ordinary LLM trace passes by", () => {
-    /** @scenario traces from other sources are untouched */
+    /**
+     * The handler's inline gate is the rollover-safety guard: a build without
+     * the enqueue filter stages a job for every span, so after the upgrade the
+     * handler must still discard the non-matching ones it dequeues.
+     *
+     * @scenario a job staged before the filter existed is still gated by the handler
+     */
     it("is ignored without decoding it", async () => {
       const { subscriber, dispatched } = makeSubscriber();
 
@@ -173,6 +177,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
   describe("given the enqueue-time filter (ADR-069)", () => {
     describe("when the raw span name is a coding-agent name", () => {
+      /** @scenario a matching event mints a job for the subscriber */
       it("passes the filter so a job is staged", () => {
         const { subscriber } = makeSubscriber();
 
@@ -185,6 +190,7 @@ describe("codingAgentSpanFactsDispatch", () => {
     });
 
     describe("when the raw span name is an ordinary trace name", () => {
+      /** @scenario a non-matching event never mints a job */
       it("fails the filter so no job is ever minted", () => {
         const { subscriber } = makeSubscriber();
 
@@ -197,124 +203,21 @@ describe("codingAgentSpanFactsDispatch", () => {
     });
   });
 
-  describe("given the enqueue-time projection (ADR-069)", () => {
-    describe("when a matched span is projected at the seam", () => {
-      it("lifts the same command the full-event handler builds", async () => {
-        const { subscriber, dispatched } = makeSubscriber();
-        const event = rawSpanEvent({
-          name: "claude_code.llm_request",
-          spanId: "llm-1",
-          attributes: {
-            "gen_ai.conversation.id": "sess-1",
-            input_tokens: 100,
-            stop_reason: "end_turn",
-          },
-        });
-
-        // The full-event path (what a pre-upgrade job runs) builds the command.
-        await subscriber.handle(event, context);
-        const fromFullEvent = dispatched[0]!;
-
-        // The projection lifts the identical command at enqueue time.
-        const projected = subscriber.options!.enqueue!.project!(event);
-
-        expect(projected).toEqual(fromFullEvent);
-      });
-    });
-  });
-
-  describe("given a staged projection job (the post-upgrade shape)", () => {
-    describe("when the handler receives the projection envelope", () => {
-      /**
-       * @scenario a matching event's job carries the derived slice, not the raw payload
-       */
-      it("dispatches the carried command without re-decoding a span", async () => {
-        const { subscriber, dispatched } = makeSubscriber();
-        const event = rawSpanEvent({
-          name: "claude_code.tool",
-          spanId: "tool-9",
-          attributes: { tool_name: "Bash" },
-        });
-        const projection = subscriber.options!.enqueue!.project!(event);
-        const envelope = makeStagedProjection({
-          event: event as unknown as Event,
-          projection,
-        });
-
-        await subscriber.handle(
-          envelope as unknown as TraceProcessingEvent,
-          context,
-        );
-
-        expect(dispatched).toHaveLength(1);
-        expect(dispatched[0]).toEqual(projection);
-      });
-    });
-  });
-
-  describe("given a mixed deploy across the upgrade boundary", () => {
-    describe("when the same span arrives as both the old and new shape", () => {
-      /**
-       * The hard compatibility requirement: a pre-upgrade job carries the full
-       * event, a post-upgrade job carries the projection, and both must produce
-       * the identical command.
-       *
-       * @scenario a job staged before the upgrade still processes
-       */
-      it("produces the identical command from either shape", async () => {
-        const event = rawSpanEvent({
-          name: "claude_code.llm_request",
-          spanId: "llm-mixed",
-          attributes: {
-            "gen_ai.conversation.id": "sess-mixed",
-            input_tokens: 42,
-          },
-        });
-
-        const oldBuild = makeSubscriber();
-        await oldBuild.subscriber.handle(event, context);
-
-        const newBuild = makeSubscriber();
-        const envelope = makeStagedProjection({
-          event: event as unknown as Event,
-          projection: newBuild.subscriber.options!.enqueue!.project!(event),
-        });
-        await newBuild.subscriber.handle(
-          envelope as unknown as TraceProcessingEvent,
-          context,
-        );
-
-        expect(oldBuild.dispatched).toHaveLength(1);
-        expect(newBuild.dispatched).toHaveLength(1);
-        expect(newBuild.dispatched[0]).toEqual(oldBuild.dispatched[0]);
-      });
-    });
-  });
-
-  describe("given the dedup key must survive the projection", () => {
-    describe("when keying a staged projection job", () => {
-      /** @scenario extraction changes the payload, not the delivery guarantees */
-      it("keeps the tenant:trace:span key on the envelope", () => {
+  describe("given the dedup key", () => {
+    describe("when keying a span job", () => {
+      /** @scenario filtering leaves the dedup identity of the jobs that remain intact */
+      it("keys on tenant, trace and span so two traces' spans never collide", () => {
         const { subscriber } = makeSubscriber();
         const event = rawSpanEvent({
           name: "claude_code.tool",
           spanId: "tool-dedup",
           attributes: { tool_name: "Bash" },
         });
-        const projection = subscriber.options!.enqueue!.project!(
-          event,
-        ) as ContributeSpanFactsCommandData;
-        const envelope = makeStagedProjection({
-          event: event as unknown as Event,
-          projection,
-        });
 
-        const key = subscriber.options!.deduplication!.makeId(
-          envelope as unknown as TraceProcessingEvent,
-        );
+        const key = subscriber.options!.deduplication!.makeId(event);
 
         expect(key).toBe(
-          `coding-agent-span-facts:tenant-1:${TRACE_ID}:${projection.spanId}`,
+          `coding-agent-span-facts:tenant-1:${TRACE_ID}:tool-dedup`,
         );
       });
     });

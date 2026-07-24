@@ -1,16 +1,18 @@
 Feature: Payload cost governs the scheduling plane
-  A subscriber that needs a small slice of a large event must not buy the whole
-  payload twice. The event is already in memory when it is routed; that is where
-  an irrelevant event is discarded — so the job never exists — and where a
-  needed slice is lifted, so the job carries the slice and never the bulk
-  payload. Work waiting in a queue is cheap as a pointer and fatal as resident
-  memory; when the platform kills a worker for memory it did not choose to
-  hold, a shedding layer is missing. (ADR-069; phase 1 scenarios below are
-  shipping, the planned scenarios record phases 2–4.)
+  A subscriber that needs a small slice of a large event must not mint a job for
+  every event it does not care about. The event is already in memory when it is
+  routed; that is where an irrelevant event is discarded — so the job never
+  exists. The routing seam is shared by the whole fan-out, so only a cheap,
+  total predicate runs there; deriving the slice from a relevant event stays in
+  the subscriber's own lane until the event carries a cost-honest claim-check
+  (phase 2). Work waiting in a queue is cheap as a pointer and fatal as resident
+  memory; when the platform kills a worker for memory it did not choose to hold,
+  a shedding layer is missing. (ADR-069; phase 1 scenarios below are shipping,
+  the planned scenarios record phases 2–4.)
 
   See dev/docs/adr/069-payload-cost-doctrine.md.
 
-  # --- Phase 1: filtering and extraction at ingest ---
+  # --- Phase 1: filtering at ingest ---
 
   Background:
     Given an event subscriber that needs only a small derived slice of each relevant event
@@ -22,26 +24,24 @@ Feature: Payload cost governs the scheduling plane
     Then no job is staged for that subscriber
     And the subscriber's handler never runs for that event
 
-  Scenario: a matching event's job carries the derived slice, not the raw payload
+  Scenario: a matching event mints a job for the subscriber
     Given an event the subscriber considers relevant
     When the event is routed to subscribers
-    Then the staged job carries the small derived slice
-    And the bulk event payload does not travel on the queue
-    And the handler completes its work from the slice alone
+    Then a job is staged for that subscriber
 
-  Scenario: extraction changes the payload, not the delivery guarantees
+  Scenario: filtering leaves the dedup identity of the jobs that remain intact
     Given two relevant events for the same aggregate
     When both are routed to subscribers
-    Then their jobs are processed in order for that aggregate
-    And a redelivery of the same event inside the dedup window stages no second job
+    Then a redelivery of the same event inside the dedup window stages no second job
 
-  Scenario: a job staged before the upgrade still processes
-    Given a job staged by the previous release that carries the full event payload
+  Scenario: a job staged before the filter existed is still gated by the handler
+    Given a job staged by the previous release, which minted one for every event
+    And that job carries an event the filter would now decline
     When the handler dequeues it after the upgrade
-    Then the job is processed to the same outcome as before the upgrade
+    Then the handler discards it to the same outcome as before the upgrade
 
-  Scenario: a failed lift surfaces into retry, never a silent drop
-    Given a relevant event whose slice cannot be derived
+  Scenario: a throwing enqueue filter surfaces into retry, never a silent drop
+    Given a relevant event whose filter predicate raises
     When the event is routed to subscribers
     Then the routing attempt fails and is retried
     And the event is never silently discarded
@@ -49,9 +49,19 @@ Feature: Payload cost governs the scheduling plane
   Scenario: enqueue outcomes are visible to operators
     Given a stream of relevant and irrelevant events
     When they are routed to subscribers
-    Then an operator-visible count distinguishes events filtered out, events staged as a slice, and events staged whole
+    Then an operator-visible count distinguishes events filtered out from events staged as a job
 
   # --- Phases 2-4: the remaining ADR-069 invariants ---
+
+  @planned
+  # Not yet implemented as of 2026-07-24 — ADR-069 phase 2: with the event
+  # carrying a cost-honest claim-check, the subscriber reads its slice from the
+  # reference instead of the full payload riding the queue.
+  Scenario: a matched event's heavy payload travels as a claim-check, not inline
+    Given an event the subscriber considers relevant whose payload is large
+    When the event is routed to subscribers
+    Then the staged job carries a reference to the payload, not the payload
+    And the handler reads only the small slice it needs through that reference
 
   @planned
   # Not yet implemented as of 2026-07-24 — ADR-069 phase 2: offloaded payloads

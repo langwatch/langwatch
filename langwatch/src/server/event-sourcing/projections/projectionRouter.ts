@@ -38,7 +38,6 @@ import {
 import type { QueueManager } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
-import { makeStagedProjection } from "../subscribers/stagedProjection";
 import { EventUtils } from "../utils/event.utils";
 import { isComponentDisabled } from "../utils/killSwitch";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry";
@@ -1210,31 +1209,20 @@ export class ProjectionRouter<
             continue;
           }
 
-          // Enqueue-time projection: stage the lifted slice instead of the
-          // full event, so the handler never re-buys the payload. The envelope
-          // mirrors the event's routing metadata, so group/score/dedup/span
-          // resolution downstream is unchanged.
-          const staged = enqueue?.project
-            ? (makeStagedProjection({
-                event,
-                projection: enqueue.project(event),
-              }) as unknown as EventType)
-            : event;
-
           incrementEsSubscriberEnqueueTotal({
             pipelineName: this.pipelineName,
             subscriberName: name,
-            outcome: enqueue?.project ? "projected" : "staged_full",
+            outcome: "staged",
           });
 
           if (queued) {
             const queue = this.queueManager.getSubscriberQueue(name);
             if (queue) {
-              await queue.send(staged);
+              await queue.send(event);
               continue;
             }
           }
-          await this.handleSubscriber(subscriber, staged);
+          await this.handleSubscriber(subscriber, event);
         } catch (error) {
           this.logger.error(
             {
