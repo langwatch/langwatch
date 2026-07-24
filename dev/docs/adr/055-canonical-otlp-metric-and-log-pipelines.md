@@ -82,7 +82,7 @@ writes. The exception is only possible because these columns are declared
 **Why map projections and not folds.** A fold earns its cost when an aggregate
 has a lifetime: state that later events amend. An observation has no lifetime.
 Modelling points and records as folds would mean per-series state that lives
-forever in a store and refolds from the event log on a cache miss, to derive
+forever in a store, read back on every cache miss (ADR-066), to derive
 something the raw table already answers. The rollup projection is the case worth
 naming, because it does read-modify-write and so looks like a fold. Making it
 recompute from the raw rows is what keeps it idempotent under replay, and it

@@ -33,7 +33,7 @@ which is fold-shaped.
 It is still a map projection, because it never accumulates. It recomputes the
 affected buckets from the authoritative raw rows every time, so running it twice
 produces the same buckets as running it once. A fold would need per-series state
-living forever in a store, refolding from the event log on a cache miss, to
+living forever in a store, read back on every cache miss (ADR-066), to
 derive something the raw table already answers. The cheaper source of truth was
 sitting right there.
 

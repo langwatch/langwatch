@@ -1,7 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import type {
+  CodingAgentSessionMetricSeriesRow,
+  CodingAgentSessionRow,
+} from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
@@ -110,6 +113,15 @@ interface ClickHouseWriteRecord {
   StopReason: string;
   Truncated: boolean;
 
+  // ── Read-back state (ADR-066, migration 00053) ─────────────────────────
+  SubAgentIds: string[];
+  // UInt64 arrays / scalars ride as strings, like the other UInt64 columns.
+  StepStartedAt: string[];
+  PreviousCallContextTokens: string;
+  // Array(Tuple(SeriesId, MetricName, Type, Decision, Language, Value)).
+  MetricSeries: [string, string, string, string, string, number][];
+  LastEventOccurredAt: Date;
+
   _retention_days: number;
 }
 
@@ -127,7 +139,9 @@ function toRecord(
     SessionKeySource: row.sessionKeySource,
     Version: row.version,
     StartedAt: new Date(row.startedAtMs),
-    CreatedAt: now,
+    // Preserve first-seen creation across re-folds; UpdatedAt is the RMT
+    // version and must be the write time so the latest version wins.
+    CreatedAt: row.createdAt > 0 ? new Date(row.createdAt) : now,
     UpdatedAt: now,
 
     Agent: row.agent,
@@ -211,6 +225,19 @@ function toRecord(
 
     StopReason: row.stopReason,
     Truncated: row.truncated,
+
+    SubAgentIds: row.subAgentIds,
+    StepStartedAt: row.stepStartedAt.map(big),
+    PreviousCallContextTokens: big(row.previousCallContextTokens),
+    MetricSeries: row.metricSeries.map((unit) => [
+      unit.seriesId,
+      unit.metricName,
+      unit.type,
+      unit.decision,
+      unit.language,
+      unit.value,
+    ]),
+    LastEventOccurredAt: new Date(row.lastEventOccurredAt),
 
     _retention_days: retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
   };
@@ -430,6 +457,34 @@ const asStringArray = (value: unknown): string[] =>
     ? value.filter((v): v is string => typeof v === "string")
     : [];
 
+const asNumberArray = (value: unknown): number[] =>
+  Array.isArray(value) ? value.map(asNumber) : [];
+
+/** Parse the `MetricSeries` Array(Tuple(...)), read as an array of arrays. */
+const asMetricSeriesRows = (
+  value: unknown,
+): CodingAgentSessionMetricSeriesRow[] =>
+  Array.isArray(value)
+    ? value.map((unit) => {
+        const tuple = unit as [
+          unknown,
+          unknown,
+          unknown,
+          unknown,
+          unknown,
+          unknown,
+        ];
+        return {
+          seriesId: String(tuple[0] ?? ""),
+          metricName: String(tuple[1] ?? ""),
+          type: String(tuple[2] ?? ""),
+          decision: String(tuple[3] ?? ""),
+          language: String(tuple[4] ?? ""),
+          value: asNumber(tuple[5]),
+        };
+      })
+    : [];
+
 const asNumberMap = (value: unknown): Record<string, number> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
     ? Object.fromEntries(
@@ -535,5 +590,13 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
 
     stopReason: String(record.StopReason ?? ""),
     truncated: Boolean(record.Truncated),
+
+    subAgentIds: asStringArray(record.SubAgentIds),
+    stepStartedAt: asNumberArray(record.StepStartedAt),
+    previousCallContextTokens: asNumber(record.PreviousCallContextTokens),
+    metricSeries: asMetricSeriesRows(record.MetricSeries),
+    createdAt: new Date(String(record.CreatedAt)).getTime(),
+    updatedAt: new Date(String(record.UpdatedAt)).getTime(),
+    lastEventOccurredAt: new Date(String(record.LastEventOccurredAt)).getTime(),
   };
 }

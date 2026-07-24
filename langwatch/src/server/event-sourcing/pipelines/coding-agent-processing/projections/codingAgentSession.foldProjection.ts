@@ -21,7 +21,10 @@ import {
   applySpanToCodingAgentSession,
   createInitCodingAgentSession,
 } from "../services/coding-agent-session.derivation";
-import type { CodingAgentSessionData } from "../services/coding-agent-session.types";
+import type {
+  CodingAgentSessionData,
+  MetricSeriesFact,
+} from "../services/coding-agent-session.types";
 
 /**
  * The coding-agent session fold (ADR-056).
@@ -85,13 +88,19 @@ export class CodingAgentSessionFoldProjection
   protected readonly events = codingAgentSessionEvents;
 
   /**
-   * The row is an aggregate, not a copy, so it cannot be read back into state
-   * (the counters are there, but the step ordering and the "first seen" identity
-   * rules are not reconstructable from it). On a cache miss the executor must
-   * rebuild from the event log, or a partial batch would overwrite a complete
-   * session with only the events in that batch.
+   * The store reads its own last committed state back (ADR-066): the row now
+   * round-trips the full working state, so `get()` returns it and nothing on
+   * the delivery path reads `event_log`.
+   *
+   * `refoldOnStoreMiss` is gone — there is no null-returning miss to refold.
+   * `refoldOnOutOfOrder` is off because the derivation is order-insensitive:
+   * accumulators commute (sums, counters, min/max, bounded first-seen sets),
+   * steps are inserted by their own `startedAtMs`, and the metric overlay
+   * replaces per series. A late event folds onto the loaded state in place; no
+   * history replay derives anything. (See the 2026-07-23 outage: unbounded
+   * refolds starved ClickHouse merges into a platform-wide `TOO_MANY_PARTS`.)
    */
-  override options: FoldProjectionOptions = { refoldOnStoreMiss: true };
+  override options: FoldProjectionOptions = { refoldOnOutOfOrder: false };
 
   constructor(deps: { store: FoldProjectionStore<CodingAgentSessionState> }) {
     super({
@@ -204,9 +213,24 @@ export class CodingAgentSessionFoldProjection
 }
 
 /**
- * The row that lands in `coding_agent_sessions` (migration 00051). Field names
- * mirror the ClickHouse columns 1:1 so the repository's record literal is a
- * straight mapping.
+ * One converged metric unit, as it rides in the row's `MetricSeries` column
+ * (migration 00053). Mirrors {@link MetricSeriesFact} but with the nullable
+ * attribute fields flattened to empty strings for the ClickHouse tuple; they
+ * map back to null on read-back.
+ */
+export interface CodingAgentSessionMetricSeriesRow {
+  seriesId: string;
+  metricName: string;
+  type: string;
+  decision: string;
+  language: string;
+  value: number;
+}
+
+/**
+ * The row that lands in `coding_agent_sessions` (migration 00051, extended by
+ * 00053). Field names mirror the ClickHouse columns 1:1 so the repository's
+ * record literal is a straight mapping.
  */
 export interface CodingAgentSessionRow {
   tenantId: string;
@@ -296,12 +320,29 @@ export interface CodingAgentSessionRow {
 
   stopReason: string;
   truncated: boolean;
+
+  // ── Read-back state (ADR-066, migration 00053) ─────────────────────────
+  // Not analytics columns — these round-trip the fold's working state so
+  // store.get() can read it back (decode the row) without replaying event_log.
+  /** The dedup set behind `subAgents`; the row keeps count + types, plus this. */
+  subAgentIds: string[];
+  /** Per-step start times, index-aligned with `steps` (dropped by the 3-tuple). */
+  stepStartedAt: number[];
+  /** Previous model call's context size, to detect the next cache rebuild. */
+  previousCallContextTokens: number;
+  /** The converged metric units the metric-fed fields are recomputed from. */
+  metricSeries: CodingAgentSessionMetricSeriesRow[];
+  /** Fold bookkeeping timestamps (createdAt/updatedAt map to CreatedAt/UpdatedAt). */
+  createdAt: number;
+  updatedAt: number;
+  lastEventOccurredAt: number;
 }
 
 /**
  * Project the fold state into the row. Every heavy thing stays out: the row
  * carries counters, bounded sets, and the IDS that reach the spans, the logs and
- * the response body — never their contents.
+ * the response body — never their contents. The read-back columns (ADR-066)
+ * carry the fold's working-state bookkeeping so `store.get()` round-trips.
  */
 export function projectCodingAgentSessionToRow({
   state,
@@ -401,5 +442,154 @@ export function projectCodingAgentSessionToRow({
 
     stopReason: state.stopReason ?? "",
     truncated: state.truncated,
+
+    subAgentIds: state.subAgentIds,
+    stepStartedAt: state.steps.map((s) => s.startedAtMs),
+    previousCallContextTokens: state.previousCallContextTokens,
+    metricSeries: Object.entries(state.metricSeries).map(
+      ([seriesId, fact]) => ({
+        seriesId,
+        metricName: fact.metricName,
+        type: fact.type ?? "",
+        decision: fact.decision ?? "",
+        language: fact.language ?? "",
+        value: fact.value,
+      }),
+    ),
+    createdAt: state.createdAt,
+    updatedAt: state.updatedAt,
+    lastEventOccurredAt: state.LastEventOccurredAt,
+  };
+}
+
+/** An empty string in a row column reads back as "unset" (null) in state. */
+const nullIfEmpty = (value: string): string | null =>
+  value === "" ? null : value;
+
+/**
+ * Decode the fold's working state from its persisted row — the `fromRow`
+ * inverse of {@link projectCodingAgentSessionToRow}'s `toRow` (ADR-066).
+ *
+ * This is a deserialize, NOT a rebuild. A rebuild replays the aggregate's
+ * history from `event_log`; this only maps the columns of the last committed
+ * projection back into the state shape, so `store.get()` can return the state
+ * that Redis (or, on a miss, ClickHouse) already holds. It derives nothing.
+ *
+ * The row mirrors the state field-for-field; the only conversions are the
+ * nullable identity fields (stored as "" ) mapping back to null, `steps`
+ * zipping with the parallel `stepStartedAt`, and `metricSeries` re-keying by
+ * series id.
+ */
+export function codingAgentSessionStateFromRow(
+  row: CodingAgentSessionRow,
+): CodingAgentSessionState {
+  const metricSeries: Record<string, MetricSeriesFact> = Object.fromEntries(
+    row.metricSeries.map((unit) => [
+      unit.seriesId,
+      {
+        metricName: unit.metricName,
+        type: nullIfEmpty(unit.type),
+        decision: nullIfEmpty(unit.decision),
+        language: nullIfEmpty(unit.language),
+        value: unit.value,
+      },
+    ]),
+  );
+
+  return {
+    agent: nullIfEmpty(row.agent),
+    sessionId: nullIfEmpty(row.sessionId),
+    agentVersion: nullIfEmpty(row.agentVersion),
+    terminalType: nullIfEmpty(row.terminalType),
+    entrypoint: nullIfEmpty(row.entrypoint),
+    finalRequestId: nullIfEmpty(row.finalRequestId),
+    userId: nullIfEmpty(row.userId),
+
+    modelCalls: row.modelCalls,
+    toolCalls: row.toolCalls,
+    subAgents: row.subAgents,
+    subAgentIds: row.subAgentIds,
+    steps: row.steps.map((step, index) => ({
+      name: step[0],
+      count: step[1],
+      failed: step[2],
+      startedAtMs: row.stepStartedAt[index] ?? 0,
+    })),
+    prompts: row.prompts,
+    promptChars: row.promptChars,
+    responseChars: row.responseChars,
+
+    toolCounts: row.toolCounts,
+    toolDurationMs: row.toolDurationMs,
+    filesTouched: row.filesTouched,
+    skills: row.skills,
+    subAgentTypes: row.subAgentTypes,
+    slashCommands: row.slashCommands,
+    models: row.models,
+    mcpServers: row.mcpServers,
+    mcpTools: row.mcpTools,
+
+    inputTokens: row.inputTokens,
+    outputTokens: row.outputTokens,
+    cacheReadTokens: row.cacheReadTokens,
+    cacheCreationTokens: row.cacheCreationTokens,
+    costUsd: row.costUsd,
+
+    modelCallMs: row.modelCallMs,
+    toolMs: row.toolMs,
+    ttftMsTotal: row.ttftMsTotal,
+    ttftSamples: row.ttftSamples,
+    blockedOnUserMs: row.blockedOnUserMs,
+    activeTimeUserSec: row.activeTimeUserSec,
+    activeTimeCliSec: row.activeTimeCliSec,
+
+    toolResultBytes: row.toolResultBytes,
+    toolInputBytes: row.toolInputBytes,
+    compactions: row.compactions,
+    compactionTokensBefore: row.compactionTokensBefore,
+    compactionTokensAfter: row.compactionTokensAfter,
+    peakContextTokens: row.peakContextTokens,
+    cacheRebuildCount: row.cacheRebuildCount,
+    largestCacheRebuildTokens: row.largestCacheRebuildTokens,
+    previousCallContextTokens: row.previousCallContextTokens,
+
+    failedTools: row.failedTools,
+    errorTypes: row.errorTypes,
+    apiErrors: row.apiErrors,
+    rateLimited: row.rateLimited,
+    retriesExhausted: row.retriesExhausted,
+    retryMs: row.retryMs,
+    attempts: row.attempts,
+    refusals: row.refusals,
+    refusalCategories: row.refusalCategories,
+    internalErrors: row.internalErrors,
+
+    toolsDenied: row.toolsDenied,
+    toolsAborted: row.toolsAborted,
+    permissionMode: nullIfEmpty(row.permissionMode),
+    permissionChanges: row.permissionChanges,
+    hooksBlocked: row.hooksBlocked,
+    hooksCancelled: row.hooksCancelled,
+    hookMs: row.hookMs,
+
+    metricSeries,
+    linesAdded: row.linesAdded,
+    linesRemoved: row.linesRemoved,
+    commits: row.commits,
+    pullRequests: row.pullRequests,
+    editsAccepted: row.editsAccepted,
+    editsRejected: row.editsRejected,
+    languagesEdited: row.languagesEdited,
+    atMentions: row.atMentions,
+
+    stopReason: nullIfEmpty(row.stopReason),
+    truncated: row.truncated,
+
+    sessionKeySource: row.sessionKeySource,
+    traceIds: row.traceIds,
+    startedAtMs: row.startedAtMs,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    LastEventOccurredAt: row.lastEventOccurredAt,
   };
 }
