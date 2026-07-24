@@ -1,4 +1,5 @@
 import { makeRequest } from "./langwatch-api.js";
+import { requestPublicJson } from "./public-http-request.js";
 
 export interface AgentSummary {
   id: string;
@@ -76,13 +77,12 @@ export async function runAgent(
       throw new Error("HTTP agent has no URL configured");
     }
 
-    const response = await fetch(url, {
+    const result = await requestPublicJson(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input ?? {}),
     });
 
-    const result = (await response.json()) as Record<string, unknown>;
     return { agentType: "http", result };
   }
 

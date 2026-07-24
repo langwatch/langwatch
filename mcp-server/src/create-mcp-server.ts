@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.js";
+import { fetchDocumentation } from "./documentation-fetch.js";
 import {
   createDatasetSchema,
   datasetColumnDefinitionSchema,
@@ -70,21 +71,8 @@ function registerTools(server: McpServer): void {
         ),
     },
     withToolLogging("fetch_langwatch_docs", async ({ url }) => {
-      let urlToFetch = url || "https://langwatch.ai/docs/llms.txt";
-      if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
-        urlToFetch += ".md";
-      }
-      if (!urlToFetch.startsWith("http")) {
-        if (!urlToFetch.startsWith("/")) {
-          urlToFetch = "/" + urlToFetch;
-        }
-        urlToFetch = "https://langwatch.ai/docs" + urlToFetch;
-      }
-      const response = await fetch(urlToFetch);
-
-      return {
-        content: [{ type: "text", text: await response.text() }],
-      };
+      const text = await fetchDocumentation("langwatch", url);
+      return { content: [{ type: "text", text }] };
     })
   );
 
@@ -100,21 +88,8 @@ function registerTools(server: McpServer): void {
         ),
     },
     withToolLogging("fetch_scenario_docs", async ({ url }) => {
-      let urlToFetch = url || "https://langwatch.ai/scenario/llms.txt";
-      if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
-        urlToFetch += ".md";
-      }
-      if (!urlToFetch.startsWith("http")) {
-        if (!urlToFetch.startsWith("/")) {
-          urlToFetch = "/" + urlToFetch;
-        }
-        urlToFetch = "https://langwatch.ai" + urlToFetch;
-      }
-      const response = await fetch(urlToFetch);
-
-      return {
-        content: [{ type: "text", text: await response.text() }],
-      };
+      const text = await fetchDocumentation("scenario", url);
+      return { content: [{ type: "text", text }] };
     })
   );
 

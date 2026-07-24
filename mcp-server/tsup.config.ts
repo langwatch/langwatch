@@ -11,7 +11,7 @@ export default defineConfig([
     dts: true,
     // Source-only workspace package — must be bundled, not externalized,
     // since the published npm package has no runtime dep on it.
-    noExternal: ["@langwatch/handled-error"],
+    noExternal: ["@langwatch/handled-error", "@langwatch/ssrf"],
     sourcemap: true,
   },
 ]);
