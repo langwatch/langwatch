@@ -4,10 +4,10 @@
  * The RMT version stamp. The IN-tuple dedup read depends on the repo-wide
  * invariant that no two versions of one row tie on UpdatedAt
  * (dev/docs/best_practices/clickhouse-queries.md): a tie makes both versions
- * match max(UpdatedAt), and the drifted-window read then returns the stale
- * in-window version instead of empty — the flake observed on the
- * "returns empty, not a stale version" integration scenario when two upserts
- * landed in the same millisecond.
+ * match max(UpdatedAt), so a windowed read can return a stale in-window
+ * version instead of empty. The full write→read contract, including the
+ * drifted-window scenario, lives in the sibling integration suite against
+ * real ClickHouse; this suite pins the stamp seam itself.
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -60,64 +60,69 @@ function makeRepository() {
   return { repository, captured };
 }
 
+/** Freezes the clock for one case so every stamp starts from the same now. */
+async function withFrozenClock(run: () => Promise<void>): Promise<void> {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-07-24T12:00:00.000Z"));
+  try {
+    await run();
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
 describe("CodingAgentSessionClickHouseRepository version stamp", () => {
-  describe("given two upserts landing in the same millisecond", () => {
-    it("stamps strictly increasing versions so the latest always wins", async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2026-07-24T12:00:00.000Z"));
-      try {
-        const { repository, captured } = makeRepository();
+  describe("given two versions of one session inside the same millisecond", () => {
+    describe("when both are written through the repository", () => {
+      it("stamps strictly increasing versions so the latest always wins", async () => {
+        await withFrozenClock(async () => {
+          const { repository, captured } = makeRepository();
 
-        await repository.upsert(rowWith({ updatedAt: 0 }));
-        await repository.upsert(rowWith({ updatedAt: 0 }));
+          await repository.upsert(rowWith({ updatedAt: 0 }));
+          await repository.upsert(rowWith({ updatedAt: 0 }));
 
-        expect(captured).toHaveLength(2);
-        expect(captured[1]!.UpdatedAt.getTime()).toBeGreaterThan(
-          captured[0]!.UpdatedAt.getTime(),
-        );
-      } finally {
-        vi.useRealTimers();
-      }
+          expect(captured).toHaveLength(2);
+          expect(captured[1]!.UpdatedAt.getTime()).toBeGreaterThan(
+            captured[0]!.UpdatedAt.getTime(),
+          );
+        });
+      });
     });
   });
 
   describe("given a row threading its superseded version's timestamp", () => {
-    it("stamps past the prior version even when this writer's clock lags it", async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2026-07-24T12:00:00.000Z"));
-      try {
-        const { repository, captured } = makeRepository();
-        const priorMs = Date.now() + 60_000;
+    describe("when it is written while this writer's clock lags that prior", () => {
+      it("stamps past the prior version", async () => {
+        await withFrozenClock(async () => {
+          const { repository, captured } = makeRepository();
+          const priorMs = Date.now() + 60_000;
 
-        await repository.upsert(rowWith({ updatedAt: priorMs }));
+          await repository.upsert(rowWith({ updatedAt: priorMs }));
 
-        expect(captured[0]!.UpdatedAt.getTime()).toBeGreaterThan(priorMs);
-      } finally {
-        vi.useRealTimers();
-      }
+          expect(captured[0]!.UpdatedAt.getTime()).toBeGreaterThan(priorMs);
+        });
+      });
     });
   });
 
   describe("given a batch of versions for one session", () => {
-    it("stamps each entry past the one before it", async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2026-07-24T12:00:00.000Z"));
-      try {
-        const { repository, captured } = makeRepository();
+    describe("when the batch is written in one insert", () => {
+      it("stamps each entry past the one before it", async () => {
+        await withFrozenClock(async () => {
+          const { repository, captured } = makeRepository();
 
-        await repository.upsertBatch([
-          { row: rowWith({ updatedAt: 0 }) },
-          { row: rowWith({ updatedAt: 0 }) },
-          { row: rowWith({ updatedAt: 0 }) },
-        ]);
+          await repository.upsertBatch([
+            { row: rowWith({ updatedAt: 0 }) },
+            { row: rowWith({ updatedAt: 0 }) },
+            { row: rowWith({ updatedAt: 0 }) },
+          ]);
 
-        const stamps = captured.map((r) => r.UpdatedAt.getTime());
-        expect(stamps).toHaveLength(3);
-        expect(stamps[1]).toBeGreaterThan(stamps[0]!);
-        expect(stamps[2]).toBeGreaterThan(stamps[1]!);
-      } finally {
-        vi.useRealTimers();
-      }
+          const stamps = captured.map((r) => r.UpdatedAt.getTime());
+          expect(stamps).toHaveLength(3);
+          expect(stamps[1]).toBeGreaterThan(stamps[0]!);
+          expect(stamps[2]).toBeGreaterThan(stamps[1]!);
+        });
+      });
     });
   });
 });
