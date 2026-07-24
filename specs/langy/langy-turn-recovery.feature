@@ -207,10 +207,10 @@ Feature: Langy recovers from a failed turn without making the user re-ask
   @unit
   Scenario: A rate-limit burst keeps its normal retries, then is cut
     Given the model provider rate-limits relayed calls without naming a deterministic limit
-    When the same conversation's calls keep being rate-limited with no success in between
+    When the same conversation's calls keep being rate-limited without interruption
     Then the first two rejections pass through for the SDK's own backoff
-    And the third consecutive rejection becomes a failure the SDK does not retry
-    But a successful call in between starts the count over
+    And the third uninterrupted rejection becomes a failure the SDK does not retry
+    But any other answer in between, a success or a different error, starts the count over
 
   @unit
   Scenario: A rate-limited conversation never blocks a healthy one

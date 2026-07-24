@@ -184,16 +184,23 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// loop here (see cutRateLimitRetry): the SDK sees a final failure,
 			// the turn fails, and the captured error above still carries the
 			// provider's own cause for the panel's plan-limit card.
-			if resp.StatusCode == http.StatusTooManyRequests {
-				hard := hasHardLimitReason(e)
-				strikes := entry.strikeRateLimit()
-				if hard || strikes >= rateLimitCutAfter {
-					cutRateLimitRetry(resp)
-					clog.Get(r.baseCtx).Info("otelrelay llm rate-limit retry loop cut",
-						zap.String("conversation", entry.info.ConversationID),
-						zap.Bool("hard_limit", hard),
-						zap.Int("consecutive", strikes))
-				}
+			//
+			// The count is of UNINTERRUPTED 429s: any other answer, a 500
+			// included, resets it (without touching the capture above). A mixed
+			// flap is not a deterministic limit, and only a limit that answers
+			// every backoff identically should be cut.
+			if resp.StatusCode != http.StatusTooManyRequests {
+				entry.resetRateLimitStrikes()
+				return nil
+			}
+			hard := hasHardLimitReason(e)
+			strikes := entry.strikeRateLimit()
+			if hard || strikes >= rateLimitCutAfter {
+				cutRateLimitRetry(resp)
+				clog.Get(r.baseCtx).Info("otelrelay llm rate-limit retry loop cut",
+					zap.String("conversation", entry.info.ConversationID),
+					zap.Bool("hard_limit", hard),
+					zap.Int("consecutive", strikes))
 			}
 			return nil
 		},

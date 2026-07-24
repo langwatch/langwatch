@@ -182,6 +182,15 @@ func (e *workerEntry) strikeRateLimit() int {
 	return e.rateLimitStrikes
 }
 
+// resetRateLimitStrikes zeroes the consecutive-429 count without touching the
+// captured llmErr: any non-429 answer breaks the run, but a captured 5xx
+// cause must survive as the turn's most recent real failure.
+func (e *workerEntry) resetRateLimitStrikes() {
+	e.mu.Lock()
+	e.rateLimitStrikes = 0
+	e.mu.Unlock()
+}
+
 func (e *workerEntry) lastLLMError() (herr.E, bool) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
