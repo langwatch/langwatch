@@ -217,3 +217,23 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given one conversation has been cut off at a hard rate limit
     When a different conversation's calls are relayed
     Then they pass through untouched with their own fresh count
+
+  # The turn stream's terminal error entry shares its `type: "error"`
+  # discriminant with the SSE transport's own protocol failure frame. The
+  # transport once claimed every such frame for itself, so the one entry that
+  # names the real failure killed the subscription instead: watching a turn
+  # fail LIVE showed the generic unknown card, while reloading the same
+  # conversation showed the correct one from the durable record. The live road
+  # and the reload road must end at the same card.
+  @unit
+  Scenario: A live-watched failure shows the same card a reload shows
+    Given a turn fails while its conversation is open and streaming
+    When the typed failure rides the stream's terminal error entry
+    Then the entry reaches the panel as data, not as a dead connection
+    And the panel renders the same specific card a reload would render
+
+  @unit
+  Scenario: A genuinely dead stream still names the durable failure
+    Given the live stream itself breaks with no typed payload
+    When the turn's real failure is already on the durable record
+    Then the panel reads the durable error instead of settling for unknown

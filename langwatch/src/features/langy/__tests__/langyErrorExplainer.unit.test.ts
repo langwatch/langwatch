@@ -4,6 +4,7 @@ import {
   KNOWN_LANGY_ERROR_KINDS,
   type LangyDomainError,
   readLangyStreamError,
+  resolveLiveTurnError,
 } from "../logic/langyErrorExplainer";
 
 /**
@@ -399,6 +400,55 @@ describe("readLangyStreamError", () => {
   describe("given a legacy plain-string error", () => {
     it("returns null so the caller can fall back", () => {
       expect(readLangyStreamError("manager responded 503")).toBeNull();
+    });
+  });
+});
+
+describe("resolveLiveTurnError", () => {
+  const typedStreamError = JSON.stringify({
+    code: "langy_agent_errored",
+    httpStatus: 502,
+    meta: {},
+    reasons: [
+      {
+        kind: "llm_upstream_error",
+        meta: { http_status: 429, message: "The usage limit has been reached" },
+        reasons: [{ kind: "usage_limit_reached" }],
+      },
+    ],
+  });
+
+  describe("given the failure rode the stream's terminal entry", () => {
+    it("resolves the typed domain error off the live message", () => {
+      const domain = resolveLiveTurnError({
+        error: new Error(typedStreamError),
+        durableLastError: null,
+      });
+
+      expect(domain.code).toBe("langy_agent_errored");
+    });
+  });
+
+  // @scenario "A genuinely dead stream still names the durable failure"
+  describe("given the live stream died with no typed payload", () => {
+    it("reads the durable record instead of settling for unknown", () => {
+      const domain = resolveLiveTurnError({
+        error: new Error("SSE Error"),
+        durableLastError: typedStreamError,
+      });
+
+      expect(domain.code).toBe("langy_agent_errored");
+      expect(explainLangyError(domain).kind).toBe("langy_codex_plan_limit");
+    });
+
+    it("falls back to unknown only when the durable record is empty too", () => {
+      const domain = resolveLiveTurnError({
+        error: new Error("SSE Error"),
+        durableLastError: null,
+      });
+
+      expect(domain.code).toBe("unknown");
+      expect(domain.meta).toEqual({ error: "SSE Error" });
     });
   });
 });
