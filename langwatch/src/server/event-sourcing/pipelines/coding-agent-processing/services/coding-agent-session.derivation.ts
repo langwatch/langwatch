@@ -1,3 +1,4 @@
+import { LOGS_ONLY_AGENT_IDS } from "../agents";
 import {
   normalizeEventName,
   normalizeMetricName,
@@ -595,14 +596,6 @@ function foldToolInvocation(
   return withTool;
 }
 
-/**
- * Agents whose telemetry is events-only: no spans arrive, so the facts that
- * span-bearing agents fold from spans (model calls, tokens, tool runs) fold
- * from their LOG events instead. Membership is the double-count gate — an
- * agent listed here must never also emit the equivalent spans into this
- * pipeline, or every call would fold twice.
- */
-const LOGS_ONLY_AGENTS: ReadonlySet<string> = new Set(["claude_cowork"]);
 
 /**
  * Fold one LOG record's facts into the session.
@@ -633,7 +626,10 @@ export function applyLogToCodingAgentSession({
   occurredAtMs?: number;
 }): CodingAgentSessionData {
   const attrs = attributes;
-  const logsOnly = agent !== undefined && LOGS_ONLY_AGENTS.has(agent);
+  // Membership rides the registry (`logsOnly` on the definition), so adding
+  // an events-only agent touches agents/ only. String-typed at this seam
+  // because the contribution schema is a wire string, not the union.
+  const isLogsOnly = agent !== undefined && LOGS_ONLY_AGENT_IDS.has(agent);
   // Normalize the agent's spelling into one vocabulary before matching. Claude
   // Code and Codex namespace their event names (`claude_code.tool_result`,
   // `codex.tool_result`); opencode sends a bare `tool_result` and dots its
@@ -671,7 +667,7 @@ export function applyLogToCodingAgentSession({
       const withCost = { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
       // For a logs-only agent this event IS the model call — the same facts
       // the llm_request span carries for Claude Code fold from here instead.
-      return logsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
+      return isLogsOnly ? foldModelCall(withCost, attrs, 0) : withCost;
     }
 
     case CLAUDE.EVENT.TOOL_RESULT: {
@@ -690,7 +686,7 @@ export function applyLogToCodingAgentSession({
       };
       // For a logs-only agent this event IS the tool run — name, duration,
       // outcome — which span-bearing agents fold from the tool span.
-      return logsOnly
+      return isLogsOnly
         ? foldToolInvocation(withBytes, {
             attrs,
             failed: scalarStr(attrs.success) === "false",

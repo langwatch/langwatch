@@ -127,4 +127,12 @@ export interface CodingAgentDefinition {
    * attribute, this resolves it; return null when the span is not a tool span.
    */
   toolNameFromSpanName?(spanName: string): string | null;
+
+  /**
+   * True when the agent's telemetry is events-only (no spans): the session
+   * fold then folds model calls and tool runs from its LOG events. This is
+   * the double-count gate — an agent with this flag must never also emit
+   * the equivalent spans into the pipeline.
+   */
+  logsOnly?: boolean;
 }
