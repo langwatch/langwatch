@@ -468,9 +468,12 @@ export class FoldProjectionExecutor {
     // Anchor the read to the batch's earliest event (any event in the batch is
     // for the same aggregate, so it anchors the same partition window; the
     // unwindowed retry covers a batch that somehow spans wider than widthMs).
-    const loadContext = ordered[0]
-      ? withReadHints({ context, event: ordered[0], projection })
-      : context;
+    // biome-ignore lint/style/noNonNullAssertion: the empty/single-event batches returned above, so ordered has at least two events.
+    const loadContext = withReadHints({
+      context,
+      event: ordered[0]!,
+      projection,
+    });
     const { state: loaded, appliedEventIds } = await this.loadWithApplied({
       projectionName: projection.name,
       store: projection.store,

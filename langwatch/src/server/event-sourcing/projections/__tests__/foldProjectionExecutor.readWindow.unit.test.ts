@@ -157,6 +157,32 @@ describe("FoldProjectionExecutor declared read window", () => {
       });
     });
 
+    describe("when a batch's windowed read misses a row that exists outside the window", () => {
+      it("retries once without the window and folds the batch onto the recovered state", async () => {
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+        (store.get as ReturnType<typeof vi.fn>).mockImplementation(
+          async (_key: string, readContext: ProjectionStoreContext) =>
+            readContext.readWindow === undefined
+              ? { count: 10, LastEventOccurredAt: OCCURRED_AT - 1 }
+              : null,
+        );
+
+        const state = await executor.executeBatch(
+          fold,
+          [eventAt(OCCURRED_AT), eventAt(OCCURRED_AT + 1_000)],
+          context,
+        );
+
+        expect(store.get).toHaveBeenCalledTimes(2);
+        const retryContext = (store.get as ReturnType<typeof vi.fn>).mock
+          .calls[1]![1] as ProjectionStoreContext;
+        expect(retryContext.readWindow).toBeUndefined();
+        expect(retryContext.bypassReadCache).toBe(true);
+        expect(state.count).toBe(12);
+        expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");
+      });
+    });
+
     describe("when a batch is folded", () => {
       it("anchors the window on the batch's earliest event", async () => {
         const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });

@@ -292,11 +292,21 @@ export class CodingAgentSessionClickHouseRepository
    * full sort key, and `StartedAt` can shift when an earlier signal arrives
    * late, so superseded rows can persist until TTL.
    *
-   * `window` bounds StartedAt so this stays a partition-pruned point read
-   * instead of a full-table scan. The width is the CALLER's declaration
-   * (the fold's `options.readWindow`, or a direct caller deriving from
-   * CODING_AGENT_SESSION_READ_WINDOW_MS) — this repository applies the bound
-   * verbatim and implements no widening or miss fallback of its own.
+   * `window` bounds StartedAt on the OUTER read only, so it stays a
+   * partition-pruned point read instead of a full-table scan. The width is
+   * the CALLER's declaration (the fold's `options.readWindow`, or a direct
+   * caller deriving from CODING_AGENT_SESSION_READ_WINDOW_MS) — this
+   * repository applies the bound verbatim and implements no widening or miss
+   * fallback of its own.
+   *
+   * The inner dedup subquery is deliberately UNWINDOWED: it must resolve the
+   * TRUE latest version. Windowing it too would make a session whose latest
+   * version's StartedAt drifted outside the window (while an older version
+   * sits inside) read back as that stale older version — a non-null result no
+   * fallback can catch, and folding onto it overwrites the real latest row.
+   * Unwindowed, the same case yields an EMPTY outer read, which the caller's
+   * retry recovers. The subquery touches only sort-key columns, so it stays a
+   * cheap keyed seek without partition pruning.
    */
   private async findLatestRecord({
     tenantId,
@@ -330,7 +340,6 @@ export class CodingAgentSessionClickHouseRepository
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND SessionId = {sessionId:String}
-              ${partitionFilter}
             GROUP BY TenantId, SessionId
           )
         LIMIT 1

@@ -53,7 +53,11 @@ export class CodingAgentSessionService {
    * hint — pass it whenever the caller has it. The window width is the fold's
    * declaration (CODING_AGENT_SESSION_READ_WINDOW_MS), and a windowed miss is
    * retried without the window so a stale hint degrades to a slower read, not
-   * a 404 for a session that exists.
+   * a 404 for a session that exists. The retry is intentionally unmetered:
+   * unlike the fold path (where a recovery means fold state sat outside a
+   * DECLARED width — `es_fold_read_window_fallback_total` tracks that drift),
+   * a miss here only says a caller's own hint was stale, and the cost is one
+   * slower read.
    */
   async getBySessionId({
     projectId,

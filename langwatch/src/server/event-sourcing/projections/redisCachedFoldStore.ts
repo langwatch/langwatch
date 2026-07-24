@@ -147,7 +147,10 @@ export class RedisCachedFoldStore<State>
     // The executor's read-window fallback re-reads moments after its windowed
     // attempt already consulted the cache — a second Redis read is a
     // guaranteed miss that would double-count the cache and dedup metrics, so
-    // the retry goes straight to the durable tier.
+    // the retry goes straight to the durable tier. Deliberately NO
+    // dedup-unavailable accounting here: the windowed attempt already ran the
+    // full miss path (including that accounting) for this same delivery —
+    // counting again on the retry would double-count one logical read.
     if (context.bypassReadCache) {
       return await this.readDurable(aggregateId, context);
     }
