@@ -79,6 +79,10 @@ export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   "cursor",
   "gemini",
   "opencode",
+  // Support reporting: sends an issue report to the LangWatch team; no
+  // platform resource to card. Mirrored in the app's capabilityCatalog
+  // EXCLUDED_COMMANDS.
+  "report",
   // The CLI's own background process management.
   "daemon",
   // Local agent-skill installer: manages files under ~/.agents, not platform

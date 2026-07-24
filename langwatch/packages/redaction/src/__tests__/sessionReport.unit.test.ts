@@ -81,6 +81,7 @@ describe("redactReportText", () => {
   });
 
   describe("when the text contains personal data", () => {
+    /** @scenario "Session redaction covers secrets, emails, phone numbers, and cards" */
     it("redacts email addresses", () => {
       const result = redactReportText({
         text: "contact me at jane.doe@acme.com please",
@@ -118,6 +119,7 @@ describe("redactReportText", () => {
   });
 
   describe("when the text contains debugging data that only looks sensitive", () => {
+    /** @scenario "Loopback and private network addresses stay readable" */
     it("keeps loopback and private addresses", () => {
       const text =
         "listening on 127.0.0.1:5560, lan 192.168.1.5, vpc 10.0.0.3, docker 172.17.0.2";
@@ -216,6 +218,7 @@ describe("truncateJsonlToByteBudget", () => {
   });
 
   describe("given a transcript over the budget", () => {
+    /** @scenario "Oversized sessions are truncated from the start, keeping the most recent activity" */
     it("keeps only the most recent whole lines and flags truncation", () => {
       const lines = Array.from(
         { length: 100 },

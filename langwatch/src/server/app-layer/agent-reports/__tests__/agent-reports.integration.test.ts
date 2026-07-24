@@ -63,6 +63,8 @@ describe("agent reports intake", () => {
   });
 
   describe("when a summary report arrives without credentials", () => {
+    /** @scenario "A summary report is stored" */
+    /** @scenario "Reports do not require authentication" */
     it("stores it under a prefixed id and returns it", async () => {
       const response = await postReport(baseReport());
       expect(response.status).toBe(201);
@@ -80,6 +82,7 @@ describe("agent reports intake", () => {
   });
 
   describe("when a raw submission carries secrets, bypassing client redaction", () => {
+    /** @scenario "Submitted content is redacted again on the platform before storage" */
     it("stores every field redacted", async () => {
       const key = "sk-proj-abcdefghijklmnopqrstuvwxyz123456";
       const response = await postReport({
@@ -105,6 +108,7 @@ describe("agent reports intake", () => {
   });
 
   describe("when a full session report arrives", () => {
+    /** @scenario "A full session report is stored with its transcript" */
     it("stores the transcript", async () => {
       const sessionData = '{"role":"user","content":"it broke"}';
       const response = await postReport({
@@ -158,6 +162,7 @@ describe("agent reports intake", () => {
       projectId = project.id;
     });
 
+    /** @scenario "Reports with a valid project API key are linked to the project" */
     it("links the report to the project", async () => {
       const response = await postReport(baseReport(), {
         "x-auth-token": legacyApiKey,
@@ -172,6 +177,7 @@ describe("agent reports intake", () => {
   });
 
   describe("when an invalid API key is presented", () => {
+    /** @scenario "Reports with an invalid API key are still accepted, unlinked" */
     it("still accepts the report, unlinked", async () => {
       const response = await postReport(baseReport(), {
         "x-auth-token": "sk-lw-definitely-not-a-real-key-000000",
@@ -185,7 +191,40 @@ describe("agent reports intake", () => {
     });
   });
 
+  describe("when the payload exceeds the size limit", () => {
+    /** @scenario "Oversized payloads are rejected" */
+    it("rejects it with a payload-too-large response", async () => {
+      const response = await postReport({
+        ...baseReport(),
+        kind: "full_session",
+        sessionData: "x".repeat(13 * 1024 * 1024),
+      });
+      expect(response.status).toBe(413);
+    });
+  });
+
+  describe("when Slack credentials are not configured", () => {
+    /** @scenario "Missing Slack configuration never blocks intake" */
+    it("stores the report without attempting a Slack call", async () => {
+      // The default notifier reads SLACK_AGENT_REPORTS_BOT_TOKEN, unset in
+      // tests, and returns without any network call.
+      const { id } = await submitAgentReport({
+        input: {
+          source: "cli",
+          kind: "summary",
+          title: `${testNamespace} no slack configured`,
+          summary: "stored fine",
+        },
+        callerKey: `noslack-${testNamespace}`,
+      });
+      trackReport(id);
+      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      expect(stored?.title).toBe(`${testNamespace} no slack configured`);
+    });
+  });
+
   describe("when the submission is malformed", () => {
+    /** @scenario "Malformed submissions are rejected with validation errors" */
     it("rejects a report without any content", async () => {
       const response = await postReport({
         source: "cli",
@@ -206,6 +245,7 @@ describe("agent reports intake", () => {
   });
 
   describe("when the caller exceeds the rate limit", () => {
+    /** @scenario "Submissions are rate limited per client" */
     it("rejects further reports for that caller only", async () => {
       const callerKey = `ratelimit-${testNamespace}`;
       const submitOnce = () =>
@@ -241,6 +281,7 @@ describe("agent reports intake", () => {
   });
 
   describe("when the team alert is delivered", () => {
+    /** @scenario "The team is notified on Slack for each new report" */
     it("passes the stored report to the notifier", async () => {
       const notified: AgentReport[] = [];
       const { id } = await submitAgentReport({
@@ -263,6 +304,7 @@ describe("agent reports intake", () => {
   });
 
   describe("when the team alert fails", () => {
+    /** @scenario "Slack failures never fail the report intake" */
     it("stores the report and succeeds anyway", async () => {
       const { id } = await submitAgentReport({
         input: {

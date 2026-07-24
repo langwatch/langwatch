@@ -90,6 +90,11 @@ Feature: CLI Agent Issue Reports
     And the surrounding text is preserved so the session stays readable
 
   @unit
+  Scenario: Secrets leaking into the title are redacted too
+    When I run "langwatch report --user-approved --title 'auth with sk-... failed' --summary '...'"
+    Then the delivered title carries a redaction marker instead of the key
+
+  @unit
   Scenario: Environment secrets are scrubbed even in unusual formats
     Given the environment has LANGWATCH_API_KEY set
     And the session transcript contains that exact key value split into an unusual context

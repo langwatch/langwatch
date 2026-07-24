@@ -107,6 +107,7 @@ describe("AgentReportsView", () => {
   });
 
   describe("given stored reports", () => {
+    /** @scenario "Admins see reports in the backoffice" */
     it("lists them with date, kind, agent, project, and contact", () => {
       renderView();
       expect(

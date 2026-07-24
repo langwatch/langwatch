@@ -9,6 +9,7 @@ import {
   it,
 } from "vitest";
 import { initConfig } from "../config.js";
+import { createMcpServer } from "../create-mcp-server.js";
 import { handleReportIssue } from "../tools/report-issue.js";
 
 /**
@@ -43,7 +44,24 @@ describe("report_issue", () => {
     initConfig({ endpoint, apiKey: undefined });
   });
 
+  describe("given the registered tool set", () => {
+    /** @scenario "The report tool is listed with an agent-facing description" */
+    it("lists report_issue with the agent-facing consent description", () => {
+      const server = createMcpServer();
+      const tools = (
+        server as unknown as {
+          _registeredTools: Record<string, { description?: string }>;
+        }
+      )._registeredTools;
+      expect(Object.keys(tools)).toContain("report_issue");
+      const description = tools.report_issue?.description ?? "";
+      expect(description).toMatch(/whenever you struggled/i);
+      expect(description).toMatch(/ask the user for permission first/i);
+    });
+  });
+
   describe("given the user did not approve sending", () => {
+    /** @scenario "Calls without user approval are rejected with instructions" */
     it("refuses with instructions to ask the user first", async () => {
       await expect(
         handleReportIssue({
@@ -65,6 +83,7 @@ describe("report_issue", () => {
   });
 
   describe("when the user approved a summary report", () => {
+    /** @scenario "Reporting an issue through MCP reaches the LangWatch backend" */
     it("delivers it marked as coming from MCP and returns a thank-you", async () => {
       const text = await handleReportIssue({
         user_approved: true,
@@ -94,6 +113,7 @@ describe("report_issue", () => {
   });
 
   describe("when session content includes secrets", () => {
+    /** @scenario "Session content passed through MCP is redacted before sending" */
     it("redacts them locally before sending", async () => {
       await handleReportIssue({
         user_approved: true,

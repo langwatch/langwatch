@@ -34,6 +34,12 @@ Feature: Agent Issue Reports Intake
     Then it is accepted and stored without a project reference
 
   @integration
+  Scenario: Submitted content is redacted again on the platform before storage
+    When a report arrives carrying a raw API key in the title, summary, transcript, or metadata
+    Then the stored report carries redaction markers in place of the key
+    And the raw key is nowhere in storage
+
+  @integration
   Scenario: Submissions are rate limited per client
     Given a client already submitted many reports within the window
     When another report arrives from the same client

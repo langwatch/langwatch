@@ -64,6 +64,7 @@ describe("langwatch report", () => {
   });
 
   describe("given the user did not approve sending", () => {
+    /** @scenario "Sending without user approval is rejected with instructions" */
     it("refuses with instructions to ask the user first", async () => {
       await expect(
         reportCommand({ summary: "docs pointed to a 404 endpoint" }),
@@ -81,6 +82,8 @@ describe("langwatch report", () => {
   });
 
   describe("when sending a summary report", () => {
+    /** @scenario "A summary report reaches the LangWatch backend" */
+    /** @scenario "Reports work without an API key" */
     it("delivers title and summary and returns the report id", async () => {
       const result = await reportCommand({
         userApproved: true,
@@ -98,6 +101,7 @@ describe("langwatch report", () => {
       expect((result as { data: { id: string } }).data.id).toBe("report-123");
     });
 
+    /** @scenario "Secrets leaking into the title are redacted too" */
     it("redacts secrets that leak into the title", async () => {
       await reportCommand({
         userApproved: true,
@@ -108,6 +112,22 @@ describe("langwatch report", () => {
       expect(received[0]?.body.title).toBe("auth with [SECRET] failed");
     });
 
+    /** @scenario "Summary can be read from a file for long content" */
+    it("reads the summary from a file", async () => {
+      const notesPath = join(tempDir, "notes.md");
+      writeFileSync(notesPath, "long write-up of the confusing evaluator setup");
+      await reportCommand({
+        userApproved: true,
+        endpoint,
+        title: "confusing evaluator setup",
+        summaryFile: notesPath,
+      });
+      expect(received[0]?.body.summary).toBe(
+        "long write-up of the confusing evaluator setup",
+      );
+    });
+
+    /** @scenario "Reports are linked to the project when an API key is present" */
     it("attaches the API key when one is configured", async () => {
       process.env.LANGWATCH_API_KEY = "sk-lw-test-key-abcdef123456789012";
       await reportCommand({
@@ -122,6 +142,7 @@ describe("langwatch report", () => {
   });
 
   describe("when sending a full session report", () => {
+    /** @scenario "A full session report attaches the redacted transcript" */
     it("redacts secrets and PII before anything leaves the machine", async () => {
       const sessionPath = join(tempDir, "session.jsonl");
       writeFileSync(
@@ -156,6 +177,7 @@ describe("langwatch report", () => {
       expect(body.sessionData).toContain("127.0.0.1:5560");
     });
 
+    /** @scenario "Environment secrets are scrubbed even in unusual formats" */
     it("scrubs the literal values of sensitive environment variables", async () => {
       process.env.MY_SERVICE_TOKEN = "extremely-unique-token-value-98765";
       try {
@@ -176,6 +198,7 @@ describe("langwatch report", () => {
       }
     });
 
+    /** @scenario "A missing session file fails with a helpful error" */
     it("reports a missing session file helpfully", async () => {
       await expect(
         reportCommand({
@@ -188,6 +211,7 @@ describe("langwatch report", () => {
   });
 
   describe("when using --dry-run", () => {
+    /** @scenario "Dry run needs no user approval, because nothing is sent" */
     it("needs no user approval, because nothing is sent", async () => {
       const result = (await reportCommand({
         endpoint,
@@ -198,6 +222,7 @@ describe("langwatch report", () => {
       expect(result.data.dryRun).toBe(true);
     });
 
+    /** @scenario "Dry run shows exactly what would be sent without sending it" */
     it("returns the redacted payload without sending anything", async () => {
       const result = (await reportCommand({
         userApproved: true,
@@ -220,6 +245,7 @@ describe("langwatch report", () => {
       ).rejects.toThrow(/HTTP 500[\s\S]*support@langwatch.ai/);
     });
 
+    /** @scenario "Backend being unreachable fails politely without losing the summary" */
     it("fails politely when the endpoint cannot be reached", async () => {
       await expect(
         reportCommand({
