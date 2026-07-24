@@ -583,10 +583,7 @@ function detectAgentFrom({
   logs: TranscriptLogRecord[];
 }): CodingAgent {
   for (const span of spans) {
-    const agent = detectCodingAgent({
-      recordName: span.name,
-      serviceName: span.serviceName,
-    });
+    const agent = detectCodingAgent({ recordName: span.name });
     if (agent !== "unknown") return agent;
     // opencode's spans are named by the Vercel AI SDK (`ai.streamText`), so
     // the name carries no agent; its request-header attributes do.
