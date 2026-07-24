@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
 import type { AgentReport } from "@prisma/client";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
@@ -72,20 +73,26 @@ export async function submitAgentReport({
     projectIdHint,
   });
 
+  // Defense in depth: the CLI and MCP redact locally, but the endpoint is
+  // public, so a direct POST could carry raw secrets into this cross-tenant,
+  // admin-visible inbox. Pattern redaction re-runs here before persisting
+  // (no env pass: environment literals are a client-side concern).
+  const redacted = redactSubmission(input);
+
   const repository = new AgentReportRepository(prisma);
   const report = await repository.create({
     data: {
       source: input.source,
       kind: input.kind,
-      title: input.title,
-      summary: input.summary,
-      sessionData: input.sessionData,
+      title: redacted.title,
+      summary: redacted.summary,
+      sessionData: redacted.sessionData,
       sessionTruncated: input.sessionTruncated ?? false,
       agent: input.agent,
       contactEmail: input.contactEmail,
       cliVersion: input.cliVersion,
       linkedProjectId,
-      metadata: input.metadata,
+      metadata: redacted.metadata,
     },
   });
 
@@ -111,6 +118,33 @@ export async function submitAgentReport({
   }
 
   return { id: report.id };
+}
+
+function redactSubmission(input: SubmitAgentReportInput): {
+  title: string;
+  summary?: string;
+  sessionData?: string;
+  metadata?: Record<string, string | number | boolean>;
+} {
+  return {
+    title: redactReportText({ text: input.title }).text,
+    summary: input.summary
+      ? redactReportText({ text: input.summary }).text
+      : undefined,
+    sessionData: input.sessionData
+      ? redactSessionJsonl({ jsonl: input.sessionData }).text
+      : undefined,
+    metadata: input.metadata
+      ? Object.fromEntries(
+          Object.entries(input.metadata).map(([key, value]) => [
+            key,
+            typeof value === "string"
+              ? redactReportText({ text: value }).text
+              : value,
+          ]),
+        )
+      : undefined,
+  };
 }
 
 /**

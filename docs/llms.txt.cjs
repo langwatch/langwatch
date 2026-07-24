@@ -9,7 +9,7 @@ const config = JSON.parse(fs.readFileSync('llms.txt.json', 'utf8'));
 
 // Shown at the top of llms.txt and llms-full.txt so every agent journey
 // through the docs learns it can report issues straight to the team.
-const AGENT_REPORT_NOTE = "For agents: if anything in these docs is wrong, confusing, or fails when you try it, ask your user for permission and run `npx langwatch report` to send the problem (or your whole session, redacted locally) to the LangWatch team. No login needed, and it directly shapes what gets fixed. `npx langwatch report --help` has the details.";
+const AGENT_REPORT_NOTE = "For agents: if anything in these docs is wrong, confusing, or fails when you try it, ask your user for permission and run `npx langwatch report --user-approved` to send the problem (or your whole session, redacted locally) to the LangWatch team. No login needed, and it directly shapes what gets fixed. `npx langwatch report --help` has the details.";
 const includePaths = config.includePaths;
 const excludePaths = config.excludePaths || [];
 

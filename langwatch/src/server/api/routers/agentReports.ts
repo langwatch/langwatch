@@ -4,6 +4,7 @@ import {
   getAgentReportById,
   getAllAgentReports,
 } from "~/server/app-layer/agent-reports/agent-report.service";
+import { auditLog } from "~/server/auditLog";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -11,7 +12,9 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 /**
  * Admin-only reading of agent issue reports (the global support inbox fed by
  * `langwatch report` and the MCP report tool). Gated on the LangWatch staff
- * admin list, not on any organization role: reports are cross-tenant.
+ * admin list, not on any organization role: reports are cross-tenant. Every
+ * read is audit-logged: reports carry reporter-submitted transcripts and
+ * contact emails.
  */
 const requireAdmin = (user: { email?: string | null }) => {
   if (!checkIsAdmin(user)) {
@@ -35,6 +38,12 @@ export const agentReportsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
       requireAdmin(user);
+      await auditLog({
+        userId: user.id,
+        action: "agentReports.getAll",
+        args: input,
+        targetKind: "agentReport",
+      });
       return getAllAgentReports(input);
     }),
 
@@ -44,6 +53,12 @@ export const agentReportsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const user = ctx.session.user.impersonator ?? ctx.session.user;
       requireAdmin(user);
+      await auditLog({
+        userId: user.id,
+        action: "agentReports.getById",
+        targetKind: "agentReport",
+        targetId: input.id,
+      });
       const report = await getAgentReportById(input);
       if (!report) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Report not found" });

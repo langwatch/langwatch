@@ -63,11 +63,12 @@ describe("agent reports intake", () => {
   });
 
   describe("when a summary report arrives without credentials", () => {
-    it("stores it and returns the new report id", async () => {
+    it("stores it under a prefixed id and returns it", async () => {
       const response = await postReport(baseReport());
       expect(response.status).toBe(201);
       const { id } = (await response.json()) as { id: string };
       trackReport(id);
+      expect(id).toMatch(/^agentreport_/);
 
       const stored = await prisma.agentReport.findUnique({ where: { id } });
       expect(stored?.title).toBe(`${testNamespace} scenario create 500`);
@@ -75,6 +76,31 @@ describe("agent reports intake", () => {
       expect(stored?.kind).toBe("summary");
       expect(stored?.agent).toBe("claude-code");
       expect(stored?.linkedProjectId).toBeNull();
+    });
+  });
+
+  describe("when a raw submission carries secrets, bypassing client redaction", () => {
+    it("stores every field redacted", async () => {
+      const key = "sk-proj-abcdefghijklmnopqrstuvwxyz123456";
+      const response = await postReport({
+        source: "cli",
+        kind: "full_session",
+        title: `${testNamespace} leaked ${key}`,
+        summary: `the key ${key} appeared in the summary`,
+        sessionData: JSON.stringify({ content: `curl -H 'Bearer ${key}'` }),
+        metadata: { command: `langwatch login --api-key ${key}` },
+      });
+      expect(response.status).toBe(201);
+      const { id } = (await response.json()) as { id: string };
+      trackReport(id);
+
+      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      const wire = JSON.stringify(stored);
+      expect(wire).not.toContain(key);
+      expect(stored?.title).toContain("[SECRET]");
+      expect(stored?.summary).toContain("[SECRET]");
+      expect(stored?.sessionData).toContain("[SECRET]");
+      expect(JSON.stringify(stored?.metadata)).toContain("[SECRET]");
     });
   });
 

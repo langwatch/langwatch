@@ -82,6 +82,17 @@ describe("report_issue", () => {
     });
   });
 
+  describe("when the title itself includes a secret", () => {
+    it("redacts it before sending", async () => {
+      await handleReportIssue({
+        user_approved: true,
+        title: "X-Api-Key sk-proj-abcdefghijklmnopqrstuvwxyz123456 rejected",
+        summary: "the key was rejected",
+      });
+      expect(received[0]?.body.title).toBe("X-Api-Key [SECRET] rejected");
+    });
+  });
+
   describe("when session content includes secrets", () => {
     it("redacts them locally before sending", async () => {
       await handleReportIssue({

@@ -139,10 +139,13 @@ export const reportCommand = async (
     sessionTruncated = truncated.truncated;
   }
 
-  const title =
+  const rawTitle =
     options.title?.trim() ??
     summary?.trim().split("\n")[0]?.slice(0, 200) ??
     "Session report";
+  const titleResult = redactReportText({ text: rawTitle, envValues });
+  redactedCount += titleResult.redactedCount;
+  const title = titleResult.text;
 
   const payload = {
     source: "cli" as const,

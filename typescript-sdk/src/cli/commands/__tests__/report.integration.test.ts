@@ -98,6 +98,16 @@ describe("langwatch report", () => {
       expect((result as { data: { id: string } }).data.id).toBe("report-123");
     });
 
+    it("redacts secrets that leak into the title", async () => {
+      await reportCommand({
+        userApproved: true,
+        endpoint,
+        title: "auth with sk-proj-abcdefghijklmnopqrstuvwxyz123456 failed",
+        summary: "the key was rejected",
+      });
+      expect(received[0]?.body.title).toBe("auth with [SECRET] failed");
+    });
+
     it("attaches the API key when one is configured", async () => {
       process.env.LANGWATCH_API_KEY = "sk-lw-test-key-abcdef123456789012";
       await reportCommand({

@@ -122,7 +122,7 @@ Feature: CLI Agent Issue Reports
     When I run "langwatch report --session ./transcript.jsonl --dry-run" without --user-approved
     Then the redacted payload is printed to stdout
     And nothing is delivered to the backend
-    So the agent can show the user the exact payload before asking for permission
+    And the agent can show the user the exact payload before asking for permission
 
   # --- error handling ---
 

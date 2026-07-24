@@ -1,4 +1,6 @@
+import { generate } from "@langwatch/ksuid";
 import type { AgentReport, Prisma, PrismaClient } from "@prisma/client";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
  * Storage for agent issue reports (`langwatch report` / the MCP report tool).
@@ -13,7 +15,12 @@ export class AgentReportRepository {
   }: {
     data: Prisma.AgentReportCreateInput;
   }): Promise<AgentReport> {
-    return this.prisma.agentReport.create({ data });
+    return this.prisma.agentReport.create({
+      data: {
+        id: generate(KSUID_RESOURCES.AGENT_REPORT).toString(),
+        ...data,
+      },
+    });
   }
 
   /**

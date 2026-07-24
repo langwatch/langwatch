@@ -1,7 +1,7 @@
 -- CreateTable
 CREATE TABLE "AgentReport" (
     "id" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "source" TEXT NOT NULL,
     "kind" TEXT NOT NULL,
     "title" TEXT NOT NULL,

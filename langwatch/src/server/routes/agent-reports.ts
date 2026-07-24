@@ -19,7 +19,9 @@ import { submitAgentReport } from "~/server/app-layer/agent-reports/agent-report
 
 const secured = createServiceApp({ basePath: "/api/agent-reports" });
 
-const MAX_BODY_BYTES = 10 * 1024 * 1024;
+// Headroom over the 9M-char sessionData cap: JSON escaping can inflate the
+// same characters past 10MB, and the zod 400 is the better error than a 413.
+const MAX_BODY_BYTES = 12 * 1024 * 1024;
 
 const agentReportBodySchema = z
   .object({

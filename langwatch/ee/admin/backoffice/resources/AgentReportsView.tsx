@@ -74,63 +74,10 @@ export default function AgentReportsView() {
           onPageChange: setPage,
         }}
       >
-        <Table.Root size="sm" variant="line">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Received</Table.ColumnHeader>
-              <Table.ColumnHeader>Title</Table.ColumnHeader>
-              <Table.ColumnHeader>Kind</Table.ColumnHeader>
-              <Table.ColumnHeader>Agent</Table.ColumnHeader>
-              <Table.ColumnHeader>Source</Table.ColumnHeader>
-              <Table.ColumnHeader>Project</Table.ColumnHeader>
-              <Table.ColumnHeader>Contact</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {list.data?.reports.length === 0 && (
-              <Table.Row>
-                <Table.Cell colSpan={7}>
-                  <Text color="fg.muted" paddingY={6} textAlign="center">
-                    No reports yet. They arrive here when a customer's coding
-                    agent runs `langwatch report`.
-                  </Text>
-                </Table.Cell>
-              </Table.Row>
-            )}
-            {list.data?.reports.map((report) => (
-              <Table.Row
-                key={report.id}
-                cursor="pointer"
-                _hover={{ backgroundColor: "bg.muted" }}
-                onClick={() => setOpenReport(report.id)}
-              >
-                <Table.Cell whiteSpace="nowrap">
-                  {formatDateTime(report.createdAt)}
-                </Table.Cell>
-                <Table.Cell maxWidth="320px">
-                  <Text truncate fontWeight="medium">
-                    {report.title}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <Badge
-                    colorPalette={
-                      report.kind === "full_session" ? "purple" : "gray"
-                    }
-                  >
-                    {kindLabel[report.kind] ?? report.kind}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell>{report.agent ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>{report.source}</Table.Cell>
-                <Table.Cell>
-                  {report.linkedProjectId ?? <EmptyCell />}
-                </Table.Cell>
-                <Table.Cell>{report.contactEmail ?? <EmptyCell />}</Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
+        <AgentReportsTable
+          reports={list.data?.reports}
+          onOpen={setOpenReport}
+        />
       </BackofficeTable>
 
       <AgentReportDrawer
@@ -138,6 +85,94 @@ export default function AgentReportsView() {
         onClose={() => setOpenReport(null)}
       />
     </>
+  );
+}
+
+interface AgentReportRow {
+  id: string;
+  createdAt: string | Date;
+  source: string;
+  kind: string;
+  title: string;
+  agent: string | null;
+  linkedProjectId: string | null;
+  contactEmail: string | null;
+}
+
+function AgentReportsTable({
+  reports,
+  onOpen,
+}: {
+  reports: AgentReportRow[] | undefined;
+  onOpen: (reportId: string) => void;
+}) {
+  return (
+    <Table.Root size="sm" variant="line">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Received</Table.ColumnHeader>
+          <Table.ColumnHeader>Title</Table.ColumnHeader>
+          <Table.ColumnHeader>Kind</Table.ColumnHeader>
+          <Table.ColumnHeader>Agent</Table.ColumnHeader>
+          <Table.ColumnHeader>Source</Table.ColumnHeader>
+          <Table.ColumnHeader>Project</Table.ColumnHeader>
+          <Table.ColumnHeader>Contact</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {reports?.length === 0 && (
+          <Table.Row>
+            <Table.Cell colSpan={7}>
+              <Text color="fg.muted" paddingY={6} textAlign="center">
+                No reports yet. They arrive here when a customer's coding agent
+                runs `langwatch report`.
+              </Text>
+            </Table.Cell>
+          </Table.Row>
+        )}
+        {reports?.map((report) => (
+          <Table.Row
+            key={report.id}
+            cursor="pointer"
+            _hover={{ backgroundColor: "bg.muted" }}
+            onClick={() => onOpen(report.id)}
+          >
+            <Table.Cell whiteSpace="nowrap">
+              {formatDateTime(report.createdAt)}
+            </Table.Cell>
+            <Table.Cell maxWidth="320px">
+              <Button
+                variant="plain"
+                size="sm"
+                paddingX={0}
+                height="auto"
+                fontWeight="medium"
+                maxWidth="full"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpen(report.id);
+                }}
+              >
+                <Text truncate>{report.title}</Text>
+              </Button>
+            </Table.Cell>
+            <Table.Cell>
+              <Badge
+                colorPalette={
+                  report.kind === "full_session" ? "purple" : "gray"
+                }
+              >
+                {kindLabel[report.kind] ?? report.kind}
+              </Badge>
+            </Table.Cell>
+            <Table.Cell>{report.agent ?? <EmptyCell />}</Table.Cell>
+            <Table.Cell>{report.source}</Table.Cell>
+            <Table.Cell>{report.linkedProjectId ?? <EmptyCell />}</Table.Cell>
+            <Table.Cell>{report.contactEmail ?? <EmptyCell />}</Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </Table.Root>
   );
 }
 

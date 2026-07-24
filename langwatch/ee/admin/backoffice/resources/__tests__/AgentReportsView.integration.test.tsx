@@ -106,7 +106,7 @@ describe("AgentReportsView", () => {
     };
   });
 
-  describe("when reports exist", () => {
+  describe("given stored reports", () => {
     it("lists them with date, kind, agent, project, and contact", () => {
       renderView();
       expect(
@@ -121,7 +121,7 @@ describe("AgentReportsView", () => {
     });
   });
 
-  describe("when a report row is clicked", () => {
+  describe("when the report title is activated", () => {
     it("deep-links the report id into the URL", () => {
       renderView();
       fireEvent.click(screen.getByText("agent stuck instrumenting python"));
@@ -133,7 +133,7 @@ describe("AgentReportsView", () => {
     });
   });
 
-  describe("when the URL carries a report id", () => {
+  describe("given a report id in the URL", () => {
     it("opens the drawer with the full summary and redacted transcript", async () => {
       routerState.query = { report: "rep-1" };
       renderView();
@@ -147,7 +147,7 @@ describe("AgentReportsView", () => {
     });
   });
 
-  describe("when there are no reports", () => {
+  describe("given no stored reports", () => {
     it("explains where reports come from", () => {
       listState.current = {
         data: { reports: [], total: 0 },
