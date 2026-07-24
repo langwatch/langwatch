@@ -151,6 +151,46 @@ three shapes, and each has a standard fix:
 Only when this is a DAG can either side become a package. Attempting the split
 before it is the failure mode that makes a large refactor unmergeable.
 
+**Measured result (2026-07-23, this branch):** reverse edges cut from **129
+files to 49**, of which only **23 are production code** — the rest are the two
+composition-root files (`pipelineRegistry.ts`, `replay/replayPreset.ts`, which
+by convention may name app-layer concretes until Phase 3 moves the root out)
+and integration tests, which legitimately construct real implementations.
+
+What did it, in order of leverage:
+
+1. **Deps-first triage, move before port.** Six "app-layer services" turned
+   out to be mis-layered trace-processing logic with zero app-layer imports of
+   their own — `canonicalisation/` (58 files), `trace-io-extraction`,
+   `span-normalization`, `span-pii-redaction`, `trace-read-derivation`,
+   `claude-code-log-to-span`, `lean-for-projection`. Relocating them removes
+   the edge outright and flips their outside consumers to the allowed
+   direction. Check dependencies before designing an abstraction: two of these
+   had a port half-built before the check showed a move was strictly better.
+2. **Ports for the genuinely shared** — Project, Broadcast, EvaluationCost,
+   BlobStore, Monitor, Trigger, EvaluationExecution, EvaluationRun — declared
+   in `domain/` (or `event-sourcing/ports/` where they reference pipeline
+   schemas), satisfied structurally, no composition-root changes.
+3. **Pure leaves down into `domain/`** (trace/evaluation types, span-attribute
+   vocabulary, `ProcessRole`).
+
+The remaining 23-file production tail is enumerable by category: five
+`.store.ts` adapters typed against app-layer repositories, the automations
+dispatch/settlement dep structs, `executeEvaluation.command`'s azure env
+helper, and `eventSourcing.ts`/`projectionRouter.ts` on `roleRunsWorkers`
+(deliberate — the domain owns the `ProcessRole` vocabulary, the app owns the
+policy). Each is a small, independent inversion; none blocks starting Phase 3
+on a domain whose edges are already clean.
+
+Method notes that repaid themselves every time (see also the trap list in the
+commit history): normalize a moving file's climbing relative imports to
+absolute `~/server/...` **before** the move and typecheck to prove the
+normalization inert; then move; then let **both** TS programs enumerate the
+stragglers — `typecheck:tests` catches `__tests__`-dir imports the app program
+cannot see, and did so on five separate occasions. Never blanket-rename a
+service symbol: tests that construct the concrete class keep the old import
+path and break silently otherwise.
+
 ### Phase 3 — extract one domain at a time
 
 Per domain (traces, simulations, experiments, langy, automations), in this
