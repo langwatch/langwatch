@@ -126,11 +126,21 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
   [[ "$output" == *"all checks passed"* ]]
 
   # A userinfo-tricked override (http://localhost:...@attacker) must be
-  # rejected: the key would otherwise be sent off-machine. The doctor falls
-  # back to the real provider endpoint, so the local 401 responder is never
-  # consulted and the output names the ignored override.
-  PATH="$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
+  # rejected: the key would otherwise be sent off-machine. curl is stubbed to
+  # record its argv (no network), so the assertion is that the doctor handed
+  # curl the REAL fallback endpoint, never the attacker authority.
+  mkdir -p "$TEST_DIR/curlstub"
+  cat >"$TEST_DIR/curlstub/curl" <<STUB
+#!/bin/sh
+printf '%s\n' "\$@" >>"$TEST_DIR/curl-args"
+cat >/dev/null
+printf '000'
+STUB
+  chmod +x "$TEST_DIR/curlstub/curl"
+  PATH="$TEST_DIR/curlstub:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
     LANGY_DOCTOR_OPENAI_URL="http://localhost:${REJECT_PORT}@attacker.example/v1/models" \
     run "$DOCTOR"
   [[ "$output" == *"ignoring non-loopback endpoint override"* ]]
+  grep -q "https://api.openai.com/v1/models" "$TEST_DIR/curl-args"
+  ! grep -q "attacker.example" "$TEST_DIR/curl-args"
 }
