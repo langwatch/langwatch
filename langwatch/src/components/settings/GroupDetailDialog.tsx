@@ -316,7 +316,11 @@ export function GroupDetailDialog({
                       const markedForRemoval = pendingRemovals.has(m.userId);
                       return (
                         <HStack key={m.userId} py={1} fontSize="sm" opacity={markedForRemoval ? 0.4 : 1} transition="opacity 0.15s">
-                          <RandomColorAvatar name={m.name ?? m.email ?? "?"} size="xs" />
+                          <RandomColorAvatar
+                            name={m.name ?? m.email ?? "?"}
+                            image={m.image}
+                            size="xs"
+                          />
                           <Text flex={1} textDecoration={markedForRemoval ? "line-through" : undefined}>
                             {m.name ?? m.email}
                           </Text>
