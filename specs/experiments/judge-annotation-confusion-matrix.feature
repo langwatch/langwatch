@@ -65,6 +65,56 @@ Feature: Judge-vs-annotation confusion matrix
     Then I see "Accuracy: 75%", "Precision: 83%", "Recall: 71%", "F1: 77%"
     # (5+4)/12=75%, 5/(5+1)=83%, 5/(5+2)=71%, 2*.83*.71/(.83+.71)=77%
 
+  Scenario: A judge that only matches the base rate scores zero agreement
+    Given 10 annotated rows where the reviewer marked 9 as thumbs up
+    And the judge answered "pass" on every one of them
+    When I open the expanded confusion matrix
+    Then the accuracy reads 90%
+    But the chance-corrected agreement reads 0.00
+    And the agreement is described as "none"
+    # This is the whole reason a second number exists. A judge that has
+    # learned nothing scores 90% on this set purely off the base rate;
+    # accuracy alone would call that a success.
+
+  Scenario: Accuracy is reported with the range it could plausibly be
+    Given 8 annotated rows of which the judge got 6 right
+    When I open the expanded confusion matrix
+    Then the accuracy reads 75%
+    And it is accompanied by a 95% interval of roughly 41% to 93%
+    And a warning explains the sample cannot yet separate a good judge from a bad one
+    # A point estimate off 8 rows reads far more settled than it is. The
+    # warning keys off the WIDTH of that interval, not a row count — the
+    # chart already refuses to mount below its own row floor, so a
+    # count-based warning could never fire.
+
+  Scenario: Agreement is shown against the level chance alone would reach
+    Given any matrix with enough annotated rows to mount
+    When I open the expanded confusion matrix
+    Then I see the observed accuracy plotted against the chance-agreement floor
+    And the confidence interval is drawn at the same scale
+    # Drawn, not just tabulated: a base-rate judge should be visibly
+    # swallowed by the chance floor, and a thin sample should read as a
+    # wide smear rather than a crisp number.
+
+  Scenario: Undefined agreement is reported as undefined, not as perfect
+    Given every annotated row was marked thumbs up by the reviewer
+    And the judge answered "pass" on every one of them
+    When I open the expanded confusion matrix
+    Then the chance-corrected agreement reads "—"
+    And it is described as undefined rather than as perfect agreement
+    # Chance agreement is already total here, so the correction divides by
+    # zero. Reporting 1.00 would dress a degenerate case up as a triumph.
+
+  Scenario: The reader is told the annotated rows may not be representative
+    Given the annotated rows were chosen by reviewers browsing for problems
+    When I open the expanded confusion matrix
+    Then I am told the figures describe only the annotated rows
+    And I am warned they may not generalise to the full run
+    # The sharpest limitation of this whole chart. LangWatch annotations are
+    # left ad hoc — reviewers thumbs-down what catches their eye — so the
+    # annotated set skews toward suspicious rows. No confidence interval
+    # fixes a biased sample; the honest move is to say so on the surface.
+
   Scenario: Clicking a matrix cell drills into the underlying rows
     Given the expanded confusion matrix is showing
     When I click the "False Positive" cell

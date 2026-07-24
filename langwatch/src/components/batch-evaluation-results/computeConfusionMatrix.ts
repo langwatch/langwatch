@@ -15,6 +15,13 @@ export type JudgeAnnotationPair = {
   predicted: boolean;
   /** The human reviewer's ground truth for the same target output. */
   actual: boolean;
+  /**
+   * What the reviewer wrote, when they wrote anything. Carried purely so
+   * the drill-down can show it: on a disagreement cell the reviewer's own
+   * words are the explanation of why the judge was wrong, which is the
+   * entire reason for drilling in. Never used in the arithmetic.
+   */
+  comment?: string;
 };
 
 export type ConfusionMatrixCounts = {

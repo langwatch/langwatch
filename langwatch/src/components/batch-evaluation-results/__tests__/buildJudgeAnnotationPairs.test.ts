@@ -43,11 +43,13 @@ const makeRow = ({
 const makeAnnotation = (
   traceId: string,
   isThumbsUp: boolean | null,
+  comment?: string | null,
 ): AnnotationByTrace =>
   ({
     id: `annotation-${traceId}-${Math.random()}`,
     traceId,
     isThumbsUp,
+    comment: comment ?? null,
   }) as AnnotationByTrace;
 
 const toMap = (
@@ -226,6 +228,76 @@ describe("buildJudgeAnnotationPairs", () => {
       expect(result.annotatedRows).toBe(3);
       expect(result.conflictingRows).toBe(1);
       expect(result.pairs).toHaveLength(2);
+    });
+  });
+
+  describe("when the reviewer left a comment", () => {
+    // On a disagreement cell the reviewer's own words are the explanation of
+    // why the judge was wrong, so the pair has to carry them through to the
+    // drill-down.
+    it("carries the comment onto the pair", () => {
+      const rows = [makeRow({ index: 0, traceId: "trace-a", passed: true })];
+      const annotations = toMap([
+        makeAnnotation("trace-a", false, "Cancelled the wrong subscription."),
+      ]);
+
+      const result = buildJudgeAnnotationPairs(
+        rows,
+        TARGET_ID,
+        EVALUATOR_ID,
+        annotations,
+      );
+
+      expect(result.pairs[0]?.comment).toBe(
+        "Cancelled the wrong subscription.",
+      );
+    });
+
+    it("omits the comment entirely when the reviewer left none", () => {
+      const rows = [makeRow({ index: 0, traceId: "trace-a", passed: true })];
+      const annotations = toMap([makeAnnotation("trace-a", true)]);
+
+      const result = buildJudgeAnnotationPairs(
+        rows,
+        TARGET_ID,
+        EVALUATOR_ID,
+        annotations,
+      );
+
+      expect(result.pairs[0]).not.toHaveProperty("comment");
+    });
+
+    it("ignores a whitespace-only comment", () => {
+      const rows = [makeRow({ index: 0, traceId: "trace-a", passed: true })];
+      const annotations = toMap([makeAnnotation("trace-a", true, "   ")]);
+
+      const result = buildJudgeAnnotationPairs(
+        rows,
+        TARGET_ID,
+        EVALUATOR_ID,
+        annotations,
+      );
+
+      expect(result.pairs[0]).not.toHaveProperty("comment");
+    });
+
+    it("takes the first non-empty comment when several reviewers agreed", () => {
+      const rows = [makeRow({ index: 0, traceId: "trace-a", passed: true })];
+      const annotations = toMap([
+        makeAnnotation("trace-a", true, ""),
+        makeAnnotation("trace-a", true, "Matches the expected refund flow."),
+      ]);
+
+      const result = buildJudgeAnnotationPairs(
+        rows,
+        TARGET_ID,
+        EVALUATOR_ID,
+        annotations,
+      );
+
+      expect(result.pairs[0]?.comment).toBe(
+        "Matches the expected refund flow.",
+      );
     });
   });
 });

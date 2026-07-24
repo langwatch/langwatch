@@ -65,10 +65,16 @@ export const buildJudgeAnnotationPairs = (
       continue;
     }
 
+    // First non-empty comment among the (now known to agree) reviewers.
+    const comment = annotations
+      .map((annotation) => annotation.comment?.trim())
+      .find((value): value is string => !!value);
+
     pairs.push({
       rowIndex: row.index,
       predicted: evaluatorResult.passed,
       actual: verdicts[0]!,
+      ...(comment ? { comment } : {}),
     });
   }
 

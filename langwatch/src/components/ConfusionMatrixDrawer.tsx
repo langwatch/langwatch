@@ -65,6 +65,12 @@ const QUADRANT_LABELS: Record<Quadrant, string> = {
  */
 const UNINFORMATIVE_INTERVAL_WIDTH = 0.3;
 
+// Module-level so the "no data" path hands the same array identity to every
+// useMemo on every render — a fresh `[]` here cascades through the memo chain
+// and re-renders the subtree for nothing.
+const EMPTY_PAIRS: JudgeAnnotationPair[] = [];
+const EMPTY_ROWS: BatchResultRow[] = [];
+
 const formatPercent = (value: number | null): string =>
   value === null ? "—" : `${Math.round(value * 100)}%`;
 
@@ -80,7 +86,19 @@ export function ConfusionMatrixDrawer({
     null,
   );
 
-  const metrics = useMemo(() => computeConfusionMatrix(pairs), [pairs]);
+  // This drawer is URL-routed, so `?drawer.open=confusionMatrix&...` survives
+  // a reload or a pasted link — but pairs/rows/coverage travel in
+  // complexProps, a module-level store that does not. On that path the props
+  // arrive undefined, so normalise here and explain the situation below
+  // rather than throwing inside computeConfusionMatrix.
+  const hasData = Array.isArray(pairs) && Array.isArray(rows) && !!coverage;
+  const safePairs = hasData ? pairs : EMPTY_PAIRS;
+  const safeRows = hasData ? rows : EMPTY_ROWS;
+
+  const metrics = useMemo(
+    () => computeConfusionMatrix(safePairs),
+    [safePairs],
+  );
   const total = Math.max(1, metrics.total);
 
   const isUninformative =
@@ -89,29 +107,43 @@ export function ConfusionMatrixDrawer({
       UNINFORMATIVE_INTERVAL_WIDTH;
 
   const rowsByIndex = useMemo(
-    () => new Map(rows.map((row) => [row.index, row])),
-    [rows],
+    () => new Map(safeRows.map((row) => [row.index, row])),
+    [safeRows],
   );
 
   const quadrantPairs = useMemo(() => {
-    if (!selectedQuadrant) return [];
-    return pairs.filter((pair) => {
+    if (!selectedQuadrant) return EMPTY_PAIRS;
+    return safePairs.filter((pair) => {
       if (selectedQuadrant === "truePositive") return pair.predicted && pair.actual;
       if (selectedQuadrant === "falsePositive") return pair.predicted && !pair.actual;
       if (selectedQuadrant === "falseNegative") return !pair.predicted && pair.actual;
       return !pair.predicted && !pair.actual;
     });
-  }, [selectedQuadrant, pairs]);
+  }, [selectedQuadrant, safePairs]);
 
   return (
     <Drawer.Root open={true} placement="end" size="lg" onOpenChange={closeDrawer}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Text fontWeight="semibold" fontSize="lg">
-            {evaluatorName} — agreement with reviewers
+            {evaluatorName ?? "Judge"} — agreement with reviewers
           </Text>
           <Drawer.CloseTrigger />
         </Drawer.Header>
+        {!hasData ? (
+          <Drawer.Body>
+            <Box bg="bg.muted" borderRadius="md" padding={4}>
+              <Text fontSize="sm" fontWeight="semibold" marginBottom={1}>
+                Nothing to show yet
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                This view is built from the run currently loaded on the results
+                page, so it cannot be restored from a link on its own. Open the
+                agreement chart from the results page and expand it again.
+              </Text>
+            </Box>
+          </Drawer.Body>
+        ) : (
         <Drawer.Body>
           <VStack align="stretch" gap={5} paddingBottom={6}>
             <Box>
@@ -125,6 +157,17 @@ export function ConfusionMatrixDrawer({
                       coverage.conflictingRows === 1 ? "" : "s"
                     } excluded for conflicting reviewer annotations`
                   : ""}
+              </Text>
+              {/* The sharpest limitation of this chart, and the one no
+                  confidence interval can fix. Reviewers annotate what catches
+                  their eye, so the annotated set skews toward rows that
+                  already looked wrong. Every figure below describes THAT set,
+                  not the run — say so rather than letting the statistics imply
+                  a rigour the sample doesn't have. */}
+              <Text fontSize="xs" color="fg.muted" marginTop={1}>
+                Figures describe the annotated rows only. If those were picked
+                by browsing for problems rather than sampled at random, they
+                will not reflect the full run.
               </Text>
             </Box>
 
@@ -295,7 +338,7 @@ export function ConfusionMatrixDrawer({
                   </Text>
                 ) : (
                   <VStack align="stretch" gap={2}>
-                    {quadrantPairs.map(({ rowIndex }) => {
+                    {quadrantPairs.map(({ rowIndex, comment }) => {
                       const row = rowsByIndex.get(rowIndex);
                       const target = row?.targets[targetId];
                       // Same formatter the results table uses, so a row reads
@@ -312,6 +355,21 @@ export function ConfusionMatrixDrawer({
                           <Text fontSize="sm" lineClamp={3}>
                             {outputText}
                           </Text>
+                          {/* On a disagreement cell this is the whole point of
+                              drilling in — the reviewer already wrote down why
+                              the judge was wrong. */}
+                          {comment ? (
+                            <Text
+                              fontSize="xs"
+                              color="fg.muted"
+                              marginTop={1}
+                              borderInlineStartWidth="2px"
+                              borderColor="border.emphasized"
+                              paddingInlineStart={2}
+                            >
+                              Reviewer: {comment}
+                            </Text>
+                          ) : null}
                         </Box>
                       );
                     })}
@@ -321,6 +379,7 @@ export function ConfusionMatrixDrawer({
             ) : null}
           </VStack>
         </Drawer.Body>
+        )}
       </Drawer.Content>
     </Drawer.Root>
   );
