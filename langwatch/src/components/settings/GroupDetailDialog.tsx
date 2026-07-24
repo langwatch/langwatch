@@ -154,11 +154,15 @@ export function GroupDetailDialog({
       return next;
     });
 
-  const stageMemberAdd = (
-    userId: string,
-    label: string,
-    image: string | null,
-  ) => {
+  const stageMemberAdd = ({
+    userId,
+    label,
+    image,
+  }: {
+    userId: string;
+    label: string;
+    image: string | null;
+  }) => {
     setPendingAdditions((prev) => [...prev, { userId, label, image }]);
     setAddMemberId("");
     setMemberSearch("");
@@ -404,7 +408,12 @@ export function GroupDetailDialog({
                         disabled={!addMemberId}
                         onClick={() => {
                           const item = allAvailable.find((a) => a.value === addMemberId);
-                          if (item) stageMemberAdd(item.value, item.label, item.image);
+                          if (item)
+                            stageMemberAdd({
+                              userId: item.value,
+                              label: item.label,
+                              image: item.image,
+                            });
                         }}
                       >
                         Add

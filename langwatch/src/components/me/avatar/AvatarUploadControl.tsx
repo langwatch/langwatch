@@ -27,6 +27,7 @@ function AvatarEditButton({
       role="button"
       tabIndex={isDisabled ? -1 : 0}
       aria-label={label}
+      aria-disabled={isDisabled}
       cursor={isDisabled ? "default" : "pointer"}
       transition="opacity 0.15s"
       _hover={isDisabled ? undefined : { opacity: 0.85 }}

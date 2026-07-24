@@ -22,7 +22,7 @@ const MEMBER_USER_SELECT = {
   name: true,
   email: true,
   image: true,
-} satisfies Prisma.UserSelect;
+} as const satisfies Prisma.UserSelect;
 
 const principalInOrganizationWhere = (
   organizationId: string,
