@@ -160,10 +160,22 @@ check_key() {
     warn "$name REJECTED by the provider (HTTP $code), turns on this provider will fail"
   fi
 }
-# The provider endpoints are overridable so tests (and proxy setups) can
-# point the checks somewhere reachable.
-check_key OPENAI_API_KEY "${LANGY_DOCTOR_OPENAI_URL:-https://api.openai.com/v1/models}" "Authorization: Bearer "
-check_key ANTHROPIC_API_KEY "${LANGY_DOCTOR_ANTHROPIC_URL:-https://api.anthropic.com/v1/models}" "x-api-key: " "anthropic-version: 2023-06-01"
+# The provider endpoints are overridable for tests, but only to LOOPBACK
+# URLs: these checks send real credentials, and an inherited env var must not
+# be able to redirect them off-machine. Proxy routing belongs to HTTPS_PROXY.
+loopback_or() {
+  local override="$1" fallback="$2"
+  case "$override" in
+    http://127.0.0.1:*|http://127.0.0.1/*|http://localhost:*|http://localhost/*)
+      printf '%s' "$override" ;;
+    "") printf '%s' "$fallback" ;;
+    *)
+      warn "ignoring non-loopback endpoint override ($override); using the real provider endpoint" >&2
+      printf '%s' "$fallback" ;;
+  esac
+}
+check_key OPENAI_API_KEY "$(loopback_or "${LANGY_DOCTOR_OPENAI_URL:-}" "https://api.openai.com/v1/models")" "Authorization: Bearer "
+check_key ANTHROPIC_API_KEY "$(loopback_or "${LANGY_DOCTOR_ANTHROPIC_URL:-}" "https://api.anthropic.com/v1/models")" "x-api-key: " "anthropic-version: 2023-06-01"
 
 # --- verdict ---------------------------------------------------------------
 echo
