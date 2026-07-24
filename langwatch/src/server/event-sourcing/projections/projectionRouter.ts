@@ -39,6 +39,7 @@ import type { EventStoreReadContext } from "../stores/eventStore.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import { EventUtils } from "../utils/event.utils";
 import { isComponentDisabled } from "../utils/killSwitch";
+import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
 import { FoldProjectionExecutor } from "./foldProjectionExecutor";
 import type { MapProjectionDefinition } from "./mapProjection.types";
@@ -154,7 +155,44 @@ export class ProjectionRouter<
         { projectionName: projection.name },
       );
     }
+    this.assertCoalesceWithinAppliedIdCap(projection);
     this.foldProjections.set(projection.name, projection);
+  }
+
+  /**
+   * Rejects the one config combination that silently breaks redelivery dedup.
+   *
+   * A store that exposes `getWithApplied` carries a durable (ClickHouse)
+   * applied-event-id watermark that is NOT trimmed, while its Redis cache trims
+   * the applied set to `MAX_APPLIED_EVENT_IDS`. If such a fold coalesces a batch
+   * at or above that cap, a single fresh batch can leave ids that survive only
+   * in ClickHouse: a cache-hit retry deduping against the trimmed Redis set
+   * re-applies them and double-counts. Cache-only folds trim identically in both
+   * places and have no such window, so the guard binds only durable-watermark
+   * folds. The effective batch mirrors `initializeFoldQueues`' resolution
+   * (`coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH`).
+   */
+  private assertCoalesceWithinAppliedIdCap(
+    projection: FoldProjectionDefinition<any, EventType>,
+  ): void {
+    const hasDurableWatermark =
+      typeof (projection.store as { getWithApplied?: unknown })
+        .getWithApplied === "function";
+    if (!hasDurableWatermark) return;
+
+    const effectiveBatch =
+      projection.options?.coalesceMaxBatch ?? DEFAULT_FOLD_COALESCE_MAX_BATCH;
+    if (effectiveBatch < MAX_APPLIED_EVENT_IDS) return;
+
+    throw new ConfigurationError(
+      "ProjectionRouter",
+      `Fold projection "${projection.name}" coalesces up to ${effectiveBatch} events but the applied-id cap is ${MAX_APPLIED_EVENT_IDS}: a coalesced batch larger than the applied-id cap breaks redelivery dedup for durable-watermark folds.`,
+      {
+        projectionName: projection.name,
+        coalesceMaxBatch: effectiveBatch,
+        maxAppliedEventIds: MAX_APPLIED_EVENT_IDS,
+      },
+    );
   }
 
   registerStateProjection(
