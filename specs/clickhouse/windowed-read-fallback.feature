@@ -9,7 +9,7 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
   triggered by a routine miss is cheap while a flood of them at once is the load
   that stalls every other reader. So widening is a deliberate, declared choice,
   and — this is the point — it is never silent: every windowed read is counted,
-  and a widen is counted as a widen. (ADR-067.)
+  and a widen is counted as a widen. (ADR-068.)
 
   Background:
     Given a read scoped to a recent-time window with a declared fallback
@@ -54,7 +54,7 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
     Then it is recorded as having run without a window
     And the record names the table it ran against, like every other windowed read
 
-  # ADR-067, point 3 — the rate-limited fallback ships as a separate change,
+  # ADR-068, point 3 — the rate-limited fallback ships as a separate change,
   # after the outcome counts above establish a per-table baseline for its limit.
   @planned
   # Not yet implemented as of 2026-07-24 — this change measures the fallback so

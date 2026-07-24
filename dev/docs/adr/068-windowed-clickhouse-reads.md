@@ -1,4 +1,4 @@
-# ADR-067: One windowed ClickHouse read with a measured fallback — `queryWindowed` on the resilient client
+# ADR-068: One windowed ClickHouse read with a measured fallback — `queryWindowed` on the resilient client
 
 **Date:** 2026-07-24
 

@@ -44,7 +44,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [057](./057-token-gated-trace-sharing.md)                         | Token-gated trace sharing (ShareLink)                                                       | Accepted                                          |
 | [059](./059-card-selection-is-deterministic.md)                    | Card selection is deterministic — the model supplies data, never presentation               | Proposed                                          |
 | [066](./066-projection-clickhouse-cached-store.md)                | `event_log` off the per-item hot path — read-back fold store + append coalescing            | Accepted                                          |
-| [067](./067-windowed-clickhouse-reads.md)                         | One windowed ClickHouse read with a measured fallback (`queryWindowed`)                      | Accepted                                          |
+| [068](./068-windowed-clickhouse-reads.md)                         | One windowed ClickHouse read with a measured fallback (`queryWindowed`)                      | Accepted                                          |
 
 ## When to Write an ADR
 
