@@ -204,6 +204,7 @@ describe("PromptService", () => {
     });
 
     describe("when local content differs from remote and no commit message is provided", () => {
+      /** @scenario "Syncing local changes without a commit message describes what changed" */
       it("describes the changed fields instead of a generic message", async () => {
         const existingPrompt = buildExistingPrompt();
 
