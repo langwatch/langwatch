@@ -1,5 +1,6 @@
-import { Avatar, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
+import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -70,11 +71,15 @@ export const AnnotationExpectedOutputs = ({
                       });
                     }}
                   >
-                    <Avatar.Root size="xs">
-                      <Tooltip content={annotation.user?.name ?? ""}>
-                        <Avatar.Fallback name={annotation.user?.name ?? ""} />
-                      </Tooltip>
-                    </Avatar.Root>
+                    <Tooltip content={annotation.user?.name ?? ""}>
+                      <Box display="inline-flex">
+                        <UserAvatar
+                          size="xs"
+                          name={annotation.user?.name ?? ""}
+                          image={annotation.user?.image}
+                        />
+                      </Box>
+                    </Tooltip>
 
                     {commentState.expectedOutputAction === "edit" &&
                     annotationId === annotation.id ? (
