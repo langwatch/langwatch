@@ -2,7 +2,7 @@ import atexit
 import os
 import logging
 import threading
-from typing import List, Optional, Sequence, ClassVar
+from typing import List, Optional, Sequence, ClassVar, Union
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
@@ -70,6 +70,7 @@ class Client(LangWatchClientProtocol):
         dict[opentelemetry.trace.TracerProvider, set[BaseInstrumentor]]
     ] = {}
     _prompts_path: ClassVar[Optional[str]] = None
+    _ssl_config_warned: ClassVar[bool] = False
 
     # Regular attributes for protocol compatibility
     base_attributes: BaseAttributes
@@ -399,6 +400,7 @@ class Client(LangWatchClientProtocol):
         cls._rest_api_client = None
         cls._prompts_path = None
         cls._registered_instrumentors.clear()
+        cls._ssl_config_warned = False
 
     @classmethod
     def reset_for_testing(cls) -> None:
@@ -713,11 +715,21 @@ class Client(LangWatchClientProtocol):
                 f"Configuring OTLP exporter with endpoint: {Client._endpoint_url}/api/otel/v1/traces"
             )
 
-        otlp_exporter = OTLPSpanExporter(
-            endpoint=f"{Client._endpoint_url}/api/otel/v1/traces",
-            headers=headers,
-            timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
-        )
+        ssl_verify_value = Client._get_ssl_config()
+        exporter_kwargs = {
+            "endpoint": f"{Client._endpoint_url}/api/otel/v1/traces",
+            "headers": headers,
+            "timeout": int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
+        }
+
+        if ssl_verify_value is not None:
+            # NOTE: Passing certificate_file=False requires
+            # opentelemetry-exporter-otlp-proto-http with the fix from
+            # https://github.com/open-telemetry/opentelemetry-python/pull/5379
+            # Without it, False is falsy and silently ignored by the exporter.
+            exporter_kwargs["certificate_file"] = ssl_verify_value  # type: ignore[assignment]
+
+        otlp_exporter = OTLPSpanExporter(**exporter_kwargs)
 
         # Wrap the exporter with conditional logic
         conditional_exporter = ConditionalSpanExporter(
@@ -750,6 +762,51 @@ class Client(LangWatchClientProtocol):
         )
 
         return Client._rest_api_client
+
+    @staticmethod
+    def _get_ssl_config() -> Optional[Union[bool, str]]:
+        """
+        Returns the value to pass as certificate_file to OTLPSpanExporter.
+
+        Reads from environment variables:
+        - LANGWATCH_SSL_VERIFY: set to 'false'/'0'/'no'/'disable' to skip verification
+        - LANGWATCH_CA_BUNDLE: path to a .pem/.crt CA bundle file
+
+        Returns:
+        - False: disables SSL verification
+        - str: path to custom CA bundle
+        - None: use default behavior (let OTEL exporter decide)
+
+        When LANGWATCH_CA_BUNDLE is set, it takes precedence over the native
+        OTEL variables (OTEL_EXPORTER_OTLP_CERTIFICATE /
+        OTEL_EXPORTER_OTLP_TRACES_CERTIFICATE).
+
+        NOTE: certificate_file=False requires opentelemetry-exporter-otlp-proto-http
+        with the fix from https://github.com/open-telemetry/opentelemetry-python/pull/5379
+        """
+        ssl_verify = os.getenv("LANGWATCH_SSL_VERIFY", "true").lower()
+        ca_bundle = os.getenv("LANGWATCH_CA_BUNDLE", "")
+
+        if ssl_verify in ("false", "0", "no", "disable"):
+            if not Client._ssl_config_warned:
+                Client._ssl_config_warned = True
+                logger.info(
+                    "LANGWATCH_SSL_VERIFY is disabled. SSL certificate "
+                    "verification will be skipped."
+                )
+            return False  # type: ignore[return-value]  # OTEL exporter passes this as verify= to requests
+
+        if ca_bundle:
+            if os.path.isfile(ca_bundle):
+                logger.info(f"Using custom CA bundle: {ca_bundle}")
+                return ca_bundle
+            else:
+                logger.warning(
+                    f"LANGWATCH_CA_BUNDLE={ca_bundle} was set but the file "
+                    "does not exist. Falling back to default SSL behavior."
+                )
+
+        return None
 
 
 class ConditionalSpanExporter(SpanExporter):
