@@ -135,13 +135,22 @@ type workerEntry struct {
 	// cause behind the agent's laundered error event, captured so the turn's
 	// terminal error frame can carry the full typed chain through.
 	llmErr *herr.E
+	// rateLimitStrikes counts CONSECUTIVE rate-limited (429) mediated LLM
+	// calls for this conversation. A successful call resets it, as does a new
+	// turn. At the cut threshold handleLLM stops the worker SDK's retry loop:
+	// a hard plan limit answers every retry identically, and the SDK's
+	// ever-growing backoff otherwise leaves the turn spinning silently.
+	rateLimitStrikes int
 }
 
 func (e *workerEntry) setTurn(sc trace.SpanContext) {
 	e.mu.Lock()
 	e.turn = sc
-	// A new turn must never inherit the previous turn's failure as its cause.
+	// A new turn must never inherit the previous turn's failure as its cause,
+	// nor its rate-limit strikes: the user asked something new, so let the SDK
+	// retry from a clean slate (a hard limit will re-strike immediately).
 	e.llmErr = nil
+	e.rateLimitStrikes = 0
 	e.mu.Unlock()
 }
 
@@ -160,6 +169,23 @@ func (e *workerEntry) setLLMError(err herr.E) {
 func (e *workerEntry) clearLLMError() {
 	e.mu.Lock()
 	e.llmErr = nil
+	e.rateLimitStrikes = 0
+	e.mu.Unlock()
+}
+
+func (e *workerEntry) strikeRateLimit() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.rateLimitStrikes++
+	return e.rateLimitStrikes
+}
+
+// resetRateLimitStrikes zeroes the consecutive-429 count without touching the
+// captured llmErr: any non-429 answer breaks the run, but a captured 5xx
+// cause must survive as the turn's most recent real failure.
+func (e *workerEntry) resetRateLimitStrikes() {
+	e.mu.Lock()
+	e.rateLimitStrikes = 0
 	e.mu.Unlock()
 }
 
