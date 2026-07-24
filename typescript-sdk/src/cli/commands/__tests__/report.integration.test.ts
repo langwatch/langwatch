@@ -112,6 +112,16 @@ describe("langwatch report", () => {
       expect(received[0]?.body.title).toBe("auth with [SECRET] failed");
     });
 
+    it("falls back to the summary's first line when the title is whitespace", async () => {
+      await reportCommand({
+        userApproved: true,
+        endpoint,
+        title: "   ",
+        summary: "evaluator wizard hangs on step 2\nmore detail below",
+      });
+      expect(received[0]?.body.title).toBe("evaluator wizard hangs on step 2");
+    });
+
     /** @scenario "Summary can be read from a file for long content" */
     it("reads the summary from a file", async () => {
       const notesPath = join(tempDir, "notes.md");

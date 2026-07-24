@@ -35,6 +35,12 @@ export interface ReportCommandOptions {
 const cliVersion = (): string =>
   typeof __CLI_VERSION__ !== "undefined" ? __CLI_VERSION__ : "dev";
 
+/** Whitespace-only inputs fall through to the next title candidate. */
+const nonEmptyTrimmed = (text: string | undefined): string | undefined => {
+  const trimmed = text?.trim();
+  return trimmed === "" ? undefined : trimmed;
+};
+
 /** Best-effort detection of the coding agent driving this terminal. */
 export const detectAgent = (
   env: NodeJS.ProcessEnv = process.env,
@@ -140,8 +146,8 @@ export const reportCommand = async (
   }
 
   const rawTitle =
-    options.title?.trim() ||
-    summary?.trim().split("\n")[0]?.slice(0, 200) ||
+    nonEmptyTrimmed(options.title) ??
+    nonEmptyTrimmed(summary?.trim().split("\n")[0]?.slice(0, 200)) ??
     "Session report";
   const titleResult = redactReportText({ text: rawTitle, envValues });
   redactedCount += titleResult.redactedCount;
