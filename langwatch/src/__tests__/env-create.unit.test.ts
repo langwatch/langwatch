@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEnv } from "@t3-oss/env-core";
 
@@ -214,6 +216,29 @@ describe("rumSampleRatioSchema", () => {
 // schema — not an inline copy — so a mutation of the enum widening it back to
 // a free string fails here.
 describe("storedObjectsBackendSchema", () => {
+  describe("given the env-create source", () => {
+    /** @scenario "The env schema declares the Azure backend variables as first-class keys" */
+    it("declares STORED_OBJECTS_BACKEND and AZURE_BLOB_CONTAINER in both the schema and the runtime map", () => {
+      const source = fs.readFileSync(
+        path.join(__dirname, "..", "env-create.mjs"),
+        "utf-8",
+      );
+      // Both keys must be first-class env vars: declared in the zod server
+      // schema AND wired through runtimeEnv — otherwise application code
+      // would have to reach into process.env directly, which the repo bans.
+      const schemaHits = source.match(/STORED_OBJECTS_BACKEND/g) ?? [];
+      const containerHits = source.match(/AZURE_BLOB_CONTAINER/g) ?? [];
+      expect(schemaHits.length).toBeGreaterThanOrEqual(2);
+      expect(containerHits.length).toBeGreaterThanOrEqual(2);
+      expect(source).toMatch(
+        /STORED_OBJECTS_BACKEND:\s*process\.env\.STORED_OBJECTS_BACKEND/,
+      );
+      expect(source).toMatch(
+        /AZURE_BLOB_CONTAINER:\s*process\.env\.AZURE_BLOB_CONTAINER/,
+      );
+    });
+  });
+
   describe("given a supported value", () => {
     it.each([["s3"], ["azure"]])("accepts %s", (value) => {
       const parsed = storedObjectsBackendSchema.safeParse(value);

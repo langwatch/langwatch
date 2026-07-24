@@ -45,7 +45,7 @@ function newDriver() {
 
 describe("AzureBlobDriver", () => {
   describe("when registered alongside the existing drivers", () => {
-    /** @scenario "Stored-objects writes do not mint azure-blob URIs in this PR" */
+    /** @scenario "Both drivers remain available for reads regardless of which scheme new URIs use" */
     it("uses an azure-blob scheme distinct from s3/file AND the registry round-trips existing azure-blob URIs through the driver", async () => {
       // Import lazily to keep the registry construction local to this test.
       const { StorageRegistry } = await import("../storage-registry");
