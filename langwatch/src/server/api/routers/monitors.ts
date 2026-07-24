@@ -3,13 +3,9 @@ import { EvaluationExecutionMode, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
+import { getApp } from "~/server/app-layer";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
-import { AnalyticsClientUnavailableError } from "../../app-layer/analytics";
-import { summarizeMonitorPerformance } from "../../app-layer/evaluations/monitor-performance.service";
-import { MonitorPerformanceClickHouseRepository } from "../../app-layer/evaluations/repositories/monitor-performance.clickhouse.repository";
-import type { ClickHouseClientResolver } from "../../clickhouse/clickhouseClient";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -24,16 +20,6 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
-
-const resolveClickHouseClient: ClickHouseClientResolver = async (tenantId) => {
-  const client = await getClickHouseClientForProject(tenantId);
-  if (!client) throw new AnalyticsClientUnavailableError(tenantId);
-  return client;
-};
-
-const monitorPerformanceRepository = new MonitorPerformanceClickHouseRepository(
-  resolveClickHouseClient,
-);
 
 /**
  * Generates a unique slug for a monitor.
@@ -145,16 +131,14 @@ export const monitorsRouter = createTRPCRouter({
       }));
       const endMs = Date.now();
       const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
-      const buckets = await monitorPerformanceRepository.findBuckets({
+      return getApp().evaluations.performance.getPerformance({
         tenantId: input.projectId,
-        evaluatorIds: monitors.map((monitor) => monitor.id),
+        monitors: performanceMonitors,
         previousStartMs: currentStartMs - PERFORMANCE_PERIOD_MS,
         currentStartMs,
         endMs,
         timeZone: input.timeZone ?? "UTC",
       });
-
-      return summarizeMonitorPerformance(performanceMonitors, buckets);
     }),
   toggle: protectedProcedure
     .input(

@@ -9,7 +9,10 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { summarizeMonitorPerformance } from "../monitor-performance.service";
+import {
+  MonitorPerformanceService,
+  summarizeMonitorPerformance,
+} from "../monitor-performance.service";
 import { MonitorPerformanceClickHouseRepository } from "../repositories/monitor-performance.clickhouse.repository";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -168,22 +171,18 @@ describe("online evaluation monitor performance", () => {
     const repository = new MonitorPerformanceClickHouseRepository(async () =>
       countingClient(),
     );
-
-    const buckets = await repository.findBuckets({
+    const service = new MonitorPerformanceService(repository);
+    const performance = await service.getPerformance({
       tenantId,
-      evaluatorIds: [scoreEvaluatorId, guardrailEvaluatorId],
+      monitors: [
+        { id: scoreEvaluatorId, isGuardrail: false },
+        { id: guardrailEvaluatorId, isGuardrail: true },
+      ],
       previousStartMs,
       currentStartMs,
       endMs,
       timeZone: "UTC",
     });
-    const performance = summarizeMonitorPerformance(
-      [
-        { id: scoreEvaluatorId, isGuardrail: false },
-        { id: guardrailEvaluatorId, isGuardrail: true },
-      ],
-      buckets,
-    );
 
     expect(queryCount).toBe(1);
     expect(performance).toEqual([
@@ -218,10 +217,10 @@ describe("online evaluation monitor performance", () => {
     });
 
     expect(
-      summarizeMonitorPerformance(
-        [{ id: `${tenantId}-empty`, isGuardrail: false }],
+      summarizeMonitorPerformance({
+        monitors: [{ id: `${tenantId}-empty`, isGuardrail: false }],
         buckets,
-      ),
+      }),
     ).toEqual([
       {
         monitorId: `${tenantId}-empty`,

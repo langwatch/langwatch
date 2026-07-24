@@ -24,3 +24,13 @@ export interface MonitorPerformanceRepository {
     params: FindMonitorPerformanceParams,
   ): Promise<MonitorPerformanceBucket[]>;
 }
+
+export class NullMonitorPerformanceRepository
+  implements MonitorPerformanceRepository
+{
+  async findBuckets(
+    _params: FindMonitorPerformanceParams,
+  ): Promise<MonitorPerformanceBucket[]> {
+    return [];
+  }
+}

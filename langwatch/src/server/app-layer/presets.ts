@@ -155,12 +155,15 @@ import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.reco
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import { EvaluationRunService } from "./evaluations/evaluation-run.service";
+import { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
 import { EvaluationAnalyticsClickHouseRepository } from "./evaluations/repositories/evaluation-analytics.clickhouse.repository";
 import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/evaluation-analytics.repository";
 import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
+import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
+import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
 import {
@@ -482,6 +485,14 @@ export function initializeDefaultApp(options?: {
   const evaluations = {
     runs: evaluationRuns,
     execution: evaluationExecution,
+    performance: traced(
+      new MonitorPerformanceService(
+        clickhouseEnabled
+          ? new MonitorPerformanceClickHouseRepository(resolveClickHouseClient)
+          : new NullMonitorPerformanceRepository(),
+      ),
+      "MonitorPerformanceService",
+    ),
   };
 
   const planResolver = (organizationId: string) =>
@@ -1426,6 +1437,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       execution:
         void 0 as unknown as AppDependencies["evaluations"]["execution"],
+      performance: new MonitorPerformanceService(
+        new NullMonitorPerformanceRepository(),
+      ),
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),

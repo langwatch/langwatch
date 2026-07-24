@@ -11,34 +11,41 @@ import type { RetroactiveUpdateService } from "../data-retention/retroactive/ret
 import type { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { ExperimentService } from "../experiments/experiment.service";
+import type { EmailSuppressionService } from "./automations/emailSuppression.service";
+import type { TriggerService } from "./automations/trigger.service";
+import type {
+  TestFireResult,
+  TestFireTriggerInput,
+} from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
+import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
+import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
+import type { LangyCredentialService } from "./langy/LangyCredentialService";
+import type { LangyConversationService } from "./langy/langy-conversation.service";
+import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
+import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
+import type { LangyMessageService } from "./langy/langy-message.service";
+import type { LangyTurnService } from "./langy/langy-turn.service";
+import type { BlobStoreService } from "./ops/blob-store.service";
 import type { EventExplorerService } from "./ops/event-explorer.service";
 import type { ManagerExplorerService } from "./ops/manager-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
-import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
-import type { BlobStoreService } from "./ops/blob-store.service";
 import type { ReplayService } from "./ops/replay.service";
+import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
-import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import type { ShareService } from "./share/share.service";
+import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
-import type { LangyConversationService } from "./langy/langy-conversation.service";
-import type { LangyTurnService } from "./langy/langy-turn.service";
-import type { LangyGithubInstallationsService } from "./langy/langy-github-installations.service";
-import type { LangyCredentialService } from "./langy/LangyCredentialService";
-import type { LangyMessageService } from "./langy/langy-message.service";
-import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
-import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
 import type { TopicService } from "./topic-clustering/topic.service";
 import type { TopicClusteringStatusService } from "./topic-clustering/topic-clustering-status.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
@@ -49,12 +56,6 @@ import type { TokenizerService } from "./traces/tokenizer.service";
 import type { TraceListService } from "./traces/trace-list.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
-import type { EmailSuppressionService } from "./automations/emailSuppression.service";
-import type { TriggerService } from "./automations/trigger.service";
-import type {
-  TestFireResult,
-  TestFireTriggerInput,
-} from "./automations/trigger-template.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface DataRetentionDependencies {
@@ -92,6 +93,7 @@ export interface AppDependencies {
   evaluations: {
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
+    performance: MonitorPerformanceService;
   };
   dspySteps: {
     steps: DspyStepService;
