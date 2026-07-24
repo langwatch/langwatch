@@ -34,6 +34,7 @@ import {
 } from "./repositories";
 import { PromptTagAssignmentRepository, TagValidationError } from "./repositories/llm-config-tag.repository";
 import {
+  diffRuntimeParameters,
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
@@ -1147,13 +1148,16 @@ export class PromptService {
         return { action: "up_to_date", prompt: existingPrompt };
       } else {
         // Content differs - create new version
+        const allDifferences = [
+          ...(comparison.differences ?? []),
+          ...diffRuntimeParameters(params.parameters, existingPrompt.parameters),
+        ];
         const updatedPrompt = await this.updatePrompt({
           idOrHandle: existingPrompt.id,
           projectId,
           data: {
             authorId,
-            commitMessage:
-              commitMessage ?? describeLocalFileUpdate(comparison.differences),
+            commitMessage: commitMessage ?? describeLocalFileUpdate(allDifferences),
             ...this.transformToDbFormat(resolvedConfigData),
             schemaVersion: SchemaVersion.V1_0,
             parameters: params.parameters,

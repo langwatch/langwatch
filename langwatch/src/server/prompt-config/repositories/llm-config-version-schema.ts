@@ -150,6 +150,26 @@ export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
   );
 }
 
+/**
+ * Per-key description of runtime parameters that differ between `a` and `b`,
+ * in the same `a → b` direction as `runtimeParametersEqual`'s arguments.
+ */
+export function diffRuntimeParameters(a: unknown, b: unknown): string[] {
+  const paramsA = (a ?? {}) as RuntimeParameters;
+  const paramsB = (b ?? {}) as RuntimeParameters;
+  const keys = new Set([...Object.keys(paramsA), ...Object.keys(paramsB)]);
+
+  const differences: string[] = [];
+  for (const key of keys) {
+    if (JSON.stringify(paramsA[key]) !== JSON.stringify(paramsB[key])) {
+      differences.push(
+        `${key}: ${JSON.stringify(paramsA[key])} → ${JSON.stringify(paramsB[key])}`,
+      );
+    }
+  }
+  return differences;
+}
+
 export function isValidHandle(handle: string): boolean {
   // npm package name pattern: allows lowercase letters, numbers, hyphens, and optionally one slash
   const npmPackagePattern = /^[a-z0-9_-]+(?:\/[a-z0-9_-]+)?$/;

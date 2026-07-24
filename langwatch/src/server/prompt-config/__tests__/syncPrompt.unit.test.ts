@@ -293,6 +293,50 @@ describe("PromptService", () => {
           }),
         );
       });
+
+      it("describes runtime-parameter changes even when config content is unchanged", async () => {
+        const existingPrompt = buildExistingPrompt({
+          parameters: { max_tokens: 500 },
+        });
+
+        vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(
+          existingPrompt,
+        );
+
+        const updateSpy = vi
+          .spyOn(promptService, "updatePrompt")
+          .mockResolvedValue(existingPrompt);
+
+        // Config content itself is identical - only runtime parameters differ.
+        mockRepository.compareConfigContent.mockReturnValue({ isEqual: true });
+
+        const localConfigData = {
+          model: "gpt-4",
+          prompt: "You are a helpful assistant",
+          messages: [{ role: "user" as const, content: "Hello {{input}}" }],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          temperature: 0.7,
+        };
+
+        const result = await promptService.syncPrompt({
+          idOrHandle: "test-prompt",
+          localConfigData: localConfigData as any,
+          localVersion: 1,
+          projectId,
+          organizationId,
+          parameters: { max_tokens: 1000 },
+        });
+
+        expect(result.action).toBe("updated");
+        expect(updateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              commitMessage: "Updated from local file (max_tokens: 1000 → 500)",
+            }),
+          }),
+        );
+      });
     });
 
     describe("when prompt does not exist and is created", () => {

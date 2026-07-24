@@ -338,7 +338,15 @@ describe("VersionHistoryListPopover", () => {
           renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
           await openPopover();
 
-          expect(screen.getByText(longMessage)).toBeInTheDocument();
+          const messageEl = screen.getByText(longMessage);
+          // Full-text presence is supplementary: the DOM keeps the whole
+          // string even under a 1-line clamp, so it alone can't prove the
+          // text isn't visually cut off. Assert the clamp actually applied
+          // is the generous multi-line bound, not the single-line clamp
+          // that caused the "2-3 words" bug.
+          const style = getComputedStyle(messageEl);
+          expect(style.getPropertyValue("-webkit-line-clamp")).toBe("8");
+          expect(style.getPropertyValue("overflow")).toBe("hidden");
         });
       });
     });
