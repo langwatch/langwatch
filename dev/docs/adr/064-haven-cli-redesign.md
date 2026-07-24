@@ -85,7 +85,7 @@ they never keep working silently.
 
 Daily driver:
 
-```
+```text
 haven                 the hub: every stack, health, RAM, actions (agents/pipes get plain status)
 haven up [+svc|-svc] [-f]  start or reconcile this worktree's stack; deltas stick; -f restarts
 haven down [-f] [--all]    stop this stack, keep all data; -f kills hard; --all stops everything
@@ -96,7 +96,7 @@ haven status [--json] one-shot: selection, service health, shared-server health,
 
 Data and cleanup (the only destructive nouns):
 
-```
+```text
 haven db reset [preset] [--yes]   fresh migrated+seeded databases for this stack
 haven db seed [preset]            reseed in place — idempotent, drops nothing
 haven db url [postgres|clickhouse|redis]   connection strings
@@ -123,7 +123,7 @@ bare, unseeded database keeps the 7-day default.
 
 Workflow tier, unchanged in behaviour but de-aliased:
 
-```
+```text
 haven pr <ref>        try a GitHub PR in a fresh worktree (--force renamed --allow-closed)
 haven play [pr]       run a PR in a throwaway sandbox; quitting destroys everything it created
 haven git [target]    embedded git TUI across worktrees
@@ -146,7 +146,7 @@ Per-worktree services are `workers` (standalone lane), `gateway`, `nlp`, and
 accepted spellings). `app` always runs and is not selectable. Selection is
 expressed as deltas on `up` and is **sticky**:
 
-```
+```text
 haven up +langy       add langy to this worktree's stack, now and from now on
 haven up -nlp         stop running nlp here; the hostname falls back to the shared baseline
 haven up              whatever this worktree last selected
@@ -210,9 +210,9 @@ view in attached mode is just a live rendering of the same tap. Consequently:
 - `haven logs` prints the recent interleaved tail of every service of this
   worktree's stack, each line labelled with its service, levels colourised.
 - `haven logs nlp` filters to one service; multiple names combine.
-- `-f` follows; `--since 10m` windows; `--level warn` filters structured
-  lines by severity; `--stack <slug>` reads another worktree's stack;
-  `--json` emits raw lines for tooling.
+- `-t`/`--tail` follows; `--since 10m` windows; `--level warn` filters
+  structured lines by severity; `--stack <slug>` reads another worktree's
+  stack.
 - Logs outlive the stack: after `down` (or a crash) the last run's logs are
   still readable — which is precisely when you want them.
 - `obs` is a valid log target (replacing `make observability-logs`).

@@ -43,7 +43,7 @@ make observability-connect    # mint a Grafana token + configure gcx
 # any pnpm dev stack you start while it is up exports to it automatically,
 # tagged by worktree — no .env changes needed. Already-running stacks need a
 # restart (pnpm dev) to pick it up.
-LANGWATCH_HAVEN_OBS=0          # keep the next up from starting it; haven down --all stops everything
+LANGWATCH_HAVEN_OBS=0 haven up # keep the next up from starting it; haven down --all stops everything
 ```
 
 Then open Grafana at http://localhost:3000 (anonymous Admin, or admin/admin), or

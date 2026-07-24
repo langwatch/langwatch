@@ -12,7 +12,7 @@ import (
 
 // The `haven logs` command: every service's captured output, from any
 // terminal, whether the stack runs attached, detached, or already stopped.
-// Filtering is a plain argument (`haven logs nlp`), following is -f, time
+// Filtering is a plain argument (`haven logs nlp`), following is -t, time
 // windows are --since, severity is --level, another stack is --stack. The
 // supervisor writes the per-service files this reads (adapters/procsupervisor
 // logsink.go); the launcher's terminal view and these files carry the same

@@ -175,7 +175,9 @@ var removed = map[string]string{
 	"observability": "haven status — the observability stack is managed automatically (haven restart obs bounces it)",
 	"seed":          "haven db seed [preset] (reseed in place) or haven db reset [preset] (fresh database)",
 	"tc":            "haven typecheck",
-	"oc":            "haven cleanup",
+	"oc":            "haven clean",
+	"cleanup":       "haven clean",
+	"prune":         "haven clean",
 	"moron":         "haven git",
 	"setup":         "nothing — `haven up` bootstraps the machine itself (portless install, CA trust, proxy)",
 }

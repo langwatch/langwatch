@@ -18,7 +18,11 @@ import (
 func runGitUI(_ context.Context, d deps, inv invocation) error {
 	if d.isAgent || inv.has("--json") {
 		if len(inv.args) > 0 {
-			return fmt.Errorf("targets are not supported with --json")
+			mode := "--json"
+			if d.isAgent && !inv.has("--json") {
+				mode = "agent mode"
+			}
+			return fmt.Errorf("targets are not supported with %s", mode)
 		}
 		return d.orch.GitOverview(d.worktree, true)
 	}

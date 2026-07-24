@@ -79,7 +79,7 @@ observability-connect:
 
 # Tail the stack logs (same tap as every service: haven logs).
 observability-logs:
-	@$(HAVEN) logs obs -f
+	@$(HAVEN) logs obs -t
 
 # Show the stack status (part of the one status report).
 observability-status:

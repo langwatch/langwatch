@@ -62,7 +62,13 @@ export interface MassTimelineOptions {
 const DAYS_PER_MONTH = 30;
 
 /** Quality drifts upward over the window, with per-day noise. */
-function passProbability(trend: number, scenarioIndex: number): number {
+function passProbability({
+  trend,
+  scenarioIndex,
+}: {
+  trend: number;
+  scenarioIndex: number;
+}): number {
   return 0.55 + trend * 0.3 - scenarioIndex * 0.025;
 }
 
@@ -89,7 +95,7 @@ export function buildMassTimeline(options: MassTimelineOptions): MassTimeline {
           ? ordinal
           : Math.floor(random() * SCENARIO_FIXTURES.length);
       const scenario = SCENARIO_FIXTURES[scenarioIndex]!;
-      const passed = random() < passProbability(trend, scenarioIndex);
+      const passed = random() < passProbability({ trend, scenarioIndex });
       const variant = passed ? "improved" : "baseline";
       const latencyMs = Math.round(
         950 + random() * 3_800 + (passed ? 0 : random() * 2_500),

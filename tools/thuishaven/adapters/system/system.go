@@ -59,10 +59,16 @@ func (System) Terminate(pid int) {
 }
 
 // KillGroup SIGKILLs pid's whole process group — the no-grace hard stop
-// behind `haven down -f`.
+// behind `haven down -f`. Falls back to killing just the pid when the group
+// resolves to <= 1: kill(-1, …) would broadcast SIGKILL to every process this
+// user can signal, and kill(-0, …) hits our own group.
 func (s System) KillGroup(pid int) {
-	if pgid, err := syscall.Getpgid(pid); err == nil {
+	if pgid, err := syscall.Getpgid(pid); err == nil && pgid > 1 {
 		_ = syscall.Kill(-pgid, syscall.SIGKILL)
+		return
+	}
+	if p, err := os.FindProcess(pid); err == nil {
+		_ = p.Signal(syscall.SIGKILL)
 	}
 }
 

@@ -79,7 +79,7 @@ haven status     one-shot report: selection, per-service health, shared servers,
 haven db         this stack's data: `db seed [preset]` (reseed in place, drops
                  nothing) · `db reset [preset]` (fresh database, confirmed;
                  --yes for scripts) · `db url [engine]`. Presets: demo, traces,
-                 onboarding, post-onboarding, bare
+                 onboarding, post-onboarding, bare, mass
 haven clean      one cleanup: interactive worktree picker + safe reclaim
                  (build artifacts, orphaned processes); --yes applies only the
                  safe categories

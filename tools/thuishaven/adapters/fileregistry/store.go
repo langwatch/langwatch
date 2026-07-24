@@ -115,13 +115,39 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 	return f.Services, true
 }
 
-// WriteSelection persists the worktree's sticky service selection.
+// WriteSelection persists the worktree's sticky service selection. The write is
+// atomic (temp file + rename): a crash mid-write must never leave a half-written
+// .haven.json, which ReadSelection can't tell from "never written" and would
+// silently reset the sticky selection to the lean default.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 	b, err := json.MarshalIndent(selectionFile{Services: sel}, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(selectionPath(worktreeDir), append(b, '\n'), 0o644)
+	return writeFileAtomic(selectionPath(worktreeDir), append(b, '\n'), 0o644)
+}
+
+// writeFileAtomic writes data to a temp file in the destination directory and
+// renames it into place, so a reader never observes a partial file.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // a no-op once the rename succeeds
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 // WriteOverlay writes langwatch/.env.portless. Mode 0o600: it carries

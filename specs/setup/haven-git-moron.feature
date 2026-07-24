@@ -8,14 +8,14 @@ Feature: Git inspection across worktrees via haven
   # Behavior lives in tools/thuishaven: `cmd/git.go` (embeds the moron git
   # TUI via github.com/0xdeafcafe/moron/tui, so no separate install),
   # `app/git.go` (target resolution + the agent/plain overview),
-  # `app/prune.go` (database reclaim during prune), and `domain/guard.go`
+  # `app/prune.go` (database reclaim, driven by `haven clean`), and `domain/guard.go`
   # (local-dev + protected-database guards). Scenarios are bound by Go tests
   # (`go test ./...` in tools/thuishaven): `app/git_test.go`
   # (TestResolveGitTarget), `app/prune_test.go` (drop --all keeps lw_main),
   # `cmd/guard_test.go` + `domain/guard_test.go` (the local-dev refusal).
   # The parity checker (`langwatch/scripts/check-feature-parity.ts`) scans
   # tools/thuishaven's Go tests: @unit scenarios are bound by `// @scenario`
-  # annotations above the Go test funcs; TUI-launch and end-to-end prune
+  # annotations above the Go test funcs; TUI-launch and end-to-end clean
   # flows remain `@unimplemented`.
 
   Background:
@@ -57,19 +57,19 @@ Feature: Git inspection across worktrees via haven
     Then the same overview is printed as JSON
 
   @integration @unimplemented
-  Scenario: Pruning a worktree also reclaims its databases
+  Scenario: Deleting a worktree through haven clean reclaims its databases
     Given a worktree haven has previously brought up, now neither up nor dirty
-    When I run "haven prune --yes"
+    When I delete it through "haven clean"
     Then the worktree's ClickHouse database is dropped
     And the worktree's Postgres database is dropped even if connections are still open
     And the shared database servers themselves keep running
 
   @integration @unimplemented
-  Scenario: Prune dry-run announces database drops without acting
+  Scenario: haven clean previews the databases a worktree deletion would drop
     Given a worktree haven has previously brought up, now neither up nor dirty
-    When I run "haven prune"
-    Then the databases that would be dropped are listed
-    And nothing is dropped
+    When I run "haven clean"
+    Then the databases that would be dropped are listed before anything is deleted
+    And nothing is dropped until I confirm
 
   @unit
   Scenario: The standing main database survives bulk cleanup

@@ -16,7 +16,7 @@
  * whole window (metrics have no ingest-age guard).
  *
  * Backdated rows are stamped with a retention horizon relative to their DATA
- * time (platform default 49 days), so the seeder first upserts an org-scoped
+ * time (the dev default is 7 days), so the seeder first upserts an org-scoped
  * RetentionPolicy that outlives the window — otherwise months two and three
  * would be written pre-expired.
  *
@@ -80,10 +80,13 @@ assertLocalUrl("CLICKHOUSE_URL", process.env.CLICKHOUSE_URL);
  * window. Runs the same validation, conversion, and resource building the
  * REST collector route runs, then enqueues through the production producer.
  */
-async function dispatchDeepTrace(
-  app: ReturnType<typeof initializeDefaultApp>,
-  trace: TraceFixture,
-): Promise<void> {
+async function dispatchDeepTrace({
+  app,
+  trace,
+}: {
+  app: ReturnType<typeof initializeDefaultApp>;
+  trace: TraceFixture;
+}): Promise<void> {
   const payload = buildCollectorPayload(
     trace,
     trace.finishedAtMs ?? Date.now(),
@@ -117,10 +120,13 @@ async function dispatchDeepTrace(
   }
 }
 
-async function dispatchTimeline(
-  app: ReturnType<typeof initializeDefaultApp>,
-  timeline: MassTimeline,
-): Promise<void> {
+async function dispatchTimeline({
+  app,
+  timeline,
+}: {
+  app: ReturnType<typeof initializeDefaultApp>;
+  timeline: MassTimeline;
+}): Promise<void> {
   // Dispatch only — Haven's running worker consumes the queue and projects.
   const suiteSetId = getSuiteSetId(DEMO_PLATFORM_IDS.suite);
 
@@ -370,10 +376,10 @@ async function main(): Promise<void> {
 
     const app = initializeDefaultApp({ processRole: "web" });
     for (const trace of deep) {
-      await dispatchDeepTrace(app, trace);
+      await dispatchDeepTrace({ app, trace });
     }
     console.log("   deep trace history dispatched as pipeline commands");
-    await dispatchTimeline(app, timeline);
+    await dispatchTimeline({ app, timeline });
     console.log("   lifecycles dispatched — waiting for projections…");
     const counts = await waitForProjections({
       simulations: timeline.scenarioRuns.length,
