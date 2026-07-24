@@ -14,8 +14,17 @@ export interface TraceAnalyticsRepository {
    * and readers dedup to the latest UpdatedAt per (TenantId, TraceId).
    * `retentionDays` is stamped onto the row's `_retention_days` column; the
    * table's TTL drops the row that many days after its `OccurredAt`.
+   *
+   * `appliedEventIds` is the executor's redelivery-dedup watermark (ADR-066,
+   * migration 00055): the ids folded into this write, persisted next to the row
+   * so a retry with a cold cache still recognises a batch it already committed.
+   * Not part of the row — it is fold bookkeeping, not trace analytics.
    */
-  upsert(row: TraceAnalyticsRow, retentionDays?: number): Promise<void>;
+  upsert(
+    row: TraceAnalyticsRow,
+    retentionDays?: number,
+    appliedEventIds?: readonly string[],
+  ): Promise<void>;
 
   /**
    * Optional batch path; the store falls back to per-row upsert when this is
@@ -23,8 +32,30 @@ export interface TraceAnalyticsRepository {
    * tenantId (mirroring TraceAnalyticsRollupClickHouseRepository.insertRows).
    */
   upsertBatch?(
-    entries: Array<{ row: TraceAnalyticsRow; retentionDays?: number }>,
+    entries: Array<{
+      row: TraceAnalyticsRow;
+      retentionDays?: number;
+      appliedEventIds?: readonly string[];
+    }>,
   ): Promise<void>;
+
+  /**
+   * The trace's last committed slim row plus the applied-event-id watermark
+   * persisted next to it (ADR-066, migration 00055). The read-back store uses
+   * this on a cache miss so `store.get()` reconstructs working state — and a
+   * retry can dedup a redelivered batch — without ever reading `event_log`.
+   * Null when no row exists.
+   *
+   * `window` bounds OccurredAt so ClickHouse prunes partitions; the repository
+   * applies it verbatim (a pruning optimisation only), so a caller that cannot
+   * rule out a row outside its window retries without one — the fold path gets
+   * that retry from the executor's declared-read-window contract.
+   */
+  findByTraceIdWithApplied(params: {
+    tenantId: string;
+    traceId: string;
+    window?: { fromMs: number; toMs: number };
+  }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null>;
 }
 
 /** No-op implementation for tests and ClickHouse-less environments. */
@@ -32,9 +63,21 @@ export class NullTraceAnalyticsRepository implements TraceAnalyticsRepository {
   async upsert(
     _row: TraceAnalyticsRow,
     _retentionDays?: number,
+    _appliedEventIds?: readonly string[],
   ): Promise<void> {}
 
   async upsertBatch(
-    _entries: Array<{ row: TraceAnalyticsRow; retentionDays?: number }>,
+    _entries: Array<{
+      row: TraceAnalyticsRow;
+      retentionDays?: number;
+      appliedEventIds?: readonly string[];
+    }>,
   ): Promise<void> {}
+
+  async findByTraceIdWithApplied(): Promise<{
+    row: TraceAnalyticsRow;
+    appliedEventIds: string[];
+  } | null> {
+    return null;
+  }
 }

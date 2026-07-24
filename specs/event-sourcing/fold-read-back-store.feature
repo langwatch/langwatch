@@ -6,6 +6,10 @@ Feature: Fold projections read back their own state
   store and stall every writer sharing it; a fold recovers from its own last
   committed state instead. (ADR-066, pillar 1.)
 
+  This promise is universal: it holds for every fold, including the ones whose
+  stored row keeps only a slimmed, query-shaped summary. Such a fold still
+  recovers its full working state from its own row — never from the event log.
+
   Background:
     Given a fold projection whose state is persisted after every batch
 
@@ -34,6 +38,14 @@ Feature: Fold projections read back their own state
     When the state is recovered from the store after a cold cache
     Then a subsequent contribution does not double-count
     And derived measures that depend on prior context stay correct
+
+  Scenario: a fold whose stored row is a slimmed analytics summary still recovers its working state
+    Given a fold whose stored row keeps only the columns an analytics query needs
+    And whose working state tracks more than those columns show
+    When its cached state has expired and the next event for the aggregate arrives
+    Then the fold recovers its full working state from its own stored row
+    And a late dimension-only signal still lands on the recovered state
+    And it does not replay the aggregate's history from the event log
 
   Scenario: a redelivered batch after a committed write does not double-count
     Given a fold that persists its applied-event set durably next to its state

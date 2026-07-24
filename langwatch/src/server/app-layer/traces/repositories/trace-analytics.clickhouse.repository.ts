@@ -56,12 +56,27 @@ interface ClickHouseTraceAnalyticsWriteRecord {
 
   Attributes: Record<string, string>;
 
+  // ── Read-back state (ADR-066, migration 00055) ─────────────────────────
+  SpanCount: number;
+  AnnotationIds: string[];
+  // UInt64 epoch-ms columns ride as strings, like TotalDurationMs — exact
+  // integer round-trip, TZ-immune (the fold compares these numerically).
+  RootSpanStartTimeMs: string;
+  TraceNameFromFallback: boolean;
+  RootMetadataFromFallback: boolean;
+  TraceNameUserOverridden: boolean;
+  LastEventOccurredAt: string;
+
+  // ── Durable dedup watermark (ADR-066, migration 00055) ─────────────────
+  AppliedEventIds: string[];
+
   _retention_days: number;
 }
 
 function toClickHouseRecord(
   row: TraceAnalyticsRow,
   retentionDays: number,
+  appliedEventIds: readonly string[] = [],
 ): ClickHouseTraceAnalyticsWriteRecord {
   return {
     TenantId: row.tenantId,
@@ -100,6 +115,16 @@ function toClickHouseRecord(
 
     Attributes: row.attributes,
 
+    SpanCount: Math.max(0, Math.round(row.spanCount)),
+    AnnotationIds: row.annotationIds,
+    RootSpanStartTimeMs: String(Math.max(0, Math.round(row.rootSpanStartTimeMs))),
+    TraceNameFromFallback: row.traceNameFromFallback,
+    RootMetadataFromFallback: row.rootMetadataFromFallback,
+    TraceNameUserOverridden: row.traceNameUserOverridden,
+    LastEventOccurredAt: String(Math.max(0, Math.round(row.lastEventOccurredAt))),
+
+    AppliedEventIds: [...appliedEventIds],
+
     _retention_days: retentionDays,
   };
 }
@@ -112,6 +137,7 @@ export class TraceAnalyticsClickHouseRepository
   async upsert(
     row: TraceAnalyticsRow,
     retentionDays: number = PLATFORM_DEFAULT_RETENTION_DAYS,
+    appliedEventIds?: readonly string[],
   ): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: row.tenantId },
@@ -122,7 +148,7 @@ export class TraceAnalyticsClickHouseRepository
       const client = await this.resolveClient(row.tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: [toClickHouseRecord(row, retentionDays)],
+        values: [toClickHouseRecord(row, retentionDays, appliedEventIds)],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
@@ -140,7 +166,11 @@ export class TraceAnalyticsClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ row: TraceAnalyticsRow; retentionDays?: number }>,
+    entries: Array<{
+      row: TraceAnalyticsRow;
+      retentionDays?: number;
+      appliedEventIds?: readonly string[];
+    }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -164,10 +194,11 @@ export class TraceAnalyticsClickHouseRepository
       const client = await this.resolveClient(tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: entries.map(({ row, retentionDays }) =>
+        values: entries.map(({ row, retentionDays, appliedEventIds }) =>
           toClickHouseRecord(
             row,
             retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+            appliedEventIds,
           ),
         ),
         format: "JSONEachRow",
@@ -185,4 +216,160 @@ export class TraceAnalyticsClickHouseRepository
       throw error;
     }
   }
+
+  /**
+   * The trace's last committed slim row plus its applied-event-id watermark
+   * (ADR-066, migration 00055) — the CH-fallthrough behind a Redis cache miss.
+   *
+   * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
+   * ReplacingMergeTree only physically collapses rows sharing the full sort key
+   * `(TenantId, OccurredAt, TraceId)`, and OccurredAt shifts when an
+   * earlier-starting span arrives late, so superseded versions persist until
+   * TTL. The inner dedup subquery reads only sort-key columns — no heavy
+   * Attributes map — so it stays a cheap keyed seek.
+   *
+   * `window` bounds OccurredAt on the OUTER read only, keeping it a
+   * partition-pruned point read. The inner dedup is deliberately UNWINDOWED so
+   * it resolves the TRUE latest version: windowing it too would let a trace
+   * whose latest version's OccurredAt drifted outside the window read back as a
+   * stale older version (a non-null result no fallback catches). Unwindowed, the
+   * same case yields an empty outer read, which the executor's unwindowed retry
+   * recovers.
+   */
+  async findByTraceIdWithApplied({
+    tenantId,
+    traceId,
+    window,
+  }: {
+    tenantId: string;
+    traceId: string;
+    window?: { fromMs: number; toMs: number };
+  }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "TraceAnalyticsClickHouseRepository.findByTraceIdWithApplied",
+    );
+    const client = await this.resolveClient(tenantId);
+
+    const partitionFilter =
+      window !== undefined
+        ? "AND OccurredAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
+        : "";
+
+    const result = await client.query({
+      query: `
+        SELECT *
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          ${partitionFilter}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND TraceId = {traceId:String}
+            GROUP BY TenantId, TraceId
+          )
+        LIMIT 1
+      `,
+      query_params: {
+        tenantId,
+        traceId,
+        ...(window !== undefined
+          ? { from: window.fromMs, to: window.toMs }
+          : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<Record<string, unknown>>();
+    const record = rows[0];
+    if (!record) return null;
+    return {
+      row: fromRecord(record),
+      appliedEventIds: asStringArray(record.AppliedEventIds),
+    };
+  }
+}
+
+const asNumber = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const asNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const asStringArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];
+
+const asStringMap = (value: unknown): Record<string, string> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .filter(([, v]) => typeof v === "string")
+          .map(([k, v]) => [k, v as string]),
+      )
+    : {};
+
+const asNullableString = (value: unknown): string | null =>
+  typeof value === "string" && value.length > 0 ? value : null;
+
+/**
+ * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}. The inverse
+ * of {@link toClickHouseRecord}: DateTime64 columns come back as strings, the
+ * UInt64 epoch-ms columns as strings, arrays/maps as themselves. A
+ * pre-migration record simply omits the 00055 fields, so the parsers fall back
+ * to the documented defaults (0 / empty / false).
+ */
+function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
+  return {
+    tenantId: String(record.TenantId ?? ""),
+    traceId: String(record.TraceId ?? ""),
+    version: String(record.Version ?? ""),
+    occurredAtMs: new Date(String(record.OccurredAt)).getTime(),
+    createdAtMs: new Date(String(record.CreatedAt)).getTime(),
+    updatedAtMs: new Date(String(record.UpdatedAt)).getTime(),
+
+    traceName: String(record.TraceName ?? ""),
+    topicId: asNullableString(record.TopicId),
+    subTopicId: asNullableString(record.SubTopicId),
+    userId: asNullableString(record.UserId),
+    conversationId: asNullableString(record.ConversationId),
+    customerId: asNullableString(record.CustomerId),
+    origin: String(record.Origin ?? ""),
+    models: asStringArray(record.Models),
+    labels: asStringArray(record.Labels),
+
+    totalCost: asNullableNumber(record.TotalCost),
+    nonBilledCost: asNullableNumber(record.NonBilledCost),
+    totalDurationMs: asNumber(record.TotalDurationMs),
+    timeToFirstTokenMs: asNullableNumber(record.TimeToFirstTokenMs),
+    tokensPerSecond: asNullableNumber(record.TokensPerSecond),
+    promptTokens: asNullableNumber(record.PromptTokens),
+    completionTokens: asNullableNumber(record.CompletionTokens),
+    cacheReadTokens: asNullableNumber(record.CacheReadTokens),
+    cacheWriteTokens: asNullableNumber(record.CacheWriteTokens),
+    reasoningTokens: asNullableNumber(record.ReasoningTokens),
+    hasError: Boolean(record.HasError),
+    hasAnnotation:
+      record.HasAnnotation === null || record.HasAnnotation === undefined
+        ? null
+        : Boolean(record.HasAnnotation),
+
+    attributes: asStringMap(record.Attributes),
+
+    spanCount: asNumber(record.SpanCount),
+    annotationIds: asStringArray(record.AnnotationIds),
+    rootSpanStartTimeMs: asNumber(record.RootSpanStartTimeMs),
+    traceNameFromFallback: Boolean(record.TraceNameFromFallback),
+    rootMetadataFromFallback: Boolean(record.RootMetadataFromFallback),
+    traceNameUserOverridden: Boolean(record.TraceNameUserOverridden),
+    lastEventOccurredAt: asNumber(record.LastEventOccurredAt),
+  };
 }
