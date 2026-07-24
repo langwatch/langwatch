@@ -122,17 +122,17 @@ LangWatch builds and maintains several integrations listed below. Our tracing pl
 **Frameworks:**  
 [LangChain](https://langwatch.ai/docs/integration/python/integrations/langchain) ·
 [LangGraph](https://langwatch.ai/docs/integration/python/integrations/langgraph) ·
-[Vercel AI SDK](https://langwatch.ai/docs/integration/typescript/integrations/vercel-ai) ·
+[Vercel AI SDK](https://langwatch.ai/docs/integration/typescript/integrations/vercel-ai-sdk) ·
 [Mastra](https://langwatch.ai/docs/integration/typescript/integrations/mastra) ·
-[CrewAI](https://langwatch.ai/docs/integration/python/integrations/crewai) ·
+[CrewAI](https://langwatch.ai/docs/integration/python/integrations/crew-ai) ·
 [Google ADK](https://langwatch.ai/docs/integration/python/integrations/google-ai)
 
 **Model Providers:**  
-[OpenAI](https://langwatch.ai/docs/integration/python/integrations/openai) ·
+[OpenAI](https://langwatch.ai/docs/integration/python/integrations/open-ai) ·
 [Anthropic](https://langwatch.ai/docs/integration/python/integrations/anthropic) ·
 [Azure](https://langwatch.ai/docs/integration/python/integrations/azure) ·
 [Google Cloud](https://langwatch.ai/docs/integration/python/integrations/google-cloud) ·
-[AWS](https://langwatch.ai/docs/integration/python/integrations/aws) ·
+[AWS](https://langwatch.ai/docs/integration/python/integrations/aws-bedrock) ·
 [Groq](https://langwatch.ai/docs/integration/python/integrations/groq) ·
 [Ollama](https://langwatch.ai/docs/integration/python/integrations/ollama)
 
