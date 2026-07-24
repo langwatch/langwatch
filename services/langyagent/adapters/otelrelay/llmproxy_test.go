@@ -494,3 +494,128 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 		}
 	})
 }
+
+// The proxy ends a hopeless retry loop: a hard plan limit answers every retry
+// identically, and the worker SDK's ever-growing backoff otherwise leaves the
+// turn spinning silently for hours while the panel's plan-limit card never
+// gets its chance.
+func TestLLMProxyRateLimitCut(t *testing.T) {
+	// One relay-mediated call; the fake gateway answers whatever the test
+	// scripted next.
+	callThrough := func(t *testing.T, relay *Relay, token string) *http.Response {
+		t.Helper()
+		resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
+		if err != nil {
+			t.Fatalf("proxied LLM call: %v", err)
+		}
+		t.Cleanup(func() { resp.Body.Close() })
+		return resp
+	}
+
+	const usageLimitBody = `{"error":{"type":"usage_limit_reached","message":"You've hit your usage limit.","resets_in_seconds":10000}}`
+	const burstBody = `{"error":{"type":"rate_limit_exceeded","message":"Rate limit reached, retry shortly."}}`
+
+	// @scenario "A provider that says its usage limit is reached fails the turn at once"
+	t.Run("when the provider names its usage limit as reached", func(t *testing.T) {
+		gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Retry-After", "600")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(usageLimitBody))
+		}))
+		defer gateway.Close()
+
+		relay := startRelay(t)
+		token, _ := relay.Register(WorkerInfo{ConversationID: "conv-hard-limit", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+		resp := callThrough(t, relay, token)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("first hard-limit call answered %d, want 400: the SDK must not retry into the same wall", resp.StatusCode)
+		}
+		if got := resp.Header.Get("Retry-After"); got != "" {
+			t.Errorf("Retry-After %q survived the cut; no header may invite a retry", got)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		if string(body) != usageLimitBody {
+			t.Errorf("body was altered by the cut:\n got %s\nwant %s", body, usageLimitBody)
+		}
+
+		// The captured cause still tells the truth: upstream said 429, and the
+		// discriminant the panel promotes to the plan-limit card is intact.
+		e, ok := relay.LastLLMError(token)
+		if !ok {
+			t.Fatal("the cut call must still leave a captured cause")
+		}
+		if e.Meta["http_status"] != http.StatusTooManyRequests {
+			t.Errorf("captured http_status = %v, want the REAL upstream 429", e.Meta["http_status"])
+		}
+		var cause herr.E
+		if len(e.Reasons) != 1 || !errors.As(e.Reasons[0], &cause) || cause.Code != "usage_limit_reached" {
+			t.Errorf("captured reasons = %v, want the usage_limit_reached discriminant", e.Reasons)
+		}
+	})
+
+	// @scenario "A rate-limit burst keeps its normal retries, then is cut"
+	t.Run("when the provider rate-limits without naming a deterministic limit", func(t *testing.T) {
+		var status int
+		gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Retry-After", "2")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			if status == http.StatusTooManyRequests {
+				_, _ = w.Write([]byte(burstBody))
+			} else {
+				_, _ = w.Write([]byte(`{"ok":true}`))
+			}
+		}))
+		defer gateway.Close()
+
+		relay := startRelay(t)
+		token, _ := relay.Register(WorkerInfo{ConversationID: "conv-burst", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+		status = http.StatusTooManyRequests
+		for i := 1; i <= 2; i++ {
+			resp := callThrough(t, relay, token)
+			if resp.StatusCode != http.StatusTooManyRequests {
+				t.Fatalf("burst strike %d answered %d, want the 429 passed through for the SDK's own backoff", i, resp.StatusCode)
+			}
+			if resp.Header.Get("Retry-After") == "" {
+				t.Errorf("burst strike %d lost its Retry-After; a passed-through 429 keeps its headers", i)
+			}
+		}
+		if resp := callThrough(t, relay, token); resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("third consecutive 429 answered %d, want 400: the loop must be cut", resp.StatusCode)
+		}
+
+		// A success starts the count over: the next 429 is a fresh strike one.
+		status = http.StatusOK
+		if resp := callThrough(t, relay, token); resp.StatusCode != http.StatusOK {
+			t.Fatal("the scripted success must pass through")
+		}
+		status = http.StatusTooManyRequests
+		if resp := callThrough(t, relay, token); resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatal("after a success the first 429 must pass through again: the count restarted")
+		}
+	})
+
+	// @scenario "A rate-limited conversation never blocks a healthy one"
+	t.Run("when a different conversation calls after another was cut", func(t *testing.T) {
+		gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(burstBody))
+		}))
+		defer gateway.Close()
+
+		relay := startRelay(t)
+		cutToken, _ := relay.Register(WorkerInfo{ConversationID: "conv-cut", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+		freshToken, _ := relay.Register(WorkerInfo{ConversationID: "conv-fresh", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+
+		for i := 0; i < rateLimitCutAfter; i++ {
+			callThrough(t, relay, cutToken)
+		}
+		if resp := callThrough(t, relay, freshToken); resp.StatusCode != http.StatusTooManyRequests {
+			t.Fatalf("the fresh conversation's first 429 answered %d, want the passthrough of its own strike one", resp.StatusCode)
+		}
+	})
+}

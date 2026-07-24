@@ -184,3 +184,36 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When both try to terminate the same turn
     Then only the first terminal is recorded
     And the second is collapsed as a duplicate, like a tool call's terminals
+
+  # A provider rate limit is retryable by every SDK's book, and for a burst
+  # (tokens-per-minute) that is right: back off a little and the call lands.
+  # But a PLAN limit ("usage limit reached until next week") answers every
+  # retry identically, and the coding agent's ever-growing backoff turns that
+  # into an hours-long silent spinner: the turn never fails, so the plan-limit
+  # card the panel already knows how to draw never gets its chance. The relay
+  # sits between the agent and the gateway and is the one place that sees every
+  # rejected call, so it is the one that ends the loop: it converts the hard
+  # rate limit into a failure the agent's SDK treats as final, keeping the
+  # provider's own body so the turn's error frame still names the real cause.
+
+  @unit
+  Scenario: A provider that says its usage limit is reached fails the turn at once
+    Given the model provider rejects a relayed call with a rate limit that names its usage limit as reached
+    When the relay answers the coding agent
+    Then the answer is a failure the agent's SDK does not retry
+    And it carries the provider's own error body unchanged
+    And the turn fails with the plan-limit explanation instead of spinning
+
+  @unit
+  Scenario: A rate-limit burst keeps its normal retries, then is cut
+    Given the model provider rate-limits relayed calls without naming a deterministic limit
+    When the same conversation's calls keep being rate-limited with no success in between
+    Then the first two rejections pass through for the SDK's own backoff
+    And the third consecutive rejection becomes a failure the SDK does not retry
+    But a successful call in between starts the count over
+
+  @unit
+  Scenario: A rate-limited conversation never blocks a healthy one
+    Given one conversation has been cut off at a hard rate limit
+    When a different conversation's calls are relayed
+    Then they pass through untouched with their own fresh count
