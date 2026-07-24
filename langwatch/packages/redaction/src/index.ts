@@ -18,6 +18,7 @@ export {
   type SecretsRedactionResult,
 } from "./secrets.js";
 export {
+  REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
   collectSensitiveEnvValues,
   redactReportText,
