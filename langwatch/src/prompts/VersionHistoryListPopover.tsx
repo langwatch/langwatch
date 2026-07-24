@@ -5,7 +5,6 @@ import {
   Button,
   HStack,
   Separator,
-  Spacer,
   Spinner,
   Tag,
   Text,
@@ -163,9 +162,19 @@ function VersionHistoryItem({
       <HStack width="full" gap={3} align="start">
         <VersionNumberBox version={data} minWidth="48px" />
         <VStack align="start" width="full" gap={1}>
-          <HStack width="full">
-            <HStack gap={2} flex={1} minWidth={0}>
-              <Text fontWeight={600} fontSize="13px" lineClamp={1}>
+          <HStack width="full" align="start">
+            <HStack gap={2} flex={1} minWidth={0} align="start">
+              <Text
+                fontWeight={600}
+                fontSize="13px"
+                wordBreak="break-word"
+                flex="1"
+                minWidth={0}
+                // Generous enough that the 200-char message the Save Version
+                // dialog allows never clips; still bounds a pathological
+                // message set via the API/SDK, which has no length limit.
+                lineClamp={8}
+              >
                 {data.commitMessage}
               </Text>
               {isCurrent && (
@@ -179,7 +188,6 @@ function VersionHistoryItem({
                 </Tag.Root>
               )}
             </HStack>
-            <Spacer />
             {/* Discard changes button - reloads current version (same as "Load this version") */}
             {isCurrent && hasUnsavedChanges && (
               <Button
