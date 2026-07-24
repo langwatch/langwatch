@@ -1,6 +1,5 @@
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   HStack,
@@ -72,6 +71,7 @@ import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
+import { UserAvatar } from "./UserAvatar";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -793,18 +793,15 @@ export const DashboardLayout = ({
                     }
                   : {})}
               >
-                <Avatar.Root
+                <UserAvatar
+                  name={user?.name ?? undefined}
+                  image={user?.image ?? undefined}
                   size="xs"
                   backgroundColor="orange.400"
                   color="white"
                   width="28px"
                   height="28px"
-                >
-                  <Avatar.Fallback
-                    name={user?.name ?? undefined}
-                    fontSize="11px"
-                  />
-                </Avatar.Root>
+                />
               </Button>
             </Menu.Trigger>
             {session && (
