@@ -88,6 +88,7 @@ const mocks = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
   mockCloseDrawer: vi.fn(),
   mockSetFlowCallbacks: vi.fn(),
+  mockClearFlowCallbacks: vi.fn(),
   mockRunScenario: vi.fn(),
   mockRouterPush: vi.fn(),
   mockGetByIdData: null as { id: string; name: string; situation: string; criteria: string[]; labels: string[] } | null,
@@ -174,6 +175,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawerParams: () => mocks.mockDrawerParams,
   getComplexProps: () => mocks.mockComplexProps,
   setFlowCallbacks: mocks.mockSetFlowCallbacks,
+  clearFlowCallbacks: mocks.mockClearFlowCallbacks,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -631,6 +633,22 @@ describe("<ScenarioFormDrawer/>", () => {
           type: "success",
         }),
       );
+    });
+
+    describe("when agent type selector is closed without completing the flow", () => {
+      it("clears flow callbacks to prevent stale callbacks in other contexts", async () => {
+        const user = userEvent.setup();
+        render(<ScenarioFormDrawer open={true} />, { wrapper: Wrapper });
+
+        // Open agent type selector
+        await user.click(screen.getByTestId("create-agent-button"));
+        expect(screen.getByTestId("agent-type-selector-drawer")).toBeInTheDocument();
+
+        // Close without completing (cancellation path)
+        await user.click(screen.getByTestId("close-agent-selector"));
+
+        expect(mocks.mockClearFlowCallbacks).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });
