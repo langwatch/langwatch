@@ -170,6 +170,10 @@ function VersionHistoryItem({
                 wordBreak="break-word"
                 flex="1"
                 minWidth={0}
+                // Generous enough that the 200-char message the Save Version
+                // dialog allows never clips; still bounds a pathological
+                // message set via the API/SDK, which has no length limit.
+                lineClamp={8}
               >
                 {data.commitMessage}
               </Text>
