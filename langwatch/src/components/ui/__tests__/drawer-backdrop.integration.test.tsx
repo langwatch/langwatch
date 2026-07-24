@@ -9,6 +9,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Drawer } from "../drawer";
+import { cssRulesForElement } from "~/utils/emotionTestCss";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -66,11 +67,14 @@ describe("DrawerContent transparency", () => {
         { wrapper: Wrapper },
       );
 
-      const injectedCss = Array.from(document.querySelectorAll("style"))
-        .map((s) => s.innerHTML)
-        .join("\n");
-      expect(injectedCss).toContain("--lw-backdrop-blur");
-      expect(injectedCss).toContain("--lw-panel-alpha");
+      // Scope to the drawer content panel's OWN generated class so an
+      // unrelated rule referencing these variables can't keep the test green.
+      const content = document.querySelector(
+        "[data-part='content']",
+      ) as HTMLElement;
+      const contentCss = cssRulesForElement(content);
+      expect(contentCss).toContain("--lw-backdrop-blur");
+      expect(contentCss).toContain("--lw-panel-alpha");
     });
   });
 });

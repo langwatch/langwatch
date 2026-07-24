@@ -13,6 +13,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RunRow } from "../RunRow";
+import { cssRulesForElement } from "~/utils/emotionTestCss";
 import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";
 
 vi.mock("../usePrefetchRunState", () => ({
@@ -383,19 +384,19 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      // Chakra applies non-token style props via an emotion-injected
-      // stylesheet class, not an inline `style` attribute — check the
-      // injected CSS text rather than the DOM node's `.style`.
-      const injectedCss = Array.from(document.querySelectorAll("style"))
-        .map((s) => s.innerHTML)
-        .join("\n");
-      expect(injectedCss).toContain("--lw-backdrop-blur");
+      // Scope the assertion to the sticky header's OWN generated class, not
+      // every injected <style> — otherwise an unrelated rule referencing the
+      // same variable would keep this green after the header regresses to a
+      // hard-coded blur.
+      const header = screen.getAllByTestId("run-row-header")[0]!;
+      const headerCss = cssRulesForElement(header);
+      expect(headerCss).toContain("--lw-backdrop-blur");
       // The header's background is semi-transparent specifically because
       // the blur diffuses whatever shows through it — removing just the
       // blur while leaving that transparency would turn a frosted header
       // into a literal see-through window onto the scrolling list behind
       // it, so --lw-panel-alpha must go with it.
-      expect(injectedCss).toContain("--lw-panel-alpha");
+      expect(headerCss).toContain("--lw-panel-alpha");
     });
   });
 });
