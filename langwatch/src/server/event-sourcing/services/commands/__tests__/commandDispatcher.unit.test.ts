@@ -377,7 +377,10 @@ describe("processCommandBatch", () => {
   ): CommandSchema<any, CommandType> {
     return {
       type: commandType,
-      validate: vi.fn((p: any) => ({ success: true, data: p })),
+      validate: vi.fn().mockImplementation((p: any) => ({
+        success: true,
+        data: p,
+      })),
       ...overrides,
     };
   }
@@ -446,7 +449,7 @@ describe("processCommandBatch", () => {
       it("throws ValidationError and stores nothing", async () => {
         const storeEventsFn = vi.fn();
         const commandSchema = createEchoCommandSchema({
-          validate: vi.fn((p: any) =>
+          validate: vi.fn().mockImplementation((p: any) =>
             p.id === "agg-1"
               ? {
                   success: false,

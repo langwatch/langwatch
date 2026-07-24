@@ -98,9 +98,13 @@ const CONTEXT: ProjectionStoreContext = {
 };
 const CACHE_KEY = `fold:test_table:${String(TENANT)}:agg-1`;
 
-function createStore(
+function createStore<
+  Inner extends { store: FoldProjectionStore<TestState> } = ReturnType<
+    typeof createInnerStore
+  >,
+>(
   redis: ReturnType<typeof createRedis>,
-  inner = createInnerStore(),
+  inner: Inner = createInnerStore() as Inner,
 ) {
   return {
     inner,
