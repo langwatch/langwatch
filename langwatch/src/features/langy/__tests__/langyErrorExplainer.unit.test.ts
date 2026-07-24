@@ -419,36 +419,42 @@ describe("resolveLiveTurnError", () => {
   });
 
   describe("given the failure rode the stream's terminal entry", () => {
-    it("resolves the typed domain error off the live message", () => {
-      const domain = resolveLiveTurnError({
-        error: new Error(typedStreamError),
-        durableLastError: null,
-      });
+    describe("when the live message carries the typed payload", () => {
+      it("resolves the typed domain error from it", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error(typedStreamError),
+          durableLastError: null,
+        });
 
-      expect(domain.code).toBe("langy_agent_errored");
+        expect(domain.code).toBe("langy_agent_errored");
+      });
     });
   });
 
-  // @scenario "A genuinely dead stream still names the durable failure"
   describe("given the live stream died with no typed payload", () => {
-    it("reads the durable record instead of settling for unknown", () => {
-      const domain = resolveLiveTurnError({
-        error: new Error("SSE Error"),
-        durableLastError: typedStreamError,
-      });
+    describe("when the turn's failure is already on the durable record", () => {
+      /** @scenario "A genuinely dead stream still names the durable failure" */
+      it("reads the durable record instead of settling for unknown", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error("SSE Error"),
+          durableLastError: typedStreamError,
+        });
 
-      expect(domain.code).toBe("langy_agent_errored");
-      expect(explainLangyError(domain).kind).toBe("langy_codex_plan_limit");
+        expect(domain.code).toBe("langy_agent_errored");
+        expect(explainLangyError(domain).kind).toBe("langy_codex_plan_limit");
+      });
     });
 
-    it("falls back to unknown only when the durable record is empty too", () => {
-      const domain = resolveLiveTurnError({
-        error: new Error("SSE Error"),
-        durableLastError: null,
-      });
+    describe("when the durable record is empty too", () => {
+      it("falls back to unknown", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error("SSE Error"),
+          durableLastError: null,
+        });
 
-      expect(domain.code).toBe("unknown");
-      expect(domain.meta).toEqual({ error: "SSE Error" });
+        expect(domain.code).toBe("unknown");
+        expect(domain.meta).toEqual({ error: "SSE Error" });
+      });
     });
   });
 });

@@ -227,13 +227,14 @@ Feature: Langy recovers from a failed turn without making the user re-ask
   # and the reload road must end at the same card.
   @unit
   Scenario: A live-watched failure shows the same card a reload shows
-    Given a turn fails while its conversation is open and streaming
-    When the typed failure rides the stream's terminal error entry
-    Then the entry reaches the panel as data, not as a dead connection
-    And the panel renders the same specific card a reload would render
+    Given the user is watching Langy answer when the turn fails
+    When the failure reaches the open conversation
+    Then the user sees the card that names what actually went wrong
+    And it is the same card a reload of the conversation would show
+    And the generic something-went-wrong card never appears in its place
 
   @unit
   Scenario: A genuinely dead stream still names the durable failure
-    Given the live stream itself breaks with no typed payload
-    When the turn's real failure is already on the durable record
-    Then the panel reads the durable error instead of settling for unknown
+    Given the live connection drops before Langy can say what went wrong
+    When the turn's failure is already on the conversation's record
+    Then the user sees the card naming that recorded failure, not a generic apology
