@@ -96,6 +96,9 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   // The agent itself reported the turn failed (its LLM call was rejected) —
   // the worker is fine, the reply failed. Terminal with a manual retry.
   "langy_agent_errored",
+  // The manager's step-limit gate stopped a turn stuck in a tool-call loop.
+  // Terminal with a manual retry — a fresh turn usually behaves.
+  "langy_turn_step_limit",
   // NOT a failure — an unmet prerequisite. See the `suppress` case below.
   "langy_github_not_connected",
   // GitHub access exists but the repository the agent reached for isn't
@@ -322,6 +325,17 @@ export function explainLangyError(
         title: "Langy lost its place",
         description:
           "Langy dropped this conversation before the reply finished. Send your message again to pick it back up.",
+        render: "card",
+        action: { label: "Try again", kind: "retry" },
+        ...debug,
+      };
+
+    case "langy_turn_step_limit":
+      return {
+        kind: domain.code,
+        title: "Langy stopped to avoid a loop",
+        description:
+          "Langy kept running commands without finishing, so it stopped. Try again — and if it keeps happening, narrow or rephrase what you're after.",
         render: "card",
         action: { label: "Try again", kind: "retry" },
         ...debug,
