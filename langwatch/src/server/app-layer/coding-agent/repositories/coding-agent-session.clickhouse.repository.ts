@@ -292,19 +292,20 @@ export class CodingAgentSessionClickHouseRepository
    * full sort key, and `StartedAt` can shift when an earlier signal arrives
    * late, so superseded rows can persist until TTL.
    *
-   * `startedAtMs` prunes to a handful of partitions. A session can run for
-   * hours, and a late signal can move StartedAt backwards, so the hint is
-   * widened ±7 days rather than pinned to the exact ms — the window keeps
-   * this a partition-pruned point read instead of a full-table scan.
+   * `window` bounds StartedAt so this stays a partition-pruned point read
+   * instead of a full-table scan. The width is the CALLER's declaration
+   * (the fold's `options.readWindow`, or a direct caller deriving from
+   * CODING_AGENT_SESSION_READ_WINDOW_MS) — this repository applies the bound
+   * verbatim and implements no widening or miss fallback of its own.
    */
   private async findLatestRecord({
     tenantId,
     sessionId,
-    startedAtMs,
+    window,
   }: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<Record<string, unknown> | null> {
     EventUtils.validateTenantId(
       { tenantId },
@@ -313,7 +314,7 @@ export class CodingAgentSessionClickHouseRepository
     const client = await this.resolveClient(tenantId);
 
     const partitionFilter =
-      startedAtMs !== undefined
+      window !== undefined
         ? "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
         : "";
 
@@ -337,11 +338,8 @@ export class CodingAgentSessionClickHouseRepository
       query_params: {
         tenantId,
         sessionId,
-        ...(startedAtMs !== undefined
-          ? {
-              from: startedAtMs - 7 * 24 * 60 * 60 * 1000,
-              to: startedAtMs + 7 * 24 * 60 * 60 * 1000,
-            }
+        ...(window !== undefined
+          ? { from: window.fromMs, to: window.toMs }
           : {}),
       },
       format: "JSONEachRow",
@@ -355,7 +353,7 @@ export class CodingAgentSessionClickHouseRepository
   async findBySessionId(params: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<CodingAgentSessionRow | null> {
     const record = await this.findLatestRecord(params);
     return record ? fromRecord(record) : null;
@@ -369,7 +367,7 @@ export class CodingAgentSessionClickHouseRepository
   async findBySessionIdWithApplied(params: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null> {
     const record = await this.findLatestRecord(params);
     if (!record) return null;

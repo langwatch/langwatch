@@ -126,12 +126,50 @@ export class TraceSummaryClickHouseRepository
   async findByTraceId(
     tenantId: string,
     traceId: string,
-    options?: { occurredAtMs?: number },
+    options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
     EventUtils.validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.findByTraceId",
     );
+
+    // Fold read-back path (ADR-066): an explicit window is applied verbatim
+    // with NO internal fallback — the caller (the fold executor) owns the miss
+    // retry, so a second recovery ladder here would re-run the resolve seek on
+    // results the executor is about to re-read unwindowed anyway. Mapped onto
+    // queryWindowed with `fallback: "none"` so the read still lands on
+    // `clickhouse_windowed_read_total` exactly once. The centre/half-width
+    // round-trip is exact: fromMs/toMs are integers, so their mean and
+    // half-difference are exactly representable and reconstruct the bounds.
+    if (options?.window) {
+      const { fromMs, toMs } = options.window;
+      try {
+        return await queryWindowed<TraceSummaryData | null>({
+          table: TABLE_NAME,
+          hintMs: (fromMs + toMs) / 2,
+          windowMs: (toMs - fromMs) / 2,
+          fallback: "none",
+          isEmpty: (result) => result === null,
+          run: async (window) =>
+            // With a hint and `fallback: "none"` the fragment is always
+            // present; the null arm exists only to satisfy the contract.
+            window
+              ? await this.queryByTraceId(tenantId, traceId, {
+                  fromMs: window.fromMs,
+                  toMs: window.toMs,
+                })
+              : null,
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        logger.error(
+          { tenantId, traceId, error: errorMessage },
+          "Failed to get trace summary from ClickHouse",
+        );
+        throw error;
+      }
+    }
 
     // One logical read with two stages, mapped onto queryWindowed so the
     // outcome lands on `clickhouse_windowed_read_total{table}` exactly once per

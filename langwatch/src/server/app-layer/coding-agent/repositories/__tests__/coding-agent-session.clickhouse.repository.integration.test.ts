@@ -182,7 +182,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     const read = await sessions.findBySessionId({
       tenantId,
       sessionId: `${tag}-rt`,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
 
     expect(read).not.toBeNull();
@@ -251,12 +251,12 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId: `${tag}-applied`,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
     const direct = await sessions.findBySessionId({
       tenantId,
       sessionId: `${tag}-applied`,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
 
     expect(withApplied).not.toBeNull();
@@ -274,7 +274,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId: `${tag}-noapplied`,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
 
     expect(withApplied).not.toBeNull();
@@ -306,7 +306,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
 
     expect(withApplied).not.toBeNull();

@@ -8,6 +8,15 @@ export interface FindByTraceIdOptions {
    * is a hint — drift up to a few hours is fine.
    */
   occurredAtMs?: number;
+
+  /**
+   * An explicit time bound for the first read attempt, used verbatim — the
+   * caller declared the width (the fold's `options.readWindow`). Takes
+   * precedence over `occurredAtMs`, which exists for callers that only hold a
+   * point-in-time hint and want the repository to widen it. Miss handling is
+   * identical for both: the trace's real OccurredAt bounds a retry.
+   */
+  window?: { fromMs: number; toMs: number };
 }
 
 export interface TraceSummaryRepository {

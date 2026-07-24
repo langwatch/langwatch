@@ -1,8 +1,12 @@
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import {
+  CODING_AGENT_SESSION_READ_WINDOW_MS,
+  type CodingAgentSessionRow,
+} from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
   normalizeMetricName,
   normalizeTokenType,
 } from "~/server/event-sourcing/pipelines/coding-agent-processing/services/coding-agent-normalization";
+import { readWindowAround } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { CodingAgentSessionRepository } from "./repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "./repositories/coding-agent-trace-session.repository";
 import type {
@@ -46,7 +50,10 @@ export class CodingAgentSessionService {
 
   /**
    * One session by its key, or null. `startedAtMs` is the partition-pruning
-   * hint — pass it whenever the caller has it.
+   * hint — pass it whenever the caller has it. The window width is the fold's
+   * declaration (CODING_AGENT_SESSION_READ_WINDOW_MS), and a windowed miss is
+   * retried without the window so a stale hint degrades to a slower read, not
+   * a 404 for a session that exists.
    */
   async getBySessionId({
     projectId,
@@ -57,11 +64,22 @@ export class CodingAgentSessionService {
     sessionId: string;
     startedAtMs?: number;
   }): Promise<CodingAgentSessionRow | null> {
-    const row = await this.sessions.findBySessionId({
-      tenantId: projectId,
-      sessionId,
-      startedAtMs,
-    });
+    const window =
+      startedAtMs !== undefined
+        ? readWindowAround(startedAtMs, CODING_AGENT_SESSION_READ_WINDOW_MS)
+        : undefined;
+    const row =
+      (await this.sessions.findBySessionId({
+        tenantId: projectId,
+        sessionId,
+        window,
+      })) ??
+      (window !== undefined
+        ? await this.sessions.findBySessionId({
+            tenantId: projectId,
+            sessionId,
+          })
+        : null);
     if (row === null) return null;
     const [overlaid] = await this.withMetricTotals(projectId, [row]);
     return overlaid ?? row;

@@ -146,6 +146,26 @@ export interface FoldProjectionOptions {
    */
   coalesceMaxBatch?: number;
   /**
+   * Bound the store's read-back to a time window around the folded event's
+   * business time.
+   *
+   * Declared here — once, on the fold — instead of every store forwarding an
+   * occurredAt hint by hand and every repository widening it with its own
+   * arithmetic and its own (sometimes forgotten) unwindowed fallback. The
+   * executor computes `context.readWindow = occurredAt ± widthMs` and, when a
+   * windowed read misses, retries once without the window before treating the
+   * aggregate as new — so a row outside the window (long-lived aggregate,
+   * clock skew, backfill) is still found rather than silently overwritten by
+   * a batch folded onto `init()`. Stores pass `context.readWindow` through to
+   * their repository verbatim.
+   *
+   * Pick `widthMs` from the drift between the event's business time and the
+   * backing table's partition column, not from the partition size: the window
+   * is a pruning optimisation, the unwindowed retry is the correctness net.
+   * Omit for stores whose backing read is not time-partitioned.
+   */
+  readWindow?: { widthMs: number };
+  /**
    * Re-fold from the event log when `store.get()` returns null instead of
    * starting from `init()`.
    *
