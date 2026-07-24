@@ -503,8 +503,6 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 const rateLimitUsageLimitBody = `{"error":{"type":"usage_limit_reached","message":"You've hit your usage limit.","resets_in_seconds":10000}}`
 const rateLimitBurstBody = `{"error":{"type":"rate_limit_exceeded","message":"Rate limit reached, retry shortly."}}`
 
-// rateLimitGateway answers every call with whatever status the test scripted
-// next, with a Retry-After header and the matching body.
 func rateLimitGateway(t *testing.T, status *int) *httptest.Server {
 	t.Helper()
 	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -524,7 +522,6 @@ func rateLimitGateway(t *testing.T, status *int) *httptest.Server {
 	return gateway
 }
 
-// rateLimitCall makes one relay-mediated LLM call and returns the response.
 func rateLimitCall(t *testing.T, relay *Relay, token string) *http.Response {
 	t.Helper()
 	resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
