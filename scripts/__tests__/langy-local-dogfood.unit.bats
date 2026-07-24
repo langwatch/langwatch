@@ -124,4 +124,13 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
   [ "$status" -eq 0 ]
   [[ "$output" == *"OPENAI_API_KEY REJECTED by the provider (HTTP 401)"* ]]
   [[ "$output" == *"all checks passed"* ]]
+
+  # A userinfo-tricked override (http://localhost:...@attacker) must be
+  # rejected: the key would otherwise be sent off-machine. The doctor falls
+  # back to the real provider endpoint, so the local 401 responder is never
+  # consulted and the output names the ignored override.
+  PATH="$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
+    LANGY_DOCTOR_OPENAI_URL="http://localhost:${REJECT_PORT}@attacker.example/v1/models" \
+    run "$DOCTOR"
+  [[ "$output" == *"ignoring non-loopback endpoint override"* ]]
 }

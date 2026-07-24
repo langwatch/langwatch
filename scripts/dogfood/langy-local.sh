@@ -165,14 +165,19 @@ check_key() {
 # be able to redirect them off-machine. Proxy routing belongs to HTTPS_PROXY.
 loopback_or() {
   local override="$1" fallback="$2"
-  case "$override" in
-    http://127.0.0.1:*|http://127.0.0.1/*|http://localhost:*|http://localhost/*)
-      printf '%s' "$override" ;;
-    "") printf '%s' "$fallback" ;;
-    *)
-      warn "ignoring non-loopback endpoint override ($override); using the real provider endpoint" >&2
-      printf '%s' "$fallback" ;;
-  esac
+  if [[ -z "$override" ]]; then
+    printf '%s' "$fallback"
+    return
+  fi
+  # Strict authority match: no userinfo, no other hosts. A glob like
+  # http://localhost:* would also match http://localhost:123@attacker.example/
+  # (userinfo), which sends the key off-machine.
+  if [[ "$override" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]{1,5})?(/.*)?$ ]]; then
+    printf '%s' "$override"
+    return
+  fi
+  warn "ignoring non-loopback endpoint override ($override); using the real provider endpoint" >&2
+  printf '%s' "$fallback"
 }
 check_key OPENAI_API_KEY "$(loopback_or "${LANGY_DOCTOR_OPENAI_URL:-}" "https://api.openai.com/v1/models")" "Authorization: Bearer "
 check_key ANTHROPIC_API_KEY "$(loopback_or "${LANGY_DOCTOR_ANTHROPIC_URL:-}" "https://api.anthropic.com/v1/models")" "x-api-key: " "anthropic-version: 2023-06-01"
