@@ -118,16 +118,25 @@ export function QuietHeadline() {
     ? action.phrase
     : action.phrase.slice(0, step.length);
 
-  // Primary: send your first trace. Navigates to the trace surface (plain
-  // anchor semantics, so ⌘/middle-click still open a tab).
+  // Native anchor behavior (cmd/ctrl/shift-click, middle-click) belongs to
+  // the browser: intercept ONLY an unmodified primary click, so open-in-a-tab
+  // keeps working on these real links.
+  const isPlainLeftClick = (event: MouseEvent<HTMLAnchorElement>) =>
+    event.button === 0 &&
+    !event.metaKey &&
+    !event.ctrlKey &&
+    !event.shiftKey &&
+    !event.altKey;
+
+  // Primary: send your first trace, on the client router.
   const onSendTrace = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (!project) return;
+    if (!project || !isPlainLeftClick(event)) return;
     event.preventDefault();
     void router.push(traceHref(project.slug));
   };
 
   const onLearnMore = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (!project) return;
+    if (!project || !isPlainLeftClick(event)) return;
     event.preventDefault();
     void router.push(action.href(project.slug));
   };
@@ -186,26 +195,11 @@ export function QuietHeadline() {
           <LuArrowRight size={13} />
         </chakra.a>
         {canAsk ? (
-          <chakra.button
-            type="button"
+          <LangyHandOff
+            label="Walk me through it"
+            ariaLabel="Ask Langy how to send your first trace"
             onClick={() => askLangy(TRACE_ASK)}
-            aria-label="Ask Langy how to send your first trace"
-            display="inline-flex"
-            alignItems="center"
-            gap={1}
-            fontFamily="mono"
-            fontSize="12px"
-            color="orange.fg"
-            cursor="pointer"
-            whiteSpace="nowrap"
-            borderBottomWidth="1px"
-            borderColor="transparent"
-            transition="border-color 130ms ease"
-            _hover={{ borderColor: "orange.fg" }}
-          >
-            <Sparkles size={12} />
-            Walk me through it
-          </chakra.button>
+          />
         ) : null}
       </HStack>
 
@@ -264,27 +258,46 @@ export function QuietHeadline() {
           Learn more →
         </chakra.a>
         {canAsk ? (
-          <chakra.button
-            type="button"
+          <LangyHandOff
+            label="Do it with Langy"
             onClick={() => askLangy(action.ask)}
-            display="inline-flex"
-            alignItems="center"
-            gap={1}
-            fontFamily="mono"
-            fontSize="12px"
-            color="orange.fg"
-            cursor="pointer"
-            whiteSpace="nowrap"
-            borderBottomWidth="1px"
-            borderColor="transparent"
-            transition="border-color 130ms ease"
-            _hover={{ borderColor: "orange.fg" }}
-          >
-            <Sparkles size={12} />
-            Do it with Langy
-          </chakra.button>
+          />
         ) : null}
       </HStack>
     </chakra.div>
+  );
+}
+
+/** The one Langy hand-off look, shared so the two routes cannot drift. */
+function LangyHandOff({
+  label,
+  ariaLabel,
+  onClick,
+}: {
+  label: string;
+  ariaLabel?: string;
+  onClick: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      display="inline-flex"
+      alignItems="center"
+      gap={1}
+      fontFamily="mono"
+      fontSize="12px"
+      color="orange.fg"
+      cursor="pointer"
+      whiteSpace="nowrap"
+      borderBottomWidth="1px"
+      borderColor="transparent"
+      transition="border-color 130ms ease"
+      _hover={{ borderColor: "orange.fg" }}
+    >
+      <Sparkles size={12} />
+      {label}
+    </chakra.button>
   );
 }

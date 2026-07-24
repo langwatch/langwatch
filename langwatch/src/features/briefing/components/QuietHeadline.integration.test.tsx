@@ -22,10 +22,6 @@ const gates = { langy: false };
 const askLangy = vi.fn();
 const push = vi.fn();
 
-// The headline's action auto-sends, so the component asks `useCanAskLangy`
-// (`langy:create`) rather than `useShowLangy` (`langy:view`). Both are mocked
-// off the one gate: the distinction between them is exercised where it is
-// decided, not restated in every consumer's fixture.
 vi.mock("~/features/langy/hooks/useShowLangy", () => ({
   useShowLangy: () => gates.langy,
 }));
@@ -66,79 +62,119 @@ describe("QuietHeadline invitation", () => {
   });
 
   describe("given a brand-new quiet project", () => {
-    /** @scenario The quiet invitation leads with sending the first trace */
-    it("leads with a prominent Send your first trace action to the trace surface", () => {
-      renderHeadline();
+    describe("when the prominent action is clicked", () => {
+      /** @scenario The quiet invitation leads with sending the first trace */
+      it("lands on the trace surface", () => {
+        renderHeadline();
 
-      fireEvent.click(
-        screen.getByRole("link", { name: "Send your first trace" }),
-      );
+        fireEvent.click(
+          screen.getByRole("link", { name: "Send your first trace" }),
+        );
 
-      expect(push).toHaveBeenCalledWith("/acme/traces");
+        expect(push).toHaveBeenCalledWith("/acme/traces");
+      });
+
+      it("leaves modified clicks to the browser for open-in-a-tab", () => {
+        renderHeadline();
+
+        fireEvent.click(
+          screen.getByRole("link", { name: "Send your first trace" }),
+          { metaKey: true },
+        );
+
+        expect(push).not.toHaveBeenCalled();
+      });
     });
 
-    it("rotates the OTHER first steps below, not sending a trace again", () => {
-      renderHeadline();
+    describe("when the rotation renders under reduced motion", () => {
+      it("offers the OTHER first steps, not sending a trace again", () => {
+        renderHeadline();
 
-      // Reduced motion pins the first rotating phrase; it is no longer a trace.
-      expect(
-        screen.getByRole("button", { name: "Learn more: Generate a dataset" }),
-      ).toBeDefined();
-      expect(screen.queryByRole("button", { name: /Send a trace/ })).toBeNull();
+        expect(
+          screen.getByRole("button", {
+            name: "Learn more: Generate a dataset",
+          }),
+        ).toBeDefined();
+        expect(
+          screen.queryByRole("button", { name: /Send a trace/ }),
+        ).toBeNull();
+      });
     });
   });
 
-  describe("when the reader does not have Langy", () => {
+  describe("given the reader does not have Langy", () => {
     /** @scenario The quiet invitation adapts to Langy's absence */
-    it("keeps the trace action and opens surfaces, offering no Langy action", () => {
+    it("offers no Langy hand-off anywhere", () => {
       renderHeadline();
 
-      // The prominent trace action still opens the trace surface.
-      fireEvent.click(
-        screen.getByRole("link", { name: "Send your first trace" }),
-      );
-      expect(push).toHaveBeenCalledWith("/acme/traces");
-
-      // The typed first step opens the feature surface that teaches it.
-      fireEvent.click(
-        screen.getByRole("button", { name: "Learn more: Generate a dataset" }),
-      );
-      expect(push).toHaveBeenCalledWith("/acme/datasets");
-
-      // No hand-to-Langy anywhere: not the primary, not the rotation.
-      expect(askLangy).not.toHaveBeenCalled();
       expect(screen.queryByText("Walk me through it")).toBeNull();
       expect(screen.queryByText("Do it with Langy")).toBeNull();
     });
-  });
 
-  describe("when the reader has Langy", () => {
-    it("hands the trace step to Langy from Walk me through it", () => {
-      gates.langy = true;
-      renderHeadline();
+    describe("when the prominent action is clicked", () => {
+      it("still opens the trace surface", () => {
+        renderHeadline();
 
-      fireEvent.click(
-        screen.getByRole("button", {
-          name: "Ask Langy how to send your first trace",
-        }),
-      );
+        fireEvent.click(
+          screen.getByRole("link", { name: "Send your first trace" }),
+        );
 
-      expect(askLangy).toHaveBeenCalledWith(
-        expect.stringContaining("first trace"),
-      );
-      expect(push).not.toHaveBeenCalled();
+        expect(push).toHaveBeenCalledWith("/acme/traces");
+        expect(askLangy).not.toHaveBeenCalled();
+      });
     });
 
-    it("hands the rotating step to Langy with the question already sent", () => {
+    describe("when the typed step is clicked", () => {
+      it("opens the feature surface that teaches it", () => {
+        renderHeadline();
+
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "Learn more: Generate a dataset",
+          }),
+        );
+
+        expect(push).toHaveBeenCalledWith("/acme/datasets");
+        expect(askLangy).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the reader has Langy", () => {
+    beforeEach(() => {
       gates.langy = true;
-      renderHeadline();
+    });
 
-      fireEvent.click(
-        screen.getByRole("button", { name: "Ask Langy: Generate a dataset" }),
-      );
+    describe("when the walkthrough is chosen", () => {
+      it("hands the trace step to Langy", () => {
+        renderHeadline();
 
-      expect(askLangy).toHaveBeenCalledWith(expect.stringContaining("dataset"));
-      expect(screen.getByText("Do it with Langy")).toBeDefined();
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "Ask Langy how to send your first trace",
+          }),
+        );
+
+        expect(askLangy).toHaveBeenCalledWith(
+          expect.stringContaining("first trace"),
+        );
+        expect(push).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the rotating step is handed to Langy", () => {
+      it("sends its question already composed", () => {
+        renderHeadline();
+
+        fireEvent.click(
+          screen.getByRole("button", { name: "Ask Langy: Generate a dataset" }),
+        );
+
+        expect(askLangy).toHaveBeenCalledWith(
+          expect.stringContaining("dataset"),
+        );
+        expect(screen.getByText("Do it with Langy")).toBeDefined();
+      });
     });
   });
 });
