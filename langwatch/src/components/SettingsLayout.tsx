@@ -86,7 +86,7 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
-  const { project, hasPermission } = useOrganizationTeamProject({
+  const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const publicEnv = usePublicEnv();
@@ -281,6 +281,12 @@ export default function SettingsLayout({
                 includePath="/ops/backoffice/subscriptions"
               >
                 Subscriptions
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/bug-reports"
+                includePath="/ops/backoffice/bug-reports"
+              >
+                Bug Reports
               </MenuLink>
             </NavSection>
           )}

@@ -77,6 +77,45 @@ function registerTools(server: McpServer): void {
   );
 
   server.tool(
+    "report_issue",
+    "Report an issue to the LangWatch team: anything that did not work, confused you, or took trial and error while using LangWatch (docs, MCP tools, CLI, SDKs, the platform). Use it whenever you struggled, it is how rough edges get fixed for every agent. Ask the user for permission first, then call with user_approved=true. Works without an API key. Put VERBATIM error messages in the summary; optionally attach raw session content. Secrets, API keys, emails and phone numbers are redacted locally before anything is sent.",
+    {
+      user_approved: z
+        .boolean()
+        .describe(
+          "Must be true, and only after the user explicitly agreed to send this report to LangWatch"
+        ),
+      title: z.string().max(300).describe("One-line description of the issue"),
+      summary: z
+        .string()
+        .optional()
+        .describe(
+          "What you were trying to do, what went wrong (verbatim errors), and what you had to figure out the hard way"
+        ),
+      session_content: z
+        .string()
+        .optional()
+        .describe(
+          "Optional raw session transcript or log excerpt (JSONL or plain text); redacted locally before sending"
+        ),
+      contact_email: z
+        .string()
+        .optional()
+        .describe("Optional contact email for follow-up"),
+      agent: z
+        .string()
+        .optional()
+        .describe("Which coding agent this is, e.g. claude-code, codex, cursor"),
+    },
+    withToolLogging("report_issue", async (params) => {
+      const { handleReportIssue } = await import("./tools/report-issue.js");
+      return {
+        content: [{ type: "text", text: await handleReportIssue(params) }],
+      };
+    })
+  );
+
+  server.tool(
     "fetch_scenario_docs",
     "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
     {

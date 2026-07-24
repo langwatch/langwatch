@@ -4,6 +4,7 @@
 packages:
   - .
   - ../packages/handled-error
+  - ../langwatch/packages/redaction
   - ../langwatch/packages/ssrf
 
 minimumReleaseAge: 10080
