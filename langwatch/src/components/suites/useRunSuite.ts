@@ -76,6 +76,12 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
       } else {
         toaster.create({
           title: `Run plan scheduled (${result.jobCount} jobs)`,
+          // #5815: match the sibling warning toast's shape so the
+          // action button isn't orphaned under a bare title. The
+          // description is intentionally short and factual (mirrors
+          // "... skipped." in the warning above) — it adds new info
+          // (timing) rather than restating the title.
+          description: "Jobs are starting now.",
           type: "success",
           meta: { closable: true },
           action: optionsRef.current.onViewRun
