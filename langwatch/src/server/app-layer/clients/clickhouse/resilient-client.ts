@@ -157,7 +157,10 @@ function safeQueryMeta(params: unknown): {
 
 /** Default threshold for slow query warnings. */
 const DEFAULT_SLOW_QUERY_MS = 1000;
-const DEFAULT_MAX_READ_BYTES = 3 * 1024 * 1024; // 3MB
+// There is deliberately no default read-bytes threshold: response size on its
+// own is a poor proxy for a problem query, so a global default only produced
+// warning noise for legitimately large-but-healthy reads. Read-bytes warnings
+// are opt-in per query via `langwatch_expected_max_read_bytes`.
 
 /**
  * Per-query performance expectations, passed via `clickhouse_settings`.
@@ -186,7 +189,6 @@ interface QueryExpectations {
 
 const DEFAULT_EXPECTATIONS: QueryExpectations = {
   maxDurationMs: DEFAULT_SLOW_QUERY_MS,
-  maxReadBytes: DEFAULT_MAX_READ_BYTES,
 };
 
 function extractExpectations(params: unknown): QueryExpectations {
@@ -201,7 +203,7 @@ function extractExpectations(params: unknown): QueryExpectations {
       : DEFAULT_SLOW_QUERY_MS,
     maxReadBytes: typeof s.langwatch_expected_max_read_bytes === "number"
       ? s.langwatch_expected_max_read_bytes
-      : DEFAULT_MAX_READ_BYTES,
+      : undefined,
   };
 }
 

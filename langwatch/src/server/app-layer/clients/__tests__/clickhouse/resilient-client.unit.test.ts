@@ -415,7 +415,26 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 
-  describe("when query result exceeds default size threshold (3MB)", () => {
+  describe("when query result is heavy but sets no read-byte expectation", () => {
+    it("does not warn on size alone (there is no default read-byte threshold)", async () => {
+      const queryResult = {
+        response_headers: {
+          "x-clickhouse-summary": JSON.stringify({ read_bytes: "8000000" }),
+        },
+      };
+      const mock = makeMockClient({
+        query: vi.fn().mockResolvedValue(queryResult),
+      });
+      const client = createResilientClickHouseClient({ client: mock });
+
+      await client.query({ query: "SELECT messages FROM traces" });
+
+      expect(mockQueryLogger.warn).not.toHaveBeenCalled();
+      expect(mockQueryLogger.debug).toHaveBeenCalled();
+    });
+  });
+
+  describe("when query result exceeds an explicit read-byte expectation", () => {
     it("logs at warn level with readBytes", async () => {
       const queryResult = {
         response_headers: {
@@ -427,7 +446,12 @@ describe("createResilientClickHouseClient()", () => {
       });
       const client = createResilientClickHouseClient({ client: mock });
 
-      await client.query({ query: "SELECT messages FROM traces" });
+      await client.query({
+        query: "SELECT messages FROM traces",
+        clickhouse_settings: {
+          langwatch_expected_max_read_bytes: 3 * 1024 * 1024,
+        },
+      } as any);
 
       expect(mockQueryLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -471,7 +495,7 @@ describe("createResilientClickHouseClient()", () => {
       });
       const client = createResilientClickHouseClient({ client: mock });
 
-      // 4MB is over the default 3MB, but under the custom 5MB
+      // 4MB is under the custom 5MB read-byte threshold
       await client.query({
         query: "SELECT * FROM heavy_table",
         clickhouse_settings: {
@@ -526,7 +550,12 @@ describe("createResilientClickHouseClient()", () => {
       });
       const client = createResilientClickHouseClient({ client: mock });
 
-      await client.query({ query: "SELECT * FROM huge" });
+      await client.query({
+        query: "SELECT * FROM huge",
+        clickhouse_settings: {
+          langwatch_expected_max_read_bytes: 3_000_000,
+        },
+      } as any);
 
       const msg = mockQueryLogger.warn.mock.calls[0]![1] as string;
       expect(msg).toContain("ms >");
