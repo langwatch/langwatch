@@ -44,7 +44,7 @@ Feature: Claude Code telemetry turn bounding
   # sharded getGroupKey on recordLog), and recordLogCommand.sharding.integration
   # (live GroupQueue staging: records land in more than one
   # `trace:<traceId>:<shard>` group).
-  @sharding @unit @integration
+  @sharding @unimplemented
   Scenario: one turn's logs fan out across ingest lanes
     Given log-command sharding is enabled with more than one shard
     And a Claude Code turn streaming thousands of log records
@@ -73,7 +73,7 @@ Feature: Claude Code telemetry turn bounding
   # spans carry the session id as gen_ai.conversation.id + langwatch.thread.id,
   # so the session view is unchanged. Driving the actual product session view
   # in a browser is a tracked gap.
-  @sharding @integration
+  @sharding @unimplemented
   Scenario: session grouping is unchanged by sharding
     Given a session whose turns were ingested through sharded lanes
     When the session is viewed in the product

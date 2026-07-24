@@ -217,7 +217,7 @@ describe("trace-processing pipeline span-command sharding", () => {
 });
 
 describe("when the trace pipeline is built", () => {
-  /** @scenario "New logs are written only to the canonical store" */
+  /** @scenario Ingested log telemetry reaches only the canonical store */
   it("registers no legacy log write machinery", () => {
     // The recordLog command + logRecordStorage map projection were the
     // stored_log_records write chain. Canonical `log_records` is now the only

@@ -122,7 +122,7 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
 
 describe("mergeStoredLogRows", () => {
   describe("given two rows that share the identity key with divergent bodies", () => {
-    /** @scenario "New logs are written only to the canonical store" */
+    /** @scenario Ingested log telemetry reaches only the canonical store */
     it("keeps exactly one, and the canonical (later) value wins", () => {
       // Identity is (traceId, spanId, timeUnixMs, scopeName, sorted attributes) —
       // the body is NOT part of it. A pre-cutover legacy row and its canonical
