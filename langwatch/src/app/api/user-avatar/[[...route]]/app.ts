@@ -20,6 +20,8 @@ import { HTTPException } from "hono/http-exception";
 import { anyAuthenticated, createServiceApp } from "~/server/api/security";
 import { rateLimit } from "~/server/rateLimit";
 import {
+  jsonResponse,
+  rateLimitedResponse,
   safeMediaType,
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
 } from "~/server/stored-objects/media-response";
@@ -37,16 +39,6 @@ const secured = createServiceApp<{ Variables: DualAuthVariables }>({
 // is looser than /api/files; still caps enumeration abuse from one credential.
 const AVATAR_RATE_LIMIT_WINDOW_SECONDS = 60;
 const AVATAR_RATE_LIMIT_MAX = 240;
-
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
-    },
-  });
-}
 
 function streamAvatarResponse({
   row,
@@ -99,16 +91,7 @@ async function handleAvatarRead(
     max: AVATAR_RATE_LIMIT_MAX,
   });
   if (!rl.allowed) {
-    return new Response(JSON.stringify({ error: "rate_limited" }), {
-      status: 429,
-      headers: {
-        "Content-Type": "application/json",
-        "Retry-After": String(
-          Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000)),
-        ),
-        ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
-      },
-    });
+    return rateLimitedResponse(rl.resetAt);
   }
 
   let result;

@@ -15,6 +15,15 @@ export const TEAM_ROLE_PRIORITY: Record<TeamUserRole, number> = {
   [TeamUserRole.CUSTOM]: 3,
 };
 
+/** The user fields every team-member projection selects (kept in one place so
+ * the shape can't drift across the three role-binding include sites). */
+const MEMBER_USER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  image: true,
+} satisfies Prisma.UserSelect;
+
 const principalInOrganizationWhere = (
   organizationId: string,
 ): Prisma.RoleBindingWhereInput => ({
@@ -298,7 +307,7 @@ export class TeamService {
               ...principalInOrganizationWhere(organizationId),
             },
             include: {
-              user: { select: { id: true, name: true, email: true, image: true } },
+              user: { select: MEMBER_USER_SELECT },
               group: { select: { id: true, name: true, scimSource: true } },
               apiKey: { select: { id: true, name: true } },
               customRole: { select: { id: true, name: true } },
@@ -313,7 +322,7 @@ export class TeamService {
                   ...principalInOrganizationWhere(organizationId),
                 },
                 include: {
-                  user: { select: { id: true, name: true, email: true, image: true } },
+                  user: { select: MEMBER_USER_SELECT },
                   group: { select: { id: true, name: true, scimSource: true } },
                   apiKey: { select: { id: true, name: true } },
                   customRole: { select: { id: true, name: true } },
@@ -342,7 +351,7 @@ export class TeamService {
                 group: { organizationId },
                 user: { orgMemberships: { some: { organizationId } } },
               },
-              include: { user: { select: { id: true, name: true, email: true, image: true } } },
+              include: { user: { select: MEMBER_USER_SELECT } },
             })
           : [];
 

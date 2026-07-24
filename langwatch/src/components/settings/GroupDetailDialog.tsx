@@ -31,7 +31,7 @@ import {
 } from "./GroupBindingInputRow";
 
 type Group = RouterOutputs["group"]["listAll"][number];
-type PendingAddition = { userId: string; label: string };
+type PendingAddition = { userId: string; label: string; image: string | null };
 
 export function GroupDetailDialog({
   group,
@@ -154,8 +154,12 @@ export function GroupDetailDialog({
       return next;
     });
 
-  const stageMemberAdd = (userId: string, label: string) => {
-    setPendingAdditions((prev) => [...prev, { userId, label }]);
+  const stageMemberAdd = (
+    userId: string,
+    label: string,
+    image: string | null,
+  ) => {
+    setPendingAdditions((prev) => [...prev, { userId, label, image }]);
     setAddMemberId("");
     setMemberSearch("");
   };
@@ -339,7 +343,7 @@ export function GroupDetailDialog({
                     })}
                     {pendingAdditions.map((a) => (
                       <HStack key={a.userId} py={1} fontSize="sm" opacity={0.7}>
-                        <RandomColorAvatar name={a.label} size="xs" />
+                        <RandomColorAvatar name={a.label} image={a.image} size="xs" />
                         <Text flex={1} color="green.600">{a.label}</Text>
                         <Button
                           size="xs" variant="ghost" color="fg.muted"
@@ -359,6 +363,7 @@ export function GroupDetailDialog({
                     .map((m) => ({
                       label: `${m.user.name ?? m.user.email} (${m.user.email})`,
                       value: m.userId,
+                      image: m.user.image ?? null,
                     }))
                     .sort((a, b) => a.label.localeCompare(b.label));
                   const availableItems = memberSearch
@@ -399,7 +404,7 @@ export function GroupDetailDialog({
                         disabled={!addMemberId}
                         onClick={() => {
                           const item = allAvailable.find((a) => a.value === addMemberId);
-                          if (item) stageMemberAdd(item.value, item.label);
+                          if (item) stageMemberAdd(item.value, item.label, item.image);
                         }}
                       >
                         Add

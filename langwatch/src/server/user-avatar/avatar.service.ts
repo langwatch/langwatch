@@ -14,9 +14,12 @@
  * `removeAvatar` simply clears `User.image` (bytes are content-addressed and
  * may be shared via dedup, so they are not eagerly deleted).
  *
- * SSO precedence: better-auth only writes `User.image` on user *create*, never
- * on re-login, so an uploaded photo is never clobbered by a later SSO sign-in.
- * No guard is needed here; the invariant is covered by tests.
+ * SSO precedence: better-auth writes `User.image` only on user *create* (via
+ * `mapProfileToUser`), never on re-login — no provider opts into overwriting
+ * profile info on sign-in — so an uploaded photo is never clobbered by a later
+ * SSO sign-in. No guard is needed here; that "no override-on-sign-in" invariant
+ * is locked by better-auth/__tests__/index.test.ts and specified in
+ * specs/settings/user-avatar.feature.
  *
  * Collaborators are injected (with production defaults) so the orchestration is
  * unit-testable without ClickHouse or the EE workspace service.

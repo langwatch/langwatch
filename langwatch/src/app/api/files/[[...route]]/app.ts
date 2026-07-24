@@ -7,6 +7,8 @@ import { requireProjectPermission } from "~/server/auth/permissions";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
 import {
+  jsonResponse,
+  rateLimitedResponse,
   safeMediaType,
   sanitizeFilenameSegment,
   STORED_OBJECT_RESPONSE_BASE_HEADERS as FILES_RESPONSE_BASE_HEADERS,
@@ -39,15 +41,6 @@ const secured = createServiceApp<{ Variables: DualAuthVariables }>({
 const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
 const FILES_RATE_LIMIT_MAX = 120;
 
-function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      ...FILES_RESPONSE_BASE_HEADERS,
-    },
-  });
-}
 
 /**
  * Stored objects are shared by several features, and which permission guards
@@ -266,16 +259,7 @@ async function handleFileRead(
     max: FILES_RATE_LIMIT_MAX,
   });
   if (!rl.allowed) {
-    return new Response(JSON.stringify({ error: "rate_limited" }), {
-      status: 429,
-      headers: {
-        "Content-Type": "application/json",
-        "Retry-After": String(
-          Math.max(1, Math.ceil((rl.resetAt - Date.now()) / 1000)),
-        ),
-        ...FILES_RESPONSE_BASE_HEADERS,
-      },
-    });
+    return rateLimitedResponse(rl.resetAt);
   }
 
   // Step 2: resolve the owning project.

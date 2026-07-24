@@ -774,6 +774,13 @@ export const DashboardLayout = ({
                 minWidth="auto"
                 height="auto"
                 borderRadius="full"
+                aria-label={
+                  publicPage
+                    ? "Sign in"
+                    : user?.name
+                      ? `Open user menu for ${user.name}`
+                      : "Open user menu"
+                }
                 {...(publicPage
                   ? {
                       // On a public share page, clicking the avatar offers

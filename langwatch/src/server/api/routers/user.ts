@@ -23,7 +23,10 @@ import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRe
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
-import { AvatarValidationError } from "~/server/user-avatar/avatar";
+import {
+  AVATAR_MAX_DATA_URL_LENGTH,
+  AvatarValidationError,
+} from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
@@ -497,8 +500,10 @@ export const userRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         // A base64 image data URL (`data:image/...;base64,...`) produced by the
-        // client crop/resize step. Validated + decoded in UserAvatarService.
-        imageDataUrl: z.string().min(1),
+        // client crop/resize step. Bounded here as first-line defense so an
+        // oversized payload is rejected before UserAvatarService decodes it;
+        // validated + decoded there.
+        imageDataUrl: z.string().min(1).max(AVATAR_MAX_DATA_URL_LENGTH),
       }),
     )
     .use(checkOrganizationPermission("organization:view"))

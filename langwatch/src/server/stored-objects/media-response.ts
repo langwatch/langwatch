@@ -37,3 +37,29 @@ export function safeMediaType(mediaType: string): string {
 export function sanitizeFilenameSegment(id: string): string {
   return id.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 128);
 }
+
+/** A JSON response carrying the shared stored-object hardening headers. */
+export function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
+    },
+  });
+}
+
+/**
+ * A 429 response with a `Retry-After` derived from the rate-limit reset time
+ * (clamped to ≥ 1s), plus the shared hardening headers.
+ */
+export function rateLimitedResponse(resetAtMs: number): Response {
+  return new Response(JSON.stringify({ error: "rate_limited" }), {
+    status: 429,
+    headers: {
+      "Content-Type": "application/json",
+      "Retry-After": String(Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000))),
+      ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
+    },
+  });
+}

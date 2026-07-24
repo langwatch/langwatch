@@ -29,6 +29,16 @@ export const AVATAR_OWNER_KIND = "user";
 export const AVATAR_MAX_BYTES = 1 * 1024 * 1024;
 
 /**
+ * Upper bound on the raw `data:` URL length we accept, so an oversized payload
+ * is rejected before the regex scans it or any Buffer is allocated. base64
+ * inflates bytes by 4/3; the extra 256 covers the `data:<type>;base64,` prefix
+ * and any incidental whitespace. Used both here and by the tRPC input schema
+ * (`user.setAvatar`) as a first-line `.max()` guard.
+ */
+export const AVATAR_MAX_DATA_URL_LENGTH =
+  Math.ceil(AVATAR_MAX_BYTES / 3) * 4 + 256;
+
+/**
  * Image types we accept on upload. Every entry must also be readback-safe
  * (`isReadbackSafe` in stored-objects/safe-media-types.ts) so the serve route
  * can echo the Content-Type without coercing it to octet-stream.
@@ -83,7 +93,18 @@ export function parseAvatarDataUrl(dataUrl: string): {
   mediaType: AvatarMediaType;
   bytes: Buffer;
 } {
-  const match = DATA_URL_RE.exec(dataUrl.trim());
+  const trimmed = dataUrl.trim();
+  // Reject an oversized payload up front — before the regex scans it or any
+  // Buffer is decoded — so a huge user-controlled string can't allocate memory
+  // just to be rejected. The precise decoded-size check still runs below.
+  if (trimmed.length > AVATAR_MAX_DATA_URL_LENGTH) {
+    throw new AvatarValidationError(
+      "file_too_large",
+      `Image is too large (max ${Math.round(AVATAR_MAX_BYTES / 1024 / 1024)} MB).`,
+    );
+  }
+
+  const match = DATA_URL_RE.exec(trimmed);
   if (!match) {
     throw new AvatarValidationError(
       "invalid_data_url",
