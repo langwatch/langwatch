@@ -99,6 +99,7 @@ import {
   explainLangyError,
   readLangyStreamError,
   readLangyTrpcError,
+  resolveLiveTurnError,
 } from "../logic/langyErrorExplainer";
 import {
   PANEL_SUGGESTION_COUNT,
@@ -1577,13 +1578,9 @@ function LangyPanel({
     // fallback now also carries the raw message so a genuinely-unhandled error
     // stays legible in the dev-mode debug drawer instead of being a black box.
     if (error) {
-      const domain = readLangyTrpcError(error) ??
-        readLangyStreamError(error.message) ?? {
-          code: "unknown",
-          meta: error.message ? { error: error.message } : {},
-          httpStatus: 500,
-        };
-      return explainLangyError(domain);
+      return explainLangyError(
+        resolveLiveTurnError({ error, durableLastError: historyLastError }),
+      );
     }
     // The DURABLE failure, off the conversation fold. A turn error lived only in
     // `useChat` state, so a refresh after a failed turn left the user's question
