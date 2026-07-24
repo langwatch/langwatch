@@ -134,11 +134,17 @@ interface ClickHouseWriteRecord {
 /** UInt64 columns ride as strings — see the interface docblock. */
 const big = (n: number): string => String(Math.max(0, Math.round(n)));
 
-function toRecord(
-  row: CodingAgentSessionRow,
-  retentionDays?: number,
-  appliedEventIds: readonly string[] = [],
-): ClickHouseWriteRecord {
+function toRecord({
+  row,
+  retentionDays,
+  appliedEventIds = [],
+  versionStampMs,
+}: {
+  row: CodingAgentSessionRow;
+  retentionDays?: number;
+  appliedEventIds?: readonly string[];
+  versionStampMs: number;
+}): ClickHouseWriteRecord {
   const now = new Date();
   return {
     TenantId: row.tenantId,
@@ -147,9 +153,10 @@ function toRecord(
     Version: row.version,
     StartedAt: new Date(row.startedAtMs),
     // Preserve first-seen creation across re-folds; UpdatedAt is the RMT
-    // version and must be the write time so the latest version wins.
+    // version and must be strictly greater than the version it supersedes —
+    // see nextVersionStamp for why write time alone is not enough.
     CreatedAt: row.createdAt > 0 ? new Date(row.createdAt) : now,
-    UpdatedAt: now,
+    UpdatedAt: new Date(versionStampMs),
 
     Agent: row.agent,
     AgentVersion: row.agentVersion,
@@ -257,6 +264,30 @@ export class CodingAgentSessionClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
+  /**
+   * Monotonic floor for the RMT version stamp this writer issues. The
+   * IN-tuple read pattern requires that no two versions of one session tie on
+   * UpdatedAt (dev/docs/best_practices/clickhouse-queries.md: "nextUpdatedAt =
+   * max(now, prevUpdatedAt + 1) … no ties possible"): a tie makes BOTH rows
+   * match max(UpdatedAt), and a windowed read can then resurrect the stale
+   * in-window version while the true latest sits outside the window. The
+   * stamp combines the superseded version's timestamp threaded through the
+   * row (the read-back path) with this writer's own last stamp (covers
+   * writers that did not read back); per-aggregate group serialization covers
+   * the cross-process window.
+   */
+  private lastVersionStampMs = 0;
+
+  private nextVersionStamp(priorUpdatedAtMs: number): number {
+    const stamp = Math.max(
+      Date.now(),
+      priorUpdatedAtMs + 1,
+      this.lastVersionStampMs + 1,
+    );
+    this.lastVersionStampMs = stamp;
+    return stamp;
+  }
+
   async upsert(
     row: CodingAgentSessionRow,
     retentionDays?: number,
@@ -270,7 +301,14 @@ export class CodingAgentSessionClickHouseRepository
     try {
       await client.insert({
         table: TABLE_NAME,
-        values: [toRecord(row, retentionDays, appliedEventIds)],
+        values: [
+          toRecord({
+            row,
+            retentionDays,
+            appliedEventIds,
+            versionStampMs: this.nextVersionStamp(row.updatedAt),
+          }),
+        ],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
@@ -481,7 +519,12 @@ export class CodingAgentSessionClickHouseRepository
       await client.insert({
         table: TABLE_NAME,
         values: entries.map(({ row, retentionDays, appliedEventIds }) =>
-          toRecord(row, retentionDays, appliedEventIds),
+          toRecord({
+            row,
+            retentionDays,
+            appliedEventIds,
+            versionStampMs: this.nextVersionStamp(row.updatedAt),
+          }),
         ),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
