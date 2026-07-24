@@ -238,6 +238,43 @@ describe("coding_agent_sessions round-trip (migration 00051)", () => {
     // The later write wins.
     expect(forSession[0]!.costUsd).toBeCloseTo(2);
   });
+
+  it("reads back the applied-event-id watermark next to the row (ADR-066)", async () => {
+    const row = sessionRow({ sessionId: `${tag}-applied` });
+    await sessions.upsert(row, 30, ["ev-1", "ev-2"]);
+
+    const withApplied = await sessions.findBySessionIdWithApplied({
+      tenantId,
+      sessionId: `${tag}-applied`,
+      startedAtMs: baseMs,
+    });
+    const direct = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-applied`,
+      startedAtMs: baseMs,
+    });
+
+    expect(withApplied).not.toBeNull();
+    // The watermark rides beside the row, not inside it.
+    expect(withApplied!.appliedEventIds).toEqual(["ev-1", "ev-2"]);
+    // The mapped row is exactly what findBySessionId returns — one read, same
+    // query, same decode.
+    expect(withApplied!.row).toEqual(direct);
+  });
+
+  it("reads back an empty watermark when a row is written without one", async () => {
+    const row = sessionRow({ sessionId: `${tag}-noapplied` });
+    await sessions.upsert(row, 30);
+
+    const withApplied = await sessions.findBySessionIdWithApplied({
+      tenantId,
+      sessionId: `${tag}-noapplied`,
+      startedAtMs: baseMs,
+    });
+
+    expect(withApplied).not.toBeNull();
+    expect(withApplied!.appliedEventIds).toEqual([]);
+  });
 });
 
 describe("coding_agent_trace_sessions map (migration 00051)", () => {

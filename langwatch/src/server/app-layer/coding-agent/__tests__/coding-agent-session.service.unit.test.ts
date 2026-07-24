@@ -134,6 +134,8 @@ function makeService({
   const sessions: CodingAgentSessionRepository = {
     upsert: async () => {},
     findBySessionId: async () => row,
+    findBySessionIdWithApplied: async () =>
+      row ? { row, appliedEventIds: [] } : null,
     findManyRecent: async () => listed,
   };
   const traceSessions: CodingAgentTraceSessionRepository = {

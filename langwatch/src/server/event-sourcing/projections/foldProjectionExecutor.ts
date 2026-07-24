@@ -5,6 +5,7 @@ import {
   observeEsFoldBlindReapplyEvents,
 } from "~/server/metrics";
 import type { Event } from "../domain/types";
+import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry";
 import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
@@ -126,28 +127,47 @@ export class FoldProjectionExecutor {
   /**
    * Loads state along with the ids of the events already folded into it.
    *
-   * Caching stores answer with the applied-set they recorded; the rest answer
-   * with an empty one, correctly — a store with no cache always reads the
-   * durable row, so it has no redelivery window to close.
+   * A store that keeps an applied-event-id set — the Redis cache wrapper, or a
+   * store that persists the set durably next to its row — answers with it via
+   * `getWithApplied`. A store that keeps none has no `getWithApplied`; its read
+   * carries an empty set and the executor treats every delivery as fresh.
    */
   private async loadWithApplied<State>(
     store: FoldProjectionStore<State>,
     key: string,
     context: ProjectionStoreContext,
   ): Promise<{ state: State | null; appliedEventIds: string[] }> {
-    const withApplied = (
-      store as FoldProjectionStore<State> & {
-        getWithApplied?: (
-          aggregateId: string,
-          context: ProjectionStoreContext,
-        ) => Promise<{ state: State | null; appliedEventIds: string[] }>;
-      }
-    ).getWithApplied;
-
-    if (typeof withApplied === "function") {
-      return await withApplied.call(store, key, context);
+    if (store.getWithApplied) {
+      return await store.getWithApplied(key, context);
     }
     return { state: await store.get(key, context), appliedEventIds: [] };
+  }
+
+  /**
+   * The applied-event-id set to record at commit.
+   *
+   * On a fresh delivery the previous batch for this group already acked (the
+   * queue holds one active batch per group), so its ids can never be
+   * redelivered — the set resets to this batch's fresh ids, staying bounded to
+   * one batch. On a RETRY it must instead be the UNION of the set loaded at read
+   * time and the fresh ids: a retry chain that keeps losing its cache would
+   * otherwise record only each attempt's fresh ids, and a later attempt
+   * redelivering the whole batch would re-apply the events an earlier attempt
+   * already folded into the durable row (silent double-count). Merging keeps
+   * every id the durable row still needs to recognise, capped and deduped.
+   */
+  private appliedIdsForCommit({
+    context,
+    loadedAppliedIds,
+    freshIds,
+  }: {
+    context: ProjectionStoreContext;
+    loadedAppliedIds: readonly string[];
+    freshIds: readonly string[];
+  }): string[] {
+    return (context.deliveryAttempt ?? 1) > 1
+      ? mergeAppliedEventIds({ previous: loadedAppliedIds, applied: freshIds })
+      : [...freshIds];
   }
 
   /**
@@ -237,7 +257,14 @@ export class FoldProjectionExecutor {
       if (refolded !== null) {
         await projection.store.store(
           refolded,
-          withAppliedEventIds(context, [event.id]),
+          withAppliedEventIds(
+            context,
+            this.appliedIdsForCommit({
+              context,
+              loadedAppliedIds: appliedEventIds,
+              freshIds: [event.id],
+            }),
+          ),
         );
         return refolded;
       }
@@ -308,7 +335,14 @@ export class FoldProjectionExecutor {
 
     await projection.store.store(
       state,
-      withAppliedEventIds(context, [event.id]),
+      withAppliedEventIds(
+        context,
+        this.appliedIdsForCommit({
+          context,
+          loadedAppliedIds: appliedEventIds,
+          freshIds: [event.id],
+        }),
+      ),
     );
     return state;
   }
@@ -373,7 +407,11 @@ export class FoldProjectionExecutor {
           refolded,
           withAppliedEventIds(
             context,
-            ordered.map((event) => event.id),
+            this.appliedIdsForCommit({
+              context,
+              loadedAppliedIds: appliedEventIds,
+              freshIds: ordered.map((event) => event.id),
+            }),
           ),
         );
         return refolded;
@@ -447,7 +485,11 @@ export class FoldProjectionExecutor {
       state,
       withAppliedEventIds(
         context,
-        fresh.map((event) => event.id),
+        this.appliedIdsForCommit({
+          context,
+          loadedAppliedIds: appliedEventIds,
+          freshIds: fresh.map((event) => event.id),
+        }),
       ),
     );
     return state;

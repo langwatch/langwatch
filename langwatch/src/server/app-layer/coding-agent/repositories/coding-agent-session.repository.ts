@@ -8,11 +8,25 @@ import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/co
  * per (TenantId, SessionId), so a re-fold simply writes a newer version.
  */
 export interface CodingAgentSessionRepository {
-  upsert(row: CodingAgentSessionRow, retentionDays?: number): Promise<void>;
+  /**
+   * `appliedEventIds` is the executor's redelivery-dedup watermark (ADR-066,
+   * migration 00054): the ids folded into this write, persisted next to the row
+   * so a retry with a cold cache still recognises a batch it already committed.
+   * Not part of the row — it is fold bookkeeping, not session state.
+   */
+  upsert(
+    row: CodingAgentSessionRow,
+    retentionDays?: number,
+    appliedEventIds?: readonly string[],
+  ): Promise<void>;
 
   /** Batch path. The store falls back to per-row upsert when absent. */
   upsertBatch?(
-    rows: Array<{ row: CodingAgentSessionRow; retentionDays?: number }>,
+    rows: Array<{
+      row: CodingAgentSessionRow;
+      retentionDays?: number;
+      appliedEventIds?: readonly string[];
+    }>,
   ): Promise<void>;
 
   /**
@@ -24,6 +38,18 @@ export interface CodingAgentSessionRepository {
     sessionId: string;
     startedAtMs?: number;
   }): Promise<CodingAgentSessionRow | null>;
+
+  /**
+   * The same session as `findBySessionId`, plus the applied-event-id watermark
+   * persisted next to it (ADR-066, migration 00054). Same query — the read-back
+   * store uses this on a cache miss so a retry can dedup a redelivered batch
+   * without the cache. Null when no row exists.
+   */
+  findBySessionIdWithApplied(params: {
+    tenantId: string;
+    sessionId: string;
+    startedAtMs?: number;
+  }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null>;
 
   /**
    * A project's coding-agent sessions in a period, newest first. The time
@@ -53,6 +79,13 @@ export class NullCodingAgentSessionRepository
   }
 
   async findBySessionId(): Promise<CodingAgentSessionRow | null> {
+    return null;
+  }
+
+  async findBySessionIdWithApplied(): Promise<{
+    row: CodingAgentSessionRow;
+    appliedEventIds: string[];
+  } | null> {
     return null;
   }
 

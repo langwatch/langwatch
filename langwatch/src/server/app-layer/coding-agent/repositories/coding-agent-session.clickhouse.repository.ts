@@ -122,6 +122,12 @@ interface ClickHouseWriteRecord {
   MetricSeries: [string, string, string, string, string, number][];
   LastEventOccurredAt: Date;
 
+  // ── Durable dedup watermark (ADR-066, migration 00054) ─────────────────
+  // The applied-event-id set the executor checks a redelivery against. Not fold
+  // state and not analytics — it rides next to the row so dedup survives cache
+  // loss.
+  AppliedEventIds: string[];
+
   _retention_days: number;
 }
 
@@ -131,6 +137,7 @@ const big = (n: number): string => String(Math.max(0, Math.round(n)));
 function toRecord(
   row: CodingAgentSessionRow,
   retentionDays?: number,
+  appliedEventIds: readonly string[] = [],
 ): ClickHouseWriteRecord {
   const now = new Date();
   return {
@@ -239,6 +246,8 @@ function toRecord(
     ]),
     LastEventOccurredAt: new Date(row.lastEventOccurredAt),
 
+    AppliedEventIds: [...appliedEventIds],
+
     _retention_days: retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
   };
 }
@@ -251,6 +260,7 @@ export class CodingAgentSessionClickHouseRepository
   async upsert(
     row: CodingAgentSessionRow,
     retentionDays?: number,
+    appliedEventIds?: readonly string[],
   ): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: row.tenantId },
@@ -260,7 +270,7 @@ export class CodingAgentSessionClickHouseRepository
     try {
       await client.insert({
         table: TABLE_NAME,
-        values: [toRecord(row, retentionDays)],
+        values: [toRecord(row, retentionDays, appliedEventIds)],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
@@ -274,7 +284,8 @@ export class CodingAgentSessionClickHouseRepository
   }
 
   /**
-   * One session by its key.
+   * The latest raw record for a session key, or null — the shared read behind
+   * both `findBySessionId` and `findBySessionIdWithApplied`.
    *
    * Dedups with the IN-tuple pattern (max(UpdatedAt) per key) rather than
    * FINAL: the ReplacingMergeTree only physically collapses rows sharing the
@@ -286,7 +297,7 @@ export class CodingAgentSessionClickHouseRepository
    * widened ±7 days rather than pinned to the exact ms — the window keeps
    * this a partition-pruned point read instead of a full-table scan.
    */
-  async findBySessionId({
+  private async findLatestRecord({
     tenantId,
     sessionId,
     startedAtMs,
@@ -294,7 +305,7 @@ export class CodingAgentSessionClickHouseRepository
     tenantId: string;
     sessionId: string;
     startedAtMs?: number;
-  }): Promise<CodingAgentSessionRow | null> {
+  }): Promise<Record<string, unknown> | null> {
     EventUtils.validateTenantId(
       { tenantId },
       "CodingAgentSessionClickHouseRepository.findBySessionId",
@@ -337,8 +348,35 @@ export class CodingAgentSessionClickHouseRepository
     });
 
     const rows = await result.json<Record<string, unknown>>();
-    const first = rows[0];
-    return first ? fromRecord(first) : null;
+    return rows[0] ?? null;
+  }
+
+  /** One session by its key, or null. */
+  async findBySessionId(params: {
+    tenantId: string;
+    sessionId: string;
+    startedAtMs?: number;
+  }): Promise<CodingAgentSessionRow | null> {
+    const record = await this.findLatestRecord(params);
+    return record ? fromRecord(record) : null;
+  }
+
+  /**
+   * The session plus its applied-event-id watermark (ADR-066, migration 00054).
+   * One ClickHouse read — the same query as `findBySessionId` — with the
+   * watermark carried alongside the mapped row rather than inside it.
+   */
+  async findBySessionIdWithApplied(params: {
+    tenantId: string;
+    sessionId: string;
+    startedAtMs?: number;
+  }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null> {
+    const record = await this.findLatestRecord(params);
+    if (!record) return null;
+    return {
+      row: fromRecord(record),
+      appliedEventIds: asStringArray(record.AppliedEventIds),
+    };
   }
 
   /**
@@ -406,7 +444,11 @@ export class CodingAgentSessionClickHouseRepository
   }
 
   async upsertBatch(
-    entries: Array<{ row: CodingAgentSessionRow; retentionDays?: number }>,
+    entries: Array<{
+      row: CodingAgentSessionRow;
+      retentionDays?: number;
+      appliedEventIds?: readonly string[];
+    }>,
   ): Promise<void> {
     if (entries.length === 0) return;
 
@@ -431,8 +473,8 @@ export class CodingAgentSessionClickHouseRepository
     try {
       await client.insert({
         table: TABLE_NAME,
-        values: entries.map(({ row, retentionDays }) =>
-          toRecord(row, retentionDays),
+        values: entries.map(({ row, retentionDays, appliedEventIds }) =>
+          toRecord(row, retentionDays, appliedEventIds),
         ),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },

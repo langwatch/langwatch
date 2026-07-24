@@ -1,3 +1,4 @@
+import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../domain/tenantId";
 import type { FoldProjectionStore } from "../foldProjection.types";
@@ -28,6 +29,51 @@ function createInnerStore(
   };
 
   return { store, calls };
+}
+
+/**
+ * An inner store that persists the applied-event-id set next to its state —
+ * the durable read-back shape (`getWithApplied`) a store gains under ADR-066.
+ * Its `get()` still answers state-only, so the wrapper's cache-miss path is
+ * exercised for both entry points.
+ */
+function createDurableInnerStore({
+  state = { count: 1, UpdatedAt: 100 },
+  appliedEventIds,
+}: {
+  state?: TestState | null;
+  appliedEventIds: string[];
+}) {
+  const calls = { get: [] as string[], getWithApplied: [] as string[] };
+  const store: FoldProjectionStore<TestState> = {
+    async get(aggregateId: string) {
+      calls.get.push(aggregateId);
+      return state;
+    },
+    async getWithApplied(aggregateId: string) {
+      calls.getWithApplied.push(aggregateId);
+      return { state, appliedEventIds };
+    },
+    async store() {},
+  };
+  return { store, calls };
+}
+
+/**
+ * Reads the dedup-unavailable counter straight off the registry for the
+ * `test_table` projection — a spy on a destructured copy would intercept
+ * nothing and pass regardless.
+ */
+async function dedupUnavailableCount(reason: string): Promise<number> {
+  const metric = await register
+    .getSingleMetric("es_fold_dedup_unavailable_total")
+    ?.get();
+  return (
+    metric?.values.find(
+      (v) =>
+        v.labels.projection_name === "test_table" && v.labels.reason === reason,
+    )?.value ?? 0
+  );
 }
 
 function createRedis() {
@@ -251,22 +297,6 @@ describe("RedisCachedFoldStore", () => {
   });
 
   describe("given a retry whose applied-set is gone", () => {
-    /** Reads the counter straight off the registry — a spy on a destructured
-     *  copy would intercept nothing and pass regardless. */
-    async function dedupUnavailableCount(reason: string): Promise<number> {
-      const { register } = await import("prom-client");
-      const metric = await register
-        .getSingleMetric("es_fold_dedup_unavailable_total")
-        ?.get();
-      return (
-        metric?.values.find(
-          (v) =>
-            v.labels.projection_name === "test_table" &&
-            v.labels.reason === reason,
-        )?.value ?? 0
-      );
-    }
-
     it("counts it, because the batch is about to be re-applied on top of itself", async () => {
       // The dangerous case is invisible in the existing signals: a miss on a
       // retry and a miss on a fresh delivery are the same observation, and the
@@ -293,6 +323,48 @@ describe("RedisCachedFoldStore", () => {
       await store.getWithApplied("agg-1", { ...CONTEXT, deliveryAttempt: 1 });
 
       expect(await dedupUnavailableCount("cache_miss")).toBe(before);
+    });
+  });
+
+  describe("given an inner store that persists the applied-set durably", () => {
+    describe("when a retry misses the cache and the durable set has ids", () => {
+      /** @scenario a redelivered batch after a committed write does not double-count */
+      it("returns the durable set and does not count dedup unavailable", async () => {
+        const before = await dedupUnavailableCount("cache_miss");
+
+        const redis = createRedis();
+        const inner = createDurableInnerStore({ appliedEventIds: ["e1", "e2"] });
+        const { store } = createStore(redis, inner);
+
+        const result = await store.getWithApplied("agg-1", {
+          ...CONTEXT,
+          deliveryAttempt: 2,
+        });
+
+        // The durable row answered the redelivery, so dedup was available.
+        expect(result.state).toEqual({ count: 1, UpdatedAt: 100 });
+        expect(result.appliedEventIds).toEqual(["e1", "e2"]);
+        expect(inner.calls.getWithApplied).toEqual(["agg-1"]);
+        expect(await dedupUnavailableCount("cache_miss")).toBe(before);
+      });
+    });
+
+    describe("when a retry misses the cache and the durable set is empty", () => {
+      it("still counts dedup unavailable, preserving the blind-reapply signal", async () => {
+        const before = await dedupUnavailableCount("cache_miss");
+
+        const redis = createRedis();
+        const inner = createDurableInnerStore({ appliedEventIds: [] });
+        const { store } = createStore(redis, inner);
+
+        const result = await store.getWithApplied("agg-1", {
+          ...CONTEXT,
+          deliveryAttempt: 2,
+        });
+
+        expect(result.appliedEventIds).toEqual([]);
+        expect(await dedupUnavailableCount("cache_miss")).toBe(before + 1);
+      });
     });
   });
 

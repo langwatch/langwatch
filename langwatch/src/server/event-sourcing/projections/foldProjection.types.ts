@@ -203,4 +203,21 @@ export interface FoldProjectionStore<State> {
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<State | null>;
+
+  /**
+   * Retrieves the stored state together with the ids of the events already
+   * folded into it.
+   *
+   * Implemented by stores that persist the applied-event-id set durably next to
+   * the state row (first adopter: the codingAgentSession ClickHouse store) — and
+   * by the Redis cache wrapper, which serves the set from its entry. The
+   * executor prefers it over `get()` so redelivery dedup survives cache loss: a
+   * retry that reaches a cold cache can still read the durable set and recognise
+   * a batch it already committed. Stores that keep no such set omit it; the
+   * executor then reads `get()` and treats the applied set as empty.
+   */
+  getWithApplied?(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{ state: State | null; appliedEventIds: string[] }>;
 }
