@@ -7,7 +7,7 @@ requires-python = ">=3.10,<3.14"
 license = { text = "MIT" }
 readme = "README.md"
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -41,6 +41,9 @@ dependencies = [
     "attrs>=24",
     "pksuid>=1.1.2",
     "pyyaml>=6.0.2",
+    # Progress bars for experiment loop()/aloop(); pure-python and tiny, so a
+    # declared dependency rather than an optional (it always runs there).
+    "tqdm>=4.62.0",
 ]
 
 [project.optional-dependencies]
