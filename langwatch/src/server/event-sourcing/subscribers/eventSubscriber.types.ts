@@ -41,6 +41,17 @@ export interface EnqueueDispatchOptions<E extends Event = Event> {
    * typeof check, a field comparison).
    */
   filter?: (event: E) => boolean;
+  /**
+   * Claim-check staging (ADR-069): swap the staged payload for a small
+   * reference event that mirrors the source event's scheduling identity (id,
+   * aggregate, tenant, occurredAt) while the payload stays in its canonical
+   * store. Total field-picks only — no decoding, no normalization; return the
+   * source event unchanged when a reference cannot be built. The handler must
+   * understand every shape this can return, plus the full event (pre-upgrade
+   * jobs). Runs after `filter` accepted the event; a throw fails loudly into
+   * the routing retry.
+   */
+  stage?: (event: E) => Event;
 }
 
 export interface EventSubscriberOptions<E extends Event = Event> {

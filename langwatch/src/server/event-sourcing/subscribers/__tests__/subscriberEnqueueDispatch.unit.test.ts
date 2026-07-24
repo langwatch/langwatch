@@ -303,4 +303,99 @@ describe("subscriber enqueue-time contract", () => {
       });
     });
   });
+
+  describe("given a subscriber with a claim-check stage hook", () => {
+    describe("when the hook swaps the payload for a reference", () => {
+      /** @scenario a matched event's heavy payload travels as a claim-check, not inline */
+      it("stages the reference in place of the event and counts it as referenced", async () => {
+        const received: unknown[] = [];
+        const before = await enqueueOutcomeCount("referenced");
+        const event = makeEvent("evt-ref");
+        const router = makeRouter({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async (staged) => {
+            received.push(staged);
+          },
+          options: {
+            enqueue: {
+              stage: (source) => ({
+                ...source,
+                type: "test.referenced",
+                data: { ref: source.id },
+              }),
+            },
+          },
+        });
+
+        await router.dispatch([event], readContext);
+
+        expect(received).toHaveLength(1);
+        const staged = received[0] as {
+          type: string;
+          data: unknown;
+          id: string;
+          aggregateId: unknown;
+          occurredAt: number;
+        };
+        expect(staged.type).toBe("test.referenced");
+        expect(staged.data).toEqual({ ref: event.id });
+        // The scheduling identity travels on the reference.
+        expect(staged.id).toBe(event.id);
+        expect(staged.aggregateId).toBe(event.aggregateId);
+        expect(staged.occurredAt).toBe(event.occurredAt);
+        expect(await enqueueOutcomeCount("referenced")).toBe(before + 1);
+      });
+    });
+
+    describe("when the hook returns the event unchanged", () => {
+      /** @scenario an event that cannot be referenced stages whole */
+      it("stages the full event and counts it as staged, not referenced", async () => {
+        const received: unknown[] = [];
+        const beforeStaged = await enqueueOutcomeCount("staged");
+        const beforeReferenced = await enqueueOutcomeCount("referenced");
+        const event = makeEvent("evt-passthrough");
+        const router = makeRouter({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async (staged) => {
+            received.push(staged);
+          },
+          options: { enqueue: { stage: (source) => source } },
+        });
+
+        await router.dispatch([event], readContext);
+
+        expect(received[0]).toEqual(event);
+        expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged + 1);
+        expect(await enqueueOutcomeCount("referenced")).toBe(beforeReferenced);
+      });
+    });
+
+    describe("when the hook throws", () => {
+      /** @scenario a throwing enqueue filter surfaces into retry, never a silent drop */
+      it("fails loudly into the routing retry rather than dropping silently", async () => {
+        let handlerRan = false;
+        const router = makeRouter({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async () => {
+            handlerRan = true;
+          },
+          options: {
+            enqueue: {
+              stage: () => {
+                throw new Error("stage blew up");
+              },
+            },
+          },
+        });
+
+        await expect(
+          router.dispatch([makeEvent("evt-stage-throw")], readContext),
+        ).rejects.toThrow();
+        expect(handlerRan).toBe(false);
+      });
+    });
+  });
 });

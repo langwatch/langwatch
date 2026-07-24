@@ -4,6 +4,7 @@ import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscr
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace-processing/schemas/constants";
 import {
   isSpanReceivedEvent,
+  makeSpanReferencedEvent,
   parseSpanReferencedEvent,
   type SpanReceivedEvent,
   type TraceProcessingEvent,
@@ -66,7 +67,14 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
     name: "codingAgentSpanFactsDispatch",
     eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
     options: {
-      enqueue: { filter: isCodingAgentSpan },
+      enqueue: {
+        filter: isCodingAgentSpan,
+        // `filter` has already established a coding-agent span_received
+        // event; the stage hook is a total field-pick that swaps the staged
+        // payload for its claim-check (or returns the event unchanged when
+        // the span has no id to reference).
+        stage: (event) => makeSpanReferencedEvent(event as SpanReceivedEvent),
+      },
       // Debounce past the spanStorage sibling write: the reference resolves
       // against the span store, and both jobs are staged by the same fan-out.
       // Two seconds puts the first attempt after that write in the common

@@ -636,20 +636,24 @@ export const observeEsSubscriberDuration = ({
  * doctrine invariant 4 — ADR-069):
  *
  * - `filtered` — the predicate declined; no job was minted.
- * - `staged` — the event was handed off to the subscriber's lane, counted only
- *   after the handoff succeeded: the queue accepted the job, or (in the
- *   no-queue configuration) the handler ran inline. A handoff that throws
- *   counts neither outcome — it is reported as a dispatch failure instead, so
- *   a queue outage cannot inflate `staged`.
+ * - `staged` — a job carrying the full event was handed off to the
+ *   subscriber's lane.
+ * - `referenced` — a job carrying a claim-check reference instead of the
+ *   payload was handed off.
  *
- * The two outcomes therefore do not sum to "events routed"; the shortfall is
+ * `staged` and `referenced` are counted only after the handoff succeeded: the
+ * queue accepted the job, or (in the no-queue configuration) the handler ran
+ * inline. A handoff that throws counts no outcome at all — it is reported as a
+ * dispatch failure instead, so a queue outage cannot inflate either.
+ *
+ * The outcomes therefore do not sum to "events routed"; the shortfall is
  * the failure count, which is the honest reading.
  */
-type SubscriberEnqueueOutcome = "filtered" | "staged";
+type SubscriberEnqueueOutcome = "filtered" | "staged" | "referenced";
 register.removeSingleMetric("es_subscriber_enqueue_total");
 const esSubscriberEnqueueTotal = new Counter({
   name: "es_subscriber_enqueue_total",
-  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, or staged once the handoff to the subscriber's lane succeeded",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, or — once the handoff to the subscriber's lane succeeded — staged as a full event or referenced as a claim-check",
   labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
 });
 
