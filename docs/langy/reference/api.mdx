@@ -1,0 +1,39 @@
+---
+title: Is There an API to Drive Langy
+description: There is no public REST or SDK API to drive Langy programmatically yet. What exists today is the in-product chat, the GitHub App, the langwatch CLI with Skills, and an MCP path.
+sidebarTitle: API
+keywords: langy api, drive langy programmatically, langy mcp, langy rest api
+---
+
+There is no public REST or SDK API to drive Langy programmatically yet. You cannot start a Langy turn, submit a task, or read a conversation over an HTTP endpoint from your own code today.
+
+<Note>
+**Not yet available:** a programmatic Langy API (REST or SDK) to drive Langy from your own code. The surfaces below are what exists today.
+</Note>
+
+## What exists today
+
+| Surface | What it does | Docs |
+|---|---|---|
+| In-product chat | Ask Langy in plain language inside LangWatch; it reads traces and evals, writes tests, and opens pull requests. | [Chat](/langy/chat) |
+| GitHub App | The mechanism Langy uses to produce pull requests on your installed repositories. It is not an API you call; Langy calls it. | [GitHub access](/langy/security/github-access) |
+| `langwatch` CLI and Skills | The CLI plus the Skills catalog let your own coding agent (Claude, Codex, or another) do Langy-style work against LangWatch data. This is the closest thing to driving the work programmatically. | [Skills and CLI](/langy/skills-and-cli) |
+| MCP | Langy can be exposed over MCP so an external client drives it. This is how the launch robot demo drove Langy over MCP. | Below |
+
+## The CLI and Skills path
+
+If you want your own coding agent to do what Langy does, use the `langwatch` CLI and the Skills catalog. Langy itself is that CLI plus those Skills, assembled inside an isolated runtime; the same pieces run in your own agent. This is the supported way to get Langy-style behavior from your own code today. See [Skills and CLI](/langy/skills-and-cli).
+
+## Driving Langy over MCP
+
+Langy can be exposed over MCP so an external client drives it rather than a person typing in the chat panel. The launch demo used this: an external robot drove Langy over MCP and had it run Scenario simulations against a voice agent. MCP is the path when you want an external client, not your code, to send Langy work.
+
+<Info>
+**Pairs with:** [Skills and CLI](/langy/skills-and-cli), [Chat](/langy/chat).
+</Info>
+
+## Reference
+
+- [Skills and CLI](/langy/skills-and-cli)
+- [Chat](/langy/chat)
+- [GitHub access](/langy/security/github-access)

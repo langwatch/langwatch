@@ -1,0 +1,56 @@
+---
+title: Getting started with Langy
+description: Turn Langy on, pick a model or sign in with Codex, ask it something in the panel, and review the pull request it opens.
+sidebarTitle: Getting started
+keywords:
+  - langy getting started
+  - enable langy
+  - ai engineer setup
+---
+
+To use Langy you enable it, pick a model, ask it a question in the chat panel, and review the pull request it opens. Langy needs no separate install on your side: it reads your data through the `langwatch` CLI it already ships with, and it changes code only through a GitHub App you install on the repos you choose.
+
+<Info>
+  **Pairs with:** [How Langy works](/langy/how-langy-works), [Models and Codex](/langy/models), [Pull requests](/langy/pull-requests)
+</Info>
+
+<Steps>
+  <Step title="Have Langy enabled for your account">
+    Access to Langy is controlled by a single feature flag, `release_langy_enabled`.
+
+    - **On LangWatch Cloud:** Langy is being rolled out. If you do not see the panel yet, it is not enabled for your organization.
+    - **On a self-hosted install:** the agent pod is off by default and an admin turns it on. See [self-hosting enablement](/langy/self-hosting/overview) for the runtime toggle and the flag.
+
+    Turning the runtime on and exposing the UI are two separate steps: the agent can be running while the panel stays hidden until `release_langy_enabled` is on for your users.
+  </Step>
+  <Step title="Pick a model or sign in with Codex">
+    Open the model picker in the composer. You bring your own model access, one of two ways:
+
+    - **Add a provider API key** for OpenAI, Anthropic, or another supported provider, then pick a model such as `gpt-5.6-terra` or `claude-opus-4-8`. See [Models](/langy/models).
+    - **Sign in with your OpenAI account** to run Langy on your ChatGPT subscription through Codex, using a device-code sign-in instead of pasting a key. See [Codex](/langy/codex).
+
+    Every model call, including Codex, goes through the LangWatch AI gateway, so tracing, budgets, and policy apply the same way regardless of which you pick.
+
+    <Frame caption="The Langy home with the panel open in its model-setup state. Codex leads the provider list with a Recommended badge.">
+      ![The Langy home and panel prompting for model setup](/images/langy/fresh/langy-panel-model-setup.png)
+    </Frame>
+  </Step>
+  <Step title="Ask it something in the panel">
+    Type a question in plain language into the Langy panel. Langy reads the traces and evals your question points at, then works toward an answer or a change. As it runs, its tool calls stream into the conversation as activity cards, so you can see which traces it searched and which tests it ran.
+
+    <Frame caption="Langy mid-turn, streaming its tool work into the conversation as it reads traces and runs tests.">
+      ![The Langy chat panel mid-turn, doing tool work](/images/langy/chat/chat-toolwork.png)
+    </Frame>
+
+    For the kinds of questions Langy answers, see [Ask Langy](/langy/chat).
+  </Step>
+  <Step title="Review the pull request it opens">
+    When Langy changes code, it opens a pull request on the repo you installed the GitHub App on. The PR is authored by the LangWatch bot and credits you with a `Co-authored-by` trailer and a "Requested by @your-login via LangWatch" note. The Scenario tests Langy wrote run in your CI on that PR, so you can read the diff and see the checks before merging.
+
+    You review and merge. Langy never merges its own PR. See [Pull requests](/langy/pull-requests) for the full flow.
+  </Step>
+</Steps>
+
+<Note>
+  Langy can open pull requests only on repositories where the GitHub App is installed. If it reaches for `git` or `gh` on a repo the app is not installed on, it stops the turn and shows an install card in the chat.
+</Note>

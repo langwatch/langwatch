@@ -1,0 +1,38 @@
+---
+title: Signals and briefing
+description: How Langy surfaces what needs attention: an in-chat briefing and attention inbox backed by topic clustering and signals, with Investigate chips to dig in. Not a scheduled digest.
+sidebarTitle: Signals and briefing
+keywords:
+  - ai agent monitoring
+  - agentic signals
+  - ai anomaly detection
+---
+
+Langy surfaces what needs attention right in the chat home: an attention inbox that reads "AGENTIC SIGNALS, N need attention". It is not a scheduled email or Slack digest. It is a live view backed by topic clustering over your traces plus the signals and monitors Langy sets up, and it gives you Investigate chips to dig into any signal.
+
+<Info>**Pairs with:** [Ask Langy](/langy/chat) (the same panel you investigate from), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what an investigation can produce).</Info>
+
+<Frame caption="The Langy home: 'AGENTIC SIGNALS, N need attention' with ranked signals and inline model setup.">
+  ![Langy briefing home with agentic signals](/images/langy/briefing/home-signals.png)
+</Frame>
+
+## What the briefing is
+
+The briefing is the home of the Langy panel. It ranks what changed in your production data (errors that moved, evidence that repeated, metrics that shifted) and puts the most attention-worthy signals at the top. Each signal is something you can act on now, in the same panel.
+
+It is backed by:
+
+- **Topic clustering.** Langy clusters the topics in your traces so related behavior groups together instead of arriving as a flat list.
+- **Signals and monitors.** The clustering feeds signals and the monitors Langy sets up, which is what raises a signal to the top of the inbox.
+
+<Note>This is not a delivered digest. There is no scheduled report emailed or posted to Slack. The briefing lives in-chat and updates as your data does.</Note>
+
+## Investigate chips
+
+Each signal offers an Investigate chip that starts a turn from that signal. The chips are real questions Langy answers by [reading your data](/langy/chat):
+
+- "What changed in my errors?"
+- "Why is p50 latency 12s?"
+- "Where is my cost going?"
+
+Click one and Langy runs the CLI queries behind it, comes back with the traces and the metric, and can go on to [write a test](/langy/scenario-tests-and-evals) or [open a PR](/langy/pull-requests) from there.

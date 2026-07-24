@@ -1,0 +1,74 @@
+---
+title: Run Langy on Your Own OpenAI Plan (Codex)
+description: Sign in with your OpenAI account so Langy runs on your ChatGPT subscription through the LangWatch AI gateway instead of per-token API billing.
+sidebarTitle: Codex
+keywords: codex, run codex on your own openai plan, openai subscription harness, langy codex
+---
+
+Sign in with your OpenAI account and Langy runs on your ChatGPT subscription instead of per-token API billing. Codex uses OpenAI's device-code OAuth, the same sign-in flow the Codex CLI uses. It is the one provider you connect by signing in rather than pasting an API key.
+
+<Frame caption="Codex leads the provider grid with a Recommended badge during onboarding.">
+  ![Codex recommended in onboarding](/images/langy/codex/onboarding-recommended.png)
+</Frame>
+
+## Sign in with your OpenAI account
+
+<Steps>
+  <Step title="Open settings and add a provider">
+    In model-provider settings, choose **Add provider**.
+
+    <Frame caption="The add-provider settings menu, where you pick Codex.">
+      ![Add provider settings menu](/images/langy/codex/settings-add-provider.png)
+    </Frame>
+  </Step>
+  <Step title="Choose Codex">
+    Codex replaces the API-key fields with a device-code sign-in drawer.
+
+    <Frame caption="The Codex sign-in drawer. A device code replaces the usual API-key fields.">
+      ![Codex device-code sign-in drawer](/images/langy/codex/signin-drawer.png)
+    </Frame>
+  </Step>
+  <Step title="Approve the device code">
+    Open `auth.openai.com/codex/device`, enter the code shown in the drawer, and approve. The approval lands on OpenAI's own Codex sign-in screen because Langy uses the same OAuth client the Codex CLI uses. Once approved, the drawer completes the connection.
+  </Step>
+</Steps>
+
+After you connect, a dialog offers to set Codex as your coding default. Accepting applies Codex to the Langy and Fast roles. Your playground, evaluations, and workflows keep their current model.
+
+Once connected, Codex appears in the model menu with its own icon.
+
+<Frame caption="A Codex model row in the Langy model menu.">
+  ![Codex icon in the model menu](/images/langy/models/model-menu-codex-icon.png)
+</Frame>
+
+## What Codex is scoped to
+
+Codex runs only through the LangWatch AI gateway, on the gateway's Responses endpoint, riding the same per-project virtual key the rest of Langy uses. Tracing, rate limits, budgets, and model policy still apply, exactly as they do for any other model. See [Models and bring your own key](/langy/models).
+
+Codex is available only for Langy and the Fast tier, not for the playground, evaluations, or workflows. This scope follows OpenAI's terms, which the product states verbatim as licensing Codex for "coding-assistant harnesses and light AI assists, not general inference."
+
+<Note>
+Codex uses your OpenAI subscription via OAuth device sign-in. Every other provider, including Anthropic, is configured with an API key. See [Models and bring your own key](/langy/models).
+</Note>
+
+## Why teams run Langy on their own plan
+
+Langy reads production trace data and does heavy token work over many turns. Running it on your own OpenAI subscription keeps that token flow, and the account it bills, under your control:
+
+- **Cost.** A flat subscription instead of per-token API billing for Langy's usage.
+- **Data control.** The token flow stays on your own account. For what leaves your environment and where it goes, see [Data flow and privacy](/langy/security/data-flow-and-privacy).
+
+## Troubleshooting
+
+- **Session expired.** If the OAuth session dies, Langy shows a re-auth card. Sign in again through the same settings drawer.
+- **Plan limit reached.** If your plan hits its usage cap, Langy shows a switch-model card. Pick another model in the composer for the turn. See [Models and bring your own key](/langy/models).
+
+<Info>
+**Pairs with:** [Models and bring your own key](/langy/models), [Token usage and cost](/langy/token-usage-and-cost).
+</Info>
+
+## Reference
+
+- [Models and bring your own key](/langy/models)
+- [Token usage and cost](/langy/token-usage-and-cost)
+- [Data flow and privacy](/langy/security/data-flow-and-privacy)

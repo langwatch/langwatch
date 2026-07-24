@@ -743,6 +743,65 @@
         ]
       },
       {
+        "anchor": "Langy",
+        "icon": "robot",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "langy/overview",
+              "langy/getting-started",
+              "langy/how-langy-works"
+            ]
+          },
+          {
+            "group": "Using Langy",
+            "pages": [
+              "langy/chat",
+              "langy/scenario-tests-and-evals",
+              "langy/pull-requests",
+              "langy/signals-and-briefing",
+              "langy/skills-and-cli"
+            ]
+          },
+          {
+            "group": "Models & Cost",
+            "pages": [
+              "langy/models",
+              "langy/codex",
+              "langy/token-usage-and-cost"
+            ]
+          },
+          {
+            "group": "Security & Control",
+            "pages": [
+              "langy/security/sandbox",
+              "langy/security/data-flow-and-privacy",
+              "langy/security/github-access"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "langy/self-hosting/overview",
+              "langy/self-hosting/helm",
+              "langy/self-hosting/github-app",
+              "langy/self-hosting/environment-variables",
+              "langy/self-hosting/networking-and-egress"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "langy/reference/supported-models",
+              "langy/reference/limits",
+              "langy/reference/api",
+              "langy/reference/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
         "anchor": "Self Hosting",
         "icon": "server",
         "groups": [
