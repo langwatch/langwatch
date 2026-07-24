@@ -1,27 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildCollectorPayload,
-  requiredRetentionDays,
-  type TraceFixture,
-} from "../seed-primitives";
-
-describe("requiredRetentionDays", () => {
-  describe("given a seed window shorter than the floor", () => {
-    // @scenario "Backdated history outlives the default retention horizon"
-    it("pins a horizon that outlives the window with margin", () => {
-      // Rows are stamped TTL = data time + retention days (platform default
-      // 49), so a 90-day window's oldest rows must get well over 90.
-      expect(requiredRetentionDays(90)).toBeGreaterThan(90 + 49);
-      expect(requiredRetentionDays(90)).toBe(400);
-    });
-  });
-
-  describe("given a window longer than the floor", () => {
-    it("scales with the window instead of capping", () => {
-      expect(requiredRetentionDays(400)).toBe(460);
-    });
-  });
-});
+import { buildCollectorPayload, type TraceFixture } from "../seed-primitives";
 
 describe("buildCollectorPayload", () => {
   const trace: TraceFixture = {

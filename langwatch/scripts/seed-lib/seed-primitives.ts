@@ -67,17 +67,6 @@ export const DAY_MS = 24 * 60 * 60_000;
  */
 export const TRACE_WINDOW_DAYS = 30;
 
-/**
- * ClickHouse rows are stamped with a per-tenant retention horizon relative to
- * their DATA time (TTL = TimeUnixMs + _retention_days), platform default 49
- * days. A backdated seed older than that would be written pre-expired, so the
- * mass seeder upserts a RetentionPolicy long enough to outlive the whole
- * window with margin.
- */
-export function requiredRetentionDays(windowDays: number): number {
-  return Math.max(400, windowDays + 60);
-}
-
 export interface CollectorTarget {
   endpoint: string;
   apiKey: string;

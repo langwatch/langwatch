@@ -55,6 +55,7 @@
     "seed:sample-traces": "tsx scripts/seed-sample-traces.ts",
     "seed:realistic-platform": "tsx scripts/seed-realistic-platform-data.ts",
     "seed:mass": "tsx scripts/seed-mass.ts",
+    "seed:retention": "tsx scripts/seed-retention.ts",
     "seed:langy-prompts": "tsx scripts/seed-langy-prompts.ts",
     "clickhouse:migrate": "sh -c 'if [ \"$SKIP_CLICKHOUSE_MIGRATE\" != \"true\" ]; then pnpm run task clickhouseMigrate; else echo \"Skipping ClickHouse migrations\"; fi'",
     "copy:langevals-types": "cp ../langevals/ts-integration/evaluators.generated.ts src/server/evaluations/evaluators.generated.ts",

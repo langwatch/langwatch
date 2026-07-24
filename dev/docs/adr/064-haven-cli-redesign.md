@@ -102,10 +102,24 @@ haven db seed [preset]            reseed in place — idempotent, drops nothing
 haven db url [postgres|clickhouse|redis]   connection strings
   presets (shared): demo · traces · onboarding · post-onboarding · bare · mass
   (mass = demo plus months of backdated history: event-log seeding with backdated
-  occurredAt + projection replay for the event-sourced products; traces through the
-  collector inside its 31-day window — the ingest guard is deliberately not weakened)
+  occurredAt + projection replay for the event-sourced products; recent traces
+  through the collector, older ones as recordSpan commands — the ingest guard is
+  deliberately not weakened; plus months of OTLP metric series)
 haven clean [--yes]   one interactive cleanup: worktrees, artifacts, idle DBs, orphan processes
 ```
+
+**Data retention.** A dev stack keeps only **7 days** by default so ClickHouse
+stays small and whole weekly partitions drop cleanly (the partition key is
+`toYearWeek`, so retention is always a whole number of weeks). haven pins it
+through `LANGWATCH_DEFAULT_RETENTION_DAYS=7` in `.env.portless`; the control
+plane reads that override only outside production and **fails loud at start-up if
+it is ever set in prod**, where the platform default is fixed — lowering it there
+would silently expire customer data. Because a 7-day window would immediately
+cull seeded data (and instantly expire the mass preset's backdated rows, which
+are stamped `TTL = data time + retention`), every data-loading preset runs a
+`seed:retention` step first that pins a **two-year, partition-aligned**
+RetentionPolicy (728 days = 104 weeks; a deeper mass window scales it up). A
+bare, unseeded database keeps the 7-day default.
 
 Workflow tier, unchanged in behaviour but de-aliased:
 

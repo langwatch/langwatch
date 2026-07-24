@@ -105,15 +105,44 @@ Feature: Seed presets — a database that is ready to look at
     Then deterministic hourly token, cost, latency, request, and user series cover every day of the window
     And they tell an improving story: traffic grows while errors and latency fall
 
+  # --- Seed retention ---
+  # A dev stack keeps only a week of data by default (see
+  # data-retention/platform-default-override.feature), so seeded data — and
+  # especially the mass preset's backdated history — would be written
+  # pre-expired. Every seed preset therefore pins a two-year, partition-aligned
+  # RetentionPolicy for the local-dev org first (the seed:retention step),
+  # overriding the 7-day default so the seeded data survives. A bare, unseeded
+  # database keeps the 7-day default. ClickHouse rows expire relative to their
+  # DATA time, so a running worker must see the new policy before backdated
+  # events reach it; the step waits out the resolver cache for a backdated
+  # (mass) window.
   @unit
-  Scenario: Backdated history outlives the default retention horizon
-    Given rows are stamped to expire relative to their data time, 49 days by default
-    When the mass seed prepares its window
-    Then an organisation retention policy is pinned that outlives the whole window with margin
-    And months two and three are not written pre-expired
+  Scenario: A seeded database keeps two years of partition-aligned history
+    Given every retention-managed table is partitioned by week
+    When the seed retention is computed for a window inside two years
+    Then it is 728 days, exactly 104 whole weeks
+
+  @unit
+  Scenario: A deeper seed window scales retention up to outlive it
+    Given a mass window deeper than two years
+    When the seed retention is computed
+    Then it outlives the window and stays a whole number of weeks
+
+  @unit
+  Scenario: Pinning seed retention writes every category once
+    Given a database with no retention override
+    When the seed retention is applied for the local-dev org
+    Then a policy is written for traces, scenarios, and experiments
+
+  @unit
+  Scenario: Re-pinning seed retention is a no-op
+    Given the retention policy is already at the target
+    When the seed retention is applied again
+    Then nothing changes and the cache wait is never triggered
 
   @e2e @unimplemented
   Scenario: A mass seed lands end to end on a live stack
     Given this worktree's stack is running
     When I run "haven db seed mass"
     Then the projections report every seeded scenario run, evaluation, experiment run, trace, and metric point
+    And the seeded data survives because retention was raised above the 7-day default

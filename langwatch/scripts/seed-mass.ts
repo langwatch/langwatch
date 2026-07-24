@@ -46,7 +46,6 @@ import {
   buildCollectorPayload,
   ingestOtlpMetrics,
   ingestTrace,
-  requiredRetentionDays,
   type CollectorTarget,
   type TraceFixture,
 } from "./seed-lib/seed-primitives";
@@ -59,12 +58,11 @@ import {
   type MassTimeline,
 } from "./seed-lib/mass-timeline";
 import { MASS_METRICS_SCOPE, buildMassMetrics } from "./seed-lib/mass-metrics";
+import { applySeedRetention, seededRetentionDays } from "./seed-lib/retention";
 
 const PROJECT_ID = "local-dev-project";
 const USER_ID = "local-dev-admin-user";
 const ORG_ID = "local-dev-organization";
-/** Categories the retention cascade resolves (retentionPolicy.schema.ts). */
-const RETENTION_CATEGORIES = ["traces", "scenarios", "experiments"] as const;
 const target: CollectorTarget = {
   endpoint: process.env.HAVEN_SEED_ENDPOINT ?? "http://localhost:5560",
   apiKey:
@@ -75,58 +73,6 @@ const MONTHS = Math.max(1, Number(process.env.HAVEN_SEED_MONTHS ?? 3) || 3);
 assertLocalUrl("HAVEN_SEED_ENDPOINT", target.endpoint);
 assertLocalUrl("DATABASE_URL", process.env.DATABASE_URL);
 assertLocalUrl("CLICKHOUSE_URL", process.env.CLICKHOUSE_URL);
-
-/**
- * Backdated rows get TTL = data time + the tenant's resolved retention days
- * (platform default 49). Upsert an org-scoped policy that outlives the seeded
- * window so months two and three are not written pre-expired. The resolver
- * caches for 60s per process, so when anything changed we wait one cache
- * window before dispatching — otherwise a running worker would stamp the
- * first minute of writes with the old horizon.
- */
-async function ensureRetentionOutlivesWindow(
-  prisma: PrismaClient,
-  windowDays: number,
-): Promise<void> {
-  const retentionDays = requiredRetentionDays(windowDays);
-  let changed = false;
-  for (const category of RETENTION_CATEGORIES) {
-    const existing = await prisma.retentionPolicy.findUnique({
-      where: {
-        scopeType_scopeId_category: {
-          scopeType: "ORGANIZATION",
-          scopeId: ORG_ID,
-          category,
-        },
-      },
-    });
-    if (existing && existing.retentionDays >= retentionDays) continue;
-    await prisma.retentionPolicy.upsert({
-      where: {
-        scopeType_scopeId_category: {
-          scopeType: "ORGANIZATION",
-          scopeId: ORG_ID,
-          category,
-        },
-      },
-      create: {
-        organizationId: ORG_ID,
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-        category,
-        retentionDays,
-      },
-      update: { retentionDays },
-    });
-    changed = true;
-  }
-  if (changed) {
-    console.log(
-      `   retention policy set to ${retentionDays} days — waiting 65s for the resolver caches to roll over…`,
-    );
-    await new Promise((resolve) => setTimeout(resolve, 65_000));
-  }
-}
 
 /**
  * Dispatch one trace's spans as recordSpan pipeline commands with backdated
@@ -382,7 +328,16 @@ async function main(): Promise<void> {
     const now = Date.now();
     const timeline = buildMassTimeline({ months: MONTHS, now });
     const metrics = buildMassMetrics({ months: MONTHS, now });
-    await ensureRetentionOutlivesWindow(prisma, timeline.days);
+    // haven runs seed:retention first, but keep this so a direct `pnpm seed:mass`
+    // still pins a horizon that outlives the backdated window (idempotent — a
+    // no-op, no wait, when the step already set it).
+    await applySeedRetention({
+      prisma,
+      organizationId: ORG_ID,
+      retentionDays: seededRetentionDays(timeline.days),
+      waitForCacheRollover: true,
+      log: (message) => console.log(`   ${message}`),
+    });
 
     const traces = [
       ...timeline.scenarioRuns.map((run) => run.trace),
