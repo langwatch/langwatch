@@ -187,6 +187,13 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via PostHog or the operator store to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
+  {
+    key: "release_ui_judge_annotation_confusion_matrix_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Adds a judge-vs-reviewer confusion matrix chart to pass/fail evaluators on the experiments-v3 results page, alongside the existing per-evaluator pass-rate chart — a compact card with an expand affordance opening the full 2x2 matrix, derived Accuracy/Precision/Recall/F1, and click-through to the underlying rows. Compares the evaluator's own verdict against a human reviewer's annotation on the same target output (no new dataset schema needed — every experiments-v3 target execution already gets a real trace id, joined against existing annotations via annotation.getByTraceIds). Only mounts once a minimum number of rows have annotations (below that, a 2x2 table is two anecdotes, not a matrix). Default off — power-user surface, additive to the existing pass-rate chart. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_judge_annotation_confusion_matrix_enabled.",
+  },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
   // when the query shape allows. OFF (default) = legacy trace_summaries reads

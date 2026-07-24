@@ -28,6 +28,30 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
+// ComparisonCharts now fetches annotations (useAnnotationsByTraceIds ->
+// api.useQueries) for the judge-vs-reviewer confusion matrix. None of these
+// tests enable `showConfusionMatrix`, so the hook's traceIds list is always
+// empty.
+//
+// Real @tanstack/react-query's useQueries returns a REFERENTIALLY STABLE
+// result array across renders when nothing changed — that stability is load
+// bearing: useAnnotationsByTraceIds' `data` memo depends on it, which feeds
+// ComparisonCharts' `availableMetrics` memo, which is a useEffect dependency
+// that calls setState. A naive mock that calls the callback and returns
+// `chunks.map(...)` allocates a NEW (if empty) array every render — Array.map
+// always returns a fresh array even over an empty input — which makes that
+// whole memo chain recompute every render, the effect re-fire every render,
+// and setState every render: an infinite render loop and, in a real run, an
+// OOM crash. Returning one stable empty-array constant regardless of input
+// sidesteps that without needing to reimplement react-query's real caching —
+// no test in this file ever needs actual annotation data back.
+const STABLE_EMPTY_QUERY_RESULTS: never[] = [];
+vi.mock("~/utils/api", () => ({
+  api: {
+    useQueries: vi.fn(() => STABLE_EMPTY_QUERY_RESULTS),
+  },
+}));
+
 // Mock data for testing
 type MockRunOptions = {
   targetCount?: number;
@@ -129,6 +153,13 @@ const createMockRunData = (
 describe("ComparisonCharts", () => {
   afterEach(() => {
     cleanup();
+    // `api.useQueries` (mocked above) is invoked on every render of every
+    // test in this file. vi.fn()'s call-history tracking (mock.calls,
+    // mock.results) retains every past invocation's arguments — including
+    // the render-scoped closures useAnnotationsByTraceIds passes in — until
+    // explicitly cleared, which otherwise leaks across this file's full
+    // test run rather than being scoped per test.
+    vi.clearAllMocks();
   });
 
   describe("Rendering", () => {

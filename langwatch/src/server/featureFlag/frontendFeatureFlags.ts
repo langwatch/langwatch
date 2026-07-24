@@ -75,6 +75,9 @@ export const FRONTEND_FEATURE_FLAGS = [
   // panel and Cmd/Ctrl+I are identical either way.
   "release_ui_langy_peek_dock_enabled",
   "release_webhook_automations",
+  // Judge-vs-reviewer confusion matrix chart for pass/fail evaluators on the
+  // experiments-v3 results page. See ComparisonCharts.tsx / ConfusionMatrixChart.tsx.
+  "release_ui_judge_annotation_confusion_matrix_enabled",
   // Pins the Ops section into the main sidebar for a user who already has ops
   // access, so it shows on every route instead of only under /ops. Deliberately
   // NOT a PostHog flag — it resolves false server-side (unknown flag) and is

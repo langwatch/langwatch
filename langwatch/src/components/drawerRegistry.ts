@@ -58,6 +58,10 @@ const AgentHistoryDrawer = lazyDefault({
   factory: () => import("./agents/AgentHistoryDrawer"),
   key: "AgentHistoryDrawer",
 });
+const ConfusionMatrixDrawer = lazyDefault({
+  factory: () => import("./ConfusionMatrixDrawer"),
+  key: "ConfusionMatrixDrawer",
+});
 const AgentListDrawer = lazyDefault({
   factory: () => import("./agents/AgentListDrawer"),
   key: "AgentListDrawer",
@@ -266,6 +270,7 @@ export const drawers = {
   evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,
   evaluatorEditor: EvaluatorEditorDrawer,
   codeEvaluatorEditor: CodeEvaluatorEditorDrawer,
+  confusionMatrix: ConfusionMatrixDrawer,
   // Workflow selector specifically for evaluators (creates evaluator, not agent)
   workflowSelectorForEvaluator: WorkflowSelectorForEvaluatorDrawer,
   // Scenarios

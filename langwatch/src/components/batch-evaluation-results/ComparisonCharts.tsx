@@ -19,6 +19,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { ChartTooltip } from "../analytics/ChartTooltip";
 import { ComparisonLeaderboardChart } from "./ComparisonLeaderboardChart";
 import {
@@ -27,6 +28,8 @@ import {
   chartHeightFor,
   truncateLabel,
 } from "./chartAxisLabels";
+import { buildJudgeAnnotationPairs } from "./buildJudgeAnnotationPairs";
+import { ConfusionMatrixChart } from "./ConfusionMatrixChart";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
@@ -38,6 +41,23 @@ import { RUN_COLORS } from "./useMultiRunData";
 import { useShowComparisonLeaderboard } from "./useShowComparisonLeaderboard";
 import { WinRateChart } from "./WinRateChart";
 
+/**
+ * Minimum resolved (annotated, non-conflicting) rows before the confusion
+ * matrix is offered at all — below this, a 2x2 table is two anecdotes, not
+ * a matrix, and showing it invites false confidence (mirrors the low-sample
+ * framing already used for the Bradley-Terry comparison leaderboard).
+ */
+const CONFUSION_MATRIX_MIN_ANNOTATED_ROWS = 5;
+
+/**
+ * Stable empty-array fallback for `confusionMatrixRows` — a `?? []` literal
+ * would hand out a fresh reference on every render with no rows, breaking
+ * every downstream useMemo's referential stability and cascading into
+ * `availableMetrics` recomputing (and its consuming useEffect re-firing)
+ * on every render: an infinite render loop, not just wasted work.
+ */
+const EMPTY_ROWS: BatchResultRow[] = [];
+
 /** Metric types that can be displayed */
 type MetricType =
   | "cost"
@@ -45,7 +65,8 @@ type MetricType =
   | `score_${string}`
   | `pass_${string}`
   | `comparison_${string}`
-  | `leaderboard_${string}`;
+  | `leaderboard_${string}`
+  | `confusion_${string}`;
 
 /** Available metric definition */
 type MetricDefinition = {
@@ -57,7 +78,8 @@ type MetricDefinition = {
     | "score"
     | "passRate"
     | "comparison"
-    | "leaderboard";
+    | "leaderboard"
+    | "confusion";
   evaluatorId?: string;
 };
 
@@ -139,6 +161,13 @@ type ComparisonChartsProps = {
    * through per-run in `comparisonData`.
    */
   comparisonRows?: BatchResultRow[];
+  /**
+   * Whether the judge-vs-reviewer confusion matrix is available at all
+   * (release_ui_judge_annotation_confusion_matrix_enabled). Additive to the
+   * existing per-evaluator pass-rate chart — gated separately since it's a
+   * power-user surface, not a replacement.
+   */
+  showConfusionMatrix?: boolean;
 };
 
 type EvaluatorMetrics = {
@@ -406,6 +435,7 @@ export const ComparisonCharts = ({
   onTargetColorsChange,
   comparisonColumns,
   comparisonRows,
+  showConfusionMatrix,
 }: ComparisonChartsProps) => {
   // Rollout gate for the Bradley-Terry leaderboard (#5103). Read here rather
   // than passed in as a prop so the flag cannot drift from the two surfaces it
@@ -906,6 +936,103 @@ export const ComparisonCharts = ({
     return evaluators;
   }, [runMetrics]);
 
+  // Judge-vs-reviewer confusion matrix candidates. Row-level data (not the
+  // run-aggregated `runMetrics`) is required here, since annotation matching
+  // needs each target's actual trace id — only available on `comparisonData`'s
+  // first run's rows. Multi-run compare mode is out of scope for v1 (matches
+  // the single-run assumption `ComparisonLeaderboardChart`'s data source
+  // makes): this feature simply doesn't offer itself when comparing runs.
+  const firstRunData =
+    comparisonData.length === 1 ? (comparisonData[0]?.data ?? null) : null;
+  // `?? EMPTY_ROWS` (a module-level stable reference), NOT `?? []` — a fresh
+  // array literal on every render with no rows would break every downstream
+  // useMemo's referential stability, cascading into availableMetrics
+  // recomputing every render and re-firing its consuming useEffect forever
+  // (an infinite render loop, not just wasted work).
+  const confusionMatrixRows = firstRunData?.rows ?? EMPTY_ROWS;
+  const confusionMatrixProjectId = firstRunData?.projectId;
+
+  // Every distinct (targetId, evaluatorId) pairing with a resolvable pass/fail
+  // verdict anywhere in the run, excluding Comparison evaluators (a ranking
+  // judge has no single "predicted class" to build a 2x2 from).
+  const passFailTargets = useMemo(() => {
+    if (!showConfusionMatrix) return [];
+    const seen = new Set<string>();
+    const out: { targetId: string; evaluatorId: string; evaluatorName: string }[] =
+      [];
+    for (const row of confusionMatrixRows) {
+      for (const [targetId, target] of Object.entries(row.targets)) {
+        for (const evalResult of target.evaluatorResults) {
+          if (comparisonEvaluatorIds.has(evalResult.evaluatorId)) continue;
+          if (evalResult.passed === null || evalResult.passed === undefined) {
+            continue;
+          }
+          const key = `${targetId}::${evalResult.evaluatorId}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          out.push({
+            targetId,
+            evaluatorId: evalResult.evaluatorId,
+            evaluatorName: evalResult.evaluatorName,
+          });
+        }
+      }
+    }
+    return out;
+  }, [confusionMatrixRows, comparisonEvaluatorIds, showConfusionMatrix]);
+
+  const confusionMatrixTraceIds = useMemo(() => {
+    if (passFailTargets.length === 0) return [];
+    const targetIds = new Set(passFailTargets.map((t) => t.targetId));
+    const ids: string[] = [];
+    for (const row of confusionMatrixRows) {
+      for (const targetId of targetIds) {
+        const traceId = row.targets[targetId]?.traceId;
+        if (traceId) ids.push(traceId);
+      }
+    }
+    return ids;
+  }, [confusionMatrixRows, passFailTargets]);
+
+  const { data: confusionMatrixAnnotations } = useAnnotationsByTraceIds({
+    projectId: confusionMatrixProjectId ?? "",
+    traceIds: confusionMatrixTraceIds,
+    enabled:
+      !!showConfusionMatrix &&
+      !!confusionMatrixProjectId &&
+      confusionMatrixTraceIds.length > 0,
+  });
+
+  const annotationsByTraceId = useMemo(() => {
+    const map = new Map<string, typeof confusionMatrixAnnotations>();
+    for (const annotation of confusionMatrixAnnotations) {
+      const existing = map.get(annotation.traceId) ?? [];
+      existing.push(annotation);
+      map.set(annotation.traceId, existing);
+    }
+    return map;
+  }, [confusionMatrixAnnotations]);
+
+  // Each candidate's resolved judge/reviewer pairs, keyed by evaluatorId —
+  // only ones meeting the annotation floor become an available metric.
+  const confusionMatrixData = useMemo(() => {
+    return passFailTargets
+      .map((candidate) => ({
+        ...candidate,
+        coverage: buildJudgeAnnotationPairs(
+          confusionMatrixRows,
+          candidate.targetId,
+          candidate.evaluatorId,
+          annotationsByTraceId,
+        ),
+      }))
+      .filter(
+        (candidate) =>
+          candidate.coverage.pairs.length >=
+          CONFUSION_MATRIX_MIN_ANNOTATED_ROWS,
+      );
+  }, [passFailTargets, confusionMatrixRows, annotationsByTraceId]);
+
   // Build available metrics list
   const availableMetrics: MetricDefinition[] = useMemo(
     () => [
@@ -927,12 +1054,22 @@ export const ComparisonCharts = ({
         columns: comparisonColumns ?? [],
         showLeaderboard: showComparisonLeaderboard,
       }),
+      // Judge-vs-reviewer confusion matrix — only meaningful once a pass/fail
+      // evaluator has enough annotated rows, so `confusionMatrixData` is
+      // already empty both when the flag is off and when coverage is thin.
+      ...confusionMatrixData.map((candidate) => ({
+        id: `confusion_${candidate.evaluatorId}` as MetricType,
+        name: `${candidate.evaluatorName} (Agreement with Reviewers)`,
+        type: "confusion" as const,
+        evaluatorId: candidate.evaluatorId,
+      })),
     ],
     [
       scoreEvaluators,
       passRateEvaluators,
       comparisonColumns,
       showComparisonLeaderboard,
+      confusionMatrixData,
     ],
   );
 
@@ -1609,6 +1746,27 @@ export const ComparisonCharts = ({
                       </BarChart>
                     </ResponsiveContainer>
                   </Box>
+                ),
+            )}
+
+            {/* Judge-vs-reviewer confusion matrix — one per pass/fail
+                evaluator with enough annotation coverage. Rendered in the
+                same flex row as its siblings, gated on `visibleMetrics`. */}
+            {confusionMatrixData.map(
+              (candidate) =>
+                visibleMetrics.has(
+                  `confusion_${candidate.evaluatorId}` as MetricType,
+                ) && (
+                  <ConfusionMatrixChart
+                    key={`confusion-${candidate.targetId}-${candidate.evaluatorId}`}
+                    evaluatorId={candidate.evaluatorId}
+                    evaluatorName={candidate.evaluatorName}
+                    targetId={candidate.targetId}
+                    pairs={candidate.coverage.pairs}
+                    coverage={candidate.coverage}
+                    rows={confusionMatrixRows}
+                    chartHeight={chartHeight}
+                  />
                 ),
             )}
           </HStack>
