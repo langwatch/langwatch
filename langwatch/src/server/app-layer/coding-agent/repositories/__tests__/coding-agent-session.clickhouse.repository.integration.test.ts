@@ -250,6 +250,9 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     // max(UpdatedAt) seek is unwindowed, so the drifted latest makes the
     // outer windowed read empty and the caller's unwindowed retry recovers
     // the real row instead of folding onto (and overwriting) stale state.
+    // The drift only needs to clear the ±60s read window below — it must stay
+    // well inside the 30-day retention TTL (keyed on StartedAt), or the
+    // "latest" row is expired on arrival and vanishes mid-test.
     const drifted = `${tag}-drift`;
     await sessions.upsert(
       sessionRow({ sessionId: drifted, startedAtMs: baseMs, costUsd: 1 }),
@@ -258,7 +261,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     await sessions.upsert(
       sessionRow({
         sessionId: drifted,
-        startedAtMs: baseMs - 30 * 24 * 60 * 60 * 1000,
+        startedAtMs: baseMs - 60 * 60 * 1000,
         costUsd: 2,
       }),
       30,
