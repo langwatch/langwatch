@@ -35,6 +35,8 @@ export interface WaterfallTreeNode {
 export interface SiblingGroup {
   kind: "group";
   name: string;
+  /** Tool display name when the whole group is one tool (key includes it). */
+  toolName: string | null;
   type: string;
   count: number;
   spans: SpanTreeNode[];
