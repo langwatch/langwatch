@@ -39,6 +39,37 @@ export const incrementClickHouseQueryCount = (
   status: "success" | "error",
 ) => clickhouseQueryTotal.labels(queryType, status).inc();
 
+// Counter for windowed reads: the partition-pruning-window-with-fallback read
+// pattern (see app-layer/clients/clickhouse/windowed-read.ts). One increment
+// per queryWindowed call, tagged with the path it took:
+//   hit             - hinted window sufficed (cheap, no widening)
+//   widened_hit     - hinted window empty; a bounded lookback re-scan found rows
+//   widened_empty   - hinted window empty; bounded lookback re-scan also empty
+//   unbounded_hit   - hinted window empty; unbounded re-scan found rows
+//   unbounded_empty - hinted window empty; unbounded re-scan also empty
+//   unwindowed      - no hint; ran the fallback window directly
+// Exists to size how often reads fall off the cheap path before a rate limit is
+// chosen for the expensive ones.
+export type WindowedReadOutcome =
+  | "hit"
+  | "widened_hit"
+  | "widened_empty"
+  | "unbounded_hit"
+  | "unbounded_empty"
+  | "unwindowed";
+
+register.removeSingleMetric("clickhouse_windowed_read_total");
+const clickhouseWindowedReadTotal = new Counter({
+  name: "clickhouse_windowed_read_total",
+  help: "Total number of ClickHouse windowed reads by table and outcome",
+  labelNames: ["table", "outcome"] as const,
+});
+
+export const incrementWindowedReadCount = (
+  table: string,
+  outcome: WindowedReadOutcome,
+) => clickhouseWindowedReadTotal.labels(table, outcome).inc();
+
 // ============================================================================
 // Storage Metrics
 // ============================================================================

@@ -1,4 +1,9 @@
 import { createLogger } from "@langwatch/observability";
+import {
+  DEFAULT_PARTITION_WINDOW_MS,
+  queryWindowed,
+  type WindowFragment,
+} from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
@@ -64,70 +69,26 @@ const SPAN_INSERT_SETTINGS = {
 } as const;
 
 /**
- * `stored_spans` is partitioned by `toYearWeek(StartTime)`. When the caller
- * passes an approximate trace timestamp we narrow the scan to a ±2-day
- * window around it — this keeps drawer reads on the warm partition tier
+ * Renders the partition-pruning time predicate for a single-trace `stored_spans`
+ * read from a {@link WindowFragment} — or `null` for a time-unbounded scan (no
+ * predicate). `stored_spans` is partitioned by `toYearWeek(StartTime)`, so
+ * bounding `StartTime` to a window keeps drawer reads on the warm partition tier
  * instead of walking every weekly partition (incl. cold S3) on every query.
  *
- * Generous on purpose: long-running traces and clock skew should still hit
- * the hinted window. If they don't, callers retry without the hint.
+ * `sqlAnd` bounds the outer scan and `sqlAndInner` the dedup subquery — the same
+ * `StartTime` predicate on both so they prune to identical partitions. Both come
+ * from {@link WindowFragment.sqlFor}, keeping SQL and params in one place.
  */
-const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
-
-interface PartitionWindow {
-  fromMs: number;
-  toMs: number;
-}
-
-interface PartitionFragment {
+function partitionFragment(window: WindowFragment | null): {
   sqlAnd: string;
   sqlAndInner: string;
   params: Record<string, unknown>;
-}
-
-function partitionWindowFor(
-  hint: OccurredAtHint | undefined,
-): PartitionWindow | undefined {
-  if (hint?.occurredAtMs === undefined) return undefined;
-  return {
-    fromMs: hint.occurredAtMs - PARTITION_WINDOW_MS,
-    toMs: hint.occurredAtMs + PARTITION_WINDOW_MS,
-  };
-}
-
-function partitionFragment(
-  window: PartitionWindow | undefined,
-): PartitionFragment {
+} {
   if (!window) {
     return { sqlAnd: "", sqlAndInner: "", params: {} };
   }
-  return {
-    sqlAnd:
-      "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-      "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})",
-    sqlAndInner:
-      "AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
-      "AND StartTime <= fromUnixTimestamp64Milli({toMs:Int64})",
-    params: { fromMs: window.fromMs, toMs: window.toMs },
-  };
-}
-
-/**
- * Run a hinted query first; if the hint window misses (e.g. long-running
- * trace, stale URL hint, clock skew), fall back to an unconstrained scan.
- * Avoids the slow path on the happy path while keeping correctness when
- * hints are wrong.
- */
-async function withPartitionHint<T>(
-  hint: OccurredAtHint | undefined,
-  isEmpty: (result: T) => boolean,
-  run: (window: PartitionWindow | undefined) => Promise<T>,
-): Promise<T> {
-  const window = partitionWindowFor(hint);
-  if (!window) return run(undefined);
-  const hinted = await run(window);
-  if (!isEmpty(hinted)) return hinted;
-  return run(undefined);
+  const predicate = window.sqlFor("StartTime");
+  return { sqlAnd: predicate, sqlAndInner: predicate, params: window.params };
 }
 
 /**
@@ -1206,10 +1167,12 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * authoritative: the trace has no matching events within its ±2-day span
    * window, and we do NOT rescan unbounded.
    *
-   * That unbounded-on-empty rescan (what {@link withPartitionHint} does) was
-   * itself a cold S3 partition walk: a trace legitimately *without* events made
-   * every such read scan the whole table. We only scan unbounded when the trace
-   * time is genuinely unknown (the trace isn't in `trace_summaries`).
+   * That is why the {@link queryWindowed} call uses `fallback: "none"`: the
+   * hinted window is single-shot, never widened on empty. The unbounded-on-empty
+   * rescan spans use was itself a cold S3 partition walk, and a trace legitimately
+   * *without* events would trigger it on every read. We only scan unbounded when
+   * the trace time is genuinely unknown (the trace isn't in `trace_summaries`),
+   * which is the `hintMs === null` branch inside `queryWindowed`.
    */
   private async readTraceEvents<T>(
     {
@@ -1217,11 +1180,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       traceId,
       occurredAtMs,
     }: { tenantId: string; traceId: string } & OccurredAtHint,
-    run: (window: PartitionWindow | undefined) => Promise<T>,
+    run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
     const hintMs =
       occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
-    return run(partitionWindowFor({ occurredAtMs: hintMs }));
+    return queryWindowed<T>({
+      table: TABLE_NAME,
+      hintMs: hintMs ?? null,
+      windowMs: DEFAULT_PARTITION_WINDOW_MS,
+      fallback: "none",
+      // `fallback: "none"` never widens, so `isEmpty` is never consulted.
+      isEmpty: () => false,
+      run,
+    });
   }
 
   /**
@@ -1229,26 +1200,27 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * Mirrors {@link readTraceEvents} for the no-hint case while preserving the
    * existing hinted behaviour:
    *
-   *   - Caller threaded an `occurredAtMs` hint: keep
-   *     {@link withPartitionHint} (hinted scan, then an unbounded fallback if
-   *     the window misses) so a stale URL hint or clock skew still resolves.
+   *   - Caller threaded an `occurredAtMs` hint: prune to its ±2-day window,
+   *     then fall back to an unbounded scan if the window misses, so a stale
+   *     URL hint or clock skew still resolves.
    *   - No hint — back-stack / conversation-jump / deep-link drawer opens and
    *     worker callers that never had one: resolve the trace's occurrence time
    *     from `trace_summaries` and bound the read to its ±2-day span window
    *     instead of scanning every weekly partition (incl. the cold S3 tier).
    *
    * Unlike {@link readTraceEvents}, an empty windowed result is NOT treated as
-   * authoritative here: `trace_summaries.OccurredAt` is the trace's *start*
-   * (min over projected rows) and never widens, so a long-running trace can
-   * produce spans well past `OccurredAt + 2 days`. Both branches therefore keep
-   * the {@link withPartitionHint} `isEmpty`-driven fallback: run bounded first,
-   * and only if that comes back empty rescan unbounded, so a trace whose spans
-   * all fall outside the window is still returned correctly (at the cost of one
-   * extra unbounded scan only in that case). Events cluster at the trace start
-   * so they can skip the fallback; spans cannot.
+   * authoritative here — hence `fallback: "unbounded"`: `trace_summaries.OccurredAt`
+   * is the trace's *start* (min over projected rows) and never widens, so a
+   * long-running trace can produce spans well past `OccurredAt + 2 days`. The
+   * `isEmpty`-driven fallback runs bounded first and only rescans unbounded if
+   * that comes back empty, so a trace whose spans all fall outside the window is
+   * still returned correctly (at the cost of one extra unbounded scan only in
+   * that case). Events cluster at the trace start so they can skip the fallback;
+   * spans cannot.
    *
    * Only when the trace time is genuinely unknown (the trace isn't in
-   * `trace_summaries`) do we go straight to the unbounded read.
+   * `trace_summaries`) do we go straight to the unbounded read — the
+   * `hintMs === null` branch inside {@link queryWindowed}.
    */
   private async readTraceSpans<T>(
     {
@@ -1257,14 +1229,18 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       occurredAtMs,
     }: { tenantId: string; traceId: string } & OccurredAtHint,
     isEmpty: (result: T) => boolean,
-    run: (window: PartitionWindow | undefined) => Promise<T>,
+    run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
-    if (occurredAtMs !== undefined) {
-      return withPartitionHint<T>({ occurredAtMs }, isEmpty, run);
-    }
-    const resolved = await this.resolveTraceOccurredAtMs(tenantId, traceId);
-    if (resolved === undefined) return run(undefined);
-    return withPartitionHint<T>({ occurredAtMs: resolved }, isEmpty, run);
+    const hintMs =
+      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+    return queryWindowed<T>({
+      table: TABLE_NAME,
+      hintMs: hintMs ?? null,
+      windowMs: DEFAULT_PARTITION_WINDOW_MS,
+      fallback: "unbounded",
+      isEmpty,
+      run,
+    });
   }
 
   async getTraceEventsByTraceId({
@@ -1759,7 +1735,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     });
 
     // This reader deliberately does NOT go through readTraceSpans /
-    // withPartitionHint — a paged read breaks both of that seam's
+    // queryWindowed — a paged read breaks both of that seam's
     // assumptions:
     //
     //   - Its ±2-day window has an UPPER bound, and a page that runs into it
@@ -1859,7 +1835,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const hintMs =
       occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
     if (hintMs === undefined) return runPage(undefined);
-    const bounded = await runPage(hintMs - PARTITION_WINDOW_MS);
+    const bounded = await runPage(hintMs - DEFAULT_PARTITION_WINDOW_MS);
     if (bounded.rows.length > 0) return bounded;
     return runPage(undefined);
   }

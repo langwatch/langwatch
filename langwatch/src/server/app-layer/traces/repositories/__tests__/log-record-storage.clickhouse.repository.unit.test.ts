@@ -128,6 +128,26 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
     });
   });
 
+  // The read is single-shot: a hinted window that comes back empty is
+  // authoritative (`fallback: "none"` in the queryWindowed adopter), so it must
+  // NOT fire a second, wider query the way an `"unbounded"`/`{ lookbackMs }`
+  // fallback would. This pins the pre-adopter behaviour through the migration.
+  describe("when the caller provides a time and the hinted window is empty", () => {
+    it("does not re-widen — it issues exactly one query", async () => {
+      const { repo, query } = repoCapturingQuery([]);
+
+      await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      const { query_params } = capturedQuery(query);
+      const windowMs = 2 * 24 * 60 * 60 * 1000;
+      // The single query stayed on the ±2d hinted window; it never fell back to
+      // the now-anchored lookback frame.
+      expect(query_params.fromMs).toBe(1_700_000_000_000 - windowMs);
+      expect(query_params.toMs).toBe(1_700_000_000_000 + windowMs);
+    });
+  });
+
   describe("when the caller does not provide a time", () => {
     it("falls back to a 90d-lookback window with clock-skew headroom on the upper bound", async () => {
       const { repo, query } = repoCapturingQuery();
