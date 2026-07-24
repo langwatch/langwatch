@@ -25,6 +25,7 @@ export const agentReportsRouter = createTRPCRouter({
       z.object({
         page: z.number().int().min(0).default(0),
         pageSize: z.number().int().min(1).max(100).default(50),
+        search: z.string().max(200).optional(),
       }),
     )
     .use(skipPermissionCheck)

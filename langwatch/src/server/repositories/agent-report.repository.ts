@@ -23,11 +23,14 @@ export class AgentReportRepository {
   async findAll({
     page,
     pageSize,
+    search,
   }: {
     page: number;
     pageSize: number;
+    search?: string;
   }): Promise<Omit<AgentReport, "sessionData">[]> {
     return this.prisma.agentReport.findMany({
+      where: buildSearchWhere(search),
       select: {
         id: true,
         createdAt: true,
@@ -52,7 +55,23 @@ export class AgentReportRepository {
     return this.prisma.agentReport.findUnique({ where: { id } });
   }
 
-  async count(): Promise<number> {
-    return this.prisma.agentReport.count();
+  async count({ search }: { search?: string } = {}): Promise<number> {
+    return this.prisma.agentReport.count({ where: buildSearchWhere(search) });
   }
+}
+
+function buildSearchWhere(
+  search: string | undefined,
+): Prisma.AgentReportWhereInput | undefined {
+  const term = search?.trim();
+  if (!term) return undefined;
+  return {
+    OR: [
+      { title: { contains: term, mode: "insensitive" } },
+      { summary: { contains: term, mode: "insensitive" } },
+      { agent: { contains: term, mode: "insensitive" } },
+      { contactEmail: { contains: term, mode: "insensitive" } },
+      { linkedProjectId: { contains: term, mode: "insensitive" } },
+    ],
+  };
 }

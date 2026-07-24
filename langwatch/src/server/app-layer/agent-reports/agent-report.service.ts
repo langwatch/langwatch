@@ -138,14 +138,16 @@ async function resolveLinkedProjectId({
 export async function getAllAgentReports({
   page,
   pageSize,
+  search,
 }: {
   page: number;
   pageSize: number;
+  search?: string;
 }): Promise<{ reports: Omit<AgentReport, "sessionData">[]; total: number }> {
   const repository = new AgentReportRepository(prisma);
   const [reports, total] = await Promise.all([
-    repository.findAll({ page, pageSize }),
-    repository.count(),
+    repository.findAll({ page, pageSize, search }),
+    repository.count({ search }),
   ]);
   return { reports, total };
 }

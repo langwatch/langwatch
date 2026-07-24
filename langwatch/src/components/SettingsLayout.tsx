@@ -282,6 +282,12 @@ export default function SettingsLayout({
               >
                 Subscriptions
               </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/agent-reports"
+                includePath="/ops/backoffice/agent-reports"
+              >
+                Agent Reports
+              </MenuLink>
             </NavSection>
           )}
         </VStack>

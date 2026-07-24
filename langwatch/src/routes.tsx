@@ -595,6 +595,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/ops/backoffice")),
   },
   {
+    path: "/ops/backoffice/agent-reports",
+    ...page(() => import("./pages/ops/backoffice/agent-reports")),
+  },
+  {
     path: "/ops/backoffice/users",
     ...page(() => import("./pages/ops/backoffice/users")),
   },
