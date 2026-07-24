@@ -683,9 +683,6 @@ export function initializeDefaultApp(options?: {
     traceSummaryFold: clickhouseEnabled
       ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
       : traceSummary.repository,
-    logRecordStorage: clickhouseEnabled
-      ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
-      : new NullLogRecordStorageRepository(),
     canonicalLogStorage: clickhouseEnabled
       ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
       : new NullCanonicalLogRecordRepository(),
@@ -1580,7 +1577,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       traces: {
         recordSpan: noop,
         assignTopic: noop,
-        recordLog: noop,
         recordLogContribution: noop,
         recordMetricCorrelation: noop,
         resolveOrigin: noop,

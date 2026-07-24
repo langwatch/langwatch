@@ -1,5 +1,3 @@
-import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
-
 /**
  * A stored log record read back by trace. Generic across emitters (Claude Code,
  * Spring AI, codex, gemini, …): logs correlate at the TRACE level, and the raw
@@ -32,14 +30,6 @@ export interface StoredLogRecordRow {
 export const TRACE_LOG_READ_CAP = 2000;
 
 export interface LogRecordStorageRepository {
-  insertLogRecord(
-    record: NormalizedLogRecord,
-    retentionDays?: number,
-  ): Promise<void>;
-  insertLogRecords(
-    records: NormalizedLogRecord[],
-    retentionDays?: number,
-  ): Promise<void>;
   /**
    * Read every log record correlated to one trace (generic — not filtered to
    * any emitter), oldest first, capped at `limit` rows
@@ -90,18 +80,6 @@ export function mergeStoredLogRows(
 export class NullLogRecordStorageRepository
   implements LogRecordStorageRepository
 {
-  async insertLogRecord(
-    _record: NormalizedLogRecord,
-    _retentionDays?: number,
-  ): Promise<void> {
-    // No-op store: log records are dropped when ClickHouse is disabled.
-  }
-  async insertLogRecords(
-    _records: NormalizedLogRecord[],
-    _retentionDays?: number,
-  ): Promise<void> {
-    // No-op store: log records are dropped when ClickHouse is disabled.
-  }
   async getLogsByTraceId(
     _tenantId: string,
     _traceId: string,

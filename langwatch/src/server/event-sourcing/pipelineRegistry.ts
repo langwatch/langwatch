@@ -72,7 +72,6 @@ import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
 import { createRateLimitedBootstrap } from "../app-layer/topic-clustering/topicClusteringBootstrapGate";
-import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
@@ -163,13 +162,11 @@ import { createTopicClusteringProcessingPipeline } from "./pipelines/topic-clust
 import type { TopicClusteringRunHistoryData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 import type { TopicClusteringRunStatusData } from "./pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
 import type { TopicModelData } from "./pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
-import { resolveLogCommandShardCount } from "./pipelines/trace-processing/commands/logCommandGroupKey";
 import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "./pipelines/trace-processing/pipeline";
-import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
@@ -258,7 +255,6 @@ export interface PipelineRepositories {
   experimentRunState: ExperimentRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   traceSummaryFold: TraceSummaryRepository;
-  logRecordStorage: LogRecordStorageRepository;
   canonicalLogStorage: CanonicalLogRecordRepository;
   /** ADR-056: the session-aggregate row + the (trace → session) map. */
   codingAgentSession: CodingAgentSessionRepository;
@@ -970,10 +966,6 @@ export class PipelineRegistry {
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
         ),
-        // CUTOVER ONLY — see TraceProcessingPipelineDeps.logRecordAppendStore.
-        logRecordAppendStore: new LogRecordAppendStore(
-          this.deps.repositories.logRecordStorage,
-        ),
         // Redis cache is the slim fold's ONLY warm read path — its store's
         // get() returns null by design (lossy row, no read-back), and on a
         // cache miss the fold's refoldOnStoreMiss option rebuilds state from
@@ -1002,14 +994,6 @@ export class PipelineRegistry {
         // parallel across `traceId:<shard>` GroupQueue groups; fold stays per-trace.
         spanCommandShardCount: resolveSpanCommandShardCount(
           process.env.TRACE_SPAN_PROCESSING_SHARDS,
-        ),
-        // Log-command sharding fan-out, ON by default (4 lanes; env
-        // TRACE_LOG_PROCESSING_SHARDS tunes it, 1 disables). Lets one Claude
-        // Code turn's recordLog commands drain in parallel across
-        // `traceId:<shard>` GroupQueue groups; the fold and the
-        // claude-span-sync reactor stay per-trace.
-        logCommandShardCount: resolveLogCommandShardCount(
-          process.env.TRACE_LOG_PROCESSING_SHARDS,
         ),
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,

@@ -12,6 +12,12 @@ export const TOPIC_ASSIGNED_EVENT_VERSIONS = [
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 ] as const;
 
+/**
+ * Trace-fold contribution event for a received log record. No live minter
+ * since the `recordLog` command was retired (canonical `log_records` is now the
+ * only log write path) — kept so historical `event_log` replays of the trace
+ * folds still reproduce pre-cutover log contributions.
+ */
 export const LOG_RECORD_RECEIVED_EVENT_TYPE =
   "lw.obs.trace.log_record_received" as const;
 export const LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST = "2026-03-08" as const;
@@ -98,7 +104,6 @@ export type TraceProcessingEventType =
 
 export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
 export const ASSIGN_TOPIC_COMMAND_TYPE = "lw.obs.trace.assign_topic" as const;
-export const RECORD_LOG_COMMAND_TYPE = "lw.obs.trace.record_log" as const;
 export const RECORD_LOG_CONTRIBUTION_COMMAND_TYPE =
   "lw.obs.trace.record_log_contribution" as const;
 export const RECORD_METRIC_CORRELATION_COMMAND_TYPE =
@@ -117,7 +122,6 @@ export const CHANGE_TRACE_NAME_COMMAND_TYPE =
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
   ASSIGN_TOPIC_COMMAND_TYPE,
-  RECORD_LOG_COMMAND_TYPE,
   RECORD_LOG_CONTRIBUTION_COMMAND_TYPE,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
   RESOLVE_ORIGIN_COMMAND_TYPE,
