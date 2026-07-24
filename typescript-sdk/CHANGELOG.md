@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.37.0...typescript-sdk@v1.0.0) (2026-07-24)
+
+
+### Features
+
+* **typescript-sdk:** graduate to 1.0.0 ([f2e7067](https://github.com/langwatch/langwatch/commit/f2e70674c292b9634929e11bfede42b1ea70c86e))
+
 ## [0.37.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.36.0...typescript-sdk@v0.37.0) (2026-07-24)
 
 
