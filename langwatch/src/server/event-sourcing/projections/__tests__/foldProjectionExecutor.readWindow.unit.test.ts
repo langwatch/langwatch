@@ -199,7 +199,7 @@ describe("FoldProjectionExecutor declared read window", () => {
                 }
               : { state: null, appliedEventIds: [] },
         );
-      (store as Record<string, unknown>).getWithApplied = getWithApplied;
+      store.getWithApplied = getWithApplied;
 
       const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
