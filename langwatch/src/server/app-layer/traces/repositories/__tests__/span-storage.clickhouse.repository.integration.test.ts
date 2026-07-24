@@ -878,3 +878,107 @@ describe("SpanStorageClickHouseRepository langwatch signals read (integration)",
     });
   });
 });
+
+// A lone (unpaired) UTF-16 surrogate half — the shape a string takes when it is
+// truncated mid-emoji, or an SDK captured binary/garbage text as a string.
+// `JSONEachRow` serialises it as a `\uD83D`-style escape with no second part,
+// which ClickHouse's JSON parser rejects by default ("missing second part of
+// surrogate pair") — failing the whole insert, exhausting retries, and
+// dead-lettering the span forever. `SPAN_INSERT_SETTINGS` disables that throw
+// (`input_format_json_throw_on_bad_escape_sequence: 0`) so the byte is kept as
+// text and the span survives. This suite drives the real production write path
+// against real ClickHouse: with the setting removed, `insertSpans` throws here
+// and the round-trip read finds nothing.
+const LONE_HIGH_SURROGATE = "\uD83D";
+const LONE_LOW_SURROGATE = "\uDC00";
+
+function spanWithLoneSurrogates(
+  surrogateTenantId: string,
+  surrogateTraceId: string,
+): SpanInsertData {
+  return {
+    id: `proj-${nanoid()}`,
+    tenantId: surrogateTenantId,
+    traceId: surrogateTraceId,
+    spanId: "surrogate-span",
+    parentSpanId: null,
+    parentTraceId: null,
+    parentIsRemote: null,
+    sampled: true,
+    startTimeUnixMs: base,
+    endTimeUnixMs: base + 100,
+    durationMs: 100,
+    name: `span name ${LONE_HIGH_SURROGATE}`,
+    kind: 0,
+    resourceAttributes: {
+      [`res.key.${LONE_HIGH_SURROGATE}`]: `res.val.${LONE_LOW_SURROGATE}`,
+    },
+    spanAttributes: {
+      clean: "kept-verbatim",
+      [`attr.key.${LONE_HIGH_SURROGATE}`]: `attr.val.${LONE_LOW_SURROGATE}`,
+      nested: { text: `deep ${LONE_HIGH_SURROGATE}` },
+    },
+    statusCode: 2,
+    statusMessage: `error: ${LONE_LOW_SURROGATE}`,
+    instrumentationScope: {
+      name: `scope ${LONE_HIGH_SURROGATE}`,
+      version: `v1 ${LONE_LOW_SURROGATE}`,
+    },
+    events: [
+      {
+        name: `event ${LONE_HIGH_SURROGATE}`,
+        timeUnixMs: base + 50,
+        attributes: {
+          [`ev.key.${LONE_HIGH_SURROGATE}`]: `ev.val.${LONE_LOW_SURROGATE}`,
+        },
+      },
+    ],
+    links: [],
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
+    retentionDays: 0,
+  };
+}
+
+describe("SpanStorageClickHouseRepository lone-surrogate span insert (integration)", () => {
+  const surrogateTenantId = `test-span-surrogate-${nanoid()}`;
+  const surrogateTraceId = `trace-${nanoid()}`;
+
+  afterAll(async () => {
+    if (ch) {
+      await ch.exec({
+        query:
+          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: surrogateTenantId },
+      });
+    }
+  });
+
+  describe("given a span whose name, status, scope, events and attributes carry lone UTF-16 surrogates", () => {
+    describe("when the repository inserts it through the JSONEachRow write path", () => {
+      it("does not throw the surrogate-pair parse error that dead-letters the span", async () => {
+        await expect(
+          repo.insertSpans([
+            spanWithLoneSurrogates(surrogateTenantId, surrogateTraceId),
+          ]),
+        ).resolves.toBeUndefined();
+      });
+
+      it("persists the span so it reads back instead of being lost", async () => {
+        const spans = await repo.getNormalizedSpansByTraceId({
+          tenantId: surrogateTenantId,
+          traceId: surrogateTraceId,
+        });
+
+        const span = spans.find((s) => s.spanId === "surrogate-span");
+        expect(span).toBeDefined();
+        // Valid data on the same span is untouched — the insert stored the row
+        // whole, it did not drop the malformed fields or the clean ones.
+        expect(String(span?.spanAttributes.clean)).toBe("kept-verbatim");
+      });
+    });
+  });
+});

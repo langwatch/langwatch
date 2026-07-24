@@ -38,6 +38,32 @@ import {
 const TABLE_NAME = "stored_spans" as const;
 
 /**
+ * Settings for every `stored_spans` insert.
+ *
+ * `input_format_json_throw_on_bad_escape_sequence: 0` is load-bearing.
+ * Span strings originate as JS UTF-16 and can carry a lone (unpaired) surrogate
+ * half (`\uD800`–`\uDFFF`) — a value truncated mid-emoji, or binary/garbage text
+ * an SDK captured as a string. `JSONEachRow` serializes such a half as a bare
+ * `\uD800`-style escape with no second part, which ClickHouse's JSON parser
+ * rejects by default ("missing second part of surrogate pair"), failing the
+ * whole insert. The pipeline then retries and dead-letters, and the span is lost
+ * forever (13 groups dead-lettered for one project in prod).
+ *
+ * With the setting at 0, ClickHouse keeps the bad escape sequence as-is instead
+ * of throwing — exactly what its own error message recommends. This is done at
+ * the insert boundary, per-batch and O(1), rather than walking and rewriting
+ * every string of every span (attribute keys/values, names, statuses, event
+ * names — unbounded per-span payload) on the hot ingest path just to pre-empt
+ * the parser. The rare malformed string is stored verbatim; every valid string
+ * is untouched.
+ */
+const SPAN_INSERT_SETTINGS = {
+  async_insert: 1,
+  wait_for_async_insert: 1,
+  input_format_json_throw_on_bad_escape_sequence: 0,
+} as const;
+
+/**
  * `stored_spans` is partitioned by `toYearWeek(StartTime)`. When the caller
  * passes an approximate trace timestamp we narrow the scan to a ±2-day
  * window around it — this keeps drawer reads on the warm partition tier
@@ -610,39 +636,8 @@ export function deserializeAttributes(
 }
 
 /**
- * Sanitizes a string to well-formed UTF-16 before it crosses the ClickHouse
- * write boundary.
- *
- * JS strings are UTF-16 and can hold a lone (unpaired) surrogate half
- * (`\uD800`–`\uDFFF`) — e.g. a value truncated mid-emoji, or binary/garbage
- * text captured by an SDK. `JSONEachRow` serializes such a half as a `\uD800`-
- * style escape with no second part, and ClickHouse's JSON parser rejects it
- * ("missing second part of surrogate pair"), failing the whole insert. Because
- * the pipeline retries and then dead-letters, that span is lost forever.
- *
- * `String.prototype.toWellFormed()` replaces each lone surrogate with U+FFFD
- * (the Unicode replacement character) and leaves every valid string untouched,
- * so it is lossless for well-formed input and the correct, minimal fix here.
- * Applied once, at the write boundary, to every string a span contributes to a
- * `stored_spans` row.
- */
-function toWellFormedString(value: string): string {
-  return value.toWellFormed();
-}
-
-/** Nullable variant of {@link toWellFormedString} for optional string columns. */
-function toWellFormedStringOrNull(value: string | null): string | null {
-  return value === null ? null : value.toWellFormed();
-}
-
-/**
  * Serializes attribute values for ClickHouse Map(String, String) columns.
  * Non-scalar values are JSON-stringified at the write boundary.
- *
- * Every map KEY and every string VALUE is passed through
- * {@link toWellFormedString}: a lone UTF-16 surrogate in either half triggers
- * the same ClickHouse insert rejection, so both are sanitized here at the
- * write boundary.
  *
  * @internal Exported for unit testing
  */
@@ -650,11 +645,10 @@ export function serializeAttributes(
   attrs: Record<string, unknown>,
 ): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [rawKey, value] of Object.entries(attrs)) {
+  for (const [key, value] of Object.entries(attrs)) {
     if (value === null || value === undefined) continue;
-    const key = toWellFormedString(rawKey);
     if (typeof value === "string") {
-      result[key] = toWellFormedString(value);
+      result[key] = value;
     } else if (
       typeof value === "number" ||
       typeof value === "boolean" ||
@@ -665,9 +659,6 @@ export function serializeAttributes(
       try {
         const serialized = JSON.stringify(value);
         if (typeof serialized === "string") {
-          // `JSON.stringify` already escapes any lone surrogate inside the
-          // value as a `\uXXXX` sequence, so its output is well-formed UTF-16
-          // as-is — no further sanitization needed on this branch.
           result[key] = serialized;
         }
       } catch {
@@ -816,7 +807,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.error(
@@ -865,7 +856,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         table: TABLE_NAME,
         values: records,
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: SPAN_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.error(
@@ -2052,24 +2043,17 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       StartTime: new Date(span.startTimeUnixMs),
       EndTime: new Date(span.endTimeUnixMs),
       DurationMs: Math.round(span.durationMs),
-      // Every free-text string below is sanitized to well-formed UTF-16: a lone
-      // surrogate in any of them fails the JSONEachRow insert identically to one
-      // in SpanAttributes (see toWellFormedString). Attribute maps are handled
-      // inside serializeAttributes (keys + values); Links.TraceId/SpanId are
-      // structural OTel ids, not free text, so they are left as-is.
-      SpanName: toWellFormedString(span.name),
+      SpanName: span.name,
       SpanKind: span.kind,
-      ServiceName: toWellFormedString(serviceName),
+      ServiceName: serviceName,
       ResourceAttributes: serializeAttributes(span.resourceAttributes),
       SpanAttributes: serializeAttributes(span.spanAttributes),
       StatusCode: span.statusCode,
-      StatusMessage: toWellFormedStringOrNull(span.statusMessage),
-      ScopeName: toWellFormedString(span.instrumentationScope.name),
-      ScopeVersion: toWellFormedStringOrNull(
-        span.instrumentationScope.version ?? null,
-      ),
+      StatusMessage: span.statusMessage,
+      ScopeName: span.instrumentationScope.name,
+      ScopeVersion: span.instrumentationScope.version ?? null,
       "Events.Timestamp": span.events.map((e) => new Date(e.timeUnixMs)),
-      "Events.Name": span.events.map((e) => toWellFormedString(e.name)),
+      "Events.Name": span.events.map((e) => e.name),
       "Events.Attributes": span.events.map((e) =>
         serializeAttributes(e.attributes),
       ),
