@@ -26,6 +26,7 @@ import {
 } from "./batch-evaluation-results/computeConfusionMatrix";
 import type { BatchResultRow } from "./batch-evaluation-results/types";
 import { useDrawer } from "~/hooks/useDrawer";
+import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { Drawer } from "./ui/drawer";
 
 export type ConfusionMatrixDrawerProps = {
@@ -50,8 +51,19 @@ const QUADRANT_LABELS: Record<Quadrant, string> = {
   trueNegative: "True Negative — judge said Fail, reviewer said 👎",
 };
 
-/** Sample-size floor below which a 2x2 table is two anecdotes, not a matrix. */
-const LOW_SAMPLE_FLOOR = 5;
+/**
+ * Width of the 95% accuracy interval beyond which the sample cannot
+ * separate a good judge from a bad one.
+ *
+ * Deliberately a property of the interval rather than a row count. A raw
+ * "fewer than N rows" floor is both arbitrary and unreachable here — the
+ * chart already refuses to mount below its own minimum — whereas the
+ * interval answers the question actually being asked: is this enough
+ * evidence to act on? Thirty points is roughly the span at which the
+ * plausible range still covers both "clearly working" and "barely better
+ * than chance".
+ */
+const UNINFORMATIVE_INTERVAL_WIDTH = 0.3;
 
 const formatPercent = (value: number | null): string =>
   value === null ? "—" : `${Math.round(value * 100)}%`;
@@ -70,6 +82,11 @@ export function ConfusionMatrixDrawer({
 
   const metrics = useMemo(() => computeConfusionMatrix(pairs), [pairs]);
   const total = Math.max(1, metrics.total);
+
+  const isUninformative =
+    metrics.accuracyInterval !== null &&
+    metrics.accuracyInterval.upper - metrics.accuracyInterval.lower >
+      UNINFORMATIVE_INTERVAL_WIDTH;
 
   const rowsByIndex = useMemo(
     () => new Map(rows.map((row) => [row.index, row])),
@@ -111,11 +128,14 @@ export function ConfusionMatrixDrawer({
               </Text>
             </Box>
 
-            {metrics.total < LOW_SAMPLE_FLOOR ? (
+            {isUninformative ? (
               <Box bg="orange.subtle" borderRadius="md" padding={3}>
                 <Text fontSize="xs" color="orange.fg">
-                  Sample size low — fewer than {LOW_SAMPLE_FLOOR} annotated
-                  rows. Agreement may not be representative.
+                  Not enough annotated rows to judge this yet — accuracy
+                  could plausibly be anywhere from{" "}
+                  {formatPercent(metrics.accuracyInterval!.lower)} to{" "}
+                  {formatPercent(metrics.accuracyInterval!.upper)}. Annotate
+                  more rows to narrow that range.
                 </Text>
               </Box>
             ) : null}
@@ -278,13 +298,12 @@ export function ConfusionMatrixDrawer({
                     {quadrantPairs.map(({ rowIndex }) => {
                       const row = rowsByIndex.get(rowIndex);
                       const target = row?.targets[targetId];
-                      const output = target?.output;
+                      // Same formatter the results table uses, so a row reads
+                      // identically here and there — it unwraps the common
+                      // single-"output"-key envelope instead of dumping raw
+                      // JSON with escaped newlines at the reader.
                       const outputText =
-                        typeof output === "string"
-                          ? output
-                          : output
-                            ? JSON.stringify(output)
-                            : "(no output)";
+                        formatTargetOutput(target?.output) || "(no output)";
                       return (
                         <Box key={rowIndex}>
                           <Text fontSize="xs" color="fg.muted">
