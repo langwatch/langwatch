@@ -742,6 +742,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../packages/handled-error
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../langwatch/packages/redaction
       '@langwatch/scenario':
         specifier: ^0.4.6
         version: 0.4.10(5537b93b6807657c4a23641e4b707fe7)
