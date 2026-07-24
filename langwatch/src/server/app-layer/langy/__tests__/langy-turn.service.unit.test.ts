@@ -827,6 +827,7 @@ describe("LangyTurnService.stopTurn", () => {
       releasePermit: vi.fn(),
       perDayPrCap: 0,
       mintSessionKey: vi.fn(),
+      resolveMissingPermissions: vi.fn(),
       revokeSessionKey: vi.fn(),
       admission: {} as unknown as LangyTurnServiceDeps["admission"],
       accessStore: {
