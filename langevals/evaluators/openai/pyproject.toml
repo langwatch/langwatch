@@ -1,6 +1,6 @@
 [project]
 name = "langevals-openai"
-version = "2.2.0"
+version = "2.3.0"
 description = "LangEvals OpenAI moderation evaluator for LLM outputs."
 authors = [
     {name = "Rogerio Chaves", email = "rogerio@langwatch.ai"},
