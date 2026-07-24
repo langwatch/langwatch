@@ -1,5 +1,6 @@
 import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -12,7 +13,13 @@ import {
 import {
   contentAttrKeys,
   enrichCodingAgentSpansFromLogs,
+  enrichSingleSpanWithClaudeLogContent,
+  isCodingAgentShapedSpan,
+  mapSummaryRowsToClaudeRefs,
 } from "~/server/app-layer/traces/claude-code-log-enrichment";
+
+const logger = createLogger("langwatch:api:traces-v2");
+
 import {
   buildCodingAgentTranscript,
   type CodingAgentTranscript,
@@ -274,6 +281,7 @@ export function mapSpanSummaryToTreeNode(row: SpanSummaryRow): SpanTreeNode {
     durationMs: row.durationMs,
     status,
     model: row.model,
+    toolName: row.toolName,
     cost: row.cost,
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
@@ -864,6 +872,60 @@ const sortSchema = z.object({
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
+
+/**
+ * Single-span twin of the bulk claude join for `spanDetail`: one trace-log
+ * read, plus the light summary refs ONLY for model-call spans (their
+ * positional input pairing needs the trace's call order; tool and
+ * interaction joins are exact and skip the second read). Best-effort — any
+ * read failure returns the un-enriched span, mirroring
+ * `enrichCodingAgentSpansFromLogs`'s never-fail contract.
+ */
+async function enrichSpanDetailFromCodingAgentLogs({
+  app,
+  span,
+  tenantId,
+  traceId,
+  occurredAtMs,
+}: {
+  app: ReturnType<typeof getApp>;
+  span: Span;
+  tenantId: string;
+  traceId: string;
+  occurredAtMs?: number;
+}): Promise<Span> {
+  try {
+    const needsSiblingRefs =
+      typeof (span.params as Record<string, unknown> | null)?.request_id ===
+      "string";
+    const [logRows, summaryRows] = await Promise.all([
+      app.traces.logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs),
+      needsSiblingRefs
+        ? app.traces.spans.getSpanSummaryByTraceId({
+            tenantId,
+            traceId,
+            occurredAtMs,
+          })
+        : Promise.resolve([]),
+    ]);
+    return enrichSingleSpanWithClaudeLogContent({
+      span,
+      modelCallRefs: mapSummaryRowsToClaudeRefs(summaryRows),
+      logRows,
+    });
+  } catch (error) {
+    logger.warn(
+      {
+        tenantId,
+        traceId,
+        spanId: span.span_id,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "spanDetail coding-agent enrichment skipped: failed to read trace logs",
+    );
+    return span;
+  }
+}
 
 /**
  * Load one trace's spans, enriched and REDACTED.
@@ -1664,11 +1726,30 @@ export const tracesV2Router = createTRPCRouter({
         throw new TraceNotFoundError(input.spanId);
       }
 
+      // Coding-agent spans store their content in the trace's OTLP LOGS, not
+      // on the span row — join it on here, BEFORE protections, so the joined
+      // content goes through the same redaction pass as any other span
+      // content (identical order to loadProtectedSpansFull). Gated so only
+      // coding-agent-shaped spans pay the log read.
+      const targetSpan = isCodingAgentShapedSpan(span)
+        ? await enrichSpanDetailFromCodingAgentLogs({
+            app,
+            span,
+            tenantId: input.projectId,
+            traceId: input.traceId,
+            occurredAtMs: hint.occurredAtMs,
+          })
+        : span;
+
       // Span-level protections first (category visibility, restricted custom
       // attributes, hidden content scrubbed out of params and events), then
       // the DTO pass below.
-      const redactions = buildSpanContentRedactions([span], protections);
-      const protectedSpan = applySpanProtections(span, protections, redactions);
+      const redactions = buildSpanContentRedactions([targetSpan], protections);
+      const protectedSpan = applySpanProtections(
+        targetSpan,
+        protections,
+        redactions,
+      );
 
       const detail = mapSpanToDetail(
         protectedSpan,
@@ -1696,6 +1777,10 @@ export const tracesV2Router = createTRPCRouter({
       // span has no own prompt attrs.
       if (
         detail.type === "llm" &&
+        // Coding-agent traces carry no `langwatch.prompt.*` anywhere, so the
+        // full-trace ancestor walk is a guaranteed miss — skipping it makes
+        // the enriched spanDetail read CHEAPER than before for these spans.
+        !isCodingAgentShapedSpan(span) &&
         !hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
       ) {
         const enriched = await enrichLlmSpanWithAncestorPrompt({

@@ -39,6 +39,15 @@ interface IOPreviewProps {
    */
   inputMediaRefs?: TraceMediaRef[];
   outputMediaRefs?: TraceMediaRef[];
+  /**
+   * Render a muted "— no input/output recorded" row for a null side when the
+   * other side has content. Off by default so non-list consumers
+   * (ConversationCell) keep their current shape. A redacted side is never
+   * labelled missing — hidden content is not absent content.
+   */
+  showMissingPlaceholders?: boolean;
+  inputRedacted?: boolean | null;
+  outputRedacted?: boolean | null;
 }
 
 // memo: the addon cell re-renders with identical props whenever the table
@@ -49,8 +58,18 @@ export const IOPreview = memo(function IOPreview({
   output,
   inputMediaRefs,
   outputMediaRefs,
+  showMissingPlaceholders = false,
+  inputRedacted,
+  outputRedacted,
 }: IOPreviewProps) {
   const density = useDensityStore((s) => s.density);
+  const placeholders = missingPlaceholderSides({
+    input,
+    output,
+    showMissingPlaceholders,
+    inputRedacted,
+    outputRedacted,
+  });
   if (density === "comfortable") {
     return (
       <ComfortableIOPreview
@@ -58,6 +77,7 @@ export const IOPreview = memo(function IOPreview({
         output={output}
         inputMediaRefs={inputMediaRefs}
         outputMediaRefs={outputMediaRefs}
+        placeholders={placeholders}
       />
     );
   }
@@ -67,9 +87,41 @@ export const IOPreview = memo(function IOPreview({
       output={output}
       inputMediaRefs={inputMediaRefs}
       outputMediaRefs={outputMediaRefs}
+      placeholders={placeholders}
     />
   );
 });
+
+interface MissingPlaceholderSides {
+  input: boolean;
+  output: boolean;
+}
+
+/**
+ * Which sides get a "— no X recorded" placeholder: only a null side opposite
+ * a recorded one, never a redacted side (RedactedField semantics belong to
+ * the drawer; here silence is the only honest treatment for hidden content).
+ * Pure + exported for unit testing.
+ */
+export function missingPlaceholderSides({
+  input,
+  output,
+  showMissingPlaceholders,
+  inputRedacted,
+  outputRedacted,
+}: {
+  input: string | null;
+  output: string | null;
+  showMissingPlaceholders: boolean;
+  inputRedacted?: boolean | null;
+  outputRedacted?: boolean | null;
+}): MissingPlaceholderSides {
+  if (!showMissingPlaceholders) return { input: false, output: false };
+  return {
+    input: input === null && output !== null && inputRedacted !== true,
+    output: output === null && input !== null && outputRedacted !== true,
+  };
+}
 
 /**
  * Build the row data once per cell. `formatPreview` runs the unified
@@ -389,12 +441,9 @@ function buildRow(
   };
 }
 
-const CompactIOPreview: React.FC<IOPreviewProps> = ({
-  input,
-  output,
-  inputMediaRefs,
-  outputMediaRefs,
-}) => {
+const CompactIOPreview: React.FC<
+  IOPreviewProps & { placeholders: MissingPlaceholderSides }
+> = ({ input, output, inputMediaRefs, outputMediaRefs, placeholders }) => {
   const tokens = useDensityTokens();
   // Cache the parse work per row: without this a density flip (a store
   // subscription every visible cell holds) re-parses every row's IO.
@@ -415,6 +464,9 @@ const CompactIOPreview: React.FC<IOPreviewProps> = ({
           direction="input"
         />
       )}
+      {placeholders.input && (
+        <CompactMissingRow direction="input" fontSize={tokens.ioFontSize} />
+      )}
       {outputRow && (
         <CompactRow
           row={outputRow}
@@ -422,9 +474,38 @@ const CompactIOPreview: React.FC<IOPreviewProps> = ({
           direction="output"
         />
       )}
+      {placeholders.output && (
+        <CompactMissingRow direction="output" fontSize={tokens.ioFontSize} />
+      )}
     </VStack>
   );
 };
+
+/**
+ * Muted stand-in for a side that was never recorded — same geometry as a
+ * CompactRow so the surviving side doesn't jump, copy matching the drawer
+ * summary's MissingIORow.
+ */
+const CompactMissingRow: React.FC<{
+  direction: "input" | "output";
+  fontSize: string;
+}> = ({ direction, fontSize }) => (
+  <HStack gap={1} width="full" overflow="hidden" align="flex-start">
+    <Flex align="center" gap={1} flexShrink={0} paddingTop="2px">
+      <Icon boxSize="10px" color="fg.subtle">
+        {direction === "input" ? <ArrowUp /> : <ArrowDown />}
+      </Icon>
+    </Flex>
+    <Text
+      data-testid={`io-preview-missing-${direction}`}
+      fontSize={fontSize}
+      color="fg.subtle"
+      fontStyle="italic"
+    >
+      — no {direction} recorded
+    </Text>
+  </HStack>
+);
 
 interface CompactRowProps {
   row: { text: string; isChat: boolean; isTool: boolean; media: RowMedia };
@@ -508,12 +589,9 @@ const RoleIcon: React.FC<{
   return null;
 };
 
-const ComfortableIOPreview: React.FC<IOPreviewProps> = ({
-  input,
-  output,
-  inputMediaRefs,
-  outputMediaRefs,
-}) => {
+const ComfortableIOPreview: React.FC<
+  IOPreviewProps & { placeholders: MissingPlaceholderSides }
+> = ({ input, output, inputMediaRefs, outputMediaRefs, placeholders }) => {
   const inputRow = useMemo(
     () =>
       input !== null
@@ -547,6 +625,7 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({
           media={inputRow.media}
         />
       )}
+      {placeholders.input && <ComfortableMissingRow direction="input" />}
       {outputRow && (
         <ComfortableRow
           label="Output"
@@ -556,9 +635,34 @@ const ComfortableIOPreview: React.FC<IOPreviewProps> = ({
           media={outputRow.media}
         />
       )}
+      {placeholders.output && <ComfortableMissingRow direction="output" />}
     </VStack>
   );
 };
+
+const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({
+  direction,
+}) => (
+  <HStack align="flex-start" gap={2}>
+    <Text
+      textStyle="sm"
+      fontWeight="600"
+      color="fg.subtle"
+      flexShrink={0}
+      width={COMFORTABLE_LABEL_WIDTH}
+    >
+      {direction === "input" ? "Input" : "Output"}
+    </Text>
+    <Text
+      data-testid={`io-preview-missing-${direction}`}
+      textStyle="sm"
+      color="fg.subtle"
+      fontStyle="italic"
+    >
+      — no {direction} recorded
+    </Text>
+  </HStack>
+);
 
 const ComfortableRow: React.FC<{
   label: string;

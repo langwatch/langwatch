@@ -1,9 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
-  computeClaudeSpanEnrichment,
   type ClaudeContentLog,
   type ClaudeSpanRef,
+  type ClaudeToolLog,
+  computeClaudeInteractionOutput,
+  computeClaudeSpanEnrichment,
+  computeClaudeToolSpanEnrichment,
 } from "../claude-code-span-enrichment";
 
 /**
@@ -70,13 +73,16 @@ describe("computeClaudeSpanEnrichment", () => {
           querySource: REPL,
           timeUnixMs: 1000,
           body: JSON.stringify({
-            content: [{ type: "tool_use", name: "Bash", input: { command: "ls" } }],
+            content: [
+              { type: "tool_use", name: "Bash", input: { command: "ls" } },
+            ],
           }),
         },
       ];
 
-      const output = computeClaudeSpanEnrichment({ spans, logs }).get("span-1")
-        ?.output;
+      const output = computeClaudeSpanEnrichment({ spans, logs }).get(
+        "span-1",
+      )?.output;
       expect(output?.type).toBe("text");
       expect((output as { value: string }).value).toContain("[tool_use: Bash]");
     });
@@ -310,8 +316,9 @@ describe("computeClaudeSpanEnrichment", () => {
         },
       ];
 
-      const input = computeClaudeSpanEnrichment({ spans, logs }).get("span-1")
-        ?.input;
+      const input = computeClaudeSpanEnrichment({ spans, logs }).get(
+        "span-1",
+      )?.input;
 
       expect(input).toEqual({
         type: "text",
@@ -399,7 +406,8 @@ describe("computeClaudeSpanEnrichment", () => {
       ];
 
       expect(
-        computeClaudeSpanEnrichment({ spans, logs }).get("span-1")?.cost ?? null,
+        computeClaudeSpanEnrichment({ spans, logs }).get("span-1")?.cost ??
+          null,
       ).toBeNull();
     });
   });
@@ -492,7 +500,10 @@ describe("computeClaudeSpanEnrichment", () => {
           requestId: null,
           querySource: REPL,
           timeUnixMs: 100,
-          body: requestBody({ system: "You are helpful", userText: "hi there" }),
+          body: requestBody({
+            system: "You are helpful",
+            userText: "hi there",
+          }),
         },
         {
           eventName: "api_response_body",
@@ -516,6 +527,302 @@ describe("computeClaudeSpanEnrichment", () => {
         { role: "system", content: "You are helpful" },
         { role: "user", content: "hi there" },
       ]);
+    });
+  });
+});
+
+function toolLog(over: Partial<ClaudeToolLog> = {}): ClaudeToolLog {
+  return {
+    eventName: "tool_result",
+    toolUseId: "toolu_01AbCdEfGhIjKlMnOpQrStUv",
+    toolName: "Bash",
+    toolParameters: '{"command":"wc -l notes.txt"}',
+    toolInput: '{"command":"wc -l notes.txt","description":"Count lines"}',
+    decision: null,
+    decisionSource: "config",
+    success: true,
+    durationMs: 820,
+    resultSizeBytes: 799,
+    timeUnixMs: 2000,
+    ...over,
+  };
+}
+
+function contentLog(over: Partial<ClaudeContentLog> = {}): ClaudeContentLog {
+  return {
+    eventName: "api_request_body",
+    requestId: null,
+    querySource: REPL,
+    timeUnixMs: 3000,
+    body: null,
+    ...over,
+  };
+}
+
+describe("computeClaudeToolSpanEnrichment", () => {
+  const TOOL_USE_ID = "toolu_01AbCdEfGhIjKlMnOpQrStUv";
+
+  describe("given a tool span and its tool_result log", () => {
+    it("attaches the real tool_input as the span input", () => {
+      const result = computeClaudeToolSpanEnrichment({
+        spans: [{ spanId: "tool-span-1", toolUseId: TOOL_USE_ID }],
+        toolLogs: [toolLog()],
+        contentLogs: [],
+      });
+
+      expect(result.get("tool-span-1")?.input).toEqual({
+        type: "json",
+        value: { command: "wc -l notes.txt", description: "Count lines" },
+      });
+    });
+
+    it("summarises the outcome as output when no request body carries the result content", () => {
+      const result = computeClaudeToolSpanEnrichment({
+        spans: [{ spanId: "tool-span-1", toolUseId: TOOL_USE_ID }],
+        toolLogs: [toolLog()],
+        contentLogs: [],
+      });
+
+      expect(result.get("tool-span-1")?.output).toEqual({
+        type: "json",
+        value: {
+          status: "completed",
+          success: true,
+          durationMs: 820,
+          resultSizeBytes: 799,
+          decisionSource: "config",
+        },
+      });
+    });
+
+    it("reports failed runs distinctly", () => {
+      const result = computeClaudeToolSpanEnrichment({
+        spans: [{ spanId: "tool-span-1", toolUseId: TOOL_USE_ID }],
+        toolLogs: [toolLog({ success: false })],
+        contentLogs: [],
+      });
+
+      expect(result.get("tool-span-1")?.output).toMatchObject({
+        type: "json",
+        value: { status: "failed", success: false },
+      });
+    });
+  });
+
+  describe("given the next model call's request body carrying the tool_result block", () => {
+    it("recovers the REAL tool output content keyed by tool_use_id", () => {
+      const body = JSON.stringify({
+        model: "claude-sonnet-4",
+        messages: [
+          { role: "user", content: "count the lines" },
+          {
+            role: "assistant",
+            content: [
+              { type: "tool_use", id: TOOL_USE_ID, name: "Bash", input: {} },
+            ],
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: TOOL_USE_ID,
+                content: [{ type: "text", text: "42 notes.txt" }],
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = computeClaudeToolSpanEnrichment({
+        spans: [{ spanId: "tool-span-1", toolUseId: TOOL_USE_ID }],
+        toolLogs: [toolLog()],
+        contentLogs: [contentLog({ body })],
+      });
+
+      expect(result.get("tool-span-1")?.output).toEqual({
+        type: "text",
+        value: "42 notes.txt",
+      });
+    });
+  });
+
+  describe("given a denied tool (decision without a result)", () => {
+    it("reports the rejection as the output", () => {
+      const result = computeClaudeToolSpanEnrichment({
+        spans: [{ spanId: "tool-span-1", toolUseId: TOOL_USE_ID }],
+        toolLogs: [
+          toolLog({
+            eventName: "tool_decision",
+            decision: "reject",
+            decisionSource: "user_temporary",
+            toolInput: null,
+            success: null,
+            durationMs: null,
+            resultSizeBytes: null,
+          }),
+        ],
+        contentLogs: [],
+      });
+
+      const enrichment = result.get("tool-span-1");
+      expect(enrichment?.output).toEqual({
+        type: "json",
+        value: {
+          status: "rejected",
+          decision: "reject",
+          decisionSource: "user_temporary",
+        },
+      });
+      expect(enrichment?.input).toEqual({
+        type: "json",
+        value: { command: "wc -l notes.txt" },
+      });
+    });
+  });
+
+  describe("given malformed tool_input JSON", () => {
+    it("keeps the raw string as text input", () => {
+      const result = computeClaudeToolSpanEnrichment({
+        spans: [{ spanId: "tool-span-1", toolUseId: TOOL_USE_ID }],
+        toolLogs: [toolLog({ toolInput: "{not json" })],
+        contentLogs: [],
+      });
+
+      expect(result.get("tool-span-1")?.input).toEqual({
+        type: "text",
+        value: "{not json",
+      });
+    });
+  });
+
+  describe("given a tool span with no matching logs", () => {
+    it("leaves the span untouched", () => {
+      const result = computeClaudeToolSpanEnrichment({
+        spans: [{ spanId: "tool-span-1", toolUseId: "toolu_unmatched" }],
+        toolLogs: [toolLog()],
+        contentLogs: [],
+      });
+
+      expect(result.has("tool-span-1")).toBe(false);
+    });
+  });
+});
+
+describe("computeClaudeInteractionOutput", () => {
+  describe("given conversational replies inside the turn window", () => {
+    it("picks the LAST reply as the turn's output", () => {
+      const output = computeClaudeInteractionOutput({
+        logs: [
+          contentLog({
+            eventName: "assistant_response",
+            requestId: "req_a",
+            timeUnixMs: 1500,
+            body: "first reply",
+          }),
+          contentLog({
+            eventName: "assistant_response",
+            requestId: "req_b",
+            timeUnixMs: 2500,
+            body: "final reply",
+          }),
+        ],
+        windowStartMs: 1000,
+        windowEndMs: 3000,
+      });
+
+      expect(output).toEqual({ type: "text", value: "final reply" });
+    });
+
+    it("prefers the parsed response body over the raw text at the same timestamp", () => {
+      const output = computeClaudeInteractionOutput({
+        logs: [
+          contentLog({
+            eventName: "assistant_response",
+            requestId: "req_a",
+            timeUnixMs: 2000,
+            body: "raw text",
+          }),
+          contentLog({
+            eventName: "api_response_body",
+            requestId: "req_a",
+            timeUnixMs: 2000,
+            body: responseBody("parsed body reply"),
+          }),
+        ],
+        windowStartMs: 1000,
+        windowEndMs: 3000,
+      });
+
+      expect(output).toEqual({ type: "text", value: "parsed body reply" });
+    });
+  });
+
+  describe("given a utility reply (non-conversational query source)", () => {
+    it("never lets it headline the turn", () => {
+      const output = computeClaudeInteractionOutput({
+        logs: [
+          contentLog({
+            eventName: "assistant_response",
+            requestId: "req_a",
+            querySource: "generate_session_title",
+            timeUnixMs: 2000,
+            body: "Telemetry chat",
+          }),
+        ],
+        windowStartMs: 1000,
+        windowEndMs: 3000,
+      });
+
+      expect(output).toBeNull();
+    });
+  });
+
+  describe("given a reply flushed just after the span closed", () => {
+    it("accepts it within the 2s slack", () => {
+      const output = computeClaudeInteractionOutput({
+        logs: [
+          contentLog({
+            eventName: "assistant_response",
+            requestId: "req_a",
+            timeUnixMs: 4500,
+            body: "late flush",
+          }),
+        ],
+        windowStartMs: 1000,
+        windowEndMs: 3000,
+      });
+
+      expect(output).toEqual({ type: "text", value: "late flush" });
+    });
+
+    it("rejects replies beyond the slack (another turn's reply)", () => {
+      const output = computeClaudeInteractionOutput({
+        logs: [
+          contentLog({
+            eventName: "assistant_response",
+            requestId: "req_a",
+            timeUnixMs: 9000,
+            body: "next turn",
+          }),
+        ],
+        windowStartMs: 1000,
+        windowEndMs: 3000,
+      });
+
+      expect(output).toBeNull();
+    });
+  });
+
+  describe("given no logs", () => {
+    it("returns null", () => {
+      expect(
+        computeClaudeInteractionOutput({
+          logs: [],
+          windowStartMs: 0,
+          windowEndMs: 1,
+        }),
+      ).toBeNull();
     });
   });
 });

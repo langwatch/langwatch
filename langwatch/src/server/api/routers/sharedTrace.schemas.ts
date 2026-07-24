@@ -106,6 +106,10 @@ const sharedSpanTreeNodeSchema = spanTreeNodeSchema.pick({
   durationMs: true,
   status: true,
   model: true,
+  // The tool's NAME (WebSearch, Bash...) labels the waterfall row exactly as
+  // in-app; arguments/results are span CONTENT and stay behind the detail
+  // read's redaction pass.
+  toolName: true,
   // `gateTreeCost` nulls per-span spend on the same `cost:view` rule as the
   // header.
   cost: true,

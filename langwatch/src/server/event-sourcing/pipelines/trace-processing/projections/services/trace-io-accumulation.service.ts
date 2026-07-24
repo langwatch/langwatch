@@ -132,6 +132,26 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
         return { input: null, output: responseText };
       }
     }
+    // LIGHT path: without OTEL_LOG_RAW_API_BODIES the reply text rides an
+    // `assistant_response` event (attribute `response`) and no
+    // api_response_body exists in the session — the two events are
+    // per-session alternatives carrying the same reply text, so accepting
+    // both at the same rank cannot double-lift. Same conversational gate as
+    // above: utility replies (autosuggest, session titles) must not clobber
+    // the headline output.
+    if (
+      data.attributes["event.name"] === "assistant_response" &&
+      isConversationalQuerySource(
+        typeof data.attributes.query_source === "string"
+          ? data.attributes.query_source
+          : null,
+      )
+    ) {
+      const response = data.attributes.response;
+      if (typeof response === "string" && response.length > 0) {
+        return { input: null, output: response };
+      }
+    }
   }
 
   // Codex emits the user's text on a separate codex.user_prompt event.

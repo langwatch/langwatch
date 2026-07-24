@@ -85,7 +85,7 @@ export const GroupRow = memo(function GroupRow({
         <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
           <HStack gap={1.5} minWidth={0}>
             <Text textStyle="xs" color="fg" truncate>
-              {group.name}
+              {group.toolName ? `${group.name} · ${group.toolName}` : group.name}
             </Text>
             <Text
               textStyle="2xs"

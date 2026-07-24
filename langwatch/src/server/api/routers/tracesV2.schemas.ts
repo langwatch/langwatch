@@ -171,6 +171,12 @@ export const spanTreeNodeSchema = z.object({
   status: z.enum(["ok", "error", "unset"]),
   model: z.string().nullable(),
   /**
+   * Tool display name (`gen_ai.tool.name` ?? claude's `tool_name`) for tool
+   * spans — lets the waterfall label WHICH tool ran without a spanDetail
+   * call. Null for non-tool spans.
+   */
+  toolName: z.string().nullish(),
+  /**
    * USD cost — `gen_ai.usage.cost` when the SDK reported one, otherwise
    * computed server-side from token counts × model pricing (same cascade
    * the trace-level fold uses). Null when neither yields a value.

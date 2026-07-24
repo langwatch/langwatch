@@ -144,3 +144,86 @@ describe("IOPreview media badges", () => {
     });
   });
 });
+
+describe("IOPreview missing-side placeholders", () => {
+  function renderWithPlaceholders(
+    input: string | null,
+    output: string | null,
+    over: {
+      showMissingPlaceholders?: boolean;
+      inputRedacted?: boolean;
+      outputRedacted?: boolean;
+    } = {},
+  ) {
+    return render(
+      <ChakraProvider value={defaultSystem}>
+        <IOPreview
+          input={input}
+          output={output}
+          showMissingPlaceholders={over.showMissingPlaceholders ?? true}
+          inputRedacted={over.inputRedacted}
+          outputRedacted={over.outputRedacted}
+        />
+      </ChakraProvider>,
+    );
+  }
+
+  describe("given a row with input but no recorded output", () => {
+    describe("when the list renders it with placeholders enabled", () => {
+      it("renders the input plus a muted no-output placeholder", () => {
+        const { getByTestId, container } = renderWithPlaceholders(
+          "hello claudinho",
+          null,
+        );
+
+        expect(container.textContent).toContain("hello claudinho");
+        expect(getByTestId("io-preview-missing-output").textContent).toBe(
+          "— no output recorded",
+        );
+      });
+    });
+
+    describe("when the consumer leaves placeholders off (non-list surfaces)", () => {
+      it("renders no placeholder row", () => {
+        const { queryByTestId } = renderWithPlaceholders("hello", null, {
+          showMissingPlaceholders: false,
+        });
+
+        expect(queryByTestId("io-preview-missing-output")).toBeNull();
+      });
+    });
+
+    describe("when the output side is redacted", () => {
+      it("stays silent instead of calling hidden content missing", () => {
+        const { queryByTestId } = renderWithPlaceholders("hello", null, {
+          outputRedacted: true,
+        });
+
+        expect(queryByTestId("io-preview-missing-output")).toBeNull();
+      });
+    });
+  });
+
+  describe("given a row with output but no recorded input", () => {
+    describe("when the list renders it with placeholders enabled", () => {
+      it("renders the no-input placeholder before the output", () => {
+        const { getByTestId } = renderWithPlaceholders(null, "done!");
+
+        expect(getByTestId("io-preview-missing-input").textContent).toBe(
+          "— no input recorded",
+        );
+      });
+    });
+  });
+
+  describe("given a row with neither side", () => {
+    describe("when the list renders it with placeholders enabled", () => {
+      it("renders no placeholders at all", () => {
+        const { queryByTestId } = renderWithPlaceholders(null, null);
+
+        expect(queryByTestId("io-preview-missing-input")).toBeNull();
+        expect(queryByTestId("io-preview-missing-output")).toBeNull();
+      });
+    });
+  });
+});

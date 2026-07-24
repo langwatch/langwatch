@@ -13,6 +13,7 @@ function group(over: Partial<SiblingGroup> = {}): SiblingGroup {
   return {
     kind: "group",
     name: "Bash",
+    toolName: null,
     type: "tool",
     count: 5,
     spans: [],
@@ -29,7 +30,7 @@ function group(over: Partial<SiblingGroup> = {}): SiblingGroup {
 }
 
 const baseProps = {
-  groupKey: "root::Bash",
+  groupKey: JSON.stringify(["root", "Bash", "tool", ""]),
   isExpanded: false,
   onToggle: vi.fn(),
 };

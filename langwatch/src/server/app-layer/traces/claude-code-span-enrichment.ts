@@ -41,6 +41,8 @@ import type { ChatMessage, SpanInputOutput } from "~/server/tracer/types";
 import {
   buildInputMessagesFromRequestBody,
   extractAssistantOutputFromResponseBody,
+  extractToolResultsFromRequestBody,
+  isConversationalQuerySource,
 } from "./canonicalisation/extractors/claudeCode";
 
 /** A claude_code content log record, normalized by the caller. */
@@ -377,4 +379,258 @@ function pushInto<T>(map: Map<string, T[]>, key: string, item: T): void {
   const existing = map.get(key);
   if (existing !== undefined) existing.push(item);
   else map.set(key, [item]);
+}
+
+/** A claude_code tool event log (`tool_decision` / `tool_result`), normalized. */
+export interface ClaudeToolLog {
+  /** `tool_decision` | `tool_result` */
+  eventName: string;
+  toolUseId: string | null;
+  toolName: string | null;
+  /** Claude's derived params JSON (both events). */
+  toolParameters: string | null;
+  /** The REAL tool input JSON (`tool_result` only). */
+  toolInput: string | null;
+  /** `tool_decision`'s accept/reject verdict. */
+  decision: string | null;
+  /** Who decided (`config`, `user_permanent`, ...). */
+  decisionSource: string | null;
+  /** `tool_result`'s success flag (string "true"/"false" in CH). */
+  success: boolean | null;
+  durationMs: number | null;
+  resultSizeBytes: number | null;
+  timeUnixMs: number;
+}
+
+/** A tool span (`claude_code.tool` / `.execution`), normalized by the caller. */
+export interface ClaudeToolSpanRef {
+  spanId: string;
+  toolUseId: string;
+}
+
+export interface ClaudeToolSpanEnrichment {
+  input: SpanInputOutput | null;
+  output: SpanInputOutput | null;
+}
+
+const TOOL_DECISION_EVENT = "tool_decision";
+const TOOL_RESULT_EVENT = "tool_result";
+
+/**
+ * Compute input/output for the trace's tool spans from its tool event logs —
+ * an EXACT join by `tool_use_id` (both sides carry it), no positional risk.
+ *
+ * Input: the `tool_result`'s real `tool_input` JSON, else its derived
+ * `tool_parameters`, else the `tool_decision`'s parameters.
+ *
+ * Output: the actual result content when the trace's request bodies carry it
+ * (`contentLogs` — see {@link extractToolResultsFromRequestBody}: claude ships
+ * tool stdout only as `tool_result` blocks of the NEXT model call's request
+ * body). Without bodies (light path), a structured summary of what the
+ * telemetry does state: status, success, duration, result size, decision. A
+ * rejected tool (decision without a result — it never ran) reports
+ * `status: "rejected"`.
+ */
+export function computeClaudeToolSpanEnrichment({
+  spans,
+  toolLogs,
+  contentLogs,
+}: {
+  spans: ClaudeToolSpanRef[];
+  toolLogs: ClaudeToolLog[];
+  contentLogs: ClaudeContentLog[];
+}): Map<string, ClaudeToolSpanEnrichment> {
+  const result = new Map<string, ClaudeToolSpanEnrichment>();
+  if (spans.length === 0 || toolLogs.length === 0) return result;
+
+  // First log per (event, tool_use_id) wins, mirroring buildOutputIndex.
+  const resultByUseId = new Map<string, ClaudeToolLog>();
+  const decisionByUseId = new Map<string, ClaudeToolLog>();
+  for (const log of toolLogs) {
+    if (log.toolUseId === null) continue;
+    if (
+      log.eventName === TOOL_RESULT_EVENT &&
+      !resultByUseId.has(log.toolUseId)
+    ) {
+      resultByUseId.set(log.toolUseId, log);
+    } else if (
+      log.eventName === TOOL_DECISION_EVENT &&
+      !decisionByUseId.has(log.toolUseId)
+    ) {
+      decisionByUseId.set(log.toolUseId, log);
+    }
+  }
+  if (resultByUseId.size === 0 && decisionByUseId.size === 0) return result;
+
+  const resultContentByUseId = buildToolResultContentIndex(contentLogs);
+
+  for (const span of spans) {
+    const toolResult = resultByUseId.get(span.toolUseId) ?? null;
+    const decision = decisionByUseId.get(span.toolUseId) ?? null;
+    if (toolResult === null && decision === null) continue;
+
+    const input = buildToolInput({ toolResult, decision });
+    const output = buildToolOutput({
+      toolResult,
+      decision,
+      resultContent: resultContentByUseId.get(span.toolUseId) ?? null,
+    });
+    if (input !== null || output !== null) {
+      result.set(span.spanId, { input, output });
+    }
+  }
+  return result;
+}
+
+/**
+ * Harvest every request body's `tool_result` blocks into one
+ * `tool_use_id` → content index (first occurrence wins — a tool result is
+ * re-sent verbatim in every later turn's rolling history).
+ */
+function buildToolResultContentIndex(
+  contentLogs: ClaudeContentLog[],
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const log of contentLogs) {
+    if (log.eventName !== INPUT_BODY_EVENT || log.body === null) continue;
+    for (const [useId, text] of extractToolResultsFromRequestBody(log.body)) {
+      if (!out.has(useId)) out.set(useId, text);
+    }
+  }
+  return out;
+}
+
+function buildToolInput({
+  toolResult,
+  decision,
+}: {
+  toolResult: ClaudeToolLog | null;
+  decision: ClaudeToolLog | null;
+}): SpanInputOutput | null {
+  const raw =
+    toolResult?.toolInput ??
+    toolResult?.toolParameters ??
+    decision?.toolParameters ??
+    null;
+  if (raw === null || raw.length === 0) return null;
+  return toJsonOrText(capPayloadString(raw, undefined, "tool_input"));
+}
+
+function buildToolOutput({
+  toolResult,
+  decision,
+  resultContent,
+}: {
+  toolResult: ClaudeToolLog | null;
+  decision: ClaudeToolLog | null;
+  resultContent: string | null;
+}): SpanInputOutput | null {
+  if (resultContent !== null) {
+    return { type: "text", value: resultContent };
+  }
+  if (toolResult !== null) {
+    const status =
+      toolResult.success === false
+        ? "failed"
+        : toolResult.success === true
+          ? "completed"
+          : "unknown";
+    return {
+      type: "json",
+      value: prune({
+        // The telemetry states sizes and outcome, not content — this summary
+        // IS the output on the light path, not a fallback for a parse miss.
+        status,
+        success: toolResult.success,
+        durationMs: toolResult.durationMs,
+        resultSizeBytes: toolResult.resultSizeBytes,
+        decision: decision?.decision ?? null,
+        decisionSource: decision?.decisionSource ?? toolResult.decisionSource,
+      }),
+    };
+  }
+  if (decision !== null && decision.decision === "reject") {
+    // Denied tools never run: no result log ever comes.
+    return {
+      type: "json",
+      value: prune({
+        status: "rejected",
+        decision: decision.decision,
+        decisionSource: decision.decisionSource,
+      }),
+    };
+  }
+  return null;
+}
+
+/** Parse-or-text: valid JSON becomes a `json` payload, anything else `text`. */
+function toJsonOrText(value: string): SpanInputOutput {
+  try {
+    return { type: "json", value: JSON.parse(value) as object };
+  } catch {
+    return { type: "text", value };
+  }
+}
+
+function prune<T extends Record<string, unknown>>(obj: T): T {
+  const out = {} as T;
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== null && v !== undefined) (out as Record<string, unknown>)[k] = v;
+  }
+  return out;
+}
+
+/**
+ * The interaction (turn) span's OUTPUT: the last conversational assistant
+ * reply that falls inside the turn's window (+`slackMs` for the exporter
+ * flushing the reply just after the span closes). `api_response_body` beats
+ * `assistant_response` at the same timestamp (parsed body keeps `tool_use`
+ * markers); both are gated on {@link isConversationalQuerySource} so a
+ * utility reply (title generation, autosuggest) can never headline the turn.
+ */
+export function computeClaudeInteractionOutput({
+  logs,
+  windowStartMs,
+  windowEndMs,
+  slackMs = 2_000,
+}: {
+  logs: ClaudeContentLog[];
+  windowStartMs: number;
+  windowEndMs: number;
+  slackMs?: number;
+}): SpanInputOutput | null {
+  let best: { timeUnixMs: number; rank: number; text: string } | null = null;
+  for (const log of logs) {
+    if (!isConversationalQuerySource(log.querySource)) continue;
+    if (log.timeUnixMs < windowStartMs) continue;
+    if (log.timeUnixMs > windowEndMs + slackMs) continue;
+
+    let text: string | null = null;
+    let rank = 0;
+    if (log.eventName === OUTPUT_BODY_EVENT) {
+      const derived =
+        log.derivedOutputText != null && (log.derivedToolCallCount ?? 0) === 0
+          ? log.derivedOutputText
+          : null;
+      text = derived ?? extractAssistantOutputFromResponseBody(log.body);
+      rank = 1;
+    } else if (log.eventName === ASSISTANT_RESPONSE_EVENT) {
+      text =
+        log.body !== null && log.body.length > 0
+          ? capPayloadString(log.body, undefined, "assistant_output")
+          : null;
+      rank = 0;
+    } else {
+      continue;
+    }
+    if (text === null) continue;
+    if (
+      best === null ||
+      log.timeUnixMs > best.timeUnixMs ||
+      (log.timeUnixMs === best.timeUnixMs && rank > best.rank)
+    ) {
+      best = { timeUnixMs: log.timeUnixMs, rank, text };
+    }
+  }
+  return best !== null ? { type: "text", value: best.text } : null;
 }
