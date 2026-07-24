@@ -20,7 +20,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer = "2026-07-17T17:19:05.065156Z"
 exclude-newer-span = "P7D"
 
 [manifest]
@@ -3345,6 +3345,8 @@ dependencies = [
     { name = "retry" },
     { name = "tenacity" },
     { name = "termcolor" },
+    { name = "tqdm", version = "4.67.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "tqdm", version = "4.67.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 
 [package.optional-dependencies]
@@ -3443,6 +3445,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
     { name = "tenacity", specifier = ">=8.0.0" },
     { name = "termcolor", specifier = ">=3.0.1" },
+    { name = "tqdm", specifier = ">=4.62.0" },
 ]
 provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
 
