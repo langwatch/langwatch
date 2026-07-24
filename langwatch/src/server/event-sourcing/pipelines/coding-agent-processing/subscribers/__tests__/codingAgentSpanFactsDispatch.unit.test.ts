@@ -214,9 +214,14 @@ describe("codingAgentSpanFactsDispatch", () => {
           attributes: { tool_name: "Bash" },
         });
 
-        const key = subscriber.options!.deduplication!.makeId(event);
+        // `deduplication` is the `"aggregate" | DeduplicationConfig` union;
+        // this subscriber uses the custom-key form.
+        const dedup = subscriber.options?.deduplication;
+        if (dedup === undefined || dedup === "aggregate") {
+          throw new Error("expected a custom deduplication config");
+        }
 
-        expect(key).toBe(
+        expect(dedup.makeId(event)).toBe(
           `coding-agent-span-facts:tenant-1:${TRACE_ID}:tool-dedup`,
         );
       });
