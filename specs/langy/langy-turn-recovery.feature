@@ -218,6 +218,26 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When a different conversation's calls are relayed
     Then they pass through untouched with their own fresh count
 
+  # A provider can also fail AFTER answering 200: the stream opens, then an
+  # in-stream error event (OpenAI's insufficient_quota) ends it. Status-based
+  # cutting never sees these, every retry re-opens a fresh 200 stream and
+  # dies the same way, the same silent spinner with a different door.
+
+  @unit
+  Scenario: A hard limit delivered inside a 200 stream is cut like a rejected call
+    Given the model provider opens a 200 stream on a relayed call
+    And ends it with an in-stream error event naming exhausted quota
+    When the agent's SDK retries the call
+    Then the relay answers the retry with a failure the SDK does not retry
+    And it carries the provider's own error payload
+    And the turn fails with the provider's message instead of spinning
+
+  @unit
+  Scenario: A clean stream clears the in-stream failure capture
+    Given a conversation's relayed call previously ended with an in-stream error event
+    When a later relayed call streams to completion without an error event
+    Then the capture is cleared and later calls pass through untouched
+
   # The turn stream's terminal error entry shares its `type: "error"`
   # discriminant with the SSE transport's own protocol failure frame. The
   # transport once claimed every such frame for itself, so the one entry that
