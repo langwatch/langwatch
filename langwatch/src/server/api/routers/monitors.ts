@@ -5,8 +5,11 @@ import { customAlphabet } from "nanoid";
 import { ZodError, z } from "zod";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
-import { getAnalyticsService } from "../../app-layer/analytics";
-import { buildSeriesName } from "../../app-layer/analytics/repositories/_timeseries-row-parser";
+import { AnalyticsClientUnavailableError } from "../../app-layer/analytics";
+import { summarizeMonitorPerformance } from "../../app-layer/evaluations/monitor-performance.service";
+import { MonitorPerformanceClickHouseRepository } from "../../app-layer/evaluations/repositories/monitor-performance.clickhouse.repository";
+import type { ClickHouseClientResolver } from "../../clickhouse/clickhouseClient";
+import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -19,6 +22,18 @@ import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
+
+const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+
+const resolveClickHouseClient: ClickHouseClientResolver = async (tenantId) => {
+  const client = await getClickHouseClientForProject(tenantId);
+  if (!client) throw new AnalyticsClientUnavailableError(tenantId);
+  return client;
+};
+
+const monitorPerformanceRepository = new MonitorPerformanceClickHouseRepository(
+  resolveClickHouseClient,
+);
 
 /**
  * Generates a unique slug for a monitor.
@@ -123,59 +138,23 @@ export const monitorsRouter = createTRPCRouter({
 
       if (monitors.length === 0) return [];
 
-      const series = monitors.map((monitor) => ({
-        metric: getEvaluatorDefinitions(monitor.checkType)?.isGuardrail
-          ? ("evaluations.evaluation_pass_rate" as const)
-          : ("evaluations.evaluation_score" as const),
-        aggregation: "avg" as const,
-        key: monitor.id,
-        filters: {
-          "evaluations.state": {
-            [monitor.id]: ["processed"],
-          },
-        },
+      const performanceMonitors = monitors.map((monitor) => ({
+        id: monitor.id,
+        isGuardrail:
+          getEvaluatorDefinitions(monitor.checkType)?.isGuardrail ?? false,
       }));
-      const endDate = Date.now();
-      const startDate = endDate - 7 * 24 * 60 * 60 * 1000;
-      const analytics = getAnalyticsService();
-      const baseInput = {
-        projectId: input.projectId,
-        startDate,
-        endDate,
-        filters: {},
-        series,
+      const endMs = Date.now();
+      const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
+      const buckets = await monitorPerformanceRepository.findBuckets({
+        tenantId: input.projectId,
+        evaluatorIds: monitors.map((monitor) => monitor.id),
+        previousStartMs: currentStartMs - PERFORMANCE_PERIOD_MS,
+        currentStartMs,
+        endMs,
         timeZone: input.timeZone ?? "UTC",
-      };
-
-      const [daily, summary] = await Promise.all([
-        analytics.getTimeseries({ ...baseInput, timeScale: 24 * 60 }),
-        analytics.getTimeseries({ ...baseInput, timeScale: "full" }),
-      ]);
-
-      return monitors.map((monitor, index) => {
-        const metric = series[index]!.metric;
-        const resultKey = buildSeriesName(series[index]!, index);
-        const numberAtKey = (
-          bucket: (typeof daily.currentPeriod)[number] | undefined,
-        ) => {
-          const value = bucket?.[resultKey];
-          return typeof value === "number" && Number.isFinite(value)
-            ? value
-            : null;
-        };
-
-        return {
-          monitorId: monitor.id,
-          metric: metric.endsWith("pass_rate")
-            ? ("pass_rate" as const)
-            : ("score" as const),
-          points: daily.currentPeriod
-            .map((bucket) => numberAtKey(bucket))
-            .filter((value): value is number => value !== null),
-          current: numberAtKey(summary.currentPeriod[0]),
-          previous: numberAtKey(summary.previousPeriod[0]),
-        };
       });
+
+      return summarizeMonitorPerformance(performanceMonitors, buckets);
     }),
   toggle: protectedProcedure
     .input(

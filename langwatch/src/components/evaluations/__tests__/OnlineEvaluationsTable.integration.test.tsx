@@ -174,7 +174,7 @@ describe("<OnlineEvaluationsTable />", () => {
       { wrapper: Wrapper },
     );
 
-    expect(screen.getAllByText("Analytics unavailable")).toHaveLength(3);
+    expect(screen.getAllByText("Analytics access required")).toHaveLength(3);
     expect(
       screen.queryByRole("button", { name: "Actions for Answer quality" }),
     ).not.toBeInTheDocument();

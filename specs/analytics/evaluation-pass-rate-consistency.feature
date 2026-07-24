@@ -76,3 +76,25 @@ Feature: Evaluation pass-rate consistency across surfaces
     Given an online evaluation with no runs in the selected period
     When the user opens the Evaluations page
     Then the evaluation card shows a no-data placeholder instead of a percentage
+
+  # ---------------------------------------------------------------------------
+  # Online-evaluation list: bounded loading and permission behavior
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Performance for every monitor is read in one bounded query
+    Given a project with multiple online evaluations and guardrails
+    And processed evaluation runs exist inside and outside the comparison period
+    When the Online Evaluations page requests performance
+    Then one evaluation-runs query loads the daily and period summaries
+    And the query is restricted to the project's evaluator identifiers
+    And the query is restricted to the current and previous seven-day periods
+    And only the latest version of each evaluation run contributes to the result
+
+  @integration
+  Scenario: A viewer without analytics access does not wait forever
+    Given a user can view online evaluations but cannot view analytics
+    When the user opens the Online Evaluations page
+    Then the performance request is not sent
+    And each performance cell explains that analytics access is required
+    And no performance loading skeleton remains visible

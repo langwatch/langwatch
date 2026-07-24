@@ -150,7 +150,7 @@ export const OnlineEvaluationsTable = ({
                 </Link>
               ) : (
                 <Text textStyle="sm" color="fg.muted">
-                  Analytics unavailable
+                  Analytics access required
                 </Text>
               )}
             </Table.Cell>
