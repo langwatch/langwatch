@@ -1,0 +1,34 @@
+{
+  "viewport": "1440x900",
+  "pixelCount": 1296000,
+  "throttleRate": 6,
+  "trials": [
+    {
+      "reducedGraphics": false,
+      "frames": 28,
+      "elapsedMs": 4066.3999999999996,
+      "fps": 6.885697422781822
+    },
+    {
+      "reducedGraphics": true,
+      "frames": 49,
+      "elapsedMs": 4049.9000000000015,
+      "fps": 12.099064174424056
+    },
+    {
+      "reducedGraphics": true,
+      "frames": 62,
+      "elapsedMs": 4066.5,
+      "fps": 15.246526496987581
+    },
+    {
+      "reducedGraphics": false,
+      "frames": 29,
+      "elapsedMs": 4099.9000000000015,
+      "fps": 7.0733432522744435
+    }
+  ],
+  "blurredAvgFps": 6.9795203375281325,
+  "opaqueAvgFps": 13.672795335705818,
+  "fpsGainPct": 95.89878207229604
+}
