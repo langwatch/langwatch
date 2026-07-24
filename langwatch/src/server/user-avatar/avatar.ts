@@ -22,11 +22,12 @@ export const AVATAR_OWNER_KIND = "user";
 
 /**
  * Hard cap on the bytes an avatar upload may take, server-side. The client
- * crops + downscales to a small square first, so a real avatar is only a few
- * KB–tens of KB; 1 MB is the ceiling we accept (and the same limit the client
- * enforces on the picked file — see AVATAR_MAX_SOURCE_BYTES).
+ * crops + downscales to a small square first, so a stored avatar is only a few
+ * KB–tens of KB; 8 MB is the ceiling we accept — matching LinkedIn's
+ * profile-photo limit — and the same limit the client enforces on the picked
+ * file (see AVATAR_MAX_SOURCE_BYTES).
  */
-export const AVATAR_MAX_BYTES = 1 * 1024 * 1024;
+export const AVATAR_MAX_BYTES = 8 * 1024 * 1024;
 
 /**
  * Upper bound on the raw `data:` URL length we accept, so an oversized payload

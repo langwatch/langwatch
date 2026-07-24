@@ -14,11 +14,12 @@
 export const AVATAR_OUTPUT_SIZE = 256;
 
 /**
- * Max size of the image file a user may pick. Enforced client-side so the user
- * gets immediate "too large" feedback; the server applies the same 1 MB ceiling
- * on the (post-resize) payload as a backstop. Kept in sync with AVATAR_MAX_BYTES.
+ * Max size of the image file a user may pick (8 MB, matching LinkedIn's
+ * profile-photo limit). Enforced client-side so the user gets immediate "too
+ * large" feedback; the server applies the same ceiling on the (post-resize)
+ * payload as a backstop. Kept in sync with AVATAR_MAX_BYTES.
  */
-export const AVATAR_MAX_SOURCE_BYTES = 1 * 1024 * 1024;
+export const AVATAR_MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 
 export class AvatarImageError extends Error {
   constructor(message: string) {

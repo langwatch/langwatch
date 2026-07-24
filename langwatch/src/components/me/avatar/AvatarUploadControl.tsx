@@ -220,7 +220,7 @@ export function AvatarUploadControl({
           onRemove={() => removeAvatar.mutate({})}
         />
         <Text fontSize="xs" color="fg.muted">
-          PNG, JPG, WEBP or GIF, up to 1 MB. Cropped to a square.
+          PNG, JPG, WEBP or GIF, up to 8 MB. Cropped to a square.
         </Text>
       </VStack>
     </HStack>
