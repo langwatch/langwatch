@@ -67,6 +67,7 @@ import { roleBindingRouter } from "./routers/roleBinding";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
+import { fanOutRouter } from "./routers/fan-out/fan-out.router";
 import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "./routers/secrets";
 import { shareRouter } from "./routers/share";
@@ -133,6 +134,7 @@ const coreRouters = {
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
   suites: suiteRouter,
+  fanOut: fanOutRouter,
   role: roleRouter,
   prompts: promptsRouter,
   promptTags: promptTagsRouter,

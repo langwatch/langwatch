@@ -6,6 +6,7 @@ import {
   MessagesSquare,
   MoreVertical,
   Play,
+  Radar,
 } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -28,6 +29,12 @@ interface ScenarioRunActionsProps {
   onOpenInTraces?: (() => void) | null;
   /** When set, the overflow menu offers "Open in DejaView". */
   dejaViewHref?: string | null;
+  /**
+   * When set, the overflow menu offers finding related failures: generating
+   * scenarios adjacent to this one to see how far the failure reaches.
+   * Only passed for runs that actually failed.
+   */
+  onFindRelatedFailures?: (() => void) | null;
 }
 
 /**
@@ -44,9 +51,14 @@ export function ScenarioRunActions({
   onOpenThread,
   onOpenInTraces,
   dejaViewHref,
+  onFindRelatedFailures,
 }: ScenarioRunActionsProps) {
   const isArchived = !!scenario && scenario.archivedAt !== null;
-  const hasOverflow = !!onOpenThread || !!onOpenInTraces || !!dejaViewHref;
+  const hasOverflow =
+    !!onOpenThread ||
+    !!onOpenInTraces ||
+    !!dejaViewHref ||
+    !!onFindRelatedFailures;
 
   if (!scenario && !hasOverflow) {
     return null;
@@ -100,6 +112,17 @@ export function ScenarioRunActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content minWidth="200px">
+            {onFindRelatedFailures && (
+              <Menu.Item
+                value="find-related-failures"
+                onClick={onFindRelatedFailures}
+              >
+                <HStack gap={2}>
+                  <Icon as={Radar} boxSize={3.5} />
+                  <Text>Find related failures</Text>
+                </HStack>
+              </Menu.Item>
+            )}
             {onOpenInTraces && (
               <Menu.Item value="open-in-traces" onClick={onOpenInTraces}>
                 <HStack gap={2}>

@@ -70,6 +70,9 @@ const RELATIONAL_PARENT_SCOPED = [
   // Annotation-queue join tables, written through the parent queue.
   "AnnotationQueueMembers",
   "AnnotationQueueScores",
+  // Generated adjacent-scenario variants, owned by their parent FanOutBatch
+  // (which carries projectId). Always reached through batchId or a row id.
+  "FanOutVariant",
 ] as const;
 
 /**

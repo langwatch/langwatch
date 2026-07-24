@@ -64,4 +64,6 @@ export const KSUID_RESOURCES = {
   TOPIC_CLUSTERING_RUN: "topicrun",
   TOPIC_CLUSTERING_RUN_HISTORY: "topicrunhist",
   TOPIC_MODEL_PROJECTION: "topicmodel",
+  FAN_OUT_BATCH: "fanoutbatch",
+  FAN_OUT_VARIANT: "fanoutvariant",
 } as const;
