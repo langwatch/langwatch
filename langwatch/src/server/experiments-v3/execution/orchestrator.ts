@@ -1241,6 +1241,7 @@ export async function* executeCell(
               cell.rowIndex,
               targetNodes,
               cellConfig,
+              evaluatorInputs,
             );
             if (mappedEvent) {
               yield mappedEvent;
@@ -2065,6 +2066,7 @@ export async function* runOrchestrator(
                 ? result.cost.amount
                 : null,
             duration: event.duration ?? null,
+            inputs: event.inputs ?? null,
           })
           .catch((err) => {
             chDispatchFailures++;

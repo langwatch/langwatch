@@ -213,7 +213,17 @@ export const mapEvaluatorResult = (
     timestamps?: { started_at?: number; finished_at?: number };
     error?: string;
   },
-  options?: { stripScore?: boolean },
+  options?: {
+    stripScore?: boolean;
+    /**
+     * The evaluator's own request payload (e.g. a Comparison evaluator's
+     * ordered `candidates` list). Persisted alongside the result so
+     * downstream aggregation (Bradley-Terry leaderboard) can recover which
+     * variants the judge actually compared on this row — the response alone
+     * only names the winner, not the full candidate set.
+     */
+    inputs?: Record<string, unknown>;
+  },
 ): EvaluationV3Event => {
   const { targetId, evaluatorId } = parseNodeId(nodeId);
 
@@ -286,6 +296,7 @@ export const mapEvaluatorResult = (
     evaluatorId,
     result,
     duration,
+    inputs: options?.inputs,
   };
 };
 
@@ -296,6 +307,9 @@ export const mapEvaluatorResult = (
  * @param rowIndex - The dataset row index this event corresponds to
  * @param targetNodes - Set of node IDs that are target nodes (not evaluators)
  * @param config - Optional configuration for result mapping
+ * @param evaluatorInputs - The request payload sent to the evaluator for this
+ * cell (only relevant when the event's node is an evaluator node); passed
+ * through untouched to `mapEvaluatorResult`.
  * @returns The mapped SSE event, or null if the event should be ignored
  */
 export const mapNlpEvent = (
@@ -303,6 +317,7 @@ export const mapNlpEvent = (
   rowIndex: number,
   targetNodes: Set<string>,
   config?: ResultMapperConfig,
+  evaluatorInputs?: Record<string, unknown>,
 ): EvaluationV3Event | null => {
   if (event.type !== "component_state_change") {
     // Ignore non-component events (debug, done, etc.)
@@ -360,7 +375,7 @@ export const mapNlpEvent = (
         timestamps: execution_state.timestamps,
         error: isError ? execution_state.error : undefined,
       },
-      { stripScore },
+      { stripScore, inputs: evaluatorInputs },
     );
   }
 

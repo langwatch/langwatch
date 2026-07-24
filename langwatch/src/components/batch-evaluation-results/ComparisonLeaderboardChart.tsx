@@ -28,7 +28,7 @@ import {
 } from "recharts";
 
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
-import { setComplexProps, useDrawer } from "~/hooks/useDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { buildPairwiseComparisons } from "./buildPairwiseComparisons";
 import { axisLabelProps, truncateLabel } from "./chartAxisLabels";
 import { computeBTLeaderboard } from "./computeBTLeaderboard";
@@ -89,8 +89,17 @@ export function ComparisonLeaderboardChart({
   const yMax = Math.max(1, ...chartData.map((d) => Math.abs(d.score)));
 
   const onExpand = () => {
-    setComplexProps({ column, rows, targetColors });
-    openDrawer("comparisonLeaderboard", { evaluatorId: column.evaluatorId });
+    // Passed straight through openDrawer (not a separate setComplexProps
+    // call) — openDrawer's own updateDrawerUrl recomputes complexProps from
+    // whatever props it was given and would otherwise clobber a prior
+    // setComplexProps call with an empty object, since evaluatorId alone is
+    // URL-serializable.
+    openDrawer("comparisonLeaderboard", {
+      evaluatorId: column.evaluatorId,
+      column,
+      rows,
+      targetColors,
+    });
   };
 
   return (

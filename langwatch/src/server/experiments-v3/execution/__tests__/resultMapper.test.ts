@@ -322,6 +322,36 @@ describe("resultMapper", () => {
       }
     });
 
+    it("includes the evaluator's request inputs when provided", () => {
+      const candidates = [{ id: "target-a" }, { id: "target-b" }];
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        {
+          status: "success",
+          outputs: { label: "target-a" },
+        },
+        { inputs: { candidates } },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toEqual({ candidates });
+      }
+    });
+
+    it("omits inputs when none are provided", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toBeUndefined();
+      }
+    });
+
     it("maps successful evaluator result with passed=false", () => {
       const result = mapEvaluatorResult("target-1.eval-1", 1, {
         status: "success",
@@ -740,6 +770,27 @@ describe("resultMapper", () => {
       expect(result?.type).toBe("evaluator_result");
       expect((result as any).evaluatorId).toBe("eval-1");
       expect((result as any).result.passed).toBe(true);
+    });
+
+    it("threads the evaluator's request inputs through to the mapped event", () => {
+      const event: StudioServerEvent = {
+        type: "component_state_change",
+        payload: {
+          component_id: "target-1.eval-1",
+          execution_state: {
+            status: "success",
+            outputs: { label: "target-a" },
+          },
+        },
+      };
+      const candidates = [{ id: "target-a" }, { id: "target-b" }];
+
+      const result = mapNlpEvent(event, 0, targetNodes, undefined, {
+        candidates,
+      });
+
+      expect(result?.type).toBe("evaluator_result");
+      expect((result as any).inputs).toEqual({ candidates });
     });
 
     it("ignores running state events", () => {
