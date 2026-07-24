@@ -53,6 +53,17 @@ Feature: Ask Langy from the command bar
     And Langy starts a fresh conversation and asks "summarise last night's runs"
     And no intermediate composer step appears in between
 
+  # Under the Ask Langy CTA on an empty bar sit the getting-started asks (the
+  # same chips as the home). Each carries its own prompt, so selecting one is a
+  # handoff of THAT prompt — not the empty-bar "enter AI mode" behaviour of the
+  # CTA above it.
+  Scenario: Selecting a getting-started suggestion hands its prompt to Langy
+    Given the command bar is open with nothing typed
+    And the getting-started suggestions are shown under the Ask Langy activation
+    When I select one of the suggestions by Enter or by click
+    Then the Langy panel opens
+    And Langy starts a fresh conversation and asks that suggestion's prompt
+
   Scenario: Selecting Ask Langy on an empty bar turns it into AI mode
     Given the command bar is open with nothing typed
     When I select the Ask Langy activation

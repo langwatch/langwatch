@@ -573,6 +573,9 @@ vi.mock("~/utils/api", async () => {
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
     modelProvider: {
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve({ ok: true }), isPending: false }),
+      },
       getResolvedDefault: {
         // A resolved model is configured: these tests exercise conversation
         // history on a usable Langy, so langyNeedsModel must be false (else

@@ -174,6 +174,9 @@ vi.mock("~/utils/api", () => ({
       },
     },
     modelProvider: {
+      setFeatureOverrideForScope: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve({ ok: true }), isPending: false }),
+      },
       getResolvedDefault: {
         // A resolved model is configured: these tests exercise conversation
         // threading on a usable Langy, so langyNeedsModel must be false (else

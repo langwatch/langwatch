@@ -204,6 +204,15 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     [backendModelProviderKey],
   );
 
+  // Langy variant only (ADR-065): the Default Chat Model above sets the project
+  // DEFAULT — which Langy's chat model inherits — so it's the default for Langy
+  // AND the platform. This adds the cheaper model Langy names conversations
+  // with, written as the langy.conversation_title feature key on save.
+  const isLangy = variant === "langy";
+  const [langyTitleModel, setLangyTitleModel] = useState<string>("");
+  const setTitleOverride =
+    api.modelProvider.setFeatureOverrideForScope.useMutation();
+
   const { fields: derivedFields } = useModelProviderFields(
     backendModelProviderKey,
   );
@@ -354,6 +363,19 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       if (!isValid) return;
     }
 
+    // Langy title model is its own feature-key write (not part of the provider
+    // row), so it rides alongside the submit rather than through the form hook.
+    if (isLangy && langyTitleModel && projectId) {
+      void setTitleOverride
+        .mutateAsync({
+          scopeType: "PROJECT",
+          scopeId: projectId,
+          featureKey: "langy.conversation_title",
+          model: langyTitleModel,
+        })
+        .catch((err) => logger.error(err, "failed to set Langy title model"));
+    }
+
     submitForm();
   }, [
     validateOpenAi,
@@ -366,6 +388,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     isUsingEnvVars,
     validateApiKey,
     validateWithCustomUrl,
+    isLangy,
+    langyTitleModel,
+    projectId,
+    setTitleOverride,
   ]);
 
   if (!meta || !backendModelProviderKey) return null;
@@ -460,6 +486,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
           )}
 
           {PROVIDERS_WITH_WELL_KNOWN_MODELS.has(backendModelProviderKey) ? (
+            <>
             <Field.Root>
               <Field.Label>Default Chat Model</Field.Label>
               <NativeSelect.Root size="sm" bg="bg.muted/40">
@@ -479,10 +506,37 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
               <Field.HelperText>
-                This model will be used for evaluations, prompt optimization,
-                and dataset generation.
+                {isLangy
+                  ? "Langy chats with this model — and it's the default across the platform (evaluations, prompts, datasets)."
+                  : "This model will be used for evaluations, prompt optimization, and dataset generation."}
               </Field.HelperText>
             </Field.Root>
+            {isLangy ? (
+              <Field.Root>
+                <Field.Label>Title model (optional)</Field.Label>
+                <NativeSelect.Root size="sm" bg="bg.muted/40">
+                  <NativeSelect.Field
+                    value={langyTitleModel}
+                    onChange={(
+                      event: React.ChangeEvent<HTMLSelectElement>,
+                    ) => setLangyTitleModel(event.target.value)}
+                  >
+                    <option value="">Inherit (your Fast model)</option>
+                    {chatModelOptions.map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+                <Field.HelperText>
+                  The cheaper model Langy names conversations with. Leave on
+                  inherit to use your project&apos;s Fast model.
+                </Field.HelperText>
+              </Field.Root>
+            ) : null}
+            </>
           ) : (
             <VStack align="stretch" gap={4}>
               <CustomModelInputSection
@@ -518,13 +572,17 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             </VStack>
           )}
 
-          <DocsLinks
-            docs={{
-              external: meta.externalDocsUrl,
-              internal: variantToDocsMapping[variant],
-            }}
-            label={meta.label}
-          />
+          {/* Docs links are onboarding-page furniture; inside the compact Langy
+              setup panel they read as clutter next to the one key field. */}
+          {isLangy ? null : (
+            <DocsLinks
+              docs={{
+                external: meta.externalDocsUrl,
+                internal: variantToDocsMapping[variant],
+              }}
+              label={meta.label}
+            />
+          )}
 
           <HStack justify="end">
             {/* Same button as every settings drawer's Save (solid orange),

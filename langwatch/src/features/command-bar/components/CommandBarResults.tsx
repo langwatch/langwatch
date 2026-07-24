@@ -26,6 +26,7 @@ interface CommandBarResultsProps {
   recentItemsLimited: RecentItem[];
   easterEggItem: ListItem | null;
   askLangyItem: ListItem | null;
+  askLangySuggestionItems: ListItem[];
   isLoading: boolean;
 }
 
@@ -61,6 +62,7 @@ export const CommandBarResults = forwardRef<
     recentItemsLimited,
     easterEggItem,
     askLangyItem,
+    askLangySuggestionItems,
     isLoading,
   },
   ref,
@@ -209,7 +211,15 @@ export const CommandBarResults = forwardRef<
   // matches and above the fallbacks.
   const groups = useMemo<GroupConfig[]>(() => {
     const askGroup: GroupConfig | null = askLangyItem
-      ? { label: "Ask Langy", items: [askLangyItem] }
+      ? {
+          label: "Ask Langy",
+          // On the empty bar the getting-started asks sit under the CTA; while
+          // typing, only the CTA ("Ask Langy: <query>") shows.
+          items: [
+            askLangyItem,
+            ...(query === "" ? askLangySuggestionItems : []),
+          ],
+        }
       : null;
     if (query === "") {
       return askGroup ? [askGroup, ...emptyQueryGroups] : emptyQueryGroups;
@@ -219,7 +229,14 @@ export const CommandBarResults = forwardRef<
       ...(askGroup ? [askGroup] : []),
       ...fallbackGroups,
     ];
-  }, [query, emptyQueryGroups, queryGroups, askLangyItem, fallbackGroups]);
+  }, [
+    query,
+    emptyQueryGroups,
+    queryGroups,
+    askLangyItem,
+    askLangySuggestionItems,
+    fallbackGroups,
+  ]);
 
   // Render groups with running index calculation
   const renderGroups = () => {
