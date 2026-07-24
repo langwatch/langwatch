@@ -61,7 +61,12 @@ export function groupSiblings(
   const nameGroups = new Map<string, WaterfallTreeNode[]>();
   const order: string[] = [];
   for (const child of children) {
-    const key = `${child.span.name}::${child.span.type ?? "span"}`;
+    // toolName joins the key so a turn's tools fold per TOOL (Bash ×5,
+    // Read ×3), not into one anonymous claude_code.tool ×12 — the whole
+    // point of naming tool rows.
+    const key = `${child.span.name}::${child.span.type ?? "span"}::${
+      child.span.toolName ?? ""
+    }`;
     if (!nameGroups.has(key)) {
       nameGroups.set(key, []);
       order.push(key);
@@ -79,6 +84,7 @@ export function groupSiblings(
       result.push({
         kind: "group",
         name: group[0]!.span.name,
+        toolName: group[0]!.span.toolName ?? null,
         type: group[0]!.span.type ?? "span",
         count: group.length,
         spans,
@@ -111,7 +117,9 @@ export function flattenTree(
 
     for (const item of items) {
       if ("kind" in item && item.kind === "group") {
-        const groupKey = `${item.parentSpanId}::${item.name}`;
+        const groupKey = `${item.parentSpanId}::${item.name}::${
+          item.toolName ?? ""
+        }`;
         result.push(item);
         if (expandedGroups.has(groupKey)) {
           for (const span of item.spans) {

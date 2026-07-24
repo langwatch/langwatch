@@ -527,7 +527,9 @@ export const WaterfallView = memo(function WaterfallView({
               const i = virtualRow.index;
 
               if (row.kind === "group") {
-                const groupKey = `${row.parentSpanId}::${row.name}`;
+                const groupKey = `${row.parentSpanId}::${row.name}::${
+                  row.toolName ?? ""
+                }`;
                 return (
                   <Box
                     key={`group-${row.parentSpanId}-${row.name}`}

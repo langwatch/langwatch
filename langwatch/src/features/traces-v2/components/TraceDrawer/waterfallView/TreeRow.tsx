@@ -99,7 +99,11 @@ export const TreeRow = memo(function TreeRow({
   const isPulsing = useSpanPulseStore((s) => s.pulsingIds.has(span.spanId));
   const isError = span.status === "error";
   const isLlm = span.type === "llm" && span.model != null;
-  const rowH = isLlm ? LLM_ROW_HEIGHT : ROW_HEIGHT;
+  // A named tool span gets the same two-line treatment as an LLM span: the
+  // second line names WHICH tool ran (WebSearch, Read, Bash...), because a
+  // wall of identical `claude_code.tool` rows was unreadable.
+  const isNamedTool = !isLlm && span.toolName != null;
+  const rowH = isLlm || isNamedTool ? LLM_ROW_HEIGHT : ROW_HEIGHT;
   // A skill run (a `Skill` tool span) gets the sparkles glyph + purple chip so
   // it stands out from ordinary tool spans in the tree — the waterfall node
   // carries no input, so this flags the invocation without naming the skill
@@ -108,7 +112,7 @@ export const TreeRow = memo(function TreeRow({
   const isSkill = isSkillSpan({ type: span.type, name: span.name });
   const TypeIcon = isSkill
     ? LuSparkles
-    : SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!;
+    : (SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!);
   const palette = isSkill ? "purple" : getSpanPalette(span.type);
   const duration = span.durationMs;
   const isZeroDuration = duration === 0;
@@ -160,6 +164,11 @@ export const TreeRow = memo(function TreeRow({
         {span.model && (
           <Text textStyle="2xs" color="fg.muted">
             {span.model}
+          </Text>
+        )}
+        {span.toolName && (
+          <Text textStyle="2xs" color="fg.muted">
+            {span.toolName}
           </Text>
         )}
       </HStack>
@@ -441,11 +450,12 @@ export const TreeRow = memo(function TreeRow({
                 </Text>
               )}
             </HStack>
-            {isLlm && (
-              // Model as a compact pill (one per span) rather than a bare
-              // text line — matches the header's Chip-based Models pill
-              // idiom. The rich detail (full model name, token breakdown,
-              // cost) lives in the row tooltip, which covers the pill.
+            {(isLlm || isNamedTool) && (
+              // Model / tool name as a compact pill (one per span) rather
+              // than a bare text line — matches the header's Chip-based
+              // Models pill idiom. The rich detail (full model name, token
+              // breakdown, cost) lives in the row tooltip, which covers the
+              // pill.
               <HStack gap={1} marginTop="1px">
                 <Text
                   textStyle="2xs"
@@ -459,7 +469,7 @@ export const TreeRow = memo(function TreeRow({
                   maxWidth="100%"
                   bg="bg.subtle"
                 >
-                  {abbreviateModel(span.model!)}
+                  {isLlm ? abbreviateModel(span.model!) : span.toolName}
                 </Text>
               </HStack>
             )}

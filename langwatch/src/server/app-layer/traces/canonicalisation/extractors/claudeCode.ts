@@ -288,7 +288,11 @@ export function extractAssistantOutputFromResponseBody(
         block.input !== undefined && block.input !== null
           ? safeStringify(block.input)
           : "";
-      parts.push(args ? `[tool_use: ${block.name}]\n${args}` : `[tool_use: ${block.name}]`);
+      parts.push(
+        args
+          ? `[tool_use: ${block.name}]\n${args}`
+          : `[tool_use: ${block.name}]`,
+      );
     }
   }
   if (parts.length === 0) return null;
@@ -337,6 +341,63 @@ function contentToText(content: unknown): string {
     }
   }
   return parts.join("\n\n");
+}
+
+/**
+ * Harvest tool RESULT content out of an `api_request_body` payload.
+ *
+ * Claude's telemetry never ships tool stdout on the `tool_result` event (it
+ * carries sizes only) — the actual result text appears one turn LATER, as the
+ * `tool_result` content blocks of the NEXT model call's request body, keyed by
+ * `tool_use_id`. With `OTEL_LOG_RAW_API_BODIES=1` those bodies are in the
+ * trace's logs, so a read-time join can put the real output back on the tool
+ * span. Returns `tool_use_id` → flattened content text for every tool_result
+ * block found; empty map when the body is unparseable or has none.
+ *
+ * @internal exported for the read-time tool-span enrichment + unit testing
+ */
+export function extractToolResultsFromRequestBody(
+  raw: unknown,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  if (raw === null || raw === undefined) return out;
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    if (raw.length === 0) return out;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return out;
+    }
+  }
+  if (!parsed || typeof parsed !== "object") return out;
+  const obj = parsed as { messages?: unknown };
+  if (!Array.isArray(obj.messages)) return out;
+  for (const m of obj.messages) {
+    if (!m || typeof m !== "object") continue;
+    const content = (m as { content?: unknown }).content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content) {
+      if (!block || typeof block !== "object") continue;
+      const b = block as {
+        type?: unknown;
+        tool_use_id?: unknown;
+        content?: unknown;
+      };
+      if (b.type !== "tool_result" || typeof b.tool_use_id !== "string") {
+        continue;
+      }
+      if (out.has(b.tool_use_id)) continue;
+      const text = contentToText(b.content);
+      if (text.length > 0) {
+        out.set(
+          b.tool_use_id,
+          capPayloadString(text, undefined, "tool_result"),
+        );
+      }
+    }
+  }
+  return out;
 }
 
 /**
@@ -390,4 +451,3 @@ export function buildInputMessagesFromRequestBody(
 
   return out.length > 0 ? out : null;
 }
-
