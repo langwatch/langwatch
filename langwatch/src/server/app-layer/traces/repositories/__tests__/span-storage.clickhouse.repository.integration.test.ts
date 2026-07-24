@@ -878,3 +878,139 @@ describe("SpanStorageClickHouseRepository langwatch signals read (integration)",
     });
   });
 });
+
+// A lone (unpaired) UTF-16 surrogate half — the shape a string takes when it is
+// truncated mid-emoji, or an SDK captured binary/garbage text as a string.
+// `JSONEachRow` serialises it as a `\uD83D`-style escape with no second part,
+// which ClickHouse's JSON parser rejects by default ("missing second part of
+// surrogate pair") — failing the whole insert, exhausting retries, and
+// dead-lettering the span forever. `SPAN_INSERT_SETTINGS` disables that throw
+// (`input_format_json_throw_on_bad_escape_sequence: 0`) so the byte is kept as
+// text and the span survives. This suite drives the real production write paths
+// (`insertSpan` and `insertSpans`) against real ClickHouse: with the setting
+// removed, the insert throws here and the round-trip read finds nothing.
+const LONE_HIGH_SURROGATE = "\uD83D";
+const LONE_LOW_SURROGATE = "\uDC00";
+
+function spanWithLoneSurrogates({
+  tenantId: surrogateTenantId,
+  traceId: surrogateTraceId,
+  spanId,
+}: {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+}): SpanInsertData {
+  return {
+    id: `proj-${nanoid()}`,
+    tenantId: surrogateTenantId,
+    traceId: surrogateTraceId,
+    spanId,
+    parentSpanId: null,
+    parentTraceId: null,
+    parentIsRemote: null,
+    sampled: true,
+    startTimeUnixMs: base,
+    endTimeUnixMs: base + 100,
+    durationMs: 100,
+    name: `span name ${LONE_HIGH_SURROGATE}`,
+    kind: 0,
+    resourceAttributes: {
+      [`res.key.${LONE_HIGH_SURROGATE}`]: `res.val.${LONE_LOW_SURROGATE}`,
+    },
+    spanAttributes: {
+      clean: "kept-verbatim",
+      [`attr.key.${LONE_HIGH_SURROGATE}`]: `attr.val.${LONE_LOW_SURROGATE}`,
+      nested: { text: `deep ${LONE_HIGH_SURROGATE}` },
+    },
+    statusCode: 2,
+    statusMessage: `error: ${LONE_LOW_SURROGATE}`,
+    instrumentationScope: {
+      name: `scope ${LONE_HIGH_SURROGATE}`,
+      version: `v1 ${LONE_LOW_SURROGATE}`,
+    },
+    events: [
+      {
+        name: `event ${LONE_HIGH_SURROGATE}`,
+        timeUnixMs: base + 50,
+        attributes: {
+          [`ev.key.${LONE_HIGH_SURROGATE}`]: `ev.val.${LONE_LOW_SURROGATE}`,
+        },
+      },
+    ],
+    links: [],
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
+    retentionDays: 0,
+  };
+}
+
+describe("SpanStorageClickHouseRepository lone-surrogate span insert (integration)", () => {
+  const surrogateTenantId = `test-span-surrogate-${nanoid()}`;
+
+  afterAll(async () => {
+    if (ch) {
+      await ch.exec({
+        query:
+          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: surrogateTenantId },
+      });
+    }
+  });
+
+  // Each test inserts its own span under a fresh traceId and reads it back
+  // within the same test — so it exercises the full write→read path on its own
+  // (no ordering dependency on a sibling test) and covers both repository write
+  // methods. Without `SPAN_INSERT_SETTINGS`, the insert throws the surrogate-
+  // pair parse error and the read-back finds nothing.
+  describe("given a span whose name, status, scope, events and attributes carry lone UTF-16 surrogates", () => {
+    describe("when it is inserted through the bulk insertSpans write path", () => {
+      it("stores the span whole instead of throwing the surrogate-pair error that dead-letters it", async () => {
+        const traceId = `trace-${nanoid()}`;
+        await expect(
+          repo.insertSpans([
+            spanWithLoneSurrogates({
+              tenantId: surrogateTenantId,
+              traceId,
+              spanId: "surrogate-bulk",
+            }),
+          ]),
+        ).resolves.toBeUndefined();
+
+        const spans = await repo.getNormalizedSpansByTraceId({
+          tenantId: surrogateTenantId,
+          traceId,
+        });
+        const stored = spans.find((s) => s.spanId === "surrogate-bulk");
+        expect(stored).toBeDefined();
+        expect(String(stored?.spanAttributes.clean)).toBe("kept-verbatim");
+      });
+    });
+
+    describe("when it is inserted through the single insertSpan write path", () => {
+      it("stores the span whole instead of throwing the surrogate-pair error that dead-letters it", async () => {
+        const traceId = `trace-${nanoid()}`;
+        await expect(
+          repo.insertSpan(
+            spanWithLoneSurrogates({
+              tenantId: surrogateTenantId,
+              traceId,
+              spanId: "surrogate-single",
+            }),
+          ),
+        ).resolves.toBeUndefined();
+
+        const spans = await repo.getNormalizedSpansByTraceId({
+          tenantId: surrogateTenantId,
+          traceId,
+        });
+        const stored = spans.find((s) => s.spanId === "surrogate-single");
+        expect(stored).toBeDefined();
+        expect(String(stored?.spanAttributes.clean)).toBe("kept-verbatim");
+      });
+    });
+  });
+});
