@@ -151,6 +151,17 @@ export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * Renders a single side of a runtime parameter diff. A key entirely absent
+ * from the object ("unset") must read differently from that key being
+ * present with an explicit `undefined` value, even though
+ * `JSON.stringify(undefined)` can't tell them apart on its own.
+ */
+function describeRuntimeParamValue(hasKey: boolean, value: unknown): string {
+  if (!hasKey) return "unset";
+  return value === undefined ? "undefined" : JSON.stringify(value);
+}
+
+/**
  * Per-key description of runtime parameters that differ between
  * `localParameters` and `remoteParameters`, in the same direction as
  * `runtimeParametersEqual`'s arguments. Canonicalizes nested values with
@@ -180,7 +191,7 @@ export function diffRuntimeParameters({
 
     if (!equal) {
       differences.push(
-        `${key}: ${hasA ? JSON.stringify(paramsA[key]) : "undefined"} → ${hasB ? JSON.stringify(paramsB[key]) : "undefined"}`,
+        `${key}: ${describeRuntimeParamValue(hasA, paramsA[key])} → ${describeRuntimeParamValue(hasB, paramsB[key])}`,
       );
     }
   }

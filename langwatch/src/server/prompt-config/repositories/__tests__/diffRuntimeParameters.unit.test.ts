@@ -44,7 +44,7 @@ describe("diffRuntimeParameters()", () => {
             localParameters: { seed: 42 },
             remoteParameters: {},
           }),
-        ).toEqual(["seed: 42 → undefined"]);
+        ).toEqual(["seed: 42 → unset"]);
       });
 
       it("describes a key only present on the remote side", () => {
@@ -53,7 +53,7 @@ describe("diffRuntimeParameters()", () => {
             localParameters: {},
             remoteParameters: { seed: 42 },
           }),
-        ).toEqual(["seed: undefined → 42"]);
+        ).toEqual(["seed: unset → 42"]);
       });
     });
 
@@ -67,6 +67,37 @@ describe("diffRuntimeParameters()", () => {
           "max_tokens: 1000 → 500",
           "top_p: 0.9 → 0.5",
         ]);
+      });
+    });
+
+    describe("given a nested value with the same data in a different key order", () => {
+      it("returns no differences", () => {
+        expect(
+          diffRuntimeParameters({
+            localParameters: { reasoning: { effort: "high", budget: 100 } },
+            remoteParameters: { reasoning: { budget: 100, effort: "high" } },
+          }),
+        ).toEqual([]);
+      });
+    });
+
+    describe("given a key explicitly set to undefined versus entirely missing", () => {
+      it("distinguishes local explicit-undefined from remote missing", () => {
+        expect(
+          diffRuntimeParameters({
+            localParameters: { seed: undefined },
+            remoteParameters: {},
+          }),
+        ).toEqual(["seed: undefined → unset"]);
+      });
+
+      it("distinguishes local missing from remote explicit-undefined", () => {
+        expect(
+          diffRuntimeParameters({
+            localParameters: {},
+            remoteParameters: { seed: undefined },
+          }),
+        ).toEqual(["seed: unset → undefined"]);
       });
     });
   });
