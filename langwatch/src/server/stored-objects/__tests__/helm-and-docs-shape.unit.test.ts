@@ -118,6 +118,63 @@ describe("Helm chart deployment surface for stored-objects", () => {
   });
 });
 
+describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133)", () => {
+  describe("when the app.dataplane.providers block is inspected", () => {
+    /** @scenario "Helm chart exposes an azureBlob dataplane provider mirroring awsS3" */
+    it("offers azureBlob with accountName, accountKey, and container, each accepting a value or secretKeyRef", () => {
+      const values = readRepoFile("charts/langwatch/values.yaml");
+
+      expect(values).toMatch(/azureBlob:/);
+      // Each secret-bearing field appears with BOTH a `value:` and a
+      // `secretKeyRef:` sibling, mirroring the awsS3 provider's shape.
+      for (const field of ["accountName", "accountKey", "container"]) {
+        const fieldBlock = values.match(
+          new RegExp(`${field}:\\s*\\n\\s*value:[^\\n]*\\n(?:[^\\n]*\\n)?\\s*secretKeyRef:`),
+        );
+        expect(fieldBlock, `expected ${field} to declare value + secretKeyRef`).not.toBeNull();
+      }
+    });
+  });
+
+  describe("when the azureBlob provider is selected", () => {
+    /** @scenario "Helm chart exposes an azureBlob dataplane provider mirroring awsS3" */
+    it("emits STORED_OBJECTS_BACKEND=azure and the AZURE_BLOB_* env vars on the deployment", () => {
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+
+      expect(helpers).toMatch(/eq \.Values\.app\.dataplane\.provider "azureBlob"/);
+      expect(helpers).toContain("STORED_OBJECTS_BACKEND");
+      expect(helpers).toMatch(/value:\s*"azure"/);
+      expect(helpers).toContain("AZURE_BLOB_ACCOUNT_NAME");
+      expect(helpers).toContain("AZURE_BLOB_ACCOUNT_KEY");
+      expect(helpers).toContain("AZURE_BLOB_CONTAINER");
+    });
+  });
+
+  describe("when azureBlob is selected alongside a multi-replica install", () => {
+    /** @scenario "Selecting the azureBlob provider satisfies the multi-replica shared-storage guard" */
+    it("the local-FS multi-replica hard-fail is gated on dataplane.enabled generically, not the awsS3 provider specifically", () => {
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+
+      // The hard-fail guard trips only when local-FS is the ACTIVE backend
+      // (dataplane.enabled is false). It does not special-case the provider
+      // name, so dataplane.enabled=true with provider=azureBlob already
+      // disables local-FS as the active backend — same as provider=awsS3 —
+      // and the render succeeds at replicaCount > 1.
+      const guardMatch = helpers.match(
+        /\{\{-\s*if and \.Values\.app\.storedObjects\.localFilesystem\.enabled \(not \.Values\.app\.dataplane\.enabled\) \}\}[\s\S]{0,400}requires replicaCount=1/,
+      );
+      expect(guardMatch).not.toBeNull();
+
+      // localFilesystemIsActive — the single source of truth both the PVC and
+      // the deployment volume mount gate on — is provider-agnostic too.
+      expect(helpers).toContain(
+        'if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled)',
+      );
+      expect(helpers).toMatch(/S3\/Azure is the\s*\n?\s*active backend/);
+    });
+  });
+});
+
 describe("Self-hosting docs cover the stored-objects deployment surface", () => {
   describe("when the environment-variables doc is loaded", () => {
     /** @scenario "Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket" */
@@ -166,6 +223,37 @@ describe(".env.example carries the local storage path config", () => {
       // The multi-pod warning must be co-located with the var so a
       // production operator copying .env.example sees the caveat.
       expect(example).toMatch(/multi-pod|Multi-pod/);
+    });
+  });
+});
+
+describe(".env.example and self-hosting docs describe the Azure stored-objects backend (AC37, issue #4133)", () => {
+  describe("when the example env file is loaded", () => {
+    /** @scenario ".env.example and self-hosting docs describe the Azure stored-objects backend" */
+    it("documents AZURE_BLOB_* as live config, no longer deferred, alongside STORED_OBJECTS_BACKEND and AZURE_BLOB_CONTAINER", () => {
+      const example = readRepoFile("langwatch/.env.example");
+
+      expect(example).not.toMatch(/Azure Blob Storage.*DEFERRED/i);
+      expect(example).toContain("STORED_OBJECTS_BACKEND");
+      expect(example).toContain("AZURE_BLOB_ACCOUNT_NAME");
+      expect(example).toContain("AZURE_BLOB_ACCOUNT_KEY");
+      expect(example).toContain("AZURE_BLOB_CONTAINER");
+      // The explicit-toggle rationale must be documented, not just the vars.
+      expect(example).toMatch(/EXPLICIT toggle|explicit toggle/);
+    });
+  });
+
+  describe("when the self-hosting environment-variables doc is loaded", () => {
+    /** @scenario ".env.example and self-hosting docs describe the Azure stored-objects backend" */
+    it("documents the Azure stored-objects block with the explicit-toggle rationale", () => {
+      const doc = readRepoFile("docs/self-hosting/configuration/environment-variables.mdx");
+
+      expect(doc).toContain("STORED_OBJECTS_BACKEND");
+      expect(doc).toContain("AZURE_BLOB_ACCOUNT_NAME");
+      expect(doc).toContain("AZURE_BLOB_ACCOUNT_KEY");
+      expect(doc).toContain("AZURE_BLOB_CONTAINER");
+      expect(doc).toMatch(/explicit/i);
+      expect(doc).toMatch(/#4133/);
     });
   });
 });

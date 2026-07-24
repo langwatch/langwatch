@@ -593,6 +593,34 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
       expect(insertedRow.storage_uri).toBe(putUri);
     });
   });
+
+  describe("when STORED_OBJECTS_BACKEND=azure is configured with a complete Azure config", () => {
+    /** @scenario "defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination" */
+    it("mints an azure-blob:// URI via defaultMintStorageUri", async () => {
+      vi.mocked(dataplaneS3.getS3ConfigForProject).mockResolvedValueOnce(null);
+      const env = mockedEnv as Record<string, string | undefined>;
+      env.STORED_OBJECTS_BACKEND = "azure";
+      env.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
+      env.AZURE_BLOB_ACCOUNT_KEY = "key-value";
+      env.AZURE_BLOB_CONTAINER = "lw-container";
+
+      try {
+        await service.storeFromBytes(STORE_PARAMS);
+      } finally {
+        env.STORED_OBJECTS_BACKEND = undefined;
+        env.AZURE_BLOB_ACCOUNT_NAME = undefined;
+        env.AZURE_BLOB_ACCOUNT_KEY = undefined;
+        env.AZURE_BLOB_CONTAINER = undefined;
+      }
+
+      const putUri = vi.mocked(registry.put).mock.calls[0]![0];
+      const insertedRow = vi.mocked(repo.insert).mock.calls[0]![0].row;
+      expect(putUri).toBe(
+        `azure-blob://lwacct/lw-container/${PROJECT_ID}/${insertedRow.sha256}`,
+      );
+      expect(insertedRow.storage_uri).toBe(putUri);
+    });
+  });
 });
 
 describe("StoredObjectsService surface", () => {

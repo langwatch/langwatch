@@ -269,12 +269,14 @@ app:
   # Controls how LangWatch stores and manages training datasets
   ## @extra app.dataplane Object storage configuration for datasets.
   ## @param app.dataplane.enabled [default: false] Enable dataset object storage.
-  ## @param app.dataplane.provider [string, default: awsS3] Object storage provider.
-  ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets.
+  ## @param app.dataplane.provider [string, default: awsS3] Object storage provider. Options: awsS3, azureBlob.
+  ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets (awsS3 provider).
   dataplane:
     enabled: false
-    # Storage provider to use. Options: awsS3 (default)
-    # When set to 'awsS3', enables AWS S3 native integration
+    # Storage provider to use. Options: awsS3 (default), azureBlob.
+    # When set to 'awsS3', enables AWS S3 native integration.
+    # When set to 'azureBlob', enables Azure Blob Storage (STORED_OBJECTS_BACKEND=azure,
+    # AC37 / issue #4133) — SharedKey auth only, mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
 
@@ -302,6 +304,27 @@ app:
         keySalt:
           value: ""
           ## @param app.dataplane.providers.awsS3.keySalt.secretKeyRef [object] Secret ref for optional key salt.
+          secretKeyRef: { name: "", key: "" }
+
+      # Azure Blob Storage configuration for dataset + stored-objects storage
+      # (AC37, issue #4133). SharedKey auth only — workload identity is a later
+      # issue (#6087), per-project Azure BYOC is #6088.
+      ## @extra app.dataplane.providers.azureBlob Azure Blob provider configuration.
+      ## @param app.dataplane.providers.azureBlob.accountName.value [string] Azure Storage account name (not recommended in production — use accountName.secretKeyRef).
+      ## @param app.dataplane.providers.azureBlob.accountKey.value [string] Azure Storage account key (not recommended in production — use accountKey.secretKeyRef).
+      ## @param app.dataplane.providers.azureBlob.container.value [string] Azure Blob container name (not recommended in production — use container.secretKeyRef).
+      azureBlob:
+        accountName:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.accountName.secretKeyRef [object] Secret ref for the Azure Storage account name.
+          secretKeyRef: { name: "", key: "" }
+        accountKey:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.accountKey.secretKeyRef [object] Secret ref for the Azure Storage account key.
+          secretKeyRef: { name: "", key: "" }
+        container:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).

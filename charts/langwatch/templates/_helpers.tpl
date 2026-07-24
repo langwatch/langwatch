@@ -259,6 +259,30 @@ app.kubernetes.io/instance: {{ .Release.Name }}
         {{- $errors = append $errors "app.dataplane.providers.awsS3.keySalt.secretKeyRef.name is set but key is empty" }}
       {{- end }}
     {{- end }}
+  {{- else if eq .Values.app.dataplane.provider "azureBlob" }}
+    {{- if .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.azureBlob.accountName.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountName.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- else if empty .Values.app.dataplane.providers.azureBlob.accountName.value }}
+      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountName is not configured" }}
+    {{- end }}
+
+    {{- if .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
+      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountKey is not configured" }}
+    {{- end }}
+
+    {{- if .Values.app.dataplane.providers.azureBlob.container.secretKeyRef.name }}
+      {{- if empty .Values.app.dataplane.providers.azureBlob.container.secretKeyRef.key }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.container.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- else if empty .Values.app.dataplane.providers.azureBlob.container.value }}
+      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.container is not configured" }}
+    {{- end }}
   {{- end }}
 {{- end }}
 
@@ -708,9 +732,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 # Dataplane Object Storage (shared between datasets and stored-objects;
 # emitted under the legacy `dataplane` value key for
-# backwards compatibility — bucket carries BOTH dataset uploads and
-# externalized scenario media in this release).
+# backwards compatibility — the bucket/container carries BOTH dataset
+# uploads and externalized scenario media in this release).
 {{- if .Values.app.dataplane.enabled }}
+{{- if eq .Values.app.dataplane.provider "azureBlob" }}
+# Azure Blob backend (AC37, issue #4133). STORED_OBJECTS_BACKEND is the
+# EXPLICIT toggle resolveProjectStorageDestination reads — AZURE_BLOB_* env
+# presence alone never selects this backend, only this value does.
+- name: STORED_OBJECTS_BACKEND
+  value: "azure"
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_NAME" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountName) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_KEY" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountKey) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_CONTAINER" "fieldValues" .Values.app.dataplane.providers.azureBlob.container) }}
+{{- else }}
 - name: USE_S3_STORAGE
   value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all
@@ -720,7 +754,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # silent bug that this fix resolves by aligning on S3_BUCKET_NAME.
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.bucket | quote }}
-{{- if eq .Values.app.dataplane.provider "awsS3" }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}

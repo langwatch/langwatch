@@ -244,6 +244,35 @@ describe("region resolution — non-AWS endpoint (BYOC/R2/MinIO)", () => {
   });
 });
 
+describe("given the resolved destination is azure", () => {
+  beforeEach(resetS3Env);
+
+  /** @scenario "The legacy S3 client factory refuses an azure destination instead of inventing a bucket" */
+  it("throws a configuration error identifying the azure backend instead of falling back to the langwatch bucket", async () => {
+    vi.resetModules();
+    vi.doMock("../stored-objects/project-storage-destination", () => ({
+      resolveProjectStorageDestination: vi.fn(async () => ({
+        kind: "azure",
+        accountName: "lwacct",
+        container: "lw-container",
+      })),
+    }));
+    vi.doMock("../dataplane-s3", () => ({
+      getS3ConfigForProject: vi.fn(async () => null),
+    }));
+
+    const { createS3Client: createS3ClientFresh } = await import("../storage");
+
+    await expect(createS3ClientFresh("test-project")).rejects.toThrow(
+      /azure/i,
+    );
+    expect(s3ClientConstructorCalls).toHaveLength(0);
+
+    vi.doUnmock("../stored-objects/project-storage-destination");
+    vi.doUnmock("../dataplane-s3");
+  });
+});
+
 describe("region resolution — explicit S3_REGION always wins", () => {
   beforeEach(resetS3Env);
 

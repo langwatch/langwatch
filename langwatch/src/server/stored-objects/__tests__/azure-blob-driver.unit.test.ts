@@ -242,6 +242,42 @@ describe("AzureBlobDriver", () => {
     });
   });
 
+  describe("ensureContainer() — integration-test setup helper, not part of StorageDriver", () => {
+    it("PUTs ?restype=container with the query param folded into the signed resource", async () => {
+      const driver = newDriver();
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+
+      await driver.ensureContainer(CONTAINER);
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const [url, init] = fetchSpy.mock.calls[0]!;
+      expect(url).toBe(
+        `https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}?restype=container`,
+      );
+      expect(init.method).toBe("PUT");
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toMatch(
+        new RegExp(`^SharedKey ${ACCOUNT_NAME}:`),
+      );
+    });
+
+    it("treats 409 (already exists) as success — idempotent", async () => {
+      const driver = newDriver();
+      fetchSpy.mockResolvedValueOnce(
+        new Response("ContainerAlreadyExists", { status: 409 }),
+      );
+
+      await expect(driver.ensureContainer(CONTAINER)).resolves.toBeUndefined();
+    });
+
+    it("throws on a non-409 error", async () => {
+      const driver = newDriver();
+      fetchSpy.mockResolvedValueOnce(new Response("oops", { status: 500 }));
+
+      await expect(driver.ensureContainer(CONTAINER)).rejects.toThrow(/500/);
+    });
+  });
+
   describe("given a fixed-input vector (known-answer test for SharedKey HMAC)", () => {
     /**
      * KAT vector — all inputs are fixed so any regression in canonicalization
@@ -363,6 +399,125 @@ describe("AzureBlobDriver", () => {
       const [url] = fetchSpy.mock.calls[0]!;
       expect(url).toBe(
         `http://127.0.0.1:10000/devstoreaccount1/${CONTAINER}/${BLOB_PATH}`,
+      );
+    });
+  });
+
+  describe("when Azurite path-style addressing puts the account in the endpoint path", () => {
+    /**
+     * Regression for the Azurite-signing gap (AC37 / issue #4133): when
+     * `endpointBaseUrl` addresses the account via a path segment (Azurite's
+     * only mode — it has no per-account subdomain like production Azure),
+     * the shared-key canonicalised resource must include the account name
+     * TWICE (`/{account}/{account}/{container}/{blob}`), not once. Getting
+     * this wrong produces a well-formed-looking `SharedKey` header that
+     * Azurite rejects with 403 AuthenticationFailed — a bug a prefix-only
+     * regex assertion on the header would never catch, so this test
+     * recomputes the exact expected signature (KAT-style) rather than just
+     * checking the `SharedKey {account}:` prefix.
+     */
+    const PATH_STYLE_ACCOUNT = "devstoreaccount1";
+    const PATH_STYLE_ENDPOINT = "http://127.0.0.1:10000/devstoreaccount1";
+    const PATH_STYLE_TIMESTAMP = "Wed, 23 Oct 2013 09:49:06 GMT";
+    const PATH_STYLE_BODY = Buffer.from("hello world"); // 11 bytes
+
+    it("signs with the account name doubled in the canonicalised resource", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
+
+      const driver = new AzureBlobDriver({
+        accountName: PATH_STYLE_ACCOUNT,
+        accountKey: ACCOUNT_KEY,
+        endpointBaseUrl: PATH_STYLE_ENDPOINT,
+      });
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+
+      const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
+      await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
+
+      vi.useRealTimers();
+
+      const stringToSign = [
+        "PUT",
+        "",
+        "",
+        String(PATH_STYLE_BODY.length),
+        "",
+        "application/octet-stream",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        [
+          `x-ms-blob-type:BlockBlob`,
+          `x-ms-date:${PATH_STYLE_TIMESTAMP}`,
+          `x-ms-version:2021-12-02`,
+        ].join("\n"),
+        // The account name appears twice: once for "the path-style host",
+        // once for "the actual account" — this is the assertion under test.
+        `/${PATH_STYLE_ACCOUNT}/${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`,
+      ].join("\n");
+      const keyBytes = Buffer.from(ACCOUNT_KEY, "base64");
+      const expectedSignature = crypto
+        .createHmac("sha256", keyBytes)
+        .update(stringToSign, "utf8")
+        .digest("base64");
+
+      const [, init] = fetchSpy.mock.calls[0]!;
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toBe(
+        `SharedKey ${PATH_STYLE_ACCOUNT}:${expectedSignature}`,
+      );
+    });
+
+    it("does NOT use the single-account-segment signature production Azure would produce", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
+
+      const driver = new AzureBlobDriver({
+        accountName: PATH_STYLE_ACCOUNT,
+        accountKey: ACCOUNT_KEY,
+        endpointBaseUrl: PATH_STYLE_ENDPOINT,
+      });
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+
+      const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
+      await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
+
+      vi.useRealTimers();
+
+      const wrongStringToSign = [
+        "PUT",
+        "",
+        "",
+        String(PATH_STYLE_BODY.length),
+        "",
+        "application/octet-stream",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        [
+          `x-ms-blob-type:BlockBlob`,
+          `x-ms-date:${PATH_STYLE_TIMESTAMP}`,
+          `x-ms-version:2021-12-02`,
+        ].join("\n"),
+        `/${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`,
+      ].join("\n");
+      const keyBytes = Buffer.from(ACCOUNT_KEY, "base64");
+      const wrongSignature = crypto
+        .createHmac("sha256", keyBytes)
+        .update(wrongStringToSign, "utf8")
+        .digest("base64");
+
+      const [, init] = fetchSpy.mock.calls[0]!;
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).not.toBe(
+        `SharedKey ${PATH_STYLE_ACCOUNT}:${wrongSignature}`,
       );
     });
   });

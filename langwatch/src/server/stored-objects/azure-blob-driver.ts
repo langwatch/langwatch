@@ -82,16 +82,71 @@ function parseAzureBlobUri(uri: string): ParsedAzureBlobUri {
 }
 
 /**
+ * True when `endpointBaseUrl` addresses the account via a path segment
+ * rather than a subdomain — the shape Azurite (and other path-style
+ * emulators) use, e.g. `http://127.0.0.1:10000/devstoreaccount1` for
+ * account `devstoreaccount1`. Production Azure always uses host-style
+ * (`https://{account}.blob.core.windows.net`), so this only trips for an
+ * explicitly-configured emulator/dev endpoint.
+ */
+function isPathStyleEndpoint(
+  endpointBaseUrl: string | undefined,
+  accountName: string,
+): boolean {
+  if (!endpointBaseUrl) return false;
+  try {
+    const url = new URL(endpointBaseUrl);
+    const segments = url.pathname.split("/").filter(Boolean);
+    return segments[segments.length - 1] === accountName;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Builds the canonicalised resource path Azure uses for the shared-key
  * authorization signature. See:
  * https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key
+ *
+ * Path-style addressing (Azurite): the account name is ALSO the first path
+ * segment of the request URL (`/{account}/{container}/{blob}`), so Azure's
+ * signing spec requires it to appear twice in the canonicalised resource —
+ * once for "the emulator account" and once for "the actual account" —
+ * giving `/{account}/{account}/{container}/{blob}`. Host-style (production)
+ * keeps the single `/{account}/{container}/{blob}` form. Getting this wrong
+ * produces a well-formed-looking `SharedKey` header that Azure/Azurite
+ * rejects with a 403 AuthenticationFailed — no test hits this path unless
+ * it asserts the actual signed bytes, not just the header's prefix.
  */
 function canonicalisedResource(
   accountName: string,
   container: string,
   blobPath: string,
+  pathStyle: boolean,
 ): string {
-  return `/${accountName}/${container}/${blobPath}`;
+  // A blank blobPath addresses the CONTAINER itself (e.g. container-create),
+  // not a blob under it — omit the trailing "/" so the resource path reads
+  // `/{account}/{container}`, not `/{account}/{container}/`.
+  const resourcePath = blobPath ? `${container}/${blobPath}` : container;
+  return pathStyle
+    ? `/${accountName}/${accountName}/${resourcePath}`
+    : `/${accountName}/${resourcePath}`;
+}
+
+/**
+ * Appends canonicalised query parameters to a canonicalised resource, per the
+ * shared-key spec: each param is lowercased-name, sorted, `name:value` on its
+ * own line. Only used by container-level operations (e.g. `?restype=container`)
+ * — the blob get/put/delete/exists paths carry no query string.
+ */
+function withCanonicalisedQuery(
+  resource: string,
+  queryParams: Record<string, string>,
+): string {
+  const lines = Object.entries(queryParams)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k.toLowerCase()}:${v}`);
+  return lines.length > 0 ? [resource, ...lines].join("\n") : resource;
 }
 
 /**
@@ -120,6 +175,8 @@ function signRequest({
   container,
   blobPath,
   extraHeaders,
+  pathStyle,
+  queryParams = {},
 }: {
   method: string;
   contentLength: string;
@@ -130,6 +187,9 @@ function signRequest({
   container: string;
   blobPath: string;
   extraHeaders: Record<string, string>;
+  pathStyle: boolean;
+  /** Canonicalised query params (e.g. `{ restype: "container" }`) for container-level operations. */
+  queryParams?: Record<string, string>;
 }): string {
   const xMsHeaders = {
     "x-ms-date": date,
@@ -151,7 +211,10 @@ function signRequest({
     "", // If-Unmodified-Since
     "", // Range
     canonicalisedHeaders(xMsHeaders),
-    canonicalisedResource(accountName, container, blobPath),
+    withCanonicalisedQuery(
+      canonicalisedResource(accountName, container, blobPath, pathStyle),
+      queryParams,
+    ),
   ].join("\n");
 
   const keyBytes = Buffer.from(accountKey, "base64");
@@ -221,12 +284,15 @@ export class AzureBlobDriver implements StorageDriver {
       extraHeaders: { "x-ms-blob-type": "BlockBlob" },
     });
 
+    // Content-Length is deliberately NOT set here: undici computes it from
+    // the body and rejects a manually supplied duplicate. The SharedKey
+    // signature above still covers String(bytes.length), which matches the
+    // value undici sends on the wire.
     const response = await fetch(`${endpoint}/${container}/${blobPath}`, {
       method: "PUT",
       headers: {
         ...headers,
         "Content-Type": mediaType,
-        "Content-Length": String(bytes.length),
       },
       body: new Uint8Array(bytes),
     });
@@ -291,6 +357,40 @@ export class AzureBlobDriver implements StorageDriver {
     return true;
   }
 
+  /**
+   * Idempotently creates a container. NOT part of the `StorageDriver`
+   * interface (get/put/delete/exists) — production deployments provision
+   * their container out-of-band (Terraform/Helm/portal), same as an S3
+   * bucket. This exists for integration-test setup against a fresh Azurite
+   * container, which starts with no containers at all. A 409
+   * ContainerAlreadyExists is treated as success.
+   */
+  async ensureContainer(container: string): Promise<void> {
+    const { endpoint, headers } = this.signedRequest({
+      method: "PUT",
+      container,
+      blobPath: "",
+      // Per the shared-key spec (2015-02-21+), Content-Length must be the
+      // EMPTY STRING (not "0") when the request body is empty.
+      contentLength: "",
+      contentType: "",
+      extraHeaders: {},
+      queryParams: { restype: "container" },
+    });
+
+    const response = await fetch(`${endpoint}/${container}?restype=container`, {
+      method: "PUT",
+      headers,
+    });
+
+    if (!response.ok && response.status !== 409) {
+      const body = await response.text().catch(() => "");
+      throw new Error(
+        `Azure Blob container create failed for ${container}: ${response.status} ${response.statusText} ${body}`,
+      );
+    }
+  }
+
   private signedRequest({
     method,
     container,
@@ -298,6 +398,7 @@ export class AzureBlobDriver implements StorageDriver {
     contentLength,
     contentType,
     extraHeaders,
+    queryParams,
   }: {
     method: string;
     container: string;
@@ -305,10 +406,16 @@ export class AzureBlobDriver implements StorageDriver {
     contentLength: string;
     contentType: string;
     extraHeaders: Record<string, string>;
+    /** Canonicalised query params (e.g. `{ restype: "container" }`) for container-level operations. */
+    queryParams?: Record<string, string>;
   }): { endpoint: string; headers: Record<string, string> } {
     const date = new Date().toUTCString();
     const endpoint =
       this.credentials.endpointBaseUrl ?? defaultEndpoint(this.credentials.accountName);
+    const pathStyle = isPathStyleEndpoint(
+      this.credentials.endpointBaseUrl,
+      this.credentials.accountName,
+    );
 
     const xMsDate = date;
     const xMsVersion = "2021-12-02";
@@ -323,6 +430,8 @@ export class AzureBlobDriver implements StorageDriver {
       container,
       blobPath,
       extraHeaders,
+      pathStyle,
+      queryParams,
     });
 
     return {

@@ -25,7 +25,7 @@ import {
 import type { StorageRegistry } from "./storage-registry";
 import type { StoredObject } from "./stored-object";
 import type { StoredObjectsRepository } from "./stored-objects.repository";
-import { mintFileUri, mintS3Uri } from "./uri";
+import { mintAzureBlobUri, mintFileUri, mintS3Uri } from "./uri";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
 const logger = createLogger("langwatch:stored-objects:service");
@@ -69,11 +69,14 @@ export type MintStorageUri = (args: {
  * this service module does not encode the precedence rules itself.
  *
  * If `resolveProjectStorageDestination` throws (e.g. a transient DB
- * error while reading BYOC config), the error propagates — falling
- * back silently to the global bucket on a transient error would risk
- * spilling a BYOC tenant's bytes into the wrong account.
+ * error while reading BYOC config, or an incomplete Azure config when
+ * STORED_OBJECTS_BACKEND=azure), the error propagates — falling back
+ * silently to another destination on a misconfiguration or transient
+ * error would risk spilling a tenant's bytes into the wrong place.
+ *
+ * Exported so tests exercise the real production function directly.
  */
-async function defaultMintStorageUri({
+export async function defaultMintStorageUri({
   projectId,
   sha256,
 }: {
@@ -83,6 +86,14 @@ async function defaultMintStorageUri({
   const destination = await resolveProjectStorageDestination(projectId);
   if (destination.kind === "s3") {
     return mintS3Uri({ bucket: destination.bucket, projectId, sha256 });
+  }
+  if (destination.kind === "azure") {
+    return mintAzureBlobUri({
+      accountName: destination.accountName,
+      container: destination.container,
+      projectId,
+      sha256,
+    });
   }
   return mintFileUri({ root: destination.root, projectId, sha256 });
 }

@@ -114,6 +114,21 @@ export const createS3Client = async (projectId: string) => {
   // configuring it, which we preserve as the historical hardcoded
   // "langwatch" bucket to avoid silently rebinding to /var/lib/langwatch.
   const destination = await resolveProjectStorageDestination(projectId);
+
+  // This factory only ever speaks the S3 wire protocol. An azure
+  // destination means STORED_OBJECTS_BACKEND=azure is configured for this
+  // project — inventing an S3 client against the hardcoded "langwatch"
+  // bucket here would silently write bytes nobody reads back (the azure
+  // destination is what the read path resolves against). Fail loud instead;
+  // callers on the S3-only legacy path (StorageService, S3DatasetStorage)
+  // must route azure destinations through the Azure dataset/stored-objects
+  // storage implementations instead.
+  if (destination.kind === "azure") {
+    throw new Error(
+      `createS3Client cannot serve project ${projectId}: the resolved storage destination is the azure backend (STORED_OBJECTS_BACKEND=azure), not S3. Use AzureDatasetStorage / the stored-objects Azure driver instead of the legacy S3 client factory.`,
+    );
+  }
+
   const s3Bucket =
     destination.kind === "s3" ? destination.bucket : "langwatch";
 
