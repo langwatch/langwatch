@@ -11,8 +11,8 @@ keywords:
 
 Langy is the automated AI engineer inside LangWatch. You ask it a question in plain language where your eval and trace data already lives, and it works the way an engineer would: it reads the relevant production traces and evals over the `langwatch` CLI, writes a Scenario simulation test or evaluation that captures the problem, drafts a fix, and opens a pull request on the GitHub repo you install it on. It then runs the Scenario tests it wrote in your CI, so what comes back is either findings or a PR with green checks. A human reviews and merges; Langy never merges its own PR.
 
-<Frame caption="The Langy chat panel, empty state. Ask it a question and it starts reading your traces.">
-  ![The Langy chat panel showing the empty state with suggested prompts](/images/langy/overview/chat-panel-empty.png)
+<Frame caption="The Langy panel open on the LangWatch home. Ask it a question and it starts reading your traces.">
+  ![The Langy home with the chat panel open and suggested prompts](/images/langy/overview/chat-panel-empty.png)
 </Frame>
 
 Langy runs each conversation in its own isolated sandbox and uses your own model accounts and API keys. Every turn it takes is itself a traced, costed run in your LangWatch project, so you watch Langy work with the same tools you use to watch your own agents.

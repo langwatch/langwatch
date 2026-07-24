@@ -9,10 +9,8 @@ Each problem below lists the check that resolves it. Start with the one that mat
 
 <AccordionGroup>
   <Accordion title="Langy is not available in my org">
-    Langy is off by default and gated behind a feature flag.
-
-    - **Self-hosted:** the agent runtime is off until you enable it, and the UI stays off until the flag is on. Confirm the agent pod is chart-managed (`langyagent.chartManaged=true`) and that the `release_langy_enabled` flag is on for your users or org. Runtime on and user-facing on are two separate switches. See [Self-hosting overview](/langy/self-hosting/overview) and [Helm](/langy/self-hosting/helm).
-    - **Cloud:** access is controlled by the same `release_langy_enabled` rollout. If you do not see Langy, it has not been rolled out to your org yet.
+    - **Cloud:** Langy is available. Open the panel to get started.
+    - **Self-hosted:** the agent pod is off by default until you enable it. Confirm the agent pod is chart-managed (`langyagent.chartManaged=true`) and running. Once the pod is up, Langy is available. See [Self-hosting overview](/langy/self-hosting/overview) and [Helm](/langy/self-hosting/helm).
   </Accordion>
 
   <Accordion title="Langy can't open a PR">

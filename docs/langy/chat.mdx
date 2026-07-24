@@ -10,10 +10,10 @@ keywords:
 
 You ask Langy a question in plain language and it answers by reading your own production data. It reads the relevant traces and evals through the `langwatch` CLI, and depending on the question it writes a [Scenario simulation test or an evaluation](/langy/scenario-tests-and-evals), or [opens a pull request](/langy/pull-requests) on the code you connected.
 
-<Info>**Pairs with:** [Scenario tests and evals](/langy/scenario-tests-and-evals) (what Langy produces), [Pull requests](/langy/pull-requests) (how it changes code), [Signals and briefing](/langy/signals-and-briefing) (what it surfaces without being asked).</Info>
+<Info>**Pairs with:** [Scenario tests and evals](/langy/scenario-tests-and-evals) (what Langy produces), [Pull requests](/langy/pull-requests) (how it changes code), [Insights across your traces](/langy/insights) (what it finds when you ask what changed).</Info>
 
-<Frame caption="The empty Langy panel. 'Ready when you are.' with suggested prompts and a 'Choose what Langy can see' context row on the composer.">
-  ![Empty Langy chat panel](/images/langy/overview/chat-panel-empty.png)
+<Frame caption="The Langy panel, ready for a question, with suggested prompts and a 'Choose what Langy can see' context row on the composer.">
+  ![The Langy chat panel ready for a question](/images/langy/overview/chat-panel-empty.png)
 </Frame>
 
 ## What you can ask
@@ -77,13 +77,17 @@ When Langy runs a Scenario simulation, the result appears as a run card in the c
   ![Simulation run card in chat](/images/langy/chat/simulation-run-card.png)
 </Frame>
 
+## Ask about what you are looking at
+
+The panel stays docked while you move through the app, so you can open a trace and ask Langy about that trace. Paste the trace ID or add it through the context chip, and Langy reads the same spans you see in the waterfall.
+
+<Frame caption="A trace's span waterfall with Langy alongside, walking through what happened in that trace and why an evaluator errored.">
+  ![A trace drawer with its span waterfall and a Langy conversation about that trace](/images/langy/panel/drawer-companion.png)
+</Frame>
+
 ## Choose what Langy can see
 
-Context is explicit. The composer shows a complete, honest list of what Langy was told: the chips on the composer are exactly the context the model receives, nothing hidden. Add context from a trace list with "Add to context" (the Sparkles action) on the selection bar, or point Langy at a resource on the page.
-
-<Frame caption="'Add to context' from the trace-list selection bar. The selected traces become explicit context chips on the composer.">
-  ![Add to context from the trace list](/images/langy/chat/add-to-context.png)
-</Frame>
+Context is explicit. The `# Context` chip on the composer lets you choose what Langy can see, and the chips shown are exactly the context the model receives, nothing hidden.
 
 ## Stop a turn
 

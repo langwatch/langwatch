@@ -1,14 +1,14 @@
 ---
 title: Enable Langy via Helm
-description: Turn on the Langy agent pod in the LangWatch umbrella chart by creating the shared secret, setting langyagent.chartManaged, and flipping the release_langy_enabled flag.
+description: Turn on the Langy agent pod in the LangWatch umbrella chart by creating the shared secret and setting langyagent.chartManaged.
 sidebarTitle: Enable via Helm
 keywords:
   - enable langy helm
   - langyagent chart
-  - release_langy_enabled
+  - langy self hosting
 ---
 
-Enabling Langy takes three steps: create the shared `LANGY_INTERNAL_SECRET` secret out-of-band, opt the agent pod in with `helm upgrade ... --set langyagent.chartManaged=true`, then flip the `release_langy_enabled` feature flag for the users or orgs you want to reach. The first two steps bring the runtime up; the third makes it user-facing. They are independent on purpose.
+Enabling Langy takes two steps: create the shared `LANGY_INTERNAL_SECRET` secret out-of-band, then opt the agent pod in with `helm upgrade ... --set langyagent.chartManaged=true`. Once the pod is running, Langy is available.
 
 The agent pod is **default off** in the umbrella chart (`langyagent.chartManaged: false` at the umbrella level). The app and the agent both reference a shared `LANGY_INTERNAL_SECRET` Secret that the chart does **not** materialise, so defaulting on would break every existing operator's next upgrade with `CreateContainerConfigError`.
 
@@ -44,25 +44,12 @@ A `gvisor` RuntimeClass must exist in the cluster before you enable Langy. With 
       --set langyagent.chartManaged=true
     ```
 
-    After the rollout, the app reaches the agent over cluster DNS at `http://<release>-langyagent:80`. The Service is ClusterIP only, so the agent is never exposed outside the cluster.
-  </Step>
-  <Step title="Flip the feature flag">
-    Even with the runtime up, the in-product UI stays gated until `release_langy_enabled` is on for the target users or orgs. Runtime-on is not user-facing-on. Set the flag in `/ops/feature-flags` (or PostHog).
-
-    <Frame caption="The /ops feature-flags list showing release_langy_enabled. This is the switch that controls who sees Langy in the product.">
-      ![The ops feature-flags list showing the release_langy_enabled flag](/images/langy/fresh/ops-feature-flags-langy.png)
-    </Frame>
-
-    Use the targeting rules to scope the flag to specific users or organizations while you roll out.
-
-    <Frame caption="The targeting-rules editor for release_langy_enabled. Scope the rollout to the users or orgs you want before enabling it broadly.">
-      ![The targeting-rules editor for the release_langy_enabled flag](/images/langy/fresh/ops-langy-targeting-rules.png)
-    </Frame>
+    After the rollout, the app reaches the agent over cluster DNS at `http://<release>-langyagent:80`. The Service is ClusterIP only, so the agent is never exposed outside the cluster. Once the pod is running, Langy is available in the product.
   </Step>
 </Steps>
 
 <Note>
-The `release_langy_enabled` flag is a complete kill switch for Langy access. Turning it off hides Langy for everyone regardless of the runtime state. To show users without access a teaser instead, use `release_langy_promo_enabled`.
+Langy is an optional component. You can disable it again by setting `langyagent.chartManaged=false` and running `helm upgrade`, which removes the agent pod on the next rollout.
 </Note>
 
 ## Standalone subchart install

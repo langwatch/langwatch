@@ -1,6 +1,6 @@
 ---
 title: Self-Hosting Langy
-description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod, the gVisor requirement, and the enablement flag.
+description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
 sidebarTitle: Overview
 keywords:
   - self-host langy
@@ -9,13 +9,17 @@ keywords:
   - ai agent self hosting
 ---
 
-Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, that ships in the LangWatch umbrella Helm chart but is **off by default**. To run Langy self-hosted you enable that pod, satisfy its one hard infrastructure requirement (a `gvisor` RuntimeClass), and flip the `release_langy_enabled` feature flag for the users who should see it. The GitHub App and outbound network egress are both optional and off until you configure them.
+Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, that ships in the LangWatch umbrella Helm chart but is **off by default**. To run Langy self-hosted you enable that pod and satisfy its one hard infrastructure requirement, a `gvisor` RuntimeClass. Once the pod is running, Langy is available. The GitHub App and outbound network egress are both optional and off until you configure them.
 
 The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [opencode](/langy/how-langy-works) worker per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
 **Pairs with:** [Enable Langy via Helm](/langy/self-hosting/helm), [Environment variables](/langy/self-hosting/environment-variables), [Networking and egress](/langy/self-hosting/networking-and-egress), [The sandbox](/langy/security/sandbox).
 </Info>
+
+<Note>
+**Turning Langy off.** Langy's availability is a deployment toggle, not a runtime feature flag. To disable it, set `langyagent.chartManaged: false` (its default) or unset `OPENCODE_AGENT_URL` on the app: the backend has nothing to connect to, so the panel opens no turns. On LangWatch Cloud, availability is managed for you.
+</Note>
 
 ## At a glance
 
@@ -30,7 +34,6 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 | Shared secret | `LANGY_INTERNAL_SECRET`, created out-of-band (the chart does not materialise it) |
 | GitHub App | Optional, for bot-authored pull requests |
 | Outbound egress | Off by default (`networkPolicy.allowExternalHttps: false`) |
-| User exposure | Gated by the `release_langy_enabled` feature flag, separate from the runtime toggle |
 
 ## Hard requirements
 
@@ -64,7 +67,7 @@ The control plane reaches the agent over cluster DNS at `http://<release>-langya
 
 <CardGroup cols={2}>
   <Card title="Enable Langy via Helm" icon="ship" href="/langy/self-hosting/helm">
-    Create the shared secret, opt the agent in with `chartManaged=true`, and flip the feature flag.
+    Create the shared secret and opt the agent in with `chartManaged=true`.
   </Card>
   <Card title="Register the GitHub App" icon="github" href="/langy/self-hosting/github-app">
     Register the app, set the `GITHUB_LANGY_*` env vars, and install it on the repos Langy may touch.

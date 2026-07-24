@@ -760,7 +760,7 @@
               "langy/chat",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
-              "langy/signals-and-briefing",
+              "langy/insights",
               "langy/skills-and-cli"
             ]
           },

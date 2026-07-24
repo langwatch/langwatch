@@ -15,13 +15,9 @@ To use Langy you enable it, pick a model, ask it a question in the chat panel, a
 </Info>
 
 <Steps>
-  <Step title="Have Langy enabled for your account">
-    Access to Langy is controlled by a single feature flag, `release_langy_enabled`.
-
-    - **On LangWatch Cloud:** Langy is being rolled out. If you do not see the panel yet, it is not enabled for your organization.
-    - **On a self-hosted install:** the agent pod is off by default and an admin turns it on. See [self-hosting enablement](/langy/self-hosting/overview) for the runtime toggle and the flag.
-
-    Turning the runtime on and exposing the UI are two separate steps: the agent can be running while the panel stays hidden until `release_langy_enabled` is on for your users.
+  <Step title="Open the Langy panel">
+    - **On LangWatch Cloud:** Langy is available. Open the panel to get started.
+    - **On a self-hosted install:** an admin enables the Langy agent pod through the chart first. Once the pod is running, Langy is available. See [self-hosting enablement](/langy/self-hosting/overview).
   </Step>
   <Step title="Pick a model or sign in with Codex">
     Open the model picker in the composer. You bring your own model access, one of two ways:
@@ -31,8 +27,8 @@ To use Langy you enable it, pick a model, ask it a question in the chat panel, a
 
     Every model call, including Codex, goes through the LangWatch AI gateway, so tracing, budgets, and policy apply the same way regardless of which you pick.
 
-    <Frame caption="The Langy home with the panel open in its model-setup state. Codex leads the provider list with a Recommended badge.">
-      ![The Langy home and panel prompting for model setup](/images/langy/fresh/langy-panel-model-setup.png)
+    <Frame caption="The Langy panel on the LangWatch home in its model-setup state. Codex leads the provider grid with a Recommended badge.">
+      ![The LangWatch home with the Langy panel asking for a model, Codex recommended](/images/langy/fresh/langy-panel-model-setup.png)
     </Frame>
   </Step>
   <Step title="Ask it something in the panel">
