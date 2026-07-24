@@ -338,9 +338,9 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
-    it("organization.getOrganizationPendingInvites → UNAUTHORIZED for member", async () => {
+    it("invite.getOrganizationPendingInvites → UNAUTHORIZED for member", async () => {
       await expect(
-        memberCaller.organization.getOrganizationPendingInvites({
+        memberCaller.invite.getOrganizationPendingInvites({
           organizationId: ORG_ID,
         }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
@@ -375,7 +375,7 @@ describe("#47 RBAC member-leak coverage (integration)", () => {
         }),
       ).resolves.toBeDefined();
       await expect(
-        adminCaller.organization.getOrganizationPendingInvites({
+        adminCaller.invite.getOrganizationPendingInvites({
           organizationId: ORG_ID,
         }),
       ).resolves.toBeDefined();
