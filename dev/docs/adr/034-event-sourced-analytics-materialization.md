@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-06-20
 - **Supersedes:** the abandoned Postgres app-rollup (sign-collapsing + HLL/t-digest sketches — wrong layer).
+- **Amended by:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the slim fold's store-continuity mechanism (`refoldOnStoreMiss` + `RedisCachedFoldStore`) is replaced by the ClickHouse-cached read-back store (the store reads its own last committed state; it never refolds from `event_log` on the hot path). The analytics-materialisation shape decided here — slim fold + additive rollup — is unchanged.
 - **Behavioural contract:** [specs/analytics/event-sourced-analytics-materialization.feature](../../../specs/analytics/event-sourced-analytics-materialization.feature)
 
 ## Context

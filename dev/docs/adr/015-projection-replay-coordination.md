@@ -4,6 +4,8 @@
 
 **Status:** Accepted
 
+**Related to:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the replay protocol defined here is unchanged, but it is now **off the projection hot path**. Projections read back their own committed state and never refold from `event_log` on delivery, so this protocol runs only for projection-version migration and disaster recovery.
+
 ## Context
 
 LangWatch uses event sourcing with fold projections that materialize state into ClickHouse (ReplacingMergeTree tables). Over time, projection logic evolves — bug fixes, new fields, schema changes — and historical data must be reprocessed ("replayed") to bring projection state up to date.
