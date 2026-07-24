@@ -9,6 +9,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const openDrawerMock = vi.fn();
@@ -65,6 +66,7 @@ vi.mock("../effects/useEasterEggEffects", () => ({
 }));
 
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+import { SUGGESTIONS } from "~/features/langy/components/EmptyState";
 import { CommandPalette } from "../CommandPalette";
 
 const QUESTION = "what are my traces about?";
@@ -207,6 +209,85 @@ describe("given the bar is empty", () => {
       expect(state.isOpen).toBe(false);
       expect(state.pendingPrompt).toBeNull();
       expect(onDone).not.toHaveBeenCalled();
+    });
+  });
+
+  // The getting-started asks under the CTA (SUGGESTIONS) each carry a prompt.
+  // Selecting one hands THAT prompt straight to Langy — the same handoff as a
+  // typed question, not the empty-bar "enter composer mode" path.
+  describe("when a getting-started suggestion is selected", () => {
+    /** @scenario Selecting a getting-started suggestion hands its prompt to Langy */
+    it("hands the suggestion's prompt to Langy on click", () => {
+      const { onDone } = renderPalette({ query: "" });
+
+      fireEvent.click(screen.getByText("Set up an evaluator"));
+
+      const state = useLangyStore.getState();
+      expect(state.isOpen).toBe(true);
+      expect(state.pendingPrompt).toBe(
+        "Suggest an evaluator for my agent and set it up.",
+      );
+      expect(onDone).toHaveBeenCalledTimes(1);
+    });
+
+    it("hands the suggestion's prompt to Langy on Enter after arrowing to it", () => {
+      renderPalette({ query: "" });
+
+      // CTA leads at index 0; the three suggestions follow it.
+      fireEvent.keyDown(paletteInput(), { key: "ArrowDown" });
+      fireEvent.keyDown(paletteInput(), { key: "Enter" });
+
+      expect(useLangyStore.getState().pendingPrompt).toBe(
+        SUGGESTIONS[0]!.prompt,
+      );
+    });
+
+    // The inline home renders its results only WHILE the field holds focus, so
+    // a click on a suggestion first blurs the field. If the blur closed the
+    // results synchronously, the row would unmount before its click landed and
+    // clicking a suggestion on the home would do nothing. The field DEFERS the
+    // close (mirrored by this harness — the same shape as LangyHomeHero) exactly
+    // so the click survives. This pins that guard.
+    it("fires on click in the inline surface even though the click blurs the field", () => {
+      vi.useFakeTimers();
+      function InlineHarness() {
+        const [focused, setFocused] = useState(false);
+        const fieldRef = useRef<HTMLDivElement>(null);
+        return (
+          <ChakraProvider value={defaultSystem}>
+            <div ref={fieldRef}>
+              <CommandPalette
+                surface="inline"
+                active={focused}
+                query=""
+                setQuery={vi.fn()}
+                onDone={vi.fn()}
+                onFocus={() => setFocused(true)}
+                onBlur={() =>
+                  window.setTimeout(() => {
+                    if (!fieldRef.current?.contains(document.activeElement))
+                      setFocused(false);
+                  }, 0)
+                }
+              />
+            </div>
+          </ChakraProvider>
+        );
+      }
+      render(<InlineHarness />);
+
+      const input = screen.getByPlaceholderText("Where would you like to go?");
+      fireEvent.focus(input); // results (with the suggestions) appear
+      const row = screen.getByText("Compare two runs");
+      fireEvent.blur(input); // the blur the click causes — close is deferred
+      fireEvent.click(row); // must still land: the row is not yet gone
+
+      const state = useLangyStore.getState();
+      expect(state.isOpen).toBe(true);
+      expect(state.pendingPrompt).toBe(SUGGESTIONS[2]!.prompt);
+
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
     });
   });
 });
