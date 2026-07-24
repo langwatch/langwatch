@@ -74,7 +74,15 @@ export interface CollectorTarget {
 
 export interface CollectorPayload {
   trace_id: string;
-  spans: Array<Record<string, unknown> & { timestamps: { started_at: number } }>;
+  spans: Array<
+    Record<string, unknown> & {
+      timestamps: {
+        started_at: number;
+        first_token_at?: number;
+        finished_at?: number;
+      };
+    }
+  >;
   metadata: Record<string, string | string[]>;
 }
 
