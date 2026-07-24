@@ -39,7 +39,7 @@ The findings cluster into three roots: **unbounded inputs** (a huge payload OOMs
 
 ### 2. Distinguish a missing blob from a transient store error
 
-`TieredBlobStore.get` for the s3 tier must classify failures: a genuine *not-found* (`NoSuchKey` / 404) returns null → the decode fail-safe (complete the slot without the handler, recover via replay). A *transient* error (5xx, throttling, timeout, connection reset) **rethrows as retryable** so the queue's normal retry handles it. Today both collapse to "missing", so a brief S3 blip mass-drops in-flight jobs to replay instead of retrying.
+`TieredBlobStore.get` for the s3 tier must classify failures: a genuine *not-found* (`NoSuchKey` / 404) returns null → the decode fail-safe (complete the slot without the handler, recover via replay — for a fold/map projection **only**; replay never invokes reactors, so a reactor on the path is real loss unless the job is preserved and named, see [ADR-046](./046-drop-to-replay-not-recovery-for-reactors.md)). A *transient* error (5xx, throttling, timeout, connection reset) **rethrows as retryable** so the queue's normal retry handles it. Today both collapse to "missing", so a brief S3 blip mass-drops in-flight jobs to replay instead of retrying.
 
 ### 3. Coordinated, access-refreshed TTLs
 

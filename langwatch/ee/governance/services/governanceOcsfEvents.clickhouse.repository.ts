@@ -3,7 +3,11 @@
 import { createLogger } from "@langwatch/observability";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
- * `governance_ocsf_events` fold projection. Each call inserts ONE
+ * `governance_ocsf_events` — a REACTOR-populated table (NOT a fold
+ * projection: it is registered via `builder.withReactor("traceSummary", …)`,
+ * and two of its writers — adminWorkspaceViewAudit + pullerWorker — never touch
+ * `event_log` at all, so it cannot be rebuilt from `event_log`; see ADR-046).
+ * Each call inserts ONE
  * OCSF row keyed by (TenantId, EventId) so reactor replays of the
  * same event collapse at merge time.
  *
@@ -15,7 +19,7 @@ import { createLogger } from "@langwatch/observability";
  *
  * Spec: specs/ai-gateway/governance/folds.feature §"governance_ocsf_events"
  *       + specs/ai-gateway/governance/siem-export.feature
- * Migration: 00023_create_governance_ocsf_events.sql
+ * Migration: 00026_create_governance_ocsf_events.sql
  */
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 

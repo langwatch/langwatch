@@ -216,6 +216,16 @@ export interface EnvelopeHeader {
   t?: string;
   n?: string;
   /**
+   * Recovery key (#718): the event id, lifted into the header so a discarded job
+   * whose body/blob may be gone is still nameable back to its `event_log` row.
+   * Reactor jobs stage `{event, foldState}` with no top-level `.id`, so
+   * `generateStagedJobId` falls back to a random UUID and — without this — a
+   * `missing_blob` reactor drop is unaddressable. Set by {@link routingHeader}
+   * from `__recoveryKey`; lives beside `p/t/n` so it survives blob loss in both
+   * tiers and never enters the body (so it can't perturb the GQ2 content hash).
+   */
+  k?: string;
+  /**
    * GQ2: queue-machinery fields (every `__*` key in jobData) lifted out of the
    * body so they don't perturb the content hash. Restored onto the parsed body
    * on decode. The user payload is everything else; the body is hashed over
@@ -283,6 +293,9 @@ function routingHeader(
     header.p = jobData.__pipelineName;
   if (typeof jobData.__jobType === "string") header.t = jobData.__jobType;
   if (typeof jobData.__jobName === "string") header.n = jobData.__jobName;
+  // #718: lift the recovery key into the header alongside the routing trio, for
+  // BOTH tiers — a value whose blob is gone can still name its event.
+  if (typeof jobData.__recoveryKey === "string") header.k = jobData.__recoveryKey;
   return header;
 }
 
@@ -514,10 +527,13 @@ export async function encodeJobEnvelope({
     const { machinery, payload } = splitMachineryFromBody(jobData);
     // The routing trio is already in header.p/t/n via routingHeader(); drop
     // the duplicate copy from m so the wire format isn't ~50 bytes heavier
-    // per envelope and the two can't drift.
+    // per envelope and the two can't drift. Same for the recovery key
+    // (header.k, #718) — it is lifted to the header, so it must not also ride
+    // header.m, or the drop record would carry two sources of the same field.
     delete machinery.__pipelineName;
     delete machinery.__jobType;
     delete machinery.__jobName;
+    delete machinery.__recoveryKey;
     if (Object.keys(machinery).length > 0) {
       header.m = machinery;
     }
@@ -723,6 +739,32 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
     };
   } catch {
     return { pipelineName: null, jobType: null, jobName: null };
+  }
+}
+
+/**
+ * Reads the recovery key (the event id) from the header alone, or from the raw
+ * fields of a legacy bare-JSON value. Never throws; legacy/malformed/keyless
+ * values yield null. Sibling of {@link readJobRoutingMeta} and the same trick: the
+ * header survives what the body does not, so a value we could not decode can still
+ * say WHICH event it was (#718).
+ *
+ * Length-bounded (≤128): it lands in a drop log and a dead-letter record, and on a
+ * malformed or forged envelope `header.k` is attacker-shaped by the time this
+ * reader runs — bound it rather than let a runaway string into the log. No charset
+ * guard: event ids are our own but their shape varies (UUID, hex span id, log
+ * record id), and an over-narrow guard would null legitimate ids.
+ */
+export function readJobRecoveryKey(value: string): string | null {
+  try {
+    const raw = isEnvelope(value)
+      ? splitEnvelope(value).header.k
+      : (JSON.parse(value) as Record<string, unknown>).__recoveryKey;
+    return typeof raw === "string" && raw.length > 0 && raw.length <= 128
+      ? raw
+      : null;
+  } catch {
+    return null;
   }
 }
 

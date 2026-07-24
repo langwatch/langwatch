@@ -305,6 +305,66 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
+   * Push a still-referenced blob's TTL out to at least the dead-letter quarantine
+   * window (#719/#720). A body-present drop is preserved in the dead-letter for
+   * ~7 days, but the referenced blob's own backstop is shorter (`BLOB_BACKSTOP_TTL_SECONDS`,
+   * 4 days for GQ2) — so without this the dead-letter would outlive the blob it
+   * references and a drain would recover an envelope pointing at nothing.
+   * s3-tier objects have no redis TTL and are left to the bucket lifecycle.
+   * Best-effort: a failure warns and relies on the existing backstop, and never
+   * blocks the drop.
+   *
+   * Uses {@link BlobLeases.extendTtl} — plain `EXPIRE` calls, not `renew` — because
+   * `renew`/`take` only extend the *logical* lease deadline (the Lua script's
+   * hardcoded `BLOB_LEASE_SET_TTL_SECONDS`/`BLOB_BACKSTOP_TTL_SECONDS` still cap
+   * the *physical* Redis TTL regardless of the ttlSeconds passed to them).
+   */
+  async preserveForDlq({
+    value,
+    groupId,
+    ttlSeconds,
+  }: {
+    value: string;
+    groupId: string;
+    ttlSeconds: number;
+  }): Promise<void> {
+    const { lease, blobId } = readEnvelopeRetirement(value);
+    try {
+      if (lease) {
+        // Tenant guard (ADR-030 §5), matching decode/release/transfer: derive the
+        // ref's tenant from untrusted envelope data, so a forged or mis-routed ref
+        // must not extend another tenant's blob lifetime.
+        if (lease.ref.projectId !== this.projectIdFor(groupId)) {
+          logger.warn(
+            { groupId, refProjectId: lease.ref.projectId },
+            "Skipping blob TTL preserve-for-DLQ for a tenant-mismatched ref",
+          );
+          return;
+        }
+        await this.blobLeases.extendTtl({
+          projectId: lease.ref.projectId,
+          hash: lease.ref.hash,
+          tier: lease.ref.tier,
+          ttlSeconds,
+        });
+      } else if (blobId) {
+        // GQ1: extend the standalone blob.
+        await this.blobs.refreshTtl({ id: blobId, ttlSeconds });
+      }
+    } catch (err) {
+      logger.warn(
+        {
+          groupId,
+          error: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
+        },
+        "Blob TTL preserve-for-DLQ failed; relying on the backstop",
+      );
+    }
+  }
+
+  /**
    * Atomically moves the lease from a retired value to its replacement (retry
    * re-encode or dedup squash): one eval takes the new lease and drops the old.
    * No transfer path deletes blobs. Falls back to

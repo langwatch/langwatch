@@ -11,6 +11,7 @@ import {
 } from "vitest";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
 import {
   getTestRedisConnection,
   startTestContainers,
@@ -18,7 +19,7 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
-import { encodeJobEnvelope } from "../jobEnvelope";
+import { encodeJobEnvelope, readJobRecoveryKey } from "../jobEnvelope";
 import { gqJobsDroppedTotal } from "../metrics";
 import { GroupStagingScripts } from "../scripts";
 import { TieredBlobStore } from "../tieredBlobStore";
@@ -47,6 +48,9 @@ type TestPayload = {
   __pipelineName?: string;
   __jobType?: string;
   __jobName?: string;
+  // #718: normally the QueueManager facade injects this; the harness sets it
+  // directly (it is in CALLER_RESERVED_KEYS) to stand in for a reactor's event id.
+  __recoveryKey?: string;
 };
 
 // Tenant prefix for groupIds so GQ2 (content-addressed, tenant-namespaced)
@@ -98,16 +102,23 @@ describe.skipIf(!hasTestcontainers)(
       processFn,
       consumerEnabled,
       objectStore,
+      processBatch,
+      coalesceMaxBatch,
     }: {
       name: string;
       processFn: (payload: TestPayload) => Promise<void>;
       consumerEnabled: boolean;
       objectStore: InMemoryObjectStore;
+      // Opt-in batch coalescing (drives the drained-sibling path).
+      processBatch?: (payloads: TestPayload[]) => Promise<void>;
+      coalesceMaxBatch?: (payload: TestPayload) => number;
     }): GroupQueueProcessor<TestPayload> {
       const definition: EventSourcedQueueDefinition<TestPayload> = {
         name,
         groupKey: (p) => p.groupId,
         process: processFn,
+        ...(processBatch ? { processBatch } : {}),
+        ...(coalesceMaxBatch ? { coalesceMaxBatch } : {}),
       };
       const queue = new GroupQueueProcessor<TestPayload>(definition, redis, {
         consumerEnabled,
@@ -128,6 +139,14 @@ describe.skipIf(!hasTestcontainers)(
       const metric = await gqJobsDroppedTotal.get();
       return metric.values.filter((v) => v.labels.queue_name === name);
     }
+
+    // Job-scoped dead-letter reads (#719). Same key layout the ops drain uses.
+    const dlqValue = (name: string, groupId: string, stagedJobId: string) =>
+      redis.hget(`${name}:gq:dlq:${groupId}:data`, stagedJobId);
+    const dlqReason = (name: string, groupId: string, stagedJobId: string) =>
+      redis.hget(`${name}:gq:dlq:${groupId}:error`, stagedJobId);
+    const liveValue = (name: string, groupId: string, stagedJobId: string) =>
+      redis.hget(`${name}:gq:group:${groupId}:data`, stagedJobId);
 
     /**
      * Stages a GQ2 s3-tier job directly (bypassing the dispatch loop) whose
@@ -702,6 +721,321 @@ describe.skipIf(!hasTestcontainers)(
           // the durable-store lifecycle.
           expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
           expect(flaky.deleted).toEqual([]);
+        });
+      });
+    });
+
+    describe("given a body-present drop carrying a recovery key (#719/#718)", () => {
+      describe("when a worker claims the group and the decode fails", () => {
+        /** @scenario a body-present reactor drop is dead-lettered with its recovery key */
+        it("preserves the value in the dead-letter, labelled and keyed", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/dlq-body-present`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloaded({
+            name,
+            groupId,
+            objectStore,
+            extra: { __recoveryKey: "evt-1" },
+          });
+          // Body present but unreadable (codec skew), NOT evicted.
+          for (const uri of [...objectStore.store.keys()]) {
+            objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
+          }
+          newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: true,
+            objectStore,
+          });
+
+          // Poll the recovery SIDE EFFECT (DLQ written, live value gone) rather
+          // than the drop metric directly: waiting on the side effect is the
+          // robust condition regardless of exactly when recordDrop fires
+          // relative to the DLQ write (review #5853 moved recordDrop to fire
+          // only after the write succeeds, so the metric below is no longer
+          // racing it either — but the side effect remains the thing this test
+          // is actually about).
+          await vi.waitFor(
+            async () => {
+              expect(await dlqValue(name, groupId, "victim")).not.toBeNull();
+              expect(await liveValue(name, groupId, "victim")).toBeNull();
+            },
+            { timeout: 10000, interval: 100 },
+          );
+
+          // AC-719.1: preserved in the dead-letter, gone from live staging.
+          // Revert-check: before #719 the drop only called complete(), so the
+          // value was deleted and the waitFor above times out.
+          const preserved = await dlqValue(name, groupId, "victim");
+          expect(preserved).not.toBeNull();
+          // AC-719.3: labelled with the failure class.
+          expect(await dlqReason(name, groupId, "victim")).toBe("body_unreadable");
+          // AC-718.2: the quarantined reactor job is addressable by its event id.
+          expect(readJobRecoveryKey(preserved!)).toBe("evt-1");
+          // The drop is counted: recordDrop now fires only after the DLQ write
+          // above succeeded, so by the time the side effect is observed the
+          // metric is already incremented — no race.
+          expect(await dropsFor(name)).toHaveLength(1);
+        });
+      });
+    });
+
+    describe("given a missing-blob drop carrying a recovery key (#718.2b/#719.2)", () => {
+      describe("when a worker claims the group and the blob is genuinely gone", () => {
+        /** @scenario a missing-blob reactor drop is named in the log but not dead-lettered */
+        it("does not dead-letter and releases the absent blob's holder", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/dlq-missing-blob`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloaded({
+            name,
+            groupId,
+            objectStore,
+            extra: { __recoveryKey: "evt-1" },
+          });
+          // Genuinely gone (eviction / purge), not corrupt — delete the object.
+          for (const uri of [...objectStore.store.keys()]) {
+            objectStore.store.delete(uri);
+          }
+          const consumer = newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: true,
+            objectStore,
+          });
+          // Once the blob is gone the recoveryKey is the ONLY recovery identifier,
+          // and it rides the structured drop LOG (recordDrop) — not the metric,
+          // not Redis. Capture the log at the seam to prove it actually carries
+          // "evt-1" (RaiMf). Installed synchronously before any async drop runs.
+          const dropLog = vi.spyOn((consumer as any).logger, "error");
+
+          // Wait on the drop LOG itself (installed synchronously above), not
+          // objectStore.deleted: lease release is non-destructive under the
+          // new BlobLeases model (bytes reclaim lazily via TTL, never an
+          // eager S3 delete on release — unlike the old BlobHolders design),
+          // so there is no S3-delete side effect to poll here anymore. The
+          // stale lease is still released (`releaseLease`, unit-tested
+          // directly in groupQueue.deadLetterFallback.unit.test.ts's
+          // missing_blob case); this integration test's job is the
+          // externally-observable contract below.
+          await vi.waitFor(
+            () => {
+              expect(dropLog).toHaveBeenCalled();
+            },
+            { timeout: 10000, interval: 100 },
+          );
+
+          // The body is GONE, so there is nothing to preserve: no dead-letter
+          // entry is written, and the stale lease is released rather than
+          // leaked. This is the honest boundary — a missing_blob reactor drop
+          // is NAMED (recoveryKey rides the drop log via recordDrop) but NOT
+          // recovered.
+          expect(await dlqValue(name, groupId, "victim")).toBeNull();
+          const [entry] = await dropsFor(name);
+          expect(entry!.labels.reason).toBe("missing_blob");
+          // AC-718.2b: the drop log names the exact event that was lost — the sole
+          // recovery identifier after the blob is gone. Revert-check: drop the
+          // header.k lift and recoveryKey logs as null here.
+          expect(dropLog).toHaveBeenCalledWith(
+            expect.objectContaining({
+              recoveryKey: "evt-1",
+              reason: "missing_blob",
+            }),
+            expect.any(String),
+          );
+        });
+      });
+    });
+
+    describe("given a body-present job quarantined in the dead-letter (#719 recovery)", () => {
+      describe("when an operator drains the group's dead-letter", () => {
+        /** @scenario draining the dead-letter restores the job to live staging and it dispatches */
+        it("restores it to live staging byte-identical and it dispatches", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/dlq-replay`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloaded({
+            name,
+            groupId,
+            objectStore,
+            extra: { __recoveryKey: "evt-1" },
+          });
+
+          // Save the good bytes, then corrupt so the first claim drops it to the
+          // dead-letter (the rolling-deploy codec-skew shape).
+          const [uri] = [...objectStore.store.keys()];
+          const goodBytes = Buffer.from(objectStore.store.get(uri!)!);
+          objectStore.store.set(uri!, Buffer.from("not a valid gzip body"));
+
+          const processed = vi.fn<(p: TestPayload) => Promise<void>>();
+          const consumer = newQueue({
+            name,
+            processFn: processed,
+            consumerEnabled: true,
+            objectStore,
+          });
+          await consumer.waitUntilReady();
+
+          await vi.waitFor(
+            async () => {
+              expect(await dlqValue(name, groupId, "victim")).not.toBeNull();
+            },
+            { timeout: 10000, interval: 100 },
+          );
+          const preserved = await dlqValue(name, groupId, "victim");
+
+          // A newer worker can now read the body (the rollout has completed).
+          objectStore.store.set(uri!, goodBytes);
+
+          // The operator drains via the EXISTING group-scoped drain — unchanged.
+          // That it recovers a job-scoped entry proves the key layout matches.
+          const ops = new QueueRedisRepository(redis);
+          const { jobsReplayed } = await ops.replayFromDlq({
+            queueName: name,
+            groupId,
+          });
+          expect(jobsReplayed).toBe(1);
+
+          // Restored byte-identical to live staging, and gone from the dead-letter.
+          expect(await liveValue(name, groupId, "victim")).toBe(preserved);
+          expect(await dlqValue(name, groupId, "victim")).toBeNull();
+
+          // And it actually dispatches + processes now the body reads, with the
+          // queue machinery (incl. __recoveryKey) stripped from the handler payload.
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 10000, interval: 100 },
+          );
+          expect(processed.mock.calls[0]![0].id).toBe("victim");
+          expect(processed.mock.calls[0]![0]).not.toHaveProperty("__recoveryKey");
+        });
+      });
+    });
+
+    describe("given a body-present GQ2 drop (#720 blob lifetime)", () => {
+      describe("when the job is dead-lettered", () => {
+        /** @scenario a dead-lettered GQ2 job's blob holder outlives the dead-letter window */
+        it("extends the blob holder past the dead-letter quarantine window", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/dlq-blob-ttl`;
+          const objectStore = new InMemoryObjectStore();
+          await stageOffloaded({ name, groupId, objectStore });
+
+          // The send() path acquired a holder — so pttl is a real TTL, not -2
+          // (the harness's batch-stage path would bypass acquire).
+          const holderKeys = await redis.keys(`${name}:gq:blobholders:*`);
+          expect(holderKeys).toHaveLength(1);
+
+          for (const uri of [...objectStore.store.keys()]) {
+            objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
+          }
+          newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: true,
+            objectStore,
+          });
+
+          await vi.waitFor(
+            async () => {
+              expect(await dlqValue(name, groupId, "victim")).not.toBeNull();
+            },
+            { timeout: 10000, interval: 100 },
+          );
+
+          // The blob's holder must be preserved to the SAME dead-letter window as
+          // the entry it backs, or a drain would recover an envelope pointing at a
+          // reclaimed blob. Compare against the ACTUAL DLQ data-key TTL rather than
+          // a magic 6-day threshold (RaiMk): preserveForDlq extends the holder just
+          // BEFORE the DLQ write, so the holder's remaining TTL tracks the entry's
+          // within write latency (5s slack) — it does not expire before it.
+          const holderPttl = await redis.pttl(holderKeys[0]!);
+          const dlqDataPttl = await redis.pttl(`${name}:gq:dlq:${groupId}:data`);
+          expect(dlqDataPttl).toBeGreaterThan(0);
+          expect(holderPttl).toBeGreaterThan(dlqDataPttl - 5_000);
+          // Falsifiability retained: the legacy holder-mirror key's default TTL is
+          // BLOB_LEASE_SET_TTL_SECONDS (4 days), so > 6 days proves preserveForDlq
+          // pushed it to the window. Revert preserveForDlq and this drops back to
+          // ~4d → red.
+          expect(holderPttl).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
+        });
+      });
+    });
+
+    describe("given a coalesced batch whose drained sibling is dead-lettered (#5853 release fix)", () => {
+      describe("when the dispatched job succeeds", () => {
+        /** @scenario a dead-lettered drained sibling's blob survives the batch's success */
+        it("does not release the dropped sibling's preserved blob on the batch's success", async () => {
+          const name = freshName();
+          const groupId = `${TENANT}/coalesce-release`;
+          const objectStore = new InMemoryObjectStore();
+
+          // Stage TWO offloaded jobs in the same group with a consumer-less queue
+          // so corruption can't race the dispatcher: J (dispatched, decodes fine)
+          // first, then S2 (the drained sibling). incompressible() is random per
+          // call, so the two get distinct blobs.
+          const staging = newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: false,
+            objectStore,
+          });
+          await staging.waitUntilReady();
+          await staging.send({
+            id: "dispatched",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
+          const jUris = new Set(objectStore.store.keys());
+          await staging.send({
+            id: "sibling",
+            groupId,
+            value: OFFLOADABLE_S3_VALUE(),
+          });
+          const s2Uri = [...objectStore.store.keys()].find((u) => !jUris.has(u));
+          expect(s2Uri).toBeDefined();
+
+          // Corrupt ONLY the sibling's blob: body present, unreadable to this
+          // worker (the codec-skew case #719 targets) — NOT evicted.
+          objectStore.store.set(s2Uri!, Buffer.from("not a valid gzip body"));
+
+          // Coalescing consumer: dispatches J, drains S2 as a sibling, S2 decode
+          // fails → dead-lettered, J's handler succeeds → the success-path release
+          // runs. maxBatch > 1 + processBatch is what turns coalescing on.
+          const processed = vi.fn<(p: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          newQueue({
+            name,
+            processFn: processed,
+            consumerEnabled: true,
+            objectStore,
+            processBatch: async () => {},
+            coalesceMaxBatch: () => 50,
+          });
+
+          // Wait until S2 is dead-lettered AND the dispatched job completed
+          // (a real completion, not a drop — completedStat is only bumped by a
+          // non-dropped complete()).
+          await vi.waitFor(
+            async () => {
+              expect(
+                await redis.hlen(`${name}:gq:dlq:${groupId}:data`),
+              ).toBe(1);
+              expect(await completedStat(name)).not.toBeNull();
+            },
+            { timeout: 15000, interval: 100 },
+          );
+
+          // The fix: the dispatched job's success released only its OWN blob, not
+          // the dropped sibling's PRESERVED blob. Revert the fix (release every
+          // drainedSibling) and S2's blob is UNLINKed here → its dead-letter entry
+          // points at a gone blob and a drain recovers a bodyless envelope. This
+          // is the exact use-after-free the adversarial review found.
+          expect(objectStore.deleted).not.toContain(s2Uri);
+          expect(objectStore.store.has(s2Uri!)).toBe(true);
         });
       });
     });

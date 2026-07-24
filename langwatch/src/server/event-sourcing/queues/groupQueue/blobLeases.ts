@@ -280,6 +280,49 @@ export class BlobLeases {
     return Number(graced) === 1;
   }
 
+  /**
+   * Directly extends the Redis TTL on the lease-set keys and the blob's own
+   * redis-tier key to at least `ttlSeconds` — independent of the fixed
+   * `BLOB_LEASE_SET_TTL_SECONDS` / `BLOB_BACKSTOP_TTL_SECONDS` constants
+   * `take`/`renew` bake into `TAKE_LUA`. Plain `EXPIRE` calls, not a Lua script:
+   * passing a larger `ttlSeconds` to `take`/`renew` only extends the *logical*
+   * lease deadline recorded as the sorted-set member's score — the *physical*
+   * Redis TTL on the lease-set key and the blob key stays capped at the
+   * hardcoded constant, so the blob would still be reclaimed on schedule. This
+   * method touches only the real TTLs, and never the Lua scripts, so it cannot
+   * perturb `take`/`renew`/`release`/`transfer`'s atomicity.
+   *
+   * Used by the DLQ dead-letter path (#719/#720): a body-present drop is
+   * quarantined for a window that can exceed the routine lease/backstop TTL,
+   * so without this the referenced blob could be reclaimed before an operator
+   * drains the dead-letter. s3-tier objects have no per-object Redis TTL (left
+   * to the bucket lifecycle, ADR-029), so only the lease bookkeeping is
+   * extended for that tier — the caller's tier param mirrors `renew`'s.
+   */
+  async extendTtl({
+    projectId,
+    hash,
+    tier,
+    ttlSeconds,
+  }: {
+    projectId: TenantId;
+    hash: string;
+    tier: "redis" | "s3";
+    ttlSeconds: number;
+  }): Promise<void> {
+    await this.redis.expire(this.leaseKey({ projectId, hash }), ttlSeconds);
+    await this.redis.expire(
+      this.legacyHolderKey({ projectId, hash }),
+      ttlSeconds,
+    );
+    if (tier === "redis") {
+      await this.redis.expire(
+        redisBlobKey({ queueName: this.queueName, projectId, hash }),
+        ttlSeconds,
+      );
+    }
+  }
+
   async countLive({
     projectId,
     hash,
