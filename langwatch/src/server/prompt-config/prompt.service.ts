@@ -14,6 +14,7 @@ import {
   type outputsSchema,
   type promptingTechniqueSchema,
 } from "~/prompts/schemas/field-schemas";
+import { describeLocalFileUpdate } from "./describe-local-file-update";
 import { SchemaVersion } from "./enums";
 import {
   HandleGenerationError,
@@ -1151,7 +1152,8 @@ export class PromptService {
           projectId,
           data: {
             authorId,
-            commitMessage: commitMessage ?? "Updated from local file",
+            commitMessage:
+              commitMessage ?? describeLocalFileUpdate(comparison.differences),
             ...this.transformToDbFormat(resolvedConfigData),
             schemaVersion: SchemaVersion.V1_0,
             parameters: params.parameters,

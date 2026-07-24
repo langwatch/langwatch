@@ -203,6 +203,98 @@ describe("PromptService", () => {
       });
     });
 
+    describe("when local content differs from remote and no commit message is provided", () => {
+      it("describes the changed fields instead of a generic message", async () => {
+        const existingPrompt = buildExistingPrompt();
+
+        vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(
+          existingPrompt,
+        );
+
+        const updateSpy = vi
+          .spyOn(promptService, "updatePrompt")
+          .mockResolvedValue(existingPrompt);
+
+        mockRepository.compareConfigContent.mockReturnValue({
+          isEqual: false,
+          differences: [
+            "model: gpt-4 → gpt-4o-mini",
+            "temperature: 0.7 → 0.3",
+          ],
+        });
+
+        const localConfigData = {
+          model: "gpt-4o-mini",
+          prompt: "You are a helpful assistant",
+          messages: [{ role: "user" as const, content: "Hello {{input}}" }],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          temperature: 0.3,
+        };
+
+        const result = await promptService.syncPrompt({
+          idOrHandle: "test-prompt",
+          localConfigData: localConfigData as any,
+          localVersion: 1,
+          projectId,
+          organizationId,
+        });
+
+        expect(result.action).toBe("updated");
+        expect(updateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              commitMessage:
+                "Updated from local file (model: gpt-4 → gpt-4o-mini; temperature: 0.7 → 0.3)",
+            }),
+          }),
+        );
+      });
+
+      it("keeps the caller's commit message when one is provided", async () => {
+        const existingPrompt = buildExistingPrompt();
+
+        vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(
+          existingPrompt,
+        );
+
+        const updateSpy = vi
+          .spyOn(promptService, "updatePrompt")
+          .mockResolvedValue(existingPrompt);
+
+        mockRepository.compareConfigContent.mockReturnValue({
+          isEqual: false,
+          differences: ["model: gpt-4 → gpt-4o-mini"],
+        });
+
+        const localConfigData = {
+          model: "gpt-4o-mini",
+          prompt: "You are a helpful assistant",
+          messages: [{ role: "user" as const, content: "Hello {{input}}" }],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          temperature: 0.7,
+        };
+
+        await promptService.syncPrompt({
+          idOrHandle: "test-prompt",
+          localConfigData: localConfigData as any,
+          localVersion: 1,
+          projectId,
+          organizationId,
+          commitMessage: "Switch to the cheaper model",
+        });
+
+        expect(updateSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              commitMessage: "Switch to the cheaper model",
+            }),
+          }),
+        );
+      });
+    });
+
     describe("when prompt does not exist and is created", () => {
       it("does not double-transform camelCase params through transformToDbFormat", async () => {
         vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(

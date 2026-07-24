@@ -306,6 +306,44 @@ describe("VersionHistoryListPopover", () => {
     });
   });
 
+  describe("commit message of a version", () => {
+    const openPopover = async () => {
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+      await waitFor(() => {
+        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+      });
+    };
+
+    describe("given the commit message is long", () => {
+      describe("when displaying the version history", () => {
+        /** @scenario "A long commit message is shown in full" */
+        it("renders the full message text", async () => {
+          const longMessage =
+            "Lowered temperature to reduce hallucination rate on the summarizer step, per eval run #82, and switched to the mini model to cut latency";
+
+          mockUseQuery.mockReturnValue({
+            data: [
+              {
+                id: "config-1",
+                versionId: "version-1",
+                version: 1,
+                commitMessage: longMessage,
+                author: { name: "User 1" },
+              },
+            ] as unknown as VersionedPrompt[],
+            isLoading: false,
+          });
+
+          renderWithChakra(<VersionHistoryListPopover configId="config-1" />);
+          await openPopover();
+
+          expect(screen.getByText(longMessage)).toBeInTheDocument();
+        });
+      });
+    });
+  });
+
   describe("author of a version", () => {
     const openPopover = async () => {
       const historyButton = screen.getAllByTestId("version-history-button")[0]!;
