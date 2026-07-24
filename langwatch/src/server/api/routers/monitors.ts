@@ -17,6 +17,7 @@ import { enforceLicenseLimit } from "../../license-enforcement";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { currentVsPreviousDates } from "./analytics/common";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
@@ -131,10 +132,19 @@ export const monitorsRouter = createTRPCRouter({
       }));
       const endMs = Date.now();
       const currentStartMs = endMs - PERFORMANCE_PERIOD_MS;
+      // The previous window comes from the same helper the analytics page
+      // uses, so the trend comparison covers the exact same runs a user sees
+      // when they open the analytics page for this evaluation.
+      const { previousPeriodStartDate } = currentVsPreviousDates({
+        projectId: input.projectId,
+        startDate: currentStartMs,
+        endDate: endMs,
+        filters: {},
+      });
       return getApp().evaluations.performance.getPerformance({
         tenantId: input.projectId,
         monitors: performanceMonitors,
-        previousStartMs: currentStartMs - PERFORMANCE_PERIOD_MS,
+        previousStartMs: previousPeriodStartDate.getTime(),
         currentStartMs,
         endMs,
         timeZone: input.timeZone ?? "UTC",
