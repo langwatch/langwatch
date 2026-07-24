@@ -12,6 +12,7 @@ import {
   createAutomationsPipeline,
   type AutomationsPipelineDeps,
 } from "../pipeline";
+import { TRIGGER_MATCH_COALESCE_MAX_BATCH } from "../schemas/constants";
 
 const tenantId = createTenantId("project-1");
 
@@ -123,7 +124,50 @@ describe("automations pipeline", () => {
     });
   });
 
+  // ADR-066 pillar 2: recordTriggerMatch opts into append coalescing. This suite
+  // runs on the in-memory queue (redis: null), which processes one job at a time
+  // and does NOT coalesce — so the "N matches → fewer inserts" observable is
+  // proven end-to-end at the GroupQueue layer (groupQueue.integration.test.ts,
+  // scripts.integration.test.ts). Here we pin the adopter's opt-in and confirm
+  // the config leaves every match durably recorded and in FIFO order.
   describe("given several matches for one trigger", () => {
+    describe("when coalescing is configured on the producer", () => {
+      it("registers recordTriggerMatch with append coalescing enabled", () => {
+        const builtPipeline = createAutomationsPipeline(pipelineDeps());
+        const recordMatch = builtPipeline.commands.find(
+          (c) => c.name === "recordTriggerMatch",
+        );
+
+        expect(recordMatch?.options?.coalesceMaxBatch).toBe(
+          TRIGGER_MATCH_COALESCE_MAX_BATCH,
+        );
+        expect(recordMatch?.options?.serializeByAggregate).toBe(true);
+      });
+
+      it("records every match durably in FIFO order", async () => {
+        const processStore = new InMemoryProcessStore();
+        eventSourcing = new EventSourcing({ processStore, redis: null });
+        const pipeline = eventSourcing.register(
+          createAutomationsPipeline(pipelineDeps()),
+        );
+        const commands = mapCommands(pipeline.commands);
+
+        await commands.recordTriggerMatch(command("trace-1", 1_000));
+        await commands.recordTriggerMatch(command("trace-2", 2_000));
+        await commands.recordTriggerMatch(command("trace-3", 3_000));
+
+        const events = await eventSourcing
+          .getEventStore<AutomationEvent>()!
+          .getEvents("trigger-1", { tenantId }, "trigger");
+
+        expect(events.map((event) => event.idempotencyKey)).toEqual([
+          "trigger-1:trace-1:30000-0",
+          "trigger-1:trace-2:30000-0",
+          "trigger-1:trace-3:30000-0",
+        ]);
+      });
+    });
+
     describe("when commands and committed events are delivered", () => {
       it("keeps FIFO ordering through the trigger process", async () => {
         const processStore = new InMemoryProcessStore();

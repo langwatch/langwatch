@@ -119,6 +119,19 @@ const GROUP_QUEUE_CONFIG = {
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
 /**
+ * Default byte budget for a coalesced batch when a queue enables coalescing but
+ * supplies no `coalesceMaxBytes` resolver (ADR-066 pillar 2).
+ *
+ * 4 MiB keeps a coalesced multi-row append inside the ClickHouse async-insert
+ * flush budget, so producer-side coalescing collapses many tiny appends into one
+ * insert without ever assembling an insert large enough to stall the flush. It
+ * is generous enough that the fold/map batches that predate ADR-066 stay bounded
+ * by their count limit (`coalesceMaxBatch`) in practice, so their behaviour is
+ * unchanged — the byte bound only ever binds first for a genuinely large burst.
+ */
+export const DEFAULT_COALESCE_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
  * Decides whether a failed job attempt should be retried.
  *
  * Two non-retryable classes:
@@ -241,6 +254,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     delivery?: JobDelivery,
   ) => Promise<void>;
   private readonly coalesceMaxBatch?: (payload: Payload) => number | undefined;
+  private readonly coalesceMaxBytes?: (payload: Payload) => number | undefined;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly processingQueue: fastq.queueAsPromised<DispatchResult, void>;
   private readonly delay?: number;
@@ -283,6 +297,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       process,
       processBatch,
       coalesceMaxBatch,
+      coalesceMaxBytes,
       options: defOptions,
       delay,
       spanAttributes,
@@ -330,6 +345,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.process = process;
     this.processBatch = processBatch;
     this.coalesceMaxBatch = coalesceMaxBatch;
+    this.coalesceMaxBytes = coalesceMaxBytes;
     this.auditAdapter = auditAdapter;
     this.globalConcurrency =
       defOptions?.globalConcurrency ??
@@ -848,11 +864,21 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     let batchPayloads: Payload[] | null = null;
     let drainedSiblings: DrainedJob[] = [];
     if (maxBatch > 1 && this.processBatch) {
+      // Byte bound (ADR-066 pillar 2): the drain also stops before a job that
+      // would push the batch past maxBytes, counting the dispatched job's own
+      // stored size as the starting point. Whichever of the count/byte bound
+      // binds first wins; an oversized dispatched job (initialBytes already at
+      // or over the budget) drains no siblings and processes on its own.
+      const maxBytes =
+        this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
+      const initialBytes = Buffer.byteLength(jobDataJson);
       try {
         drainedSiblings = await this.scripts.drainGroupReady({
           groupId,
           nowMs: Date.now(),
           maxJobs: maxBatch - 1,
+          maxBytes,
+          initialBytes,
         });
       } catch (err) {
         this.logger.warn(
@@ -864,6 +890,38 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           "Failed to drain group siblings for coalescing — processing single job",
         );
         drainedSiblings = [];
+      }
+      // Mixed-command groups (ADR-066 pillar 2): with `serializeByAggregate` the
+      // group key namespace is shared across command types, so a drained sibling
+      // can belong to a DIFFERENT job than the dispatched one. Fold/map groups
+      // are single-`__jobName` by construction, so for them this is a no-op. Only
+      // coalesce siblings whose `__jobName` matches the dispatched job's; restage
+      // the rest untouched (via the same path a failed batch uses) so they run as
+      // their own dispatches — a payload is never handed to another job's handler.
+      //
+      // Read the dispatched job's name the SAME way as each sibling
+      // (`readJobRoutingMeta`, null when absent), so a queue that sets no
+      // `__jobName` at all (every job null) still matches and coalesces — rather
+      // than the `jobName` local, which defaults absent to "unknown" and would
+      // mismatch a sibling's null.
+      if (drainedSiblings.length > 0) {
+        const dispatchedJobName = readJobRoutingMeta(jobDataJson).jobName;
+        const matchingSiblings: DrainedJob[] = [];
+        const foreignSiblings: DrainedJob[] = [];
+        for (const sibling of drainedSiblings) {
+          const siblingJobName = readJobRoutingMeta(
+            sibling.jobDataJson,
+          ).jobName;
+          if (siblingJobName === dispatchedJobName) {
+            matchingSiblings.push(sibling);
+          } else {
+            foreignSiblings.push(sibling);
+          }
+        }
+        if (foreignSiblings.length > 0) {
+          await this.restageDrainedSiblings(groupId, foreignSiblings);
+        }
+        drainedSiblings = matchingSiblings;
       }
       if (drainedSiblings.length > 0) {
         try {

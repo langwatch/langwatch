@@ -1078,6 +1078,17 @@ return results
  * so no other worker can concurrently dequeue from this group. Used to coalesce
  * a backed-up group's queued events into a single fold load/apply/store cycle.
  *
+ * Two bounds, whichever binds first (ADR-066 pillar 2):
+ *   - count: at most maxJobs candidates are considered.
+ *   - bytes: the drain stops BEFORE taking a job that would push
+ *     initialBytes + (sum of taken jobs' stored sizes) past maxBytes, so a
+ *     coalesced batch stays inside the downstream append/flush budget. A job
+ *     too large to fit is LEFT in staging (it becomes its own later dispatch),
+ *     never dropped. maxBytes <= 0 disables the byte bound (count bound only,
+ *     the pre-ADR-066 behaviour). Sizes are the stored envelope's `#value`,
+ *     which is the append-shaped quantity — for the small inline appends this
+ *     targets it equals the payload size.
+ *
  * Mirrors the per-job bookkeeping DISPATCH does for the jobs it removes:
  * ZREM from the jobs zset, HDEL the job data, and DECR total-pending. It does
  * NOT mark anything active and does NOT re-score ready — the caller's active
@@ -1088,23 +1099,42 @@ local jobsKey         = KEYS[1]
 local dataKey         = KEYS[2]
 local totalPendingKey = KEYS[3]
 
-local nowMs   = tonumber(ARGV[1])
-local maxJobs = tonumber(ARGV[2])
+local nowMs        = tonumber(ARGV[1])
+local maxJobs      = tonumber(ARGV[2])
+local maxBytes     = tonumber(ARGV[3]) or 0
+local initialBytes = tonumber(ARGV[4]) or 0
 
 local results = {}
 if maxJobs <= 0 then
   return results
 end
 
+-- Peek candidates in score order. HGET happens before the byte check so a job
+-- that would overflow the budget can be measured and then left in staging
+-- (we break rather than remove it), preserving score-ordered FIFO for the
+-- next dispatch.
 local entries = redis.call("ZRANGEBYSCORE", jobsKey, "-inf", nowMs, "WITHSCORES", "LIMIT", 0, maxJobs)
+local accumulated = initialBytes
 local i = 1
 while i < #entries do
   local stagedJobId   = entries[i]
   local originalScore = entries[i + 1]
   i = i + 2
 
-  redis.call("ZREM", jobsKey, stagedJobId)
   local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+  local size = 0
+  if jobDataJson then
+    size = #jobDataJson
+  end
+
+  -- Byte bound: stop before the first job that would overflow the budget.
+  -- Ordering keeps the batch FIFO, so everything from here on stays staged.
+  if maxBytes > 0 and (accumulated + size) > maxBytes then
+    break
+  end
+  accumulated = accumulated + size
+
+  redis.call("ZREM", jobsKey, stagedJobId)
   redis.call("HDEL", dataKey, stagedJobId)
   redis.call("DECR", totalPendingKey)
 
@@ -1942,15 +1972,26 @@ export class GroupStagingScripts {
    * Drain up to maxJobs additional DUE jobs from a group's pending queue without
    * altering the group's active/ready state. Only safe while the caller holds
    * the group's active slot. Returns the drained jobs (may be empty).
+   *
+   * `maxBytes` caps the coalesced batch by the summed stored size of the jobs
+   * taken, counting `initialBytes` (the dispatched job's own stored size) toward
+   * the budget; the drain stops before a job that would overflow it, leaving that
+   * job in staging for its own later dispatch (ADR-066 pillar 2). `maxBytes <= 0`
+   * (the default) disables the byte bound, so callers that only want the count
+   * bound are unchanged.
    */
   async drainGroupReady({
     groupId,
     nowMs,
     maxJobs,
+    maxBytes = 0,
+    initialBytes = 0,
   }: {
     groupId: string;
     nowMs: number;
     maxJobs: number;
+    maxBytes?: number;
+    initialBytes?: number;
   }): Promise<DrainedJob[]> {
     if (maxJobs <= 0) return [];
 
@@ -1966,6 +2007,8 @@ export class GroupStagingScripts {
       totalPendingKey,
       String(nowMs),
       String(maxJobs),
+      String(maxBytes),
+      String(initialBytes),
     );
 
     if (!result || !Array.isArray(result) || result.length < 3) {

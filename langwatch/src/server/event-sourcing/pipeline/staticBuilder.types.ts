@@ -41,6 +41,20 @@ export interface CommandHandlerOptions<Payload = any> {
   getGroupKey?: (payload: Payload) => string;
   /** Share one command queue group per tenant and aggregate across command types. */
   serializeByAggregate?: boolean;
+  /**
+   * Coalesce this producer's appends into one multi-row insert (ADR-066 pillar
+   * 2). Set the max same-command jobs (including the dispatched one) to fold per
+   * batch when one aggregate can mint events faster than they drain (a hot
+   * trigger recording every match). Leave unset for a low-fan-in producer that
+   * appends at most one event per human action — it appends immediately.
+   */
+  coalesceMaxBatch?: number;
+  /**
+   * Optional byte cap for a coalesced batch (ADR-066 pillar 2); the drain stops
+   * before a job that would overflow it. Unset uses the GroupQueue default. Only
+   * consulted when `coalesceMaxBatch` enables coalescing.
+   */
+  coalesceMaxBytes?: number;
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;

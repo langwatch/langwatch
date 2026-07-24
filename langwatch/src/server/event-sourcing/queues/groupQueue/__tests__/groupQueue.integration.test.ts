@@ -767,6 +767,153 @@ describe.skipIf(!hasTestcontainers)(
           );
         });
       });
+
+      // ADR-066 pillar 2: the drain is bounded by bytes as well as count. These
+      // exercise the byte budget end-to-end through the GroupQueueProcessor. Byte
+      // math is asserted at the Lua level in scripts.integration.test.ts; here we
+      // only need the observable: a burst that the count bound alone would fold
+      // whole is split by the byte bound, and nothing is lost.
+      describe("when a byte budget bounds the batch", () => {
+        /** @scenario 'a batch is bounded by size as well as count' */
+        it("splits a burst at the byte budget and loses nothing", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const bulk = "x".repeat(500);
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 50,
+              coalesceMaxBytes: () => 1500,
+              score: (p) => Number((p.id as string).slice(1)),
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 6 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: bulk,
+            })),
+          );
+
+          await vi.waitFor(
+            () => {
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              expect(total).toBe(6);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // The byte bound bit: the whole burst never collapsed into one batch,
+          // even though the count bound alone (50) would have folded all six.
+          const maxBatch =
+            batches.length > 0
+              ? Math.max(...batches.map((b) => b.length))
+              : 0;
+          expect(maxBatch).toBeLessThan(6);
+          // Every event processed exactly once — the remainder became later batches.
+          const allIds = [...batches.flat(), ...singles].map((p) => p.id);
+          expect(new Set(allIds).size).toBe(6);
+        });
+
+        /** @scenario 'a single oversized item is appended on its own' */
+        it("processes an oversized job on its own, coalescing nothing", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const bulk = "x".repeat(500);
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 50,
+              // Smaller than any single job's stored size, so every dispatch's
+              // own initialBytes already exceeds the budget.
+              coalesceMaxBytes: () => 50,
+              score: (p) => Number((p.id as string).slice(1)),
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch(
+            Array.from({ length: 4 }, (_, i) => ({
+              id: `j${i}`,
+              groupId: "group-a",
+              value: bulk,
+            })),
+          );
+
+          await vi.waitFor(
+            () => {
+              expect(singles.length).toBe(4);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+          // No siblings are ever folded, so the batch handler is never called.
+          expect(batches.length).toBe(0);
+        });
+      });
+
+      // ADR-066 pillar 2: serialized commands share a group across command types,
+      // so a drained sibling can belong to a DIFFERENT __jobName. A coalesced
+      // batch must never mix job names; foreign siblings are restaged, not folded.
+      describe("when a group mixes __jobName (serialized commands)", () => {
+        /** @scenario 'coalescing preserves every item' */
+        it("never mixes __jobName within a batch and restages foreign siblings", async () => {
+          const batches: TestPayload[][] = [];
+          const singles: TestPayload[] = [];
+          const queue = createQueue(
+            async (p) => {
+              singles.push(p);
+            },
+            {
+              processBatch: async (ps) => {
+                batches.push(ps as TestPayload[]);
+              },
+              coalesceMaxBatch: () => 50,
+              score: (p) => Number((p.id as string).slice(1)),
+            },
+          );
+          await queue.waitUntilReady();
+
+          await queue.sendBatch([
+            { id: "j0", groupId: "group-a", value: "a", __jobName: "cmdA" },
+            { id: "j1", groupId: "group-a", value: "b", __jobName: "cmdB" },
+            { id: "j2", groupId: "group-a", value: "a", __jobName: "cmdA" },
+          ] as unknown as TestPayload[]);
+
+          await vi.waitFor(
+            () => {
+              const total =
+                batches.reduce((n, b) => n + b.length, 0) + singles.length;
+              expect(total).toBe(3);
+            },
+            { timeout: 30000, interval: 50 },
+          );
+
+          // The invariant: no coalesced batch ever contains two distinct job names.
+          for (const batch of batches) {
+            const names = new Set(
+              batch.map((p) => (p as Record<string, unknown>).__jobName),
+            );
+            expect(names.size).toBe(1);
+          }
+          // Every job processed exactly once — the foreign sibling was restaged,
+          // not lost.
+          const allIds = [...batches.flat(), ...singles].map((p) => p.id);
+          expect(new Set(allIds).size).toBe(3);
+        });
+      });
     });
   },
 );

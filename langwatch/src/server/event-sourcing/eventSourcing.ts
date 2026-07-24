@@ -509,6 +509,12 @@ export class EventSourcing {
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBatch ?? 1;
       },
+      coalesceMaxBytes: (payload: Record<string, unknown>) => {
+        // Resolve the same way as coalesceMaxBatch: per-job via routing meta.
+        // undefined falls back to the GroupQueue's DEFAULT_COALESCE_MAX_BYTES.
+        const result = this.lookupEntry(payload);
+        return result?.entry.coalesceMaxBytes;
+      },
       processBatch: async (payloads: Record<string, unknown>[]) => {
         if (payloads.length === 0) return;
         // A coalesced batch is always one group → one registry entry. Resolve

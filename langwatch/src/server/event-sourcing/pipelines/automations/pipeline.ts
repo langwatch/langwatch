@@ -40,7 +40,10 @@ import {
   pruneSchema,
   webhookDeliveryPruneWake,
 } from "./process-manager/webhookDeliveryPrune.process";
-import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "./schemas/constants";
+import {
+  TRIGGER_MATCH_COALESCE_MAX_BATCH,
+  TRIGGER_MATCH_RECORDED_EVENT_TYPE,
+} from "./schemas/constants";
 import type { AutomationEvent } from "./schemas/events";
 
 const logger = createLogger("langwatch:triggers:automations-pipeline");
@@ -92,6 +95,10 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
     .withAggregateType("trigger")
     .withCommand("recordTriggerMatch", RecordTriggerMatchCommand, {
       serializeByAggregate: true,
+      // ADR-066 pillar 2: a hot trigger appends one match per trace. Coalesce a
+      // backed-up trigger's matches into one multi-row insert instead of one
+      // tiny insert per match.
+      coalesceMaxBatch: TRIGGER_MATCH_COALESCE_MAX_BATCH,
     })
     .withProcessManager("triggerSettlement", (pm) =>
       pm
