@@ -1150,7 +1150,10 @@ export class PromptService {
         // Content differs - create new version
         const allDifferences = [
           ...(comparison.differences ?? []),
-          ...diffRuntimeParameters(params.parameters, existingPrompt.parameters),
+          ...diffRuntimeParameters({
+            localParameters: params.parameters,
+            remoteParameters: existingPrompt.parameters,
+          }),
         ];
         const updatedPrompt = await this.updatePrompt({
           idOrHandle: existingPrompt.id,

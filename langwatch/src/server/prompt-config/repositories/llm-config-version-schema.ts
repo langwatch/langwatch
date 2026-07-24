@@ -151,19 +151,36 @@ export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
 }
 
 /**
- * Per-key description of runtime parameters that differ between `a` and `b`,
- * in the same `a → b` direction as `runtimeParametersEqual`'s arguments.
+ * Per-key description of runtime parameters that differ between
+ * `localParameters` and `remoteParameters`, in the same direction as
+ * `runtimeParametersEqual`'s arguments. Canonicalizes nested values with
+ * `sortKeysDeep` (same as `runtimeParametersEqual`) so key reordering alone
+ * isn't reported as a change, and treats a key entirely missing from one
+ * side as distinct from that key being explicitly set to `undefined`.
  */
-export function diffRuntimeParameters(a: unknown, b: unknown): string[] {
-  const paramsA = (a ?? {}) as RuntimeParameters;
-  const paramsB = (b ?? {}) as RuntimeParameters;
+export function diffRuntimeParameters({
+  localParameters,
+  remoteParameters,
+}: {
+  localParameters: unknown;
+  remoteParameters: unknown;
+}): string[] {
+  const paramsA = (localParameters ?? {}) as RuntimeParameters;
+  const paramsB = (remoteParameters ?? {}) as RuntimeParameters;
   const keys = new Set([...Object.keys(paramsA), ...Object.keys(paramsB)]);
 
   const differences: string[] = [];
   for (const key of keys) {
-    if (JSON.stringify(paramsA[key]) !== JSON.stringify(paramsB[key])) {
+    const hasA = key in paramsA;
+    const hasB = key in paramsB;
+    const equal =
+      hasA === hasB &&
+      JSON.stringify(sortKeysDeep(paramsA[key])) ===
+        JSON.stringify(sortKeysDeep(paramsB[key]));
+
+    if (!equal) {
       differences.push(
-        `${key}: ${JSON.stringify(paramsA[key])} → ${JSON.stringify(paramsB[key])}`,
+        `${key}: ${hasA ? JSON.stringify(paramsA[key]) : "undefined"} → ${hasB ? JSON.stringify(paramsB[key]) : "undefined"}`,
       );
     }
   }
