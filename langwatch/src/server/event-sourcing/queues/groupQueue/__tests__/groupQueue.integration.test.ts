@@ -9,6 +9,7 @@ import {
   vi,
 } from "vitest";
 import type { Redis } from "ioredis";
+import { register } from "prom-client";
 import {
   startTestContainers,
   stopTestContainers,
@@ -16,6 +17,15 @@ import {
 } from "../../../__tests__/integration/testContainers";
 import { GroupQueueProcessor } from "../groupQueue";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
+
+async function foreignSiblingsRestagedCount(queueName: string): Promise<number> {
+  const metric = await register
+    .getSingleMetric("gq_foreign_siblings_restaged_total")
+    ?.get();
+  return (
+    metric?.values.find((v) => v.labels.queue_name === queueName)?.value ?? 0
+  );
+}
 
 // Skip when running without testcontainers (unit-only test runs)
 const hasTestcontainers = !!(
@@ -877,11 +887,13 @@ describe.skipIf(!hasTestcontainers)(
         it("never mixes __jobName within a batch and restages foreign siblings", async () => {
           const batches: TestPayload[][] = [];
           const singles: TestPayload[] = [];
+          const queueName = `{test/gq/mixed-${crypto.randomUUID().slice(0, 8)}}`;
           const queue = createQueue(
             async (p) => {
               singles.push(p);
             },
             {
+              name: queueName,
               processBatch: async (ps) => {
                 batches.push(ps as TestPayload[]);
               },
@@ -890,6 +902,9 @@ describe.skipIf(!hasTestcontainers)(
             },
           );
           await queue.waitUntilReady();
+
+          const foreignRestagedBefore =
+            await foreignSiblingsRestagedCount(queueName);
 
           await queue.sendBatch([
             { id: "j0", groupId: "group-a", value: "a", __jobName: "cmdA" },
@@ -932,6 +947,13 @@ describe.skipIf(!hasTestcontainers)(
           // not lost.
           const allIds = [...batches.flat(), ...singles].map((p) => p.id);
           expect(new Set(allIds).size).toBe(3);
+
+          // The mixed-command restage is counted distinctly from the
+          // batch-failure restage paths (ADR-066 pillar 2): exactly the one
+          // foreign cmdB sibling was recorded against this queue.
+          expect(await foreignSiblingsRestagedCount(queueName)).toBe(
+            foreignRestagedBefore + 1,
+          );
         });
       });
     });

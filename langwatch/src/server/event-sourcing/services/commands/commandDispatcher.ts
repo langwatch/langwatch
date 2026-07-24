@@ -15,7 +15,10 @@ import type { TenantId } from "../../domain/tenantId";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
-import type { KillSwitchOptions } from "../../pipeline/staticBuilder.types";
+import type {
+  CommandSerializationOptions,
+  KillSwitchOptions,
+} from "../../pipeline/staticBuilder.types";
 import type { DeduplicationStrategy } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import { EventUtils } from "../../utils/event.utils";
@@ -226,6 +229,185 @@ export interface ProcessCommandBatchParams<EventType extends Event>
 }
 
 /**
+ * Attempted-command counter shared with {@link processCommandBatch}'s catch
+ * block. Held in a mutable ref so a mid-loop throw still exposes the partial
+ * count for the failure metrics.
+ */
+interface BatchProgress {
+  attempted: number;
+}
+
+/**
+ * Schema-validate every payload up front (Phase 1). A failure throws (like the
+ * single path), failing the whole batch; downstream idempotency keys make the
+ * batch's retry safe.
+ */
+function validateBatchPayloads<EventType extends Event>(
+  params: ProcessCommandBatchParams<EventType>,
+): any[] {
+  const { payloads, commandSchema, commandType } = params;
+  return payloads.map((payload) => {
+    const validation = commandSchema.validate(payload);
+    if (!validation.success) {
+      throw new ValidationError(
+        `Invalid payload for command type "${commandType}". Validation failed.`,
+        "payload",
+        undefined,
+        {
+          commandType,
+          zodIssues: mapZodIssuesToLogContext(validation.error.issues),
+        },
+      );
+    }
+    return validation.data;
+  });
+}
+
+/**
+ * Resolve the single tenant for the batch, enforcing the defensive invariant
+ * that a coalesced batch comes from ONE tenant-scoped group. A mismatch is an
+ * upstream routing bug — fail loudly rather than write cross-tenant events
+ * under one tenant's insert.
+ */
+function resolveBatchTenantId(args: {
+  validatedPayloads: any[];
+  commandType: CommandType;
+}): TenantId {
+  const { validatedPayloads, commandType } = args;
+  const tenantId = createTenantId(String(validatedPayloads[0]!.tenantId));
+  for (const validated of validatedPayloads) {
+    if (createTenantId(String(validated.tenantId)) !== tenantId) {
+      throw new ValidationError(
+        `Coalesced batch for command type "${commandType}" mixes tenants. All payloads in one group share a tenant.`,
+        "tenantId",
+        undefined,
+        { commandType },
+      );
+    }
+  }
+  return tenantId;
+}
+
+/**
+ * Kill-switch-check, handle, and collect events for every validated payload in
+ * dispatch order. `progress.attempted` counts non-kill-switched payloads so the
+ * caller's metrics (and its catch block) see the count even on a mid-loop throw.
+ */
+async function handleBatchCommands<EventType extends Event>(args: {
+  params: ProcessCommandBatchParams<EventType>;
+  validatedPayloads: any[];
+  progress: BatchProgress;
+}): Promise<{ handledCommands: Command<any>[]; allEvents: EventType[] }> {
+  const { params, validatedPayloads, progress } = args;
+  const {
+    getAggregateId,
+    handler,
+    commandType,
+    aggregateType,
+    commandName,
+    featureFlagService,
+    killSwitchOptions,
+    logger: log,
+  } = params;
+
+  const handledCommands: Command<any>[] = [];
+  const allEvents: EventType[] = [];
+  for (const validated of validatedPayloads) {
+    const payloadTenantId = createTenantId(String(validated.tenantId));
+    const aggregateId = getAggregateId(validated);
+
+    const disabled = await isComponentDisabled({
+      featureFlagService,
+      aggregateType,
+      componentType: "command",
+      componentName: commandName,
+      tenantId: payloadTenantId,
+      customKey: killSwitchOptions?.customKey,
+      logger: log,
+    });
+    if (disabled) {
+      // Mirror the single path's silent return: no events, no metrics — but
+      // the rest of the batch still runs.
+      continue;
+    }
+
+    progress.attempted++;
+    const command = createCommand(
+      payloadTenantId,
+      aggregateId,
+      commandType,
+      validated,
+    );
+    const events = await handler.handle(command);
+    validateHandlerEvents(events, commandType);
+    handledCommands.push(command);
+    for (const event of events) {
+      allEvents.push(event);
+    }
+  }
+
+  return { handledCommands, allEvents };
+}
+
+/**
+ * Persist the batch in ONE multi-row append, then run each handled command's
+ * best-effort post-store cleanup (ADR-022). An empty event set skips the store.
+ * A cleanup failure is logged and swallowed — it must never roll back durable
+ * events.
+ */
+async function persistBatch<EventType extends Event>(args: {
+  params: ProcessCommandBatchParams<EventType>;
+  tenantId: TenantId;
+  allEvents: EventType[];
+  handledCommands: Command<any>[];
+}): Promise<void> {
+  const { params, tenantId, allEvents, handledCommands } = args;
+  const { handler, storeEventsFn, commandType, logger: log } = params;
+
+  if (allEvents.length === 0) {
+    return;
+  }
+
+  await storeEventsFn(allEvents, { tenantId });
+  if (handler.cleanupAfterStore) {
+    for (const command of handledCommands) {
+      try {
+        await handler.cleanupAfterStore(command);
+      } catch (err) {
+        log?.warn(
+          {
+            error: err instanceof Error ? err.message : String(err),
+            commandType,
+          },
+          "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Emit one counter increment and one duration sample per attempted command,
+ * keeping counter and histogram 1:1 with the single path. The whole-batch time
+ * is amortised across attempts so each sample carries a per-command time rather
+ * than N-commands of it.
+ */
+function emitBatchMetrics<EventType extends Event>(args: {
+  params: ProcessCommandBatchParams<EventType>;
+  outcome: "completed" | "failed";
+  attempted: number;
+  durationMs: number;
+}): void {
+  const { params, outcome, attempted, durationMs } = args;
+  const { pipelineName, commandType } = params;
+  const perCommandMs = attempted > 0 ? durationMs / attempted : 0;
+  for (let i = 0; i < attempted; i++) {
+    incrementEsCommandTotal(pipelineName, commandType, outcome);
+    observeEsCommandDuration(pipelineName, commandType, perCommandMs);
+  }
+}
+
+/**
  * Batched sibling of {@link processCommand} (ADR-066 pillar 2).
  *
  * The GroupQueue drains a hot aggregate's queued same-command jobs and hands
@@ -255,141 +437,38 @@ export interface ProcessCommandBatchParams<EventType extends Event>
 export async function processCommandBatch<EventType extends Event>(
   params: ProcessCommandBatchParams<EventType>,
 ): Promise<void> {
-  const {
-    payloads,
-    commandType,
-    commandSchema,
-    handler,
-    getAggregateId,
-    storeEventsFn,
-    aggregateType,
-    commandName,
-    pipelineName,
-    featureFlagService,
-    killSwitchOptions,
-    logger: log,
-  } = params;
-
-  if (payloads.length === 0) {
+  if (params.payloads.length === 0) {
     return;
   }
 
-  // Phase 1 — schema-validate every payload up front. A failure throws (like the
-  // single path), failing the whole batch; downstream idempotency keys make the
-  // batch's retry safe.
-  const validatedPayloads = payloads.map((payload) => {
-    const validation = commandSchema.validate(payload);
-    if (!validation.success) {
-      throw new ValidationError(
-        `Invalid payload for command type "${commandType}". Validation failed.`,
-        "payload",
-        undefined,
-        {
-          commandType,
-          zodIssues: mapZodIssuesToLogContext(validation.error.issues),
-        },
-      );
-    }
-    return validation.data;
+  const validatedPayloads = validateBatchPayloads(params);
+  const tenantId = resolveBatchTenantId({
+    validatedPayloads,
+    commandType: params.commandType,
   });
 
-  // Defensive invariant: a coalesced batch comes from ONE group, which is
-  // tenant-scoped, so every payload must share a tenant. A mismatch is a routing
-  // bug upstream — fail loudly rather than write cross-tenant events under one
-  // tenant's insert.
-  const tenantId = createTenantId(String(validatedPayloads[0]!.tenantId));
-  for (const validated of validatedPayloads) {
-    if (createTenantId(String(validated.tenantId)) !== tenantId) {
-      throw new ValidationError(
-        `Coalesced batch for command type "${commandType}" mixes tenants. All payloads in one group share a tenant.`,
-        "tenantId",
-        undefined,
-        { commandType },
-      );
-    }
-  }
-
   const batchStartTime = performance.now();
-  // Commands whose handler ran and validated — cleanup runs per one of these.
-  const handledCommands: Command<any>[] = [];
-  const allEvents: EventType[] = [];
-  // Non-kill-switched payloads attempted this batch. Both metrics count this,
-  // mirroring the single path where a kill-switched return emits nothing.
-  let attempted = 0;
+  const progress: BatchProgress = { attempted: 0 };
   try {
-    for (const validated of validatedPayloads) {
-      const payloadTenantId = createTenantId(String(validated.tenantId));
-      const aggregateId = getAggregateId(validated);
-
-      const disabled = await isComponentDisabled({
-        featureFlagService,
-        aggregateType,
-        componentType: "command",
-        componentName: commandName,
-        tenantId: payloadTenantId,
-        customKey: killSwitchOptions?.customKey,
-        logger: log,
-      });
-      if (disabled) {
-        // Mirror the single path's silent return: no events, no metrics — but
-        // the rest of the batch still runs.
-        continue;
-      }
-
-      attempted++;
-      const command = createCommand(
-        payloadTenantId,
-        aggregateId,
-        commandType,
-        validated,
-      );
-      const events = await handler.handle(command);
-      validateHandlerEvents(events, commandType);
-      handledCommands.push(command);
-      for (const event of events) {
-        allEvents.push(event);
-      }
-    }
-
-    if (allEvents.length > 0) {
-      // ONE multi-row append for the whole batch (ADR-066 pillar 2).
-      await storeEventsFn(allEvents, { tenantId });
-      // ADR-022 post-store cleanup, per handled command, best-effort — a cleanup
-      // failure must never roll back durable events.
-      if (handler.cleanupAfterStore) {
-        for (const command of handledCommands) {
-          try {
-            await handler.cleanupAfterStore(command);
-          } catch (err) {
-            log?.warn(
-              {
-                error: err instanceof Error ? err.message : String(err),
-                commandType,
-              },
-              "Post-store cleanup failed (best-effort) — event is durable, cleanup skipped",
-            );
-          }
-        }
-      }
-    }
-
-    const durationMs = performance.now() - batchStartTime;
-    // Keep counter and histogram 1:1 like the single path: one duration sample
-    // per attempted command. The whole-batch time is amortised across them so
-    // the histogram's sample count matches the counter and each sample carries a
-    // per-command time rather than N-commands of it.
-    const perCommandMs = attempted > 0 ? durationMs / attempted : 0;
-    for (let i = 0; i < attempted; i++) {
-      incrementEsCommandTotal(pipelineName, commandType, "completed");
-      observeEsCommandDuration(pipelineName, commandType, perCommandMs);
-    }
+    const { handledCommands, allEvents } = await handleBatchCommands({
+      params,
+      validatedPayloads,
+      progress,
+    });
+    await persistBatch({ params, tenantId, allEvents, handledCommands });
+    emitBatchMetrics({
+      params,
+      outcome: "completed",
+      attempted: progress.attempted,
+      durationMs: performance.now() - batchStartTime,
+    });
   } catch (error) {
-    const durationMs = performance.now() - batchStartTime;
-    const perCommandMs = attempted > 0 ? durationMs / attempted : 0;
-    for (let i = 0; i < attempted; i++) {
-      incrementEsCommandTotal(pipelineName, commandType, "failed");
-      observeEsCommandDuration(pipelineName, commandType, perCommandMs);
-    }
+    emitBatchMetrics({
+      params,
+      outcome: "failed",
+      attempted: progress.attempted,
+      durationMs: performance.now() - batchStartTime,
+    });
     throw error;
   }
 }
@@ -397,33 +476,10 @@ export async function processCommandBatch<EventType extends Event>(
 /**
  * Options for configuring a command handler.
  */
-export interface CommandHandlerOptions<Payload> {
+export interface CommandHandlerOptions<Payload>
+  extends CommandSerializationOptions {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
-  /**
-   * Serialize this command with every other command that enables the option
-   * for the same tenant and aggregate. This keeps command handling, event
-   * append, and projection staging atomic with respect to the next command
-   * for that aggregate while allowing other aggregates to run concurrently.
-   */
-  serializeByAggregate?: boolean;
-  /**
-   * Coalesce this producer's appends (ADR-066 pillar 2). When one aggregate can
-   * mint events faster than they drain — a hot trigger recording every match —
-   * set the max number of same-command jobs (including the dispatched one) to
-   * fold into a single multi-row insert. Leave unset (or ≤ 1) for a low-fan-in
-   * producer where one aggregate appends at most one event per human action:
-   * those append immediately, with the per-job path unchanged.
-   */
-  coalesceMaxBatch?: number;
-  /**
-   * Optional byte cap for a coalesced batch (ADR-066 pillar 2). The drain stops
-   * before a job that would push the batch past this size, keeping one insert
-   * inside the downstream flush budget; a job too large to fit becomes its own
-   * dispatch. Unset falls back to the GroupQueue default. Only consulted when
-   * `coalesceMaxBatch` enables coalescing.
-   */
-  coalesceMaxBytes?: number;
   delay?: number;
   deduplication?: DeduplicationStrategy<Payload>;
   concurrency?: number;

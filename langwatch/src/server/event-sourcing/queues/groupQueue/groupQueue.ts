@@ -56,6 +56,7 @@ import {
 import {
   gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
+  gqForeignSiblingsRestagedTotal,
   gqGroupsPoisonParkedTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
@@ -919,6 +920,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           }
         }
         if (foreignSiblings.length > 0) {
+          gqForeignSiblingsRestagedTotal.inc(
+            { queue_name: this.queueName },
+            foreignSiblings.length,
+          );
           await this.restageDrainedSiblings(groupId, foreignSiblings);
         }
         drainedSiblings = matchingSiblings;

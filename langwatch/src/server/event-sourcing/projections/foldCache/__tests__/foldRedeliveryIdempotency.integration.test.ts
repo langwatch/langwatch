@@ -636,7 +636,10 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
         const evict = setInterval(() => {
           void redis
             .keys("fold:it_cache_lost_watermark:*")
-            .then((keys) => (keys.length > 0 ? redis.del(...keys) : 0));
+            .then((keys) => (keys.length > 0 ? redis.del(...keys) : 0))
+            // A transient redis hiccup mid-eviction must not surface as an
+            // unhandled rejection and flake the run; the next tick retries.
+            .catch(() => {});
         }, 20);
 
         try {

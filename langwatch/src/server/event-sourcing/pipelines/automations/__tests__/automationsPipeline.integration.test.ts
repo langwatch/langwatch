@@ -7,6 +7,10 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../__tests__/integration/testContainers";
+import {
+  cleanupTestDataForTenant,
+  getTenantIdString,
+} from "../../../__tests__/integration/testHelpers";
 import { createTenantId } from "../../../domain/tenantId";
 import { EventSourcing } from "../../../eventSourcing";
 import { mapCommands } from "../../../mapCommands";
@@ -262,7 +266,11 @@ describe.skipIf(!hasRedis)(
     });
 
     afterEach(async () => {
-      await redis.flushall();
+      // Tenant-scoped cleanup, not redis.flushall(): flushall bypasses tenant
+      // isolation and races other parallel suites on the shared test redis. The
+      // GroupQueue's own keys are torn down by eventSourcing.close() in the test
+      // body's finally; this drops any per-tenant rows left behind.
+      await cleanupTestDataForTenant(getTenantIdString(tenantId));
     });
 
     describe("given several matches for one trigger staged as a batch", () => {
