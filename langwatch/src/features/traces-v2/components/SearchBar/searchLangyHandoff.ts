@@ -1,4 +1,4 @@
-import { filterContextChip } from "~/features/langy/hooks/useLangyFilterContext";
+import { filterContextChip } from "~/features/langy/logic/filterContextChip";
 import type { LangyAttachedContext } from "~/features/langy/stores/langyStore";
 
 /**

@@ -201,8 +201,9 @@ function parseReasons(value: unknown): LangySerializedReason[] | undefined {
 
 /**
  * Parse a chat-stream error part. The stream now carries the serialized domain
- * error as a JSON string (see `serializeStreamError` in routes/langy.ts);
- * returns null for a plain-string legacy error so the caller can fall back.
+ * error as a JSON string (see `serializeLangyTurnError` in
+ * app-layer/langy/execution/langy-turn-errors.ts); returns null for a
+ * plain-string legacy error so the caller can fall back.
  */
 export function readLangyStreamError(
   message: string | undefined | null,

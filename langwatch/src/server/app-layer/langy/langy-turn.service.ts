@@ -1,12 +1,13 @@
 /**
- * LangyTurnService — durable turn admission and dispatch orchestration, lifted out of
- * `routes/langy.ts` (ADR-046 / LANGY_REWORK_PLAN.md S2 increment C).
+ * LangyTurnService — durable turn admission and dispatch orchestration, driven by
+ * the tRPC turn-start mutations in `api/routers/langy.ts` (ADR-046 /
+ * LANGY_REWORK_PLAN.md S2 increment C).
  *
- * The Hono route now keeps only Phase 1 (session auth, demo gate, rate limit,
- * body validation, project-permission gate) and maps DomainErrors to HTTP. This
- * service owns everything after the gate: resolve the conversation, model,
- * credentials and egress list; probe-then-mint the per-turn session key; reserve
- * the PR permit; guard against a concurrent turn; stash the
+ * The router keeps only Phase 1 (session auth, demo gate, rate limit, input
+ * validation, project-permission gate) and maps DomainErrors to coded tRPC
+ * errors. This service owns everything after the gate: resolve the conversation,
+ * model, credentials and egress list; probe-then-mint the per-turn session key;
+ * reserve the PR permit; guard against a concurrent turn; stash the
  * live-access grant + the worker handoff; and atomically accept the turn. Once
  * accepted, a direct dispatch starts the worker immediately while the process
  * outbox remains the at-least-once recovery path.
@@ -16,8 +17,8 @@
  * deliberate. Independent reads and transient Redis writes overlap so they do
  * not add avoidable serial latency to the command path.
  *
- * Errors are thrown as DomainErrors (each carries its httpStatus); the route
- * renders them. Infrastructure failures throw and surface generically.
+ * Errors are thrown as DomainErrors (each carries its httpStatus); the router
+ * maps them. Infrastructure failures throw and surface generically.
  */
 
 import { createHash } from "node:crypto";
@@ -168,7 +169,7 @@ export interface StartConversationTurnInput {
   modelOverride?: string;
   /** A regenerate re-drives the last turn against the message already on record. */
   isRetry: boolean;
-  /** Composer context chips (page context + skills), rendered into the system block. */
+  /** Composer context chips (page context), rendered into the system block. */
   turnContext: LangyTurnContext;
 }
 

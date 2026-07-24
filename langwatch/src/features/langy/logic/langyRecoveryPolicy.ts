@@ -291,8 +291,8 @@ export function canAutoRecover({
 /**
  * Tool names that CHANGE something. Langy's catalog splits cleanly: reads are
  * `search_*` / `get_*` / `list_*`, writes are `create_*` / `update_*` /
- * `delete_*` / `run_*` (see the system block in `routes/langy.ts`), plus the
- * GitHub PR path and the raw file/shell tools opencode exposes.
+ * `delete_*` / `run_*`, plus the GitHub PR path and the raw file/shell tools
+ * opencode exposes.
  */
 const MUTATING_TOOL_PREFIXES = [
   "create_",

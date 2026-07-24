@@ -231,7 +231,6 @@ describe("the scope reset's coverage", () => {
         langy().setModelOverride("openai/gpt-5-mini");
         langy().chooseChip("trace:abc123");
         langy().attachContext({ type: "trace", id: "abc123", label: "a trace" });
-        langy().addSkillChip({ id: "github", label: "GitHub" });
         langy().discardProposal("proposal-1");
         langy().markProposalApplying("proposal-2");
         langy().markProposalApplied("proposal-3", { href: "/somewhere" });

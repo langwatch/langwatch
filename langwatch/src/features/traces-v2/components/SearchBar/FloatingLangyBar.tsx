@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import type React from "react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { filterContextChip } from "~/features/langy/hooks/useLangyFilterContext";
+import { filterContextChip } from "~/features/langy/logic/filterContextChip";
 import { useFilterStore } from "../../stores/filterStore";
 import { AiPromptInput } from "../ai/AiPromptInput";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
