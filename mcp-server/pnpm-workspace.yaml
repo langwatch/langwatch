@@ -1,9 +1,10 @@
 # Standalone workspace: mcp-server is installed on its own in CI, the
-# release workflow, and its Dockerfile. The handled-error contract package is
-# consumed as a source-only workspace dep (bundled by tsup for publish).
+# release workflow, and its Dockerfile. Shared source-only contract packages
+# are bundled by tsup for publish.
 packages:
   - .
   - ../packages/handled-error
+  - ../langwatch/packages/ssrf
 
 minimumReleaseAge: 10080
 
