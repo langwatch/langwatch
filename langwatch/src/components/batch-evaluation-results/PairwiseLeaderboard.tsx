@@ -30,6 +30,13 @@ export type PairwiseLeaderboardProps = {
    * judge's reasoning for every row where `rowVariantId` beat `colVariantId`.
    */
   onCellClick?: (rowVariantId: string, colVariantId: string) => void;
+  /**
+   * Whether to render the sample-size / degenerate / convergence banners.
+   * The drawer turns these off because it states the same conditions once,
+   * up front, in its own trust step — repeating them here would train the
+   * reader to scroll past a warning they have already read.
+   */
+  showWarnings?: boolean;
 };
 
 type SortKey = "rank" | "score" | "winRate" | "matchups";
@@ -42,6 +49,7 @@ export function PairwiseLeaderboard({
   variantNames,
   warnThreshold = DEFAULT_WARN_THRESHOLD,
   onCellClick,
+  showWarnings = true,
 }: PairwiseLeaderboardProps) {
   const [sortKey, setSortKey] = useState<SortKey>("rank");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -87,7 +95,7 @@ export function PairwiseLeaderboard({
     }
   };
 
-  const lowSample = leaderboard.minMatchups < warnThreshold;
+  const lowSample = showWarnings && leaderboard.minMatchups < warnThreshold;
 
   return (
     <VStack
@@ -117,7 +125,7 @@ export function PairwiseLeaderboard({
         />
       ) : null}
 
-      {leaderboard.hasDegenerate ? (
+      {showWarnings && leaderboard.hasDegenerate ? (
         <WarnBanner
           tone="info"
           icon={LuTriangleAlert}
@@ -125,7 +133,7 @@ export function PairwiseLeaderboard({
         />
       ) : null}
 
-      {!leaderboard.didConverge ? (
+      {showWarnings && !leaderboard.didConverge ? (
         <WarnBanner
           tone="warning"
           icon={LuTriangleAlert}

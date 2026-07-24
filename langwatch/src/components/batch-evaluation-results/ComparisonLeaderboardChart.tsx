@@ -32,6 +32,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { buildPairwiseComparisons } from "./buildPairwiseComparisons";
 import { axisLabelProps, truncateLabel } from "./chartAxisLabels";
 import { computeBTLeaderboard } from "./computeBTLeaderboard";
+import { computeLeaderboardVerdict } from "./computeLeaderboardVerdict";
 import type { BatchComparisonColumn, BatchResultRow } from "./types";
 import { VARIANT_COLORS } from "./WinRateChart";
 
@@ -88,6 +89,23 @@ export function ComparisonLeaderboardChart({
 
   const yMax = Math.max(1, ...chartData.map((d) => Math.abs(d.score)));
 
+  // The conclusion, on the card itself. Bars alone leave the reader to
+  // eyeball whether the tallest one is meaningfully ahead, which is exactly
+  // the judgement the confidence intervals exist to make — and the tallest
+  // bar is frequently NOT a winner the run can defend.
+  const verdict = computeLeaderboardVerdict(leaderboard);
+  const verdictLabel = (() => {
+    const nameFor = (id: string) => nameById.get(id) ?? id;
+    if (verdict.kind === "no-signal") return null;
+    if (verdict.kind === "clear-winner") {
+      return { text: `Ship ${nameFor(verdict.leaderId!)}`, tone: "green.fg" };
+    }
+    return {
+      text: `Too close to call: ${verdict.tiedIds.map(nameFor).join(", ")}`,
+      tone: "orange.fg",
+    };
+  })();
+
   const onExpand = () => {
     // Passed straight through openDrawer (not a separate setComplexProps
     // call) — openDrawer's own updateDrawerUrl recomputes complexProps from
@@ -137,6 +155,18 @@ export function ComparisonLeaderboardChart({
           <LuMaximize2 size={12} />
         </IconButton>
       </HStack>
+      {verdictLabel ? (
+        <Text
+          fontSize="2xs"
+          fontWeight="semibold"
+          color={verdictLabel.tone}
+          lineClamp={1}
+          marginBottom={1}
+          title={verdictLabel.text}
+        >
+          {verdictLabel.text}
+        </Text>
+      ) : null}
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }}>
           <CartesianGrid
