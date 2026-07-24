@@ -1,7 +1,9 @@
+import { nanoid } from "nanoid";
+
 export function createTabId() {
-  return `tab-${crypto.randomUUID()}`;
+  return `tab-${nanoid()}`;
 }
 
 export function createWindowId() {
-  return `window-${crypto.randomUUID()}`;
+  return `window-${nanoid()}`;
 }
