@@ -57,10 +57,12 @@ import {
 } from "../pipelines/trace-processing/schemas/constants";
 
 /**
- * Test event type identifiers for integration tests.
- * These are minimal identifiers without full schemas - used only for validation.
+ * Test-only event type identifiers. Minimal brands without full schemas, used
+ * only to validate the pipeline in tests: `test.integration.event` for
+ * integration coverage, and `test.referenced` for the enqueue-staging seam's
+ * claim-check unit (a synthetic reference a `stage` hook returns).
  */
-const TEST_EVENT_TYPES = ["test.integration.event"] as const;
+const TEST_EVENT_TYPES = ["test.integration.event", "test.referenced"] as const;
 
 /**
  * All event type identifiers defined in schemas.
