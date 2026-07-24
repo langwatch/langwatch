@@ -12,7 +12,7 @@
 
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
 import { groupRunsByBatchId } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
@@ -32,7 +32,32 @@ type GroupRowProps = {
   cancellingJobId?: string | null;
 };
 
-export function GroupRow({
+/**
+ * Skips re-rendering a group whose own runs haven't changed — see the
+ * matching comparator in RunRow.tsx for why this matters.
+ */
+function arePropsEqual(prev: GroupRowProps, next: GroupRowProps): boolean {
+  if (
+    prev.isExpanded !== next.isExpanded ||
+    prev.viewMode !== next.viewMode ||
+    prev.cancellingJobId !== next.cancellingJobId ||
+    prev.group.groupKey !== next.group.groupKey ||
+    prev.group.groupLabel !== next.group.groupLabel ||
+    prev.group.timestamp !== next.group.timestamp
+  ) {
+    return false;
+  }
+
+  const prevRuns = prev.group.scenarioRuns;
+  const nextRuns = next.group.scenarioRuns;
+  if (prevRuns.length !== nextRuns.length) return false;
+  for (let i = 0; i < prevRuns.length; i++) {
+    if (prevRuns[i] !== nextRuns[i]) return false;
+  }
+  return true;
+}
+
+function GroupRowComponent({
   group,
   summary,
   isExpanded,
@@ -123,3 +148,5 @@ export function GroupRow({
     </Box>
   );
 }
+
+export const GroupRow = memo(GroupRowComponent, arePropsEqual);
