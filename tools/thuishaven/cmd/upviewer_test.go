@@ -8,7 +8,26 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
+
+// dashModel builds a viewer with the session dashboard wired to a fixed
+// snapshot and a restart spy — the shape both the up and play paths inject.
+func dashModel(t *testing.T, services []app.SessionServiceStatus, restart func(string) (string, error)) *viewerModel {
+	t.Helper()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	snap := app.SessionReport{
+		Found: true, Live: true, Slug: "feat-x", Branch: "feat/x",
+		Services: services,
+		Servers:  []app.SessionServer{{Name: "proxy", Up: true}, {Name: "daemon", Up: true}},
+	}
+	m.enableDashboard(sessionActions{
+		Snapshot: func() app.SessionReport { return snap },
+		Restart:  restart,
+	}, false)
+	return m
+}
 
 func key(s string) tea.KeyMsg {
 	switch s {
@@ -119,6 +138,131 @@ func TestFormatCombinedLine(t *testing.T) {
 	t.Run("a label-less provisioning line passes through", func(t *testing.T) {
 		if got := formatCombinedLine("  thuishaven: stack \"x\""); !strings.Contains(got, "thuishaven") {
 			t.Errorf("got %q, want the raw line kept", got)
+		}
+	})
+}
+
+// @scenario "The session dashboard is the first thing haven up shows"
+func TestSessionDashboardIsTabOne(t *testing.T) {
+	m := dashModel(t, []app.SessionServiceStatus{
+		{Name: "app", URL: "https://app.feat-x.langwatch.localhost", Up: true, Restartable: true},
+		{Name: "nlp", Restartable: true},
+	}, nil)
+
+	if m.groups[0] != sessionGroup {
+		t.Fatalf("first tab = %q, want the session dashboard", m.groups[0])
+	}
+	if !m.onDashboard() {
+		t.Fatal("haven up must open on the dashboard, not straight into a log tab")
+	}
+	view := m.View()
+	for _, want := range []string{"[##]", "safe harbour", "SERVICES", "app", "nlp", "SHARED"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("dashboard is missing %q\n%s", want, view)
+		}
+	}
+	t.Logf("\n%s", view) // eyeball the harbour + layout
+}
+
+// A viewer built without a session (the log-only paths, and every existing
+// test) has no dashboard tab and behaves exactly as before.
+// @scenario "The session dashboard is the first thing haven up shows"
+func TestNoDashboardWithoutASession(t *testing.T) {
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	if m.onDashboard() {
+		t.Error("a session-less viewer must not present a dashboard")
+	}
+	if m.groups[0] != viewerAllGroup {
+		t.Errorf("first tab = %q, want the combined log stream", m.groups[0])
+	}
+}
+
+// @scenario "Arrow keys move the cursor and open a service's logs"
+func TestDashboardOpensServiceLogs(t *testing.T) {
+	dir := t.TempDir()
+	line := time.Now().UTC().Format(time.RFC3339Nano) + " hi from app\n"
+	if err := os.WriteFile(filepath.Join(dir, "app.log"), []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	snap := app.SessionReport{Found: true, Services: []app.SessionServiceStatus{
+		{Name: "app", Restartable: true}, {Name: "nlp", Restartable: true},
+	}}
+	m.enableDashboard(sessionActions{Snapshot: func() app.SessionReport { return snap }}, false)
+	m.ingest() // discovers app's log group -> groups = [session all app]
+
+	m.handleKey("down")
+	if m.cursor != 1 {
+		t.Fatalf("down should move to the nlp row, cursor=%d", m.cursor)
+	}
+	m.handleKey("up")
+	if m.cursor != 0 {
+		t.Fatalf("up should return to the app row, cursor=%d", m.cursor)
+	}
+	m.handleKey("enter")
+	if m.groups[m.selected] != "app" {
+		t.Errorf("enter on app should open its log tab, landed on %q", m.groups[m.selected])
+	}
+}
+
+// enter on a service with no capture of its own falls back to the combined stream.
+// @scenario "Arrow keys move the cursor and open a service's logs"
+func TestDashboardEnterFallsBackToCombined(t *testing.T) {
+	m := dashModel(t, []app.SessionServiceStatus{{Name: "gateway", Restartable: true}}, nil)
+	m.handleKey("enter")
+	if m.groups[m.selected] != viewerAllGroup {
+		t.Errorf("enter on a captureless service should open the combined stream, landed on %q", m.groups[m.selected])
+	}
+}
+
+// @scenario "Restarting a service from the dashboard bounces just that one"
+func TestDashboardRestartDispatch(t *testing.T) {
+	t.Run("given a restartable service under the cursor", func(t *testing.T) {
+		var got []string
+		m := dashModel(t, []app.SessionServiceStatus{
+			{Name: "app", Restartable: true}, {Name: "gateway", Restartable: true},
+		}, func(name string) (string, error) { got = append(got, name); return "bounced " + name, nil })
+
+		m.handleKey("down") // cursor -> gateway
+		cmd := m.restartSelected()
+		if cmd == nil {
+			t.Fatal("restarting a restartable service must dispatch a command")
+		}
+		msg, ok := cmd().(restartDoneMsg)
+		if !ok || msg.err != nil {
+			t.Fatalf("want a clean restartDoneMsg, got %#v", msg)
+		}
+		if len(got) != 1 || got[0] != "gateway" {
+			t.Errorf("only gateway should be bounced, got %v", got)
+		}
+	})
+
+	t.Run("given a managed service under the cursor", func(t *testing.T) {
+		called := false
+		m := dashModel(t, []app.SessionServiceStatus{{Name: "clickhouse", Restartable: false}},
+			func(string) (string, error) { called = true; return "", nil })
+		if cmd := m.restartSelected(); cmd != nil {
+			t.Error("a non-restartable service must not dispatch a restart")
+		}
+		if called {
+			t.Error("the restart action must not be called for a managed service")
+		}
+		if m.toast == "" {
+			t.Error("the dashboard should explain why via a toast")
+		}
+	})
+
+	t.Run("when restarting all, an empty name bounces every child", func(t *testing.T) {
+		var got []string
+		m := dashModel(t, []app.SessionServiceStatus{{Name: "app", Restartable: true}},
+			func(name string) (string, error) { got = append(got, name); return "all bounced", nil })
+		cmd := m.restartAll()
+		if cmd == nil {
+			t.Fatal("restart-all must dispatch a command")
+		}
+		cmd()
+		if len(got) != 1 || got[0] != "" {
+			t.Errorf(`restart-all must pass the empty "all" name, got %v`, got)
 		}
 	})
 }

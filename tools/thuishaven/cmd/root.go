@@ -490,7 +490,7 @@ func runUpAttached(ctx context.Context, d deps, rest []string) error {
 	if err != nil {
 		return err
 	}
-	if err := runUpViewer(ctx, st.slug, preferredGroup(rest)); err != nil {
+	if err := runUpViewer(ctx, st.slug, preferredGroup(rest), d.sessionActions(st.slug)); err != nil {
 		return err
 	}
 	fmt.Printf("detached — stack %q keeps running in the background\n", st.slug)

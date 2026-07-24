@@ -54,28 +54,55 @@ func (o *Orchestrator) rebuildLangyImage(ctx context.Context, p UpParams, slug s
 }
 
 // RestartStack is Restart addressed by slug — what the hub (which acts on any
-// registered stack, not just the current worktree's) calls.
+// registered stack, not just the current worktree's) calls. It prints each
+// bounce; the interactive dashboard uses RestartStackQuiet instead.
 func (o *Orchestrator) RestartStack(ctx context.Context, slug, name string) error {
 	// The observability stack is shared, not a stack child — bounce it directly.
 	// It keeps no volume, so a restart is also how collected telemetry is reset.
 	if name == "obs" {
 		return o.restartObservability(ctx)
 	}
+	msgs, err := o.restartServices(slug, name)
+	for _, m := range msgs {
+		fmt.Printf("  %s\n", m)
+	}
+	return err
+}
+
+// RestartStackQuiet bounces a service like RestartStack but returns a one-line
+// summary instead of printing it. The attached session dashboard owns the
+// screen (bubbletea's alt-screen), so a stray write to stdout would corrupt the
+// render — the dashboard shows the summary as a toast instead. Observability is
+// not offered here: it is shared machinery, bounced from the CLI (`restart obs`).
+func (o *Orchestrator) RestartStackQuiet(slug, name string) (string, error) {
+	msgs, err := o.restartServices(slug, name)
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(msgs, " · "), nil
+}
+
+// restartServices SIGTERMs the process group of each supervised child the name
+// resolves to (all of them when name is empty) and lets the launcher's
+// supervisor bring it back — the crash-restart loop, triggered on purpose. It
+// returns one human line per child and never touches the launcher's own group.
+func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 	st, ok := o.stackBySlug(slug)
 	if !ok {
-		return fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
+		return nil, fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
 	}
 	if !o.sys.ProcessAlive(st.LauncherPID) {
-		return fmt.Errorf("stack %q is not running (its launcher is gone) — start it with `haven up`", slug)
+		return nil, fmt.Errorf("stack %q is not running (its launcher is gone) — start it with `haven up`", slug)
 	}
 	targets := restartTargets(st, name)
 	if len(targets) == 0 {
-		return fmt.Errorf("unknown service %q — restartable: %s", name, strings.Join(restartableNames(st), ", "))
+		return nil, fmt.Errorf("unknown service %q — restartable: %s", name, strings.Join(restartableNames(st), ", "))
 	}
+	var msgs []string
 	for _, t := range targets {
 		pids := o.sys.PIDsOnPort(t.Port)
 		if len(pids) == 0 {
-			fmt.Printf("  %-10s nothing listening on :%d — the supervisor will (re)start it on its own\n", t.Name, t.Port)
+			msgs = append(msgs, fmt.Sprintf("%-10s nothing on :%d, the supervisor will start it", t.Name, t.Port))
 			continue
 		}
 		for _, pid := range pids {
@@ -86,9 +113,9 @@ func (o *Orchestrator) RestartStack(ctx context.Context, slug, name string) erro
 			}
 			o.sys.TerminateGroup(pid)
 		}
-		fmt.Printf("  %-10s restarting (killed :%d — the supervisor brings it back)\n", t.Name, t.Port)
+		msgs = append(msgs, fmt.Sprintf("%-10s bounced :%d, the supervisor brings it back", t.Name, t.Port))
 	}
-	return nil
+	return msgs, nil
 }
 
 // restartTargets resolves which children to bounce. Only supervised children

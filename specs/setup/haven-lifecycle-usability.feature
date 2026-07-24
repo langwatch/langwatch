@@ -62,6 +62,40 @@ Feature: haven lifecycle usability
     Then arrow keys, tab, or a digit switch between "all" and each service's own log
     And the lines are coloured by service with warnings and errors highlighted
 
+  # Tab one of the attached view (haven up and haven play alike) is a live
+  # session dashboard, not a log stream: an ASCII harbour, the stack's status,
+  # and per-service actions. The log groups follow it. Behaviour is in
+  # app/session.go (the cheap live snapshot) and cmd/upviewer.go (the dashboard
+  # tab), bound by app/session_test.go and cmd/upviewer_test.go.
+  @unit
+  Scenario: The session dashboard is the first thing haven up shows
+    Given the attached view is open
+    Then tab one is a status dashboard, ahead of the "all" and per-service log tabs
+    And it shows the stack's liveness, RAM, and every service with an up/down dot
+    And a log-only view (no wired actions) still opens straight on "all"
+
+  @unit
+  Scenario: The dashboard reports every service and shared server
+    Then each routed service is listed in its CLI spelling, langy not langyagent
+    And a service this worktree runs itself is marked restartable
+    And a baseline fallback or shared database server is not
+    And the proxy, the daemon, and the managed databases are reported as shared machinery
+
+  @unit
+  Scenario: Arrow keys move the cursor and open a service's logs
+    Given the dashboard tab is showing
+    When the developer moves the cursor with the arrow keys and presses enter on a service
+    Then the view jumps to that service's own log tab
+    And a service with no capture of its own opens the combined "all" stream instead
+
+  @unit
+  Scenario: Restarting a service from the dashboard bounces just that one
+    Given the dashboard tab is showing with a restartable service under the cursor
+    When the developer presses "r"
+    Then only that service is bounced, without printing into the alt-screen
+    And "a" bounces every service
+    And a managed service refuses with a toast instead of a restart
+
   Scenario: A piped up streams in the foreground
     When "haven up" runs with output piped (pnpm dev:haven | tee)
     Then it streams plainly in the foreground and Ctrl-C stops the stack

@@ -217,6 +217,30 @@ view in attached mode is just a live rendering of the same tap. Consequently:
   still readable — which is precisely when you want them.
 - `obs` is a valid log target (replacing `make observability-logs`).
 
+### Session dashboard (attached tab one)
+
+The attached view (`haven up` and `haven play` alike) opens on a live session
+dashboard, not a log stream. Tab one is a status-and-actions screen; the
+combined `all` stream and the per-service log groups follow it.
+
+- **Status of everything, cheaply.** An ASCII harbour wordmark, then the
+  stack's liveness and process-group RAM, every routed service with an up/down
+  dot and where it is reached, and the shared machinery (proxy, daemon, the
+  managed ClickHouse/Postgres/Redis, observability) as dot pills. The snapshot
+  (`app/session.go`, `SessionSnapshot`) runs only cheap probes — port checks,
+  process liveness, group RSS — so the view refreshes on a slow (~1.2s) beat
+  without ever shelling into docker for a health ping.
+- **Per-service actions.** Arrow keys move a cursor over the services; `enter`
+  jumps straight to that service's log tab (or the combined stream when it has
+  no capture yet); `r` bounces the highlighted service and `a` bounces them
+  all, through `RestartStackQuiet` — a message-returning sibling of
+  `RestartStack` so the bounce reports as a toast instead of writing into the
+  alt-screen. Only services this worktree runs itself are restartable; a
+  baseline fallback or a shared database server refuses with a toast.
+- **The dashboard is opt-in on wiring.** It appears only when the viewer is
+  handed an action surface (`sessionActions`, the same callback shape the hub
+  uses). A log-only viewer has no tab one and opens on `all` as before.
+
 ### What is cut, and where it went
 
 | Today | v2 |

@@ -132,7 +132,7 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	if err := app.WritePlayRecord(havenHome(), rec); err != nil {
 		return fmt.Errorf("recording the sandbox launcher: %w", err)
 	}
-	if err := runPlayViewer(ctx, rec.Slug); err != nil {
+	if err := runPlayViewer(ctx, rec.Slug, d.sessionActions(rec.Slug)); err != nil {
 		return err
 	}
 	return teardown()
