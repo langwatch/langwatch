@@ -2064,6 +2064,7 @@ export async function* runOrchestrator(
               result.status === "processed" && result.cost
                 ? result.cost.amount
                 : null,
+            duration: event.duration ?? null,
           })
           .catch((err) => {
             chDispatchFailures++;

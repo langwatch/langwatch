@@ -25,10 +25,12 @@ import {
   chartHeightFor,
   truncateLabel,
 } from "./chartAxisLabels";
+import { ComparisonLeaderboardChart } from "./ComparisonLeaderboardChart";
 import { WinRateChart } from "./WinRateChart";
 import type {
   BatchEvaluationData,
   BatchComparisonColumn,
+  BatchResultRow,
   ComparisonRunData,
 } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
@@ -39,13 +41,14 @@ type MetricType =
   | "latency"
   | `score_${string}`
   | `pass_${string}`
-  | `comparison_${string}`;
+  | `comparison_${string}`
+  | `leaderboard_${string}`;
 
 /** Available metric definition */
 type MetricDefinition = {
   id: MetricType;
   name: string;
-  type: "cost" | "latency" | "score" | "passRate" | "comparison";
+  type: "cost" | "latency" | "score" | "passRate" | "comparison" | "leaderboard";
   evaluatorId?: string;
 };
 
@@ -121,6 +124,14 @@ type ComparisonChartsProps = {
    * below.
    */
   comparisonColumns?: BatchComparisonColumn[];
+  /**
+   * Rows for the primary run, needed by the Comparison leaderboard's
+   * cost/duration tradeoff chart. Single-run only for v1 — not threaded
+   * through per-run in `comparisonData`.
+   */
+  comparisonRows?: BatchResultRow[];
+  /** Feature-flag gate for the Bradley-Terry leaderboard chart (#5103). */
+  showComparisonLeaderboard?: boolean;
 };
 
 type EvaluatorMetrics = {
@@ -310,6 +321,8 @@ export const ComparisonCharts = ({
   onXAxisOptionChange,
   onTargetColorsChange,
   comparisonColumns,
+  comparisonRows,
+  showComparisonLeaderboard,
 }: ComparisonChartsProps) => {
   /**
    * The comparison evaluators on this page, which are excluded from the
@@ -811,8 +824,24 @@ export const ComparisonCharts = ({
       });
     }
 
+    // Bradley-Terry leaderboard (#5103) — only meaningful at 3+ variants; a
+    // 2-variant comparison is already a plain win-rate story. Flag-gated
+    // separately from `comparisonColumns` itself since it's an additive
+    // power-user surface, not a replacement for the win-rate chart above.
+    if (showComparisonLeaderboard) {
+      for (const column of comparisonColumns ?? []) {
+        if (column.variants.length < 3) continue;
+        metrics.push({
+          id: `leaderboard_${column.evaluatorId}` as MetricType,
+          name: `${column.name} (Leaderboard)`,
+          type: "leaderboard",
+          evaluatorId: column.evaluatorId,
+        });
+      }
+    }
+
     return metrics;
-  }, [scoreEvaluators, passRateEvaluators, comparisonColumns]);
+  }, [scoreEvaluators, passRateEvaluators, comparisonColumns, showComparisonLeaderboard]);
 
   // Initialize visible metrics to include all available metrics on first load
   useEffect(() => {
@@ -1366,6 +1395,27 @@ export const ComparisonCharts = ({
                   />
                 ),
             )}
+
+            {/* Bradley-Terry leaderboard chart (#5103) — a sibling of
+                WinRateChart, gated the same way through the Metrics
+                dropdown. Only ever added to availableMetrics for 3+ variant
+                comparisons when the flag is on (see availableMetrics above),
+                so no extra gating is needed here beyond visibleMetrics. */}
+            {showComparisonLeaderboard &&
+              comparisonColumns?.map(
+                (column) =>
+                  visibleMetrics.has(
+                    `leaderboard_${column.evaluatorId}` as MetricType,
+                  ) && (
+                    <ComparisonLeaderboardChart
+                      key={`leaderboard-${column.evaluatorId}`}
+                      column={column}
+                      rows={comparisonRows ?? []}
+                      chartHeight={chartHeight}
+                      targetColors={targetColors}
+                    />
+                  ),
+              )}
 
             {/* Per-evaluator pass rate charts */}
             {passRateEvaluators.map(

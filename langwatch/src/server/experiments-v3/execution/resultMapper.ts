@@ -222,7 +222,7 @@ export const mapEvaluatorResult = (
   }
 
   // Calculate duration if timestamps available
-  const _duration =
+  const duration =
     executionState.timestamps?.started_at &&
     executionState.timestamps?.finished_at
       ? executionState.timestamps.finished_at -
@@ -285,6 +285,7 @@ export const mapEvaluatorResult = (
     targetId,
     evaluatorId,
     result,
+    duration,
   };
 };
 

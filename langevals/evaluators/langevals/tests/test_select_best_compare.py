@@ -90,7 +90,12 @@ def test_skipped_when_only_one_candidate_with_output():
 
 
 def test_empty_output_candidates_filtered_but_remainder_kept():
-    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    # swap_and_reconcile=False: this test is about candidate filtering, not
+    # order-swap reconciliation (covered separately below), so it isolates
+    # the single-call path to keep its own assertions simple and focused.
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
     candidates = [
         CandidateInput(id="v0", output="real answer"),
         CandidateInput(id="v1", output=""),
@@ -113,7 +118,7 @@ def test_empty_output_candidates_filtered_but_remainder_kept():
     ):
         result = evaluator.evaluate(entry)
 
-    # Exactly one judge call — N-way is single-call, always.
+    # Exactly one judge call — N-way is single-call, always (per direction).
     assert mock_completion.call_count == 1
     assert result.status == "processed"
     # Result label must be one of the surviving candidate ids or "tie".
@@ -125,8 +130,14 @@ def test_returns_winning_candidate_id_not_slot_label():
     The judge picks slot "A". After the deterministic shuffle, slot A is
     whichever candidate ended up first — the evaluator must translate
     that slot back to the candidate's ORIGINAL id, not return "A".
+
+    swap_and_reconcile=False: this pins _judge()'s single-call translation
+    logic in isolation; reconciliation across the two directions is its
+    own test group below.
     """
-    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
     entry = _make_entry(num_candidates=3)
 
     with patch(
@@ -169,8 +180,11 @@ def test_out_of_enum_winner_degrades_to_first_slot():
     only slots A/B/C exist). The evaluator must not crash with a KeyError on
     the slot lookup — it degrades to the first slot and still returns a
     processed result naming a real candidate (mirrors legacy pairwise's
-    default-slot fallback)."""
-    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    default-slot fallback). swap_and_reconcile=False isolates this
+    single-call defensive-fallback behavior from order-swap reconciliation."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
     entry = _make_entry(num_candidates=3)
 
     with patch(
@@ -195,8 +209,15 @@ def test_deterministic_shuffle_by_row_index():
     Same row_index -> identical slot-to-candidate ordering across
     calls. Comparing rendered prompts asserts determinism without
     depending on Python's RNG implementation.
+
+    swap_and_reconcile=False: with it on, each evaluate() call captures TWO
+    prompts (original + reversed order), which would shift the indices this
+    test compares. Shuffle determinism and swap-and-reconcile are independent
+    concerns, so this test isolates the former.
     """
-    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
     entry_a = _make_entry(num_candidates=5, row_index=42)
     entry_b = _make_entry(num_candidates=5, row_index=42)
 
@@ -355,7 +376,13 @@ def test_metrics_not_injected_by_default():
 
 
 def test_five_candidates_use_exactly_one_call():
-    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    # swap_and_reconcile=False: this test pins the N-way-single-call
+    # invariant (all N candidates judged in ONE completion call, not one
+    # call per candidate/pair) — a property of _judge() itself, independent
+    # of whether evaluate() invokes _judge() once or twice per row.
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
     entry = _make_entry(num_candidates=5)
 
     with patch(
@@ -373,7 +400,13 @@ def test_five_candidates_use_exactly_one_call():
 
 
 def test_result_carries_reasoning_and_cost():
-    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    # swap_and_reconcile=False: this test is about the plumbing from
+    # _judge()'s reasoning/cost through to the final result, not about
+    # reconciliation across two calls (covered separately below, including
+    # its own cost-summing assertion).
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
     entry = _make_entry(num_candidates=3)
 
     with patch(
@@ -619,6 +652,273 @@ def test_custom_prompt_with_unknown_braces_does_not_crash():
     assert "{candidate_notes}" in rendered
     assert "{input}" not in rendered
     assert "{candidates}" not in rendered
+
+
+# ---------------------------------------------------------------------------
+# swap_and_reconcile: the judge is called twice per row by default — once in
+# the (possibly shuffled) candidate order, once with that order fully
+# reversed — and a disagreement between the two verdicts is treated as a tie
+# rather than trusting either individual call.
+# ---------------------------------------------------------------------------
+
+
+def test_swap_and_reconcile_defaults_to_true():
+    """Cost is not a concern for judge calls — statistical truth is
+    prioritized, so swap-and-reconcile ships default ON, not opt-in."""
+    assert SelectBestCompareSettings().swap_and_reconcile is True
+
+
+def test_swap_and_reconcile_agreement_sums_cost_and_keeps_call_one_reasoning():
+    """Both calls (original + reversed order) name the SAME real candidate.
+    The reconciliation trusts the agreement: final winner is that candidate,
+    score 1.0, cost is the SUM of both calls' costs, and the details are call
+    1's reasoning with a short confirmation prefix."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    # randomize_order=False -> ordered=[variant_0, variant_1, variant_2] for
+    # call 1 (slot B = variant_1); reversed=[variant_2, variant_1, variant_0]
+    # for call 2 (slot B = variant_1 too — the middle slot of an odd-length
+    # list is invariant under full reversal). Mocking "B" both times is a
+    # genuine real-candidate agreement, not a coincidence of slot letters.
+    responses = [
+        _mock_completion_response("variant_1 handles the edge case", "B"),
+        _mock_completion_response("variant_1 still wins reversed", "B"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        side_effect=[0.0002, 0.0003],
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert mock_completion.call_count == 2
+    assert result.label == "variant_1"
+    assert result.score == 1.0
+    assert result.details is not None
+    assert "Confirmed under order swap." in result.details
+    assert "variant_1 handles the edge case" in result.details
+    assert result.cost is not None
+    assert result.cost.amount == pytest.approx(0.0002 + 0.0003)
+
+
+def test_swap_and_reconcile_disagreement_becomes_tie_with_informative_details():
+    """First call (original order) names one candidate; reversed order names
+    a different one — a genuine order-sensitive verdict. The final result
+    must be a tie (not a guess at which direction was right), and the
+    reasoning must name both original picks, not just say they disagreed."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=3, row_index=0)
+
+    # ordered=[variant_0, variant_1, variant_2] (call 1); reversed=
+    # [variant_2, variant_1, variant_0] (call 2). Slot "A" is variant_0 in
+    # call 1 but variant_2 in call 2 — genuinely different real candidates.
+    responses = [
+        _mock_completion_response("variant_0 is more concise", "A"),
+        _mock_completion_response("variant_2 covers more ground", "A"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert mock_completion.call_count == 2
+    assert result.label == "tie"
+    assert result.score == 0.5
+    assert result.details is not None
+    # The reasoning must be genuinely informative — naming both picks and
+    # both original reasonings, not just "verdicts disagreed".
+    assert "variant_0" in result.details
+    assert "variant_2" in result.details
+    assert "variant_0 is more concise" in result.details
+    assert "variant_2 covers more ground" in result.details
+
+
+def test_swap_and_reconcile_both_calls_tie_stays_tie():
+    """Trivial agreement case worth its own explicit test: both directions
+    independently return 'tie' -> the final verdict is a tie, not treated
+    as a special case that skips confirmation."""
+    evaluator = SelectBestCompareEvaluator(settings=SelectBestCompareSettings())
+    entry = _make_entry(num_candidates=3)
+
+    responses = [
+        _mock_completion_response("indistinguishable, original order", "tie"),
+        _mock_completion_response("indistinguishable, reversed order", "tie"),
+    ]
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=responses,
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert mock_completion.call_count == 2
+    assert result.label == "tie"
+    assert result.score == 0.5
+    assert result.details is not None
+    assert "Confirmed under order swap." in result.details
+
+
+def test_swap_and_reconcile_false_makes_exactly_one_call():
+    """Regression pinning the escape hatch: swap_and_reconcile=False must
+    fully restore the original single-call behavior — not merely skip the
+    reconciliation logic while still calling the judge twice."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("ok", "A"),
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        result = evaluator.evaluate(entry)
+
+    assert mock_completion.call_count == 1
+    assert result.status == "processed"
+    assert result.label in {"variant_0", "variant_1", "variant_2"}
+    assert result.score == 1.0
+    # No "Confirmed under order swap." prefix — the reconcile path never ran.
+    assert result.details == "ok"
+
+
+def test_reversed_call_receives_candidates_in_reverse_of_call_one():
+    """Pins that the SECOND swap-and-reconcile call truly reverses call 1's
+    candidate order, not some other perturbation (e.g. re-shuffling)."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(randomize_order=False)
+    )
+    entry = _make_entry(num_candidates=4, row_index=0)
+
+    captured: list[str] = []
+
+    def capture(**kwargs: Any) -> SimpleNamespace:
+        captured.append(kwargs["messages"][1]["content"])
+        return _mock_completion_response("ok", "A")
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        side_effect=capture,
+    ), patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    assert len(captured) == 2
+    prompt1, prompt2 = captured
+
+    def order_of(prompt: str) -> list[str]:
+        positions = {
+            f"output_{i}": prompt.index(f"output_{i}") for i in range(4)
+        }
+        return sorted(positions, key=lambda k: positions[k])
+
+    order1 = order_of(prompt1)
+    order2 = order_of(prompt2)
+    assert order1 == ["output_0", "output_1", "output_2", "output_3"]
+    assert order2 == list(reversed(order1))
+
+
+def test_system_message_tells_judge_to_ignore_candidate_order():
+    """Anti-position-bias instruction: the system message must tell the
+    judge to weigh content only, independent of candidate order."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("ok", "A"),
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    system_msg = mock_completion.call_args.kwargs["messages"][0]["content"]
+    assert "ignore the order" in system_msg.lower()
+
+
+# ---------------------------------------------------------------------------
+# temperature: gpt-5-family models require temperature=1.0 and reject any
+# other value (litellm precedent: model_to_dspy_lm in llm_answer_match.py).
+# Every other model gets the user's configured value, with drop_params=True
+# so litellm silently strips the param for providers that reject it.
+# ---------------------------------------------------------------------------
+
+
+def test_temperature_defaults_to_zero():
+    assert SelectBestCompareSettings().temperature == 0.0
+
+
+@pytest.mark.parametrize(
+    "model,expected_temperature",
+    [
+        ("openai/gpt-5-mini", 1.0),
+        ("openai/gpt-5", 1.0),
+        ("azure/gpt-5-turbo", 1.0),
+        ("anthropic/claude-sonnet-4", 0.0),
+    ],
+)
+def test_temperature_forced_to_one_for_gpt5_family_models(
+    model, expected_temperature
+):
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(model=model, swap_and_reconcile=False)
+    )
+    entry = _make_entry(num_candidates=3)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("ok", "A"),
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    assert mock_completion.call_args.kwargs["temperature"] == expected_temperature
+    assert mock_completion.call_args.kwargs["drop_params"] is True
+
+
+def test_custom_temperature_passed_through_for_non_gpt5_models():
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            model="anthropic/claude-sonnet-4",
+            temperature=0.7,
+            swap_and_reconcile=False,
+        )
+    )
+    entry = _make_entry(num_candidates=3)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("ok", "A"),
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    assert mock_completion.call_args.kwargs["temperature"] == 0.7
+    assert mock_completion.call_args.kwargs["drop_params"] is True
 
 
 def test_slot_label_helper_covers_alphabet_and_overflow():

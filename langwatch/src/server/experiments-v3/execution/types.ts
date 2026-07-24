@@ -230,6 +230,7 @@ export type EvaluationV3Event =
       // evaluator nodes). DB-backed evaluators resolve their name at storage time.
       evaluatorName?: string;
       result: EvaluationV3EvaluatorResult;
+      duration?: number;
     }
   | { type: "progress"; completed: number; total: number }
   | {

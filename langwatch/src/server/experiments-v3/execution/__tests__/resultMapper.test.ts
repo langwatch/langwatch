@@ -293,7 +293,33 @@ describe("resultMapper", () => {
           details: undefined,
           cost: { currency: "USD", amount: 0.0001 },
         },
+        duration: 500,
       });
+    });
+
+    it("includes duration when timestamps are present", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+        timestamps: { started_at: 1000, finished_at: 2500 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.duration).toBe(1500);
+      }
+    });
+
+    it("omits duration when timestamps are missing", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+      });
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.duration).toBeUndefined();
+      }
     });
 
     it("maps successful evaluator result with passed=false", () => {

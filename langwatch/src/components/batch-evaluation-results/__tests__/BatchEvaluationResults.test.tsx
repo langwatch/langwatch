@@ -38,6 +38,17 @@ vi.mock("~/utils/api", () => ({
         useQuery: vi.fn(),
       },
     },
+    // BatchEvaluationResults calls useFeatureFlag for the Comparison
+    // leaderboard chart (#5103), which hits api.featureFlag.isEnabled.
+    // Stub it disabled — these tests only exercise the query-guard logic.
+    featureFlag: {
+      isEnabled: {
+        useQuery: vi.fn().mockReturnValue({
+          data: { enabled: false },
+          isLoading: false,
+        }),
+      },
+    },
   },
 }));
 

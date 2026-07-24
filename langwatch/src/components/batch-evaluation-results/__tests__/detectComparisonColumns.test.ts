@@ -159,6 +159,44 @@ describe("detecting comparison columns", () => {
       });
     });
 
+    describe("when a row's candidates are a strict subset of the column's variants", () => {
+      // select_best_compare drops any candidate with no output for a given
+      // row, so a row can legitimately compare fewer candidates than the
+      // column's full variant list. Leaderboard aggregation (Bradley-Terry)
+      // needs the row's ACTUAL candidate set, not the column-wide union, or
+      // it fabricates a matchup that never happened.
+      it("records only the candidates actually compared on that row", () => {
+        const run = createRun([
+          {
+            evaluator: "cmp-1",
+            status: "processed",
+            index: 0,
+            label: "concise-support-v2",
+            inputs: candidatesInput(["target-a", "target-b", "target-c"]),
+          },
+          {
+            evaluator: "cmp-1",
+            status: "processed",
+            index: 1,
+            label: "concise-support-v2",
+            inputs: candidatesInput(["target-a", "target-b"]),
+          },
+        ]);
+
+        const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+        expect(column.verdictsByRow[0]?.candidateIds).toEqual([
+          "target-a",
+          "target-b",
+          "target-c",
+        ]);
+        expect(column.verdictsByRow[1]?.candidateIds).toEqual([
+          "target-a",
+          "target-b",
+        ]);
+      });
+    });
+
     describe("when every row ties and inputs carry no candidate ids", () => {
       // "tie" is valid vocabulary under both the legacy 2-slot and current
       // N-way contract, so seeing it alone must NOT be treated as evidence
@@ -243,6 +281,42 @@ describe("detecting comparison columns", () => {
           "say-hi",
           "be-formal",
         ]);
+      });
+    });
+
+    describe("when the judge's label resolves to a padded, unnamed slot", () => {
+      // Distinguishes a genuine tie from a legacy slot letter with nothing
+      // real to resolve against — both leave winnerId null for a bar chart,
+      // but only the tie is real 0.5/0.5 evidence for Bradley-Terry
+      // aggregation; the unresolved slot must be excluded entirely.
+      it("flags the unresolved slot separately from a real tie", () => {
+        const run = createRun(
+          [
+            {
+              evaluator: "pw-1",
+              status: "processed",
+              index: 0,
+              label: "tie",
+              inputs: { candidate_a_id: "target-a" },
+            },
+            {
+              evaluator: "pw-1",
+              status: "processed",
+              index: 1,
+              label: "B",
+              inputs: { candidate_a_id: "target-a" },
+            },
+          ],
+          { targets: TWO_VARIANT_TARGETS, rowCount: 2 },
+        );
+
+        const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
+
+        expect(column.verdictsByRow[0]?.winnerId).toBeNull();
+        expect(column.verdictsByRow[0]?.isUnresolved).toBe(false);
+
+        expect(column.verdictsByRow[1]?.winnerId).toBeNull();
+        expect(column.verdictsByRow[1]?.isUnresolved).toBe(true);
       });
     });
   });

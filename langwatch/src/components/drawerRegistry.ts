@@ -134,6 +134,10 @@ const EvaluatorHistoryDrawer = lazyDefault({
   factory: () => import("./evaluators/EvaluatorHistoryDrawer"),
   key: "EvaluatorHistoryDrawer",
 });
+const ComparisonLeaderboardDrawer = lazyDefault({
+  factory: () => import("./ComparisonLeaderboardDrawer"),
+  key: "ComparisonLeaderboardDrawer",
+});
 const EvaluatorListDrawer = lazyDefault({
   factory: () => import("./evaluators/EvaluatorListDrawer"),
   key: "EvaluatorListDrawer",
@@ -256,6 +260,7 @@ export const drawers = {
   agentWorkflowTargetEditor: AgentWorkflowTargetEditorDrawer,
   workflowSelector: WorkflowSelectorDrawerFromUrl,
   evaluatorHistory: EvaluatorHistoryDrawer,
+  comparisonLeaderboard: ComparisonLeaderboardDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
   evaluatorTypeSelector: EvaluatorTypeSelectorDrawer,

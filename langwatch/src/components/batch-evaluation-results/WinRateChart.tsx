@@ -41,7 +41,7 @@ import type { BatchComparisonColumn } from "./types";
  * Deliberately excludes red: a losing variant isn't a failure, so no bar
  * should read as one. Ties get their own gray.
  */
-const VARIANT_COLORS = [
+export const VARIANT_COLORS = [
   "#22C55E",
   "#8B5CF6",
   "#0EA5E9",

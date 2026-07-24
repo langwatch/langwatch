@@ -916,6 +916,18 @@ export const evaluatorsSchema = z.object({
         .array(z.union([z.literal("cost"), z.literal("duration")]))
         .describe("Per-candidate metrics to inject into the judge prompt")
         .default([]),
+      temperature: z
+        .number()
+        .describe(
+          "Sampling temperature for the judge call. Lower is more deterministic.",
+        )
+        .default(0),
+      swap_and_reconcile: z
+        .boolean()
+        .describe(
+          "Call the judge twice per row — once in the (possibly shuffled) candidate order, once with that order fully reversed — and treat a disagreement between the two calls as a tie rather than guessing. Roughly doubles judge-call cost per row but measurably reduces order-sensitive verdicts.",
+        )
+        .default(true),
     }),
   }),
   "langevals/query_resolution": z.object({
@@ -2387,6 +2399,16 @@ candidate's position never sways the verdict.
       include_metrics: {
         description: "Per-candidate metrics to inject into the judge prompt",
         default: [],
+      },
+      temperature: {
+        description:
+          "Sampling temperature for the judge call. Lower is more deterministic.",
+        default: 0,
+      },
+      swap_and_reconcile: {
+        description:
+          "Call the judge twice per row — once in the (possibly shuffled) candidate order, once with that order fully reversed — and treat a disagreement between the two calls as a tie rather than guessing. Roughly doubles judge-call cost per row but measurably reduces order-sensitive verdicts.",
+        default: true,
       },
     },
     envVars: [],

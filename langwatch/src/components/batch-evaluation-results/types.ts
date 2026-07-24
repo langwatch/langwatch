@@ -120,6 +120,24 @@ export type BatchComparisonVerdict = {
    * looked up (missing target / unresolved variant).
    */
   winnerOutput?: string | null;
+  /**
+   * Candidate ids the judge actually compared on THIS row (from the judge's
+   * own `inputs.candidates`), which can be a strict subset of the column's
+   * full `variants` — select_best_compare drops any candidate with no output
+   * for that row. Empty when the row's evaluation carried no candidate
+   * inputs (very old runs). Leaderboard aggregation must use this, not the
+   * column-wide variant list, or it fabricates matchups that never happened.
+   */
+  candidateIds?: string[];
+  /**
+   * True when `winnerId === null` because the judge's label failed to
+   * resolve to any known variant (a stale/unrecognized slot), as opposed to
+   * a genuine tie verdict. Both currently collapse to `winnerId: null` for
+   * every existing consumer (a bar chart doesn't need the distinction), but
+   * Bradley-Terry aggregation does: a real tie is 0.5/0.5 evidence, an
+   * unresolved label is no evidence and the row must be skipped entirely.
+   */
+  isUnresolved?: boolean;
 };
 
 /** One candidate participating in a comparison, in the order the judge saw them. */
@@ -608,6 +626,7 @@ const detectComparisonColumns = (
         rowIndex: number;
         rawLabel: string;
         reasoning: string | null;
+        candidateIds: string[];
       }>;
     }
   >();
@@ -649,8 +668,16 @@ const detectComparisonColumns = (
 
     // Snapshot the judge's own view of who it compared. Authoritative: it
     // names every candidate even when only one of them ever wins.
-    for (const id of readCandidateIds((ev.inputs ?? {}) as Record<string, unknown>)) {
-      const resolved = resolveToTargetId(id) ?? id;
+    //
+    // Resolved fresh per row (not just merged into the column-wide
+    // `bucket.candidateIds` union below) — select_best_compare drops any
+    // candidate with no output for a given row, so row 7 may have compared
+    // only 2 of the column's 3 variants while row 8 compared all 3. Only the
+    // per-row set is truthful evidence for leaderboard aggregation.
+    const rowCandidateIds = readCandidateIds(
+      (ev.inputs ?? {}) as Record<string, unknown>,
+    ).map((id) => resolveToTargetId(id) ?? id);
+    for (const resolved of rowCandidateIds) {
       if (!bucket.candidateIds.includes(resolved)) {
         bucket.candidateIds.push(resolved);
       }
@@ -669,6 +696,7 @@ const detectComparisonColumns = (
       rowIndex: ev.index,
       rawLabel: label,
       reasoning: ev.details ?? null,
+      candidateIds: rowCandidateIds,
     });
   }
 
@@ -701,8 +729,18 @@ const detectComparisonColumns = (
     }
 
     const verdictsByRow: Record<number, BatchComparisonVerdict> = {};
-    for (const { rowIndex, rawLabel, reasoning } of bucket.verdicts) {
+    for (const {
+      rowIndex,
+      rawLabel,
+      reasoning,
+      candidateIds,
+    } of bucket.verdicts) {
       let winnerId: string | null;
+      // Distinguished from a genuinely unresolved label below — both leave
+      // winnerId null for every existing (bar-chart) consumer, but a real
+      // tie is 0.5/0.5 evidence for Bradley-Terry aggregation while an
+      // unresolved label is no evidence at all and must be excluded.
+      let isUnresolved = false;
       if (rawLabel === "tie") {
         winnerId = null;
       } else {
@@ -719,6 +757,7 @@ const detectComparisonColumns = (
         });
         const isUnresolvedSlot =
           resolved === "" || resolved === "A" || resolved === "B";
+        isUnresolved = isUnresolvedSlot;
         winnerId = isUnresolvedSlot
           ? null
           : (resolveToTargetId(resolved) ?? resolved);
@@ -738,6 +777,8 @@ const detectComparisonColumns = (
         winnerOutput: winnerCell
           ? extractWinnerOutputText(winnerCell.output)
           : null,
+        candidateIds,
+        isUnresolved,
       };
     }
 

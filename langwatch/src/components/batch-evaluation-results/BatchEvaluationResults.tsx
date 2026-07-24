@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import { Link } from "~/components/ui/link";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -67,6 +68,11 @@ export function BatchEvaluationResults({
   onSelectRunId,
 }: BatchEvaluationResultsProps) {
   const { isLiteMember } = useLiteMemberGuard();
+
+  const { enabled: comparisonLeaderboardEnabled } = useFeatureFlag(
+    "release_ui_comparison_leaderboard_enabled",
+    { projectId: project?.id, enabled: !!project?.id },
+  );
 
   // Track if any run is still in progress
   const [isSomeRunning, setIsSomeRunning] = useState(false);
@@ -551,6 +557,8 @@ export function BatchEvaluationResults({
             onVisibilityChange={setChartsVisible}
             onTargetColorsChange={setTargetColors}
             comparisonColumns={transformedData?.comparisonColumns}
+            comparisonRows={transformedData?.rows}
+            showComparisonLeaderboard={comparisonLeaderboardEnabled}
           />
         )}
 
