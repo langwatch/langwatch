@@ -94,9 +94,11 @@ export class CodingAgentSessionStore
    * a batch it already committed. It never replays `event_log`; that is the
    * offline rebuild path, not this one.
    *
-   * `context.occurredAtMs` prunes the read to a window of partitions around the
-   * event being folded; absent, the repository scans (still keyed, still
-   * correct — just not partition-pruned).
+   * `context.readWindow` — computed by the executor from the fold's declared
+   * `options.readWindow` — prunes the read to a window of partitions around the
+   * event being folded; it is passed through verbatim. On a windowed miss the
+   * EXECUTOR retries without the window, so a row outside it is still found;
+   * this store neither widens the window nor implements a fallback itself.
    */
   async getWithApplied(
     aggregateId: string,
@@ -108,7 +110,7 @@ export class CodingAgentSessionStore
     const found = await this.repo.findBySessionIdWithApplied({
       tenantId: String(context.tenantId),
       sessionId: aggregateId,
-      startedAtMs: context.occurredAtMs,
+      window: context.readWindow,
     });
     if (!found) return { state: null, appliedEventIds: [] };
     return {

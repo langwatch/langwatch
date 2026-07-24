@@ -12,6 +12,7 @@ import {
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
+import { DEFAULT_PARTITION_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import {
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
@@ -452,7 +453,18 @@ export class TraceSummaryFoldProjection
    * never caught up (2026-07-09 —
    * specs/event-sourcing/hot-trace-fold-amplification.feature).
    */
-  readonly options = { refoldOnOutOfOrder: false } as const;
+  /**
+   * `readWindow` bounds the read-back to a partition-pruned window around the
+   * folded event's business time — the platform's shared ±2-day partition
+   * window (ADR-068): OccurredAt is the trace's own occurrence time, so drift
+   * from the folded event's occurredAt is clock skew, not aggregate lifetime.
+   * The executor retries a windowed miss without the window, so correctness
+   * never depends on the width.
+   */
+  readonly options = {
+    refoldOnOutOfOrder: false,
+    readWindow: { widthMs: DEFAULT_PARTITION_WINDOW_MS },
+  } as const;
 
   protected readonly events = traceSummaryEvents;
 

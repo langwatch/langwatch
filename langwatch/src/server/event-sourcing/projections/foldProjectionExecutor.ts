@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import {
   incrementEsFoldDuplicateEventsSkipped,
+  incrementEsFoldReadWindowFallbackTotal,
   incrementEsFoldRefoldTotal,
   observeEsFoldBlindReapplyEvents,
 } from "~/server/metrics";
@@ -10,7 +11,10 @@ import type {
   FoldProjectionDefinition,
   FoldProjectionStore,
 } from "./foldProjection.types";
-import type { ProjectionStoreContext } from "./projectionStoreContext";
+import {
+  type ProjectionStoreContext,
+  readWindowAround,
+} from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
 
@@ -20,6 +24,12 @@ const logger = createLogger("langwatch:event-sourcing:fold-executor");
  * reconcile afterwards, and a handful is enough to find the trace.
  */
 const MAX_LOGGED_EVENT_IDS = 10;
+
+/**
+ * Projections that already warned about a read-window recovery this process.
+ * Bounded by the number of registered projections; see the warn site.
+ */
+const readWindowRecoveryWarned = new Set<string>();
 
 function compareFoldEvents<State, E extends Event>(
   projection: FoldProjectionDefinition<State, E>,
@@ -62,16 +72,31 @@ function canRefold<State, E extends Event>(
 }
 
 /**
- * Returns a context carrying the event's occurredAt as a store read hint, or
- * the original context unchanged when the event has no usable occurredAt.
+ * Returns a context carrying the event's occurredAt — and, when the fold
+ * DECLARED a read window (`options.readWindow`), the computed
+ * `occurredAt ± widthMs` bound for the store's backing read. The original
+ * context is returned unchanged when the event has no usable occurredAt: an
+ * unusable business time cannot anchor a window, so the read stays unbounded.
  */
-function withOccurredAtHint(
-  context: ProjectionStoreContext,
-  event: Event,
-): ProjectionStoreContext {
+function withReadHints<State, E extends Event>({
+  context,
+  event,
+  projection,
+}: {
+  context: ProjectionStoreContext;
+  event: Event;
+  projection: FoldProjectionDefinition<State, E>;
+}): ProjectionStoreContext {
   const occurredAt = (event as Record<string, unknown>).occurredAt;
   if (typeof occurredAt !== "number" || occurredAt <= 0) return context;
-  return { ...context, occurredAtMs: occurredAt };
+  const widthMs = projection.options?.readWindow?.widthMs;
+  return {
+    ...context,
+    occurredAtMs: occurredAt,
+    ...(widthMs !== undefined
+      ? { readWindow: readWindowAround({ anchorMs: occurredAt, widthMs }) }
+      : {}),
+  };
 }
 
 /**
@@ -131,16 +156,71 @@ export class FoldProjectionExecutor {
    * store that persists the set durably next to its row — answers with it via
    * `getWithApplied`. A store that keeps none has no `getWithApplied`; its read
    * carries an empty set and the executor treats every delivery as fresh.
+   *
+   * When the fold declared a read window and the windowed read misses, the
+   * read is retried ONCE without the window: the row may sit outside the
+   * window (long-lived aggregate, clock skew, backfill), and concluding "new
+   * aggregate" from a windowed miss is how a partial batch folded onto
+   * `init()` permanently overwrites the complete row. The retry is the
+   * declared-window contract's correctness net; the windowed read is only the
+   * partition-pruning fast path.
    */
-  private async loadWithApplied<State>(
-    store: FoldProjectionStore<State>,
-    key: string,
-    context: ProjectionStoreContext,
-  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
-    if (store.getWithApplied) {
-      return await store.getWithApplied(key, context);
+  private async loadWithApplied<State>({
+    projectionName,
+    store,
+    key,
+    context,
+  }: {
+    projectionName: string;
+    store: FoldProjectionStore<State>;
+    key: string;
+    context: ProjectionStoreContext;
+  }): Promise<{ state: State | null; appliedEventIds: string[] }> {
+    const read = async (
+      readContext: ProjectionStoreContext,
+    ): Promise<{ state: State | null; appliedEventIds: string[] }> => {
+      if (store.getWithApplied) {
+        return await store.getWithApplied(key, readContext);
+      }
+      return {
+        state: await store.get(key, readContext),
+        appliedEventIds: [],
+      };
+    };
+
+    const windowed = await read(context);
+    if (windowed.state !== null || context.readWindow === undefined) {
+      return windowed;
     }
-    return { state: await store.get(key, context), appliedEventIds: [] };
+
+    // The retry drops the window and bypasses the read cache: the windowed
+    // attempt consulted the cache moments ago, so a second cache read is a
+    // guaranteed miss that would only skew the cache metrics.
+    const { readWindow: _readWindow, ...rest } = context;
+    const unwindowed = await read({ ...rest, bypassReadCache: true });
+    incrementEsFoldReadWindowFallbackTotal(
+      projectionName,
+      unwindowed.state !== null ? "recovered" : "absent",
+    );
+    if (unwindowed.state !== null) {
+      // A chronically-wrong width would otherwise warn per event; the metric's
+      // `recovered` counter is the ongoing signal, so warn once per projection
+      // per process and drop to debug after that.
+      const level = readWindowRecoveryWarned.has(projectionName)
+        ? ("debug" as const)
+        : ("warn" as const);
+      readWindowRecoveryWarned.add(projectionName);
+      logger[level](
+        {
+          projection: projectionName,
+          tenantId: String(context.tenantId),
+          aggregateId: context.aggregateId,
+          readWindow: context.readWindow,
+        },
+        "Fold state found outside the declared read window — the window missed a live aggregate; widen readWindow.widthMs if this recurs",
+      );
+    }
+    return unwindowed;
   }
 
   /**
@@ -237,16 +317,16 @@ export class FoldProjectionExecutor {
     }
 
     const key = context.key ?? context.aggregateId;
-    // Pass the event's occurredAt so a time-partitioned store (e.g. the trace
-    // summary store) can prune its backing-table read to a window around this
-    // time instead of scanning every partition. Best-effort: the store falls
-    // back to an unbounded read when the hint misses.
-    const loadContext = withOccurredAtHint(context, event);
-    const { state: loaded, appliedEventIds } = await this.loadWithApplied(
-      projection.store,
+    // Anchor the store read to the event's business time. A fold that declared
+    // a read window gets its backing read bounded to occurredAt ± widthMs, with
+    // the executor retrying unwindowed on a miss (see loadWithApplied).
+    const loadContext = withReadHints({ context, event, projection });
+    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
+      projectionName: projection.name,
+      store: projection.store,
       key,
-      loadContext,
-    );
+      context: loadContext,
+    });
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
@@ -385,16 +465,21 @@ export class FoldProjectionExecutor {
     );
 
     const key = context.key ?? context.aggregateId;
-    // Hint the store with one event's occurredAt (any event in the batch is for
-    // the same aggregate, so it anchors the same partition window).
-    const loadContext = ordered[0]
-      ? withOccurredAtHint(context, ordered[0])
-      : context;
-    const { state: loaded, appliedEventIds } = await this.loadWithApplied(
-      projection.store,
+    // Anchor the read to the batch's earliest event (any event in the batch is
+    // for the same aggregate, so it anchors the same partition window; the
+    // unwindowed retry covers a batch that somehow spans wider than widthMs).
+    // biome-ignore lint/style/noNonNullAssertion: the empty/single-event batches returned above, so ordered has at least two events.
+    const loadContext = withReadHints({
+      context,
+      event: ordered[0]!,
+      projection,
+    });
+    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
+      projectionName: projection.name,
+      store: projection.store,
       key,
-      loadContext,
-    );
+      context: loadContext,
+    });
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(

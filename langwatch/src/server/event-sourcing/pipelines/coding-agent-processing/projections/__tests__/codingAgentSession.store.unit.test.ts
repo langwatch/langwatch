@@ -59,7 +59,11 @@ class FakeRepo implements CodingAgentSessionRepository {
   withApplied: { row: CodingAgentSessionRow; appliedEventIds: string[] } | null =
     null;
   lastFindParams:
-    | { tenantId: string; sessionId: string; startedAtMs?: number }
+    | {
+        tenantId: string;
+        sessionId: string;
+        window?: { fromMs: number; toMs: number };
+      }
     | undefined;
 
   async upsert(
@@ -87,7 +91,7 @@ class FakeRepo implements CodingAgentSessionRepository {
   async findBySessionIdWithApplied(params: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null> {
     this.lastFindParams = params;
     return this.withApplied;
@@ -172,13 +176,17 @@ describe("CodingAgentSessionStore durable dedup", () => {
 
         const result = await store.getWithApplied(
           "session-1",
-          context({ occurredAtMs: 4_242 }),
+          context({ readWindow: { fromMs: 4_000, toMs: 5_000 } }),
         );
 
         expect(result.state?.modelCalls).toBe(3);
         expect(result.appliedEventIds).toEqual(["e1", "e2"]);
-        // The occurredAt hint is threaded through as the partition-pruning key.
-        expect(repo.lastFindParams?.startedAtMs).toBe(4_242);
+        // The executor-computed window is threaded through verbatim as the
+        // partition-pruning bound.
+        expect(repo.lastFindParams?.window).toEqual({
+          fromMs: 4_000,
+          toMs: 5_000,
+        });
       });
     });
 

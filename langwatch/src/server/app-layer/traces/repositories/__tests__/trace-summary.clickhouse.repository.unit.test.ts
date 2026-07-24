@@ -84,4 +84,31 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
     expect(result).toBeNull();
     expect(queries.some((q) => q.includes("ComputedInput"))).toBe(false);
   });
+
+  it("applies an explicit window verbatim as one bounded read", async () => {
+    const { repo, queries } = makeRepo(() => [heavyRow]);
+
+    const result = await repo.findByTraceId("tenant-1", "t1", {
+      window: { fromMs: 1_000, toMs: 2_000 },
+    });
+
+    expect(result?.traceId).toBe("t1");
+    expect(queries).toHaveLength(1);
+    expect(queries[0]!).toContain("OccurredAt >=");
+  });
+
+  it("returns null on an explicit-window miss without a recovery ladder of its own", async () => {
+    // The window caller (the fold executor) owns the unwindowed retry — a
+    // second recovery here would re-run the resolve seek on a result the
+    // executor is about to re-read anyway.
+    const { repo, queries } = makeRepo(() => []);
+
+    const result = await repo.findByTraceId("tenant-1", "t1", {
+      window: { fromMs: 1_000, toMs: 2_000 },
+    });
+
+    expect(result).toBeNull();
+    expect(queries).toHaveLength(1);
+    expect(queries.some((q) => isResolve(q))).toBe(false);
+  });
 });
