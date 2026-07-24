@@ -83,7 +83,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   # accumulateIO are unmodified by this PR. The lean step happens at the
   # dispatch interposition AFTER the event is durable in event_log, so the
   # fold sees the same inputs (preview-shaped) regardless of order.
-  Scenario: Out-of-order refold converges on the same state as in-order folding
+  Scenario: Out-of-order folding converges on the same state as in-order folding
     Given the span events of a trace arrive out of their occurrence order
     When the trace is folded
     Then the resulting trace summary matches the state produced by folding the
@@ -254,7 +254,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   # AC T1.2: "Trace-detail full read returns byte-identical IO"
   #   -> Scenario: Trace-detail full read returns input and output byte-identical to ingestion
   # AC T1.3: "Out-of-order refold + EvaluationTrigger reactor still produce correct state"
-  #   -> Scenario: Out-of-order refold converges on the same state as in-order folding
+  #   -> Scenario: Out-of-order folding converges on the same state as in-order folding
   #   -> Scenario: EvaluationTrigger reactor fires correctly off the lean event
   #
   # Track 2 — event_log as SoT + spool + SDKs + read resolution
