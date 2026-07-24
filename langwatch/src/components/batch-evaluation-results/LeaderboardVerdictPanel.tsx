@@ -178,20 +178,46 @@ function ScoreBars({
   const entries = leaderboard.entries;
   if (entries.length === 0) return null;
 
-  // Scale across every interval so whiskers stay inside the track.
-  const bounds = entries.flatMap((entry) =>
-    entry.scoreCI ? [entry.scoreCI[0], entry.scoreCI[1]] : [entry.score],
-  );
-  const min = Math.min(...bounds);
-  const max = Math.max(...bounds);
+  // A bootstrap over very few comparisons can hand back a non-finite bound.
+  // One of those anywhere in the set turns min/max into NaN, which makes
+  // every position below NaN, which the browser silently drops — collapsing
+  // the whole chart to slivers at the left edge. So treat a non-finite
+  // interval as no interval at all rather than letting it poison the scale.
+  const finiteCI = (
+    entry: (typeof entries)[number],
+  ): [number, number] | null =>
+    entry.scoreCI &&
+    Number.isFinite(entry.scoreCI[0]) &&
+    Number.isFinite(entry.scoreCI[1])
+      ? entry.scoreCI
+      : null;
+
+  // Scale to the scores, not to the intervals. Over few comparisons a single
+  // interval can be many times wider than the spread of the scores, and
+  // scaling to it squashes every marker into the left edge — the reader
+  // loses the comparison entirely. Bands instead clip at the track edges,
+  // which reads as "the uncertainty runs off the chart" and is the correct
+  // impression anyway.
+  const scores = entries
+    .map((entry) => entry.score)
+    .filter((score) => Number.isFinite(score));
+  if (scores.length === 0) return null;
+
+  const rawMin = Math.min(...scores);
+  const rawMax = Math.max(...scores);
+  const pad = (rawMax - rawMin || 1) * 0.1;
+  const min = rawMin - pad;
+  const max = rawMax + pad;
   const span = max - min || 1;
-  const pct = (value: number) => ((value - min) / span) * 100;
+  const clamp = (value: number) => Math.min(100, Math.max(0, value));
+  const pct = (value: number) => clamp(((value - min) / span) * 100);
 
   return (
     <VStack align="stretch" gap={2}>
       {entries.map((entry) => {
         const isTied = tied.has(entry.variantId);
         const color = targetColors?.[entry.variantId] ?? "rgb(37, 99, 235)";
+        const ci = finiteCI(entry);
         return (
           <Box key={entry.variantId}>
             <HStack justify="space-between" marginBottom={1}>
@@ -225,16 +251,13 @@ function ScoreBars({
               borderRadius="sm"
             >
               {/* 95% interval — the whisker */}
-              {entry.scoreCI ? (
+              {ci ? (
                 <Box
                   position="absolute"
                   top="5px"
                   bottom="5px"
-                  insetStart={`${pct(entry.scoreCI[0])}%`}
-                  width={`${Math.max(
-                    1,
-                    pct(entry.scoreCI[1]) - pct(entry.scoreCI[0]),
-                  )}%`}
+                  insetStart={`${pct(ci[0])}%`}
+                  width={`${Math.max(1, pct(ci[1]) - pct(ci[0]))}%`}
                   bg={color}
                   opacity={0.25}
                   borderRadius="sm"

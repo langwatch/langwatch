@@ -248,6 +248,11 @@ function formatScoreWithCI(
 ): string {
   const rounded = score.toFixed(2);
   if (!ci) return rounded;
+  // A bootstrap over a handful of comparisons can return an unbounded
+  // interval. Printing "46.96 ± Infinity" tells the reader nothing and
+  // reads as a bug; the score alone is the honest thing to show, and the
+  // trust step already explains that the sample is too small.
+  if (!Number.isFinite(ci[0]) || !Number.isFinite(ci[1])) return rounded;
   // Symmetric half-width for display; close enough for power-user judgment
   // and matches the "1.42 ± 0.18" shape in the issue mockup. The raw CI is
   // still in props for anyone who wants the asymmetric range.
