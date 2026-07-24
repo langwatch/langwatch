@@ -173,8 +173,6 @@ func (e *workerEntry) clearLLMError() {
 	e.mu.Unlock()
 }
 
-// strikeRateLimit records one more consecutive rate-limited call and returns
-// the running count.
 func (e *workerEntry) strikeRateLimit() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
