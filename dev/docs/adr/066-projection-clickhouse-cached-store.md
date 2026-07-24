@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-23
 
-**Status:** Proposed
+**Status:** Accepted (Pillar 1 first adopter — `codingAgentSession` read-back store, migration 00053 — shipped in this PR; Pillar 2 append coalescing and the durable dedup watermark remain follow-ups)
 
 **Re-affirms & hardens:** [ADR-007](./007-event-sourcing-architecture.md) §"Fold Projections", §"No Checkpoints" ("fold state = stored data"; "`store.get()` loads last state").
 
