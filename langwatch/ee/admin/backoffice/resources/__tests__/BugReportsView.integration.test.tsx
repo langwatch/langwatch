@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import AgentReportsView from "../AgentReportsView";
+import BugReportsView from "../BugReportsView";
 
 const listState = vi.hoisted(() => ({
   current: {
@@ -27,7 +27,7 @@ const routerState = vi.hoisted(() => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    agentReports: {
+    bugReports: {
       getAll: { useQuery: () => listState.current },
       getById: {
         useQuery: (_input: unknown, opts?: { enabled?: boolean }) =>
@@ -82,12 +82,12 @@ const sampleReports = [
 function renderView() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <AgentReportsView />
+      <BugReportsView />
     </ChakraProvider>,
   );
 }
 
-describe("AgentReportsView", () => {
+describe("BugReportsView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     routerState.query = {};

@@ -29,7 +29,7 @@ const kindLabel: Record<string, string> = {
  * `langwatch report` and the MCP report tool. Read-only: the value is reading
  * what agents struggled with, transcript included.
  */
-export default function AgentReportsView() {
+export default function BugReportsView() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 300);
@@ -37,7 +37,7 @@ export default function AgentReportsView() {
   const openReportId =
     typeof router.query.report === "string" ? router.query.report : null;
 
-  const list = api.agentReports.getAll.useQuery({
+  const list = api.bugReports.getAll.useQuery({
     page: page - 1,
     pageSize: PAGE_SIZE,
     search: debouncedSearch.trim() || undefined,
@@ -60,7 +60,7 @@ export default function AgentReportsView() {
   return (
     <>
       <BackofficeTable
-        title="Agent Reports"
+        title="Bug Reports"
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search title, summary, agent, contact, project"
@@ -74,13 +74,10 @@ export default function AgentReportsView() {
           onPageChange: setPage,
         }}
       >
-        <AgentReportsTable
-          reports={list.data?.reports}
-          onOpen={setOpenReport}
-        />
+        <BugReportsTable reports={list.data?.reports} onOpen={setOpenReport} />
       </BackofficeTable>
 
-      <AgentReportDrawer
+      <BugReportDrawer
         reportId={openReportId}
         onClose={() => setOpenReport(null)}
       />
@@ -88,7 +85,7 @@ export default function AgentReportsView() {
   );
 }
 
-interface AgentReportRow {
+interface BugReportRow {
   id: string;
   createdAt: string | Date;
   source: string;
@@ -99,11 +96,11 @@ interface AgentReportRow {
   contactEmail: string | null;
 }
 
-function AgentReportsTable({
+function BugReportsTable({
   reports,
   onOpen,
 }: {
-  reports: AgentReportRow[] | undefined;
+  reports: BugReportRow[] | undefined;
   onOpen: (reportId: string) => void;
 }) {
   return (
@@ -176,14 +173,14 @@ function AgentReportsTable({
   );
 }
 
-function AgentReportDrawer({
+function BugReportDrawer({
   reportId,
   onClose,
 }: {
   reportId: string | null;
   onClose: () => void;
 }) {
-  const report = api.agentReports.getById.useQuery(
+  const report = api.bugReports.getById.useQuery(
     { id: reportId ?? "" },
     { enabled: !!reportId, retry: false },
   );
@@ -217,7 +214,7 @@ function AgentReportDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>{report.data?.title ?? "Agent report"}</Drawer.Title>
+          <Drawer.Title>{report.data?.title ?? "Bug report"}</Drawer.Title>
         </Drawer.Header>
         <Drawer.CloseTrigger />
         <Drawer.Body>

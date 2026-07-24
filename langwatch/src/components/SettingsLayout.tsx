@@ -283,10 +283,10 @@ export default function SettingsLayout({
                 Subscriptions
               </MenuLink>
               <MenuLink
-                href="/ops/backoffice/agent-reports"
-                includePath="/ops/backoffice/agent-reports"
+                href="/ops/backoffice/bug-reports"
+                includePath="/ops/backoffice/bug-reports"
               >
-                Agent Reports
+                Bug Reports
               </MenuLink>
             </NavSection>
           )}

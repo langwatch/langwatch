@@ -1,14 +1,14 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
-import type { AgentReport } from "@prisma/client";
+import type { BugReport } from "@prisma/client";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 import { rateLimit } from "~/server/rateLimit";
-import { AgentReportRepository } from "~/server/repositories/agent-report.repository";
-import { notifyAgentReportOnSlack } from "./agent-report-slack";
+import { BugReportRepository } from "~/server/repositories/bug-report.repository";
+import { notifyBugReportOnSlack } from "./bug-report-slack";
 
-const logger = createLogger("langwatch:agent-reports");
+const logger = createLogger("langwatch:bug-reports");
 
 /**
  * Intake for issue reports sent by customers' coding agents (the CLI
@@ -18,7 +18,7 @@ const logger = createLogger("langwatch:agent-reports");
  * present, only enriches the report with a project link and is never a gate.
  */
 
-export class AgentReportRateLimitedError extends HandledError {
+export class BugReportRateLimitedError extends HandledError {
   constructor() {
     super("agent_report_rate_limited", "Too many reports, try again later", {
       httpStatus: 429,
@@ -30,7 +30,7 @@ export class AgentReportRateLimitedError extends HandledError {
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
 const RATE_LIMIT_MAX_PER_WINDOW = 10;
 
-export interface SubmitAgentReportInput {
+export interface SubmitBugReportInput {
   source: "cli" | "mcp";
   kind: "summary" | "full_session";
   title: string;
@@ -43,30 +43,28 @@ export interface SubmitAgentReportInput {
   metadata?: Record<string, string | number | boolean>;
 }
 
-export type AgentReportNotifier = (args: {
-  report: AgentReport;
-}) => Promise<void>;
+export type BugReportNotifier = (args: { report: BugReport }) => Promise<void>;
 
-export async function submitAgentReport({
+export async function submitBugReport({
   input,
   callerKey,
   apiToken,
   projectIdHint,
-  notify = notifyAgentReportOnSlack,
+  notify = notifyBugReportOnSlack,
 }: {
-  input: SubmitAgentReportInput;
+  input: SubmitBugReportInput;
   /** Rate-limit bucket for the caller (nearest-hop IP; self-asserted). */
   callerKey: string;
   apiToken?: string;
   projectIdHint?: string | null;
-  notify?: AgentReportNotifier;
+  notify?: BugReportNotifier;
 }): Promise<{ id: string }> {
   const limit = await rateLimit({
-    key: `agent-report:${callerKey}`,
+    key: `bug-report:${callerKey}`,
     windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
     max: RATE_LIMIT_MAX_PER_WINDOW,
   });
-  if (!limit.allowed) throw new AgentReportRateLimitedError();
+  if (!limit.allowed) throw new BugReportRateLimitedError();
 
   const linkedProjectId = await resolveLinkedProjectId({
     apiToken,
@@ -79,7 +77,7 @@ export async function submitAgentReport({
   // (no env pass: environment literals are a client-side concern).
   const redacted = redactSubmission(input);
 
-  const repository = new AgentReportRepository(prisma);
+  const repository = new BugReportRepository(prisma);
   const report = await repository.create({
     data: {
       source: input.source,
@@ -104,7 +102,7 @@ export async function submitAgentReport({
       agent: report.agent,
       linkedProjectId,
     },
-    "agent report received",
+    "bug report received",
   );
 
   try {
@@ -113,14 +111,14 @@ export async function submitAgentReport({
     // The alert is best-effort; intake already succeeded.
     logger.warn(
       { error, reportId: report.id },
-      "agent report Slack alert failed",
+      "bug report Slack alert failed",
     );
   }
 
   return { id: report.id };
 }
 
-function redactSubmission(input: SubmitAgentReportInput): {
+function redactSubmission(input: SubmitBugReportInput): {
   title: string;
   summary?: string;
   sessionData?: string;
@@ -169,13 +167,13 @@ async function resolveLinkedProjectId({
   } catch (error) {
     logger.warn(
       { error },
-      "agent report project linkage failed, storing unlinked",
+      "bug report project linkage failed, storing unlinked",
     );
     return null;
   }
 }
 
-export async function getAllAgentReports({
+export async function getAllBugReports({
   page,
   pageSize,
   search,
@@ -183,8 +181,8 @@ export async function getAllAgentReports({
   page: number;
   pageSize: number;
   search?: string;
-}): Promise<{ reports: Omit<AgentReport, "sessionData">[]; total: number }> {
-  const repository = new AgentReportRepository(prisma);
+}): Promise<{ reports: Omit<BugReport, "sessionData">[]; total: number }> {
+  const repository = new BugReportRepository(prisma);
   const [reports, total] = await Promise.all([
     repository.findAll({ page, pageSize, search }),
     repository.count({ search }),
@@ -192,11 +190,11 @@ export async function getAllAgentReports({
   return { reports, total };
 }
 
-export async function getAgentReportById({
+export async function getBugReportById({
   id,
 }: {
   id: string;
-}): Promise<AgentReport | null> {
-  const repository = new AgentReportRepository(prisma);
+}): Promise<BugReport | null> {
+  const repository = new BugReportRepository(prisma);
   return repository.findById({ id });
 }

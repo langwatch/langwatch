@@ -58,7 +58,7 @@ export const KSUID_RESOURCES = {
   GROUP: "group",
   ROLE_BINDING: "rolebinding",
   API_KEY_ROLE: "apikeyrole",
-  AGENT_REPORT: "agentreport",
+  BUG_REPORT: "bugreport",
   LANGY_CONVERSATION: "langyconv",
   LANGY_MESSAGE: "langymsg",
   TOPIC_CLUSTERING_RUN: "topicrun",

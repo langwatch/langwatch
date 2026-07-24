@@ -1,16 +1,16 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
-  getAgentReportById,
-  getAllAgentReports,
-} from "~/server/app-layer/agent-reports/agent-report.service";
+  getAllBugReports,
+  getBugReportById,
+} from "~/server/app-layer/bug-reports/bug-report.service";
 import { auditLog } from "~/server/auditLog";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
- * Admin-only reading of agent issue reports (the global support inbox fed by
+ * Admin-only reading of bug reports (the global support inbox fed by
  * `langwatch report` and the MCP report tool). Gated on the LangWatch staff
  * admin list, not on any organization role: reports are cross-tenant. Every
  * read is audit-logged: reports carry reporter-submitted transcripts and
@@ -25,7 +25,7 @@ const requireAdmin = (user: { email?: string | null }) => {
   }
 };
 
-export const agentReportsRouter = createTRPCRouter({
+export const bugReportsRouter = createTRPCRouter({
   getAll: protectedProcedure
     .input(
       z.object({
@@ -40,7 +40,7 @@ export const agentReportsRouter = createTRPCRouter({
       requireAdmin(user);
       await auditLog({
         userId: user.id,
-        action: "agentReports.getAll",
+        action: "bugReports.getAll",
         // Never the raw search text: contact searches are email addresses,
         // and audit rows outlive the inbox.
         args: {
@@ -48,9 +48,9 @@ export const agentReportsRouter = createTRPCRouter({
           pageSize: input.pageSize,
           hasSearch: Boolean(input.search),
         },
-        targetKind: "agentReport",
+        targetKind: "bugReport",
       });
-      return getAllAgentReports(input);
+      return getAllBugReports(input);
     }),
 
   getById: protectedProcedure
@@ -61,11 +61,11 @@ export const agentReportsRouter = createTRPCRouter({
       requireAdmin(user);
       await auditLog({
         userId: user.id,
-        action: "agentReports.getById",
-        targetKind: "agentReport",
+        action: "bugReports.getById",
+        targetKind: "bugReport",
         targetId: input.id,
       });
-      const report = await getAgentReportById(input);
+      const report = await getBugReportById(input);
       if (!report) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Report not found" });
       }

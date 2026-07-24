@@ -48,7 +48,7 @@ const GLOBAL_MODELS = [
   // Issue reports sent by customers' coding agents (`langwatch report`). A
   // global support inbox read from the admin backoffice; `linkedProjectId` is
   // informational only, so there is no tenancy column to constrain on.
-  "AgentReport",
+  "BugReport",
 ] as const;
 
 /**

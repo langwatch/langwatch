@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "AgentReport" (
+CREATE TABLE "BugReport" (
     "id" TEXT NOT NULL,
     "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "source" TEXT NOT NULL,
@@ -14,8 +14,8 @@ CREATE TABLE "AgentReport" (
     "linkedProjectId" TEXT,
     "metadata" JSONB,
 
-    CONSTRAINT "AgentReport_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "BugReport_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE INDEX "AgentReport_createdAt_idx" ON "AgentReport"("createdAt");
+CREATE INDEX "BugReport_createdAt_idx" ON "BugReport"("createdAt");

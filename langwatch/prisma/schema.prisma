@@ -3359,7 +3359,7 @@ model ScheduledJob {
 // admin backoffice: no tenancy column on purpose. `linkedProjectId` is
 // informational (resolved from an optional API key at intake, kept without an
 // FK so reports outlive project deletion).
-model AgentReport {
+model BugReport {
   id               String   @id @default(nanoid())
   createdAt        DateTime @default(now()) @db.Timestamptz(3)
   source           String

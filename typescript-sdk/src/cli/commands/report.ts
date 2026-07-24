@@ -179,7 +179,7 @@ export const reportCommand = async (
 
   let response: Response;
   try {
-    response = await fetch(`${endpoint}/api/agent-reports`, {
+    response = await fetch(`${endpoint}/api/bug-reports`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Gating tests for the agentReports tRPC procedures: the inbox is
+ * Gating tests for the bugReports tRPC procedures: the inbox is
  * cross-tenant, so access is strictly the LangWatch staff admin list
  * (ADMIN_EMAILS), never an organization role. Corresponds to
  * specs/support/agent-issue-reports.feature.
@@ -9,16 +9,16 @@
 import type { TRPCError } from "@trpc/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
-import { agentReportsRouter } from "../agentReports";
+import { bugReportsRouter } from "../bugReports";
 
 const { mockGetAll, mockAuditLog } = vi.hoisted(() => ({
   mockGetAll: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   mockAuditLog: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
 
-vi.mock("~/server/app-layer/agent-reports/agent-report.service", () => ({
-  getAllAgentReports: mockGetAll,
-  getAgentReportById: vi.fn(),
+vi.mock("~/server/app-layer/bug-reports/bug-report.service", () => ({
+  getAllBugReports: mockGetAll,
+  getBugReportById: vi.fn(),
 }));
 
 vi.mock("~/server/auditLog", () => ({
@@ -48,10 +48,10 @@ function buildCaller(email: string) {
     permissionChecked: true,
     publiclyShared: false,
   });
-  return agentReportsRouter.createCaller(ctx);
+  return bugReportsRouter.createCaller(ctx);
 }
 
-describe("agentReports gating", () => {
+describe("bugReports gating", () => {
   const originalAdminEmails = process.env.ADMIN_EMAILS;
 
   beforeEach(() => {
@@ -66,7 +66,7 @@ describe("agentReports gating", () => {
   });
 
   describe("given a user outside the admin list", () => {
-    /** @scenario "Non-admins cannot access agent reports" */
+    /** @scenario "Non-admins cannot access bug reports" */
     it("denies the listing", async () => {
       const caller = buildCaller("customer@acme.com");
       await expect(caller.getAll({})).rejects.toMatchObject({
@@ -76,7 +76,7 @@ describe("agentReports gating", () => {
       // The framework audit-logs the DENIAL itself; only the explicit
       // PII-read entry must be absent.
       expect(mockAuditLog).not.toHaveBeenCalledWith(
-        expect.objectContaining({ action: "agentReports.getAll" }),
+        expect.objectContaining({ action: "bugReports.getAll" }),
       );
     });
   });
@@ -89,7 +89,7 @@ describe("agentReports gating", () => {
         total: 0,
       });
       expect(mockAuditLog).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "agentReports.getAll" }),
+        expect.objectContaining({ action: "bugReports.getAll" }),
       );
     });
   });

@@ -9,7 +9,6 @@ import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTempla
 import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
 import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
 import { createTRPCRouter } from "~/server/api/trpc";
-import { agentReportsRouter } from "./routers/agentReports";
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
@@ -17,6 +16,7 @@ import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
+import { bugReportsRouter } from "./routers/bugReports";
 import { codingAgentsRouter } from "./routers/codingAgents";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
@@ -117,7 +117,7 @@ const coreRouters = {
   modelProvider: modelProviderRouter,
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
-  agentReports: agentReportsRouter,
+  bugReports: bugReportsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,

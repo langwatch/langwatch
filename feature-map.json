@@ -1221,8 +1221,8 @@
       },
       "children": [
         {
-          "id": "support.agent-reports",
-          "name": "Agent issue reports",
+          "id": "support.bug-reports",
+          "name": "Bug reports",
           "description": "Coding agents report issues they hit while using LangWatch (broken flows, confusing docs, errors) straight to the team, with secrets and PII redacted locally before sending",
           "surfaces": {
             "code": {
@@ -1237,14 +1237,14 @@
               "docs": "https://langwatch.ai/docs/support.md"
             },
             "platform": {
-              "ui": "/ops/backoffice/agent-reports",
+              "ui": "/ops/backoffice/bug-reports",
               "mcp": [
                 "report_issue"
               ],
               "skill": null,
               "docs": null
             },
-            "api": "/api/agent-reports",
+            "api": "/api/bug-reports",
             "docs": "https://langwatch.ai/docs/support.md"
           },
           "sync": null,

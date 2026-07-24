@@ -354,8 +354,8 @@ export function createEnvConfig() {
       SLACK_CHANNEL_SUBSCRIPTIONS: z.string().optional(),
       // Agent issue-report alerts (bot token of the LangWatch Agents Slack
       // app; alerts are skipped entirely when unset)
-      SLACK_AGENT_REPORTS_BOT_TOKEN: z.string().optional(),
-      SLACK_AGENT_REPORTS_CHANNEL: z.string().optional(),
+      SLACK_BUG_REPORTS_BOT_TOKEN: z.string().optional(),
+      SLACK_BUG_REPORTS_CHANNEL: z.string().optional(),
 
       // SCIM
       AUTH0_SCIM_WEBHOOK_SECRET: z.string().optional(),
@@ -491,8 +491,8 @@ export function createEnvConfig() {
       CUSTOMER_IO_API_KEY: process.env.CUSTOMER_IO_API_KEY,
       CUSTOMER_IO_REGION: process.env.CUSTOMER_IO_REGION,
       SLACK_PLAN_LIMIT_CHANNEL: process.env.SLACK_PLAN_LIMIT_CHANNEL,
-      SLACK_AGENT_REPORTS_BOT_TOKEN: process.env.SLACK_AGENT_REPORTS_BOT_TOKEN,
-      SLACK_AGENT_REPORTS_CHANNEL: process.env.SLACK_AGENT_REPORTS_CHANNEL,
+      SLACK_BUG_REPORTS_BOT_TOKEN: process.env.SLACK_BUG_REPORTS_BOT_TOKEN,
+      SLACK_BUG_REPORTS_CHANNEL: process.env.SLACK_BUG_REPORTS_CHANNEL,
       SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
       SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
       AUTH0_SCIM_WEBHOOK_SECRET: process.env.AUTH0_SCIM_WEBHOOK_SECRET,

@@ -1,5 +1,5 @@
 @support @backend
-Feature: Agent Issue Reports Intake
+Feature: Bug Reports Intake
   As the LangWatch team
   I want reports sent by customers' coding agents to land in one place and alert us
   So that we learn about broken flows, confusing docs, and agent struggles without asking customers to copy-paste sessions
@@ -82,12 +82,12 @@ Feature: Agent Issue Reports Intake
 
   @integration
   Scenario: Admins see reports in the backoffice
-    Given stored agent reports exist
-    When a LangWatch admin opens the agent reports backoffice page
+    Given stored bug reports exist
+    When a LangWatch admin opens the bug reports backoffice page
     Then they see a table of reports with date, source, agent, kind, title, and contact
     And they can open a report to read the full summary and session transcript
 
   @integration
-  Scenario: Non-admins cannot access agent reports
-    When a regular user requests the agent reports listing
+  Scenario: Non-admins cannot access bug reports
+    When a regular user requests the bug reports listing
     Then access is denied

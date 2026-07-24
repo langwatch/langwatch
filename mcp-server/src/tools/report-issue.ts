@@ -75,7 +75,7 @@ async function deliverReport(
   const config = getConfig();
   const endpoint = config.endpoint.replace(/\/+$/, "");
 
-  const response = await fetch(`${endpoint}/api/agent-reports`, {
+  const response = await fetch(`${endpoint}/api/bug-reports`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

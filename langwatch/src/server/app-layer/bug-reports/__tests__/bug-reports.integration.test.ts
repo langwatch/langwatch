@@ -1,19 +1,19 @@
-import type { AgentReport } from "@prisma/client";
+import type { BugReport } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
-import { app } from "~/server/routes/agent-reports";
+import { app } from "~/server/routes/bug-reports";
 import {
-  AgentReportRateLimitedError,
-  submitAgentReport,
-} from "../agent-report.service";
+  BugReportRateLimitedError,
+  submitBugReport,
+} from "../bug-report.service";
 
 /**
- * Integration tests for the agent issue-report intake, against the real
+ * Integration tests for the bug-report intake, against the real
  * database and the real Hono route. Corresponds to the scenarios in
  * specs/support/agent-issue-reports.feature.
  */
-describe("agent reports intake", () => {
+describe("bug reports intake", () => {
   const testNamespace = `agent-report-int-${nanoid(8)}`;
   const createdReportIds: string[] = [];
   const createdProjectIds: string[] = [];
@@ -29,7 +29,7 @@ describe("agent reports intake", () => {
     body: Record<string, unknown>,
     headers: Record<string, string> = {},
   ) =>
-    app.request("/api/agent-reports", {
+    app.request("/api/bug-reports", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -51,7 +51,7 @@ describe("agent reports intake", () => {
   });
 
   afterAll(async () => {
-    await prisma.agentReport.deleteMany({
+    await prisma.bugReport.deleteMany({
       where: { id: { in: createdReportIds } },
     });
     for (const id of createdProjectIds)
@@ -70,9 +70,9 @@ describe("agent reports intake", () => {
       expect(response.status).toBe(201);
       const { id } = (await response.json()) as { id: string };
       trackReport(id);
-      expect(id).toMatch(/^agentreport_/);
+      expect(id).toMatch(/^bugreport_/);
 
-      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      const stored = await prisma.bugReport.findUnique({ where: { id } });
       expect(stored?.title).toBe(`${testNamespace} scenario create 500`);
       expect(stored?.source).toBe("cli");
       expect(stored?.kind).toBe("summary");
@@ -97,7 +97,7 @@ describe("agent reports intake", () => {
       const { id } = (await response.json()) as { id: string };
       trackReport(id);
 
-      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      const stored = await prisma.bugReport.findUnique({ where: { id } });
       const wire = JSON.stringify(stored);
       expect(wire).not.toContain(key);
       expect(stored?.title).toContain("[SECRET]");
@@ -121,7 +121,7 @@ describe("agent reports intake", () => {
       const { id } = (await response.json()) as { id: string };
       trackReport(id);
 
-      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      const stored = await prisma.bugReport.findUnique({ where: { id } });
       expect(stored?.sessionData).toBe(sessionData);
       expect(stored?.sessionTruncated).toBe(true);
     });
@@ -171,7 +171,7 @@ describe("agent reports intake", () => {
       const { id } = (await response.json()) as { id: string };
       trackReport(id);
 
-      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      const stored = await prisma.bugReport.findUnique({ where: { id } });
       expect(stored?.linkedProjectId).toBe(projectId);
     });
   });
@@ -186,7 +186,7 @@ describe("agent reports intake", () => {
       const { id } = (await response.json()) as { id: string };
       trackReport(id);
 
-      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      const stored = await prisma.bugReport.findUnique({ where: { id } });
       expect(stored?.linkedProjectId).toBeNull();
     });
   });
@@ -206,11 +206,11 @@ describe("agent reports intake", () => {
   describe("when Slack credentials are not configured", () => {
     /** @scenario "Missing Slack configuration never blocks intake" */
     it("stores the report without attempting a Slack call", async () => {
-      // The default notifier reads SLACK_AGENT_REPORTS_BOT_TOKEN, unset in
+      // The default notifier reads SLACK_BUG_REPORTS_BOT_TOKEN, unset in
       // tests, and returns before touching any transport.
       const fetchSpy = vi.spyOn(globalThis, "fetch");
       try {
-        const { id } = await submitAgentReport({
+        const { id } = await submitBugReport({
           input: {
             source: "cli",
             kind: "summary",
@@ -220,7 +220,7 @@ describe("agent reports intake", () => {
           callerKey: `noslack-${testNamespace}`,
         });
         trackReport(id);
-        const stored = await prisma.agentReport.findUnique({ where: { id } });
+        const stored = await prisma.bugReport.findUnique({ where: { id } });
         expect(stored?.title).toBe(`${testNamespace} no slack configured`);
         const slackCalls = fetchSpy.mock.calls.filter((call) =>
           String(call[0]).includes("slack.com"),
@@ -258,7 +258,7 @@ describe("agent reports intake", () => {
     it("rejects further reports for that caller only", async () => {
       const callerKey = `ratelimit-${testNamespace}`;
       const submitOnce = () =>
-        submitAgentReport({
+        submitBugReport({
           input: {
             source: "cli",
             kind: "summary",
@@ -273,9 +273,9 @@ describe("agent reports intake", () => {
         const { id } = await submitOnce();
         trackReport(id);
       }
-      await expect(submitOnce()).rejects.toThrow(AgentReportRateLimitedError);
+      await expect(submitOnce()).rejects.toThrow(BugReportRateLimitedError);
 
-      const other = await submitAgentReport({
+      const other = await submitBugReport({
         input: {
           source: "cli",
           kind: "summary",
@@ -292,8 +292,8 @@ describe("agent reports intake", () => {
   describe("when the team alert is delivered", () => {
     /** @scenario "The team is notified on Slack for each new report" */
     it("passes the stored report to the notifier", async () => {
-      const notified: AgentReport[] = [];
-      const { id } = await submitAgentReport({
+      const notified: BugReport[] = [];
+      const { id } = await submitBugReport({
         input: {
           source: "mcp",
           kind: "summary",
@@ -315,7 +315,7 @@ describe("agent reports intake", () => {
   describe("when the team alert fails", () => {
     /** @scenario "Slack failures never fail the report intake" */
     it("stores the report and succeeds anyway", async () => {
-      const { id } = await submitAgentReport({
+      const { id } = await submitBugReport({
         input: {
           source: "cli",
           kind: "summary",
@@ -328,7 +328,7 @@ describe("agent reports intake", () => {
         },
       });
       trackReport(id);
-      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      const stored = await prisma.bugReport.findUnique({ where: { id } });
       expect(stored?.title).toBe(`${testNamespace} slack down`);
     });
   });

@@ -93,7 +93,7 @@ describe("langwatch report", () => {
       });
 
       expect(received).toHaveLength(1);
-      expect(received[0]?.path).toBe("/api/agent-reports");
+      expect(received[0]?.path).toBe("/api/bug-reports");
       expect(received[0]?.body.kind).toBe("summary");
       expect(received[0]?.body.title).toBe("scenario create 500");
       expect(received[0]?.body.summary).toContain("HTTP 500");

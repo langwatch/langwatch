@@ -1,23 +1,23 @@
 import { generate } from "@langwatch/ksuid";
-import type { AgentReport, Prisma, PrismaClient } from "@prisma/client";
+import type { BugReport, Prisma, PrismaClient } from "@prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 /**
- * Storage for agent issue reports (`langwatch report` / the MCP report tool).
+ * Storage for bug reports (`langwatch report` / the MCP report tool).
  * A global support inbox: no tenancy column, read only from the admin
  * backoffice (see dbMultiTenancyProtection GLOBAL_MODELS).
  */
-export class AgentReportRepository {
+export class BugReportRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async create({
     data,
   }: {
-    data: Prisma.AgentReportCreateInput;
-  }): Promise<AgentReport> {
-    return this.prisma.agentReport.create({
+    data: Prisma.BugReportCreateInput;
+  }): Promise<BugReport> {
+    return this.prisma.bugReport.create({
       data: {
-        id: generate(KSUID_RESOURCES.AGENT_REPORT).toString(),
+        id: generate(KSUID_RESOURCES.BUG_REPORT).toString(),
         ...data,
       },
     });
@@ -35,8 +35,8 @@ export class AgentReportRepository {
     page: number;
     pageSize: number;
     search?: string;
-  }): Promise<Omit<AgentReport, "sessionData">[]> {
-    return this.prisma.agentReport.findMany({
+  }): Promise<Omit<BugReport, "sessionData">[]> {
+    return this.prisma.bugReport.findMany({
       where: buildSearchWhere(search),
       select: {
         id: true,
@@ -58,18 +58,18 @@ export class AgentReportRepository {
     });
   }
 
-  async findById({ id }: { id: string }): Promise<AgentReport | null> {
-    return this.prisma.agentReport.findUnique({ where: { id } });
+  async findById({ id }: { id: string }): Promise<BugReport | null> {
+    return this.prisma.bugReport.findUnique({ where: { id } });
   }
 
   async count({ search }: { search?: string } = {}): Promise<number> {
-    return this.prisma.agentReport.count({ where: buildSearchWhere(search) });
+    return this.prisma.bugReport.count({ where: buildSearchWhere(search) });
   }
 }
 
 function buildSearchWhere(
   search: string | undefined,
-): Prisma.AgentReportWhereInput | undefined {
+): Prisma.BugReportWhereInput | undefined {
   const term = search?.trim();
   if (!term) return undefined;
   return {
