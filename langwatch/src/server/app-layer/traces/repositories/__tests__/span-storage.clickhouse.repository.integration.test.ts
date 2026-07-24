@@ -886,21 +886,26 @@ describe("SpanStorageClickHouseRepository langwatch signals read (integration)",
 // surrogate pair") — failing the whole insert, exhausting retries, and
 // dead-lettering the span forever. `SPAN_INSERT_SETTINGS` disables that throw
 // (`input_format_json_throw_on_bad_escape_sequence: 0`) so the byte is kept as
-// text and the span survives. This suite drives the real production write path
-// against real ClickHouse: with the setting removed, `insertSpans` throws here
-// and the round-trip read finds nothing.
+// text and the span survives. This suite drives the real production write paths
+// (`insertSpan` and `insertSpans`) against real ClickHouse: with the setting
+// removed, the insert throws here and the round-trip read finds nothing.
 const LONE_HIGH_SURROGATE = "\uD83D";
 const LONE_LOW_SURROGATE = "\uDC00";
 
-function spanWithLoneSurrogates(
-  surrogateTenantId: string,
-  surrogateTraceId: string,
-): SpanInsertData {
+function spanWithLoneSurrogates({
+  tenantId: surrogateTenantId,
+  traceId: surrogateTraceId,
+  spanId,
+}: {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+}): SpanInsertData {
   return {
     id: `proj-${nanoid()}`,
     tenantId: surrogateTenantId,
     traceId: surrogateTraceId,
-    spanId: "surrogate-span",
+    spanId,
     parentSpanId: null,
     parentTraceId: null,
     parentIsRemote: null,
@@ -945,7 +950,6 @@ function spanWithLoneSurrogates(
 
 describe("SpanStorageClickHouseRepository lone-surrogate span insert (integration)", () => {
   const surrogateTenantId = `test-span-surrogate-${nanoid()}`;
-  const surrogateTraceId = `trace-${nanoid()}`;
 
   afterAll(async () => {
     if (ch) {
@@ -957,27 +961,55 @@ describe("SpanStorageClickHouseRepository lone-surrogate span insert (integratio
     }
   });
 
+  // Each test inserts its own span under a fresh traceId and reads it back
+  // within the same test — so it exercises the full write→read path on its own
+  // (no ordering dependency on a sibling test) and covers both repository write
+  // methods. Without `SPAN_INSERT_SETTINGS`, the insert throws the surrogate-
+  // pair parse error and the read-back finds nothing.
   describe("given a span whose name, status, scope, events and attributes carry lone UTF-16 surrogates", () => {
-    describe("when the repository inserts it through the JSONEachRow write path", () => {
-      it("does not throw the surrogate-pair parse error that dead-letters the span", async () => {
+    describe("when it is inserted through the bulk insertSpans write path", () => {
+      it("stores the span whole instead of throwing the surrogate-pair error that dead-letters it", async () => {
+        const traceId = `trace-${nanoid()}`;
         await expect(
           repo.insertSpans([
-            spanWithLoneSurrogates(surrogateTenantId, surrogateTraceId),
+            spanWithLoneSurrogates({
+              tenantId: surrogateTenantId,
+              traceId,
+              spanId: "surrogate-bulk",
+            }),
           ]),
         ).resolves.toBeUndefined();
-      });
 
-      it("persists the span so it reads back instead of being lost", async () => {
         const spans = await repo.getNormalizedSpansByTraceId({
           tenantId: surrogateTenantId,
-          traceId: surrogateTraceId,
+          traceId,
         });
+        const stored = spans.find((s) => s.spanId === "surrogate-bulk");
+        expect(stored).toBeDefined();
+        expect(String(stored?.spanAttributes.clean)).toBe("kept-verbatim");
+      });
+    });
 
-        const span = spans.find((s) => s.spanId === "surrogate-span");
-        expect(span).toBeDefined();
-        // Valid data on the same span is untouched — the insert stored the row
-        // whole, it did not drop the malformed fields or the clean ones.
-        expect(String(span?.spanAttributes.clean)).toBe("kept-verbatim");
+    describe("when it is inserted through the single insertSpan write path", () => {
+      it("stores the span whole instead of throwing the surrogate-pair error that dead-letters it", async () => {
+        const traceId = `trace-${nanoid()}`;
+        await expect(
+          repo.insertSpan(
+            spanWithLoneSurrogates({
+              tenantId: surrogateTenantId,
+              traceId,
+              spanId: "surrogate-single",
+            }),
+          ),
+        ).resolves.toBeUndefined();
+
+        const spans = await repo.getNormalizedSpansByTraceId({
+          tenantId: surrogateTenantId,
+          traceId,
+        });
+        const stored = spans.find((s) => s.spanId === "surrogate-single");
+        expect(stored).toBeDefined();
+        expect(String(stored?.spanAttributes.clean)).toBe("kept-verbatim");
       });
     });
   });
