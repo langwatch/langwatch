@@ -79,6 +79,7 @@ import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { codingAgentsRouter } from "./routers/codingAgents";
 import { translateRouter } from "./routers/translate";
+import { agentReportsRouter } from "./routers/agentReports";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { workflowRouter } from "./routers/workflows";
@@ -116,6 +117,7 @@ const coreRouters = {
   modelProvider: modelProviderRouter,
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
+  agentReports: agentReportsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,

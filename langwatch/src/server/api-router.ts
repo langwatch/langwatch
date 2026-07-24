@@ -35,6 +35,7 @@ import { app as teamsApp } from "../app/api/teams/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
+import { app as agentReportsApp } from "./routes/agent-reports";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
@@ -155,6 +156,7 @@ export function createApiRouter() {
   api.route("/", webhooksApp);
 
   api.route("/", adminApp);
+  api.route("/", agentReportsApp); // /api/agent-reports — public issue-report intake
   api.route("/", annotationsApp);
   // ORDERING: authCliApp MUST be registered BEFORE authApp.
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would

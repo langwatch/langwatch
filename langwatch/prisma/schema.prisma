@@ -3353,3 +3353,26 @@ model ScheduledJob {
   // conditional update keyed on the target identity.
   @@unique([targetType, targetId])
 }
+
+// Issue reports sent by customers' coding agents through `langwatch report`
+// (CLI) or the MCP report tool. A global support inbox, read only from the
+// admin backoffice: no tenancy column on purpose. `linkedProjectId` is
+// informational (resolved from an optional API key at intake, kept without an
+// FK so reports outlive project deletion).
+model AgentReport {
+  id               String   @id @default(nanoid())
+  createdAt        DateTime @default(now())
+  source           String
+  kind             String
+  title            String
+  summary          String?
+  sessionData      String?
+  sessionTruncated Boolean  @default(false)
+  agent            String?
+  contactEmail     String?
+  cliVersion       String?
+  linkedProjectId  String?
+  metadata         Json?
+
+  @@index([createdAt])
+}

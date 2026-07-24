@@ -45,6 +45,10 @@ const GLOBAL_MODELS = [
   // Cluster-wide kill switches; one row per flag key, no tenant column. Keeps
   // system-scoped flags off PostHog (see /ops/feature-flags).
   "FeatureFlag",
+  // Issue reports sent by customers' coding agents (`langwatch report`). A
+  // global support inbox read from the admin backoffice; `linkedProjectId` is
+  // informational only, so there is no tenancy column to constrain on.
+  "AgentReport",
 ] as const;
 
 /**

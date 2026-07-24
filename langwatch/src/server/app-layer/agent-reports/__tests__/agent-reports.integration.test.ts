@@ -1,0 +1,258 @@
+import type { AgentReport } from "@prisma/client";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { prisma } from "~/server/db";
+import { app } from "~/server/routes/agent-reports";
+import {
+  AgentReportRateLimitedError,
+  submitAgentReport,
+} from "../agent-report.service";
+
+/**
+ * Integration tests for the agent issue-report intake, against the real
+ * database and the real Hono route. Corresponds to the scenarios in
+ * specs/support/agent-issue-reports.feature.
+ */
+describe("agent reports intake", () => {
+  const testNamespace = `agent-report-int-${nanoid(8)}`;
+  const createdReportIds: string[] = [];
+  const createdProjectIds: string[] = [];
+  const createdTeamIds: string[] = [];
+  const createdOrgIds: string[] = [];
+
+  const trackReport = (id: string) => {
+    createdReportIds.push(id);
+    return id;
+  };
+
+  const postReport = async (
+    body: Record<string, unknown>,
+    headers: Record<string, string> = {},
+  ) =>
+    app.request("/api/agent-reports", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        // Distinct caller per namespace so the rate limiter never bleeds
+        // between test runs.
+        "x-forwarded-for": `test-${testNamespace}`,
+        ...headers,
+      },
+      body: JSON.stringify(body),
+    });
+
+  const baseReport = () => ({
+    source: "cli",
+    kind: "summary",
+    title: `${testNamespace} scenario create 500`,
+    summary: "running scenario create returned a 500 with no body",
+    agent: "claude-code",
+    cliVersion: "0.36.0",
+  });
+
+  afterAll(async () => {
+    await prisma.agentReport.deleteMany({
+      where: { id: { in: createdReportIds } },
+    });
+    for (const id of createdProjectIds)
+      await prisma.project.delete({ where: { id } }).catch(() => void 0);
+    for (const id of createdTeamIds)
+      await prisma.team.delete({ where: { id } }).catch(() => void 0);
+    for (const id of createdOrgIds)
+      await prisma.organization.delete({ where: { id } }).catch(() => void 0);
+  });
+
+  describe("when a summary report arrives without credentials", () => {
+    it("stores it and returns the new report id", async () => {
+      const response = await postReport(baseReport());
+      expect(response.status).toBe(201);
+      const { id } = (await response.json()) as { id: string };
+      trackReport(id);
+
+      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      expect(stored?.title).toBe(`${testNamespace} scenario create 500`);
+      expect(stored?.source).toBe("cli");
+      expect(stored?.kind).toBe("summary");
+      expect(stored?.agent).toBe("claude-code");
+      expect(stored?.linkedProjectId).toBeNull();
+    });
+  });
+
+  describe("when a full session report arrives", () => {
+    it("stores the transcript", async () => {
+      const sessionData = '{"role":"user","content":"it broke"}';
+      const response = await postReport({
+        ...baseReport(),
+        kind: "full_session",
+        sessionData,
+        sessionTruncated: true,
+      });
+      expect(response.status).toBe(201);
+      const { id } = (await response.json()) as { id: string };
+      trackReport(id);
+
+      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      expect(stored?.sessionData).toBe(sessionData);
+      expect(stored?.sessionTruncated).toBe(true);
+    });
+  });
+
+  describe("when a valid project API key is presented", () => {
+    let projectId: string;
+    let legacyApiKey: string;
+
+    beforeAll(async () => {
+      const organization = await prisma.organization.create({
+        data: {
+          name: `${testNamespace} org`,
+          slug: `${testNamespace}-org`,
+        },
+      });
+      createdOrgIds.push(organization.id);
+      const team = await prisma.team.create({
+        data: {
+          name: `${testNamespace} team`,
+          slug: `${testNamespace}-team`,
+          organizationId: organization.id,
+        },
+      });
+      createdTeamIds.push(team.id);
+      legacyApiKey = `${testNamespace}-key-${nanoid(16)}`;
+      const project = await prisma.project.create({
+        data: {
+          name: `${testNamespace} project`,
+          slug: `${testNamespace}-project`,
+          teamId: team.id,
+          language: "python",
+          framework: "openai",
+          apiKey: legacyApiKey,
+        },
+      });
+      createdProjectIds.push(project.id);
+      projectId = project.id;
+    });
+
+    it("links the report to the project", async () => {
+      const response = await postReport(baseReport(), {
+        "x-auth-token": legacyApiKey,
+      });
+      expect(response.status).toBe(201);
+      const { id } = (await response.json()) as { id: string };
+      trackReport(id);
+
+      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      expect(stored?.linkedProjectId).toBe(projectId);
+    });
+  });
+
+  describe("when an invalid API key is presented", () => {
+    it("still accepts the report, unlinked", async () => {
+      const response = await postReport(baseReport(), {
+        "x-auth-token": "sk-lw-definitely-not-a-real-key-000000",
+      });
+      expect(response.status).toBe(201);
+      const { id } = (await response.json()) as { id: string };
+      trackReport(id);
+
+      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      expect(stored?.linkedProjectId).toBeNull();
+    });
+  });
+
+  describe("when the submission is malformed", () => {
+    it("rejects a report without any content", async () => {
+      const response = await postReport({
+        source: "cli",
+        kind: "summary",
+        title: "no content at all",
+      });
+      expect(response.status).toBe(400);
+    });
+
+    it("rejects a report without a title", async () => {
+      const response = await postReport({
+        source: "cli",
+        kind: "summary",
+        summary: "something broke",
+      });
+      expect(response.status).toBe(400);
+    });
+  });
+
+  describe("when the caller exceeds the rate limit", () => {
+    it("rejects further reports for that caller only", async () => {
+      const callerKey = `ratelimit-${testNamespace}`;
+      const submitOnce = () =>
+        submitAgentReport({
+          input: {
+            source: "cli",
+            kind: "summary",
+            title: `${testNamespace} rate limited`,
+            summary: "spam",
+          },
+          callerKey,
+          notify: async () => void 0,
+        });
+
+      for (let i = 0; i < 10; i++) {
+        const { id } = await submitOnce();
+        trackReport(id);
+      }
+      await expect(submitOnce()).rejects.toThrow(AgentReportRateLimitedError);
+
+      const other = await submitAgentReport({
+        input: {
+          source: "cli",
+          kind: "summary",
+          title: `${testNamespace} other caller`,
+          summary: "fine",
+        },
+        callerKey: `other-${testNamespace}`,
+        notify: async () => void 0,
+      });
+      trackReport(other.id);
+    });
+  });
+
+  describe("when the team alert is delivered", () => {
+    it("passes the stored report to the notifier", async () => {
+      const notified: AgentReport[] = [];
+      const { id } = await submitAgentReport({
+        input: {
+          source: "mcp",
+          kind: "summary",
+          title: `${testNamespace} notified`,
+          summary: "notify me",
+        },
+        callerKey: `notify-${testNamespace}`,
+        notify: async ({ report }) => {
+          notified.push(report);
+        },
+      });
+      trackReport(id);
+      expect(notified).toHaveLength(1);
+      expect(notified[0]?.id).toBe(id);
+      expect(notified[0]?.title).toBe(`${testNamespace} notified`);
+    });
+  });
+
+  describe("when the team alert fails", () => {
+    it("stores the report and succeeds anyway", async () => {
+      const { id } = await submitAgentReport({
+        input: {
+          source: "cli",
+          kind: "summary",
+          title: `${testNamespace} slack down`,
+          summary: "still stored",
+        },
+        callerKey: `slackdown-${testNamespace}`,
+        notify: async () => {
+          throw new Error("slack unavailable");
+        },
+      });
+      trackReport(id);
+      const stored = await prisma.agentReport.findUnique({ where: { id } });
+      expect(stored?.title).toBe(`${testNamespace} slack down`);
+    });
+  });
+});
