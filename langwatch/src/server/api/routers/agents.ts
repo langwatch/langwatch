@@ -8,6 +8,7 @@ import {
   httpComponentSchema,
   signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
+import { dedentPythonCode } from "~/optimization_studio/utils/dedentPythonCode";
 import {
   type AgentComponentConfig,
   type AgentType,
@@ -40,6 +41,32 @@ const getConfigInputSchema = (type: AgentType) => {
       throw new Error(`Unknown agent type: ${_exhaustive}`);
     }
   }
+};
+
+/**
+ * Normalize the Python code parameter of a code-agent config on save:
+ * strip uniform leading indentation so it cannot persist un-normalized and
+ * later crash the code-block runner's compile() with IndentationError
+ * (issue #3013). Only touches a literal `{ identifier: "code", type: "code" }`
+ * parameter, so it is a no-op for every other agent type.
+ */
+const normalizeCodeAgentConfig = (
+  config: AgentComponentConfig,
+): AgentComponentConfig => {
+  const parameters = (config as { parameters?: unknown }).parameters;
+  if (!Array.isArray(parameters)) return config;
+  return {
+    ...config,
+    parameters: parameters.map((p) =>
+      p &&
+      typeof p === "object" &&
+      (p as { identifier?: unknown }).identifier === "code" &&
+      (p as { type?: unknown }).type === "code" &&
+      typeof (p as { value?: unknown }).value === "string"
+        ? { ...p, value: dedentPythonCode((p as { value: string }).value) }
+        : p,
+    ),
+  } as AgentComponentConfig;
 };
 
 /**
@@ -124,7 +151,7 @@ export const agentsRouter = createTRPCRouter({
         projectId: input.projectId,
         name: input.name,
         type: input.type,
-        config: input.config as AgentComponentConfig,
+        config: normalizeCodeAgentConfig(input.config as AgentComponentConfig),
         workflowId: input.workflowId,
       });
     }),
@@ -157,7 +184,9 @@ export const agentsRouter = createTRPCRouter({
           ...(input.name !== undefined && { name: input.name }),
           ...(input.type !== undefined && { type: input.type }),
           ...(input.config !== undefined && {
-            config: input.config as AgentComponentConfig,
+            config: normalizeCodeAgentConfig(
+              input.config as AgentComponentConfig,
+            ),
           }),
           ...(input.workflowId !== undefined && {
             workflowId: input.workflowId,

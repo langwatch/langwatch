@@ -48,6 +48,7 @@ import {
   buildCodeConfig,
   getCodeFromConfig,
 } from "~/optimization_studio/utils/codeAgentConfig";
+import { dedentPythonCode } from "~/optimization_studio/utils/dedentPythonCode";
 import type {
   AgentComponentConfig,
   TypedAgent,
@@ -230,9 +231,14 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
+    // Normalize indentation before saving so an accidental uniform indent
+    // (Monaco auto-indent on paste) can't persist and crash the runner's
+    // compile() downstream (issue #3013). The server save route enforces the
+    // same normalization for non-UI callers.
+    const normalizedCode = dedentPythonCode(code);
     // Build DSL-compatible config with current inputs/outputs/scenarioMappings/scenarioOutputField
     const config = buildCodeConfig({
-      code,
+      code: normalizedCode,
       inputs,
       outputs,
       scenarioMappings,
