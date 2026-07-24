@@ -213,6 +213,7 @@ import { NullOrganizationRepository } from "./organizations/repositories/organiz
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
+import { ModelProviderService } from "../modelProviders/modelProvider.service";
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
@@ -331,7 +332,10 @@ export function initializeDefaultApp(options?: {
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
-    new ProjectService(new PrismaProjectRepository(prisma)),
+    new ProjectService(
+      new PrismaProjectRepository(prisma),
+      ModelProviderService.create(prisma),
+    ),
     "ProjectService",
   );
   const presence = new PresenceService(

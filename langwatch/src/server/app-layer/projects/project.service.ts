@@ -2,6 +2,11 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
+import type { ModelProviderService } from "../../modelProviders/modelProvider.service";
+import {
+  PROVIDER_DEFAULT_MODELS,
+  PROVIDER_RESOLUTION_ORDER,
+} from "../../modelProviders/modelProvider.constants";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -62,10 +67,70 @@ export interface CreateProjectParams {
 }
 
 export class ProjectService {
-  constructor(readonly repo: ProjectRepository) {}
+  constructor(
+    readonly repo: ProjectRepository,
+    private readonly modelProviderService?: ModelProviderService,
+  ) {}
 
   async getById(id: string): Promise<Project | null> {
     return this.repo.getById(id);
+  }
+
+  /**
+   * Provider-level fallback for the project's default model.
+   *
+   * Walks enabled providers in `PROVIDER_RESOLUTION_ORDER` and returns the
+   * first one that has a canonical default in `PROVIDER_DEFAULT_MODELS`.
+   * Returns null when no providers are usable (new self-host install with no
+   * env vars set, or all providers disabled).
+   *
+   * For callers that need the full cascade (project → team → org overrides),
+   * use `modelProvider.getResolvedDefault` (tRPC) or `getResolvedDefaultForFeature`
+   * (server-side) instead — they layer DB-backed `ModelDefaultConfig` on top.
+   */
+  async resolveDefaultModel(projectId: string): Promise<string | null> {
+    if (!this.modelProviderService) {
+      // Null preset — no provider access available; fall through to null.
+      return null;
+    }
+
+    // project.defaultModel was removed in ADR-021 (iter 109). Defaults now live
+    // in ModelDefaultConfig rows and are resolved via the feature-key cascade.
+    // This method provides the provider-level fallback for callers that have not
+    // yet migrated to getResolvedDefaultForFeature — it finds the first enabled
+    // provider that has a canonical default in PROVIDER_DEFAULT_MODELS.
+    let modelProviders: Awaited<
+      ReturnType<
+        typeof this.modelProviderService.getProjectModelProviders
+      >
+    >;
+    try {
+      modelProviders =
+        await this.modelProviderService.getProjectModelProviders(projectId, true);
+    } catch (error) {
+      logger.error(
+        { projectId, error },
+        "resolveDefaultModel: provider lookup failed — returning null",
+      );
+      captureException(error instanceof Error ? error : new Error(String(error)), {
+        extra: { projectId, error },
+      });
+      return null;
+    }
+
+    // Walk providers in preferred order, return first usable canonical default.
+    for (const providerId of PROVIDER_RESOLUTION_ORDER) {
+      const provider = modelProviders[providerId];
+      if (!provider?.enabled) continue;
+
+      const canonicalModel = PROVIDER_DEFAULT_MODELS[providerId];
+      if (!canonicalModel) continue;
+
+      return canonicalModel;
+    }
+
+    // Nothing usable.
+    return null;
   }
 
   async create(params: CreateProjectParams): Promise<Project> {
