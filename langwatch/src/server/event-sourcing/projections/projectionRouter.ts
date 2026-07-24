@@ -13,6 +13,7 @@ import {
   incrementEsProjectionTotal,
   incrementEsReactorCollapsedTotal,
   incrementEsReactorTotal,
+  incrementEsSubscriberEnqueueTotal,
   incrementEsSubscriberTotal,
   observeEsFoldProjectionDuration,
   observeEsMapProjectionDuration,
@@ -37,6 +38,7 @@ import {
 import type { QueueManager } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import { makeStagedProjection } from "../subscribers/stagedProjection";
 import { EventUtils } from "../utils/event.utils";
 import { isComponentDisabled } from "../utils/killSwitch";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry";
@@ -1192,16 +1194,47 @@ export class ProjectionRouter<
               subscriber.eventTypes.includes(event.type),
             );
 
+      const enqueue = subscriber.options?.enqueue;
+
       for (const event of matching) {
         try {
+          // Enqueue-time filter (ADR-069 invariant 4): a declined event never
+          // mints a job. A throw here is deliberately NOT caught as `false` —
+          // it falls through to the catch below and into the routing retry.
+          if (enqueue?.filter && !enqueue.filter(event)) {
+            incrementEsSubscriberEnqueueTotal({
+              pipelineName: this.pipelineName,
+              subscriberName: name,
+              outcome: "filtered",
+            });
+            continue;
+          }
+
+          // Enqueue-time projection: stage the lifted slice instead of the
+          // full event, so the handler never re-buys the payload. The envelope
+          // mirrors the event's routing metadata, so group/score/dedup/span
+          // resolution downstream is unchanged.
+          const staged = enqueue?.project
+            ? (makeStagedProjection({
+                event,
+                projection: enqueue.project(event),
+              }) as unknown as EventType)
+            : event;
+
+          incrementEsSubscriberEnqueueTotal({
+            pipelineName: this.pipelineName,
+            subscriberName: name,
+            outcome: enqueue?.project ? "projected" : "staged_full",
+          });
+
           if (queued) {
             const queue = this.queueManager.getSubscriberQueue(name);
             if (queue) {
-              await queue.send(event);
+              await queue.send(staged);
               continue;
             }
           }
-          await this.handleSubscriber(subscriber, event);
+          await this.handleSubscriber(subscriber, staged);
         } catch (error) {
           this.logger.error(
             {
