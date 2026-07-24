@@ -631,6 +631,31 @@ export const observeEsSubscriberDuration = ({
 }) =>
   esSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
 
+/**
+ * Outcome of a subscriber's enqueue-time fan-out decision (payload-cost
+ * doctrine invariant 4 — ADR-069): `filtered` (predicate declined, no job
+ * minted), `projected` (staged carrying the lifted projection), or
+ * `staged_full` (staged carrying the full event — no `project` configured).
+ */
+type SubscriberEnqueueOutcome = "filtered" | "projected" | "staged_full";
+register.removeSingleMetric("es_subscriber_enqueue_total");
+const esSubscriberEnqueueTotal = new Counter({
+  name: "es_subscriber_enqueue_total",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, staged with a projection, or staged with the full event",
+  labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
+});
+
+export const incrementEsSubscriberEnqueueTotal = ({
+  pipelineName,
+  subscriberName,
+  outcome,
+}: {
+  pipelineName: string;
+  subscriberName: string;
+  outcome: SubscriberEnqueueOutcome;
+}) =>
+  esSubscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
+
 // --- Process manager metrics ---
 register.removeSingleMetric("es_process_manager_total");
 const esProcessManagerTotal = new Counter({
