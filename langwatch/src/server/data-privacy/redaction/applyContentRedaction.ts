@@ -8,7 +8,7 @@ import {
   isSensitiveAttributeKey,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
-} from "./secretsRedaction";
+} from "@langwatch/redaction";
 
 const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
   ESSENTIAL_PII_ENTITIES,

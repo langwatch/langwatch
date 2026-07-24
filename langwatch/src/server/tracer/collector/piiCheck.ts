@@ -3,7 +3,7 @@ import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { createLogger } from "@langwatch/observability";
 import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
-import { normalizePresidioMarkers } from "../../data-privacy/redaction/markers";
+import { normalizePresidioMarkers } from "@langwatch/redaction";
 import type { BatchEvaluationResult } from "../../evaluations/evaluators";
 import {
   evaluationDurationHistogram,

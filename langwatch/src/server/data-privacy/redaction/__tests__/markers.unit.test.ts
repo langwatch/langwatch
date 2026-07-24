@@ -8,7 +8,7 @@ import {
   normalizePresidioMarkers,
   REDACTION_MARKER_ENTITIES,
   SECRET_MARKER_ENTITY,
-} from "../markers";
+} from "@langwatch/redaction";
 
 describe("redaction markers", () => {
   describe("when the engine entity lists change", () => {

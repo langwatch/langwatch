@@ -6,7 +6,7 @@ import {
   detectSecretsInText,
   isSensitiveAttributeKey,
   redactSecretsInText,
-} from "../secretsRedaction";
+} from "../secrets.js";
 
 const redact = (text: string, customPatterns?: readonly RegExp[]) =>
   redactSecretsInText({ text, customPatterns });

@@ -1,5 +1,5 @@
 import { findPhoneNumbersInText } from "libphonenumber-js";
-import { formatPiiMarker } from "./markers";
+import { formatPiiMarker } from "@langwatch/redaction";
 
 /**
  * Native, lightweight redaction for the "essential" PII level: the pattern- and

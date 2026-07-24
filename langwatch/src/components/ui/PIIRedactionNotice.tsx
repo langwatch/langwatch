@@ -1,7 +1,7 @@
 import { Alert, Link } from "@chakra-ui/react";
 import NextLink from "~/utils/compat/next-link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { hasRedactionMarker } from "~/server/data-privacy/redaction/markers";
+import { hasRedactionMarker } from "@langwatch/redaction";
 
 /**
  * Banner shown when trace content carries redaction markers.

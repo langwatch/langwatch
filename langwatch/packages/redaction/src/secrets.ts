@@ -1,15 +1,20 @@
 /**
- * Native, lightweight secrets redaction for the ingestion pipeline.
+ * Native, lightweight secrets redaction.
  *
  * Scrubs credentials (cloud + provider API keys, JWTs, private-key blocks,
  * database-URL passwords, bearer tokens) out of free text, plus a key-name pass
- * for obviously-sensitive attribute names. Runs in-process per span: no external
- * service, no entropy scanning (too noisy for v1), all patterns precompiled and
+ * for obviously-sensitive attribute names. Runs in-process: no external
+ * service, no entropy scanning (too noisy), all patterns precompiled and
  * linear-time. Detected secrets are replaced with the typed `[SECRET]` marker,
  * which the trace view reads back and which keeps the secrets evaluator able to
  * flag a credential that was already scrubbed at ingestion.
+ *
+ * Shared across the platform: the ingestion pipeline redacts every span with
+ * these rules, and the `langwatch` CLI ships a verbatim mirror (see
+ * `sessionReport.ts`) so issue reports are scrubbed with the exact same rules
+ * before leaving the user's machine.
  */
-import { SECRET_MARKER } from "./markers";
+import { SECRET_MARKER } from "./markers.js";
 
 /** The placeholder a redacted secret is replaced with. */
 export const SECRETS_REDACTION_MARKER = SECRET_MARKER;
@@ -84,8 +89,11 @@ const VALUE_RULES: ValueRule[] = [
   {
     id: "url_credentials",
     description: "Password embedded in a connection URL",
-    // scheme://user:password@host -> keep everything but the password.
-    regex: /([a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:)([^\s:@/]+)(@)/gi,
+    // scheme://user:password@host -> keep everything but the password. The
+    // scheme length is bounded (real schemes are short) so a long run of
+    // name-like characters costs constant backtracking per position instead
+    // of a quadratic scan on huge inputs.
+    regex: /([a-z][a-z0-9+.-]{0,30}:\/\/[^\s:@/]+:)([^\s:@/]+)(@)/gi,
     render: (_m, prefix, _password, at) => `${prefix}${REPLACEMENT}${at}`,
   },
   {
