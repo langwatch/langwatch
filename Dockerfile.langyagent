@@ -128,6 +128,7 @@ COPY langwatch/src/server/filters/types.ts            /src/langwatch/src/server/
 COPY langwatch/src/server/evaluations/types.ts        /src/langwatch/src/server/evaluations/types.ts
 COPY langwatch/src/server/evaluations/evaluators.native.ts /src/langwatch/src/server/evaluations/evaluators.native.ts
 COPY langwatch/src/server/modelProviders/llmModels.json /src/langwatch/src/server/modelProviders/llmModels.json
+COPY langwatch/packages/redaction/src               /src/langwatch/packages/redaction/src
 COPY langwatch/src/app/api/openapiLangWatch.json      /src/langwatch/src/app/api/openapiLangWatch.json
 COPY langevals/ts-integration/evaluators.generated.ts /src/langevals/ts-integration/evaluators.generated.ts
 # copy-types.sh also embeds the repo-root feature-map.json (feature-map.generated.ts),
