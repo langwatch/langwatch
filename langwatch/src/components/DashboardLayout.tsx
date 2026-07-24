@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Info,
   KeyRound,
+  Monitor,
   Plus,
 } from "lucide-react";
 import numeral from "numeral";
@@ -54,6 +55,10 @@ import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { SavedViewsProvider } from "../hooks/useSavedViews";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
+import {
+  type GraphicsQualityOverride,
+  useGraphicsQualityOverrideStore,
+} from "../stores/graphicsQualityOverrideStore";
 import { api } from "../utils/api";
 import {
   buildProjectSwitchHref,
@@ -79,6 +84,12 @@ import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
 import { useWorkspaceData } from "./useWorkspaceData";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+
+const GRAPHICS_OVERRIDE_LABELS: Record<GraphicsQualityOverride, string> = {
+  auto: "Auto",
+  on: "On",
+  off: "Off",
+};
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   // No redirects from the breadcrumb path - it only reads `project` for the
@@ -469,6 +480,13 @@ export const DashboardLayout = ({
     { organizationId: organization?.id, enabled: !!organization?.id },
   );
 
+  const graphicsQualityOverride = useGraphicsQualityOverrideStore(
+    (s) => s.override,
+  );
+  const setGraphicsQualityOverride = useGraphicsQualityOverrideStore(
+    (s) => s.setOverride,
+  );
+
   usePostHogIdentify({
     session: session ?? null,
     organization,
@@ -827,6 +845,33 @@ export const DashboardLayout = ({
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
+                    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                      <Menu.TriggerItem value="reduced-graphics">
+                        <Monitor size={14} />
+                        Reduced graphics (
+                        {GRAPHICS_OVERRIDE_LABELS[graphicsQualityOverride]})
+                      </Menu.TriggerItem>
+                      <Menu.Content>
+                        <Menu.RadioItemGroup
+                          value={graphicsQualityOverride}
+                          onValueChange={(e) =>
+                            setGraphicsQualityOverride(
+                              e.value as GraphicsQualityOverride,
+                            )
+                          }
+                        >
+                          <Menu.RadioItem value="auto">
+                            Auto — adapts to this device on its own
+                          </Menu.RadioItem>
+                          <Menu.RadioItem value="on">
+                            On — always keep things responsive
+                          </Menu.RadioItem>
+                          <Menu.RadioItem value="off">
+                            Off — always show full decorative effects
+                          </Menu.RadioItem>
+                        </Menu.RadioItemGroup>
+                      </Menu.Content>
+                    </Menu.Root>
                     {showPresenceMenuItem && <PresenceMenuItem />}
                     <Menu.Item value="logout" asChild>
                       <a href="/api/auth/logout">Logout</a>
