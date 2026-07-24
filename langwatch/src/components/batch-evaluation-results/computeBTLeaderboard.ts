@@ -287,6 +287,26 @@ function fitBT(
   return { strength: p, converged };
 }
 
+/**
+ * The Beta(eps, eps) prior a given win matrix needs to keep MM finite.
+ *
+ * Shared by the point fit and by every bootstrap replicate: any variant with
+ * no wins or no losses makes the MLE degenerate, and the prior (Hunter §4) is
+ * what keeps its strength off zero without reordering healthy data.
+ */
+function smoothingFor(W: number[][], n: number): number {
+  for (let i = 0; i < n; i++) {
+    let wins = 0;
+    let losses = 0;
+    for (let j = 0; j < n; j++) {
+      wins += W[i]?.[j] ?? 0;
+      losses += W[j]?.[i] ?? 0;
+    }
+    if (wins === 0 || losses === 0) return 0.5;
+  }
+  return 0;
+}
+
 function bootstrapScoreCI(
   comparisons: PairwiseComparison[],
   idx: Map<string, number>,
@@ -308,7 +328,14 @@ function bootstrapScoreCI(
       resampled[k] = comparisons[r]!;
     }
     const Wb = buildWinMatrix(resampled, idx, n);
-    const { strength } = fitBT(Wb, smooth, maxIter, tol);
+    // Smoothing must be decided per replicate, not inherited from the full
+    // dataset. A resample routinely contains a variant that happened to win
+    // nothing, even when no variant is degenerate overall — and with smooth=0
+    // that variant's strength goes to 0, so 400*log10(0) is -Infinity and the
+    // geometric-mean renormalisation throws its opponent to ~1e300, i.e.
+    // +120000. The resulting interval is not merely wide, it is fabricated,
+    // and it is finite, so downstream isFinite() guards let it through.
+    const { strength } = fitBT(Wb, smoothingFor(Wb, n), maxIter, tol);
     for (let i = 0; i < n; i++) {
       scoreSamples[i]!.push(400 * Math.log10(strength[i] ?? 1));
     }

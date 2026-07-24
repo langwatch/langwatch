@@ -220,3 +220,53 @@ describe("computeBTLeaderboard", () => {
     expect(result.winMatrix["C"]!["A"]).toBe(0);
   });
 });
+
+describe("computeBTLeaderboard bootstrap stability", () => {
+  describe("given a small sample where a resample can wipe out a variant's wins", () => {
+    // The regime this feature explicitly warns about (under 30 matchups) was
+    // the regime where the interval was fabricated: a replicate containing a
+    // zero-win variant sent its score to -Infinity and its opponent's to
+    // ~+120000. Those bounds are FINITE, so isFinite() guards downstream let
+    // them through, and the verdict then reads every pair as overlapping.
+    const comparisons = [
+      ...Array.from({ length: 8 }, () => ({
+        candidates: ["a", "b"],
+        winner: "a",
+      })),
+      ...Array.from({ length: 2 }, () => ({
+        candidates: ["a", "b"],
+        winner: "b",
+      })),
+    ];
+
+    it("produces intervals that stay within a plausible range", () => {
+      const result = computeBTLeaderboard(comparisons, ["a", "b"], {
+        bootstrapSamples: 200,
+        seed: 1,
+      });
+
+      for (const entry of result.entries) {
+        expect(entry.scoreCI).not.toBeNull();
+        const [lower, upper] = entry.scoreCI!;
+        expect(Number.isFinite(lower)).toBe(true);
+        expect(Number.isFinite(upper)).toBe(true);
+        // Elo-style points. Anything past a few thousand is divergence, not
+        // uncertainty — the pre-fix values were ~60000.
+        expect(Math.abs(lower)).toBeLessThan(2000);
+        expect(Math.abs(upper)).toBeLessThan(2000);
+      }
+    });
+
+    it("keeps the interval ordered and containing the point estimate", () => {
+      const result = computeBTLeaderboard(comparisons, ["a", "b"], {
+        bootstrapSamples: 200,
+        seed: 1,
+      });
+
+      for (const entry of result.entries) {
+        const [lower, upper] = entry.scoreCI!;
+        expect(lower).toBeLessThanOrEqual(upper);
+      }
+    });
+  });
+});
