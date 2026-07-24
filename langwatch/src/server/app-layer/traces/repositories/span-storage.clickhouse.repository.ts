@@ -206,7 +206,20 @@ const SUMMARY_SPAN_SELECT = `
   SpanName,
   DurationMs,
   StatusCode,
-  SpanAttributes['langwatch.span.type'] AS SpanType,
+  coalesce(
+    nullIf(SpanAttributes['langwatch.span.type'], ''),
+    SpanAttributes['span.type']
+  ) AS SpanType,
+  coalesce(
+    nullIf(SpanAttributes['gen_ai.tool.name'], ''),
+    SpanAttributes['tool_name']
+  ) AS ToolName,
+  SpanAttributes['request_id'] AS RequestId,
+  SpanAttributes['query_source'] AS QuerySource,
+  coalesce(
+    nullIf(SpanAttributes['tool_use_id'], ''),
+    SpanAttributes['gen_ai.tool.call.id']
+  ) AS ToolUseId,
   SpanAttributes['gen_ai.request.model'] AS Model,
   SpanAttributes['gen_ai.response.model'] AS ResponseModel,
   SpanAttributes['gen_ai.usage.cost'] AS Cost,
@@ -337,6 +350,15 @@ export interface SpanSummaryQueryRow {
   DurationMs: number;
   StatusCode: number | null;
   SpanType: string;
+  // Semconv `gen_ai.tool.name` first, claude's bare `tool_name` second —
+  // whichever the emitter used, the waterfall can label the tool row.
+  ToolName: string;
+  // Claude joins: request_id ties llm_request spans to their api_* logs,
+  // query_source scopes positional prompt pairing, tool_use_id ties tool
+  // spans to tool_decision/tool_result logs. Server-side only.
+  RequestId: string;
+  QuerySource: string;
+  ToolUseId: string;
   Model: string;
   ResponseModel: string;
   // `SpanAttributes[...]` materialises as the raw map value; ClickHouse
@@ -423,6 +445,10 @@ export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
     durationMs: Number(row.DurationMs),
     statusCode: row.StatusCode,
     spanType: row.SpanType || null,
+    toolName: row.ToolName || null,
+    requestId: row.RequestId || null,
+    querySource: row.QuerySource || null,
+    toolUseId: row.ToolUseId || null,
     model: row.Model || null,
     cost,
     inputTokens,

@@ -54,19 +54,21 @@ describe("ioPreviewWillRenderFor", () => {
     });
   });
 
-  describe("given a row missing either side", () => {
-    it("skips when only input is present", () => {
+  describe("given a row missing one side", () => {
+    it("renders when only input is present (the preview shows a missing-output placeholder)", () => {
       expect(
         ioPreviewWillRenderFor(row({ input: "hi", output: null }), false),
-      ).toBe(false);
+      ).toBe(true);
     });
 
-    it("skips when only output is present", () => {
+    it("renders when only output is present", () => {
       expect(
         ioPreviewWillRenderFor(row({ input: null, output: "hello" }), false),
-      ).toBe(false);
+      ).toBe(true);
     });
+  });
 
+  describe("given a row with neither side", () => {
     it("skips when both are null", () => {
       expect(
         ioPreviewWillRenderFor(row({ input: null, output: null }), false),

@@ -642,4 +642,53 @@ describe("unflattenDotNotation", () => {
       expect(result).toEqual({});
     });
   });
+
+  describe("when a tool span carries only the tool-call semconv keys", () => {
+    it("maps gen_ai.tool.call.arguments to input as parsed json", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "tool",
+          "gen_ai.tool.name": "bash",
+          "gen_ai.tool.call.arguments": '{"command":"ls -la"}',
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({
+        type: "json",
+        value: { command: "ls -la" },
+      });
+    });
+
+    it("maps gen_ai.tool.call.result to output, keeping non-JSON as text", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "tool",
+          "gen_ai.tool.call.result": "total 12\ndrwxr-xr-x .",
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.output).toEqual({
+        type: "text",
+        value: "total 12\ndrwxr-xr-x .",
+      });
+    });
+
+    it("keeps langwatch.input priority over the tool-call fallback", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "tool",
+          "langwatch.input": "explicit input",
+          "gen_ai.tool.call.arguments": '{"command":"ls"}',
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.input).toEqual({ type: "text", value: "explicit input" });
+    });
+  });
 });

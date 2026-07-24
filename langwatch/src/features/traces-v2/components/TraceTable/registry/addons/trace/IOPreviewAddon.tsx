@@ -93,9 +93,12 @@ export function ioPreviewWillRenderFor(
   row: TraceListItem,
   isExpanded: boolean,
 ): boolean {
+  // One recorded side is enough: a coding-agent turn often has an input but
+  // no summarised output (or vice versa), and hiding the whole preview made
+  // those rows read as content-free. The preview itself renders a muted
+  // placeholder for the missing side.
   const hasIO = row.input !== null || row.output !== null;
-  const isLLM = row.input !== null && row.output !== null;
-  return isLLM && hasIO && !isExpanded;
+  return hasIO && !isExpanded;
 }
 
 /** Test-only re-export — pure layout helper kept private otherwise. */
@@ -175,6 +178,9 @@ export const IOPreviewAddon: AddonDef<TraceListItem> = {
                 output={row.output}
                 inputMediaRefs={row.inputMediaRefs}
                 outputMediaRefs={row.outputMediaRefs}
+                showMissingPlaceholders
+                inputRedacted={row.inputRedacted}
+                outputRedacted={row.outputRedacted}
               />
             ) : null}
           </Td>
