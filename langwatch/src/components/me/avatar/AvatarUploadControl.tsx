@@ -1,13 +1,17 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Pencil } from "lucide-react";
+import { Box, Button, Center, HStack } from "@chakra-ui/react";
+import { Info, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
+import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useSession } from "~/utils/auth-client";
 import { api } from "~/utils/api";
 import { AvatarImageError, processAvatarImage } from "./processAvatarImage";
 
-/** The photo itself as the edit control — a pencil badge overlays it. */
+const FORMAT_HINT = "PNG, JPG, WEBP or GIF, up to 8 MB. Cropped to a square.";
+
+/** The photo as the edit control — a pencil badge overlays it; click opens the dialog. */
 function AvatarEditButton({
   name,
   image,
@@ -67,61 +71,100 @@ function AvatarEditButton({
   );
 }
 
-/** Save/Cancel while previewing a pick, or Remove when a photo is already set. */
-function AvatarActions({
-  hasPreview,
+/** LinkedIn-style "Profile photo" dialog — view the photo large, then change it. */
+function AvatarPhotoDialog({
+  isOpen,
+  onOpenChange,
+  name,
+  image,
   hasImage,
+  hasPreview,
   isBusy,
   isSaving,
   isRemoving,
+  onChange,
+  onRemove,
   onSave,
   onCancel,
-  onRemove,
 }: {
-  hasPreview: boolean;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  name: string | null;
+  image: string | null;
   hasImage: boolean;
+  hasPreview: boolean;
   isBusy: boolean;
   isSaving: boolean;
   isRemoving: boolean;
+  onChange: () => void;
+  onRemove: () => void;
   onSave: () => void;
   onCancel: () => void;
-  onRemove: () => void;
 }) {
-  if (hasPreview) {
-    return (
-      <HStack gap={2}>
-        <Button size="sm" onClick={onSave} loading={isSaving} disabled={isBusy}>
-          Save photo
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel} disabled={isBusy}>
-          Cancel
-        </Button>
-      </HStack>
-    );
-  }
-  if (hasImage) {
-    return (
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="red"
-        onClick={onRemove}
-        loading={isRemoving}
-        disabled={isBusy}
-      >
-        Remove
-      </Button>
-    );
-  }
-  return null;
+  return (
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={(e) => onOpenChange(e.open)}
+      size="sm"
+    >
+      <Dialog.Content bg="bg">
+        <Dialog.Header>
+          <Dialog.Title>Profile photo</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body>
+          <Center py={2}>
+            <UserAvatar
+              name={name}
+              image={image}
+              width="180px"
+              height="180px"
+              borderWidth="1px"
+              borderColor="border.muted"
+            />
+          </Center>
+        </Dialog.Body>
+        <Dialog.Footer>
+          {hasPreview ? (
+            <HStack gap={2}>
+              <Button variant="ghost" onClick={onCancel} disabled={isBusy}>
+                Cancel
+              </Button>
+              <Button onClick={onSave} loading={isSaving} disabled={isBusy}>
+                Save photo
+              </Button>
+            </HStack>
+          ) : (
+            <HStack gap={2}>
+              {hasImage && (
+                <Button
+                  variant="ghost"
+                  colorPalette="red"
+                  onClick={onRemove}
+                  loading={isRemoving}
+                  disabled={isBusy}
+                >
+                  Remove
+                </Button>
+              )}
+              <Button onClick={onChange} disabled={isBusy}>
+                {hasImage ? "Change photo" : "Upload photo"}
+              </Button>
+            </HStack>
+          )}
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
 }
 
 /**
- * Profile-settings control to upload, preview, and remove the user's own avatar
- * photo. The avatar itself is the edit affordance (a pencil badge sits on it);
- * clicking it opens the file picker. The photo flows to every avatar surface
- * via `User.image`. `organizationId` scopes the personal-workspace the photo is
- * stored under.
+ * Profile-settings control for the user's avatar. Clicking the photo opens a
+ * dialog where the current photo is shown large (view) and can be replaced
+ * (change) — the format/size constraints live in the adjacent info tooltip.
+ * The photo flows to every avatar surface via `User.image`.
+ *
+ * `organizationId` scopes the personal-workspace the photo is stored under.
  *
  * Spec: specs/settings/user-avatar.feature
  */
@@ -132,6 +175,7 @@ export function AvatarUploadControl({
 }) {
   const session = useSession();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -142,6 +186,7 @@ export function AvatarUploadControl({
     onSuccess: async () => {
       await session.update();
       setPreview(null);
+      setIsOpen(false);
       toaster.create({ title: "Photo updated", type: "success" });
     },
     onError: (err) =>
@@ -166,7 +211,8 @@ export function AvatarUploadControl({
       }),
   });
 
-  const isBusy = isProcessing || setAvatar.isPending || removeAvatar.isPending;
+  const isBusy =
+    isProcessing || setAvatar.isPending || removeAvatar.isPending;
 
   const onFilePicked = async (file: File | undefined) => {
     // Allow re-selecting the same file later by clearing the input value.
@@ -190,14 +236,25 @@ export function AvatarUploadControl({
   };
 
   return (
-    <HStack gap={4} align="center">
-      <AvatarEditButton
-        name={name}
-        image={preview ?? currentImage}
-        label={currentImage ? "Change photo" : "Upload photo"}
-        isDisabled={isBusy}
-        onOpen={() => fileInputRef.current?.click()}
-      />
+    <>
+      <HStack gap={2.5} align="center">
+        <AvatarEditButton
+          name={name}
+          image={currentImage}
+          label={currentImage ? "Edit profile photo" : "Add profile photo"}
+          isDisabled={isBusy}
+          onOpen={() => setIsOpen(true)}
+        />
+        <Tooltip content={FORMAT_HINT} positioning={{ placement: "right" }}>
+          <Box
+            display="inline-flex"
+            color="fg.muted"
+            aria-label={FORMAT_HINT}
+          >
+            <Info size={16} />
+          </Box>
+        </Tooltip>
+      </HStack>
 
       <input
         ref={fileInputRef}
@@ -207,23 +264,27 @@ export function AvatarUploadControl({
         onChange={(e) => void onFilePicked(e.target.files?.[0])}
       />
 
-      <VStack align="start" gap={2}>
-        <AvatarActions
-          hasPreview={!!preview}
-          hasImage={!!currentImage}
-          isBusy={isBusy}
-          isSaving={setAvatar.isPending}
-          isRemoving={removeAvatar.isPending}
-          onSave={() => {
-            if (preview) setAvatar.mutate({ organizationId, imageDataUrl: preview });
-          }}
-          onCancel={() => setPreview(null)}
-          onRemove={() => removeAvatar.mutate({})}
-        />
-        <Text fontSize="xs" color="fg.muted">
-          PNG, JPG, WEBP or GIF, up to 8 MB. Cropped to a square.
-        </Text>
-      </VStack>
-    </HStack>
+      <AvatarPhotoDialog
+        isOpen={isOpen}
+        onOpenChange={(open) => {
+          if (isBusy) return;
+          setIsOpen(open);
+          if (!open) setPreview(null);
+        }}
+        name={name}
+        image={preview ?? currentImage}
+        hasImage={!!currentImage}
+        hasPreview={!!preview}
+        isBusy={isBusy}
+        isSaving={setAvatar.isPending}
+        isRemoving={removeAvatar.isPending}
+        onChange={() => fileInputRef.current?.click()}
+        onRemove={() => removeAvatar.mutate({})}
+        onSave={() => {
+          if (preview) setAvatar.mutate({ organizationId, imageDataUrl: preview });
+        }}
+        onCancel={() => setPreview(null)}
+      />
+    </>
   );
 }
