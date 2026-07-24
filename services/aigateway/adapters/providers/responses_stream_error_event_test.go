@@ -38,7 +38,9 @@ func TestResponsesStream_MidStreamErrorEvent_KeepsUpstreamPayload(t *testing.T) 
 	require.NoError(t, err)
 
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "/v1/responses", r.URL.Path)
+		// assert, not require: FailNow inside an http handler goroutine is
+		// undefined behavior (testifylint go-require).
+		assert.Equal(t, "/v1/responses", r.URL.Path)
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(fixture)

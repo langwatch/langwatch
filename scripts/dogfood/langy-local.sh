@@ -123,8 +123,10 @@ check_key() {
     warn "$name REJECTED by the provider (HTTP $code), turns on this provider will fail"
   fi
 }
-check_key OPENAI_API_KEY "https://api.openai.com/v1/models" "Authorization: Bearer "
-check_key ANTHROPIC_API_KEY "https://api.anthropic.com/v1/models" "x-api-key: " "anthropic-version: 2023-06-01"
+# The provider endpoints are overridable so tests (and proxy setups) can
+# point the checks somewhere reachable.
+check_key OPENAI_API_KEY "${LANGY_DOCTOR_OPENAI_URL:-https://api.openai.com/v1/models}" "Authorization: Bearer "
+check_key ANTHROPIC_API_KEY "${LANGY_DOCTOR_ANTHROPIC_URL:-https://api.anthropic.com/v1/models}" "x-api-key: " "anthropic-version: 2023-06-01"
 
 # --- verdict ---------------------------------------------------------------
 echo
