@@ -176,7 +176,9 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     name: "Enterprise",
     maxMembers: 1000,
     maxProjects: 9999,
-    maxMessagesPerMonth: 1_000_000,
+    // Enterprise is never ingestion-capped; a per-subscription DB override
+    // (Subscription.maxMessagesPerMonth) re-instates a cap when set.
+    maxMessagesPerMonth: UNLIMITED_MESSAGES,
     prices: {
       USD: 999,
       EUR: 999,

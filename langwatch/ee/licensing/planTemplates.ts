@@ -68,7 +68,11 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
   maxMembersLite: 50,
   maxTeams: 100,
   maxProjects: 500,
-  maxMessagesPerMonth: 10000000,
+  // Enterprise licenses are never ingestion-capped by default; a CUSTOM
+  // license with an explicit cap is the way to enforce one. Only affects
+  // newly generated licenses — already-issued licenses keep their signed
+  // limits until reissued.
+  maxMessagesPerMonth: DEFAULT_LIMIT,
   evaluationsCredit: 0,
   maxWorkflows: 1000,
   maxPrompts: 1000,

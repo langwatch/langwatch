@@ -6,6 +6,7 @@ import {
 import type { AppConfig } from "../../../src/server/app-layer/config";
 import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
 import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
+import { UNLIMITED_MESSAGES } from "../planLimits";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
@@ -72,6 +73,11 @@ type NotificationServiceOptions = {
 
 const formatNumber = (value?: number | null) =>
   typeof value === "number" ? value.toLocaleString() : "-";
+
+const formatMessagesLimit = (value?: number | null) =>
+  typeof value === "number" && value >= UNLIMITED_MESSAGES
+    ? "Unlimited"
+    : formatNumber(value);
 
 const formatDate = (value?: Date | null) =>
   value
@@ -176,7 +182,7 @@ const buildConfirmedBlocks = (
         },
         {
           type: "mrkdwn",
-          text: `*Traces/month:* ${formatNumber(payload.maxMessagesPerMonth)}`,
+          text: `*Traces/month:* ${formatMessagesLimit(payload.maxMessagesPerMonth)}`,
         },
       ],
     },

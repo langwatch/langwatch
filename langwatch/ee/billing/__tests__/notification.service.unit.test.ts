@@ -38,6 +38,7 @@ vi.mock("../../../src/utils/posthogErrorCapture", () => ({
 
 import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
+import { UNLIMITED_MESSAGES } from "../planLimits";
 import { NotificationService } from "../notifications/notification.service";
 
 const mockSendUsageLimitEmail = sendUsageLimitEmail as ReturnType<
@@ -257,6 +258,28 @@ describe("NotificationService", () => {
             }),
           ]),
         });
+      });
+    });
+
+    describe("when the confirmed plan has no message cap", () => {
+      it("renders Traces/month as Unlimited instead of the sentinel number", async () => {
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+
+        await service.sendSlackSubscriptionEvent({
+          type: "confirmed",
+          organizationId: "org_1",
+          organizationName: "Acme",
+          plan: "ENTERPRISE",
+          subscriptionId: "sub_1",
+          startDate: new Date("2025-01-01"),
+          maxMembers: 1000,
+          maxMessagesPerMonth: UNLIMITED_MESSAGES,
+        });
+
+        const blocks = vi.mocked(mockSlackSend).mock.calls[0]?.[0]?.blocks;
+        const allText = JSON.stringify(blocks);
+        expect(allText).toContain("*Traces/month:* Unlimited");
+        expect(allText).not.toContain("999,999,999");
       });
     });
 

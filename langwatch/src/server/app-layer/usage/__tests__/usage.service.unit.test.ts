@@ -1,7 +1,11 @@
 import { PricingModel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
+import {
+  PLAN_LIMITS,
+  UNLIMITED_MESSAGES,
+} from "../../../../../ee/billing/planLimits";
+import { PlanTypes } from "../../../../../ee/billing/planTypes";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import type { OrganizationService } from "../../organizations/organization.service";
@@ -310,6 +314,23 @@ describe("UsageService", () => {
           "Monthly limit of 1000 events reached",
         );
         expect(mockPlanResolver).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when org is on the ENTERPRISE subscription plan", () => {
+      it("never blocks ingestion and skips the usage count entirely", async () => {
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
+          "org-123",
+        );
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue(
+          PLAN_LIMITS[PlanTypes.ENTERPRISE],
+        );
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(false);
+        expect(mockTraceUsageService.getCountByProjects).not.toHaveBeenCalled();
+        expect(mockEventUsageService.getCountByProjects).not.toHaveBeenCalled();
       });
     });
 
