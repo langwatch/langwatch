@@ -1,15 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
+  AVATAR_ALLOWED_MEDIA_TYPES,
   AVATAR_MAX_BYTES,
   AvatarValidationError,
   buildAvatarUrl,
   parseAvatarDataUrl,
+  safeAvatarMediaType,
 } from "../avatar";
 
 // A 1x1 transparent PNG, base64 — smallest valid real image payload.
 const PNG_1x1_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 const PNG_1x1_DATA_URL = `data:image/png;base64,${PNG_1x1_BASE64}`;
+
+// Minimal buffers carrying only each format's magic-byte signature — enough
+// to exercise MAGIC_BYTE_CHECKS without needing a fully valid, decodable image.
+const JPEG_MAGIC_BYTES_DATA_URL = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]).toString("base64")}`;
+const GIF_MAGIC_BYTES_DATA_URL = `data:image/gif;base64,${Buffer.from("GIF89a", "latin1").toString("base64")}`;
+const WEBP_MAGIC_BYTES_DATA_URL = `data:image/webp;base64,${Buffer.concat([
+  Buffer.from("RIFF", "latin1"),
+  Buffer.from([0, 0, 0, 0]),
+  Buffer.from("WEBP", "latin1"),
+]).toString("base64")}`;
 
 describe("parseAvatarDataUrl", () => {
   describe("given a valid PNG data URL", () => {
@@ -76,6 +88,66 @@ describe("parseAvatarDataUrl", () => {
       } catch (err) {
         expect((err as AvatarValidationError).code).toBe("file_too_large");
       }
+    });
+  });
+
+  describe("given content whose magic bytes match the declared type", () => {
+    it.each([
+      ["image/jpeg", JPEG_MAGIC_BYTES_DATA_URL],
+      ["image/gif", GIF_MAGIC_BYTES_DATA_URL],
+      ["image/webp", WEBP_MAGIC_BYTES_DATA_URL],
+    ])("accepts a %s payload", (mediaType, dataUrl) => {
+      const result = parseAvatarDataUrl(dataUrl);
+      expect(result.mediaType).toBe(mediaType);
+    });
+  });
+
+  describe("when the decoded bytes don't match the declared type", () => {
+    it("throws a content_mismatch validation error for non-image bytes", () => {
+      const plainTextAsPng = `data:image/png;base64,${Buffer.from(
+        "hello world, this is not an image",
+      ).toString("base64")}`;
+      try {
+        parseAvatarDataUrl(plainTextAsPng);
+        throw new Error("expected parseAvatarDataUrl to throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(AvatarValidationError);
+        expect((err as AvatarValidationError).code).toBe("content_mismatch");
+      }
+    });
+
+    it("throws a content_mismatch validation error for a real image of a different type", () => {
+      // Real PNG bytes declared as image/jpeg — the signature doesn't match.
+      const pngDeclaredAsJpeg = `data:image/jpeg;base64,${PNG_1x1_BASE64}`;
+      try {
+        parseAvatarDataUrl(pngDeclaredAsJpeg);
+        throw new Error("expected parseAvatarDataUrl to throw");
+      } catch (err) {
+        expect((err as AvatarValidationError).code).toBe("content_mismatch");
+      }
+    });
+  });
+});
+
+describe("safeAvatarMediaType", () => {
+  describe("given a media type in the avatar allowlist", () => {
+    it.each(AVATAR_ALLOWED_MEDIA_TYPES)("returns %s unchanged", (mediaType) => {
+      expect(safeAvatarMediaType(mediaType)).toBe(mediaType);
+    });
+  });
+
+  describe("given a media type outside the avatar allowlist", () => {
+    it("coerces image/svg+xml to application/octet-stream even though it is image/*", () => {
+      // The general stored-objects allowlist (isReadbackSafe) passes the whole
+      // image/ family, including svg+xml; this route pins to the narrower
+      // avatar-specific list regardless of that broader allowlist.
+      expect(safeAvatarMediaType("image/svg+xml")).toBe(
+        "application/octet-stream",
+      );
+    });
+
+    it("coerces a non-image type to application/octet-stream", () => {
+      expect(safeAvatarMediaType("text/html")).toBe("application/octet-stream");
     });
   });
 });

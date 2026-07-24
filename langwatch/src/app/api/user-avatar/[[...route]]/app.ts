@@ -3,8 +3,9 @@
  *
  * Unlike /api/files (which gates each read behind the caller's `traces:view` /
  * `scenarios:view` on the owning project), an avatar is platform-level identity
- * that must be visible to any teammate on any surface. So this route authorizes
- * ANY authenticated caller — but for exactly that reason it MUST only ever
+ * that must be visible wherever a person is shown, so this route authorizes ANY
+ * authenticated caller on the platform — not only users who share an
+ * organization with the uploader. For exactly that reason it MUST only ever
  * serve objects tagged with the `user_avatar` purpose. Any other purpose is a
  * 404 here, so this broad-read route can never be used to exfiltrate the
  * trace/scenario media that /api/files protects.
@@ -22,11 +23,14 @@ import { rateLimit } from "~/server/rateLimit";
 import {
   jsonResponse,
   rateLimitedResponse,
-  safeMediaType,
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
 } from "~/server/stored-objects/media-response";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import { AVATAR_OWNER_KIND, AVATAR_PURPOSE } from "~/server/user-avatar/avatar";
+import {
+  AVATAR_OWNER_KIND,
+  AVATAR_PURPOSE,
+  safeAvatarMediaType,
+} from "~/server/user-avatar/avatar";
 import type { DualAuthVariables } from "../../middleware/dual-auth";
 import { dualAuth } from "../../middleware/dual-auth";
 
@@ -50,7 +54,7 @@ function streamAvatarResponse({
   method: "GET" | "HEAD";
 }): Response {
   const headers: Record<string, string> = {
-    "Content-Type": safeMediaType(row.media_type),
+    "Content-Type": safeAvatarMediaType(row.media_type),
     "Content-Length": String(row.size_bytes),
     // Content-addressed id => the bytes at a URL never change, so the browser
     // can cache aggressively. A new upload mints a new id (new URL), and a

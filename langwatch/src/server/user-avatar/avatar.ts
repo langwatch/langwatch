@@ -57,7 +57,8 @@ export type AvatarValidationCode =
   | "invalid_data_url"
   | "invalid_type"
   | "empty"
-  | "file_too_large";
+  | "file_too_large"
+  | "content_mismatch";
 
 /**
  * Thrown by {@link parseAvatarDataUrl} for any caller-fixable problem with the
@@ -77,18 +78,57 @@ export class AvatarValidationError extends Error {
 // The base64 group is `*` (not `+`) so an empty payload (`data:image/png;base64,`)
 // still matches here and is reported as the more specific `empty` error below,
 // rather than the generic `invalid_data_url`.
-const DATA_URL_RE = /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]*)$/i;
+const DATA_URL_RE =
+  /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]*)$/i;
 
 function isAllowedMediaType(mediaType: string): mediaType is AvatarMediaType {
   return (AVATAR_ALLOWED_MEDIA_TYPES as readonly string[]).includes(mediaType);
 }
 
 /**
+ * Per-type magic-byte signature checks, keyed by the declared media type.
+ *
+ * Defense-in-depth: the checks above only validate the client-declared type in
+ * the `data:` prefix, so without this a caller who bypasses the browser's
+ * canvas re-encode (e.g. calling `user.setAvatar` directly) could tag
+ * arbitrary bytes as `image/png` and use avatar storage as an untyped blob
+ * store. The response headers (`nosniff` + a `sandbox` CSP) already prevent
+ * the bytes from ever executing as active content regardless, so this check
+ * protects data integrity, not the XSS boundary.
+ */
+const MAGIC_BYTE_CHECKS: Record<AvatarMediaType, (bytes: Buffer) => boolean> = {
+  "image/png": (bytes) =>
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a,
+  "image/jpeg": (bytes) =>
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff,
+  "image/gif": (bytes) =>
+    bytes.length >= 6 &&
+    (bytes.subarray(0, 6).toString("latin1") === "GIF87a" ||
+      bytes.subarray(0, 6).toString("latin1") === "GIF89a"),
+  "image/webp": (bytes) =>
+    bytes.length >= 12 &&
+    bytes.subarray(0, 4).toString("latin1") === "RIFF" &&
+    bytes.subarray(8, 12).toString("latin1") === "WEBP",
+};
+
+/**
  * Parses and validates a base64 image data URL (e.g. produced by the client
  * canvas resize step) into raw bytes + media type.
  *
  * @throws {AvatarValidationError} on a malformed data URL, a disallowed image
- *   type, empty bytes, or a payload over {@link AVATAR_MAX_BYTES}.
+ *   type, empty bytes, a payload over {@link AVATAR_MAX_BYTES}, or decoded
+ *   bytes whose magic-byte signature doesn't match the declared type.
  */
 export function parseAvatarDataUrl(dataUrl: string): {
   mediaType: AvatarMediaType;
@@ -134,7 +174,30 @@ export function parseAvatarDataUrl(dataUrl: string): {
     );
   }
 
+  if (!MAGIC_BYTE_CHECKS[mediaType](bytes)) {
+    throw new AvatarValidationError(
+      "content_mismatch",
+      `The file's content doesn't match its declared type (${mediaType}).`,
+    );
+  }
+
   return { mediaType, bytes };
+}
+
+/**
+ * Resolves the Content-Type an avatar HTTP response may echo verbatim.
+ *
+ * Pinned directly to {@link AVATAR_ALLOWED_MEDIA_TYPES} rather than the
+ * broader stored-objects `isReadbackSafe` (which passes the whole `image/`
+ * prefix family, including `image/svg+xml`). The avatar serve route is
+ * readable by any authenticated user platform-wide (see
+ * src/app/api/user-avatar), so its Content-Type allowlist stays independently
+ * pinned to exactly the four types this module accepts on upload — a future
+ * widening of the general stored-objects allowlist can never widen what this
+ * route serves inline.
+ */
+export function safeAvatarMediaType(mediaType: string): string {
+  return isAllowedMediaType(mediaType) ? mediaType : "application/octet-stream";
 }
 
 /**
