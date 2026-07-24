@@ -228,7 +228,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
   });
 
   describe("given rows whose city is missing on some entries", () => {
-    const PARTIAL_ROWS = [
+    const PARTIAL_ROWS: Array<Record<string, string>> = [
       { city: "Berlin", difficulty: "easy" },
       { difficulty: "easy" }, // city missing
       { city: "Lisbon", difficulty: "hard" },
@@ -246,7 +246,6 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
       it("collects missing-city rows under an Unspecified header at the end", () => {
         render(
           <ComparisonTable
-            // @ts-expect-error props added in the implementation step
             comparisonData={PARTIAL_FIXTURE}
             disableVirtualization
             groupBy="city"
