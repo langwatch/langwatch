@@ -26,7 +26,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
  */
 
 /** Own paint server, so it can never collide with another gradient def on the page. */
-export const LANGY_MARK_GRADIENT_ID = "langy-brand-mark-grad";
+const LANGY_MARK_GRADIENT_ID = "langy-brand-mark-grad";
 
 /** The AI accent shadow under Langy's primary (apply) action — brand purple. */
 export const LANGY_ACTION_SHADOW = "0 6px 18px -4px rgba(168, 85, 247, 0.35)";

@@ -45,9 +45,7 @@ function makeCommands(
 ): LangyConversationCommands {
   return {
     createConversation: vi.fn(async () => {}),
-    forkConversation: vi.fn(async () => {}),
     recordMessage: vi.fn(async () => {}),
-    importMessage: vi.fn(async () => {}),
     acceptAgentTurn: vi.fn(async () => {}),
     initiateToolCall: vi.fn(async () => {}),
     succeedToolCall: vi.fn(async () => {}),

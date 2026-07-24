@@ -35,7 +35,7 @@ import type {
   GithubPrState,
 } from "~/shared/langy/githubPrCard";
 
-export type LangyGitHubPrCardProps = GithubPrCardData;
+type LangyGitHubPrCardProps = GithubPrCardData;
 
 /** GitHub's own semantics, in semantic tokens: open is green, merged purple. */
 const STATE_STYLE: Record<

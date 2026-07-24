@@ -42,9 +42,9 @@ const POPUP_FEATURES = (() => {
  * respond: a soft `cancelled` is silent, a `popup-blocked` offers the full-page
  * route into the same integration flow, and `failed` shows the message.
  */
-export type ConnectFailureReason = "popup-blocked" | "cancelled" | "failed";
+type ConnectFailureReason = "popup-blocked" | "cancelled" | "failed";
 
-export type ConnectResult =
+type ConnectResult =
   | { ok: true; login: string }
   | { ok: false; error: string; reason: ConnectFailureReason };
 

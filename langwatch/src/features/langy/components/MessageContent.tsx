@@ -53,7 +53,7 @@ export interface LangyProposal {
   payload: Record<string, unknown>;
 }
 
-export type AppliedOutcome = {
+type AppliedOutcome = {
   label?: string;
   onOpen?: () => void;
   href?: string;

@@ -36,7 +36,7 @@ export function formatMoneyShort(amount: number): string {
  * `0.41` rather than `0.410000000000000` — so the disclosure shows precision
  * that is really there.
  */
-export function formatMoneyExact(amount: number): string {
+function formatMoneyExact(amount: number): string {
   if (!Number.isFinite(amount)) return "—";
   const text = amount.toFixed(10).replace(/0+$/, "").replace(/\.$/, "");
   return `$${text}`;

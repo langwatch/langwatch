@@ -28,7 +28,7 @@ import { truncateRowText, traceMetaLine } from "./rowFormat";
 import type { api } from "~/utils/api";
 
 /** The tRPC utils proxy (`api.useContext()`), for imperative `.fetch` calls. */
-export type CapabilityTrpcUtils = ReturnType<typeof api.useContext>;
+type CapabilityTrpcUtils = ReturnType<typeof api.useContext>;
 
 /** One hydrated row, in the shared vocabulary every card draws. */
 export interface CapabilityHydratedRow {
@@ -41,13 +41,13 @@ export interface CapabilityHydratedRow {
   timestamp?: number;
 }
 
-export interface CapabilityHydration {
+interface CapabilityHydration {
   rows: CapabilityHydratedRow[];
   /** What the query matched in total, when the source reports it. */
   total?: number;
 }
 
-export interface CapabilityHydrator {
+interface CapabilityHydrator {
   byIds?: (a: {
     utils: CapabilityTrpcUtils;
     projectId: string;

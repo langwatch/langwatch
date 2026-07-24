@@ -1,7 +1,6 @@
 Feature: Langy composer, feedback, and card polish
-  The Langy panel's composer, feedback affordance, GitHub connect card, skill
-  chips, and trace links behave calmly and route through the app rather than
-  reloading it.
+  The Langy panel's composer, feedback affordance, GitHub connect card, and
+  trace links behave calmly and route through the app rather than reloading it.
 
   Background:
     Given the Langy panel is open in a project
@@ -46,12 +45,6 @@ Feature: Langy composer, feedback, and card polish
     Given a completed Langy answer with the feedback affordance
     When the customer submits the inline score field while it is empty
     Then no feedback is recorded
-
-  Scenario: A skill chip is compact until expanded
-    Given a skill chip on the next turn
-    Then only the skill's name shows, with no remove control
-    When the customer expands the chip
-    Then the target slot and the remove control appear
 
   Scenario: A trace link opens in place
     Given an applied proposal that opens an in-app trace

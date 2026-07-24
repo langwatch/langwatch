@@ -11,7 +11,7 @@ export function truncateRowText(text: string, max: number): string {
   return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
 }
 
-export function formatRowWhen(startedAt: number): string {
+function formatRowWhen(startedAt: number): string {
   return new Date(startedAt).toLocaleString(undefined, {
     day: "numeric",
     month: "short",
@@ -20,11 +20,11 @@ export function formatRowWhen(startedAt: number): string {
   });
 }
 
-export function formatRowLatency(ms: number): string {
+function formatRowLatency(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-export function formatRowCost(cost: number): string {
+function formatRowCost(cost: number): string {
   // Sub-cent costs are the norm for a single trace, so two decimals would round
   // almost every trace to "$0.00" and tell the reader nothing.
   return cost < 0.01 ? `$${cost.toFixed(4)}` : `$${cost.toFixed(2)}`;

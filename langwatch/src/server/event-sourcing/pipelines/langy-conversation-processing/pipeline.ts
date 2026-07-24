@@ -15,9 +15,7 @@ import {
   CreateConversationCommand,
   FailAgentResponseCommand,
   FailToolCallCommand,
-  ForkConversationCommand,
   GenerateConversationTitleCommand,
-  ImportMessageCommand,
   InitiateToolCallCommand,
   RecordAgentResponseCommand,
   RecordTurnHandoffCommand,
@@ -135,9 +133,7 @@ export function createLangyConversationProcessingPipeline(
       langyConversationProcess(deps.langyProcessPorts),
     )
     .withCommand("createConversation", CreateConversationCommand)
-    .withCommand("forkConversation", ForkConversationCommand)
     .withCommand("recordMessage", RecordMessageCommand)
-    .withCommand("importMessage", ImportMessageCommand)
     .withCommand("acceptAgentTurn", AcceptAgentTurnCommand)
     .withCommand("initiateToolCall", InitiateToolCallCommand)
     .withCommand("succeedToolCall", SucceedToolCallCommand)

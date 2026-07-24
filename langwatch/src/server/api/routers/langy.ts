@@ -37,12 +37,9 @@ import {
   type LangyConversationListCursorDto,
   type LangyConversationListItemDto,
   type LangyMessageDto,
-  langyConversationDetailSchema,
   langyConversationListCursorSchema,
-  langyConversationListItemSchema,
   langyConversationStatusSchema,
   langyMessageRoleSchema,
-  langyMessageSchema,
 } from "./langy.schemas";
 
 const logger = createLogger("langwatch:langy:router");
@@ -52,11 +49,10 @@ const logger = createLogger("langwatch:langy:router");
  *
  * Mirrors `tracesV2` for reads: a SLIM `list` reading only the Postgres
  * conversation projection (no content), a separate on-demand `messages` read
- * for the heavy Postgres message history, a `newCount` the panel polls only
- * when the freshness SSE is disconnected, and a single `onConversationUpdate`
+ * for the heavy Postgres message history, and a single `onConversationUpdate`
  * subscription that pushes a lightweight per-conversation signal (never row
  * data). It also owns the turn-start mutations (`createConversation` /
- * `continueConversation`) and the conversation commands (rename/fork/delete):
+ * `continueConversation`) and the conversation commands (rename/delete):
  * the whole Langy surface is this tRPC router plus the live `onTurnStream`
  * subscription — the old Hono `/api/langy/chat` fallback has been removed.
  *
@@ -387,10 +383,6 @@ export const langyRouter = createTRPCRouter({
     ),
 
   /**
-   * Single-conversation spine (status + counts), for the open conversation.
-   * Returns null when the conversation is not visible to the user.
-   */
-  /**
    * The conversation's durable TURN events strictly after a cursor — the tail
    * the browser folds locally with the shared @langwatch/langy reducer
    * (ADR-059). Fired when a freshness signal's cursor is ahead of the local
@@ -417,24 +409,6 @@ export const langyRouter = createTRPCRouter({
         after: input.after,
       });
     }),
-
-  detail: langyReadProcedure
-    .input(z.object({ conversationId: z.string() }))
-    .query(
-      async ({ input, ctx }): Promise<LangyConversationDetailDto | null> => {
-        // A freshness poll of the OPEN conversation — which may be the one the
-        // user JUST started, whose fold has not been projected yet. So this is a
-        // caller for which absence is a real answer: `findByIdVisible`, not
-        // `getById`. Using the throwing form here would 500 the poll on every
-        // first turn.
-        const detail = await getApp().langy.conversations.findByIdVisible({
-          id: input.conversationId,
-          projectId: input.projectId,
-          userId: ctx.session.user.id,
-        });
-        return detail ? toDetailDto(detail) : null;
-      },
-    ),
 
   /**
    * Heavy on-demand message history for a single conversation. Split from
@@ -602,18 +576,6 @@ export const langyRouter = createTRPCRouter({
       return toDetailDto(detail);
     }),
 
-  /** Branch a visible conversation into a private, independently editable one. */
-  forkConversation: langyCreateProcedure
-    .input(z.object({ conversationId: z.string().min(1) }))
-    .mutation(async ({ input, ctx }): Promise<LangyConversationDetailDto> => {
-      const { conversation } = await getApp().langy.conversations.forkById({
-        id: input.conversationId,
-        projectId: input.projectId,
-        userId: ctx.session.user.id,
-      });
-      return toDetailDto(conversation);
-    }),
-
   /**
    * Start the FIRST turn of a NEW conversation. Mints a fresh conversation id,
    * emits the semantically-first `conversation_started`, then dispatches the
@@ -715,23 +677,6 @@ export const langyRouter = createTRPCRouter({
       return { modelsAllowed };
     },
   ),
-
-  /**
-   * Count of conversations touched since a timestamp — the "N new" pill. The
-   * client only polls this when the freshness SSE is disconnected (adaptive
-   * backoff), mirroring `tracesV2.newCount`. The count derivation lives in the
-   * service (`countSince`), not here — transport only shapes input/output.
-   */
-  newCount: langyReadProcedure
-    .input(z.object({ since: z.number() }))
-    .query(async ({ input, ctx }): Promise<{ count: number }> => {
-      const count = await getApp().langy.conversations.countSince({
-        projectId: input.projectId,
-        userId: ctx.session.user.id,
-        since: input.since,
-      });
-      return { count };
-    }),
 
   /**
    * In-agent feedback capture ("How's Langy doing?" / thumbs).

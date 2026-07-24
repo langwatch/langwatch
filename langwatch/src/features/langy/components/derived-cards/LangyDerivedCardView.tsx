@@ -42,7 +42,7 @@ import {
 import { LangyChoicesCard } from "./LangyChoicesCard";
 import { LangyDerivedCardFrame } from "./LangyDerivedCardFrame";
 
-export interface LangyDerivedCardViewProps {
+interface LangyDerivedCardViewProps {
   card: LangyDerivedCard;
   /** Hints stamped on the part (already schema-validated by the kernel). */
   hints?: LangyCardHint[];

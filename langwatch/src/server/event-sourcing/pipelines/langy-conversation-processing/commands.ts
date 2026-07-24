@@ -18,13 +18,11 @@ import {
   langyAgentTurnAcceptedEventDataSchema,
   langyConversationArchivedEventDataSchema,
   langyMessageRecordedEventDataSchema,
-  langyConversationForkedEventDataSchema,
   langyConversationStartedEventDataSchema,
   langyConversationHandoffConsumedEventDataSchema,
   langyConversationHandoffPendingEventDataSchema,
   langyConversationMetadataUpdatedEventDataSchema,
   langyConversationTitleGeneratedEventDataSchema,
-  langyMessageImportedEventDataSchema,
   langyPlanUpdatedEventDataSchema,
   langyToolCallFailedEventDataSchema,
   langyToolCallInitiatedEventDataSchema,
@@ -53,21 +51,6 @@ export const CreateConversationCommand = defineCommand({
   }),
 });
 
-/** ForkConversation → conversation_forked (new aggregate with source lineage). */
-export const ForkConversationCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.FORK_CONVERSATION,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_FORKED,
-  aggregateType: "langy_conversation",
-  schema: langyConversationForkedEventDataSchema,
-  aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.conversationId}:forked`,
-  spanAttributes: (d) => ({
-    "payload.conversation.id": d.conversationId,
-    "payload.conversation.source_id": d.sourceConversationId,
-  }),
-});
-
 /** RecordMessage → message_recorded. */
 export const RecordMessageCommand = defineCommand({
   commandType: LANGY_CONVERSATION_COMMAND_TYPES.RECORD_MESSAGE,
@@ -82,24 +65,6 @@ export const RecordMessageCommand = defineCommand({
     "payload.conversation.id": d.conversationId,
     "payload.message.id": d.messageId,
     "payload.role": d.role,
-  }),
-});
-
-/** ImportMessage → message_imported (history copy, never a live turn). */
-export const ImportMessageCommand = defineCommand({
-  commandType: LANGY_CONVERSATION_COMMAND_TYPES.IMPORT_MESSAGE,
-  eventType: LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED,
-  eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.MESSAGE_IMPORTED,
-  aggregateType: "langy_conversation",
-  schema: langyMessageImportedEventDataSchema,
-  aggregateId: (d) => d.conversationId,
-  idempotencyKey: (d) =>
-    `${d.tenantId}:${d.conversationId}:import:${d.sourceMessageId}`,
-  spanAttributes: (d) => ({
-    "payload.conversation.id": d.conversationId,
-    "payload.conversation.source_id": d.sourceConversationId,
-    "payload.message.id": d.messageId,
-    "payload.message.source_id": d.sourceMessageId,
   }),
 });
 

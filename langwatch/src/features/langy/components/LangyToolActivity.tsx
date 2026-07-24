@@ -110,7 +110,7 @@ type ToolPartLike = {
  * from `UIMessage` so a SUBSET of parts (one plan step's attributed calls) can be
  * rendered through the same functions as a whole message (LangyPlanCard).
  */
-export type PartsView = { parts: readonly unknown[] };
+type PartsView = { parts: readonly unknown[] };
 
 // AI-SDK tool states that mean the call has settled (success, error, denied).
 const DONE_STATES = new Set([
@@ -141,7 +141,7 @@ export type ToolCall = {
   errorText?: string;
 };
 
-export type ActivityGroup = {
+type ActivityGroup = {
   key: string;
   /** What the group is doing, in human words. Never a tool's name. */
   label: string;
@@ -153,7 +153,7 @@ export type ActivityGroup = {
   order: number;
 };
 
-export type FailedToolCall = {
+type FailedToolCall = {
   id: string;
   call: ToolCall;
   presentation: LangyToolErrorPresentation;
@@ -173,7 +173,7 @@ export type FailedToolCall = {
  * the transcript said the turn broke before it said anything ran. A turn is a
  * sequence of events; the panel has to read like one.
  */
-export type Sequenced = { order: number };
+type Sequenced = { order: number };
 
 /** The raw tool name: `dynamic-tool` carries it, `tool-<name>` encodes it. */
 function rawToolName(part: ToolPartLike): string | undefined {
@@ -320,7 +320,7 @@ function selectTraceCards<T extends { id: string; call: CapabilityToolCall }>(
 }
 
 /** A capability call still in flight — rendered as an in-progress card. */
-export type PendingCapability = {
+type PendingCapability = {
   id: string;
   progress: CapabilityProgress;
   detail?: string;

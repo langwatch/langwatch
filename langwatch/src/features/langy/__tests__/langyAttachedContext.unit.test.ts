@@ -80,13 +80,6 @@ describe("attachContext", () => {
     });
   });
 
-  describe("clearAttachedContext", () => {
-    it("empties the list", () => {
-      useLangyStore.getState().attachContext(traceItem);
-      useLangyStore.getState().clearAttachedContext();
-      expect(useLangyStore.getState().attachedContext).toEqual([]);
-    });
-  });
 });
 
 describe("attachedContextToChip", () => {

@@ -126,7 +126,7 @@ function claimsNothing(result: CliToolResult): boolean {
  * ever remove a card, never improve one. See ADR-059 §1, and the spec rule
  * "The card a result was stamped with is the card that renders".
  */
-export function capabilityRenderFor(call: CapabilityToolCall): {
+function capabilityRenderFor(call: CapabilityToolCall): {
   descriptor: CapabilityDescriptor;
   result: CliToolResult | null;
 } | null {

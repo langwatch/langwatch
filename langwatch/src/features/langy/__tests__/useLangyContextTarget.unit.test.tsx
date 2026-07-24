@@ -50,7 +50,7 @@ const traceTarget = {
 function reset() {
   targets().reset();
   langy().closePanel();
-  langy().resetChosenChips();
+  useLangyStore.setState({ chosenChipIds: new Set() });
 }
 
 describe("useLangyContextTarget", () => {

@@ -211,7 +211,7 @@ export function LangyCapabilityCard({
  * capability touched. Hidden entirely when there's no project slug to build a
  * valid path from, so it never renders a dead link.
  */
-export function CapabilityDeepLinkChip({
+function CapabilityDeepLinkChip({
   surface,
   projectSlug,
   resourceId,

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  deriveFollowUps,
   followUpsForResult,
   SUGGESTION_LABEL,
   type SettledToolResult,
@@ -124,36 +123,6 @@ describe("followUpsForResult", () => {
           name: "bash",
           state: "output-available",
           output: "ok",
-        }),
-      ).toEqual([]);
-    });
-  });
-});
-
-describe("deriveFollowUps", () => {
-  describe("given a turn with several tool calls", () => {
-    it("offers each follow-up once, in first-seen order", () => {
-      const suggestions = deriveFollowUps({
-        results: [
-          traceSearch(),
-          traceSearch({ name: "langwatch.trace.export" }),
-        ],
-      });
-
-      const ids = suggestions.map((suggestion) => suggestion.id);
-      expect(new Set(ids).size).toBe(ids.length);
-      expect(labelsOf(suggestions)).toContain("Add to a dataset");
-    });
-  });
-
-  describe("given a turn whose calls produced nothing", () => {
-    it("offers nothing rather than an empty row of chips", () => {
-      expect(
-        deriveFollowUps({
-          results: [
-            { name: "bash", state: "output-available", output: "ok" },
-            traceSearch({ output: JSON.stringify({ traces: [] }) }),
-          ],
         }),
       ).toEqual([]);
     });

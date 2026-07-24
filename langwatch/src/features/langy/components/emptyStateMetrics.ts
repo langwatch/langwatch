@@ -20,7 +20,7 @@
  * anchors at every size — the logo carried the pane's identity too quietly.
  */
 
-export interface EmptyStateMetrics {
+interface EmptyStateMetrics {
   /** Hero mark height, px (LangyMark takes a numeric px height). */
   markSize: number;
   /** Serif greeting size, px. */

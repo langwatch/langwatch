@@ -319,7 +319,7 @@ function capitalize(text: string): string {
 }
 
 /** A resolved CLI call: the card to draw, the surface it opens, its verb tone. */
-export interface CliCapability {
+interface CliCapability {
   command: CliCommand;
   surface: CapabilitySurface;
   render: MeasuredCardKind;

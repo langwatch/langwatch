@@ -14,7 +14,7 @@ import { emptyStateMetrics } from "./emptyStateMetrics";
 import { LangyMark } from "./LangyMark";
 
 /** Structural, so a lucide icon and a react-feather one can sit in one list. */
-export type SuggestionIcon = ComponentType<{ size?: string | number }>;
+type SuggestionIcon = ComponentType<{ size?: string | number }>;
 
 /**
  * What a project must already have for an ask to be able to succeed.
@@ -23,7 +23,7 @@ export type SuggestionIcon = ComponentType<{ size?: string | number }>;
  * exactly what governs which asks are honest to offer them: "compare my last
  * two runs" is a dead end until there are two runs.
  */
-export type SuggestionRequirement =
+type SuggestionRequirement =
   | "nothing"
   | "traces"
   | "evaluations"

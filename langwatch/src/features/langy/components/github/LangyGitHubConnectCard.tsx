@@ -20,7 +20,7 @@ import { useGitHubConnectPopup } from "./useGitHubConnectPopup";
 // opens (Settings → Integrations), reachable without a popup.
 const GITHUB_SETTINGS_PATH = "/settings/integrations#github";
 
-export type LangyGitHubConnectCardProps = {
+type LangyGitHubConnectCardProps = {
   organizationId: string;
   /** Optional copy override — e.g. include the repo name the user mentioned. */
   headline?: string;

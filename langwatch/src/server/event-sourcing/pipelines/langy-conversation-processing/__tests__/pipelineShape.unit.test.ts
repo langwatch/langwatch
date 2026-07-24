@@ -81,9 +81,7 @@ function buildPipeline(
 
 const EXPECTED_COMMANDS = [
   "createConversation",
-  "forkConversation",
   "recordMessage",
-  "importMessage",
   "acceptAgentTurn",
   "initiateToolCall",
   "succeedToolCall",

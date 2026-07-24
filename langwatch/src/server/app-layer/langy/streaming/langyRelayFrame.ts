@@ -184,4 +184,3 @@ export const langyRelayFrameSchema = z.discriminatedUnion("type", [
   }),
 ]);
 export type LangyRelayFrame = z.infer<typeof langyRelayFrameSchema>;
-export type LangyRelayToolCall = z.infer<typeof langyRelayToolCallSchema>;

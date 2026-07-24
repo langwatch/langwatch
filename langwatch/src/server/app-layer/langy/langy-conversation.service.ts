@@ -26,13 +26,11 @@ import type {
   LangyAgentTurnAcceptedEventData,
   LangyConversationArchivedEventData,
   LangyMessageRecordedEventData,
-  LangyConversationForkedEventData,
   LangyConversationHandoffConsumedEventData,
   LangyConversationHandoffPendingEventData,
   LangyConversationMetadataUpdatedEventData,
   LangyConversationStartedEventData,
   LangyConversationTitleGeneratedEventData,
-  LangyMessageImportedEventData,
   LangyMessagePart,
   LangyMessageRole,
   LangyPlanUpdatedEventData,
@@ -57,7 +55,6 @@ import type {
 } from "./repositories/langy-conversation.repository";
 import {
   type LangyMessageRepository,
-  type LangyMessageRow,
   NullLangyMessageRepository,
 } from "./repositories/langy-message.repository";
 
@@ -163,9 +160,7 @@ type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
 
 export interface LangyConversationCommands {
   createConversation: Dispatch<LangyConversationStartedEventData>;
-  forkConversation: Dispatch<LangyConversationForkedEventData>;
   recordMessage: Dispatch<LangyMessageRecordedEventData>;
-  importMessage: Dispatch<LangyMessageImportedEventData>;
   acceptAgentTurn: Dispatch<
     LangyAgentTurnAcceptedEventData & {
       conversationStart?: Omit<
@@ -509,26 +504,6 @@ export class LangyConversationService {
   }
 
   /**
-   * Count the user's conversations touched since `since` (epoch ms) — the "N
-   * new" pill. Deliberately derived from the already-bounded recent list rather
-   * than a second ClickHouse read path: the pill only needs to distinguish
-   * 0 / small-N, and the list is capped at 100. Kept in the service (not the
-   * transport) so the count derivation lives behind the app layer.
-   */
-  async countSince({
-    projectId,
-    userId,
-    since,
-  }: {
-    projectId: string;
-    userId: string;
-    since: number;
-  }): Promise<number> {
-    const items = await this.getAll({ projectId, userId, limit: 100 });
-    return items.filter((item) => item.lastActivityAt.getTime() > since).length;
-  }
-
-  /**
    * Resolve the conversation id for a chat turn. Does NOT write — the aggregate
    * is created by the first `message_recorded`. Verifies ownership against the fold;
    * a stale/archived/unknown id yields a fresh conversation.
@@ -600,90 +575,6 @@ export class LangyConversationService {
       runToken: runToken ?? mintRunToken(),
     });
     return { id: conversationId };
-  }
-
-  /**
-   * Branch a visible conversation into a fresh conversation owned by the
-   * caller. Shared conversations may be forked but never mutated in place.
-   *
-   * The source projection is read exactly once at command time. From there the
-   * new aggregate is self-contained: its lineage and every imported message
-   * are canonical events, so replay never needs the old projection or source
-   * conversation to still exist.
-   */
-  async forkById({
-    id,
-    projectId,
-    userId,
-  }: {
-    id: string;
-    projectId: string;
-    userId: string;
-  }): Promise<{
-    conversation: ConversationDetail;
-    messages: LangyMessageRow[];
-  }> {
-    const source = await this.getById({ id, projectId, userId });
-    const sourceMessages = await this.messages.findAllByConversation({
-      conversationId: id,
-      projectId,
-    });
-
-    const conversationId = newConversationId();
-    const title = `${source.title?.trim() || "Untitled chat"} (fork)`;
-    const startedAt = Date.now();
-
-    await this.commands.forkConversation({
-      tenantId: projectId,
-      occurredAt: startedAt,
-      conversationId,
-      sourceConversationId: id,
-      userId,
-      title,
-      runToken: mintRunToken(),
-    });
-
-    const importedMessages: LangyMessageRow[] = [];
-    for (const [index, sourceMessage] of sourceMessages.entries()) {
-      const messageId = newMessageId();
-      const occurredAt = startedAt + index + 1;
-      await this.commands.importMessage({
-        tenantId: projectId,
-        occurredAt,
-        conversationId,
-        sourceConversationId: id,
-        sourceMessageId: sourceMessage.id,
-        messageId,
-        role: sourceMessage.role,
-        parts: sourceMessage.parts,
-      });
-      importedMessages.push({
-        id: messageId,
-        role: sourceMessage.role,
-        parts: sourceMessage.parts,
-        createdAt: new Date(occurredAt),
-      });
-    }
-
-    const lastActivityAt = new Date(startedAt + sourceMessages.length);
-    return {
-      conversation: {
-        id: conversationId,
-        title,
-        isShared: false,
-        isOwn: true,
-        lastActivityAt,
-        messageCount: importedMessages.length,
-        status: LANGY_CONVERSATION_STATUS.IDLE,
-        // An import runs no turn — there is nothing in flight to stop.
-        currentTurnId: null,
-        lastError: null,
-        // The fork's projection has not landed yet, so there is no snapshot
-        // position to seed from — the client folds from the start.
-        eventCursor: null,
-      },
-      messages: importedMessages,
-    };
   }
 
   /**

@@ -59,7 +59,7 @@ interface TimeseriesSeries {
   name: string;
   points: TimeseriesPoint[];
 }
-export interface TimeseriesPayload {
+interface TimeseriesPayload {
   series: TimeseriesSeries[];
   title?: string;
   unit?: "usd" | "count" | "ms" | "percent" | "tokens";

@@ -265,19 +265,14 @@ interface LangyState extends TurnPhaseState {
   /**
    * The conversation whose durable server history should hydrate the chat
    * engine. Set only when the USER selects a conversation; cleared once the
-   * panel has applied it. Deliberately NOT set on `adoptConversation`: a turn
-   * that just created a conversation already holds its live messages in the
-   * chat engine, so re-hydrating from the (possibly lagging) server projection
-   * would clobber the in-flight stream.
+   * panel has applied it. Deliberately NOT set on `beginTurn`: a turn that just
+   * created a conversation already holds its live messages in the chat engine,
+   * so re-hydrating from the (possibly lagging) server projection would clobber
+   * the in-flight stream.
    */
   historyLoadConversationId: string | null;
   /** User picked a conversation from recents — load its history. */
   selectConversation: (id: string) => void;
-  /**
-   * The server created/confirmed a conversation for the live turn — point at
-   * it WITHOUT reloading history (the stream already holds the messages).
-   */
-  adoptConversation: (id: string) => void;
   /**
    * Conversations THIS tab created whose read-side projection has not yet
    * been seen. The create command is accepted before the projection lands, so
@@ -329,7 +324,6 @@ interface LangyState extends TurnPhaseState {
   chooseChip: (id: string) => void;
   /** Drop a chosen chip — the chip's own ✕. */
   dismissChip: (id: string) => void;
-  resetChosenChips: () => void;
 
   /**
    * Context handed to Langy by a SURFACE (a home card, a briefing receipt, any
@@ -340,7 +334,6 @@ interface LangyState extends TurnPhaseState {
   attachedContext: LangyAttachedContext[];
   attachContext: (item: LangyAttachedContext) => void;
   detachContext: (id: string) => void;
-  clearAttachedContext: () => void;
 
   // Proposal lifecycle (keyed by proposal id)
   appliedOutcomes: Record<string, LangyAppliedOutcome>;
@@ -674,7 +667,6 @@ export const useLangyStore = create<LangyState>()(
           historyLoadConversationId: id,
           ...emptyConversationState(),
         }),
-      adoptConversation: (id) => set({ activeConversationId: id }),
       startNewConversation: () =>
         set((state) => ({
           activeConversationId: null,
@@ -719,7 +711,6 @@ export const useLangyStore = create<LangyState>()(
           next.delete(id);
           return { chosenChipIds: next };
         }),
-      resetChosenChips: () => set({ chosenChipIds: new Set<string>() }),
 
       attachedContext: [],
       attachContext: (item) =>
@@ -748,10 +739,6 @@ export const useLangyStore = create<LangyState>()(
             ),
           };
         }),
-      clearAttachedContext: () =>
-        set((state) =>
-          state.attachedContext.length === 0 ? state : { attachedContext: [] },
-        ),
 
       appliedOutcomes: {},
       discardedProposalIds: new Set<string>(),

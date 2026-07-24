@@ -289,5 +289,3 @@ export const CAPABILITY_CATALOG = {
     },
   },
 } as const satisfies Record<string, CapabilityCatalogEntry>;
-
-export type CatalogResource = keyof typeof CAPABILITY_CATALOG;

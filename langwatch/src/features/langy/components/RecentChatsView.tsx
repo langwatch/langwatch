@@ -563,9 +563,7 @@ function ChatRow({
           <Menu.Item value="rename" onClick={onStartRename}>
             <Pencil size={14} /> Rename
           </Menu.Item>
-          {/* No "Fork chat". The mutation still exists server-side
-              (`langy.forkConversation`), but branching a conversation is not
-              something the panel offers: it doubled the list with
+          {/* No "Fork chat": branching a conversation doubled the list with
               near-identical titles nobody could tell apart. */}
           <Menu.Separator />
           <Menu.Item value="delete" color="fg.error" onClick={onDelete}>

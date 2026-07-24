@@ -92,9 +92,7 @@ export const LANGY_EPHEMERAL_SIGNAL_TYPES = {
  */
 export const LANGY_CONVERSATION_COMMAND_TYPES = {
   CREATE_CONVERSATION: "lw.langy_conversation.create_conversation",
-  FORK_CONVERSATION: "lw.langy_conversation.fork_conversation",
   RECORD_MESSAGE: "lw.langy_conversation.record_message",
-  IMPORT_MESSAGE: "lw.langy_conversation.import_message",
   ACCEPT_AGENT_TURN: "lw.langy_conversation.accept_agent_turn",
   // Turn-lifecycle write surface. The durable milestones the agent records
   // during a response (ADR-044): a meaningful result the agent produces is a
@@ -117,9 +115,7 @@ export const LANGY_CONVERSATION_COMMAND_TYPES = {
 
 export const LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES = [
   LANGY_CONVERSATION_COMMAND_TYPES.CREATE_CONVERSATION,
-  LANGY_CONVERSATION_COMMAND_TYPES.FORK_CONVERSATION,
   LANGY_CONVERSATION_COMMAND_TYPES.RECORD_MESSAGE,
-  LANGY_CONVERSATION_COMMAND_TYPES.IMPORT_MESSAGE,
   LANGY_CONVERSATION_COMMAND_TYPES.ACCEPT_AGENT_TURN,
   LANGY_CONVERSATION_COMMAND_TYPES.INITIATE_TOOL_CALL,
   LANGY_CONVERSATION_COMMAND_TYPES.SUCCEED_TOOL_CALL,

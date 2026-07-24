@@ -44,7 +44,7 @@ export interface SettledToolResult {
 }
 
 /** One offer, as data. The UI decides how (and whether) to draw it. */
-export interface FollowUpSuggestion {
+interface FollowUpSuggestion {
   /** Stable per (result kind, target feature) — safe as a React key. */
   id: string;
   /** The feature that would ACT on the result. */
@@ -129,28 +129,6 @@ export function followUpsForResult(
         kind,
         sourceToolName: result.name,
       });
-    }
-  }
-  return suggestions;
-}
-
-/**
- * The offers a whole turn justifies, in first-seen order and deduped across its
- * tool calls — two trace searches in one turn offer "Add to a dataset" once.
- */
-export function deriveFollowUps({
-  results,
-}: {
-  results: SettledToolResult[];
-}): FollowUpSuggestion[] {
-  const suggestions: FollowUpSuggestion[] = [];
-  const seen = new Set<string>();
-
-  for (const result of results) {
-    for (const suggestion of followUpsForResult(result)) {
-      if (seen.has(suggestion.id)) continue;
-      seen.add(suggestion.id);
-      suggestions.push(suggestion);
     }
   }
   return suggestions;

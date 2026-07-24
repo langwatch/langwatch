@@ -1494,9 +1494,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       conversations: LangyConversationService.create(
         {
           createConversation: noop,
-          forkConversation: noop,
           recordMessage: noop,
-          importMessage: noop,
           acceptAgentTurn: noop,
           initiateToolCall: noop,
           succeedToolCall: noop,
@@ -1631,9 +1629,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       } as AppCommands["suiteRuns"],
       langy: {
         createConversation: noop,
-        forkConversation: noop,
         recordMessage: noop,
-        importMessage: noop,
         acceptAgentTurn: noop,
         initiateToolCall: noop,
         succeedToolCall: noop,
