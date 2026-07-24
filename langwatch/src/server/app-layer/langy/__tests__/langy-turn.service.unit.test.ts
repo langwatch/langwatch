@@ -38,6 +38,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
   const probe = vi.fn(async (_args: { hasGithubAuth: boolean }) => false);
   const dispatch = vi.fn(async () => "accepted" as const);
   const mintSessionKey = vi.fn(async () => ({ token: "t", apiKeyId: "k" }));
+  const resolveMissingPermissions = vi.fn(async () => [] as string[]);
   const revokeSessionKey = vi.fn(async () => {});
   const reservePermit = vi.fn(async () => ({
     reserved: true,
@@ -95,6 +96,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     releasePermit,
     perDayPrCap: 5,
     mintSessionKey,
+    resolveMissingPermissions,
     revokeSessionKey,
     admission: {
       claim,
@@ -118,6 +120,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       probe,
       dispatch,
       mintSessionKey,
+      resolveMissingPermissions,
       revokeSessionKey,
       reservePermit,
       releasePermit,
