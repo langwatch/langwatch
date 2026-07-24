@@ -10,6 +10,7 @@ import {
   groupRunsByBatchId,
   groupRunsByScenarioId,
   groupRunsByTarget,
+  preserveUnchangedRunIdentity,
   resolveOriginLabel,
 } from "../run-history-transforms";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
@@ -1267,6 +1268,89 @@ describe("availableGroupByOptions()", () => {
     it("returns all options including target", () => {
       const result = availableGroupByOptions({ viewContext: "all-runs" });
       expect(result).toEqual(["none", "scenario", "target"]);
+    });
+  });
+});
+
+describe("preserveUnchangedRunIdentity()", () => {
+  describe("when there are no previous runs", () => {
+    it("returns next as-is", () => {
+      const next = [makeScenarioRunData({ scenarioRunId: "run_1" })];
+      const result = preserveUnchangedRunIdentity({ previous: [], next });
+      expect(result).toBe(next);
+    });
+  });
+
+  describe("when a run's data is unchanged", () => {
+    it("reuses the previous run's object reference", () => {
+      const previousRun = makeScenarioRunData({ scenarioRunId: "run_1" });
+      const nextRun = makeScenarioRunData({ scenarioRunId: "run_1" });
+
+      const result = preserveUnchangedRunIdentity({
+        previous: [previousRun],
+        next: [nextRun],
+      });
+
+      expect(result[0]).toBe(previousRun);
+      expect(result[0]).not.toBe(nextRun);
+    });
+  });
+
+  describe("when a run's data actually changed", () => {
+    it("keeps the new run's object reference", () => {
+      const previousRun = makeScenarioRunData({
+        scenarioRunId: "run_1",
+        status: ScenarioRunStatus.SUCCESS,
+      });
+      const nextRun = makeScenarioRunData({
+        scenarioRunId: "run_1",
+        status: ScenarioRunStatus.FAILED,
+      });
+
+      const result = preserveUnchangedRunIdentity({
+        previous: [previousRun],
+        next: [nextRun],
+      });
+
+      expect(result[0]).toBe(nextRun);
+    });
+  });
+
+  describe("when the same data is serialized with different key order", () => {
+    it("still recognizes the run as unchanged", () => {
+      // Regression test: property insertion order isn't guaranteed stable
+      // across different construction paths (a different spread order, a
+      // server serialization tweak, an added-then-removed field). A
+      // JSON.stringify-based comparison would treat these as "changed" and
+      // silently stop reusing object identity, defeating the whole point
+      // of this function without any test failing to say so.
+      const previousRun = makeScenarioRunData({ scenarioRunId: "run_1" });
+      const sameDataReorderedKeys = Object.fromEntries(
+        Object.entries(previousRun).reverse(),
+      ) as typeof previousRun;
+
+      const result = preserveUnchangedRunIdentity({
+        previous: [previousRun],
+        next: [sameDataReorderedKeys],
+      });
+
+      expect(result[0]).toBe(previousRun);
+    });
+  });
+
+  describe("when next contains a run not present in previous", () => {
+    it("keeps the new run as-is", () => {
+      const previousRun = makeScenarioRunData({ scenarioRunId: "run_1" });
+      const newRun = makeScenarioRunData({ scenarioRunId: "run_2" });
+
+      const result = preserveUnchangedRunIdentity({
+        previous: [previousRun],
+        next: [previousRun, newRun],
+      });
+
+      expect(result).toEqual([previousRun, newRun]);
+      expect(result[0]).toBe(previousRun);
+      expect(result[1]).toBe(newRun);
     });
   });
 });

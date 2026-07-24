@@ -7,7 +7,6 @@
  *
  * @see specs/features/suites/footer-to-header-migration.feature
  */
-import { Profiler } from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,9 +24,8 @@ vi.mock("../usePrefetchRunState", () => ({
 // spying on it — while still delegating to the real implementation, so
 // existing assertions on its rendered output keep working — is a precise,
 // deterministic signal for "did GroupRow's component function actually
-// re-execute". See the equivalent useNow spy in RunRow.integration.test.tsx
-// for why this is more reliable than counting Profiler.onRender calls
-// directly.
+// re-execute". A plain call-count check, not a timing measurement, so it's
+// not sensitive to CI machine load.
 const runMetricsSummarySpy = vi.fn();
 vi.mock("../RunMetricsSummary", async (importOriginal) => {
   const actual =
@@ -178,30 +176,29 @@ describe("<GroupRow/>", () => {
     /**
      * Same regression coverage as RunRow's memoization tests: the freshness
      * probe re-fetches the whole run list on every change anywhere in the
-     * set, handing every group a brand-new wrapper object each poll. Wraps
-     * GroupRow in React's Profiler to record real commit durations, and
-     * cross-checks against the RunMetricsSummary spy (always rendered
-     * unconditionally in the header) as the deterministic "did this
-     * component's function actually re-execute" signal.
+     * set, handing every group a brand-new wrapper object each poll. The
+     * RunMetricsSummary spy (always rendered unconditionally in the header)
+     * proves whether GroupRow's component function actually re-executed.
      */
-    function ProfiledGroupRow({ group, onRender }: {
-      group: RunGroup;
-      onRender: (actualDuration: number) => void;
-    }) {
+    // Declared once per describe block (not inline in TestGroupRow) so they
+    // stay referentially stable across rerenders — matching how real call
+    // sites pass them (useCallback-wrapped). See RunRow.integration.test.tsx
+    // for why an inline vi.fn()/arrow function recreated on every render
+    // would defeat the memoization this test is meant to prove.
+    const onToggle = vi.fn();
+    const onScenarioRunClick = vi.fn();
+    const resolveTargetName = () => null;
+
+    function TestGroupRow({ group }: { group: RunGroup }) {
       return (
-        <Profiler
-          id="group-row"
-          onRender={(_id, _phase, actualDuration) => onRender(actualDuration)}
-        >
-          <GroupRow
-            group={group}
-            summary={makeSummary()}
-            isExpanded={false}
-            onToggle={vi.fn()}
-            onScenarioRunClick={vi.fn()}
-            resolveTargetName={() => null}
-          />
-        </Profiler>
+        <GroupRow
+          group={group}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={onToggle}
+          onScenarioRunClick={onScenarioRunClick}
+          resolveTargetName={resolveTargetName}
+        />
       );
     }
 
@@ -209,51 +206,42 @@ describe("<GroupRow/>", () => {
       runMetricsSummarySpy.mockClear();
     });
 
-    it("skips re-rendering when scenarioRuns keep the same object identity", () => {
-      const durations: number[] = [];
-      const onRender = (d: number) => durations.push(d);
-      const group = makeGroup();
+    describe("when scenarioRuns keep the same object identity", () => {
+      it("skips re-rendering the group", () => {
+        const group = makeGroup();
 
-      const { rerender } = render(
-        <ProfiledGroupRow group={group} onRender={onRender} />,
-        { wrapper: Wrapper },
-      );
-      expect(runMetricsSummarySpy).toHaveBeenCalledTimes(1);
-      const mountDuration = durations[0]!;
+        const { rerender } = render(<TestGroupRow group={group} />, {
+          wrapper: Wrapper,
+        });
+        expect(runMetricsSummarySpy).toHaveBeenCalledTimes(1);
 
-      const freshWrapperSameRuns: RunGroup = { ...group };
-      rerender(
-        <ProfiledGroupRow group={freshWrapperSameRuns} onRender={onRender} />,
-      );
+        const freshWrapperSameRuns: RunGroup = { ...group };
+        rerender(<TestGroupRow group={freshWrapperSameRuns} />);
 
-      // The memoized row's function body never ran again...
-      expect(runMetricsSummarySpy).toHaveBeenCalledTimes(1);
-      // ...corroborated by the profiler: negligible work on that commit.
-      expect(durations[1]).toBeLessThan(mountDuration);
+        expect(runMetricsSummarySpy).toHaveBeenCalledTimes(1);
+      });
     });
 
-    it("re-renders when a scenario run actually changes", () => {
-      const durations: number[] = [];
-      const onRender = (d: number) => durations.push(d);
-      const group = makeGroup();
+    describe("when a scenario run actually changes", () => {
+      it("re-renders the group", () => {
+        const group = makeGroup();
 
-      const { rerender } = render(
-        <ProfiledGroupRow group={group} onRender={onRender} />,
-        { wrapper: Wrapper },
-      );
-      expect(runMetricsSummarySpy).toHaveBeenCalledTimes(1);
+        const { rerender } = render(<TestGroupRow group={group} />, {
+          wrapper: Wrapper,
+        });
+        expect(runMetricsSummarySpy).toHaveBeenCalledTimes(1);
 
-      const changedGroup: RunGroup = {
-        ...group,
-        scenarioRuns: [
-          { ...group.scenarioRuns[0]!, status: ScenarioRunStatus.FAILED },
-          ...group.scenarioRuns.slice(1),
-        ],
-      };
-      rerender(<ProfiledGroupRow group={changedGroup} onRender={onRender} />);
+        const changedGroup: RunGroup = {
+          ...group,
+          scenarioRuns: [
+            { ...group.scenarioRuns[0]!, status: ScenarioRunStatus.FAILED },
+            ...group.scenarioRuns.slice(1),
+          ],
+        };
+        rerender(<TestGroupRow group={changedGroup} />);
 
-      expect(runMetricsSummarySpy).toHaveBeenCalledTimes(2);
-      expect(durations[1]).toBeGreaterThan(0);
+        expect(runMetricsSummarySpy).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

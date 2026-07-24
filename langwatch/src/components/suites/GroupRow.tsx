@@ -14,7 +14,7 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo } from "react";
 import type { RunGroup, RunGroupSummary } from "./run-history-transforms";
-import { groupRunsByBatchId } from "./run-history-transforms";
+import { groupRunsByBatchId, sameScenarioRunReferences } from "./run-history-transforms";
 import { BatchSection } from "./BatchSection";
 import { RunMetricsSummary } from "./RunMetricsSummary";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
@@ -41,6 +41,8 @@ function arePropsEqual(prev: GroupRowProps, next: GroupRowProps): boolean {
     prev.isExpanded !== next.isExpanded ||
     prev.viewMode !== next.viewMode ||
     prev.cancellingJobId !== next.cancellingJobId ||
+    prev.resolveTargetName !== next.resolveTargetName ||
+    prev.onScenarioRunClick !== next.onScenarioRunClick ||
     prev.group.groupKey !== next.group.groupKey ||
     prev.group.groupLabel !== next.group.groupLabel ||
     prev.group.timestamp !== next.group.timestamp
@@ -48,13 +50,13 @@ function arePropsEqual(prev: GroupRowProps, next: GroupRowProps): boolean {
     return false;
   }
 
-  const prevRuns = prev.group.scenarioRuns;
-  const nextRuns = next.group.scenarioRuns;
-  if (prevRuns.length !== nextRuns.length) return false;
-  for (let i = 0; i < prevRuns.length; i++) {
-    if (prevRuns[i] !== nextRuns[i]) return false;
-  }
-  return true;
+  // `onToggle` and `onCancelRun` are deliberately NOT compared here — see
+  // RunRow.tsx's arePropsEqual for why: both are recreated on every render
+  // at every call site, but their behavior is fully determined by
+  // group.groupKey (already compared above), so a stale closure is
+  // behaviorally identical to a fresh one. Comparing them by reference
+  // would always report "changed" and defeat this memoization entirely.
+  return sameScenarioRunReferences(prev.group.scenarioRuns, next.group.scenarioRuns);
 }
 
 function GroupRowComponent({

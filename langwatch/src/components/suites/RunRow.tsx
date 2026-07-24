@@ -15,7 +15,7 @@ import { memo, useMemo, useState } from "react";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";
-import { computeIterationMap } from "./run-history-transforms";
+import { computeIterationMap, sameScenarioRunReferences } from "./run-history-transforms";
 import { ScenarioRunContent } from "./ScenarioRunContent";
 import { RunMetricsSummary } from "./RunMetricsSummary";
 import { isCancellableStatus } from "./useCancelScenarioRun";
@@ -68,6 +68,8 @@ function arePropsEqual(prev: RunRowProps, next: RunRowProps): boolean {
     prev.isCancellingBatch !== next.isCancellingBatch ||
     prev.cancellingJobId !== next.cancellingJobId ||
     prev.isHighlighted !== next.isHighlighted ||
+    prev.resolveTargetName !== next.resolveTargetName ||
+    prev.onScenarioRunClick !== next.onScenarioRunClick ||
     prev.batchRun.batchRunId !== next.batchRun.batchRunId ||
     prev.batchRun.timestamp !== next.batchRun.timestamp ||
     prev.batchRun.scenarioSetId !== next.batchRun.scenarioSetId
@@ -75,13 +77,22 @@ function arePropsEqual(prev: RunRowProps, next: RunRowProps): boolean {
     return false;
   }
 
-  const prevRuns = prev.batchRun.scenarioRuns;
-  const nextRuns = next.batchRun.scenarioRuns;
-  if (prevRuns.length !== nextRuns.length) return false;
-  for (let i = 0; i < prevRuns.length; i++) {
-    if (prevRuns[i] !== nextRuns[i]) return false;
-  }
-  return true;
+  // `onToggle`, `onCancelRun`, and `onCancelAll` are deliberately NOT
+  // compared here, even though they're callback props too. Every call site
+  // recreates them on every render (inline closures over
+  // batchRun.batchRunId / batchRun.scenarioSetId — see RunHistoryPanel.tsx
+  // and ExternalSetDetailPanel.tsx), so comparing them by reference would
+  // always report "changed" and defeat this memoization entirely. That's
+  // safe to skip only because each one's actual behavior is fully
+  // determined by batchRunId/scenarioSetId, both already compared above —
+  // a "stale" closure retained from a bailed-out render behaves identically
+  // to a freshly created one. `resolveTargetName` and `onScenarioRunClick`
+  // don't have that guarantee (e.g. resolveTargetName can depend on target
+  // data outside batchRun), so those two are compared above instead.
+  return sameScenarioRunReferences(
+    prev.batchRun.scenarioRuns,
+    next.batchRun.scenarioRuns,
+  );
 }
 
 function RunRowComponent(props: RunRowProps) {

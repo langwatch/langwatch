@@ -8,7 +8,6 @@
  *
  * @see specs/suites/suite-workflow.feature - "Run History List"
  */
-import { Profiler } from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -21,10 +20,8 @@ import { makeScenarioRunData, makeBatchRun, makeSummary } from "./test-helpers";
 
 // `useNow()` is called unconditionally at the top of RunRowData's render
 // body, so spying on it is a precise, deterministic signal for "did this
-// row's function component actually re-execute" — unlike React's Profiler,
-// whose onRender fires per-commit at the boundary it wraps even when a
-// memoized child bails out deeper in the tree (verified empirically: see
-// the "memoization" tests below, which use both signals together).
+// row's component function actually re-execute" — a plain call-count check,
+// not a timing measurement, so it's not sensitive to CI machine load.
 const useNowSpy = vi.fn(() => Date.now());
 vi.mock("~/hooks/useNow", () => ({ useNow: () => useNowSpy() }));
 
@@ -414,41 +411,33 @@ describe("<RunRow/>", () => {
 
   describe("memoization", () => {
     /**
-     * Regression test for the run-history flicker: the freshness probe
+     * Regression coverage for the run-history flicker: the freshness probe
      * re-fetches the whole run list on every change anywhere in the set,
      * handing every row a brand-new `batchRun` wrapper object each poll.
-     * Wraps RunRow in React's Profiler (as a developer inspecting this in
-     * React DevTools would) to record each commit's render phase and
-     * duration, and cross-checks against the useNow spy — a hook called
-     * unconditionally at the top of RunRowData's body, so its call count is
-     * a precise, deterministic signal for "did this row's component
-     * function actually re-execute".
-     *
-     * Why both: React's Profiler.onRender fires per-commit for the boundary
-     * it wraps even when a memoized child bails out deeper in the tree (it
-     * measures the commit that touched this region, not whether the
-     * memoized child itself did work) — confirmed empirically here by the
-     * second commit's actualDuration collapsing near zero and useNow's call
-     * count staying flat, versus a real re-render where both move together.
+     * `useNow()` is called unconditionally at the top of RunRowData's
+     * render body, so the spy's call count proves whether the row's
+     * component function actually re-executed.
      */
-    function ProfiledRunRow({ batchRun, onRender }: {
-      batchRun: BatchRun;
-      onRender: (actualDuration: number) => void;
-    }) {
+    // Declared once per describe block (not inline in TestRunRow) so they
+    // stay referentially stable across rerenders — matching how real call
+    // sites pass them (useCallback-wrapped). An inline `vi.fn()`/arrow
+    // function recreated on every render would make onScenarioRunClick and
+    // resolveTargetName look "changed" on every poll and always force a
+    // re-render, which isn't representative of production usage.
+    const onToggle = vi.fn();
+    const onScenarioRunClick = vi.fn();
+    const resolveTargetName = () => "Prod Agent";
+
+    function TestRunRow({ batchRun }: { batchRun: BatchRun }) {
       return (
-        <Profiler
-          id="run-row"
-          onRender={(_id, _phase, actualDuration) => onRender(actualDuration)}
-        >
-          <RunRow
-            batchRun={batchRun}
-            summary={makeSummary()}
-            isExpanded={false}
-            onToggle={vi.fn()}
-            resolveTargetName={() => "Prod Agent"}
-            onScenarioRunClick={vi.fn()}
-          />
-        </Profiler>
+        <RunRow
+          batchRun={batchRun}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={onToggle}
+          resolveTargetName={resolveTargetName}
+          onScenarioRunClick={onScenarioRunClick}
+        />
       );
     }
 
@@ -456,61 +445,45 @@ describe("<RunRow/>", () => {
       useNowSpy.mockClear();
     });
 
-    it("skips re-rendering when scenarioRuns keep the same object identity", () => {
-      const durations: number[] = [];
-      const onRender = (d: number) => durations.push(d);
-      const batchRun = makeBatchRun();
+    describe("when scenarioRuns keep the same object identity", () => {
+      it("skips re-rendering the row", () => {
+        const batchRun = makeBatchRun();
 
-      const { rerender } = render(
-        <ProfiledRunRow batchRun={batchRun} onRender={onRender} />,
-        { wrapper: Wrapper },
-      );
-      expect(useNowSpy).toHaveBeenCalledTimes(1);
-      const mountDuration = durations[0]!;
+        const { rerender } = render(<TestRunRow batchRun={batchRun} />, {
+          wrapper: Wrapper,
+        });
+        expect(useNowSpy).toHaveBeenCalledTimes(1);
 
-      // A fresh wrapper object (as groupRunsByBatchId produces every poll)
-      // but the SAME scenarioRuns array references — exactly what
-      // preserveUnchangedRunIdentity produces for an unchanged batch.
-      const freshWrapperSameRuns: BatchRun = { ...batchRun };
-      rerender(
-        <ProfiledRunRow batchRun={freshWrapperSameRuns} onRender={onRender} />,
-      );
+        // A fresh wrapper object (as groupRunsByBatchId produces every
+        // poll) but the SAME scenarioRuns array references — exactly what
+        // preserveUnchangedRunIdentity produces for an unchanged batch.
+        const freshWrapperSameRuns: BatchRun = { ...batchRun };
+        rerender(<TestRunRow batchRun={freshWrapperSameRuns} />);
 
-      // The memoized row's function body never ran again...
-      expect(useNowSpy).toHaveBeenCalledTimes(1);
-      // ...which the profiler corroborates: the second commit did
-      // negligible work compared to the initial mount, since it never
-      // descended into RunRowData at all.
-      expect(durations[1]).toBeLessThan(mountDuration);
+        expect(useNowSpy).toHaveBeenCalledTimes(1);
+      });
     });
 
-    it("re-renders when a scenario run actually changes", () => {
-      const durations: number[] = [];
-      const onRender = (d: number) => durations.push(d);
-      const batchRun = makeBatchRun();
+    describe("when a scenario run actually changes", () => {
+      it("re-renders the row", () => {
+        const batchRun = makeBatchRun();
 
-      const { rerender } = render(
-        <ProfiledRunRow batchRun={batchRun} onRender={onRender} />,
-        { wrapper: Wrapper },
-      );
-      expect(useNowSpy).toHaveBeenCalledTimes(1);
+        const { rerender } = render(<TestRunRow batchRun={batchRun} />, {
+          wrapper: Wrapper,
+        });
+        expect(useNowSpy).toHaveBeenCalledTimes(1);
 
-      const changedBatchRun: BatchRun = {
-        ...batchRun,
-        scenarioRuns: [
-          { ...batchRun.scenarioRuns[0]!, status: ScenarioRunStatus.FAILED },
-          batchRun.scenarioRuns[1]!,
-        ],
-      };
-      rerender(
-        <ProfiledRunRow batchRun={changedBatchRun} onRender={onRender} />,
-      );
+        const changedBatchRun: BatchRun = {
+          ...batchRun,
+          scenarioRuns: [
+            { ...batchRun.scenarioRuns[0]!, status: ScenarioRunStatus.FAILED },
+            batchRun.scenarioRuns[1]!,
+          ],
+        };
+        rerender(<TestRunRow batchRun={changedBatchRun} />);
 
-      // A genuine data change re-executes RunRowData's body...
-      expect(useNowSpy).toHaveBeenCalledTimes(2);
-      // ...and the profiler shows real render work on that commit too,
-      // unlike the bailout case above.
-      expect(durations[1]).toBeGreaterThan(0);
+        expect(useNowSpy).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

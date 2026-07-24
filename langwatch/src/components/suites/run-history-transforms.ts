@@ -5,6 +5,7 @@
  * Computes pass rates and calculates totals.
  */
 
+import deepEqual from "fast-deep-equal";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData, SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
@@ -36,11 +37,31 @@ export function preserveUnchangedRunIdentity({
 
   return next.map((run) => {
     const prevRun = previousById.get(run.scenarioRunId);
-    if (prevRun && JSON.stringify(prevRun) === JSON.stringify(run)) {
+    if (prevRun && deepEqual(prevRun, run)) {
       return prevRun;
     }
     return run;
   });
+}
+
+/**
+ * Reference-equality check for two ScenarioRunData arrays — true only if
+ * both have the same length and every element is the same object reference.
+ *
+ * Shared by RunRow's and GroupRow's `React.memo` comparators: paired with
+ * preserveUnchangedRunIdentity (which keeps an unchanged run's old
+ * reference), this is how a row/group cheaply detects "nothing in here
+ * actually changed" without a deep comparison on every poll.
+ */
+export function sameScenarioRunReferences(
+  a: ScenarioRunData[],
+  b: ScenarioRunData[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 /** Valid values for the grouping dimension. */
