@@ -9,7 +9,7 @@ import {
   Toast,
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const toaster_ = createToaster({
   placement: "top-end",
@@ -29,7 +29,7 @@ export const toaster = {
   ) => {
     const { error, ...toastArgs } = args;
     if (error !== undefined) {
-      captureException(error, { tags: { source: "toaster" } });
+      captureException(toError(error), { tags: { source: "toaster" } });
     }
     return toaster_.create({
       duration: 5000,

@@ -24,7 +24,7 @@ import { setEnvironment } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { shutdownPostHog } from "./server/posthog";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
-import { captureException } from "./utils/posthogErrorCapture";
+import { captureException, toError } from "./utils/posthogErrorCapture";
 
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
@@ -104,7 +104,7 @@ process.on("unhandledRejection", (reason, promise) => {
     { reason: reason instanceof Error ? reason : { value: reason }, promise },
     "unhandled rejection detected",
   );
-  captureException(reason, {
+  captureException(toError(reason), {
     level: "error",
     tags: { source: "unhandledRejection", process: "worker" },
   });

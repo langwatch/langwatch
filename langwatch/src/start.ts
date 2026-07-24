@@ -89,7 +89,7 @@ import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
 import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
-import { captureException } from "./utils/posthogErrorCapture";
+import { captureException, toError } from "./utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:start");
 
@@ -409,7 +409,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       { reason: reason instanceof Error ? reason : { value: reason }, promise },
       "unhandled rejection detected"
     );
-    captureException(reason, {
+    captureException(toError(reason), {
       level: "error",
       tags: { source: "unhandledRejection", process: "server" },
     });
