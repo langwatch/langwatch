@@ -164,7 +164,8 @@ describe("<OnlineEvaluationsTable />", () => {
     expect(onEdit).toHaveBeenCalledWith("monitor-down");
   });
 
-  it("does not render an empty action menu when the viewer has no row actions", () => {
+  /** @scenario A viewer without analytics access does not wait forever */
+  it("shows a stable permission state without an empty action menu", () => {
     render(
       <OnlineEvaluationsTable
         {...defaultProps}
