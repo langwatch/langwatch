@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/langwatch/langwatch/compare/skills@v0.7.0...skills@v0.7.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* post-merge codex and Langy dogfood batch ([#6073](https://github.com/langwatch/langwatch/issues/6073)) ([a5a1e5a](https://github.com/langwatch/langwatch/commit/a5a1e5ac92854fc5a9619373ea57591f7b702539))
+
 ## [0.7.0](https://github.com/langwatch/langwatch/compare/skills@v0.6.1...skills@v0.7.0) (2026-07-23)
 
 
