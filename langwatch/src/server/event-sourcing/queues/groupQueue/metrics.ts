@@ -35,6 +35,8 @@ const metricNames = [
   // 2026-07-22 blob-retention fix
   "gq_blob_release_grace_total",
   "gq_blob_sweep_total",
+  // ADR-066 pillar 2 mixed-command isolation
+  "gq_foreign_siblings_restaged_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -330,4 +332,22 @@ export const gqBlobSweepTotal = new Counter({
   name: "gq_blob_sweep_total",
   help: "Blobs examined by the reclaim runner, by outcome (leased, repaired, reclaimed, bookkeeping, pending) — outcomes partition the keyspace, so this is a total, not a floor",
   labelNames: ["queue_name", "outcome"] as const,
+});
+
+/**
+ * Drained siblings restaged because their `__jobName` differed from the
+ * dispatched job's (ADR-066 pillar 2 mixed-command isolation).
+ *
+ * Distinct from the batch-failure restage paths (transient decode, oversized
+ * poison) that share `restageDrainedSiblings`: those restage the WHOLE batch
+ * because dispatch aborted, whereas this restages only foreign-command siblings
+ * that were coalesced into a group whose key namespace is shared across command
+ * types under `serializeByAggregate`. A steady rate means genuinely mixed
+ * command traffic hitting one aggregate; a spike can flag a group-key collision
+ * or a misrouted producer. Counts siblings restaged, not restage calls.
+ */
+export const gqForeignSiblingsRestagedTotal = new Counter({
+  name: "gq_foreign_siblings_restaged_total",
+  help: "Drained siblings restaged untouched because their __jobName differed from the dispatched job (ADR-066 mixed-command isolation) — excludes the batch-failure restage paths",
+  labelNames: ["queue_name"] as const,
 });

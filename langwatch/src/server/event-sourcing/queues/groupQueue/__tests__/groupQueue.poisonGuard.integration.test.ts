@@ -443,8 +443,10 @@ describe.skipIf(!hasTestcontainers)(
 
           // Stage BOTH jobs atomically as legacy bare-JSON so the small one is
           // the dispatched job (earliest score) and decodes fine, while the
-          // oversized one is drained as a coalesce sibling and blows the decode
-          // cap. Both due now; the small one sorts first.
+          // oversized one stays a staged sibling. Anything over the decode cap
+          // is necessarily over the drain's byte budget too, so it is never
+          // folded into a batch — it becomes its own dispatch and blows the
+          // decode cap there. Both due now; the small one sorts first.
           const scripts = new GroupStagingScripts(redis, name);
           const now = Date.now();
           const small = JSON.stringify({
@@ -483,16 +485,20 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 10000, interval: 100 },
           );
 
-          // The batch was parked before any handler ran (the oversized sibling
-          // is never JSON-parsed, so neither process nor processBatch fires).
-          expect(processed).not.toHaveBeenCalled();
-          expect(processBatch).not.toHaveBeenCalled();
+          // The byte budget kept the poison out of the batch: the small job's
+          // work completed exactly once, and the oversized value was parked on
+          // its own dispatch without ever being JSON-parsed — so no handler
+          // saw anything but the small payload.
+          const handledIds = [
+            ...processed.mock.calls.map(([p]) => p.id),
+            ...processBatch.mock.calls.flatMap(([ps]) => ps.map((p) => p.id)),
+          ];
+          expect(handledIds).toEqual(["job-small"]);
           const error = await storedError(name, "fat");
           expect(error).toContain("Poison guard");
           expect(error).toContain("parked unparsed");
-          // The batch's other work is not lost: the group still holds staged
-          // jobs (the re-staged siblings + the parked dispatched value), ready
-          // for operator inspection or replay on unblock, not dropped.
+          // The parked value is not lost: the group still holds it staged,
+          // ready for operator inspection or replay on unblock, not dropped.
           expect(
             await redis.zcard(`${name}:gq:group:fat:jobs`),
           ).toBeGreaterThan(0);

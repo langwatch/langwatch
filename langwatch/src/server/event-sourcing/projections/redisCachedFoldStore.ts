@@ -64,11 +64,14 @@ function readUpdatedAt<State>(state: State): number {
  * sums, appends) rather than being idempotent, and would double-count. The
  * executor uses that set to recognise and skip a redelivery.
  *
- * The set is deliberately NOT a durability mechanism. It lives in the cache
- * entry, so eviction or Redis loss takes it with them — which degrades to the
- * behaviour that existed before it, not to something worse. Closing the cold
- * path properly means making the folds themselves idempotent; see
- * dev/docs/plans/fold-idempotency-plan.md.
+ * The cache is the FAST tier for that set, not the only one. When the inner
+ * store implements `getWithApplied` (first adopter: the codingAgentSession
+ * ClickHouse store) it also persists the set durably alongside the state row,
+ * and this wrapper reads it back on a cache miss — so a retry that reaches a
+ * cold cache still recognises a batch it already committed, closing the
+ * cold-cache redelivery double-count. An inner store without `getWithApplied`
+ * keeps the pre-durable behaviour: eviction or Redis loss drops the set,
+ * degrading to a blind re-apply, not to something worse.
  */
 export class RedisCachedFoldStore<State>
   implements FoldProjectionStore<State>
@@ -95,8 +98,10 @@ export class RedisCachedFoldStore<State>
   }
 
   /**
-   * The state together with the ids already folded into it. On a miss the set
-   * is empty — there is no cached state to have applied anything to.
+   * The state together with the ids already folded into it. A cache hit serves
+   * both from the entry. On a miss the read falls through to the durable store,
+   * which carries the applied-set too when it implements `getWithApplied` (so a
+   * cold-cache retry can still dedup) and an empty set otherwise.
    */
   async getWithApplied(
     aggregateId: string,
@@ -116,16 +121,16 @@ export class RedisCachedFoldStore<State>
     }
 
     // A retry with no applied-set is the moment a batch gets re-applied on top
-    // of state that already holds it. Named by reason so an incident can tell a
-    // cold cache from a Redis fault from a corrupt entry.
-    if (isRetry) {
+    // of state that already holds it. A durable store that persists the set
+    // next to its row can still answer, though — so only count dedup as
+    // unavailable when even that came back empty. Named by reason so an incident
+    // can tell a cold cache from a Redis fault from a corrupt entry.
+    const durable = await this.readDurable(aggregateId, context);
+    if (isRetry && durable.appliedEventIds.length === 0) {
       incrementEsFoldDedupUnavailable(this.keyPrefix, cached.reason);
     }
 
-    return {
-      state: await this.readDurable(aggregateId, context),
-      appliedEventIds: [],
-    };
+    return durable;
   }
 
   private async readCached(
@@ -190,12 +195,23 @@ export class RedisCachedFoldStore<State>
     };
   }
 
+  /**
+   * The durable read behind a cache miss. When the inner store persists the
+   * applied-event-id set next to its row (`getWithApplied`), that set comes back
+   * too, so a retry with a cold cache can still recognise a batch it committed;
+   * otherwise the set is empty and dedup falls back to blind re-apply.
+   */
   private async readDurable(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<State | null> {
+  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
     const startedAt = performance.now();
-    const result = await this.inner.get(aggregateId, context);
+    const result = this.inner.getWithApplied
+      ? await this.inner.getWithApplied(aggregateId, context)
+      : {
+          state: await this.inner.get(aggregateId, context),
+          appliedEventIds: [] as string[],
+        };
     observeEsFoldCacheGetDuration(
       this.keyPrefix,
       "clickhouse",

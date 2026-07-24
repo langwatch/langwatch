@@ -28,8 +28,12 @@ export class CodingAgentSessionStore
     state: CodingAgentSessionState,
     context: ProjectionStoreContext,
   ): Promise<void> {
-    const result = this.toRow(state, context);
-    await this.repo.upsert(result.row, result.retentionDays);
+    const entry = this.toRow(state, context);
+    await this.repo.upsert(
+      entry.row,
+      entry.retentionDays,
+      entry.appliedEventIds,
+    );
   }
 
   async storeBatch(
@@ -48,8 +52,8 @@ export class CodingAgentSessionStore
       return;
     }
     await Promise.all(
-      rows.map(({ row, retentionDays }) =>
-        this.repo.upsert(row, retentionDays),
+      rows.map(({ row, retentionDays, appliedEventIds }) =>
+        this.repo.upsert(row, retentionDays, appliedEventIds),
       ),
     );
   }
@@ -60,6 +64,7 @@ export class CodingAgentSessionStore
   ): {
     row: ReturnType<typeof projectCodingAgentSessionToRow>;
     retentionDays: number;
+    appliedEventIds: string[];
   } {
     return {
       row: projectCodingAgentSessionToRow({
@@ -70,31 +75,53 @@ export class CodingAgentSessionStore
       }),
       retentionDays:
         context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      // The executor's redelivery-dedup watermark, persisted next to the row so
+      // a retry with a cold cache still recognises a batch it committed.
+      appliedEventIds: context.appliedEventIds
+        ? [...context.appliedEventIds]
+        : [],
     };
   }
 
   /**
-   * Read the session's last committed state back (ADR-066) — the CH-fallthrough
-   * side of the read path: `RedisCachedFoldStore` serves the warm cache and only
-   * calls this on a miss. The row round-trips the full working state — counters,
-   * ordered steps (with their start times), the sub-agent dedup set, the
-   * previous-call context size, and the converged metric units — so a miss reads
-   * ONE point row and decodes it. It never replays `event_log`; that is the
+   * Read the session's last committed state back together with the
+   * applied-event-id watermark persisted next to it (ADR-066) — the
+   * CH-fallthrough side of the read path: `RedisCachedFoldStore` serves the warm
+   * cache and only calls this on a miss. The row round-trips the full working
+   * state — counters, ordered steps (with their start times), the sub-agent
+   * dedup set, the previous-call context size, and the converged metric units —
+   * plus the watermark, so a retry that reaches a cold cache can still recognise
+   * a batch it already committed. It never replays `event_log`; that is the
    * offline rebuild path, not this one.
    *
    * `context.occurredAtMs` prunes the read to a window of partitions around the
    * event being folded; absent, the repository scans (still keyed, still
    * correct — just not partition-pruned).
    */
-  async get(
+  async getWithApplied(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<CodingAgentSessionState | null> {
-    const row = await this.repo.findBySessionId({
+  ): Promise<{
+    state: CodingAgentSessionState | null;
+    appliedEventIds: string[];
+  }> {
+    const found = await this.repo.findBySessionIdWithApplied({
       tenantId: String(context.tenantId),
       sessionId: aggregateId,
       startedAtMs: context.occurredAtMs,
     });
-    return row ? codingAgentSessionStateFromRow(row) : null;
+    if (!found) return { state: null, appliedEventIds: [] };
+    return {
+      state: codingAgentSessionStateFromRow(found.row),
+      appliedEventIds: found.appliedEventIds,
+    };
+  }
+
+  /** State only; delegates to `getWithApplied` so the two paths cannot diverge. */
+  async get(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<CodingAgentSessionState | null> {
+    return (await this.getWithApplied(aggregateId, context)).state;
   }
 }

@@ -2,12 +2,17 @@
  * @vitest-environment node
  * @integration
  *
- * Round-trips the three coding-agent tables (migrations 00051 / 00052) through
+ * Round-trips the three coding-agent tables (migrations 00051-00054) through
  * their real INSERT/SELECT SQL against ClickHouse. The unit tests cover the
  * query shape and record mapping with a mocked client; this proves the
  * DDL↔repository column contract — a mismatched column name or type fails a
  * real insert loudly, which no mock can catch — plus the ReplacingMergeTree
- * dedup / last-write-wins semantics ADR-056 relies on.
+ * dedup / last-write-wins semantics ADR-056 relies on. It also covers the
+ * ADR-066 additions: the 00053 read-back state columns (sub-agent ids, ordered
+ * step start times, previous-call context, converged metric units) that let
+ * store.get() reconstruct working state without touching event_log, and the
+ * 00054 AppliedEventIds watermark that survives cache loss — including the
+ * mixed-deploy read of a pre-00054 row whose body omits the column entirely.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -166,7 +171,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("coding_agent_sessions round-trip (migration 00051)", () => {
+describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
   it("writes every column and reads the session back by its key", async () => {
     const row = sessionRow({
       sessionId: `${tag}-rt`,
@@ -237,6 +242,75 @@ describe("coding_agent_sessions round-trip (migration 00051)", () => {
     expect(forSession).toHaveLength(1);
     // The later write wins.
     expect(forSession[0]!.costUsd).toBeCloseTo(2);
+  });
+
+  it("reads back the applied-event-id watermark next to the row (ADR-066)", async () => {
+    const row = sessionRow({ sessionId: `${tag}-applied` });
+    await sessions.upsert(row, 30, ["ev-1", "ev-2"]);
+
+    const withApplied = await sessions.findBySessionIdWithApplied({
+      tenantId,
+      sessionId: `${tag}-applied`,
+      startedAtMs: baseMs,
+    });
+    const direct = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-applied`,
+      startedAtMs: baseMs,
+    });
+
+    expect(withApplied).not.toBeNull();
+    // The watermark rides beside the row, not inside it.
+    expect(withApplied!.appliedEventIds).toEqual(["ev-1", "ev-2"]);
+    // The mapped row is exactly what findBySessionId returns — one read, same
+    // query, same decode.
+    expect(withApplied!.row).toEqual(direct);
+  });
+
+  it("reads back an empty watermark when a row is written without one", async () => {
+    const row = sessionRow({ sessionId: `${tag}-noapplied` });
+    await sessions.upsert(row, 30);
+
+    const withApplied = await sessions.findBySessionIdWithApplied({
+      tenantId,
+      sessionId: `${tag}-noapplied`,
+      startedAtMs: baseMs,
+    });
+
+    expect(withApplied).not.toBeNull();
+    expect(withApplied!.appliedEventIds).toEqual([]);
+  });
+
+  it("reads back an empty watermark for a pre-migration row that omits the column", async () => {
+    const sessionId = `${tag}-legacy`;
+    // The genuine mixed-deploy read: an old writer (or any row written before
+    // migration 00054) emits a JSONEachRow body with NO AppliedEventIds field
+    // at all, so ClickHouse supplies the column default — an empty
+    // Array(String). This is distinct from the case above, where `toRecord`
+    // still writes AppliedEventIds: []; here the field never leaves the writer,
+    // exercising the column default and the mapper's asStringArray fallback
+    // directly. Inserted through the same client the repository resolves.
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: "2026-07-21",
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const withApplied = await sessions.findBySessionIdWithApplied({
+      tenantId,
+      sessionId,
+      startedAtMs: baseMs,
+    });
+
+    expect(withApplied).not.toBeNull();
+    expect(withApplied!.appliedEventIds).toEqual([]);
   });
 });
 

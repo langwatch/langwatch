@@ -5009,6 +5009,100 @@ describe("GroupStagingScripts.drainGroupReady", () => {
       ).toEqual([]);
     });
   });
+
+  // ADR-066 pillar 2: the drain is bounded by bytes as well as count. Each
+  // stored value here is exactly 100 bytes so the budget arithmetic is exact.
+  describe("when a byte budget is set", () => {
+    const sizedJson = (n: number) => `{"p":"${"x".repeat(n - 8)}"}`;
+
+    async function stageThreeSizedJobs() {
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j1",
+          dispatchAfterMs: 100,
+          jobDataJson: sizedJson(100),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j2",
+          dispatchAfterMs: 200,
+          jobDataJson: sizedJson(100),
+        }),
+      );
+      await scripts.stage(
+        makeJob({
+          stagedJobId: "j3",
+          dispatchAfterMs: 300,
+          jobDataJson: sizedJson(100),
+        }),
+      );
+    }
+
+    /** @scenario 'a batch is bounded by size as well as count' */
+    it("stops before a job that would overflow the budget, leaving it staged", async () => {
+      await stageThreeSizedJobs();
+
+      // 0 + 100 + 100 = 200 ≤ 250 ✓, next 100 → 300 > 250 ✗: j3 stays.
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 250,
+        initialBytes: 0,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2"]);
+      expect(await inspectGroupJobs("group-a")).toEqual(["j3", "300"]);
+      expect(await inspectTotalPending()).toBe("1");
+    });
+
+    it("counts initialBytes (the dispatched job's own size) toward the budget", async () => {
+      await stageThreeSizedJobs();
+
+      // initialBytes already fills the budget, so the first candidate overflows.
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 250,
+        initialBytes: 250,
+      });
+
+      expect(drained).toEqual([]);
+      expect(await inspectTotalPending()).toBe("3");
+    });
+
+    /** @scenario 'a single oversized item is appended on its own' */
+    it("drains no siblings when the dispatched job alone exceeds the budget", async () => {
+      await stageThreeSizedJobs();
+
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 50,
+        initialBytes: 100,
+      });
+
+      expect(drained).toEqual([]);
+      expect(await inspectTotalPending()).toBe("3");
+    });
+
+    it("applies only the count bound when maxBytes is zero", async () => {
+      await stageThreeSizedJobs();
+
+      const drained = await scripts.drainGroupReady({
+        groupId: "group-a",
+        nowMs: 10_000,
+        maxJobs: 10,
+        maxBytes: 0,
+        initialBytes: 999_999,
+      });
+
+      expect(drained.map((d) => d.stagedJobId)).toEqual(["j1", "j2", "j3"]);
+    });
+  });
 });
 
 describe("group-key TTL safety net", () => {
