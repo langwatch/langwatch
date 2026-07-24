@@ -60,7 +60,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 _tracer = trace.get_tracer(__name__)
 
 
-def _is_dataframe(obj: Any) -> bool:
+def _is_dataframe(obj: object) -> bool:
     """True when obj is a pandas DataFrame, without importing pandas.
 
     Checked via sys.modules so plain iterables never pull pandas in: if
@@ -397,10 +397,10 @@ class Experiment:
             sys.exit(1)
 
     def _build_run_result(self) -> ExperimentRunResult:
+        """Build an ExperimentRunResult from the current results DataFrame."""
         # Imported lazily so importing langwatch.experiment does not require
         # pandas; this path only runs on DataFrames built from fetched results.
         import pandas as pd
-        """Build an ExperimentRunResult from the current results DataFrame."""
         run_url = self._run_url or ""
         df = self.results
 
