@@ -57,6 +57,7 @@ import langwatch.telemetry.context
 from langwatch.telemetry.types import SpanInputType, ContextsType
 from langwatch.__version__ import __version__
 from langwatch.utils.initialization import ensure_setup
+from langwatch.utils.validation import validate_list_param
 
 if TYPE_CHECKING:
     from .tracing import LangWatchTrace
@@ -355,6 +356,12 @@ class LangWatchSpan:
         **kwargs: Any,
     ) -> None:
         ensure_setup()
+
+        contexts = validate_list_param(
+            "contexts",
+            contexts,
+            '[{"document_id": "doc-1", "content": "..."}]',
+        )
 
         attributes = dict(kwargs)
 
