@@ -43,7 +43,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [050](./050-langy-versioned-prompts-and-dogfood-evals.md)         | Langy's prompts in the versioned prompt registry + dogfood scenarios/evals                  | Proposed                                          |
 | [057](./057-token-gated-trace-sharing.md)                         | Token-gated trace sharing (ShareLink)                                                       | Accepted                                          |
 | [059](./059-card-selection-is-deterministic.md)                    | Card selection is deterministic — the model supplies data, never presentation               | Proposed                                          |
-| [066](./066-projection-clickhouse-cached-store.md)                | Projection state storage — the ClickHouse-cached read-back store                            | Proposed                                          |
+| [066](./066-projection-clickhouse-cached-store.md)                | `event_log` off the per-item hot path — read-back fold store + append coalescing            | Accepted                                          |
 
 ## When to Write an ADR
 

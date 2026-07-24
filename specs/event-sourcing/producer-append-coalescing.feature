@@ -15,6 +15,7 @@ Feature: High-fan-in producers coalesce their event-log appends
     And not as one insert per item
 
   Scenario: coalescing preserves every item
+    Given each item's event carries an identity that is stable across retries
     When a batch of items is coalesced into a single insert
     Then every item's event is durably recorded
     And a retry of the batch neither duplicates nor drops events

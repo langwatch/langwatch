@@ -23,9 +23,10 @@ Feature: Fold projections read back their own state
     And it does not read the event log
 
   Scenario: an out-of-order event is folded in place, not replayed
-    Given an aggregate whose events can arrive out of their business-time order
+    Given a fold that declares how out-of-order events fold into its state
+    And an aggregate whose events can arrive out of their business-time order
     When an event arrives older than one already folded
-    Then the fold applies it to the current state
+    Then the fold applies it to the current state under its declared ordering contract
     And it does not replay the aggregate's history to reorder
 
   Scenario: recovered state preserves the fold's internal bookkeeping
