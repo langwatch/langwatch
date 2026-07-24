@@ -385,6 +385,46 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
+{{/* Validate Langy agent secret wiring.
+
+     Unlike the gateway, all three Langy consumers (app, workers, agent pod)
+     read the SAME langyagent.secrets.* values, so they cannot disagree with
+     each other and no name-match check is needed.
+
+     What can still go wrong: the chart materialises LANGY_INTERNAL_SECRET
+     into its own app Secret, which it only writes when autogen is on. An
+     operator who brings their own Secret (autogen off, or a Secret managed by
+     terraform / external-secrets) has to carry the key themselves, and the
+     failure mode without this check is three pods in
+     CreateContainerConfigError naming a key nothing told them to add.
+
+     `lookup` returns empty during `helm template` and on a dry run, so this
+     fires only against a real cluster, and only when the Secret is already
+     there and demonstrably missing the key — never on a first install where
+     it has yet to be created. */}}
+{{- $langy := (index .Values "langyagent") | default dict }}
+{{- if $langy.chartManaged }}
+  {{- $langySecrets := $langy.secrets | default dict }}
+  {{- $langySecretName := $langySecrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+  {{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+  {{- $chartWritesIt := and .Values.autogen.enabled (empty .Values.secrets.existingSecret) (eq $langySecretName (include "langwatch.appSecretName" .)) }}
+  {{- if not $chartWritesIt }}
+    {{- $found := lookup "v1" "Secret" .Release.Namespace $langySecretName }}
+    {{- $hint := printf "Either add the key to that Secret (kubectl -n %s create secret generic %s --from-literal=%s=$(openssl rand -hex 32), or patch it if it already exists), point langyagent.secrets.existingSecretName at the Secret that does hold it, or let the chart generate it by leaving autogen.enabled=true with no secrets.existingSecret override." .Release.Namespace $langySecretName $langyKey }}
+    {{- if not $found }}
+      {{/* Every lookup comes back empty during `helm template` and dry runs, so
+           "Secret not found" there means "we cannot see the cluster", not "it is
+           missing". Probe with an object every real cluster has: if kube-system
+           is invisible too, stay quiet rather than failing a plain render. */}}
+      {{- if lookup "v1" "Namespace" "" "kube-system" }}
+        {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q was not found in namespace %q, and this chart is not generating it. The app, the workers, and the agent pod all read %q from it to authenticate to each other, so all three would start into CreateContainerConfigError. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
+      {{- end }}
+    {{- else if not (index ($found.data | default dict) $langyKey) }}
+      {{- $errors = append $errors (printf "Langy is enabled (langyagent.chartManaged=true) but Secret %q in namespace %q has no %q key. The app, the workers, and the agent pod all read that one key to authenticate to each other. %s" $langySecretName .Release.Namespace $langyKey $hint) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
 {{/* Output errors and warnings */}}
 {{- if $errors }}
 {{- fail (printf "Secret validation failed:\n%s" (join "\n" $errors)) }}

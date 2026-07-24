@@ -1,0 +1,143 @@
+---
+title: Langy Assistant
+description: "Run LangWatch's in-product AI assistant on your own cluster"
+---
+
+Langy is the assistant inside LangWatch: it answers questions about your traces,
+runs LangWatch's own CLI on your behalf, and can open pull requests against your
+repositories. On a self-hosted install it runs as one extra pod, alongside the
+app, and it is off until you turn it on.
+
+## What it needs
+
+| Requirement | Why |
+|-------------|-----|
+| The `langyagent` pod | Runs one isolated OpenCode worker per conversation |
+| A model provider | Langy talks to a model like every other LangWatch feature |
+| A sandboxed runtime, or an explicit acceptance | The workers execute model-written shell |
+
+Everything else, including the secret the app and the agent use to authenticate
+to each other, is handled by the chart.
+
+## Turning it on
+
+```yaml
+langyagent:
+  chartManaged: true
+```
+
+```bash
+helm upgrade langwatch langwatch/langwatch -n langwatch -f values.yaml
+```
+
+That deploys the agent, wires the app and the workers to it, and makes the
+assistant available to everyone in your install. Give it a model to talk to by
+configuring a [model provider](/self-hosting/overview) for the project, then
+open the assistant from any page.
+
+<Note>
+Langy is single-tenant by nature here: every person with access to your
+LangWatch install can use it, and it runs with the permissions of whoever is
+asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
+</Note>
+
+## Clusters without a sandboxed runtime
+
+Langy's workers run shell written by a language model, so the chart asks for a
+sandboxed runtime, [gVisor](https://gvisor.dev/docs/user_guide/install/), and
+refuses to install without one rather than dropping the sandbox quietly. Managed
+offerings like GKE Sandbox provide it; most self-managed clusters do not.
+
+If yours cannot, say so explicitly and the install proceeds:
+
+```yaml
+langyagent:
+  chartManaged: true
+  runtimeClassName: ""
+  acceptUnsandboxedRuntime: true
+```
+
+What you keep either way: each conversation's worker runs under its own UID with
+its own credentials, workers cannot read each other's, and a NetworkPolicy bounds
+what any of them can reach. What the sandbox adds on top is protection of the
+node itself from a worker that escapes its container. An install whose users are
+all colleagues carries a very different risk here than one exposed to
+untrusted users, and that judgement is yours to make.
+
+## Letting Langy reach the internet
+
+Langy's tools shell out to `git`, `gh`, and package managers. Egress to the
+internet is off by default, because these workers hold the requesting user's API
+key and GitHub token:
+
+```yaml
+langyagent:
+  networkPolicy:
+    allowExternalHttps: true
+```
+
+Private address ranges and the cloud metadata endpoint stay blocked either way,
+so a worker cannot use this to reach your internal services. Without it, Langy
+still answers questions about your data; what stops working is anything that
+talks to GitHub or installs a package.
+
+## Watching Langy work
+
+Langy's own turns can be traced into one of your own LangWatch projects, so you
+can see the model calls it made, the tools it ran, and what each one cost.
+
+Create an API key in the project you want to mirror into, then:
+
+```bash
+kubectl -n langwatch create secret generic langwatch-langyagent-mirror \
+  --from-literal=LANGY_MIRROR_TRACE_KEY=<that project's API key>
+```
+
+```yaml
+langyagent:
+  mirror:
+    existingSecretName: langwatch-langyagent-mirror
+```
+
+The endpoint resolves to your own install automatically. Set
+`langyagent.mirror.traceEndpoint` only to mirror into a different LangWatch
+deployment.
+
+## Staged rollout
+
+To open Langy to a few projects before everyone, keep the rollout flag
+authoritative:
+
+```yaml
+langyagent:
+  chartManaged: true
+  enableForAllUsers: false
+```
+
+Langy then stays dark until you enable `release_langy_enabled`, or add targeting
+rules for specific projects and organizations, from `/ops/feature-flags` in your
+install.
+
+## Bringing your own secrets
+
+With `autogen.enabled: false` you supply the app Secret yourself. Add a
+`LANGY_INTERNAL_SECRET` key to it, which the app, the workers, and the agent all
+read to authenticate to each other:
+
+```bash
+kubectl -n langwatch patch secret langwatch-app-secrets \
+  -p "{\"stringData\":{\"LANGY_INTERNAL_SECRET\":\"$(openssl rand -hex 32)\"}}"
+```
+
+The install checks for the key and stops with a message naming it, rather than
+leaving three pods in `CreateContainerConfigError`.
+
+## Turning it off
+
+```yaml
+langyagent:
+  chartManaged: false
+```
+
+The agent pod and every reference to it are removed on the next upgrade. Nothing
+else in your install changes.

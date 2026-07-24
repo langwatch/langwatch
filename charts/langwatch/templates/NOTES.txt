@@ -76,6 +76,25 @@ dev's Personal Workspace at https://<your-host>/me .
   • Healthcheck (in-cluster):
       curl http://{{ .Release.Name }}-gateway/healthz
 {{- end }}
+{{- if (index .Values "langyagent").chartManaged }}
+  • Langy, the in-product assistant:
+      kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name=langyagent
+{{- if (index .Values "langyagent").enableForAllUsers }}
+    It is available to everyone in this install. Give it a model to talk to
+    by wiring a Model Provider (step 2 above), then open the assistant from
+    any project.
+{{- else }}
+    langyagent.enableForAllUsers=false, so it stays dark until you open it
+    to the projects or organizations you choose from /ops/feature-flags.
+{{- end }}
+{{- if not (index .Values "langyagent").mirror.existingSecretName }}
+    To watch Langy work with LangWatch itself, mirror its turns into one of
+    your projects: create an API key there, then
+      kubectl -n {{ .Release.Namespace }} create secret generic langwatch-langyagent-mirror \
+        --from-literal=LANGY_MIRROR_TRACE_KEY=<that project's API key>
+    and set langyagent.mirror.existingSecretName to it on your next upgrade.
+{{- end }}
+{{- end }}
   • Self-host docs:
       https://docs.langwatch.ai/self-hosting/
   • Personal-keys onboarding walkthrough:
@@ -170,6 +189,9 @@ message.
     - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
     - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
 {{- end }}
+{{- if (index .Values "langyagent").chartManaged }}
+    - LANGY_INTERNAL_SECRET           (langyagent.chartManaged=true)
+{{- end }}
 
   When autogen.enabled=true the chart materialises this Secret on
   first install via per-key lookup-or-rand and heals missing keys
@@ -191,5 +213,8 @@ message.
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
       --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if (index .Values "langyagent").chartManaged }} \{{ end }}
+{{- end }}
+{{- if (index .Values "langyagent").chartManaged }}
+      --from-literal=LANGY_INTERNAL_SECRET="$(openssl rand -hex 32)"
 {{- end }}

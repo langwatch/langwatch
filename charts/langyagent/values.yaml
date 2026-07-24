@@ -55,9 +55,15 @@ service:
   port: 80
   targetPort: 8080
 
-# Auth secret shared with the control plane. Helm never materialises it —
-# the operator creates it out-of-band (terraform / external-secrets), and
-# the SAME value must be set as LANGY_INTERNAL_SECRET on langwatch-app.
+# Auth secret shared with the control plane: the app sends it as a Bearer
+# token, the agent verifies it, so BOTH pods must read the same value.
+#
+# Under the umbrella chart this defaults to the app's own Secret, which the
+# umbrella materialises (generated when autogen is on, supplied by the
+# operator otherwise) — nothing to create by hand. This standalone default
+# only applies when the subchart is installed on its own, in which case the
+# operator creates it and sets the same value as LANGY_INTERNAL_SECRET on
+# langwatch-app:
 #   kubectl create secret generic langwatch-langyagent-auth \
 #     --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32)
 secrets:
@@ -75,7 +81,10 @@ secrets:
 #     --from-literal=LANGY_MIRROR_TRACE_KEY=<mirror project API key>
 mirror:
   # Base URL of the LangWatch deployment holding the mirror project —
-  # /api/otel/v1/traces is appended by the manager.
+  # /api/otel/v1/traces is appended by the manager. Leave empty and set
+  # existingSecretName below to mirror into THIS install: the endpoint then
+  # resolves to the release's own app Service over cluster DNS. Set it
+  # explicitly to mirror into a different LangWatch deployment.
   traceEndpoint: ""
   # Secret holding the mirror project's API key. Helm never materialises it;
   # the operator creates it out-of-band, like the auth secret above.
@@ -178,17 +187,31 @@ containerSecurityContext:
 # Without it, pods will fail to schedule with
 #   FailedCreatePodSandBox: ... runtimeclasses.node.k8s.io "gvisor" not found
 # Install via the gVisor operator or by applying the RuntimeClass manifest
-# from https://gvisor.dev/docs/user_guide/install/. The langyagent chart
-# refuses to deploy with chartManaged=true and an unset/empty runtimeClass
-# would be a security regression, so the default is opinionated.
+# from https://gvisor.dev/docs/user_guide/install/. On EKS that means a node
+# group whose AMI ships runsc; on GKE it is GKE Sandbox; kind/k3s and most
+# self-managed clusters ship no sandboxed runtime at all.
 #
-# To opt OUT (NOT recommended; documented for completeness): set
+# To run WITHOUT a sandboxed runtime — the only option on a cluster that
+# cannot provide one — blank this AND accept the reduced isolation below:
 #   runtimeClassName: ""
-# which omits the field from the pod spec → kubelet uses the node default
-# runtime (runc/containerd, no sandbox). Worker→worker isolation inside the
-# pod is still enforced by the per-UID + bearer-token authproxy work, but
-# pod→host isolation reverts to standard cgroups + namespaces only.
+#   acceptUnsandboxedRuntime: true
+# Blanking it alone is refused at render time (see deployment.yaml), so an
+# unsandboxed deploy is always something an operator wrote down on purpose.
 runtimeClassName: "gvisor"
+
+# Accept running the agent WITHOUT a sandboxed runtime. Only meaningful when
+# runtimeClassName is blank; the render fails otherwise (see deployment.yaml).
+#
+# What you give up: the pod->host escape surface reverts to standard cgroups +
+# namespaces, so a worker that breaks out of the container faces only the node
+# kernel. What you keep: per-worker UID isolation and the per-worker opencode
+# password still separate one conversation's credentials from another's inside
+# the pod, and the NetworkPolicy still bounds where workers can reach.
+#
+# The judgement call this leaves the operator: a single-tenant install whose
+# users are all colleagues carries a much smaller worker-versus-worker risk
+# than a multi-tenant one. Read it that way, not as a formality.
+acceptUnsandboxedRuntime: false
 
 networkPolicy:
   enabled: true

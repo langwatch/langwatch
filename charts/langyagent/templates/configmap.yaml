@@ -32,10 +32,22 @@ data:
   LANGY_EGRESS_REQUIRE_TLS: {{ .Values.egress.requireTls | quote }}
   LANGY_EGRESS_ENFORCE_FLOOR: {{ .Values.egress.enforceFloor | quote }}
   LANGY_EGRESS_SNI_CROSSCHECK: {{ .Values.egress.sniCrossCheck | quote }}
-  {{- with .Values.mirror.traceEndpoint }}
-  # Mirror lane (ADR-061): the secondary exporter for the turn's gen_ai trace
-  # data into the operator-designated mirror project. The key is NOT here —
-  # it is a project API key, injected from the mirror Secret in the
-  # Deployment env.
+  {{- /* Mirror lane (ADR-061): the secondary exporter for the turn's gen_ai
+         trace data into the operator-designated mirror project. The key is NOT
+         here — it is a project API key, injected from the mirror Secret in the
+         Deployment env.
+
+         The endpoint is derivable: the only thing an operator can tell us that
+         we cannot work out ourselves is which project to mirror into, which is
+         what the key says. So when they supply the key and leave the endpoint
+         empty, point at this install's own control plane over cluster DNS.
+         Only when the key is present — the manager refuses to boot if one half
+         of the pair is set without the other, so deriving an endpoint for an
+         install with no mirror key would turn a dormant lane into a crashloop. */}}
+  {{- $mirrorEndpoint := .Values.mirror.traceEndpoint }}
+  {{- if and (not $mirrorEndpoint) .Values.mirror.existingSecretName }}
+  {{- $mirrorEndpoint = printf "http://%s-app:5560" .Release.Name }}
+  {{- end }}
+  {{- with $mirrorEndpoint }}
   LANGY_MIRROR_TRACE_ENDPOINT: {{ . | quote }}
   {{- end }}
