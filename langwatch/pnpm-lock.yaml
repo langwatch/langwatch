@@ -742,6 +742,9 @@ importers:
       '@langwatch/scenario':
         specifier: ^0.4.6
         version: 0.4.10(5537b93b6807657c4a23641e4b707fe7)
+      '@langwatch/ssrf':
+        specifier: workspace:*
+        version: link:../langwatch/packages/ssrf
       '@opentelemetry/context-async-hooks':
         specifier: ^2.1.0
         version: 2.5.1(@opentelemetry/api@1.9.1)
