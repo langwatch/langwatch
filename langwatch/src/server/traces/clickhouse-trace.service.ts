@@ -17,9 +17,14 @@ import {
 } from "~/server/evaluations/evaluation-run.mappers";
 import type {
   NormalizedSpan,
-  NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+// NormalizedSpanKind is a runtime enum (used as `NormalizedSpanKind.UNSPECIFIED`
+// below), so it must be a value import — `import type` strips the binding at
+// runtime and `.UNSPECIFIED` would throw TypeError. The other two
+// (`NormalizedSpan`, `NormalizedStatusCode`) are only used in type positions
+// in this file, so they stay as `import type` for cleaner tree-shaking.
+import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Event, Span, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
@@ -1341,9 +1346,65 @@ export class ClickHouseTraceService {
             return null;
           }
 
+          // #5753: resolve offloaded eventref IO (>64 KB) for the target
+          // LLM span before extraction. Only this span's attributes are
+          // read by extractPromptStudioDataFromClickHouse; the ancestor
+          // walk below reads only small langwatch.prompt.* metadata that
+          // is never offloaded, so resolving just the target is enough.
+          let resolvedRow = row;
+          if (this.resolveTraceSpans) {
+            // #5753: build a fully-typed NormalizedSpan so the resolver
+            // gets type-checked fields. Only `spanId`, `traceId`, and
+            // `spanAttributes` are read by `resolveTraceSpans` today, but
+            // supplying safe defaults for every required field means a
+            // future change to the resolver (e.g. tenantId-scoped logging
+            // or filtering) won't silently receive undefined.
+            const targetSpan: NormalizedSpan = {
+              id: row.SpanId,
+              spanId: row.SpanId,
+              traceId: row.TraceId,
+              tenantId: projectId,
+              parentSpanId: null,
+              parentTraceId: null,
+              parentIsRemote: null,
+              sampled: false,
+              startTimeUnixMs: 0,
+              endTimeUnixMs: 0,
+              durationMs: 0,
+              name: "",
+              kind: NormalizedSpanKind.UNSPECIFIED,
+              resourceAttributes: {},
+              spanAttributes: row.SpanAttributes,
+              events: [],
+              links: [],
+              statusMessage: null,
+              statusCode: null,
+              instrumentationScope: { name: "", version: null },
+              droppedAttributesCount: 0,
+              droppedEventsCount: 0,
+              droppedLinksCount: 0,
+              cost: null,
+              nonBilledCost: null,
+            };
+            const { resolvedSpans } = await this.resolveTraceSpans(
+              projectId,
+              [targetSpan],
+            );
+            const resolved = resolvedSpans[0];
+            if (resolved) {
+              resolvedRow = {
+                ...row,
+                SpanAttributes: resolved.spanAttributes as Record<
+                  string,
+                  unknown
+                >,
+              };
+            }
+          }
+
           // Extract span data from attributes
           const result = this.extractPromptStudioDataFromClickHouse(
-            row,
+            resolvedRow,
             protections,
           );
 
