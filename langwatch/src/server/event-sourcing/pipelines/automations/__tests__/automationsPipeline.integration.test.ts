@@ -1,6 +1,12 @@
 import { TriggerAction } from "@prisma/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Redis } from "ioredis";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import {
+  getTestRedisConnection,
+  startTestContainers,
+  stopTestContainers,
+} from "../../../__tests__/integration/testContainers";
 import { createTenantId } from "../../../domain/tenantId";
 import { EventSourcing } from "../../../eventSourcing";
 import { mapCommands } from "../../../mapCommands";
@@ -232,3 +238,97 @@ describe("automations pipeline", () => {
     });
   });
 });
+
+// ADR-066 pillar 2 — the redis:null suites above never coalesce (the in-memory
+// queue processes one job at a time), so the coalesced processCommandBatch path
+// through the REAL recordTriggerMatch handler stays unexercised there. This suite
+// runs a redis-backed GroupQueue with the coalescing consumer live and proves the
+// end-to-end observable: several matches for one trigger collapse into one
+// multi-row event-store write, every match's distinct idempotency key preserved.
+const hasRedis = !!(process.env.REDIS_URL || process.env.CI_REDIS_URL);
+
+describe.skipIf(!hasRedis)(
+  "automations pipeline — coalesced redis-backed dispatch",
+  () => {
+    let redis: Redis;
+
+    beforeAll(async () => {
+      await startTestContainers();
+      redis = getTestRedisConnection()!;
+    });
+
+    afterAll(async () => {
+      await stopTestContainers();
+    });
+
+    afterEach(async () => {
+      await redis.flushall();
+    });
+
+    describe("given several matches for one trigger staged as a batch", () => {
+      describe("when the coalescing consumer drains them", () => {
+        it("stores every match in one multi-row call with distinct idempotency keys", async () => {
+          const processStore = new InMemoryProcessStore();
+          // processRole "all" runs the worker so the GroupQueue consumer actually
+          // drains and coalesces; no clickhouse → the in-memory event store backs
+          // reads, and we spy on its multi-row write.
+          const eventSourcing = new EventSourcing({
+            processStore,
+            redis,
+            processRole: "all",
+          });
+
+          try {
+            const pipeline = eventSourcing.register(
+              createAutomationsPipeline(pipelineDeps()),
+            );
+            const commands = mapCommands(pipeline.commands);
+
+            const eventStore = eventSourcing.getEventStore<AutomationEvent>()!;
+            const storeSpy = vi.spyOn(eventStore, "storeEvents");
+
+            // sendBatch stages all three atomically in one group, so the drain
+            // folds them into a single processCommandBatch call. Per-command
+            // sends would race the consumer and might never coalesce.
+            await commands.recordTriggerMatch.sendBatch!([
+              command("trace-1", 1_000),
+              command("trace-2", 2_000),
+              command("trace-3", 3_000),
+            ]);
+
+            await vi.waitFor(
+              async () => {
+                const events = await eventStore.getEvents(
+                  "trigger-1",
+                  { tenantId },
+                  "trigger",
+                );
+                expect(events).toHaveLength(3);
+              },
+              { timeout: 15_000, interval: 50 },
+            );
+
+            // One multi-row store call carried all three matches — the coalesced
+            // path collapsed three single-row appends into one insert.
+            const multiRowCalls = storeSpy.mock.calls.filter(
+              ([events]) => (events as readonly AutomationEvent[]).length > 1,
+            );
+            expect(multiRowCalls).toHaveLength(1);
+            const [batchedEvents] = multiRowCalls[0]!;
+            expect(
+              (batchedEvents as readonly AutomationEvent[]).map(
+                (event) => event.idempotencyKey,
+              ),
+            ).toEqual([
+              "trigger-1:trace-1:30000-0",
+              "trigger-1:trace-2:30000-0",
+              "trigger-1:trace-3:30000-0",
+            ]);
+          } finally {
+            await eventSourcing.close();
+          }
+        });
+      });
+    });
+  },
+);

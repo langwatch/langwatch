@@ -68,7 +68,7 @@ Every ClickHouse-backed fold projection gets the same store with the same contra
 - **`apply(state, batch)`** → in-process derivation. Pure; order-tolerant per the fold's *declared* ordering contract.
 - **`store(state)`** → **ClickHouse first (throws on failure), then Redis.** A full-state **replace**, keyed by `(TenantId, aggregate)` + a monotonic version (ReplacingMergeTree), latest version wins. **No read-time aggregation.**
 
-Idempotency is a **platform property**, not a per-fold concern: writes are full-state idempotent replaces; the GroupQueue serialises per aggregate (FIFO); redelivery is deduped by the applied-event-id set carried alongside the state (reset on each fresh delivery, so it stays bounded to the in-flight batch). Today that set travels with the *cached* state only, so redelivery dedup is exact while the cache holds the entry and degrades to at-least-once re-apply across cache loss; closing that cold hole durably is sequencing step 4 (the durable dedup watermark).
+Idempotency is a **platform property**, not a per-fold concern: writes are full-state idempotent replaces; the GroupQueue serialises per aggregate (FIFO); redelivery is deduped by the applied-event-id set carried alongside the state (reset on each fresh delivery, so it stays bounded to the in-flight batch). For read-back folds that set also persists durably next to the state row (sequencing step 4, the durable dedup watermark — migration 00054), so dedup survives cache loss; folds without a durable set keep the cache-only behaviour, exact while the cache holds the entry and degrading to at-least-once re-apply across cache loss.
 
 What the contract removes:
 
@@ -142,8 +142,8 @@ Independently of the store: fix the **session = traceId fallback** so one large 
 
 ## Adopters & sequencing
 
-1. **Now (relief):** `refoldOnOutOfOrder: false` on `codingAgentSession` — safe today (order-insensitive derivation), stops the replay storm. Small standalone PR.
-2. **Pillar 1, first adopter:** `codingAgentSession` → lossless read-back store (kills `refoldOnStoreMiss` on the hot path). The concrete shape is in *"codingAgentSession decomposition"* below. Then roll the same pattern to any other lossy-row fold. Migration is per-fold: until the last lossy-row fold adopts read-back (ADR-034's slim analytics folds are the remaining users), `refoldOnStoreMiss` / `refoldOnOutOfOrder` stay in the executor for those folds — the Rules below bind a fold from the moment it adopts, and the flags (with their executor support) are deleted with the final adopter.
+1. **Now (relief) — shipped:** `refoldOnOutOfOrder: false` on `codingAgentSession` — safe today (order-insensitive derivation), stops the replay storm. Small standalone PR.
+2. **Pillar 1, first adopter — shipped:** `codingAgentSession` → lossless read-back store (kills `refoldOnStoreMiss` on the hot path). The concrete shape is in *"codingAgentSession decomposition"* below. Then roll the same pattern to any other lossy-row fold. Migration is per-fold: until the last lossy-row fold adopts read-back (ADR-034's slim analytics folds are the remaining users), `refoldOnStoreMiss` / `refoldOnOutOfOrder` stay in the executor for those folds — the Rules below bind a fold from the moment it adopts, and the flags (with their executor support) are deleted with the final adopter.
 3. **Pillar 2, first adopter — shipped:** append coalescing for `recordTriggerMatch` (`processCommandBatch` → one multi-row insert; the drain bounds by count AND bytes for every coalescing consumer). **Remaining:** audit other high-fan-in `event_log` producers and coalesce them — serialized command producers registering without coalescing are logged at registration, so the gaps are enumerable.
 4. **Durable dedup watermark — shipped:** the applied-event-id set persists next to the state row (`AppliedEventIds`, migration 00054) and the executor commits the union of the loaded set and the fresh ids on retries, so "throw-and-retry" stays idempotent across cache loss for read-back folds. Folds without a durable set keep the cache-only behaviour.
 
@@ -192,12 +192,13 @@ Recorded here so the application-side and server-side levers are visible togethe
 
 ## References
 
-- **Behavioural contract:** [specs/event-sourcing/fold-read-back-store.feature](../../../specs/event-sourcing/fold-read-back-store.feature) (pillar 1), [specs/event-sourcing/producer-append-coalescing.feature](../../../specs/event-sourcing/producer-append-coalescing.feature) (pillar 2)
+- **Behavioural contract:** [specs/event-sourcing/fold-read-back-store.feature](../../../specs/event-sourcing/fold-read-back-store.feature) (pillar 1), [specs/event-sourcing/producer-append-coalescing.feature](../../../specs/event-sourcing/producer-append-coalescing.feature) (pillar 2), [specs/event-sourcing/fold-coalescing.feature](../../../specs/event-sourcing/fold-coalescing.feature) (the shared count+byte-bounded drain both sides ride)
 - [ADR-007](./007-event-sourcing-architecture.md) — event-sourcing architecture (this ADR hardens its storage model)
 - [ADR-015](./015-projection-replay-coordination.md) — replay coordination (narrowed to off-hot-path)
 - [ADR-021](./021-lean-fold-cache.md) — lean fold cache (fold-cache mechanics superseded here)
 - [ADR-022](./022-event-log-source-of-truth.md) — event_log as source of truth (heavy-content axis)
 - [ADR-034](./034-event-sourced-analytics-materialization.md) — analytics materialisation (its `refoldOnStoreMiss` continuity mechanism amended here)
 - [ADR-049](./049-langy-projection-independent-reactions.md) — Postgres operational-projection store (sibling implementation of the read-back principle)
+- [ADR-052](./052-automations-on-process-manager-substrate.md) — automations pipeline (pillar 2's first adopter, `recordTriggerMatch`, is an ADR-052 command; coalescing preserves its per-trigger FIFO ordering)
 - [ADR-055](./055-canonical-otlp-metric-and-log-pipelines.md) — map-vs-fold projection choice
 - [ADR-056](./056-coding-agent-pipeline-session-aggregate.md) — coding-agent session aggregate (store corrected here)

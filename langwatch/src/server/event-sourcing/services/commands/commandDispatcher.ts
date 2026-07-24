@@ -230,10 +230,17 @@ export interface ProcessCommandBatchParams<EventType extends Event>
  *
  * The GroupQueue drains a hot aggregate's queued same-command jobs and hands
  * them here as one ordered batch. Each payload is validated, kill-switch-checked,
- * and handled IN ORDER exactly as the single path does, but every resulting
- * event is persisted in ONE `storeEventsFn` call — collapsing N tiny single-row
- * appends into one multi-row insert so a high-fan-in producer stays off the
- * per-item event-log write path.
+ * and handled in dispatch order, then every resulting event is persisted in ONE
+ * `storeEventsFn` call — collapsing N tiny single-row appends into one multi-row
+ * insert so a high-fan-in producer stays off the per-item event-log write path.
+ *
+ * Contract — this is NOT the single path applied N times. All handlers run
+ * BEFORE the single end-of-batch store, so a handler CANNOT read back its own (or
+ * an earlier same-batch payload's) just-appended events — unlike the single path,
+ * which stores between dispatches. Handlers coalesced here must therefore be
+ * stateless per item: each derives its events from its own command alone, not
+ * from same-batch appends. A command opting into `coalesceMaxBatch` must satisfy
+ * this; one that needs read-your-writes within the batch must not coalesce.
  *
  * Because the drain only coalesces siblings sharing a `__jobName`, every payload
  * is the SAME command type: one schema and one handler serve the whole batch.
@@ -367,16 +374,22 @@ export async function processCommandBatch<EventType extends Event>(
     }
 
     const durationMs = performance.now() - batchStartTime;
+    // Keep counter and histogram 1:1 like the single path: one duration sample
+    // per attempted command. The whole-batch time is amortised across them so
+    // the histogram's sample count matches the counter and each sample carries a
+    // per-command time rather than N-commands of it.
+    const perCommandMs = attempted > 0 ? durationMs / attempted : 0;
     for (let i = 0; i < attempted; i++) {
       incrementEsCommandTotal(pipelineName, commandType, "completed");
+      observeEsCommandDuration(pipelineName, commandType, perCommandMs);
     }
-    observeEsCommandDuration(pipelineName, commandType, durationMs);
   } catch (error) {
     const durationMs = performance.now() - batchStartTime;
+    const perCommandMs = attempted > 0 ? durationMs / attempted : 0;
     for (let i = 0; i < attempted; i++) {
       incrementEsCommandTotal(pipelineName, commandType, "failed");
+      observeEsCommandDuration(pipelineName, commandType, perCommandMs);
     }
-    observeEsCommandDuration(pipelineName, commandType, durationMs);
     throw error;
   }
 }

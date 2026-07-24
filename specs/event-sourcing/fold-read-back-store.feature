@@ -36,7 +36,8 @@ Feature: Fold projections read back their own state
     And derived measures that depend on prior context stay correct
 
   Scenario: a redelivered batch after a committed write does not double-count
-    Given an aggregate whose committed state already contains a delivered batch
+    Given a fold that persists its applied-event set durably next to its state
+    And an aggregate whose committed state already contains a delivered batch
     And the cache entry recording that batch was lost
     When the same batch is delivered again
     Then the fold recognises every event as already applied

@@ -40,6 +40,6 @@ Feature: High-fan-in producers coalesce their event-log appends
     Then it appends immediately without waiting to batch
 
   Scenario: an un-coalesced high-fan-in producer is visible, not silent
-    Given a serialized producer registered without append coalescing
-    When the pipeline registers its producers
-    Then a record naming that producer and its pipeline is emitted, so the gap can be found and closed
+    Given a high-fan-in producer that does not coalesce its appends
+    When its pipeline starts
+    Then the gap is recorded with enough detail to find and close it

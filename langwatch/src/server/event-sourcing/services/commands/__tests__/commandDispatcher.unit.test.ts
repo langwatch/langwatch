@@ -414,7 +414,7 @@ describe("processCommandBatch", () => {
     vi.restoreAllMocks();
   });
 
-  describe("given several same-command payloads for one aggregate", () => {
+  describe("given several same-command payloads across aggregates", () => {
     describe("when the batch is processed", () => {
       /** @scenario 'many items for one aggregate become one insert' */
       /** @scenario 'coalescing preserves every item' */
@@ -544,6 +544,39 @@ describe("processCommandBatch", () => {
         await processCommandBatch(params);
 
         expect(cleanupAfterStore).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when one command's cleanup rejects", () => {
+      /** @contract 'a cleanup failure must never roll back durable events' */
+      it("still resolves, stores once, and runs the remaining cleanups", async () => {
+        const cleanupAfterStore = vi.fn(async (command: any) => {
+          if (command.aggregateId === "agg-1") {
+            throw new Error("cleanup boom");
+          }
+        });
+        const handler = {
+          handle: vi.fn(async (command: any) => [
+            eventWithKey(`k-${command.aggregateId}`),
+          ]),
+          cleanupAfterStore,
+        };
+        const storeEventsFn = vi.fn().mockResolvedValue(undefined);
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1), payloadFor(2)],
+          handler,
+          storeEventsFn,
+        });
+
+        await expect(processCommandBatch(params)).resolves.toBeUndefined();
+
+        // The durable append happened exactly once, and the failing cleanup
+        // neither rolled it back nor stopped the other commands' cleanups.
+        expect(storeEventsFn).toHaveBeenCalledTimes(1);
+        expect(cleanupAfterStore).toHaveBeenCalledTimes(3);
+        expect(
+          cleanupAfterStore.mock.calls.map(([command]) => command.aggregateId),
+        ).toEqual(["agg-0", "agg-1", "agg-2"]);
       });
     });
   });

@@ -818,6 +818,11 @@ describe.skipIf(!hasTestcontainers)(
               ? Math.max(...batches.map((b) => b.length))
               : 0;
           expect(maxBatch).toBeLessThan(6);
+          // ...but a coalesced batch DID form — without this floor the assertion
+          // above passes vacuously when nothing coalesces (maxBatch 0), leaving
+          // the byte-split path untested. A batch of ≥2 proves siblings folded
+          // up to the byte budget rather than each dispatching alone.
+          expect(maxBatch).toBeGreaterThanOrEqual(2);
           // Every event processed exactly once — the remainder became later batches.
           const allIds = [...batches.flat(), ...singles].map((p) => p.id);
           expect(new Set(allIds).size).toBe(6);
@@ -901,6 +906,12 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 30000, interval: 50 },
           );
 
+          // A coalesced cmdA batch actually formed (j0 + j2 folded). Without this
+          // the no-mix loop below is vacuously true on an empty `batches`, so the
+          // "never mixes __jobName" invariant would never be exercised.
+          const coalesced = batches.filter((b) => b.length >= 2);
+          expect(coalesced.length).toBeGreaterThan(0);
+
           // The invariant: no coalesced batch ever contains two distinct job names.
           for (const batch of batches) {
             const names = new Set(
@@ -908,6 +919,15 @@ describe.skipIf(!hasTestcontainers)(
             );
             expect(names.size).toBe(1);
           }
+
+          // The foreign sibling (cmdB) was drained out of the cmdA group and
+          // processed via its own dispatch — proving restageDrainedSiblings ran
+          // rather than the cmdB job being folded or dropped.
+          const cmdBProcessed = [...batches.flat(), ...singles].some(
+            (p) => (p as Record<string, unknown>).__jobName === "cmdB",
+          );
+          expect(cmdBProcessed).toBe(true);
+
           // Every job processed exactly once — the foreign sibling was restaged,
           // not lost.
           const allIds = [...batches.flat(), ...singles].map((p) => p.id);
