@@ -78,11 +78,15 @@ function canRefold<State, E extends Event>(
  * context is returned unchanged when the event has no usable occurredAt: an
  * unusable business time cannot anchor a window, so the read stays unbounded.
  */
-function withReadHints<State, E extends Event>(
-  context: ProjectionStoreContext,
-  event: Event,
-  projection: FoldProjectionDefinition<State, E>,
-): ProjectionStoreContext {
+function withReadHints<State, E extends Event>({
+  context,
+  event,
+  projection,
+}: {
+  context: ProjectionStoreContext;
+  event: Event;
+  projection: FoldProjectionDefinition<State, E>;
+}): ProjectionStoreContext {
   const occurredAt = (event as Record<string, unknown>).occurredAt;
   if (typeof occurredAt !== "number" || occurredAt <= 0) return context;
   const widthMs = projection.options?.readWindow?.widthMs;
@@ -90,7 +94,7 @@ function withReadHints<State, E extends Event>(
     ...context,
     occurredAtMs: occurredAt,
     ...(widthMs !== undefined
-      ? { readWindow: readWindowAround(occurredAt, widthMs) }
+      ? { readWindow: readWindowAround({ anchorMs: occurredAt, widthMs }) }
       : {}),
   };
 }
@@ -161,12 +165,17 @@ export class FoldProjectionExecutor {
    * declared-window contract's correctness net; the windowed read is only the
    * partition-pruning fast path.
    */
-  private async loadWithApplied<State>(
-    projectionName: string,
-    store: FoldProjectionStore<State>,
-    key: string,
-    context: ProjectionStoreContext,
-  ): Promise<{ state: State | null; appliedEventIds: string[] }> {
+  private async loadWithApplied<State>({
+    projectionName,
+    store,
+    key,
+    context,
+  }: {
+    projectionName: string;
+    store: FoldProjectionStore<State>;
+    key: string;
+    context: ProjectionStoreContext;
+  }): Promise<{ state: State | null; appliedEventIds: string[] }> {
     const read = async (
       readContext: ProjectionStoreContext,
     ): Promise<{ state: State | null; appliedEventIds: string[] }> => {
@@ -311,13 +320,13 @@ export class FoldProjectionExecutor {
     // Anchor the store read to the event's business time. A fold that declared
     // a read window gets its backing read bounded to occurredAt ± widthMs, with
     // the executor retrying unwindowed on a miss (see loadWithApplied).
-    const loadContext = withReadHints(context, event, projection);
-    const { state: loaded, appliedEventIds } = await this.loadWithApplied(
-      projection.name,
-      projection.store,
+    const loadContext = withReadHints({ context, event, projection });
+    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
+      projectionName: projection.name,
+      store: projection.store,
       key,
-      loadContext,
-    );
+      context: loadContext,
+    });
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(
@@ -460,14 +469,14 @@ export class FoldProjectionExecutor {
     // for the same aggregate, so it anchors the same partition window; the
     // unwindowed retry covers a batch that somehow spans wider than widthMs).
     const loadContext = ordered[0]
-      ? withReadHints(context, ordered[0], projection)
+      ? withReadHints({ context, event: ordered[0], projection })
       : context;
-    const { state: loaded, appliedEventIds } = await this.loadWithApplied(
-      projection.name,
-      projection.store,
+    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
+      projectionName: projection.name,
+      store: projection.store,
       key,
-      loadContext,
-    );
+      context: loadContext,
+    });
 
     if (loaded === null && this.shouldRefoldOnMiss(projection)) {
       const refolded = await this.refoldUpToDelivered(

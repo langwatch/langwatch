@@ -12,7 +12,7 @@ function storeWithRepo() {
 describe("TraceSummaryStore.get", () => {
   const tenantId = createTenantId("project-1");
 
-  describe("when the context carries the executor-computed readWindow", () => {
+  describe("given the context carries the executor-computed readWindow", () => {
     it("forwards it verbatim as the findByTraceId window", async () => {
       const { store, findByTraceId } = storeWithRepo();
       const context: ProjectionStoreContext = {
@@ -30,7 +30,7 @@ describe("TraceSummaryStore.get", () => {
     });
   });
 
-  describe("when the context has no readWindow", () => {
+  describe("given the context has no readWindow", () => {
     it("reads without a bound (unbounded, still correct)", async () => {
       const { store, findByTraceId } = storeWithRepo();
       const context: ProjectionStoreContext = {

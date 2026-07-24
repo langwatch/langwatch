@@ -162,8 +162,8 @@ describe("RedisCachedFoldStore", () => {
     });
   });
 
-  describe("given the executor's read-window fallback re-reads", () => {
-    describe("when the context carries bypassReadCache", () => {
+  describe("given a context carrying bypassReadCache", () => {
+    describe("when the executor's read-window fallback re-reads", () => {
       it("goes straight to the durable tier without touching Redis", async () => {
         const redis = createRedis();
         const { store, inner } = createStore(redis);

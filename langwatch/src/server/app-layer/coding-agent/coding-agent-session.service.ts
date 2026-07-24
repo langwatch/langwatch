@@ -66,7 +66,10 @@ export class CodingAgentSessionService {
   }): Promise<CodingAgentSessionRow | null> {
     const window =
       startedAtMs !== undefined
-        ? readWindowAround(startedAtMs, CODING_AGENT_SESSION_READ_WINDOW_MS)
+        ? readWindowAround({
+            anchorMs: startedAtMs,
+            widthMs: CODING_AGENT_SESSION_READ_WINDOW_MS,
+          })
         : undefined;
     const row =
       (await this.sessions.findBySessionId({

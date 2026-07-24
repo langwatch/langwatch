@@ -12,10 +12,13 @@ export interface ReadTimeWindow {
 }
 
 /** The window of `widthMs` on each side of `anchorMs`. */
-export function readWindowAround(
-  anchorMs: number,
-  widthMs: number,
-): ReadTimeWindow {
+export function readWindowAround({
+  anchorMs,
+  widthMs,
+}: {
+  anchorMs: number;
+  widthMs: number;
+}): ReadTimeWindow {
   return { fromMs: anchorMs - widthMs, toMs: anchorMs + widthMs };
 }
 

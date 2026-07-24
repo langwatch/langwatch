@@ -67,146 +67,168 @@ describe("FoldProjectionExecutor declared read window", () => {
       occurredAt,
     );
 
-  describe("when the fold declares a read window and the windowed read hits", () => {
-    it("bounds the store read to occurredAt ± widthMs and reads once", async () => {
-      const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-        count: 3,
-        LastEventOccurredAt: OCCURRED_AT - 1,
+  describe("given the fold declares a read window", () => {
+    describe("when the windowed read hits", () => {
+      it("bounds the store read to occurredAt ± widthMs and reads once", async () => {
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          count: 3,
+          LastEventOccurredAt: OCCURRED_AT - 1,
+        });
+
+        const state = await executor.execute(
+          fold,
+          eventAt(OCCURRED_AT),
+          context,
+        );
+
+        expect(store.get).toHaveBeenCalledTimes(1);
+        expect(store.get).toHaveBeenCalledWith(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          expect.objectContaining({
+            occurredAtMs: OCCURRED_AT,
+            readWindow: {
+              fromMs: OCCURRED_AT - WIDTH_MS,
+              toMs: OCCURRED_AT + WIDTH_MS,
+            },
+          }),
+        );
+        expect(state.count).toBe(4);
+        expect(fallbackMetric).not.toHaveBeenCalled();
       });
-
-      const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
-
-      expect(store.get).toHaveBeenCalledTimes(1);
-      expect(store.get).toHaveBeenCalledWith(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        expect.objectContaining({
-          occurredAtMs: OCCURRED_AT,
-          readWindow: {
-            fromMs: OCCURRED_AT - WIDTH_MS,
-            toMs: OCCURRED_AT + WIDTH_MS,
-          },
-        }),
-      );
-      expect(state.count).toBe(4);
-      expect(fallbackMetric).not.toHaveBeenCalled();
     });
-  });
 
-  describe("when the windowed read misses a row that exists outside the window", () => {
-    it("retries once without the window and folds onto the recovered state", async () => {
-      const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-      (store.get as ReturnType<typeof vi.fn>).mockImplementation(
-        async (_key: string, readContext: ProjectionStoreContext) =>
-          readContext.readWindow === undefined
-            ? { count: 7, LastEventOccurredAt: OCCURRED_AT - 1 }
-            : null,
-      );
-
-      const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
-
-      expect(store.get).toHaveBeenCalledTimes(2);
-      const retryContext = (store.get as ReturnType<typeof vi.fn>).mock
-        .calls[1]![1] as ProjectionStoreContext;
-      expect(retryContext.readWindow).toBeUndefined();
-      // The windowed attempt consulted the cache moments ago — the retry
-      // goes straight to the durable tier.
-      expect(retryContext.bypassReadCache).toBe(true);
-      // The recovered row is folded onto — not replaced by a batch on init().
-      expect(state.count).toBe(8);
-      expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");
-    });
-  });
-
-  describe("when the aggregate is genuinely new", () => {
-    it("confirms the miss unwindowed and starts from an empty state", async () => {
-      const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-
-      const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
-
-      expect(store.get).toHaveBeenCalledTimes(2);
-      expect(state.count).toBe(1);
-      expect(fallbackMetric).toHaveBeenCalledWith("windowed", "absent");
-    });
-  });
-
-  describe("when the fold declares no read window", () => {
-    it("reads once without a window and never retries a miss", async () => {
-      const { fold, store } = makeFold();
-
-      await executor.execute(fold, eventAt(OCCURRED_AT), context);
-
-      expect(store.get).toHaveBeenCalledTimes(1);
-      const readContext = (store.get as ReturnType<typeof vi.fn>).mock
-        .calls[0]![1] as ProjectionStoreContext;
-      expect(readContext.readWindow).toBeUndefined();
-      expect(readContext.occurredAtMs).toBe(OCCURRED_AT);
-      expect(fallbackMetric).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the event has no usable business time", () => {
-    it("reads unbounded even though the fold declared a window", async () => {
-      const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-
-      await executor.execute(fold, eventAt(0), context);
-
-      expect(store.get).toHaveBeenCalledTimes(1);
-      const readContext = (store.get as ReturnType<typeof vi.fn>).mock
-        .calls[0]![1] as ProjectionStoreContext;
-      expect(readContext.readWindow).toBeUndefined();
-      expect(fallbackMetric).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when a batch is folded", () => {
-    it("anchors the window on the batch's earliest event", async () => {
-      const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
-        count: 0,
-        LastEventOccurredAt: 0,
-      });
-
-      await executor.executeBatch(
-        fold,
-        [eventAt(OCCURRED_AT + 5_000), eventAt(OCCURRED_AT)],
-        context,
-      );
-
-      expect(store.get).toHaveBeenCalledWith(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        expect.objectContaining({
-          readWindow: {
-            fromMs: OCCURRED_AT - WIDTH_MS,
-            toMs: OCCURRED_AT + WIDTH_MS,
-          },
-        }),
-      );
-    });
-  });
-
-  describe("when the store serves getWithApplied (cached store)", () => {
-    it("routes the unwindowed retry through the same read path", async () => {
-      const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
-      const getWithApplied = vi
-        .fn()
-        .mockImplementation(
+    describe("when the windowed read misses a row that exists outside the window", () => {
+      it("retries once without the window and folds onto the recovered state", async () => {
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+        (store.get as ReturnType<typeof vi.fn>).mockImplementation(
           async (_key: string, readContext: ProjectionStoreContext) =>
             readContext.readWindow === undefined
-              ? {
-                  state: { count: 2, LastEventOccurredAt: OCCURRED_AT - 1 },
-                  appliedEventIds: [],
-                }
-              : { state: null, appliedEventIds: [] },
+              ? { count: 7, LastEventOccurredAt: OCCURRED_AT - 1 }
+              : null,
         );
-      store.getWithApplied = getWithApplied;
 
-      const state = await executor.execute(fold, eventAt(OCCURRED_AT), context);
+        const state = await executor.execute(
+          fold,
+          eventAt(OCCURRED_AT),
+          context,
+        );
 
-      expect(getWithApplied).toHaveBeenCalledTimes(2);
-      expect(store.get).not.toHaveBeenCalled();
-      expect(state.count).toBe(3);
-      expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");
+        expect(store.get).toHaveBeenCalledTimes(2);
+        const retryContext = (store.get as ReturnType<typeof vi.fn>).mock
+          .calls[1]![1] as ProjectionStoreContext;
+        expect(retryContext.readWindow).toBeUndefined();
+        // The windowed attempt consulted the cache moments ago — the retry
+        // goes straight to the durable tier.
+        expect(retryContext.bypassReadCache).toBe(true);
+        // The recovered row is folded onto — not replaced by a batch on init().
+        expect(state.count).toBe(8);
+        expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");
+      });
+    });
+
+    describe("when the aggregate is genuinely new", () => {
+      it("confirms the miss unwindowed and starts from an empty state", async () => {
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+
+        const state = await executor.execute(
+          fold,
+          eventAt(OCCURRED_AT),
+          context,
+        );
+
+        expect(store.get).toHaveBeenCalledTimes(2);
+        expect(state.count).toBe(1);
+        expect(fallbackMetric).toHaveBeenCalledWith("windowed", "absent");
+      });
+    });
+
+    describe("when the folded event has no usable business time", () => {
+      it("reads unbounded", async () => {
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+
+        await executor.execute(fold, eventAt(0), context);
+
+        expect(store.get).toHaveBeenCalledTimes(1);
+        const readContext = (store.get as ReturnType<typeof vi.fn>).mock
+          .calls[0]![1] as ProjectionStoreContext;
+        expect(readContext.readWindow).toBeUndefined();
+        expect(fallbackMetric).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a batch is folded", () => {
+      it("anchors the window on the batch's earliest event", async () => {
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+        (store.get as ReturnType<typeof vi.fn>).mockResolvedValue({
+          count: 0,
+          LastEventOccurredAt: 0,
+        });
+
+        await executor.executeBatch(
+          fold,
+          [eventAt(OCCURRED_AT + 5_000), eventAt(OCCURRED_AT)],
+          context,
+        );
+
+        expect(store.get).toHaveBeenCalledWith(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          expect.objectContaining({
+            readWindow: {
+              fromMs: OCCURRED_AT - WIDTH_MS,
+              toMs: OCCURRED_AT + WIDTH_MS,
+            },
+          }),
+        );
+      });
+    });
+  });
+
+  describe("given the fold's store serves getWithApplied (cached store)", () => {
+    describe("when the windowed read misses", () => {
+      it("routes the unwindowed retry through the same read path", async () => {
+        const { fold, store } = makeFold({ readWindow: { widthMs: WIDTH_MS } });
+        const getWithApplied = vi
+          .fn()
+          .mockImplementation(
+            async (_key: string, readContext: ProjectionStoreContext) =>
+              readContext.readWindow === undefined
+                ? {
+                    state: { count: 2, LastEventOccurredAt: OCCURRED_AT - 1 },
+                    appliedEventIds: [],
+                  }
+                : { state: null, appliedEventIds: [] },
+          );
+        store.getWithApplied = getWithApplied;
+
+        const state = await executor.execute(
+          fold,
+          eventAt(OCCURRED_AT),
+          context,
+        );
+
+        expect(getWithApplied).toHaveBeenCalledTimes(2);
+        expect(store.get).not.toHaveBeenCalled();
+        expect(state.count).toBe(3);
+        expect(fallbackMetric).toHaveBeenCalledWith("windowed", "recovered");
+      });
+    });
+  });
+
+  describe("given the fold declares no read window", () => {
+    describe("when an event is folded", () => {
+      it("reads once without a window and never retries a miss", async () => {
+        const { fold, store } = makeFold();
+
+        await executor.execute(fold, eventAt(OCCURRED_AT), context);
+
+        expect(store.get).toHaveBeenCalledTimes(1);
+        const readContext = (store.get as ReturnType<typeof vi.fn>).mock
+          .calls[0]![1] as ProjectionStoreContext;
+        expect(readContext.readWindow).toBeUndefined();
+        expect(readContext.occurredAtMs).toBe(OCCURRED_AT);
+        expect(fallbackMetric).not.toHaveBeenCalled();
+      });
     });
   });
 });
