@@ -43,6 +43,7 @@ listen_on() {
 }
 
 write_full_env() {
+  mkdir -p "$TEST_DIR/sessions" "$TEST_DIR/workspace"
   cat >"$ENV_FILE" <<EOF
 OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
 LANGY_INTERNAL_SECRET="test-secret"
@@ -90,7 +91,7 @@ run_doctor() {
   run_doctor
   [ "$status" -ne 0 ]
   [[ "$output" == *"langyagent not listening on :${AGENT_PORT}"* ]]
-  [[ "$output" == *"make service svc=langyagent"* ]]
+  [[ "$output" == *"service svc=langyagent"* ]]
 }
 
 # @scenario "A provider key that the provider rejects is caught before a turn wastes time on it"

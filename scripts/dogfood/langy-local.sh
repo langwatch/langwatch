@@ -30,21 +30,49 @@ bad()  { printf '  \033[31m✗\033[0m %s\n' "$1"; failures=$((failures + 1)); }
 warn() { printf '  \033[33m!\033[0m %s\n' "$1"; }
 hint() { printf '      %s\n' "$1"; }
 
-env_has() { grep -qE "^$1=" "$ENV_FILE" 2>/dev/null; }
-listening() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+# env_value prints the (unquoted) value of a key in langwatch/.env; empty when
+# the key is absent OR set to nothing, so presence checks require a real value.
+env_value() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | sed -E "s/^$1=//; s/\"//g"; }
+
+# listening prefers lsof; a machine without it falls back to a bash /dev/tcp
+# connect probe so a missing utility never reads as three dead services.
+if command -v lsof >/dev/null 2>&1; then
+  listening() { lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; }
+else
+  listening() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null && exec 3>&- 3<&-; }
+fi
 
 echo "Langy local dogfood doctor ($ENV_FILE)"
 
 # --- env block -------------------------------------------------------------
 echo "env:"
 missing_env=()
-for key in OPENCODE_AGENT_URL LANGY_INTERNAL_SECRET LANGY_UNSAFE_DEV_DISABLE_ISOLATION SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
-  if env_has "$key"; then ok "$key"; else bad "$key missing"; missing_env+=("$key"); fi
+for key in OPENCODE_AGENT_URL LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
+  if [[ -n "$(env_value "$key")" ]]; then ok "$key"; else bad "$key missing"; missing_env+=("$key"); fi
+done
+# The isolation flag must literally be true: set-but-false still spawns the
+# gVisor runner, which cannot exist on a dev laptop.
+case "$(env_value LANGY_UNSAFE_DEV_DISABLE_ISOLATION)" in
+  true|1) ok "LANGY_UNSAFE_DEV_DISABLE_ISOLATION" ;;
+  "") bad "LANGY_UNSAFE_DEV_DISABLE_ISOLATION missing"; missing_env+=(LANGY_UNSAFE_DEV_DISABLE_ISOLATION) ;;
+  *) bad "LANGY_UNSAFE_DEV_DISABLE_ISOLATION must be true for a local (no gVisor) agent" ;;
+esac
+# The roots must be writable directories or the worker provision fails at
+# spawn with a distant chown/mkdir error.
+for key in SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
+  dir="$(env_value "$key")"
+  if [[ -n "$dir" && ( ! -d "$dir" || ! -w "$dir" ) ]]; then
+    bad "$key ($dir) is not a writable directory"
+    hint "mkdir -p \"$dir\""
+  fi
 done
 
 if [[ ${#missing_env[@]} -gt 0 ]]; then
-  SECRET="$(openssl rand -hex 32)"
-  BLOCK=$(cat <<BLOCK
+  SECRET="$(openssl rand -hex 32)" || SECRET=""
+  if [[ -z "$SECRET" ]]; then
+    bad "openssl could not generate LANGY_INTERNAL_SECRET"
+  else
+    BLOCK=$(cat <<BLOCK
 
 # Langy local dev (agent runs without gVisor via the unsafe-dev runner)
 OPENCODE_AGENT_URL="http://localhost:${AGENT_PORT}"
@@ -54,17 +82,24 @@ SESSIONS_ROOT="\$HOME/.langwatch-langy/sessions"
 LANGY_WORKSPACE_ROOT="\$HOME/.langwatch-langy/workspace"
 BLOCK
 )
-  if $FIX; then
-    printf '%s\n' "$BLOCK" | sed "s|\$HOME|$HOME|g" >>"$ENV_FILE"
-    mkdir -p "$HOME/.langwatch-langy/sessions" "$HOME/.langwatch-langy/workspace"
-    warn "appended the Langy env block to langwatch/.env (restart pnpm dev + langyagent to pick it up)"
-  else
-    hint "add to langwatch/.env (or re-run with --fix):"
-    printf '%s\n' "$BLOCK" | sed 's/^/      /'
+    if $FIX; then
+      if printf '%s\n' "$BLOCK" | sed "s|\$HOME|$HOME|g" >>"$ENV_FILE" &&
+        mkdir -p "$HOME/.langwatch-langy/sessions" "$HOME/.langwatch-langy/workspace"; then
+        warn "appended the Langy env block to langwatch/.env (restart pnpm dev + langyagent to pick it up)"
+      else
+        bad "could not write the env block or create the session/workspace roots"
+      fi
+    else
+      hint "add to langwatch/.env (or re-run with --fix):"
+      printf '%s\n' "$BLOCK" | sed 's/^/      /'
+    fi
   fi
 fi
 
-if grep -qE '^FEATURE_FLAG_FORCE_ENABLE=.*release_langy_enabled' "$ENV_FILE" 2>/dev/null; then
+# Boundary-aware: release_langy_enabled must be a complete comma-separated
+# entry, not a prefix of another flag name.
+if grep -E '^FEATURE_FLAG_FORCE_ENABLE=' "$ENV_FILE" 2>/dev/null |
+  grep -qE '[=,]"?release_langy_enabled"?(,|"?$)'; then
   ok "release_langy_enabled force-enabled"
 else
   bad "release_langy_enabled not in FEATURE_FLAG_FORCE_ENABLE"
@@ -89,15 +124,15 @@ fi
 echo "services:"
 if listening "$APP_PORT"; then ok "app on :$APP_PORT"; else
   bad "app not listening on :$APP_PORT"
-  hint "cd langwatch && pnpm dev"
+  hint "cd \"$ROOT/langwatch\" && pnpm dev   (or make -C \"$ROOT\" quickstart)"
 fi
 if listening "$GATEWAY_PORT"; then ok "AI gateway on :$GATEWAY_PORT"; else
   bad "AI gateway not listening on :$GATEWAY_PORT"
-  hint "auto-starts with pnpm dev when Go is on PATH, or: make service svc=aigateway"
+  hint "auto-starts with pnpm dev when Go is on PATH, or: make -C \"$ROOT\" service svc=aigateway"
 fi
 if listening "$AGENT_PORT"; then ok "langyagent on :$AGENT_PORT"; else
   bad "langyagent not listening on :$AGENT_PORT"
-  hint "make service svc=langyagent   (sources langwatch/.env; runs the no-sandbox dev runner)"
+  hint "make -C \"$ROOT\" service svc=langyagent   (sources langwatch/.env; runs the no-sandbox dev runner)"
 fi
 
 # --- provider keys ---------------------------------------------------------
@@ -108,15 +143,17 @@ echo "provider keys (advisory):"
 check_key() {
   local name="$1" url="$2" header="$3" extra_header="${4:-}"
   local key
-  key="$(grep -E "^${name}=" "$ENV_FILE" 2>/dev/null | head -1 | sed -E "s/^${name}=//; s/\"//g")"
+  key="$(env_value "$name")"
   if [[ -z "$key" ]]; then
     warn "$name not set"
     return
   fi
-  local -a curl_args=(-s -o /dev/null -w '%{http_code}' --max-time 10 "$url" -H "${header}${key}")
+  # The secret header rides curl's config-from-stdin, never argv, so the key
+  # is not observable in process listings.
+  local -a curl_args=(-s -o /dev/null -w '%{http_code}' --max-time 10 --config - "$url")
   [[ -n "$extra_header" ]] && curl_args+=(-H "$extra_header")
   local code
-  code="$(curl "${curl_args[@]}")"
+  code="$(printf 'header = "%s%s"\n' "$header" "$key" | curl "${curl_args[@]}")"
   if [[ "$code" == "200" ]]; then
     ok "$name accepted by the provider"
   else
