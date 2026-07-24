@@ -222,9 +222,17 @@ describe("bug reports intake", () => {
         trackReport(id);
         const stored = await prisma.bugReport.findUnique({ where: { id } });
         expect(stored?.title).toBe(`${testNamespace} no slack configured`);
-        const slackCalls = fetchSpy.mock.calls.filter((call) =>
-          String(call[0]).includes("slack.com"),
-        );
+        const slackCalls = fetchSpy.mock.calls.filter((call) => {
+          const target =
+            call[0] instanceof Request ? call[0].url : String(call[0]);
+          let hostname: string;
+          try {
+            hostname = new URL(target).hostname;
+          } catch {
+            return false;
+          }
+          return hostname === "slack.com" || hostname.endsWith(".slack.com");
+        });
         expect(slackCalls).toHaveLength(0);
       } finally {
         fetchSpy.mockRestore();
