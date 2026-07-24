@@ -89,3 +89,15 @@ Feature: Canonical OTLP log ingestion
       Given an instance running the previous release sends a log record
       When a newly deployed instance processes it
       Then the record is stored and remains readable
+
+  Rule: New logs are written only to the canonical store
+
+    # The legacy store predates canonical log storage and stayed writable only
+    # to drain logs still in flight from pre-cutover instances during a rolling
+    # deploy. That write path is retired: ingestion records to the canonical
+    # store alone, while the legacy store's earlier history stays readable.
+    Scenario: Ingested log telemetry reaches only the canonical store
+      When the project sends a log record
+      Then it is recorded in the canonical log store
+      And the retired store gains no new record
+      And logs already held in the retired store stay readable

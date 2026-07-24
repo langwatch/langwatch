@@ -12,6 +12,12 @@ export const TOPIC_ASSIGNED_EVENT_VERSIONS = [
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
 ] as const;
 
+/**
+ * Trace-fold contribution event for a received log record. No live minter
+ * since the `recordLog` command was retired (canonical `log_records` is now the
+ * only log write path) — kept so historical `event_log` replays of the trace
+ * folds still reproduce pre-cutover log contributions.
+ */
 export const LOG_RECORD_RECEIVED_EVENT_TYPE =
   "lw.obs.trace.log_record_received" as const;
 export const LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST = "2026-03-08" as const;

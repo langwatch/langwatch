@@ -34,8 +34,6 @@ function makeService({
 } = {}) {
   const getLogsByTraceId = vi.fn().mockResolvedValue(legacyRows);
   const repository = {
-    insertLogRecord: vi.fn(),
-    insertLogRecords: vi.fn(),
     getLogsByTraceId,
   } as unknown as LogRecordStorageRepository;
   const canonicalGetLogsByTraceId = vi.fn().mockResolvedValue(canonicalRows);
