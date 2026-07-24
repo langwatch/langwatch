@@ -173,8 +173,12 @@ secured
 // =============================================
 // POST /api/demo/hotel_bot
 // =============================================
+// `||` (not `??`) so an empty OPENAI_API_KEY from a stock .env.example
+// falls through to the bogus default. `??` only guards null/undefined;
+// the OpenAI SDK rejects empty-string apiKey at client construction
+// with "Missing credentials" (see issue #5826).
 const hotelBotOpenai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY ?? "bogus",
+  apiKey: env.OPENAI_API_KEY || "bogus",
 });
 
 const guestQueries = [
