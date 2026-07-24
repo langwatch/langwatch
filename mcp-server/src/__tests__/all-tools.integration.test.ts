@@ -1,6 +1,10 @@
 import { createServer, type Server } from "http";
 import { afterAll, beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
 import { initConfig } from "../config.js";
+import {
+  fetchDocumentation,
+  resolveDocumentationUrl,
+} from "../documentation-fetch.js";
 
 // --- Canned responses for every API endpoint ---
 
@@ -624,7 +628,6 @@ function createMockServer(): Server {
 describe("All MCP tools integration", () => {
   let server: Server;
   let port: number;
-  let originalFetch: typeof globalThis.fetch;
 
   beforeAll(async () => {
     server = createMockServer();
@@ -639,94 +642,38 @@ describe("All MCP tools integration", () => {
         resolve();
       });
     });
-    originalFetch = globalThis.fetch;
   });
 
   afterAll(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    globalThis.fetch = originalFetch;
   });
 
   // =====================
   // 1. fetch_langwatch_docs
   // =====================
   describe("fetch_langwatch_docs", () => {
-    describe("when fetching the docs index", () => {
-      it("returns content from the langwatch docs URL", async () => {
-        // Intercept fetch to avoid hitting the real network
-        const mockFetch = vi.fn().mockResolvedValue({
-          text: () =>
-            Promise.resolve(
-              "# LangWatch Docs\nWelcome to LangWatch documentation.",
-            ),
-        });
-        globalThis.fetch = mockFetch;
-
-        // The tool is inlined in index.ts; call the same logic directly
-        const url = "https://langwatch.ai/docs/llms.txt";
-        const response = await fetch(url);
-        const text = await response.text();
-
-        expect(text).toContain("LangWatch");
-        expect(mockFetch).toHaveBeenCalledWith(url);
-
-        globalThis.fetch = originalFetch;
-      });
+    it("resolves the trusted docs index", () => {
+      expect(resolveDocumentationUrl("langwatch").toString()).toBe(
+        "https://langwatch.ai/docs/llms.txt",
+      );
     });
 
-    describe("when fetching a specific doc page", () => {
-      it("appends .md extension when missing", async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-          text: () => Promise.resolve("# Integration Guide"),
-        });
-        globalThis.fetch = mockFetch;
+    it("fetches trusted docs without following redirects", async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response("# Integration Guide"),
+      );
 
-        let urlToFetch = "https://langwatch.ai/docs/integration";
-        if (
-          !urlToFetch.endsWith(".md") &&
-          !urlToFetch.endsWith(".txt")
-        ) {
-          urlToFetch += ".md";
-        }
+      const text = await fetchDocumentation(
+        "langwatch",
+        "integration",
+        mockFetch,
+      );
 
-        const response = await fetch(urlToFetch);
-        const text = await response.text();
-
-        expect(text).toContain("Integration Guide");
-        expect(mockFetch).toHaveBeenCalledWith(
-          "https://langwatch.ai/docs/integration.md",
-        );
-
-        globalThis.fetch = originalFetch;
-      });
-    });
-
-    describe("when a relative path is provided", () => {
-      it("prepends the docs base URL", async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-          text: () => Promise.resolve("# Getting Started"),
-        });
-        globalThis.fetch = mockFetch;
-
-        let urlToFetch: string | undefined = "/getting-started";
-        if (urlToFetch && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
-          urlToFetch += ".md";
-        }
-        if (!urlToFetch!.startsWith("http")) {
-          if (!urlToFetch!.startsWith("/")) {
-            urlToFetch = "/" + urlToFetch;
-          }
-          urlToFetch = "https://langwatch.ai/docs" + urlToFetch;
-        }
-
-        await fetch(urlToFetch);
-
-        expect(mockFetch).toHaveBeenCalledWith(
-          "https://langwatch.ai/docs/getting-started.md",
-        );
-
-        globalThis.fetch = originalFetch;
-      });
+      expect(text).toContain("Integration Guide");
+      expect(mockFetch).toHaveBeenCalledWith(
+        new URL("https://langwatch.ai/docs/integration.md"),
+        { redirect: "error" },
+      );
     });
   });
 
@@ -734,53 +681,16 @@ describe("All MCP tools integration", () => {
   // 2. fetch_scenario_docs
   // =====================
   describe("fetch_scenario_docs", () => {
-    describe("when fetching the scenario docs index", () => {
-      it("returns content from the scenario docs URL", async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-          text: () =>
-            Promise.resolve(
-              "# Scenario Testing\nLearn how to test agents.",
-            ),
-        });
-        globalThis.fetch = mockFetch;
-
-        const url = "https://langwatch.ai/scenario/llms.txt";
-        const response = await fetch(url);
-        const text = await response.text();
-
-        expect(text).toContain("Scenario Testing");
-        expect(mockFetch).toHaveBeenCalledWith(url);
-
-        globalThis.fetch = originalFetch;
-      });
+    it("resolves the trusted Scenario docs index", () => {
+      expect(resolveDocumentationUrl("scenario").toString()).toBe(
+        "https://langwatch.ai/scenario/llms.txt",
+      );
     });
 
-    describe("when fetching a specific scenario doc page", () => {
-      it("appends .md extension and prepends base URL for relative paths", async () => {
-        const mockFetch = vi.fn().mockResolvedValue({
-          text: () => Promise.resolve("# Setup Guide"),
-        });
-        globalThis.fetch = mockFetch;
-
-        let urlToFetch: string | undefined = "setup";
-        if (urlToFetch && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
-          urlToFetch += ".md";
-        }
-        if (!urlToFetch!.startsWith("http")) {
-          if (!urlToFetch!.startsWith("/")) {
-            urlToFetch = "/" + urlToFetch;
-          }
-          urlToFetch = "https://langwatch.ai/scenario" + urlToFetch;
-        }
-
-        await fetch(urlToFetch);
-
-        expect(mockFetch).toHaveBeenCalledWith(
-          "https://langwatch.ai/scenario/setup.md",
-        );
-
-        globalThis.fetch = originalFetch;
-      });
+    it("normalizes a relative Scenario docs path", () => {
+      expect(resolveDocumentationUrl("scenario", "setup").toString()).toBe(
+        "https://langwatch.ai/scenario/setup.md",
+      );
     });
   });
 
