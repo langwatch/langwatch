@@ -132,4 +132,24 @@ describe("recordActiveUser", () => {
       expect(trackEvent).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe("when now is not provided", () => {
+    it("uses the real current date to key the Redis dedup entry", async () => {
+      const { set, instance: redis } = makeRedis(async () => "OK");
+      const expectedDay = new Date().toISOString().slice(0, 10);
+
+      await recordActiveUser(
+        { userId: "u1", source: "mcp" },
+        { redis, trackEvent },
+      );
+
+      expect(set).toHaveBeenCalledWith(
+        `active_user:u1:${expectedDay}:mcp`,
+        "1",
+        "EX",
+        172800,
+        "NX",
+      );
+    });
+  });
 });
