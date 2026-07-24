@@ -56,7 +56,7 @@ function AvatarEditButton({
         right="0"
         width="18px"
         height="18px"
-        bg="blue.500"
+        bg="orange.500"
         color="white"
         borderRadius="full"
         borderWidth="2px"
@@ -130,7 +130,12 @@ function AvatarPhotoDialog({
               <Button variant="ghost" onClick={onCancel} disabled={isBusy}>
                 Cancel
               </Button>
-              <Button onClick={onSave} loading={isSaving} disabled={isBusy}>
+              <Button
+                colorPalette="orange"
+                onClick={onSave}
+                loading={isSaving}
+                disabled={isBusy}
+              >
                 Save photo
               </Button>
             </HStack>
@@ -147,7 +152,11 @@ function AvatarPhotoDialog({
                   Remove
                 </Button>
               )}
-              <Button onClick={onChange} disabled={isBusy}>
+              <Button
+                colorPalette="orange"
+                onClick={onChange}
+                disabled={isBusy}
+              >
                 {hasImage ? "Change photo" : "Upload photo"}
               </Button>
             </HStack>
