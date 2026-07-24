@@ -16,7 +16,7 @@ func TestNoLaneIsRed(t *testing.T) {
 
 	children := o.planChildren(
 		domain.Stack{Slug: "test"},
-		PlanOptions{ShouldStartWorkers: true},
+		PlanOptions{ShouldStartWorkers: true, Selection: domain.Selection{Workers: true, Gateway: true, NLP: true}},
 		t.TempDir(),
 		"", // langyDockerHost — not exercised here; the langy lane isn't under test
 	)
@@ -46,3 +46,5 @@ func (stubProxy) Installed() bool                    { return false }
 func (stubProxy) EnsureReady() error                 { return nil }
 func (stubProxy) Endpoint() (string, int)            { return "https", 443 }
 func (stubProxy) CACertPath() string                 { return "" }
+func (stubProxy) Shutdown() error                    { return nil }
+func (stubProxy) Install() error                     { return nil }

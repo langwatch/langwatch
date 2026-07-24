@@ -53,14 +53,13 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Bare `haven`: the interactive hub in a terminal, help when driven by an
-	// agent/pipe.
+	// Bare `haven`: the interactive hub in a terminal, the plain stack list when
+	// driven by an agent/pipe.
 	if len(args) == 0 {
 		if isAgent {
-			fmt.Print(helpText)
-			return nil
+			return d.orch.Status(true, d.worktree)
 		}
-		return runHub(ctx, d, nil)
+		return runHub(ctx, d)
 	}
 	return d.dispatch(ctx, args[0], args[1:])
 }
@@ -180,131 +179,6 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	}
 }
 
-// command is one entry in the dispatch table.
-type command func(ctx context.Context, d deps, rest []string) error
-
-// commands is the subcommand table. A table rather than a switch so adding a
-// command is one line and dispatch itself stays branch-free.
-var commands = map[string]command{
-	"up": func(ctx context.Context, d deps, rest []string) error {
-		if hasFlag(rest, "-w") || hasFlag(rest, "--watch") {
-			d.opts.ShouldGoWatch = true
-		}
-		d.opts.ShouldForce = hasFlag(rest, "-f") || hasFlag(rest, "--force")
-		if d.opts.IsStub {
-			return d.orch.UpStub(ctx, d.params, dashboard.StartEcho)
-		}
-		if hasFlag(rest, "-d") || hasFlag(rest, "--detach") {
-			return runUpDetached(d, rest)
-		}
-		return d.orch.Up(ctx, d.params, d.opts)
-	},
-	"restart": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.Restart(ctx, d.params, firstNonFlag(rest))
-	},
-	"logs": func(ctx context.Context, d deps, rest []string) error {
-		return runLogs(ctx, d, hasFlag(rest, "-f") || hasFlag(rest, "--follow"))
-	},
-	"pr": func(ctx context.Context, d deps, rest []string) error {
-		return app.TryPR(ctx, app.TryPRParams{
-			Ref:                 firstNonFlag(rest),
-			RepoRoot:            d.worktree,
-			WorktreeBase:        prWorktreeBase(d.worktree),
-			NoInstall:           hasFlag(rest, "--no-install"),
-			Force:               hasFlag(rest, "--force"),
-			DryRun:              hasFlag(rest, "--dry-run"),
-			AllowScripts:        hasFlag(rest, "--trusted") || hasFlag(rest, "--allow-scripts"),
-			DiscardLocalChanges: hasFlag(rest, "--discard-local-changes"),
-		}, runHavenUpIn)
-	},
-	"setup":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Setup(ctx) },
-	"watch":  func(ctx context.Context, d deps, _ []string) error { return d.orch.Watch(ctx) },
-	"daemon": func(ctx context.Context, d deps, _ []string) error { return d.orch.RunDaemon(ctx, d.dash) },
-	"down": func(ctx context.Context, d deps, rest []string) error {
-		// Databases are kept by default; --drop-db is the explicit fresh-DB ask.
-		// --keep-db (the old flag) is accepted as a no-op — it now IS the default.
-		return d.orch.Down(ctx, d.params, hasFlag(rest, "--drop-db"))
-	},
-	"clickhouse": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.RunClickHouse(ctx, d.params, rest)
-	},
-	"postgres": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.RunPostgres(ctx, d.params, rest)
-	},
-	"prune": runPrune,
-	"cleanup": func(ctx context.Context, d deps, rest []string) error {
-		if !hasFlag(rest, "--force") {
-			return fmt.Errorf("refusing cleanup without --force")
-		}
-		procsupervisor.ReapOrphans([]string{d.worktree})
-		fmt.Printf("haven cleaned orphaned dev runtimes under %s\n", d.worktree)
-		return nil
-	},
-	"upgrade": func(ctx context.Context, d deps, _ []string) error {
-		cmd := exec.CommandContext(ctx, "go", "install", "./cmd/haven")
-		cmd.Dir = d.worktree
-		cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("install updated haven: %w", err)
-		}
-		fmt.Println("haven binary updated; restart the active launcher to load it (haven restart)")
-		return nil
-	},
-	"typecheck": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.Typecheck(ctx, d.lwDir, rest, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
-	},
-	"observability": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.RunObservability(ctx, rest)
-	},
-	"hmr": func(ctx context.Context, d deps, rest []string) error { return d.orch.RunHMR(ctx, d.lwDir, rest) },
-	"seed": func(ctx context.Context, d deps, rest []string) error {
-		if err := guardSeedEnv(d.lwDir); err != nil {
-			return err
-		}
-		preset, err := seedPresetArg(rest)
-		if err != nil {
-			return err
-		}
-		if hasFlag(rest, "--first-message") && hasFlag(rest, "--no-first-message") {
-			return fmt.Errorf("--first-message and --no-first-message are mutually exclusive — pass one or the other")
-		}
-		return d.orch.Seed(ctx, d.params, app.SeedOptions{
-			Preset:             preset,
-			ShouldIngestTraces: hasFlag(rest, "--traces") || os.Getenv("HAVEN_SEED_TRACES") == "1",
-			ExtraEnv:           seedExtraEnv(rest),
-		})
-	},
-	"list": func(_ context.Context, d deps, rest []string) error {
-		return d.orch.List(d.isAgent || hasFlag(rest, "--json"))
-	},
-	"switch": func(_ context.Context, d deps, rest []string) error {
-		return runSwitch(d, rest)
-	},
-	"shell-init": func(_ context.Context, _ deps, _ []string) error {
-		fmt.Print(shellInitScript)
-		return nil
-	},
-	"git":    runGitUI,
-	"hub":    runHub,
-	"doctor": func(_ context.Context, d deps, _ []string) error { return d.orch.Doctor() },
-}
-
-// aliases are the short forms accepted for a canonical command.
-var aliases = map[string]string{
-	"ch":     "clickhouse",
-	"pg":     "postgres",
-	"obs":    "observability",
-	"tc":     "typecheck",
-	"ls":     "list",
-	"status": "list",
-	"moron":  "git",
-	"rs":     "restart",
-	"sw":     "switch",
-	"ps":     "hub",
-	"active": "hub",
-	"oc":     "cleanup",
-}
-
 // observabilityEndpoints are fixed ports rather than ephemeral ones: the gcx CLI
 // and any agent all need to find the stack without asking haven first.
 func observabilityEndpoints() domain.ObservabilityEndpoints {
@@ -330,33 +204,11 @@ func clickHouseLimits() domain.ClickHouseLimits {
 	return l
 }
 
-func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {
-	if canonical, ok := aliases[sub]; ok {
-		sub = canonical
-	}
-	run, ok := commands[sub]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "haven: unknown command %q\n\n%s", sub, helpText)
-		return fmt.Errorf("unknown command %q", sub)
-	}
-	return run(ctx, d, rest)
-}
-
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
 		ShouldGoWatch:      os.Getenv("LANGWATCH_GO_WATCH") == "1",
-		ShouldStartWorkers: os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
-		// Under haven the worker stack defaults to IN-PROCESS (hosted in the app
-		// process), saving the RAM of a second Node process — the sensible default on
-		// a laptop juggling several worktrees. Workers keep their own logger name
-		// ("langwatch:workers"), so their lines stay identifiable even without a
-		// separate lane. Opt back into a standalone `workers` lane with
-		// WORKERS_IN_PROCESS=0.
-		ShouldRunWorkersInProcess: os.Getenv("WORKERS_IN_PROCESS") != "0" && os.Getenv("WORKERS_IN_PROCESS") != "false",
-		ShouldSkipNLP:             os.Getenv("LANGWATCH_SKIP_NLP") == "1",
-		ShouldSkipGateway:         os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
-		ShouldSkipLangyAgent:      os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
-		ShouldSeed:                os.Getenv("LANGWATCH_SEED") == "1",
+		ShouldStartWorkers: true,
+		ShouldSeed:         os.Getenv("LANGWATCH_SEED") == "1",
 		// The langyagent worker's local isolation posture. Default (neither flag) is
 		// the sandboxed, production-like tier: the worker runs in colima with the
 		// per-worker UID sandbox on. LANGY_UNSAFE_CONTAINER relaxes the sandbox inside
@@ -368,6 +220,36 @@ func optionsFromEnv(repoRoot string) app.PlanOptions {
 		IsStub:   os.Getenv("HAVEN_STUB") == "1",
 		RepoRoot: repoRoot,
 	}
+}
+
+// applyLegacySelectionEnv honours the pre-ADR-064 selection env vars for one
+// release as one-shot, NON-sticky overrides, each printing its sticky
+// replacement. The env vars are removed a release later.
+func applyLegacySelectionEnv(sel domain.Selection, opts *app.PlanOptions) domain.Selection {
+	warn := func(envVar, sticky string) {
+		fmt.Fprintf(os.Stderr, "haven: %s is deprecated and applies to this run only — the sticky way is `%s`\n", envVar, sticky)
+	}
+	if os.Getenv("LANGWATCH_SKIP_NLP") == "1" {
+		sel.NLP = false
+		warn("LANGWATCH_SKIP_NLP=1", "haven up -nlp")
+	}
+	if os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1" {
+		sel.Gateway = false
+		warn("LANGWATCH_SKIP_AIGATEWAY=1", "haven up -gateway")
+	}
+	if os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1" {
+		sel.Langy = false
+		warn("LANGWATCH_SKIP_LANGYAGENT=1", "haven up -langy")
+	}
+	if v := os.Getenv("WORKERS_IN_PROCESS"); v == "0" || v == "false" {
+		sel.Workers = true
+		warn("WORKERS_IN_PROCESS=0", "haven up +workers")
+	}
+	if v := os.Getenv("START_WORKERS"); v == "false" || v == "0" {
+		opts.ShouldStartWorkers = false
+		fmt.Fprintln(os.Stderr, "haven: START_WORKERS=false is deprecated and applies to this run only (no sticky equivalent — workers are part of the app by default)")
+	}
+	return sel
 }
 
 // resolveAgent turns agent mode on for AI drivers: explicit env, NO_COLOR, or a
@@ -465,14 +347,17 @@ func runHavenUpIn(ctx context.Context, dir string) error {
 // runSwitch resolves a worktree by name and prints its directory. A process
 // cannot change its parent shell's cwd, so the actual cd happens in the shell
 // function `haven shell-init` emits — this command just answers "where".
-func runSwitch(d deps, rest []string) error {
-	if hasFlag(rest, "--list") {
+func runSwitch(d deps, inv invocation) error {
+	if inv.has("--list") {
 		for _, t := range d.orch.SwitchTargets(d.worktree) {
 			fmt.Println(t.Name)
 		}
 		return nil
 	}
-	query := firstNonFlag(rest)
+	query := ""
+	if len(inv.args) > 0 {
+		query = inv.args[0]
+	}
 	if query == "" {
 		fmt.Println("Switchable worktrees (● = up):")
 		for _, t := range d.orch.SwitchTargets(d.worktree) {
@@ -499,7 +384,7 @@ func runSwitch(d deps, rest []string) error {
 // of the worktree names.
 const shellInitScript = `haven() {
   case "$1" in
-    switch|sw|cd)
+    switch)
       shift
       if [ $# -eq 0 ]; then command haven switch; return; fi
       local dir
@@ -511,7 +396,7 @@ const shellInitScript = `haven() {
 }
 if [ -n "$ZSH_VERSION" ]; then
   _haven_complete() {
-    if [ "${words[2]}" = "switch" ] || [ "${words[2]}" = "sw" ] || [ "${words[2]}" = "cd" ]; then
+    if [ "${words[2]}" = "switch" ]; then
       local -a targets
       targets=(${(f)"$(command haven switch --list 2>/dev/null)"})
       compadd -a targets
@@ -526,17 +411,25 @@ func stackLogPath(slug string) string {
 	return filepath.Join(havenHome(), "logs", slug+".log")
 }
 
-// runUpDetached backgrounds `haven up`: it re-invokes haven's own up in a new
-// session with stdout/stderr streaming to a per-slug log file, then returns
-// immediately. Follow with `haven logs -f`; stop with `haven down`.
-func runUpDetached(d deps, rest []string) error {
+// detachedStack describes a stack startDetachedUp just backgrounded.
+type detachedStack struct {
+	slug    string
+	pid     int
+	logPath string
+}
+
+// startDetachedUp backgrounds `haven up`: it re-invokes haven's own up in a new
+// session with stdout/stderr streaming to the per-slug combined log file, then
+// returns immediately. The child owns provisioning + supervision; its process
+// group survives this terminal, so only `haven down` stops it.
+func startDetachedUp(d deps, rest []string) (detachedStack, error) {
 	slug, err := d.orch.ResolveSlug(d.params)
 	if err != nil {
-		return err
+		return detachedStack{}, err
 	}
 	logPath := stackLogPath(slug)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
-		return err
+		return detachedStack{}, err
 	}
 	argv := selfArgv(d.worktree, "up")
 	for _, a := range rest {
@@ -551,45 +444,71 @@ func runUpDetached(d deps, rest []string) error {
 	// admin password and access tokens.
 	f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if ferr != nil {
-		return fmt.Errorf("opening log file %s: %w", logPath, ferr)
+		return detachedStack{}, fmt.Errorf("opening log file %s: %w", logPath, ferr)
 	}
 	// Chmod too — the mode above only applies on create, and older runs
 	// created this file 0644.
 	if err := f.Chmod(0o600); err != nil {
 		_ = f.Close()
-		return fmt.Errorf("securing log file %s: %w", logPath, err)
+		return detachedStack{}, fmt.Errorf("securing log file %s: %w", logPath, err)
 	}
 	cmd.Stdout, cmd.Stderr = f, f
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		_ = f.Close()
-		return err
+		return detachedStack{}, err
 	}
 	_ = f.Close()
 	go func() { _ = cmd.Wait() }() // reap if it exits while we're still around
-	fmt.Printf("stack %q starting detached (pid %d)\n", slug, cmd.Process.Pid)
-	fmt.Printf("  logs:   haven logs -f    (%s)\n", logPath)
+	return detachedStack{slug: slug, pid: cmd.Process.Pid, logPath: logPath}, nil
+}
+
+// runUpDetached is `haven up -d`: background the stack and return.
+func runUpDetached(d deps, rest []string) error {
+	st, err := startDetachedUp(d, rest)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("stack %q starting detached (pid %d)\n", st.slug, st.pid)
+	fmt.Printf("  logs:   haven logs -t    (%s)\n", st.logPath)
 	fmt.Printf("  stop:   haven down\n")
 	return nil
 }
 
-// runLogs prints (or follows, with -f) the detached stack's log file via tail.
-func runLogs(ctx context.Context, d deps, shouldFollow bool) error {
-	slug, err := d.orch.ResolveSlug(d.params)
+// runUpAttached is `haven up` in a human's terminal: the stack still runs in
+// the background (same detached launcher as -d), and this process merely
+// attaches the interactive log view on top — so closing the view, or the
+// terminal, never takes the stack down. `haven down` is what stops it.
+func runUpAttached(ctx context.Context, d deps, rest []string) error {
+	st, err := startDetachedUp(d, rest)
 	if err != nil {
 		return err
 	}
-	logPath := stackLogPath(slug)
-	if _, err := os.Stat(logPath); err != nil {
-		return fmt.Errorf("no log file for stack %q (%s) — logs are captured when the stack is started with `haven up -d`", slug, logPath)
+	if err := runUpViewer(ctx, st.slug, preferredGroup(rest)); err != nil {
+		return err
 	}
-	args := []string{"-n", "200"}
-	if shouldFollow {
-		args = append(args, "-f")
+	fmt.Printf("detached — stack %q keeps running in the background\n", st.slug)
+	fmt.Printf("  logs:   haven logs -t   ·   attach again: haven up   ·   stop: haven down\n")
+	return nil
+}
+
+// preferredGroup picks the log group `up` should open on: the service the last
+// `+svc` delta just added — you asked for it, you want to watch it come up.
+func preferredGroup(rest []string) string {
+	preferred := ""
+	for _, a := range rest {
+		if len(a) > 1 && a[0] == '+' {
+			preferred = a[1:]
+		}
 	}
-	cmd := exec.CommandContext(ctx, "tail", append(args, logPath)...)
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	return cmd.Run()
+	return preferred
+}
+
+// stdoutIsTTY reports whether a human terminal is on the other end — what
+// decides between the attached log view and plain foreground streaming.
+func stdoutIsTTY() bool {
+	fi, err := os.Stdout.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
 // prWorktreeBase is where `haven pr` puts new PR worktrees: HAVEN_WORKTREE_DIR if
@@ -618,16 +537,6 @@ func gitMainWorktree(dir string) string {
 	return gitTopLevel(dir)
 }
 
-// firstNonFlag returns the first positional arg (the PR ref), skipping -flags.
-func firstNonFlag(args []string) string {
-	for _, a := range args {
-		if !strings.HasPrefix(a, "-") {
-			return a
-		}
-	}
-	return ""
-}
-
 func stripFlag(args []string, flag string) ([]string, bool) {
 	var out []string
 	found := false
@@ -641,68 +550,16 @@ func stripFlag(args []string, flag string) ([]string, bool) {
 	return out, found
 }
 
-// flagValue returns the value following --name (or embedded in --name=value),
-// "" when the flag is absent.
-func flagValue(args []string, name string) string {
-	for i, a := range args {
-		if a == name && i+1 < len(args) {
-			return args[i+1]
-		}
-		if v, ok := strings.CutPrefix(a, name+"="); ok {
-			return v
-		}
+// runUpgrade reinstalls the haven binary from this checkout via go install.
+func runUpgrade(ctx context.Context, d deps, _ invocation) error {
+	cmd := exec.CommandContext(ctx, "go", "install", "./cmd/haven")
+	cmd.Dir = d.worktree
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("install updated haven: %w", err)
 	}
-	return ""
-}
-
-// seedExtraEnv maps `haven seed`'s extra flags to the HAVEN_SEED_* switches
-// the seed script reads. Only explicit flags are emitted — env vars the user
-// already exported flow through the child's inherited environment untouched.
-func seedExtraEnv(rest []string) []string {
-	var env []string
-	if hasFlag(rest, "--first-message") {
-		env = append(env, "HAVEN_SEED_FIRST_MESSAGE=1")
-	}
-	if hasFlag(rest, "--no-first-message") {
-		env = append(env, "HAVEN_SEED_FIRST_MESSAGE=0")
-	}
-	if hasFlag(rest, "--skip-model-providers") {
-		env = append(env, "HAVEN_SEED_MODEL_PROVIDERS=0")
-	}
-	if hasFlag(rest, "--skip-feature-flags") {
-		env = append(env, "HAVEN_SEED_FEATURE_FLAGS=0")
-	}
-	return env
-}
-
-// seedPresetArg extracts --preset for `haven seed`, rejecting the two silent
-// footguns: a trailing --preset with no value, and a positional arg (`haven
-// seed demo`) that flagValue would ignore — both would otherwise run the plain
-// default seed and exit successfully.
-func seedPresetArg(rest []string) (string, error) {
-	preset := flagValue(rest, "--preset")
-	if hasFlag(rest, "--preset") && preset == "" {
-		return "", fmt.Errorf("--preset needs a value — available: %s", strings.Join(app.SeedPresets, ", "))
-	}
-	for i := 0; i < len(rest); i++ {
-		if rest[i] == "--preset" {
-			i++ // skip the flag's value
-			continue
-		}
-		if !strings.HasPrefix(rest[i], "-") {
-			return "", fmt.Errorf("unexpected argument %q — presets are passed as --preset <name>; available: %s", rest[i], strings.Join(app.SeedPresets, ", "))
-		}
-	}
-	return preset, nil
-}
-
-func hasFlag(args []string, flag string) bool {
-	for _, a := range args {
-		if a == flag {
-			return true
-		}
-	}
-	return false
+	fmt.Println("haven binary updated; restart the active launcher to load it (haven restart)")
+	return nil
 }
 
 // envTruthy reports whether an env var is set to a common "on" value. Accepts the

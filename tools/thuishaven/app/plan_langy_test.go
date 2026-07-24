@@ -107,7 +107,7 @@ func TestLangyContainerShell(t *testing.T) {
 
 func TestLangyImageEnsureShell(t *testing.T) {
 	t.Run("given no force rebuild", func(t *testing.T) {
-		sh := langyImageEnsureShell("langyagent:dev", false)
+		sh := langyImageEnsureShell("langyagent:dev", false, "")
 		t.Run("builds only when the image is absent", func(t *testing.T) {
 			if !strings.Contains(sh, "docker image inspect 'langyagent:dev' >/dev/null 2>&1 ||") {
 				t.Fatalf("expected presence-gated build, got: %s", sh)
@@ -118,7 +118,7 @@ func TestLangyImageEnsureShell(t *testing.T) {
 		})
 	})
 	t.Run("given a forced rebuild", func(t *testing.T) {
-		sh := langyImageEnsureShell("langyagent:dev", true)
+		sh := langyImageEnsureShell("langyagent:dev", true, "")
 		t.Run("always rebuilds, unconditionally", func(t *testing.T) {
 			if strings.Contains(sh, "docker image inspect") {
 				t.Fatalf("forced rebuild must not gate on presence: %s", sh)

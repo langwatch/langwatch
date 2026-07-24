@@ -39,22 +39,24 @@ type Config struct {
 
 // PlanOptions decide which services `up` runs and how.
 type PlanOptions struct {
-	ShouldGoWatch      bool // air hot-reload for the Go services instead of `go run`
+	ShouldGoWatch bool // air hot-reload for the Go services instead of `go run`
+	// Selection is the worktree's sticky service choice (ADR-064): workers
+	// lane, gateway, nlp, langy. app always runs.
+	Selection domain.Selection
+	// ShouldStartWorkers is the legacy START_WORKERS=false escape: no worker
+	// stack at all, neither a lane nor in-process. Env-bridge only, never
+	// sticky; defaults to true.
 	ShouldStartWorkers bool
-	// ShouldRunWorkersInProcess hosts the worker stack inside the app process
-	// instead of a separate `workers` lane — the single-process mode that saves the
-	// RAM of a second Node process. It is the DEFAULT under haven (opt out with
-	// WORKERS_IN_PROCESS=0); mirrors scripts/start.sh + start.ts. Dev-only; haven
-	// always runs NODE_ENV=development.
-	ShouldRunWorkersInProcess bool
-	ShouldSkipNLP             bool
-	ShouldSkipGateway         bool
-	ShouldSkipLangyAgent      bool
-	ShouldSeed                bool
-	// ShouldForce lets `up` replace a stack that is already running from this
-	// worktree: the live launcher is terminated (and waited on) before the new
-	// one provisions. Without it, `up` refuses when the stack is already up.
+	ShouldSeed         bool
+	// ShouldRebuildImages (--rebuild) forces container images to be rebuilt even
+	// when their content hash says nothing changed.
+	ShouldRebuildImages bool
+	// ShouldForce (-f) replaces the running stack even when it already matches
+	// the selection — the "restart everything now" up.
 	ShouldForce bool
+	// langyImageTag is the content-addressed image tag Up resolves before
+	// provisioning (internal — derived, never set by the composition root).
+	langyImageTag string
 	// LangyTier is the local isolation posture for the langyagent worker, resolved
 	// from LANGY_UNSAFE_CONTAINER / LANGY_UNSAFE_HOST_ACCESS. The zero value is the
 	// sandboxed (production-like) default: the worker runs in colima with the

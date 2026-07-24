@@ -144,5 +144,6 @@ server.log
 
 # thuishaven (portless local dev)
 .langwatch-slug
+.haven.json
 /bin/haven
 langwatch/dev.log

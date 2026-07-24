@@ -21,17 +21,46 @@ type restartTarget struct {
 // the crash-restart loop, triggered on purpose. Perfect for services without
 // hot reloading. The shared databases (ClickHouse/Postgres/Redis) are not
 // restartable this way; they are machine-wide servers, not stack children.
-func (o *Orchestrator) Restart(ctx context.Context, p UpParams, name string) error {
+func (o *Orchestrator) Restart(ctx context.Context, p UpParams, name string, rebuild bool) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
 	}
+	if rebuild {
+		if name != "langy" {
+			return fmt.Errorf("--rebuild applies to container services — `haven restart langy --rebuild`")
+		}
+		if err := o.rebuildLangyImage(ctx, p, slug); err != nil {
+			return err
+		}
+	}
 	return o.RestartStack(ctx, slug, name)
+}
+
+// rebuildLangyImage force-builds the current source into the RUNNING stack's
+// image tag, so the bounce that follows picks the fresh bytes up without a
+// re-plan. (The tag then names newer content than its hash until the next up
+// re-derives it — fine for a dev escape hatch.)
+func (o *Orchestrator) rebuildLangyImage(ctx context.Context, p UpParams, slug string) error {
+	st, ok := o.stackBySlug(slug)
+	if !ok {
+		return fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
+	}
+	if !st.LangyTier.RunsInContainer() {
+		return fmt.Errorf("langy runs on the host here (no image) — a plain `haven restart langy` picks up source changes")
+	}
+	_, err := o.prepareLangyContainer(ctx, p.WorktreeDir, st.LangyImage, true)
+	return err
 }
 
 // RestartStack is Restart addressed by slug — what the hub (which acts on any
 // registered stack, not just the current worktree's) calls.
 func (o *Orchestrator) RestartStack(ctx context.Context, slug, name string) error {
+	// The observability stack is shared, not a stack child — bounce it directly.
+	// It keeps no volume, so a restart is also how collected telemetry is reset.
+	if name == "obs" {
+		return o.restartObservability(ctx)
+	}
 	st, ok := o.stackBySlug(slug)
 	if !ok {
 		return fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
@@ -74,7 +103,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	for _, r := range domain.PerWorktreeServices {
 		for _, svc := range st.Services {
 			if svc.Name == r.Name && !svc.IsFallback && svc.Port != 0 {
-				all = append(all, restartTarget{Name: svc.Name, Port: svc.Port})
+				all = append(all, restartTarget{Name: domain.CLIServiceName(svc.Name), Port: svc.Port})
 			}
 		}
 	}
@@ -107,3 +136,40 @@ func restartableNames(st domain.Stack) []string {
 // ResolveSlug exposes slug resolution to the composition root (for log paths,
 // detached up).
 func (o *Orchestrator) ResolveSlug(p UpParams) (string, error) { return o.resolveSlug(p) }
+
+// ResolveSelection loads the worktree's sticky service selection (lean default
+// when none exists), applies any ±deltas, and persists the result — so the
+// choice survives terminals, reboots, and detach. The file is also written on
+// a delta-less first up, making the default visible and editable.
+func (o *Orchestrator) ResolveSelection(worktreeDir string, deltas []string) (domain.Selection, error) {
+	sel, found := o.store.ReadSelection(worktreeDir)
+	if !found {
+		sel = domain.DefaultSelection()
+	}
+	sel, err := domain.ApplySelectionDeltas(sel, deltas)
+	if err != nil {
+		return sel, err
+	}
+	if len(deltas) > 0 || !found {
+		if err := o.store.WriteSelection(worktreeDir, sel); err != nil {
+			return sel, fmt.Errorf("saving the service selection: %w", err)
+		}
+	}
+	return sel, nil
+}
+
+// restartObservability stops and re-ensures the shared LGTM stack, re-routing
+// its hostname. Telemetry starts fresh — the stack keeps no volume by design.
+func (o *Orchestrator) restartObservability(ctx context.Context) error {
+	if o.obs == nil {
+		return fmt.Errorf("observability is not managed here")
+	}
+	_ = o.obs.Stop(ctx)
+	endpoints, err := o.obs.Ensure(ctx)
+	if err != nil {
+		return err
+	}
+	o.routeObservability()
+	fmt.Printf("observability restarted — grafana %s (telemetry starts fresh; it keeps no volume)\n", endpoints.GrafanaURL())
+	return nil
+}

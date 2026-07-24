@@ -62,6 +62,10 @@ type Stack struct {
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
 	IsBaseline bool `json:"baseline,omitempty"`
+	// LangyImage is the content-addressed langy image tag this stack was planned
+	// with (empty on the host tier or with langy off). `up` compares it against
+	// the freshly-derived tag so a source edit restarts the stack onto new bytes.
+	LangyImage string `json:"langyImage,omitempty"`
 	// LangyTier is the local isolation posture the langyagent worker runs under
 	// (see LangyTier). The zero value is LangyTierSandboxed — the safe, production-
 	// like default — so a stack persisted before this field existed reads back as

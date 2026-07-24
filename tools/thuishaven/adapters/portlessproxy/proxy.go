@@ -149,6 +149,29 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+// Install installs portless globally via npm — the bootstrap `haven up` runs
+// on a machine that has never had it. Output is inherited so the (possibly
+// slow) install is visible rather than a silent hang.
+func (p *Proxy) Install() error {
+	if _, err := exec.LookPath("npm"); err != nil {
+		return fmt.Errorf("npm is not on PATH — install Node first (brew install node)")
+	}
+	cmd := exec.Command("npm", "install", "-g", "portless")
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("npm install -g portless: %w", err)
+	}
+	return nil
+}
+
+// Shutdown stops the proxy daemon (`haven down --all`). Not running is fine.
+func (p *Proxy) Shutdown() error {
+	if !p.Running() {
+		return nil
+	}
+	return p.runVerbose("proxy", "stop")
+}
+
 // Register points a hostname at a loopback port (idempotent via --force).
 func (p *Proxy) Register(service, slug string, port int) error {
 	return p.run("alias", p.naming.RouteName(service, slug), strconv.Itoa(port), "--force")

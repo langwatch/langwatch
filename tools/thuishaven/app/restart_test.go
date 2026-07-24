@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -63,7 +62,7 @@ func TestRestart(t *testing.T) {
 	t.Run("given a live stack", func(t *testing.T) {
 		t.Run("when restarting one service, it kills only that service's group", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "gateway"); err != nil {
+			if err := o.Restart(ctx, params, "gateway", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 101 {
@@ -73,7 +72,7 @@ func TestRestart(t *testing.T) {
 
 		t.Run("when restarting the api, it resolves the API backend port", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, "api"); err != nil {
+			if err := o.Restart(ctx, params, "api", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 102 {
@@ -83,7 +82,7 @@ func TestRestart(t *testing.T) {
 
 		t.Run("when restarting with no service named, it bounces every supervised child", func(t *testing.T) {
 			_, sys, o := newFixture()
-			if err := o.Restart(ctx, params, ""); err != nil {
+			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			// app, gateway, api, workers — NOT the fallback nlp, NOT clickhouse.
@@ -101,7 +100,7 @@ func TestRestart(t *testing.T) {
 		t.Run("when naming an unknown or shared service, it refuses with the restartable list", func(t *testing.T) {
 			for _, name := range []string{"clickhouse", "nlp", "bogus"} {
 				_, sys, o := newFixture()
-				if err := o.Restart(ctx, params, name); err == nil {
+				if err := o.Restart(ctx, params, name, false); err == nil {
 					t.Errorf("Restart(%q) should refuse", name)
 				}
 				if len(sys.groupTerminated) != 0 {
@@ -114,7 +113,7 @@ func TestRestart(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.pidsByPort[9000] = []int{42}
 			o := restartOrch(store, sys)
-			if err := o.Restart(ctx, params, "app"); err != nil {
+			if err := o.Restart(ctx, params, "app", false); err != nil {
 				t.Fatalf("Restart: %v", err)
 			}
 			if len(sys.groupTerminated) != 0 {
@@ -136,14 +135,14 @@ func TestRestart(t *testing.T) {
 			}
 			o := restartOrch(store, sys)
 
-			if err := o.Restart(ctx, params, "workers"); err == nil {
+			if err := o.Restart(ctx, params, "workers", false); err == nil {
 				t.Error("restart workers should refuse in in-process mode")
 			}
 			if len(sys.groupTerminated) != 0 {
 				t.Errorf("restart workers must terminate nothing in in-process mode, got %v", sys.groupTerminated)
 			}
 
-			if err := o.Restart(ctx, params, ""); err != nil {
+			if err := o.Restart(ctx, params, "", false); err != nil {
 				t.Fatalf("Restart(all): %v", err)
 			}
 			// app, gateway, api — NOT workers (its port belongs to the API child).
@@ -164,145 +163,154 @@ func TestRestart(t *testing.T) {
 			store, sys, _ := newFixture()
 			sys.alive = map[int]bool{}
 			o := restartOrch(store, sys)
-			if err := o.Restart(ctx, params, "app"); err == nil {
+			if err := o.Restart(ctx, params, "app", false); err == nil {
 				t.Error("Restart should refuse when the launcher is dead")
 			}
 		})
 	})
 }
 
-// @scenario "Up refuses a worktree whose stack is already running"
-// @scenario "Up --force replaces the running stack"
-func TestUpAlreadyRunningGuard(t *testing.T) {
+// @scenario "Up on an already-running stack reconciles"
+// @scenario "Up recovers a half-dead stack without a force flag"
+func TestUpReconcilesRunningStack(t *testing.T) {
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
 
-	newFixture := func(launcherAlive bool) (*fakeSystem, *Orchestrator) {
+	newFixture := func(launcherAlive bool) (*fakeStore, *fakeSystem, *Orchestrator) {
 		store := &fakeStore{
 			stacks:    []domain.Stack{restartStack()},
 			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
 		}
 		sys := &fakeSystem{alive: map[int]bool{42: launcherAlive}}
-		return sys, restartOrch(store, sys)
+		return store, sys, restartOrch(store, sys)
 	}
 
-	t.Run("given the same worktree's stack is already live", func(t *testing.T) {
-		t.Run("when up runs without force, it refuses", func(t *testing.T) {
-			sys, o := newFixture(true)
-			if err := o.replaceRunningStack(params, false); err == nil {
-				t.Error("up should refuse when the stack is already running")
+	t.Run("given the stack is live and matches the selection", func(t *testing.T) {
+		t.Run("when up runs, it is a friendly no-op — nothing terminated, nothing provisioned", func(t *testing.T) {
+			store, sys, o := newFixture(true)
+			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0]), ShouldStartWorkers: true}
+			proceed, err := o.reconcileRunningStack(params, opts)
+			if err != nil {
+				t.Fatalf("reconcile: %v", err)
+			}
+			if proceed {
+				t.Error("a matching live stack must not be re-provisioned")
 			}
 			if len(sys.terminated) != 0 {
-				t.Errorf("refusing must not terminate anything, got %v", sys.terminated)
+				t.Errorf("nothing may be terminated, got %v", sys.terminated)
 			}
 		})
+	})
 
-		t.Run("when up runs with force, it terminates the old launcher and proceeds", func(t *testing.T) {
-			sys, o := newFixture(true)
-			if err := o.replaceRunningStack(params, true); err != nil {
-				t.Fatalf("forced up should proceed: %v", err)
+	t.Run("given the stack is live with a different selection", func(t *testing.T) {
+		t.Run("when up runs, the old launcher is replaced without any force flag", func(t *testing.T) {
+			store, sys, o := newFixture(true)
+			desired := domain.SelectionFromStack(store.stacks[0])
+			desired.Langy = !desired.Langy
+			proceed, err := o.reconcileRunningStack(params, PlanOptions{Selection: desired, ShouldStartWorkers: true})
+			if err != nil {
+				t.Fatalf("reconcile: %v", err)
+			}
+			if !proceed {
+				t.Error("a selection change must re-provision")
 			}
 			if len(sys.terminated) != 1 || sys.terminated[0] != 42 {
-				t.Errorf("force should terminate the old launcher, got %v", sys.terminated)
+				t.Errorf("the old launcher must be terminated, got %v", sys.terminated)
+			}
+		})
+	})
+
+	t.Run("given a matching live stack and -f", func(t *testing.T) {
+		t.Run("when up runs with force, the stack is replaced anyway", func(t *testing.T) {
+			store, sys, o := newFixture(true)
+			opts := PlanOptions{Selection: domain.SelectionFromStack(store.stacks[0]), ShouldStartWorkers: true, ShouldForce: true}
+			proceed, err := o.reconcileRunningStack(params, opts)
+			if err != nil {
+				t.Fatalf("reconcile: %v", err)
+			}
+			if !proceed {
+				t.Error("-f must re-provision even a matching stack")
+			}
+			if len(sys.terminated) != 1 {
+				t.Errorf("-f must terminate the old launcher, got %v", sys.terminated)
 			}
 		})
 	})
 
 	t.Run("given the registered stack's launcher already exited", func(t *testing.T) {
-		t.Run("when up runs, it proceeds without force", func(t *testing.T) {
-			sys, o := newFixture(false)
-			if err := o.replaceRunningStack(params, false); err != nil {
+		t.Run("when up runs, the stale entry is cleaned and provisioning proceeds", func(t *testing.T) {
+			store, sys, o := newFixture(false)
+			proceed, err := o.reconcileRunningStack(params, PlanOptions{ShouldStartWorkers: true})
+			if err != nil {
 				t.Fatalf("a dead launcher must not block up: %v", err)
+			}
+			if !proceed {
+				t.Error("a dead launcher must not block provisioning")
 			}
 			if len(sys.terminated) != 0 {
 				t.Errorf("nothing to terminate, got %v", sys.terminated)
+			}
+			if len(store.stacks) != 0 {
+				t.Errorf("the stale registry entry must be cleaned, got %v", store.stacks)
 			}
 		})
 	})
 }
 
-// @scenario "Down keeps the databases by default"
-// @scenario "Down drops the databases only when explicitly asked"
-func TestDownDatabaseSemantics(t *testing.T) {
+// @scenario "Down keeps the databases, always"
+func TestDownKeepsDatabases(t *testing.T) {
 	ctx := context.Background()
 	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
-
-	newFixture := func() (*fakeSystem, *fakeDBServer, *fakeDBServer, *Orchestrator) {
-		store := &fakeStore{
-			stacks:    []domain.Stack{restartStack()},
-			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
-		}
-		sys := &fakeSystem{alive: map[int]bool{42: true}}
-		ch := &fakeDBServer{databases: []string{"lw_feat_x"}}
-		pg := &fakeDBServer{databases: []string{"lw_feat_x"}}
-		o := &Orchestrator{
-			cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
-			store: store, sys: sys, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
-		}
-		return sys, ch, pg, o
+	store := &fakeStore{
+		stacks:    []domain.Stack{restartStack()},
+		slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+	}
+	sys := &fakeSystem{alive: map[int]bool{42: true}}
+	ch := &fakeDBServer{databases: []string{"lw_feat_x"}}
+	pg := &fakeDBServer{databases: []string{"lw_feat_x"}}
+	o := &Orchestrator{
+		cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
+		store: store, sys: sys, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
 	}
 
-	t.Run("when downing without flags, databases are kept and the launcher is stopped", func(t *testing.T) {
-		sys, ch, pg, o := newFixture()
+	t.Run("when downing, databases are kept and the launcher is stopped", func(t *testing.T) {
 		if err := o.Down(ctx, params, false); err != nil {
 			t.Fatalf("Down: %v", err)
 		}
 		if len(ch.dropped) != 0 || len(pg.dropped) != 0 {
-			t.Errorf("down must keep databases by default, got ch=%v pg=%v", ch.dropped, pg.dropped)
+			t.Errorf("down must never drop databases, got ch=%v pg=%v", ch.dropped, pg.dropped)
 		}
 		if len(sys.terminated) != 1 || sys.terminated[0] != 42 {
 			t.Errorf("down should stop the live launcher, got %v", sys.terminated)
 		}
+		if len(store.stacks) != 0 {
+			t.Errorf("the registry entry must be removed, got %v", store.stacks)
+		}
 	})
+}
 
-	t.Run("when downing with --drop-db, both databases are dropped", func(t *testing.T) {
-		_, ch, pg, o := newFixture()
+// @scenario "Down -f kills hard"
+func TestDownForceKillsHard(t *testing.T) {
+	ctx := context.Background()
+	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
+	store := &fakeStore{
+		stacks:    []domain.Stack{restartStack()},
+		slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+	}
+	sys := &fakeSystem{alive: map[int]bool{42: true}}
+	o := &Orchestrator{
+		cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
+		store: store, sys: sys, proxy: &fakeProxy{}, ch: &fakeDBServer{}, pg: &fakeDBServer{}, log: zap.NewNop(),
+	}
+
+	t.Run("when downing with force, the launcher group is SIGKILLed with no graceful wait", func(t *testing.T) {
 		if err := o.Down(ctx, params, true); err != nil {
 			t.Fatalf("Down: %v", err)
 		}
-		if len(ch.dropped) != 1 || ch.dropped[0] != "lw_feat_x" {
-			t.Errorf("--drop-db should drop the clickhouse db, got %v", ch.dropped)
+		if len(sys.groupKilled) != 1 || sys.groupKilled[0] != 42 {
+			t.Errorf("force must kill the launcher group, got killed=%v", sys.groupKilled)
 		}
-		if len(pg.dropped) != 1 || pg.dropped[0] != "lw_feat_x" {
-			t.Errorf("--drop-db should drop the postgres db, got %v", pg.dropped)
-		}
-	})
-
-	t.Run("when --drop-db and the clickhouse drop fails, Down attempts both and returns an error", func(t *testing.T) {
-		store, ch, pg := &fakeStore{
-			stacks:    []domain.Stack{restartStack()},
-			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
-		}, &fakeDBServer{databases: []string{"lw_feat_x"}, dropErr: errors.New("ch boom")}, &fakeDBServer{databases: []string{"lw_feat_x"}}
-		o := &Orchestrator{
-			cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
-			store: store, sys: &fakeSystem{alive: map[int]bool{42: true}}, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
-		}
-		err := o.Down(ctx, params, true)
-		if err == nil {
-			t.Fatal("Down should return an error when a database drop fails")
-		}
-		// Cleanup still completes: the postgres drop is attempted and the stack is removed.
-		if len(pg.dropped) != 1 {
-			t.Errorf("postgres drop must still be attempted after a clickhouse drop failure, got %v", pg.dropped)
-		}
-		if len(store.stacks) != 0 {
-			t.Errorf("the stack entry must still be removed, got %v", store.stacks)
-		}
-	})
-
-	t.Run("when --drop-db and the postgres drop fails, Down returns an error", func(t *testing.T) {
-		store, ch, pg := &fakeStore{
-			stacks:    []domain.Stack{restartStack()},
-			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
-		}, &fakeDBServer{databases: []string{"lw_feat_x"}}, &fakeDBServer{databases: []string{"lw_feat_x"}, dropErr: errors.New("pg boom")}
-		o := &Orchestrator{
-			cfg:   Config{ShouldManageClickHouse: true, ShouldManagePostgres: true, Naming: domain.DefaultNaming("")},
-			store: store, sys: &fakeSystem{alive: map[int]bool{42: true}}, proxy: &fakeProxy{}, ch: ch, pg: pg, log: zap.NewNop(),
-		}
-		if err := o.Down(ctx, params, true); err == nil {
-			t.Fatal("Down should return an error when the postgres drop fails")
-		}
-		if len(ch.dropped) != 1 {
-			t.Errorf("clickhouse drop must still be attempted, got %v", ch.dropped)
+		if len(sys.terminated) != 0 {
+			t.Errorf("force must not bother with SIGTERM, got %v", sys.terminated)
 		}
 	})
 }

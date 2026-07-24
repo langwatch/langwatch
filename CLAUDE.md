@@ -36,11 +36,11 @@ Hostname routing is **opt-in** — `pnpm dev` uses the plain `PORT`+offset schem
 `pnpm dev:haven` (or `make haven up`) routes through haven.
 
 ```bash
-make haven setup        # one-time: install/verify portless (443, trusted CA)
+pnpm dev:haven          # == make haven up (bootstraps portless itself on first run)
 make haven install      # optional: go install so plain `haven ...` works everywhere
-pnpm dev:haven          # == make haven up (registers hostnames, supervises the stack)
-make haven list         # which worktree runs what (all stacks)
-make haven doctor       # proxy / daemon / observability health
+make haven status       # every stack, service health, shared servers — one shot
+haven up +langy         # add a service to this worktree's stack, sticky
+haven logs nlp -t       # tail one service's logs from any terminal
 ```
 
 Open `https://langwatch.localhost` for the cross-worktree dashboard;
@@ -48,7 +48,7 @@ Open `https://langwatch.localhost` for the cross-worktree dashboard;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
 resolved config lands in `langwatch/.env.portless` (loaded last with
 `override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
-`HAVEN_AGENT=1`) for plain, token-free output; `haven list --json` is
+`HAVEN_AGENT=1`) for plain, token-free output; `haven status --json` is
 machine-readable. See `tools/thuishaven/README.md`.
 
 ```bash
@@ -78,7 +78,7 @@ See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 **Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
 
-**Two processes vs one (workers).** By default `pnpm dev` runs the app and the background workers as two Node processes (a separate `workers` lane under `concurrently`), matching prod's separate app/worker deployments. To run them as a **single process** locally, use `pnpm dev:single` (or `WORKERS_IN_PROCESS=1 pnpm dev`): the app boots with the `"all"` process role and hosts the worker stack in-process via `startWorkers()`, saving the RAM of a second Node process. **Under haven the default is a single process:** `pnpm dev:haven` hosts the workers in the app child (no separate `workers` lane) to save the RAM of a second Node process — the sensible default when a laptop juggles several worktrees. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. Opt back into a standalone `workers` lane with `pnpm dev:workers:haven` (or `WORKERS_IN_PROCESS=0 pnpm dev:haven`); `pnpm dev:single:haven` is the explicit single-process form, now equivalent to the `dev:haven` default. This is dev-only — `NODE_ENV=production` ignores the flag. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
+**Two processes vs one (workers).** By default `pnpm dev` runs the app and the background workers as two Node processes (a separate `workers` lane under `concurrently`), matching prod's separate app/worker deployments. To run them as a **single process** locally, use `pnpm dev:single` (or `WORKERS_IN_PROCESS=1 pnpm dev`): the app boots with the `"all"` process role and hosts the worker stack in-process via `startWorkers()`, saving the RAM of a second Node process. **Under haven the default is a single process:** `pnpm dev:haven` hosts the workers in the app child (no separate `workers` lane) to save the RAM of a second Node process — the sensible default when a laptop juggles several worktrees. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. Opt into a standalone `workers` lane with `haven up +workers` (sticky, per worktree; `pnpm dev:workers:haven` wraps it). This is dev-only — `NODE_ENV=production` ignores the flag. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
 
 ### AI Gateway (Go, services/aigateway/)
 
@@ -129,7 +129,7 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 

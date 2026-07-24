@@ -32,6 +32,7 @@ func pruneOrch(store *fakeStore, sys *fakeSystem, ch, pg *fakeDBServer, hyg Hygi
 
 // --- Prune database reclaim ---------------------------------------------------
 
+// @scenario "The standing main database survives bulk cleanup"
 func TestPruneDatabaseReclaim(t *testing.T) {
 	repoRoot := "/repos/langwatch"
 	victim := "/repos/worktrees/feat-x"
@@ -147,39 +148,6 @@ func TestPruneDatabasesSlugGuards(t *testing.T) {
 			o := pruneOrch(store, sys, &fakeDBServer{}, &fakeDBServer{}, &fakeHygiene{})
 			if got := o.pruneDatabases(ctx, victim, true, []string{"lw_other"}, []string{"lw_other"}); got != nil {
 				t.Errorf("must not drop a database a live stack still owns, got %v", got)
-			}
-		})
-	})
-}
-
-// --- drop --all protects lw_main ---------------------------------------------
-
-// @scenario "The standing main database survives bulk cleanup"
-func TestClickHouseDropAllProtectsMain(t *testing.T) {
-	t.Run("given --all over a server holding lw_main and a feature db", func(t *testing.T) {
-		t.Run("when dropping, only the feature db is dropped and lw_main is kept", func(t *testing.T) {
-			ch := &fakeDBServer{databases: []string{"lw_main", "lw_feat_x"}}
-			o := pruneOrch(&fakeStore{}, &fakeSystem{}, ch, &fakeDBServer{}, &fakeHygiene{})
-			if err := o.clickHouseDrop(context.Background(), UpParams{}, true); err != nil {
-				t.Fatalf("clickHouseDrop: %v", err)
-			}
-			if len(ch.dropped) != 1 || ch.dropped[0] != "lw_feat_x" {
-				t.Errorf("only the feature db should be dropped, got %v", ch.dropped)
-			}
-		})
-	})
-}
-
-func TestPostgresDropAllProtectsMain(t *testing.T) {
-	t.Run("given --all over a server holding lw_main and a feature db", func(t *testing.T) {
-		t.Run("when dropping, only the feature db is dropped and lw_main is kept", func(t *testing.T) {
-			pg := &fakeDBServer{databases: []string{"lw_main", "lw_feat_x"}}
-			o := pruneOrch(&fakeStore{}, &fakeSystem{}, &fakeDBServer{}, pg, &fakeHygiene{})
-			if err := o.postgresDrop(context.Background(), UpParams{}, true); err != nil {
-				t.Fatalf("postgresDrop: %v", err)
-			}
-			if len(pg.dropped) != 1 || pg.dropped[0] != "lw_feat_x" {
-				t.Errorf("only the feature db should be dropped, got %v", pg.dropped)
 			}
 		})
 	})
