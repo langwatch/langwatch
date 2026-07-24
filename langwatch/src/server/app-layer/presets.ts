@@ -343,27 +343,37 @@ export function initializeDefaultApp(options?: {
   );
   const spanDedup = createSpanDedupeService(redis);
 
-  // ADR-022: construct blob/IO deps before the summary + span services so
-  // both v2 read paths (header full:true, spansFull / spanDetail) can resolve
-  // offloaded eventref pointers.
-  // #4888: the same factory backs the customer-facing full=true read path; the
-  // composition root passes its own ClickHouse decision/resolver so the
-  // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
+  // ADR-022 (#5835): construct the blob/IO deps and the span read service
+  // BEFORE traceSummary so the Summary-panel read path (tracesV2.header →
+  // getByTraceId) can resolve offloaded eventref pointers and return the full
+  // trace input/output instead of the 64 KB write-time preview stored in
+  // trace_summaries. #4888: the same factory backs the customer-facing
+  // full=true detail read path; the composition root passes its own ClickHouse
+  // decision/resolver so the eval-path deps stay byte-identical to the
+  // pre-#4888 inline wiring.
   const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
     clickhouseEnabled,
     resolveClickHouseClient,
   });
-  // Shared between SpanStorageService and TraceSummaryService's full read.
-  const spanStorageRepository = clickhouseEnabled
-    ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
-    : new NullSpanStorageRepository();
+  const spanStorage = traced(
+    new SpanStorageService(
+      clickhouseEnabled
+        ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
+        : new NullSpanStorageRepository(),
+      { blobStore, ioExtractionService },
+    ),
+    "SpanStorageService",
+  );
 
   const traceSummary = traced(
     new TraceSummaryService(
       clickhouseEnabled
         ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
         : new NullTraceSummaryRepository(),
-      { spanStorageRepository, blobStore, ioExtractionService },
+      // Reuse the single spanStorage instance as the spans reader rather than
+      // re-deriving ClickHouse access — spanStorage.getNormalizedSpansByTraceId
+      // returns the raw spans this read path resolves the eventrefs from.
+      { blobStore, ioExtractionService, spansReader: spanStorage },
     ),
     "TraceSummaryService",
   );
@@ -386,6 +396,11 @@ export function initializeDefaultApp(options?: {
         : new NullTraceListRepository(),
       evaluationRuns,
       topics,
+      // #5835: same blob-resolution deps as TraceSummaryService, threaded so the
+      // Conversation tab's `resolveFullIO` opt-in can restore each turn's full
+      // input/output from event_log. Reuses the single spanStorage instance as
+      // the spans reader. The grid never opts in, so this is inert for it.
+      { blobStore, ioExtractionService, spansReader: spanStorage },
     ),
     "TraceListService",
   );
@@ -409,13 +424,6 @@ export function initializeDefaultApp(options?: {
       "discover_updated",
     );
   });
-  const spanStorage = traced(
-    new SpanStorageService(spanStorageRepository, {
-      blobStore,
-      ioExtractionService,
-    }),
-    "SpanStorageService",
-  );
   const logRecordStorage = traced(
     new LogRecordStorageService({
       repository: clickhouseEnabled

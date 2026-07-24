@@ -408,6 +408,14 @@ export const baseSpanSchema = z.object({
   timestamps: spanTimestampsSchema,
   metrics: spanMetricsSchema.optional().nullable(),
   params: spanParamsSchema.optional().nullable(),
+  /**
+   * Read-path only (#5835): true when at least one of this span's offloaded
+   * attribute values (ADR-022 eventref) could not be restored to its full
+   * content at read time, so the value shown is still the write-time preview.
+   * Never set on the ingestion/write path — the trace read services compute it
+   * after attempting resolution. Optional so every existing writer stays valid.
+   */
+  hasIncompleteAttributes: z.boolean().optional(),
 });
 
 export type BaseSpan = z.infer<typeof baseSpanSchema>;

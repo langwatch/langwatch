@@ -155,6 +155,26 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
 }
 
 /**
+ * The exact subset of {@link TraceSummaryData} that
+ * {@link TraceIOAccumulationService.accumulateIO} reads and threads between
+ * spans. Declaring the parameter as this narrow slice — rather than the full
+ * ~35-field {@link TraceSummaryData} — lets read-time callers replay the fold
+ * (see {@link recomputeTraceIO}) with a minimal state object instead of
+ * fabricating ~29 unrelated placeholder fields, while staying structurally
+ * compatible with the production fold caller (`applySpanToSummary`), which
+ * passes the full {@link TraceSummaryData} unchanged.
+ */
+export type TraceIOAccumulationState = Pick<
+  TraceSummaryData,
+  | "computedInput"
+  | "computedOutput"
+  | "outputFromRootSpan"
+  | "outputSpanEndTimeMs"
+  | "blockedByGuardrail"
+  | "attributes"
+>;
+
+/**
  * Accumulates computed input/output across spans using priority rules:
  * root > explicit (langwatch) > last-finishing inferred (gen_ai).
  */
@@ -167,7 +187,7 @@ export class TraceIOAccumulationService {
     state,
     span,
   }: {
-    state: TraceSummaryData;
+    state: TraceIOAccumulationState;
     span: NormalizedSpan;
   }): {
     computedInput: string | null;
@@ -375,4 +395,85 @@ function preferText(text: string | null | undefined, raw: unknown): string {
   // summary with a non-string value cast to string.
   if (raw === undefined) return "";
   return JSON.stringify(raw);
+}
+
+/**
+ * Replays the fold's own {@link TraceIOAccumulationService.accumulateIO}
+ * winner-selection across a set of (already blob-resolved) spans and returns the
+ * trace-level `computedInput` / `computedOutput` the fold WOULD have written to
+ * `trace_summaries`.
+ *
+ * Read-time recompute (`resolveOffloadedTraces` / `resolveOffloadedTracesBatch`)
+ * must agree with the fold's stored winner on BOTH dimensions — priority (a root
+ * span beats any non-root span) AND exclusion (tool / evaluation / guardrail /
+ * Claude-Code-utility spans never become the headline I/O). Reusing
+ * `accumulateIO` here, instead of a second hand-written winner-selection, makes
+ * that agreement hold BY CONSTRUCTION: there is exactly one selection algorithm,
+ * so the read path and the fold can never drift (issue #5835 AC9).
+ *
+ * Spans are folded in `startTimeUnixMs` order — the same canonical ordering
+ * {@link TraceIOExtractionService.organizeSpansIntoTree} sorts by — so the
+ * result is deterministic regardless of the caller's array order.
+ *
+ * The reserved-attribute threading between iterations mirrors
+ * `TraceAttributeAccumulationService.accumulateAttributes` exactly
+ * (`output_source` always set; `input_is_fallback` / `output_is_fallback` set to
+ * `"true"` or removed), because `accumulateIO` reads those three reserved keys
+ * back off `state.attributes` to decide each subsequent span's precedence.
+ */
+export function recomputeTraceIO({
+  spans,
+  accumulationService,
+}: {
+  spans: NormalizedSpan[];
+  accumulationService: TraceIOAccumulationService;
+}): { computedInput: string | null; computedOutput: string | null } {
+  const sortedSpans = [...spans].sort(
+    (a, b) => a.startTimeUnixMs - b.startTimeUnixMs,
+  );
+
+  let state: TraceIOAccumulationState = {
+    computedInput: null,
+    computedOutput: null,
+    outputFromRootSpan: false,
+    outputSpanEndTimeMs: 0,
+    blockedByGuardrail: false,
+    attributes: {},
+  };
+
+  for (const span of sortedSpans) {
+    const io = accumulationService.accumulateIO({ state, span });
+
+    // Thread the reserved keys forward exactly as the real fold's
+    // TraceAttributeAccumulationService does, so the next span's accumulateIO
+    // sees the same currentOutputSource / *_is_fallback precedence signals.
+    const attributes: Record<string, string> = {
+      ...state.attributes,
+      "langwatch.reserved.output_source": io.outputSource,
+    };
+    if (io.inputIsFallback) {
+      attributes["langwatch.reserved.input_is_fallback"] = "true";
+    } else {
+      delete attributes["langwatch.reserved.input_is_fallback"];
+    }
+    if (io.outputIsFallback) {
+      attributes["langwatch.reserved.output_is_fallback"] = "true";
+    } else {
+      delete attributes["langwatch.reserved.output_is_fallback"];
+    }
+
+    state = {
+      computedInput: io.computedInput,
+      computedOutput: io.computedOutput,
+      outputFromRootSpan: io.outputFromRootSpan,
+      outputSpanEndTimeMs: io.outputSpanEndTimeMs,
+      blockedByGuardrail: io.blockedByGuardrail,
+      attributes,
+    };
+  }
+
+  return {
+    computedInput: state.computedInput,
+    computedOutput: state.computedOutput,
+  };
 }

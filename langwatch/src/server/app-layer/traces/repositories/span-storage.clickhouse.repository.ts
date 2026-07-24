@@ -494,6 +494,9 @@ function mapEventRow(row: EventRow): ElasticSearchEvent {
  */
 const DECIMAL_NUMBER_RE = /^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
+/** Server-internal control-plane namespace (ADR-022) — never user-facing data. */
+const RESERVED_PREFIX = "langwatch.reserved.";
+
 const logger = createLogger(
   "langwatch:app-layer:traces:span-storage-repository",
 );
@@ -561,6 +564,13 @@ export function deserializeAttributes(
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(attrs)) {
+    // Reserved keys are server-internal pointers/control data, not user-facing
+    // values — auto-conversion would corrupt e.g. eventref JSON before parseSpanEventRefs reads it.
+    if (key.startsWith(RESERVED_PREFIX)) {
+      result[key] = value;
+      continue;
+    }
+
     // Boolean strings
     if (value === "true") {
       result[key] = true;

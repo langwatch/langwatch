@@ -26,11 +26,16 @@ import {
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  recomputeTraceIO,
+  TraceIOAccumulationService,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-io-accumulation.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
-import type {
-  ResolvedTraceSpans,
-  WarnLogger,
+import {
+  type ResolvedTraceSpans,
+  toRecomputedIO,
+  type WarnLogger,
 } from "./resolve-offloaded-traces";
 
 /**
@@ -179,13 +184,27 @@ export async function resolveOffloadedTracesBatch({
         return { cleanedAttrs: attrs, refs: [], hadRefs: false };
       }
 
-      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-        parseSpanEventRefs(attrs);
+      const {
+        cleanedAttrs,
+        eventrefEntries,
+        missingEventIdKeys,
+        malformedKeys,
+      } = parseSpanEventRefs(attrs);
 
       for (const attrKey of missingEventIdKeys) {
         logger.warn(
           { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
           "eventref missing eventId — keeping preview value",
+        );
+      }
+
+      // Eventref value failed JSON.parse entirely — can't resolve. Same
+      // preview-preserving fallback as missingEventIdKeys, but a distinct
+      // message so the two causes are distinguishable in logs (#5835 AC4b).
+      for (const attrKey of malformedKeys) {
+        logger.warn(
+          { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
+          "eventref value is not valid JSON — keeping preview value",
         );
       }
 
@@ -225,6 +244,13 @@ export async function resolveOffloadedTracesBatch({
   );
 
   // ----- Phase 3: assemble resolved spans + recompute IO per trace.
+  // Reuse the fold's own winner-selection for the read-time recompute — see
+  // resolveOffloadedTraces for the #5835 AC9 rationale. One accumulation-service
+  // instance serves every trace in the batch.
+  const accumulationService = new TraceIOAccumulationService(
+    ioExtractionService,
+  );
+
   return tracePlans.map((spanPlans, traceIdx) => {
     const originalSpans = spansPerTrace[traceIdx]!;
     let anyResolved = false;
@@ -257,10 +283,14 @@ export async function resolveOffloadedTracesBatch({
       };
     }
 
+    const { computedInput, computedOutput } = recomputeTraceIO({
+      spans: resolvedSpans,
+      accumulationService,
+    });
     return {
       resolvedSpans,
-      recomputedInput: ioExtractionService.extractFirstInput(resolvedSpans),
-      recomputedOutput: ioExtractionService.extractLastOutput(resolvedSpans),
+      recomputedInput: toRecomputedIO(computedInput),
+      recomputedOutput: toRecomputedIO(computedOutput),
       anyResolved: true,
     };
   });

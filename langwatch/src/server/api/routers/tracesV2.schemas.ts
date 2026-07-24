@@ -47,6 +47,12 @@ const traceListItemSchema = z.object({
   sizeBytes: z.number().int().nonnegative().default(0),
   input: z.string().nullable(),
   output: z.string().nullable(),
+  // True when computed input/output still holds the write-time preview because
+  // its offloaded eventref couldn't be resolved at read time (#5835). Only set
+  // on the Conversation tab's `resolveFullIO` path; the grid, which never
+  // resolves, leaves these absent. Mirrors `traceHeaderSchema`.
+  inputTruncated: z.boolean().optional(),
+  outputTruncated: z.boolean().optional(),
   // Compact media references derived from the winning span IO at fold time
   // (langwatch.reserved.media_refs.* on the summary): what lets the table
   // lead an Input preview with a thumbnail or an audio indicator without
@@ -109,6 +115,12 @@ export const traceHeaderSchema = z.object({
   // True when input/output/error were teaser-redacted by the plan's
   // visibility window — drives the blurred-content upgrade treatment.
   redactedByVisibilityWindow: z.boolean().optional(),
+  // True when computed input/output still holds the write-time preview
+  // because its offloaded eventref couldn't be resolved at read time
+  // (#5835) — the drawer warns the content may be incomplete instead of
+  // implying it's complete.
+  inputTruncated: z.boolean().optional(),
+  outputTruncated: z.boolean().optional(),
   models: z.array(z.string()),
   /**
    * Grand list-price cost of the trace (sum of span costs). LangWatch bills
@@ -318,6 +330,11 @@ export const spanDetailSchema = z.object({
   // (names/locations) did not run, so the content may still contain names or
   // locations. The drawer warns instead of implying it is fully scrubbed.
   piiAnalysisIncomplete: z.boolean().nullish(),
+  // True when at least one span attribute still shows its write-time preview
+  // because its offloaded content could not be loaded at read time (#5835), so
+  // the drawer warns the attribute content may be incomplete instead of
+  // implying it is complete. Absent on older cached responses.
+  hasIncompleteAttributes: z.boolean().nullish(),
   // Custom-attribute restrict rules that apply to this viewer, so the
   // attributes table can mark a matching row as restricted and name who can
   // read it. Absent on older cached responses.

@@ -177,6 +177,8 @@ export function mapTraceSummaryToHeader(
     input: summary.computedInput,
     output: summary.computedOutput,
     redactedByVisibilityWindow: summary.redactedByVisibilityWindow,
+    inputTruncated: summary.inputTruncated,
+    outputTruncated: summary.outputTruncated,
     models: summary.models,
     totalCost: summary.totalCost,
     nonBilledCost,
@@ -391,6 +393,10 @@ function mapSpanToDetail(
         }
       : null,
     params: span.params ?? null,
+    // #5835: threaded from the read path — true when an offloaded attribute
+    // could not be restored to its full value, so the Attributes pane warns
+    // the content may be a truncated preview.
+    hasIncompleteAttributes: span.hasIncompleteAttributes ?? false,
     events: rawEvents.map((e) => ({
       name: e.name,
       timestampMs: e.timeUnixMs,
@@ -861,6 +867,46 @@ const sortSchema = z.object({
   direction: z.enum(["asc", "desc"]),
 });
 
+/**
+ * Max `pageSize` accepted together with `resolveFullIO: true`. Full-IO
+ * resolution fans out a per-row span read + event_log restore for every row
+ * ({@link TraceListService.resolveFullIOForRows}), so an unbounded page
+ * multiplies that work. The sole opt-in caller — the Conversation tab — requests
+ * 100 (its turn window), so 100 is the ceiling; ordinary preview-only listing
+ * keeps the full `.max(1000)`. Guards against an authenticated caller pairing
+ * `resolveFullIO` with `pageSize: 1000` (#5835 / #5854 review).
+ */
+export const MAX_RESOLVE_FULL_IO_PAGE_SIZE = 100;
+
+export const listInputSchema = z
+  .object({
+    projectId: z.string(),
+    timeRange: timeRangeSchema,
+    sort: sortSchema,
+    page: z.number().int().min(1).default(1),
+    pageSize: z.number().int().min(1).max(1000).default(50),
+    cursor: z
+      .object({
+        sortValue: z.number().finite(),
+        traceId: z.string().min(1),
+      })
+      .optional(),
+    query: z.string().nullish(),
+    // #5835: the drawer's Conversation tab opts in to restore each row's
+    // full input/output from event_log (a turn needs its complete message,
+    // not the 64 KB preview). Every other caller — the grid, previews —
+    // omits it, keeping the preview-only, zero-event_log-read path (AC5).
+    resolveFullIO: z.boolean().optional(),
+  })
+  .refine(
+    (input) =>
+      !input.resolveFullIO || input.pageSize <= MAX_RESOLVE_FULL_IO_PAGE_SIZE,
+    {
+      message: `pageSize must be at most ${MAX_RESOLVE_FULL_IO_PAGE_SIZE} when resolveFullIO is set`,
+      path: ["pageSize"],
+    },
+  );
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -959,22 +1005,7 @@ async function loadProtectedTraceLogs({
 
 export const tracesV2Router = createTRPCRouter({
   list: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        timeRange: timeRangeSchema,
-        sort: sortSchema,
-        page: z.number().int().min(1).default(1),
-        pageSize: z.number().int().min(1).max(1000).default(50),
-        cursor: z
-          .object({
-            sortValue: z.number().finite(),
-            traceId: z.string().min(1),
-          })
-          .optional(),
-        query: z.string().nullish(),
-      }),
-    )
+    .input(listInputSchema)
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const app = getApp();
@@ -992,6 +1023,7 @@ export const tracesV2Router = createTRPCRouter({
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
         ),
+        resolveFullIO: input.resolveFullIO,
       });
       return {
         ...page,
@@ -1280,10 +1312,6 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
-          // Single-trace header read: resolve offloaded (ADR-022) IO back to
-          // the full value, exactly like legacy traces.getById. The list read
-          // never passes this.
-          full: true,
         },
       );
       if (!summary) {

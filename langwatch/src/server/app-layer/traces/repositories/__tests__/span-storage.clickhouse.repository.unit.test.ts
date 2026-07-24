@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import { parseSpanEventRefs } from "~/server/traces/offloaded-eventref-parsing";
 import {
   deserializeAttributes,
   mapSpanSummaryRow,
@@ -77,6 +79,7 @@ describe("serializeAttributes", () => {
 
 describe("deserializeAttributes", () => {
   describe("when given boolean strings", () => {
+    /** @scenario Non-reserved attribute values keep their existing typed-conversion behavior */
     it("converts 'true' to boolean true", () => {
       const result = deserializeAttributes({ flag: "true" });
       expect(result).toEqual({ flag: true });
@@ -288,6 +291,185 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
 
       const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
       expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
+    });
+  });
+
+  describe("given a span whose SpanAttributes carry a reserved eventref pointer (ADR-022 offload)", () => {
+    describe("when reading normalized spans through the real ClickHouse row-mapping path", () => {
+      it("preserves the reserved eventref as a resolvable pointer through the real row-mapping path", async () => {
+        const eventId = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
+        // Write-time-capped previews are well under 64KB, so an oversized
+        // value here unambiguously exercises the offloaded (eventref-backed)
+        // case rather than an ordinary short attribute.
+        const oversizedPreview = "x".repeat(70_000);
+
+        const { repo, query } = repoWithSpyClient();
+        query.mockResolvedValue({
+          json: async () => [
+            {
+              SpanId: "s-1",
+              TraceId: "t-1",
+              TenantId: "p-1",
+              ParentSpanId: null,
+              ParentTraceId: null,
+              ParentIsRemote: null,
+              Sampled: true,
+              StartTimeMs: 1_700_000_000_000,
+              EndTimeMs: 1_700_000_000_100,
+              DurationMs: 100,
+              SpanName: "llm-call",
+              SpanKind: 1,
+              ResourceAttributes: {},
+              // Raw ClickHouse Map(String, String) shape: every value is a
+              // string, exactly as stored_spans.SpanAttributes returns it
+              // over JSONEachRow — before deserializeAttributes runs on it.
+              SpanAttributes: {
+                "langwatch.input": oversizedPreview,
+                [`${EVENTREF_ATTR_PREFIX}langwatch.input`]: JSON.stringify({
+                  field: "langwatch.input",
+                  eventId,
+                }),
+              },
+              StatusCode: 1,
+              StatusMessage: null,
+              ScopeName: "test",
+              ScopeVersion: "1.0",
+              Cost: null,
+              NonBilledCost: null,
+              Events_Timestamp: [],
+              Events_Name: [],
+              Events_Attributes: [],
+              Links_TraceId: [],
+              Links_SpanId: [],
+              Links_Attributes: [],
+            },
+          ],
+        });
+
+        const spans = await repo.getNormalizedSpansByTraceId({
+          tenantId: "p-1",
+          traceId: "t-1",
+          occurredAtMs: Date.now(),
+        });
+
+        expect(spans).toHaveLength(1);
+        const spanAttributes = spans[0]!.spanAttributes as Record<
+          string,
+          string
+        >;
+
+        // Sanity-check the fixture still represents the offloaded scenario
+        // (a write-time-capped preview), not an ordinary short value.
+        expect(spanAttributes["langwatch.input"]?.length).toBeGreaterThan(
+          64 * 1024,
+        );
+
+        // Same cast the real read path performs (resolve-offloaded-traces.ts /
+        // resolve-offloaded-traces-batch.ts) before calling parseSpanEventRefs.
+        const { eventrefEntries } = parseSpanEventRefs(spanAttributes);
+
+        // The pointer must survive deserializeAttributes as a resolvable
+        // eventref entry so the read path can fetch the full value from
+        // event_log. Regression guard: without the RESERVED_PREFIX
+        // short-circuit in deserializeAttributes, this reserved value would
+        // get auto-JSON.parsed into an object before parseSpanEventRefs ever
+        // sees it; parseSpanEventRefs's JSON.parse on that object would then
+        // stringify to "[object Object]", throw, and be silently swallowed by
+        // its own malformed-JSON catch — dropping the pointer.
+        expect(eventrefEntries).toEqual([
+          { attrKey: "langwatch.input", field: "langwatch.input", eventId },
+        ]);
+      });
+    });
+  });
+
+  describe("given a span whose reserved eventref value is a string that is not valid JSON at all (AC4b)", () => {
+    describe("when reading normalized spans through the real ClickHouse row-mapping path", () => {
+      it("does not throw, records the malformed pointer in malformedKeys, and keeps the preview", async () => {
+        const { repo, query } = repoWithSpyClient();
+        query.mockResolvedValue({
+          json: async () => [
+            {
+              SpanId: "s-1",
+              TraceId: "t-1",
+              TenantId: "p-1",
+              ParentSpanId: null,
+              ParentTraceId: null,
+              ParentIsRemote: null,
+              Sampled: true,
+              StartTimeMs: 1_700_000_000_000,
+              EndTimeMs: 1_700_000_000_100,
+              DurationMs: 100,
+              SpanName: "llm-call",
+              SpanKind: 1,
+              ResourceAttributes: {},
+              // Raw ClickHouse Map(String, String) shape, matching the
+              // reserved-eventref fixture above: every value is a string.
+              // Unlike that fixture (a well-formed eventref pointer),
+              // this reserved value is not valid JSON under ANY
+              // interpretation — a corrupted row or a future writer bug,
+              // not the auto-JSON-parse hazard the other fixture covers.
+              SpanAttributes: {
+                "langwatch.input": "a normal preview value",
+                [`${EVENTREF_ATTR_PREFIX}langwatch.input`]:
+                  "not-json-at-all",
+              },
+              StatusCode: 1,
+              StatusMessage: null,
+              ScopeName: "test",
+              ScopeVersion: "1.0",
+              Cost: null,
+              NonBilledCost: null,
+              Events_Timestamp: [],
+              Events_Name: [],
+              Events_Attributes: [],
+              Links_TraceId: [],
+              Links_SpanId: [],
+              Links_Attributes: [],
+            },
+          ],
+        });
+
+        // (a) The read completes and returns normally. Reaching the
+        // assertions below IS the proof: a throwing read would reject this
+        // await and fail the test before any expect() below ever ran.
+        const spans = await repo.getNormalizedSpansByTraceId({
+          tenantId: "p-1",
+          traceId: "t-1",
+          occurredAtMs: Date.now(),
+        });
+        expect(spans).toHaveLength(1);
+
+        const spanAttributes = spans[0]!.spanAttributes as Record<
+          string,
+          string
+        >;
+
+        // Sanity-check the fixture: the malformed value must have survived
+        // deserializeAttributes byte-for-byte as a raw string (reserved keys
+        // are exempted from auto-parse) — otherwise parseSpanEventRefs below
+        // would not be the thing whose own catch block is being exercised.
+        expect(spanAttributes[`${EVENTREF_ATTR_PREFIX}langwatch.input`]).toBe(
+          "not-json-at-all",
+        );
+
+        // (b) parseSpanEventRefs's documented policy: a reserved key whose
+        // value fails JSON.parse is classified into `malformedKeys` (NOT
+        // eventrefEntries or missingEventIdKeys) so the caller can warn and keep
+        // the preview — which already sits in cleanedAttrs under the
+        // non-reserved IO key. The resolver logs a warning off this
+        // classification; the pointer is recorded, not silently dropped.
+        const {
+          cleanedAttrs,
+          eventrefEntries,
+          missingEventIdKeys,
+          malformedKeys,
+        } = parseSpanEventRefs(spanAttributes);
+        expect(eventrefEntries).toEqual([]);
+        expect(missingEventIdKeys).toEqual([]);
+        expect(malformedKeys).toEqual(["langwatch.input"]);
+        expect(cleanedAttrs["langwatch.input"]).toBe("a normal preview value");
+      });
     });
   });
 });
