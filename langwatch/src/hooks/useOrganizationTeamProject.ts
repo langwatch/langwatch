@@ -230,7 +230,7 @@ export const useOrganizationTeamProject = (
   // named in the URL resolves exactly like any other; the persisted selection
   // does not, because nothing on an organization-scoped page tells the user
   // which project it is about to write to.
-  const addressedBySlug = !!projectSlugFromUrl || !!teamSlug;
+  const isAddressedBySlug = !!projectSlugFromUrl || !!teamSlug;
 
   const teamsMatchingSlug = teamSlug
     ? organizations.data?.flatMap((organization) =>
@@ -269,7 +269,7 @@ export const useOrganizationTeamProject = (
   // project so the stale selection heals itself.
   const slugMatch = projectsTeamsOrganizationsMatchingSlug?.[0];
   const resolvedSlugMatch =
-    slugMatch?.team.isPersonal && !addressedBySlug ? undefined : slugMatch;
+    slugMatch?.team.isPersonal && !isAddressedBySlug ? undefined : slugMatch;
 
   // For demo mode, find the organization that contains the demo project
   // (backend returns all user orgs + demo org, so we need to find the one with demo project)

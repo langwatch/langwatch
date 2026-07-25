@@ -188,36 +188,15 @@ vi.mock("~/components/ui/tooltip", () => ({
   Tooltip: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
 
+import {
+  loadedOrganizationsQuery,
+  PERSONAL_TEAM,
+  SHARED_TEAM,
+} from "~/test-utils/personalWorkspaceOrganization";
+
 const { default: ModelProvidersPage } = await import(
   "~/pages/settings/model-providers"
 );
-
-const PERSONAL_TEAM = {
-  id: "team-personal",
-  name: "Jane's Workspace",
-  slug: "personal-jane",
-  isPersonal: true,
-  ownerUserId: "user-jane",
-  members: [{ role: "ADMIN" }],
-  projects: [
-    {
-      id: "proj-personal",
-      name: "Personal Workspace",
-      slug: "personal-jane-abc123",
-      isPersonal: true,
-    },
-  ],
-};
-
-const SHARED_TEAM = {
-  id: "team-shared",
-  name: "ACME",
-  slug: "acme",
-  isPersonal: false,
-  ownerUserId: null,
-  members: [{ role: "ADMIN" }],
-  projects: [{ id: "proj-app", name: "ACME App", slug: "acme-app" }],
-};
 
 function renderPage() {
   return render(
@@ -234,21 +213,9 @@ describe("given an organization whose personal workspace is listed first", () =>
     for (const key of Object.keys(mockLocalStorage)) {
       mockLocalStorage[key] = "";
     }
-    mockOrganizationsQuery.mockReturnValue({
-      data: [
-        {
-          id: "org-acme",
-          name: "ACME",
-          slug: "acme",
-          primaryIntent: null,
-          members: [{ role: "ADMIN" }],
-          teams: [PERSONAL_TEAM, SHARED_TEAM],
-        },
-      ],
-      isLoading: false,
-      isFetched: true,
-      isRefetching: false,
-    });
+    mockOrganizationsQuery.mockReturnValue(
+      loadedOrganizationsQuery([PERSONAL_TEAM, SHARED_TEAM]),
+    );
   });
 
   afterEach(() => {

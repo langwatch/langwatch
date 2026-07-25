@@ -73,52 +73,12 @@ vi.mock("usehooks-ts", () => ({
   ],
 }));
 
+import {
+  loadedOrganizationsQuery,
+  PERSONAL_TEAM,
+  SHARED_TEAM,
+} from "~/test-utils/personalWorkspaceOrganization";
 import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
-
-const PERSONAL_TEAM = {
-  id: "team-personal",
-  name: "Jane's Workspace",
-  slug: "personal-jane",
-  isPersonal: true,
-  ownerUserId: "user-jane",
-  members: [{ role: "ADMIN" }],
-  projects: [
-    {
-      id: "proj-personal",
-      name: "Personal Workspace",
-      slug: "personal-jane-abc123",
-      isPersonal: true,
-    },
-  ],
-};
-
-const SHARED_TEAM = {
-  id: "team-shared",
-  name: "ACME",
-  slug: "acme",
-  isPersonal: false,
-  ownerUserId: null,
-  members: [{ role: "ADMIN" }],
-  projects: [{ id: "proj-app", name: "ACME App", slug: "acme-app" }],
-};
-
-/**
- * The personal team is listed first on purpose: that ordering is what let it
- * win the ambient context, and any fix that only reshuffles the fixture would
- * pass without meaning anything.
- */
-function organizationWith(teams: unknown[]) {
-  return [
-    {
-      id: "org-acme",
-      name: "ACME",
-      slug: "acme",
-      primaryIntent: null,
-      members: [{ role: "ADMIN" }],
-      teams,
-    },
-  ];
-}
 
 function renderResolution() {
   return renderHook(() =>
@@ -139,12 +99,9 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
     for (const key of Object.keys(mockLocalStorage)) {
       mockLocalStorage[key] = "";
     }
-    mockOrganizationsQuery.mockReturnValue({
-      data: organizationWith([PERSONAL_TEAM, SHARED_TEAM]),
-      isLoading: false,
-      isFetched: true,
-      isRefetching: false,
-    });
+    mockOrganizationsQuery.mockReturnValue(
+      loadedOrganizationsQuery([PERSONAL_TEAM, SHARED_TEAM]),
+    );
   });
 
   afterEach(() => {
@@ -170,12 +127,12 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
 
   describe("given the shared team has no project yet", () => {
     beforeEach(() => {
-      mockOrganizationsQuery.mockReturnValue({
-        data: organizationWith([PERSONAL_TEAM, { ...SHARED_TEAM, projects: [] }]),
-        isLoading: false,
-        isFetched: true,
-        isRefetching: false,
-      });
+      mockOrganizationsQuery.mockReturnValue(
+        loadedOrganizationsQuery([
+          PERSONAL_TEAM,
+          { ...SHARED_TEAM, projects: [] },
+        ]),
+      );
     });
 
     /** @scenario A shared team without a project still outranks a personal one */
@@ -249,12 +206,9 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
 
   describe("given the organization's only team is the personal one", () => {
     beforeEach(() => {
-      mockOrganizationsQuery.mockReturnValue({
-        data: organizationWith([PERSONAL_TEAM]),
-        isLoading: false,
-        isFetched: true,
-        isRefetching: false,
-      });
+      mockOrganizationsQuery.mockReturnValue(
+        loadedOrganizationsQuery([PERSONAL_TEAM]),
+      );
     });
 
     /** @scenario The personal workspace is the only one there is */
