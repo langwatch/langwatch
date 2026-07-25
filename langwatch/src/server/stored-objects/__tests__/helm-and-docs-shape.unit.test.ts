@@ -148,6 +148,34 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
       expect(helpers).toContain("AZURE_BLOB_ACCOUNT_KEY");
       expect(helpers).toContain("AZURE_BLOB_CONTAINER");
     });
+
+    /** @scenario "Helm chart exposes an azureBlob dataplane provider mirroring awsS3" */
+    it("offers an optional endpoint override for sovereign clouds and private endpoints", () => {
+      const values = readRepoFile("charts/langwatch/values.yaml");
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+
+      expect(values).toMatch(
+        /azureBlob:[\s\S]*?endpoint:\s*\n\s*value: ""\s*\n[\s\S]*?secretKeyRef/,
+      );
+      expect(helpers).toContain("AZURE_BLOB_ENDPOINT");
+    });
+
+    /**
+     * Ruthless-review P2 on PR #6092: flipping the provider to azureBlob used
+     * to drop S3_BUCKET_NAME from the deployment in the same act, so the
+     * migration semantics createS3Client implements (legacy s3:// reads
+     * survive while a bucket is configured) were unreachable from the chart.
+     */
+    it("can still emit the legacy S3 read config while azure is the write backend", () => {
+      const values = readRepoFile("charts/langwatch/values.yaml");
+      const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
+
+      expect(values).toContain("legacyS3ReadBucket");
+      // Emitted from inside the azureBlob branch, gated on the opt-in value.
+      expect(helpers).toMatch(
+        /if \.Values\.app\.dataplane\.legacyS3ReadBucket[\s\S]*?S3_BUCKET_NAME/,
+      );
+    });
   });
 
   describe("when azureBlob is selected alongside a multi-replica install", () => {

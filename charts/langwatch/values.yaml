@@ -326,6 +326,22 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
+        # Optional. Override the blob endpoint for sovereign clouds
+        # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
+        # emulator. Defaults to https://{accountName}.blob.core.windows.net.
+        ## @param app.dataplane.providers.azureBlob.endpoint.value [string] Custom Azure Blob endpoint base URL.
+        endpoint:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.endpoint.secretKeyRef [object] Secret ref for a custom Azure Blob endpoint.
+          secretKeyRef: { name: "", key: "" }
+
+      # Migration aid: when provider is azureBlob, the chart still emits the
+      # S3 read config below if it is populated, so legacy s3:// objects
+      # (stored-objects, trace spool, staged payloads) written before the
+      # switch stay readable. New writes go to Azure. Leave empty on a
+      # greenfield Azure install.
+      ## @param app.dataplane.legacyS3ReadBucket [string] Existing S3 bucket to keep reading during an S3->Azure migration.
+    legacyS3ReadBucket: ""
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play

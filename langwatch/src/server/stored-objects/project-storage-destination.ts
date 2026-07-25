@@ -78,10 +78,18 @@ export class AzureBackendMisconfiguredError extends Error {
  * been checked by the caller.
  */
 function resolveAzureDestination(): ProjectStorageDestination {
+  // Trim before the emptiness check, matching the global-S3 branch below: a
+  // whitespace-only value (trivially produced by a YAML block scalar or a
+  // padded Kubernetes secret) would otherwise pass as "set" and mint URIs
+  // with a blank account or container.
+  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
+  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
+  const container = env.AZURE_BLOB_CONTAINER?.trim();
+
   const missingVariables: string[] = [];
-  if (!env.AZURE_BLOB_ACCOUNT_NAME) missingVariables.push("AZURE_BLOB_ACCOUNT_NAME");
-  if (!env.AZURE_BLOB_ACCOUNT_KEY) missingVariables.push("AZURE_BLOB_ACCOUNT_KEY");
-  if (!env.AZURE_BLOB_CONTAINER) missingVariables.push("AZURE_BLOB_CONTAINER");
+  if (!accountName) missingVariables.push("AZURE_BLOB_ACCOUNT_NAME");
+  if (!accountKey) missingVariables.push("AZURE_BLOB_ACCOUNT_KEY");
+  if (!container) missingVariables.push("AZURE_BLOB_CONTAINER");
 
   if (missingVariables.length > 0) {
     throw new AzureBackendMisconfiguredError(missingVariables);
@@ -89,8 +97,8 @@ function resolveAzureDestination(): ProjectStorageDestination {
 
   return {
     kind: "azure",
-    accountName: env.AZURE_BLOB_ACCOUNT_NAME!,
-    container: env.AZURE_BLOB_CONTAINER!,
+    accountName: accountName!,
+    container: container!,
   };
 }
 

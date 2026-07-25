@@ -279,15 +279,20 @@ export class AzureBlobDriver implements StorageDriver {
       method: "PUT",
       container,
       blobPath,
-      contentLength: String(bytes.length),
+      // Per the shared-key spec (x-ms-version 2015-02-21+, and we pin
+      // 2021-12-02), the Content-Length line of the string-to-sign is the
+      // EMPTY STRING — not "0" — when the body is empty. Signing "0" yields
+      // a well-formed SharedKey header that Azure/Azurite rejects with 403
+      // AuthorizationFailure. Reachable in production: a zero-byte staged
+      // dataset upload (putStaged has a max cap, no minimum).
+      contentLength: bytes.length > 0 ? String(bytes.length) : "",
       contentType: mediaType,
       extraHeaders: { "x-ms-blob-type": "BlockBlob" },
     });
 
-    // Content-Length is deliberately NOT set here: undici computes it from
-    // the body and rejects a manually supplied duplicate. The SharedKey
-    // signature above still covers String(bytes.length), which matches the
-    // value undici sends on the wire.
+    // Content-Length is deliberately NOT set as a request header: undici
+    // computes it from the body and rejects a manually supplied duplicate.
+    // The signature above covers the value undici puts on the wire.
     const response = await fetch(`${endpoint}/${container}/${blobPath}`, {
       method: "PUT",
       headers: {

@@ -176,6 +176,34 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
       expect(await driver.exists(uri)).toBe(false);
     });
   });
+
+  describe("given a zero-byte body", () => {
+    /**
+     * Regression (ruthless-review P1 on PR #6092): `put()` used to sign
+     * Content-Length as "0", but the shared-key spec requires the EMPTY
+     * STRING for an empty body — Azurite answered 403 AuthorizationFailure.
+     * This executes the real PUT rather than asserting on the signature
+     * string, because the defect only shows as a runtime rejection.
+     *
+     * Reachable in production via a zero-byte staged dataset upload:
+     * `AzureDatasetStorage.putStaged` caps size but has no minimum.
+     */
+    it("stores and reads back an empty blob instead of failing authorization", async () => {
+      const bytes = Buffer.alloc(0);
+      const uri = mintAzureBlobUri({
+        accountName: azurite.accountName,
+        container: CONTAINER,
+        projectId: PROJECT,
+        sha256: sha256Of(bytes),
+      });
+
+      await driver.put(uri, bytes, "application/octet-stream");
+      expect(await driver.exists(uri)).toBe(true);
+      expect(await driver.head(uri)).toBe(0);
+
+      await driver.delete(uri);
+    });
+  });
 });
 
 describe("StoredObjectsService against a real Azurite emulator", () => {
