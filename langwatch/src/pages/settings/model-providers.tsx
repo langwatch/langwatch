@@ -370,10 +370,11 @@ export default function ModelsPage() {
                           />
                         </Table.Cell>
                         <Table.Cell textAlign="right">
-                          {isSystem ? // through the UI — their config lives in the // System (env-fed) providers can't be edited
-                          // server's process env. Hide the menu so the
-                          // row reads as read-only at a glance.
-                          null : (
+                          {/* System (env-fed) providers can't be edited
+                              through the UI: their config lives in the
+                              server's process env. Hide the menu so the
+                              row reads as read-only at a glance. */}
+                          {isSystem ? null : (
                             <Menu.Root>
                               <Tooltip
                                 content={rowActionsDisabledReason ?? ""}

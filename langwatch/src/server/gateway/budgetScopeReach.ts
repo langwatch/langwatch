@@ -4,7 +4,7 @@
  * A budget only ever accrues when a completed request matches its scope.
  * The match is decided by GatewayBudgetRepository.applicableForRequest,
  * against scopes derived from the VK that served the request and from the
- * project its trace landed in — which for a key that is not scoped to
+ * project its trace landed in, which for a key that is not scoped to
  * exactly one project is the organization's governance project, not the
  * project the key's team owns (see resolveTraceProject).
  *

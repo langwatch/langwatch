@@ -2,7 +2,7 @@
 -- +goose ENVSUB ON
 
 -- ============================================================================
--- gateway_budget_scope_totals_mv — bucket spend by the budget's own window.
+-- gateway_budget_scope_totals_mv: bucket spend by the budget's own window.
 --
 -- The rollup is the only place budget spend is read from: the budgets list,
 -- the budget detail page, /budget/check, and the /config/:vk_id bundle the

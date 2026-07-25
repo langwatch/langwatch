@@ -596,6 +596,6 @@ export function currentPeriodStart(
   if (window === "MONTH") {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
   }
-  // TOTAL — one lifetime bucket, keyed by the epoch sentinel.
+  // TOTAL: one lifetime bucket, keyed by the epoch sentinel.
   return new Date(0);
 }
