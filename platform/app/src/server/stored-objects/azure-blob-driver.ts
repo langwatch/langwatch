@@ -29,7 +29,7 @@ import {
 import { ObjectNotFoundError } from "./errors";
 import {
   redactStorageUri,
-  redactStorageUrisInText,
+  redactStorageErrorText,
 } from "./project-storage-destination";
 import type { StorageDriver } from "./storage-driver";
 import { getUriScheme } from "./uri";
@@ -320,7 +320,7 @@ export class AzureBlobDriver implements StorageDriver {
     });
 
     if (!response.ok) {
-      const body = redactStorageUrisInText(
+      const body = redactStorageErrorText(
         await response.text().catch(() => ""),
       );
       throw new Error(
@@ -449,7 +449,7 @@ export class AzureBlobDriver implements StorageDriver {
     });
 
     if (!response.ok && response.status !== 409) {
-      const body = redactStorageUrisInText(
+      const body = redactStorageErrorText(
         await response.text().catch(() => ""),
       );
       throw new Error(

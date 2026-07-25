@@ -162,3 +162,39 @@ const STORAGE_URI_IN_TEXT = /\b(?:s3|azure-blob|gs|file):\/\/[^\s'"]+/gi;
 export function redactStorageUrisInText(text: string): string {
   return text.replace(STORAGE_URI_IN_TEXT, (uri) => redactStorageUri(uri));
 }
+
+/**
+ * Authorization material that must never reach a log sink, an error message,
+ * or a trace attribute:
+ *
+ *   Bearer <jwt>            — a live credential for the token's whole lifetime.
+ *   SharedKey account:sig   — the HMAC signature, plus the account name.
+ *   <assertion>...          — the federated token exchanged for the above.
+ *
+ * This matters because object-store errors are quoted verbatim: Azure answers
+ * a failed shared-key request with an AuthenticationFailed body that echoes
+ * the signed string back, and a bearer 401 can carry the presented token in
+ * the WWW-Authenticate error detail. Anything derived from a response body or
+ * a thrown SDK error goes through here before it is surfaced.
+ */
+const AUTHORIZATION_MATERIAL_IN_TEXT =
+  /\b(Bearer|SharedKey|SharedKeyLite)\s+[A-Za-z0-9\-._~+/=:]+/gi;
+const XML_ASSERTION_IN_TEXT =
+  /<(AuthenticationErrorDetail|assertion|client_assertion)>[\s\S]*?<\/\1>/gi;
+
+export function redactAuthorizationMaterial(text: string): string {
+  return text
+    .replace(AUTHORIZATION_MATERIAL_IN_TEXT, (_match, scheme: string) => `${scheme} ***`)
+    .replace(
+      XML_ASSERTION_IN_TEXT,
+      (_match, tag: string) => `<${tag}>***</${tag}>`,
+    );
+}
+
+/**
+ * The redaction every storage error text should pass through: tenant-identifying
+ * URIs AND authorization material. Callers should not have to remember both.
+ */
+export function redactStorageErrorText(text: string): string {
+  return redactAuthorizationMaterial(redactStorageUrisInText(text));
+}
