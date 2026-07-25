@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"io"
+	"strconv"
 
 	"github.com/tidwall/gjson"
 
@@ -41,6 +42,28 @@ func (a *App) HandleResponsesStream(ctx context.Context, bundle *domain.Bundle, 
 
 func (a *App) HandleEmbeddings(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string) (*EmbeddingResult, error) {
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeEmbeddings, Model: model, BodyReader: body})
+}
+
+// HandleSpeech dispatches POST /v1/audio/speech (OpenAI-wire TTS). Same
+// pipeline as every sync call; the response body is binary audio with the
+// Content-Type attached by the dispatcher.
+func (a *App) HandleSpeech(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeSpeech, Model: model, BodyReader: body})
+}
+
+// HandleTranscription dispatches POST /v1/audio/transcriptions (OpenAI-wire
+// multipart STT). The router already parsed the form; the upload rides on
+// req.Transcription and Body carries a small synthesized JSON summary so
+// body-reading pipeline stages see well-formed bytes instead of multipart
+// framing.
+func (a *App) HandleTranscription(ctx context.Context, bundle *domain.Bundle, upload *domain.TranscriptionUpload, model string) (*CompletionResult, error) {
+	body := []byte(`{"model":` + strconv.Quote(model) + `}`)
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:          domain.RequestTypeTranscription,
+		Model:         model,
+		Body:          body,
+		Transcription: upload,
+	})
 }
 
 // HandlePassthrough dispatches a provider-native request whose wire shape

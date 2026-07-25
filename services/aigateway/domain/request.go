@@ -28,6 +28,24 @@ type Request struct {
 	// (provider-native paths like Gemini /v1beta/models/{m}:generateContent).
 	// Zero for all other request types.
 	Passthrough PassthroughRequest
+
+	// Transcription carries the parsed multipart upload for
+	// RequestTypeTranscription. The router parses the form (the only place
+	// with access to the HTTP request) so the rest of the pipeline works on
+	// materialized bytes like every other request type. Nil otherwise.
+	Transcription *TranscriptionUpload
+}
+
+// TranscriptionUpload is the normalized content of a /v1/audio/transcriptions
+// multipart form: the audio file plus the OpenAI-wire optional parameters.
+type TranscriptionUpload struct {
+	File     []byte
+	Filename string
+	// Params holds the optional string form fields exactly as received
+	// (language, prompt, response_format, temperature). The dispatcher maps
+	// them onto the provider request; unknown fields are dropped by the
+	// router rather than forwarded blind.
+	Params map[string]string
 }
 
 // PassthroughRequest captures HTTP-level fields a raw-forward route needs
@@ -55,6 +73,12 @@ const (
 	// of the OpenAI/Anthropic-family schemas Bifrost exposes through its
 	// typed entry points.
 	RequestTypePassthrough RequestType = "passthrough"
+	// RequestTypeSpeech is POST /v1/audio/speech (OpenAI-wire TTS). The
+	// response body is binary audio, not JSON.
+	RequestTypeSpeech RequestType = "speech"
+	// RequestTypeTranscription is POST /v1/audio/transcriptions
+	// (OpenAI-wire multipart STT).
+	RequestTypeTranscription RequestType = "transcription"
 )
 
 // RequestMetadata holds extracted fields for policy evaluation (guardrails, blocked patterns).

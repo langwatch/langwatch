@@ -179,6 +179,14 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchEmbeddings(ctx, req, provider, model, cred)
 	}
 
+	if req.Type == domain.RequestTypeSpeech {
+		return r.dispatchSpeech(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypeTranscription {
+		return r.dispatchTranscription(ctx, req, provider, model, cred)
+	}
+
 	if req.Type == domain.RequestTypePassthrough {
 		return r.dispatchPassthrough(ctx, req, provider, model, cred)
 	}
