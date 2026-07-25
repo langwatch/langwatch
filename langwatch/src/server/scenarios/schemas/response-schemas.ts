@@ -102,6 +102,16 @@ export const archiveResponseSchema = z.object({
 });
 
 /**
+ * Browser-tab handoff response schema
+ * Returned by POST /api/scenario-events/browser-tab. `delivered` tells the SDK
+ * whether a live simulations tab took the run, so it can skip opening one.
+ */
+export const browserTabHandoffResponseSchema = z.object({
+  delivered: z.boolean(),
+  url: z.string(),
+});
+
+/**
  * Consolidated response schemas object
  * Maps response types to their corresponding Zod schemas for validation
  */
@@ -113,4 +123,5 @@ export const responseSchemas = {
   batches: batchesSchema,
   runData: runDataSchema,
   archive: archiveResponseSchema,
+  browserTabHandoff: browserTabHandoffResponseSchema,
 };

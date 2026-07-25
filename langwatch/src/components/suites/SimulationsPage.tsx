@@ -39,7 +39,9 @@ import {
   useSuiteRouting,
 } from "~/components/suites/useSuiteRouting";
 import { toaster } from "~/components/ui/toaster";
+import { useScenarioTabFollow } from "~/hooks/useScenarioTabFollow";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import type { ScenarioTabNavigatePayload } from "~/server/scenarios/browser-tab/scenario-tab-events";
 import { useDrawer } from "~/hooks/useDrawer";
 import { NowProvider } from "./NowProvider";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -120,6 +122,39 @@ export default function SimulationsPage() {
   // Connect the sidebar-level query to SSE events so new runs appear without
   // waiting for the 30s poll interval. Without this, the SSE listener only
   // lives inside RunHistoryPanel, leaving the sidebar query unreachable.
+  // When the SDK opened this tab, later runs from the same machine are steered
+  // here instead of spawning yet another browser tab.
+  const scenarioTab = useScenarioTabFollow();
+
+  const followRun = useCallback(
+    (payload: ScenarioTabNavigatePayload) => {
+      const target = new URL(payload.url);
+      if (target.origin !== window.location.origin) return;
+      if (target.pathname === window.location.pathname) return;
+
+      void router.push(target.pathname + target.search);
+
+      toaster.create({
+        title: "Following a new run from your terminal",
+        description:
+          "This tab moves to the newest run instead of opening a new one.",
+        type: "info",
+        action: {
+          label: "Stop following",
+          onClick: () => {
+            scenarioTab.stopFollowing();
+            toaster.create({
+              title: "This tab no longer follows new runs",
+              description: "Runs will open a new tab again.",
+              type: "info",
+            });
+          },
+        },
+      });
+    },
+    [router, scenarioTab]
+  );
+
   useSimulationUpdateListener({
     projectId: project?.id ?? "",
     refetch: () => {
@@ -128,6 +163,9 @@ export default function SimulationsPage() {
     },
     enabled: !!project?.id,
     debounceMs: 500,
+    tabKey: scenarioTab.tabKey,
+    tabId: scenarioTab.tabId,
+    onTabNavigate: followRun,
   });
 
   const runSummaries = useMemo(() => {

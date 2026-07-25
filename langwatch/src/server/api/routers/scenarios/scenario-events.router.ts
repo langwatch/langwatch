@@ -4,6 +4,10 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import {
+  SCENARIO_TAB_REFRESH_MS,
+  scenarioTabRegistry,
+} from "~/server/scenarios/browser-tab/scenario-tab-registry";
 import type {
   BatchRunDataResult,
   ScenarioRunData,
@@ -403,23 +407,53 @@ export const scenarioEventsRouter = createTRPCRouter({
     }),
 
   onSimulationUpdate: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        // Present only on a tab the SDK opened. While the subscription lives,
+        // that tab is offered runs started on the same machine instead of the
+        // SDK opening yet another browser tab.
+        tabKey: z.string().min(1).max(200).optional(),
+        tabId: z.string().min(1).max(200).optional(),
+      }),
+    )
     .use(checkProjectPermission("scenarios:view"))
     .subscription(async function* (opts) {
-      const { projectId } = opts.input;
+      const { projectId, tabKey, tabId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
       logger.info({ projectId }, "Simulation SSE subscription started");
 
-      for await (const eventArgs of on(emitter, "simulation_updated", {
-        // @ts-expect-error - signal is not typed
-        signal: opts.signal,
-      })) {
-        logger.debug(
-          { projectId, event: eventArgs[0] },
-          "Simulation SSE event received",
-        );
-        yield eventArgs[0];
+      // Refreshed from the server rather than the browser: a background tab's
+      // timers get throttled to once a minute, which would expire presence on
+      // exactly the tab this feature exists to reuse.
+      const tabRegistration =
+        tabKey && tabId ? { projectId, tabKey, tabId } : null;
+      let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+      if (tabRegistration) {
+        await scenarioTabRegistry.register(tabRegistration);
+        refreshTimer = setInterval(() => {
+          void scenarioTabRegistry.register(tabRegistration);
+        }, SCENARIO_TAB_REFRESH_MS);
+      }
+
+      try {
+        for await (const eventArgs of on(emitter, "simulation_updated", {
+          // @ts-expect-error - signal is not typed
+          signal: opts.signal,
+        })) {
+          logger.debug(
+            { projectId, event: eventArgs[0] },
+            "Simulation SSE event received",
+          );
+          yield eventArgs[0];
+        }
+      } finally {
+        if (refreshTimer) clearInterval(refreshTimer);
+        if (tabRegistration) {
+          await scenarioTabRegistry.unregister(tabRegistration);
+        }
       }
     }),
 });
