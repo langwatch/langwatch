@@ -53,6 +53,40 @@ func TestListModels_AliasesPlusAllowlist(t *testing.T) {
 	assert.False(t, providerCalled, "allowlist is authoritative; upstream endpoints must not be queried")
 }
 
+// @scenario "GET /v1/models expands wildcard allowlist entries"
+// models_allowed entries are patterns, not model IDs: "claude-haiku-*"
+// listed verbatim puts a literal "claude-haiku-*" in the client's model
+// picker, and dispatch then forwards that string upstream as a model no
+// provider has. The concrete IDs behind the pattern come from discovery,
+// filtered back down to what the allowlist actually permits.
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestListModels_ExpandsWildcardAllowlistEntries(t *testing.T) {
+	application := New(
+		WithLogger(zap.NewNop()),
+		WithProviders(&mockProvider{
+			listFn: func(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
+				return []domain.Model{
+					{ID: "claude-haiku-4-5-20251001", ProviderID: domain.ProviderAnthropic},
+					{ID: "claude-opus-4-20250514", ProviderID: domain.ProviderAnthropic},
+				}, nil
+			},
+		}),
+	)
+
+	models, err := application.ListModels(context.Background(), &domain.Bundle{
+		Config: domain.BundleConfig{
+			AllowedModels: []string{"gpt-5-mini", "claude-haiku-*"},
+		},
+	})
+	require.NoError(t, err)
+
+	assert.ElementsMatch(t, []string{"gpt-5-mini", "claude-haiku-4-5-20251001"}, modelIDs(models))
+	assert.NotContains(t, modelIDs(models), "claude-haiku-*",
+		"a wildcard pattern is not a model a client can request")
+	assert.NotContains(t, modelIDs(models), "claude-opus-4-20250514",
+		"discovery answers with the endpoint's whole catalog; the allowlist still applies")
+}
+
 // @scenario "GET /v1/models discovers models from self-hosted endpoints"
 // Spec: specs/ai-gateway/provider-routing.feature
 func TestListModels_DiscoversFromProviderWhenNoAllowlist(t *testing.T) {

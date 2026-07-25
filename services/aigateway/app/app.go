@@ -125,22 +125,54 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 		// guessing among multiple candidate providers would be more
 		// misleading than reporting none.
 		providerID := soleCredentialProviderID(bundle.Credentials)
+		wildcards := false
 		for _, id := range cfg.AllowedModels {
+			// A wildcard entry ("claude-haiku-*") is a pattern, not a
+			// model a client can request: listing it verbatim puts a
+			// literal "claude-haiku-*" in the model picker, which
+			// dispatch then forwards upstream as a model name that no
+			// provider has. Concrete IDs behind the pattern come from
+			// discovery instead.
+			if domain.ModelPatternIsWildcard(id) {
+				wildcards = true
+				continue
+			}
 			add(domain.Model{ID: id, Name: id, ProviderID: providerID})
 		}
-	} else if a.providers != nil {
-		discovered, err := a.providers.ListModels(ctx, bundle.Credentials)
-		if err != nil {
-			return nil, err
+		if wildcards {
+			if err := a.addDiscovered(ctx, bundle, cfg, add); err != nil {
+				return nil, err
+			}
 		}
-		for _, m := range discovered {
-			add(m)
-		}
+	} else if err := a.addDiscovered(ctx, bundle, cfg, add); err != nil {
+		return nil, err
 	}
 
 	models = filterModelsByPolicy(models, cfg.PolicyRules, a.logger)
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
 	return models, nil
+}
+
+// addDiscovered asks the credential chain's endpoints for their catalogs
+// and feeds the models the VK may actually request into add. Discovery
+// answers with whatever the endpoint serves, so the allowlist is applied
+// here too — dispatch rejects anything outside it, and listing a model
+// the VK cannot call is worse than omitting it.
+func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg domain.BundleConfig, add func(domain.Model)) error {
+	if a.providers == nil {
+		return nil
+	}
+	discovered, err := a.providers.ListModels(ctx, bundle.Credentials)
+	if err != nil {
+		return err
+	}
+	for _, m := range discovered {
+		if !cfg.AllowsModel(m.ID) {
+			continue
+		}
+		add(m)
+	}
+	return nil
 }
 
 // soleCredentialProviderID returns the credential chain's provider when

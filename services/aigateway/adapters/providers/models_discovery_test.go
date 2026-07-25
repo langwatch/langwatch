@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -197,7 +198,7 @@ func TestListModels_BoundsFanOutConcurrency(t *testing.T) {
 			mu.Unlock()
 			_, _ = w.Write([]byte(`{"data":[{"id":"m"}]}`))
 		}))
-		defer srv.Close()
+		t.Cleanup(srv.Close)
 		creds = append(creds, domain.Credential{
 			ID: srv.URL, ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv.URL},
 		})
@@ -241,6 +242,193 @@ func TestListModels_RejectsOversizedResponse(t *testing.T) {
 	}
 	if len(models) != 0 {
 		t.Fatalf("models = %v, want an oversized response to be skipped entirely, not partially decoded", models)
+	}
+}
+
+// @scenario "GET /v1/models does not follow redirects away from the configured endpoint"
+// The endpoint policy vets the configured base URL, not wherever that
+// URL points next. A discovery endpoint that answers 302 must be treated
+// as a failed probe: following it would reach an address the policy never
+// saw, with the credential's x-api-key attached (Go only strips
+// Authorization across hosts, not custom headers).
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestListModels_DoesNotFollowRedirects(t *testing.T) {
+	var redirectTargetHit bool
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		redirectTargetHit = true
+		_, _ = w.Write([]byte(`{"data":[{"id":"internal-only"}]}`))
+	}))
+	defer target.Close()
+
+	entry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Redirect(w, &http.Request{}, target.URL+"/v1/models", http.StatusFound)
+	}))
+	defer entry.Close()
+
+	router := &BifrostRouter{}
+	models, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-redirect", ProviderID: domain.ProviderCustom, APIKey: "sk-secret", Extra: map[string]string{"base_url": entry.URL}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if redirectTargetHit {
+		t.Fatal("discovery followed a redirect to an address the endpoint policy never validated")
+	}
+	if len(models) != 0 {
+		t.Fatalf("models = %v, want a redirecting endpoint treated as a failed probe", models)
+	}
+}
+
+// @scenario "GET /v1/models re-checks the resolved address before connecting"
+// The pre-flight policy check resolves the host itself, so a name that
+// answers with a public address on that lookup and a private one when the
+// connection is made (DNS rebinding) would slip past it. Every resolved
+// address must be re-checked immediately before connect.
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestListModels_RejectsRebindingToLocalAddress(t *testing.T) {
+	var hit bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit = true
+		_, _ = w.Write([]byte(`{"data":[{"id":"internal-only"}]}`))
+	}))
+	defer srv.Close()
+
+	// "localhost" really resolves to loopback, but the pre-flight check
+	// uses the policy's resolver — stubbed here to answer with a public
+	// address, which is exactly what a rebinding host does on the first
+	// lookup.
+	policy := newCustomerEndpointPolicy(true, false, nil)
+	policy.resolve = func(context.Context, string) ([]net.IP, error) {
+		return []net.IP{net.ParseIP("93.184.216.34")}, nil
+	}
+
+	_, port, err := net.SplitHostPort(strings.TrimPrefix(srv.URL, "http://"))
+	if err != nil {
+		t.Fatalf("parsing test server address: %v", err)
+	}
+
+	router := &BifrostRouter{endpointPolicy: policy}
+	models, err := router.ListModels(context.Background(), []domain.Credential{
+		{ID: "mp-rebind", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": "http://localhost:" + port}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if hit {
+		t.Fatal("discovery connected to a loopback address that passed the pre-flight check by rebinding")
+	}
+	if len(models) != 0 {
+		t.Fatalf("models = %v, want none from a rebound endpoint", models)
+	}
+}
+
+// GET /v1/models is outside the dispatch interceptor chain, so the per-VK
+// rate limiter never sees it. Without a cache every call fans out to every
+// configured endpoint, and a polling model picker becomes sustained load on
+// the customer's own servers.
+func TestListModels_CachesDiscoveryBetweenCalls(t *testing.T) {
+	var mu sync.Mutex
+	probes := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		probes++
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{"data":[{"id":"qwen3-14b"}]}`))
+	}))
+	defer srv.Close()
+
+	creds := []domain.Credential{
+		{ID: "mp-1", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv.URL}},
+	}
+	router := &BifrostRouter{}
+	for i := 0; i < 5; i++ {
+		models, err := router.ListModels(context.Background(), creds)
+		if err != nil {
+			t.Fatalf("ListModels returned error: %v", err)
+		}
+		if len(models) != 1 || models[0].ID != "qwen3-14b" {
+			t.Fatalf("call %d: models = %v, want the cached catalog", i, models)
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if probes != 1 {
+		t.Fatalf("upstream probed %d times across 5 calls, want 1 — discovery is not cached", probes)
+	}
+}
+
+// A rotated API key must not keep serving a catalog fetched with the old
+// one, so the cache key covers everything that changes what discovery
+// would return or how it authenticates.
+func TestListModels_CacheKeyedByCredentialChain(t *testing.T) {
+	var mu sync.Mutex
+	probes := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		probes++
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{"data":[{"id":"qwen3-14b"}]}`))
+	}))
+	defer srv.Close()
+
+	router := &BifrostRouter{}
+	for _, key := range []string{"sk-old", "sk-rotated"} {
+		if _, err := router.ListModels(context.Background(), []domain.Credential{
+			{ID: "mp-1", ProviderID: domain.ProviderCustom, APIKey: key, Extra: map[string]string{"base_url": srv.URL}},
+		}); err != nil {
+			t.Fatalf("ListModels returned error: %v", err)
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if probes != 2 {
+		t.Fatalf("upstream probed %d times, want 2 — a rotated key must not hit the previous key's cache entry", probes)
+	}
+}
+
+// A burst of concurrent model-list calls must collapse onto one round of
+// probes. Without in-flight deduplication, N callers arriving before the
+// first result lands each fan out on their own.
+func TestListModels_CollapsesConcurrentDiscovery(t *testing.T) {
+	var mu sync.Mutex
+	probes := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		probes++
+		mu.Unlock()
+		time.Sleep(150 * time.Millisecond)
+		_, _ = w.Write([]byte(`{"data":[{"id":"qwen3-14b"}]}`))
+	}))
+	defer srv.Close()
+
+	creds := []domain.Credential{
+		{ID: "mp-1", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv.URL}},
+	}
+	router := &BifrostRouter{}
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			models, err := router.ListModels(context.Background(), creds)
+			if err != nil {
+				t.Errorf("ListModels returned error: %v", err)
+				return
+			}
+			if len(models) != 1 {
+				t.Errorf("models = %v, want the shared catalog", models)
+			}
+		}()
+	}
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if probes != 1 {
+		t.Fatalf("upstream probed %d times for 20 concurrent calls, want 1", probes)
 	}
 }
 

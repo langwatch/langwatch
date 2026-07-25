@@ -417,14 +417,22 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 		}
 
 		// OpenAI list shape: model-picker clients (OpenWebUI, LibreChat,
-		// SDKs) expect {"id", "object": "model"} entries and an always-
-		// present data array (null breaks some parsers).
+		// SDKs) expect every field of the Model object and an always-
+		// present data array (null breaks some parsers). `created` and
+		// `owned_by` are required by the OpenAI SDK types, so omitting
+		// them leaves strict clients with a null where they expect an
+		// int / string.
 		data := make([]map[string]any, 0, len(models))
 		for _, m := range models {
 			data = append(data, map[string]any{
-				"id":       m.ID,
-				"object":   "model",
-				"owned_by": string(m.ProviderID),
+				"id":     m.ID,
+				"object": "model",
+				// A gateway model list has no creation date to report:
+				// aliases are config, and upstream catalogs rarely carry
+				// one. 0 keeps the field present and typed rather than
+				// inventing a timestamp that would churn on every call.
+				"created":  0,
+				"owned_by": modelOwnedBy(m),
 			})
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -433,6 +441,18 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 			"data":   data,
 		})
 	}
+}
+
+// modelOwnedBy names the owner of a listed model. Models that carry no
+// provider (an allowlist entry on a multi-provider credential chain, for
+// instance) are attributed to the gateway rather than to an empty string:
+// `owned_by` is a required string in the OpenAI Model object, and a
+// blank one renders as an unlabelled row in model pickers.
+func modelOwnedBy(m domain.Model) string {
+	if m.ProviderID == "" {
+		return "langwatch"
+	}
+	return string(m.ProviderID)
 }
 
 func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (*domain.Bundle, bool) {

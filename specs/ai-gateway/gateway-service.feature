@@ -54,6 +54,7 @@ Feature: Gateway service — public HTTP surface and operational basics
       When I GET /v1/models
       Then the response body includes {"id": "chat", "object": "model"}
       And includes {"id": "gpt-5-mini", "object": "model"}
+      And every entry carries "created" and a non-empty "owned_by", as OpenAI clients type them
 
   Rule: Panics are caught and converted to 500 error envelopes
 
