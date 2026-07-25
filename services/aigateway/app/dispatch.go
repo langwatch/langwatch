@@ -23,7 +23,7 @@ func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Re
 		func(ctx context.Context, slotID string) (*domain.Response, error) {
 			return a.providers.Dispatch(ctx, call.Request, findCredential(creds, slotID))
 		}, classifyProviderError)
-	call.Meta.FallbackCount = countFallbacks(el)
+	call.Meta.Update(func(m *pipeline.Meta) { m.FallbackCount = countFallbacks(el) })
 	el.Release()
 	resp, err = applyGovernanceMessage(resp, err)
 	if err != nil {
@@ -44,7 +44,7 @@ func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (doma
 		func(ctx context.Context, slotID string) (domain.StreamIterator, error) {
 			return a.providers.DispatchStream(ctx, call.Request, findCredential(creds, slotID))
 		}, classifyProviderError)
-	call.Meta.FallbackCount = countFallbacks(el)
+	call.Meta.Update(func(m *pipeline.Meta) { m.FallbackCount = countFallbacks(el) })
 	el.Release()
 	if _, err = applyGovernanceMessage(nil, err); err != nil {
 		return nil, err
