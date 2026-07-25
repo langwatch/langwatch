@@ -692,7 +692,12 @@ describe("AzureBlobDriver", () => {
       }
 
       expect(message).toMatch(/Storage Blob Data Contributor/);
-      expect(message).toMatch(new RegExp(CONTAINER));
+      // The remedy names the ROLE, never the account or container: those two
+      // segments are tenant-identifying and redactStorageUri strips them from
+      // every other storage error. An operator does not need them echoed —
+      // they are granting a role on the account they already configured.
+      expect(message).not.toMatch(new RegExp(CONTAINER));
+      expect(message).not.toMatch(new RegExp(ACCOUNT_NAME));
       // Exactly one fetch — no retry attempted for a 403.
       expect(fetchSpy).toHaveBeenCalledTimes(1);
       expect(invalidateAzureBlobTokenMock).not.toHaveBeenCalled();

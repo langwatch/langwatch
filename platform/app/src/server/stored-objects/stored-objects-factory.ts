@@ -8,7 +8,6 @@
  *
  * Call once per request — construction is lightweight; drivers are stateless.
  */
-import { env } from "~/env.mjs";
 import { AzureBlobDriver } from "./azure-blob-driver";
 import { resolveAzureCredentials } from "./azure-credentials";
 import { LocalFilesystemDriver } from "./local-filesystem-driver";
@@ -35,9 +34,14 @@ import { StoredObjectsService } from "./stored-objects.service";
  * for token-based modes (issue #6087).
  */
 export function maybeAzureDriver(): AzureBlobDriver | undefined {
-  if (env.STORED_OBJECTS_BACKEND !== "azure") return undefined;
   try {
-    return new AzureBlobDriver(resolveAzureCredentials());
+    // purpose: "read" — registration is deliberately NOT gated on the write
+    // toggle. An operator migrating OFF Azure flips STORED_OBJECTS_BACKEND
+    // back to s3 and keeps the AZURE_BLOB_* values so already-written objects
+    // stay readable; gating here would strand every historical
+    // azure-blob:// URI behind "unregistered scheme". A driver being
+    // available to READ is not symmetric with Azure being chosen for WRITES.
+    return new AzureBlobDriver(resolveAzureCredentials({ purpose: "read" }));
   } catch {
     // Misconfigured Azure (missing var, contradictory mode, etc.) — the
     // destination resolver raises the SAME error at write time with the

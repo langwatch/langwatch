@@ -45,6 +45,9 @@ spec:
             {{- if $root.Values.cronjobs.pod.labels }}
             {{- toYaml $root.Values.cronjobs.pod.labels | nindent 8 }}
             {{- end }}
+            {{- with (include "langwatch.cloudIdentityPodLabels" $root) }}
+            {{- . | nindent 12 }}
+            {{- end }}
           annotations:
             {{- if $root.Values.cronjobs.pod.annotations }}
             {{- toYaml $root.Values.cronjobs.pod.annotations | nindent 8 }}

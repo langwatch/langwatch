@@ -176,7 +176,14 @@ function assertWorkloadIdentityInjectedValues(): void {
  * `AzureCredentials` because a credential describes how to authenticate to
  * a storage ACCOUNT, not which container within it a caller addresses.
  */
-export function resolveAzureCredentials(): AzureCredentials {
+/**
+ * `purpose` distinguishes "which destination do new writes go to" from "can
+ * we still read what was written before". They are not symmetric: a
+ * deployment can legitimately need the second without the first.
+ */
+export function resolveAzureCredentials({
+  purpose = "write",
+}: { purpose?: "read" | "write" } = {}): AzureCredentials {
   // env.mjs is JavaScript, so TypeScript infers `any` for its values. Pinning
   // the type here is what makes the exhaustiveness check at the bottom of this
   // function real — against `any` it would silently pass.
@@ -184,7 +191,18 @@ export function resolveAzureCredentials(): AzureCredentials {
     (env.AZURE_BLOB_AUTH_MODE as AzureCredentials["mode"] | undefined) ??
     "sharedKey";
 
-  if (isTokenMode(mode) && env.STORED_OBJECTS_BACKEND !== "azure") {
+  // Dead-config guard, for WRITE resolution only. Reads are deliberately
+  // exempt (`purpose: "read"`): an operator migrating OFF Azure flips the
+  // backend toggle to s3 and leaves the AZURE_BLOB_* values in place so the
+  // objects already written stay readable — the mirror image of the
+  // legacyS3ReadBucket path we document for the S3->Azure direction.
+  // Refusing to build a read driver there would strand every historical
+  // azure-blob:// object behind an "unregistered scheme" error.
+  if (
+    purpose === "write" &&
+    isTokenMode(mode) &&
+    env.STORED_OBJECTS_BACKEND !== "azure"
+  ) {
     throw new AzureBackendMisconfiguredError(
       `AZURE_BLOB_AUTH_MODE=${mode} has no effect without STORED_OBJECTS_BACKEND=azure. ` +
         "Set STORED_OBJECTS_BACKEND=azure to use it, or unset AZURE_BLOB_AUTH_MODE.",

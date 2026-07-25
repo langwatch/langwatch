@@ -588,10 +588,15 @@ export class AzureBlobDriver implements StorageDriver {
     }
 
     if (response.status === 403) {
+      // The account and container are tenant-identifying — the same two
+      // segments redactStorageUri strips from every other storage error. The
+      // operator does not need them echoed to act on this: the remedy is a
+      // role assignment on the account they already configured.
       throw new Error(
-        `Azure Blob request denied (403) for account "${this.credentials.accountName}", ` +
-          `container "${container}": the identity lacks data permissions. Grant the ` +
-          '"Storage Blob Data Contributor" role on that storage account/container scope.',
+        "Azure Blob request denied (403): the identity lacks data permissions " +
+          'on the configured storage account. Grant the "Storage Blob Data ' +
+          'Contributor" role at the account or container scope. Note the ' +
+          'control-plane "Contributor" role does NOT grant data access.',
       );
     }
 

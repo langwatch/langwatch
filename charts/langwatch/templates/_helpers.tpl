@@ -1240,3 +1240,26 @@ empty, which callers treat as "omit serviceAccountName and use `default`".
 {{- .Release.Name -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Pod labels that activate cloud workload identity.
+
+Azure's admission webhook only mutates pods carrying
+`azure.workload.identity/use: "true"` — without it the projected federated
+token is never injected, the pod boots healthy, and every storage write then
+fails at runtime claiming the cluster is misconfigured. Rendering the label
+from the same value that selects the auth mode keeps those two facts from
+drifting apart.
+
+Renders nothing unless the azureBlob provider is active in workloadIdentity
+mode, so no other install gains a label.
+*/}}
+{{- define "langwatch.cloudIdentityPodLabels" -}}
+{{- $dp := .Values.app.dataplane | default dict -}}
+{{- if and $dp.enabled (eq ($dp.provider | default "") "azureBlob") -}}
+{{- $azure := (($dp.providers | default dict).azureBlob | default dict) -}}
+{{- if eq ($azure.authMode | default "sharedKey") "workloadIdentity" -}}
+azure.workload.identity/use: "true"
+{{- end -}}
+{{- end -}}
+{{- end }}
