@@ -1,9 +1,9 @@
+import importlib
+import inspect
 import json
 import os
-import importlib
-import random
-import inspect
-from typing import Optional, Sequence, cast
+from collections.abc import Sequence
+from typing import Optional
 import httpx
 import pytest
 import asyncio
@@ -34,9 +34,35 @@ from opentelemetry.sdk.trace.export import (
 )
 from opentelemetry.sdk.trace import ReadableSpan
 import litellm
-from litellm.files.main import ModelResponse
 
 trace_urls: dict[str, str] = {}
+
+EXTERNAL_SERVICE_ERROR_INDICATORS = (
+    "server_error",
+    "The server had an error",
+    "Rate limit",
+    "RateLimitError",
+    "insufficient_quota",
+    "API Error",
+    "Connection error",
+    "Timeout",
+    "Request timed out",
+    "read operation timed out",
+)
+
+
+def build_example_input(example_file: str) -> str:
+    if "span_evaluation" in example_file:
+        return "who is the oldest person?"
+    if "rag" in example_file:
+        return "what is LangWatch?"
+    return "what makes a good daily routine?"
+
+
+def is_external_service_error(error: Exception) -> bool:
+    return any(
+        indicator in str(error) for indicator in EXTERNAL_SERVICE_ERROR_INDICATORS
+    )
 
 
 class TraceIdCapturerExporter(SpanExporter):
@@ -64,6 +90,22 @@ def get_example_files():
         for f in os.listdir(opentelemetry_dir)
         if f.endswith(".py")
     ]
+
+
+# @scenario "Example tests use deterministic local input"
+def test_example_input_is_local():
+    assert build_example_input("span_evaluation.py") == "who is the oldest person?"
+    assert build_example_input("langchain_rag_bot.py") == "what is LangWatch?"
+    assert build_example_input("distributed_tracing.py") == (
+        "what makes a good daily routine?"
+    )
+
+
+# @scenario "Provider quota failures are classified as external service issues"
+def test_provider_quota_failure_is_external_service_issue():
+    assert is_external_service_error(
+        RuntimeError("request failed with insufficient_quota")
+    )
 
 
 @pytest.mark.parametrize("example_file", get_example_files())
@@ -127,39 +169,7 @@ async def test_example(example_file: str):
     if on_chat_start is not None:
         await on_chat_start()
 
-    # Create a mock cl.Message
-    if "span_evaluation" in example_file:
-        content = "who is the oldest person?"
-    elif "rag" in example_file:
-        content = "what is LangWatch?"
-    else:
-        starters = [
-            "when",
-            "who",
-            "what",
-            "where",
-            "why",
-            "how",
-            "if",
-            "how much",
-        ]
-        starter = random.choice(starters)
-        message = cast(
-            ModelResponse,
-            litellm.completion(
-                model="gpt-4.1-nano",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": f'Pretend to be a user, you are asking a question to a chatbot, any question, mundane, one short line, all lowercase, be creative. Start the question with "{starter}".',
-                    }
-                ],
-                temperature=1.0,
-                caching=False,
-            ),
-        )
-        content = message["choices"][0]["message"]["content"]
-
+    content = build_example_input(example_file)
     mock_message = content if "fastapi" in example_file else cl.Message(content=content)
 
     # Build trace metadata, optionally tagging with parity run prefix
@@ -213,27 +223,7 @@ async def test_example(example_file: str):
                     pytest.skip(
                         f"Skipping {example_file} due to unreliable external ColBERTv2 service: {e}"
                     )
-                # FIXME: Skip tests that fail due to transient external service issues
-                # OpenAI server errors, rate limiting, and other external API issues
-                # should not cause CI failures as they're not code bugs
-                elif any(
-                    error_indicator in str(e)
-                    for error_indicator in [
-                        # Provider-side 5xx (OpenAI and Azure both tag these with a
-                        # "server_error" type, regardless of the human-readable message).
-                        "server_error",
-                        "The server had an error",  # OpenAI 500 prose variant
-                        # "Error code: 404",
-                        # "This is a chat model and not supported in the v1/completions endpoint",
-                        "Rate limit",
-                        "RateLimitError",
-                        "API Error",
-                        "Connection error",
-                        "Timeout",
-                        "Request timed out",
-                        "read operation timed out",
-                    ]
-                ):
+                elif is_external_service_error(e):
                     pytest.skip(
                         f"Skipping {example_file} due to external service issue: {e}"
                     )

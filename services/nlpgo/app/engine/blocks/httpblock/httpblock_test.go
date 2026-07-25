@@ -12,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
@@ -133,6 +135,140 @@ func TestSSRF_DNSResolutionToPrivate(t *testing.T) {
 		Resolver: resolver,
 	})
 	require.Error(t, err)
+}
+
+// observedLogs returns a logger plus the buffer its entries land in, so a test
+// can assert on what an operator would actually read.
+func observedLogs() (*zap.Logger, *observer.ObservedLogs) {
+	core, logs := observer.New(zap.InfoLevel)
+	return zap.New(core), logs
+}
+
+// The ranges pkg/ssrf added on top of the historical deny set. Permitting
+// these by default is what keeps a self-hosted upgrade from breaking a
+// workflow that reaches an internal service over, say, Tailscale.
+var newlyCoveredAddresses = []string{
+	"100.64.0.1",  // CGNAT / Tailscale (RFC 6598)
+	"240.0.0.1",   // reserved (RFC 1112)
+	"198.18.0.1",  // benchmarking (RFC 2544)
+	"192.0.2.1",   // TEST-NET-1 (RFC 5737)
+	"224.0.1.1",   // multicast, not link-local
+	"203.0.113.1", // TEST-NET-3 (RFC 5737)
+}
+
+func TestSSRF_WhenStrictEgressIsOff(t *testing.T) {
+	t.Run("permits addresses outside the historical deny set", func(t *testing.T) {
+		for _, ip := range newlyCoveredAddresses {
+			t.Run(ip, func(t *testing.T) {
+				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{})
+				assert.NoError(t, err,
+					"%s was reachable before strict egress existed and must stay reachable by default", ip)
+			})
+		}
+	})
+
+	t.Run("logs each permitted non-public address so the operator can prepare", func(t *testing.T) {
+		logger, logs := observedLogs()
+		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{Logger: logger})
+		require.NoError(t, err)
+
+		entries := logs.FilterMessage("ssrf_permitted_non_public_address").All()
+		require.Len(t, entries, 1, "a permitted non-public address must be reported exactly once")
+
+		fields := entries[0].ContextMap()
+		assert.Equal(t, "100.64.0.1", fields["address"])
+		assert.Contains(t, fields["range"], "100.64.0.0/10")
+		assert.Contains(t, fields["range"], "RFC 6598", "the log must name the RFC, not just the CIDR")
+		assert.Contains(t, fields["hint"], "ALLOWED_PROXY_HOSTS",
+			"the hint must tell the operator how to keep this working under strict egress")
+	})
+
+	t.Run("still refuses the historical deny set", func(t *testing.T) {
+		for _, ip := range []string{"127.0.0.1", "10.0.0.1", "192.168.1.1", "169.254.1.1"} {
+			t.Run(ip, func(t *testing.T) {
+				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{})
+				require.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("still refuses cloud metadata", func(t *testing.T) {
+		// Azure WireServer is globally-routable-looking and sits in no
+		// special range, so only the metadata set catches it. It was
+		// reachable before pkg/ssrf; that hole closes for everyone.
+		err := httpblock.CheckURL("http://168.63.129.16/x", httpblock.SSRFOptions{})
+		require.Error(t, err)
+	})
+}
+
+func TestSSRF_WhenStrictEgressIsOn(t *testing.T) {
+	t.Run("refuses every non-globally-routable address", func(t *testing.T) {
+		for _, ip := range newlyCoveredAddresses {
+			t.Run(ip, func(t *testing.T) {
+				err := httpblock.CheckURL("http://"+ip+"/x", httpblock.SSRFOptions{
+					StrictPublicOnly: true,
+				})
+				require.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("names the range and the escape hatch in the refusal log", func(t *testing.T) {
+		logger, logs := observedLogs()
+		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{
+			StrictPublicOnly: true,
+			Logger:           logger,
+		})
+		require.Error(t, err)
+
+		entries := logs.FilterMessage("ssrf_refused").All()
+		require.Len(t, entries, 1)
+
+		fields := entries[0].ContextMap()
+		assert.Equal(t, "strict_public_only", fields["reason"])
+		assert.Contains(t, fields["range"], "CGNAT")
+		assert.Contains(t, fields["hint"], "ALLOWED_PROXY_HOSTS")
+	})
+
+	t.Run("keeps the allow-list working as the escape hatch", func(t *testing.T) {
+		err := httpblock.CheckURL("http://100.64.0.1/x", httpblock.SSRFOptions{
+			StrictPublicOnly: true,
+			AllowedHosts:     []string{"100.64.0.1"},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("permits globally routable addresses", func(t *testing.T) {
+		err := httpblock.CheckURL("http://93.184.216.34/x", httpblock.SSRFOptions{
+			StrictPublicOnly: true,
+		})
+		assert.NoError(t, err)
+	})
+}
+
+func TestSSRF_RefusalLogNeverReachesTheCaller(t *testing.T) {
+	// The log names the range; the error must not. An SSRF refusal that
+	// echoes which internal range was hit hands the tenant a network map.
+	logger, logs := observedLogs()
+	err := httpblock.CheckURL("http://10.1.2.3/x", httpblock.SSRFOptions{Logger: logger})
+
+	require.Error(t, err)
+	assert.Equal(t, "ssrf_blocked", err.Error())
+	require.NotEmpty(t, logs.FilterMessage("ssrf_refused").All(),
+		"the detail belongs in the log, which is why the error can stay opaque")
+}
+
+func TestSSRF_StrictEgressAppliesAtDialTime(t *testing.T) {
+	// CheckURL is the optimistic gate; SafeDialer is the one that holds
+	// under DNS rebinding. Strict mode must be enforced in both.
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		StrictPublicOnly: true,
+		Resolver: func(host string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("100.64.0.1")}, nil
+		},
+	})
+	_, err := dial(context.Background(), "tcp", "rebind.test:80")
+	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
 }
 
 func TestExecute_HappyPath(t *testing.T) {

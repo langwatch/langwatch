@@ -12,16 +12,20 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/jwtverify"
+
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/authresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/budget"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/cacherules"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/modelresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/policy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
@@ -70,6 +74,22 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	projectRegistry := customertracebridge.NewRegistry()
 	bridge, err := customertracebridge.NewEmitter(ctx, customertracebridge.EmitterOptions{
 		Registry: projectRegistry,
+		// This service's customer-trace policy: no resource attribute passes
+		// through (the pod environment is platform detail), and every retold
+		// span carries this service's origin identity.
+		Policy: customertracebridge.Policy{
+			Stamp: []attribute.KeyValue{
+				attribute.String(otelsetup.AttrLangWatchOrigin, gatewaytracer.OriginGateway),
+			},
+		},
+		// ADR-061 mirror leg: when configured, a Langy VK's gen_ai span is
+		// duplicated into the mirror project at the bundle's tier. Unset leaves
+		// the leg dormant.
+		Mirror: customertracebridge.MirrorConfig{
+			Endpoint:  cfg.LangyMirror.TraceEndpoint,
+			Key:       cfg.LangyMirror.TraceKey,
+			ProjectID: cfg.LangyMirror.ProjectID,
+		},
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("customer trace bridge init: %w", err)
@@ -128,6 +148,9 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		BlockLocalHTTPCalls:           cfg.BlockLocalHTTPCalls,
 		RequireHTTPSCustomerEndpoints: cfg.RequireHTTPSCustomerEndpoints,
 		AllowedEndpointHosts:          splitAllowedHosts(cfg.AllowedProxyHosts),
+		// The control plane owns codex OAuth sessions; the router calls back
+		// through it to refresh a 401'd access token once.
+		CodexRefresher: cpClient,
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("bifrost init: %w", err)
@@ -194,12 +217,12 @@ func (a changePollerAdapter) PollChanges(ctx context.Context, organizationID, si
 	out := make([]authresolver.CacheChange, len(cs))
 	for i, c := range cs {
 		out[i] = authresolver.CacheChange{
-			Kind:                 c.Kind,
-			VirtualKeyID:         c.VirtualKeyID,
-			BudgetID:             c.BudgetID,
-			ProviderCredentialID: c.ProviderCredentialID,
-			ProjectID:            c.ProjectID,
-			Revision:             c.Revision,
+			Kind:            c.Kind,
+			VirtualKeyID:    c.VirtualKeyID,
+			BudgetID:        c.BudgetID,
+			ModelProviderID: c.ModelProviderID,
+			ProjectID:       c.ProjectID,
+			Revision:        c.Revision,
 		}
 	}
 	return out, next, nil

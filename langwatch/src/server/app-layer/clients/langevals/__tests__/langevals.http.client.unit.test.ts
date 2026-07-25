@@ -8,15 +8,22 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EvaluatorExecutionError } from "../../../evaluations/errors";
+import {
+  EvaluatorExecutionError,
+  EvaluatorInputTooLargeError,
+} from "../../../evaluations/errors";
 import type { LangEvalsEvaluateParams } from "../langevals.client";
 import { LangEvalsHttpClient } from "../langevals.http.client";
+
+const { getEvaluationStatusCounter } = vi.hoisted(() => ({
+  getEvaluationStatusCounter: vi.fn(() => ({ inc: vi.fn() })),
+}));
 
 vi.mock("~/server/metrics", () => ({
   evaluationDurationHistogram: {
     labels: () => ({ observe: vi.fn() }),
   },
-  getEvaluationStatusCounter: () => ({ inc: vi.fn() }),
+  getEvaluationStatusCounter,
 }));
 
 vi.mock("~/server/tracer/tracesMapping", () => ({
@@ -54,6 +61,7 @@ describe("LangEvalsHttpClient", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    getEvaluationStatusCounter.mockClear();
   });
 
   afterEach(() => {
@@ -157,6 +165,62 @@ describe("LangEvalsHttpClient", () => {
         );
         // Should NOT retry on 4xx
         expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when langevals returns 413", () => {
+      it("throws EvaluatorInputTooLargeError without retrying", async () => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+          jsonResponse({ message: "Request Too Long" }, 413),
+        );
+
+        const client = new LangEvalsHttpClient(endpoint, 2);
+
+        await expect(client.evaluate(buildParams())).rejects.toThrow(
+          EvaluatorInputTooLargeError,
+        );
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+      });
+
+      it("counts the outcome as skipped, not error", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(
+          jsonResponse({ message: "Request Too Long" }, 413),
+        );
+
+        const client = new LangEvalsHttpClient(endpoint, 0);
+
+        await expect(client.evaluate(buildParams())).rejects.toThrow(
+          EvaluatorInputTooLargeError,
+        );
+        // An oversized input is the customer's payload, not a platform fault:
+        // the metric label has to match the "skipped" status the command
+        // ultimately emits, or dashboards read it as an error-rate spike.
+        expect(getEvaluationStatusCounter).toHaveBeenCalledWith(
+          "test/evaluator",
+          "skipped",
+        );
+        expect(getEvaluationStatusCounter).not.toHaveBeenCalledWith(
+          "test/evaluator",
+          "error",
+        );
+      });
+    });
+
+    describe("when langevals returns a non-413 error status", () => {
+      it("counts the outcome as error", async () => {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(
+          jsonResponse({ error: "bad request" }, 400),
+        );
+
+        const client = new LangEvalsHttpClient(endpoint, 0);
+
+        await expect(client.evaluate(buildParams())).rejects.toThrow(
+          EvaluatorExecutionError,
+        );
+        expect(getEvaluationStatusCounter).toHaveBeenCalledWith(
+          "test/evaluator",
+          "error",
+        );
       });
     });
 

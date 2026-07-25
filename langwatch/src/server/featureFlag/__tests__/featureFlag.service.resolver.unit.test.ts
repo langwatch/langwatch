@@ -35,6 +35,7 @@ import type { FeatureFlagServiceInterface } from "../types";
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 const FAMILY_FLAG = "es-trace-projection-spanstorage-killswitch";
 const PRODUCT_FLAG = "release_ui_ai_gateway_menu_enabled";
+const NON_ENV_OVERRIDABLE_FLAG = "release_langy_enabled";
 const UNREGISTERED_FLAG = "experiment_some_adhoc_posthog_flag";
 
 class InMemoryStore {
@@ -88,10 +89,24 @@ describe("FeatureFlagService", () => {
     delete process.env.RELEASE_NLP_GO_ENGINE_ENABLED;
     delete process.env.ES_TRACE_PROJECTION_SPANSTORAGE_KILLSWITCH;
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+    delete process.env[NON_ENV_OVERRIDABLE_FLAG.toUpperCase()];
   });
 
   afterEach(() => {
     process.env = originalEnv;
+  });
+
+  describe("given a flag registered with envOverridable false", () => {
+    describe("when its uppercase env variable is set", () => {
+      it("ignores the env variable and resolves from the store", async () => {
+        const { service, store, legacy } = buildService();
+        await store.set(NON_ENV_OVERRIDABLE_FLAG, false);
+        process.env[NON_ENV_OVERRIDABLE_FLAG.toUpperCase()] = "1";
+        const enabled = await service.isEnabled(NON_ENV_OVERRIDABLE_FLAG, { distinctId: "user-1", defaultValue: false });
+        expect(enabled).toBe(false);
+        expect(legacy.isEnabled).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given a SYSTEM-scoped flag", () => {

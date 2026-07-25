@@ -167,8 +167,10 @@ secured.access(
         { error: handled.serialize() },
         "Scenario generation rejected by LLM gateway",
       );
+      // The code, never `handled.message` — server copy stays server-side
+      // (ADR-045); the client keys its copy off `error.code`.
       return c.json(
-        { error: handled.message, domainError: handled.serialize() },
+        { error: handled.code, domainError: handled.serialize() },
         { status: handled.httpStatus as 400 },
       );
     }

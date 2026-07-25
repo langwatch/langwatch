@@ -1,8 +1,8 @@
 import { Button, Flex, IconButton, Skeleton, Text } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type React from "react";
-import { useFilterStore } from "../../stores/filterStore";
 import type { TraceListCursor } from "../../stores/filterStore";
+import { useFilterStore } from "../../stores/filterStore";
 import { useTraceTableScrollElement } from "./scrollContext";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;

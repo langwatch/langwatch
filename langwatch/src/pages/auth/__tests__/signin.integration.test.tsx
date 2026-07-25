@@ -1,30 +1,39 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the Forgot-password entry point on /auth/signin. The
- * credential form must offer a reset link in email mode, and SSO mode must not
- * render the credential form (or the link) at all.
+ * Integration tests for /auth/signin: the Forgot-password entry point (the
+ * credential form must offer a reset link in email mode, and SSO mode must
+ * not render the credential form or the link at all) and the
+ * already-authenticated bounce path (an authenticated user hitting this page
+ * must be redirected only to a same-origin destination).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockSignIn, sessionRef, publicEnvRef } = vi.hoisted(() => ({
-  mockSignIn: vi.fn(),
-  sessionRef: { current: { data: null as unknown } },
-  publicEnvRef: {
-    current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
-  },
-}));
+const { mockSignIn, sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(
+  () => ({
+    mockSignIn: vi.fn(),
+    sessionRef: { current: { data: null as unknown } },
+    publicEnvRef: {
+      current: { NEXTAUTH_PROVIDER: "email" as string | undefined },
+    },
+    searchParamsRef: { current: new URLSearchParams("") },
+  }),
+);
 
-vi.mock("~/utils/auth-client", () => ({
-  signIn: mockSignIn,
-  useSession: () => sessionRef.current,
-}));
+vi.mock("~/utils/auth-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/utils/auth-client")>();
+  return {
+    ...actual,
+    signIn: mockSignIn,
+    useSession: () => sessionRef.current,
+  };
+});
 
 vi.mock("~/utils/compat/next-navigation", () => ({
-  useSearchParams: () => new URLSearchParams(""),
+  useSearchParams: () => searchParamsRef.current,
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
@@ -62,6 +71,7 @@ describe("SignIn forgot-password entry point", () => {
     vi.clearAllMocks();
     sessionRef.current = { data: null };
     publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+    searchParamsRef.current = new URLSearchParams("");
   });
 
   afterEach(() => {
@@ -91,6 +101,62 @@ describe("SignIn forgot-password entry point", () => {
       expect(
         screen.queryByRole("link", { name: /forgot password/i }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("SignIn already-authenticated redirect", () => {
+  let originalLocation: Location;
+  let replace: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionRef.current = { data: { user: { id: "user-1" } } };
+    publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+
+    originalLocation = window.location;
+    replace = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...originalLocation, replace },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    Object.defineProperty(window, "location", {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  describe("given a protocol-relative callbackUrl (@regression: open redirect via //host)", () => {
+    it("falls back to the dashboard instead of following it off-domain", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "callbackUrl=//evil.example.com",
+      );
+      renderPage();
+
+      await waitFor(() => {
+        expect(replace).toHaveBeenCalledTimes(1);
+      });
+      expect(replace).toHaveBeenCalledWith("/");
+    });
+  });
+
+  describe("given a same-origin relative callbackUrl", () => {
+    it("preserves it as the redirect destination", async () => {
+      searchParamsRef.current = new URLSearchParams(
+        "callbackUrl=/settings/members",
+      );
+      renderPage();
+
+      await waitFor(() => {
+        expect(replace).toHaveBeenCalledTimes(1);
+      });
+      expect(replace).toHaveBeenCalledWith("/settings/members");
     });
   });
 });

@@ -8,6 +8,7 @@ import { createCommandEvents, type CommandEvents } from "../../telemetry/events"
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { parseOriginOption } from "./origin-filter";
 
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
 const PROGRESS_CHUNK = 25;
@@ -28,6 +29,7 @@ export const exportTracesCommand = async (options: {
   format?: string;
   output?: string;
   limit?: string;
+  origin?: string;
 }): Promise<void> => {
   checkApiKey();
 
@@ -49,6 +51,7 @@ export const exportTracesCommand = async (options: {
     : now;
 
   const limit = options.limit ? parseInt(options.limit, 10) : 1000;
+  const originFilter = parseOriginOption(options.origin);
   const spinner = createSpinner(`Exporting traces (${format})...`).start();
   const events = createCommandEvents({ resource: "trace", verb: "export" });
 
@@ -67,6 +70,7 @@ export const exportTracesCommand = async (options: {
         endDate,
         pageSize: Math.min(limit, 100),
         format: "json",
+        ...(originFilter ? { filters: { "traces.origin": originFilter } } : {}),
       }),
     });
 
@@ -89,7 +93,7 @@ export const exportTracesCommand = async (options: {
       });
       await events.flush();
 
-      spinner.fail(`Export failed: ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: "export traces" });
       process.exit(1);
     }
 
@@ -128,7 +132,10 @@ export const exportTracesCommand = async (options: {
   } catch (error) {
     events.failed({ error, message: "Trace export failed" });
     await events.flush();
-    failSpinner({ spinner, error, action: "export traces", format: options?.format });
+    // No explicit `format`: this command's `--format` is a FILE format (jsonl
+    // etc.), not an error-output format — the preAction hook already recorded
+    // the resolved output format, which correctly stays human here.
+    failSpinner({ spinner, error, action: "export traces" });
     process.exit(1);
   } finally {
     await events.flush();

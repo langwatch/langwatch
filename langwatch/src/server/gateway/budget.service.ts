@@ -462,6 +462,28 @@ export class GatewayBudgetService {
         });
       }
     }
+    // Cross-org + product-managed guard for VIRTUAL_KEY budgets. The scope id
+    // is request-supplied, so without the org check a caller could budget
+    // another tenant's key; and a product-managed VK (purpose != USER — the
+    // Langy VK) is not the customer's to constrain: a $0.01 BLOCK budget on it
+    // would deny every Langy turn, the same "customer breaks a product-managed
+    // credential" class the by-id mutation guards already close. Not-found
+    // rather than forbidden, so the response never confirms the id exists.
+    if (input.scope.kind === "VIRTUAL_KEY") {
+      const vk = await this.prisma.virtualKey.findFirst({
+        where: {
+          id: input.scope.virtualKeyId,
+          organizationId: input.organizationId,
+        },
+        select: { purpose: true },
+      });
+      if (!vk || vk.purpose !== "USER") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Virtual key not found.",
+        });
+      }
+    }
 
     const resetsAt = nextResetAt(input.window);
     const projectId = resolveProjectFromScope(input.scope);

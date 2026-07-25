@@ -16,6 +16,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
+import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
 import {
@@ -327,6 +328,14 @@ function MyUsagePage() {
                 );
               })}
             </VStack>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Coding-agent usage (last 30 days)">
+          {personalProjectId ? (
+            <CodingAgentUsageContent projectId={personalProjectId} />
+          ) : (
+            <EmptyState message="No coding-agent usage yet" />
           )}
         </SectionCard>
 

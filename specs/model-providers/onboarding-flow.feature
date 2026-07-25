@@ -6,7 +6,7 @@ Feature: Onboarding Flow
   # All scenarios describe the onboarding flow UI for configuring a model
   # provider (form + redirect after save). Need a JSDOM render of
   # `OnboardingFlow` + Next.js router mock to assert redirect targets
-  # ("/@project/evaluations", "/@project/prompts"). The form's
+  # ("/@project/online-evaluations", "/@project/prompts"). The form's
   # validation/save mechanics overlap with credential-validation.feature.
   # Aspirational pending an onboarding-flow test harness.
 
@@ -55,7 +55,7 @@ Feature: Onboarding Flow
     And I am configuring a model provider
     When I complete the provider configuration
     And I click "Save"
-    Then I am redirected to "/@project/evaluations"
+    Then I am redirected to "/@project/online-evaluations"
 
   @integration @unimplemented
   Scenario: Redirect to prompts after saving in prompts onboarding

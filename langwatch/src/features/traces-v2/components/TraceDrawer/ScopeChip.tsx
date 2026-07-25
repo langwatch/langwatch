@@ -42,12 +42,7 @@ export function ScopeChip({ scope }: ScopeChipProps) {
     >
       <HStack gap={1} flexShrink={0} cursor="help">
         <Icon as={LuPackage} boxSize={3} color="fg.subtle" />
-        <Text
-          textStyle="2xs"
-          color="fg.subtle"
-          truncate
-          maxWidth="320px"
-        >
+        <Text textStyle="2xs" color="fg.subtle" truncate maxWidth="320px">
           {label}
         </Text>
       </HStack>

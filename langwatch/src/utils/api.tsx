@@ -23,7 +23,7 @@ import {
 } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import superjson from "superjson";
 import type { AppRouter } from "~/server/api/root";
 import {
@@ -31,6 +31,10 @@ import {
   showMissingModelToast,
   showProviderDisabledToast,
 } from "../components/MissingModelToast";
+import {
+  invalidateModelProviderQueries,
+  subscribeToModelProvidersUpdated,
+} from "./modelProviderSync";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 import { sseLink } from "./sseLink";
 import {
@@ -336,6 +340,26 @@ export const trpcClient = createTRPCClient<AppRouter>({
 });
 
 /**
+ * Mounted once inside the provider tree. Listens for model-provider saves
+ * broadcast by OTHER tabs (see modelProviderSync.ts — a tab opened via
+ * `window.open`, e.g. from NoModelsConfiguredCallout, has its own
+ * QueryClient and can't reach this one directly) and invalidates this
+ * tab's cache immediately, rather than waiting on a window-focus event.
+ */
+function ModelProviderCrossTabSync() {
+  const utils = api.useContext();
+
+  useEffect(
+    () => subscribeToModelProvidersUpdated(() => {
+      void invalidateModelProviderQueries(utils);
+    }),
+    [utils],
+  );
+
+  return null;
+}
+
+/**
  * TRPCProvider component that replaces the old api.withTRPC() HOC from @trpc/next.
  * Provides QueryClient and tRPC client to the React tree.
  */
@@ -352,7 +376,10 @@ export function TRPCProvider({ children }: { children: ReactNode }) {
 
   return (
     <api.Provider client={trpcClientInstance} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ModelProviderCrossTabSync />
+        {children}
+      </QueryClientProvider>
     </api.Provider>
   );
 }

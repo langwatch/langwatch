@@ -240,19 +240,24 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
                 isFirstOfErrorRun={
                   !isLoading && isFirstOfErrorRun[virtualItem.index]
                 }
-                // A row in the trace lens IS a trace, so it offers itself to
-                // Langy as one: while the panel is open the row picks up a
-                // subtle gradient ring and clicking it drops the trace into
-                // the composer's context. Skeleton rows have no trace to
-                // offer. Same chip factory the route/drawer use, so pointing
-                // at a trace you already have open dedupes instead of
-                // stacking a second chip.
+                // A trace row IS a trace, so it offers itself to Langy like any
+                // other addressable resource on the page.
+                //
+                // This was null, from when the affordance was held open on
+                // hover and read as noise on a dense table. The arming gate
+                // (`#`, or a held Shift — see useLangyContextArming) settled
+                // that: disarmed, a registered row carries no class, no state
+                // attribute, no handlers and no drag, so the table is exactly
+                // the table. The multi-select route through the selection bar
+                // stays — it is the better way to take twenty — but pointing at
+                // ONE trace should not require checking a box first, and every
+                // other resource on the page already works that way.
                 langyTarget={
                   isLoading
                     ? null
                     : traceContextChip(
                         row.original.traceId,
-                        row.original.traceName || row.original.name,
+                        row.original.name ?? null,
                       )
                 }
               />

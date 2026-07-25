@@ -150,7 +150,7 @@ interface DeviceCodeRecord {
 
 /**
  * Phase 8 — device metadata captured at /exchange time so users can
- * see "Bob's MacBook Pro" entries in the /me/sessions inventory and
+ * see "Bob's MacBook Pro" entries in the /me/devices inventory and
  * revoke them per-device. All fields optional to stay
  * backwards-compatible with older CLI versions that don't send
  * client_info; rendered as "Unknown device" in the UI when missing.
@@ -185,7 +185,7 @@ interface AccessTokenRecord {
   issued_at: number;
   expires_at: number;
   /** Phase 8 — mirror of refresh-token client_info; useful for the
-   * /me/sessions UI which reads access tokens directly. */
+   * /me/devices UI which reads access tokens directly. */
   client_info?: ClientInfo;
 }
 
@@ -396,7 +396,7 @@ const exchangeRequestSchema = z.object({
    * `{ hostname: os.hostname(), uname: os.userInfo().username,
    *    platform: process.platform, device_label: <user-set> }`.
    * Older CLI builds that don't send it get rendered as
-   * "Unknown device" in /me/sessions; new builds get a friendly label.
+   * "Unknown device" in /me/devices; new builds get a friendly label.
    */
   client_info: clientInfoSchema,
 });
@@ -585,7 +585,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     const accessToken = generateAccessToken();
     const refreshToken = generateRefreshToken();
     const now = Date.now();
-    // Phase 8 — stamp client device info so /me/sessions can show
+    // Phase 8 — stamp client device info so /me/devices can show
     // "Bob's MacBook Pro" entries. session_started_at is preserved
     // through future /refresh rotations so the dashboard can show
     // "logged in 5 days ago" rather than the rotation timestamp.
@@ -768,7 +768,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   const newAccessToken = generateAccessToken();
   const newRefreshToken = generateRefreshToken();
   const now = Date.now();
-  // Preserve session_started_at across rotations so /me/sessions can
+  // Preserve session_started_at across rotations so /me/devices can
   // accurately show "logged in N days ago" even after many refreshes.
   const carriedClientInfo = record.client_info;
   const newAccessRecord: AccessTokenRecord = {
@@ -1659,21 +1659,22 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
 
   // Governance gate: the device-session flow provisions a personal
   // workspace (Team + Project) and a personal virtual key for the user.
-  // That is a governance-plane capability; for an org without governance
-  // enabled it silently created a personal project that then captured the
-  // user's evaluations (customer report). Refuse it and point at project
-  // login, which writes a real project's API key to `.env`.
-  //
-  // ADR-038 GA note: at GA this fallback flips to true together with the
-  // registry default; the gate then only fires for orgs kill-switched off
-  // in PostHog, where /me is a 404 and refusing device login is correct.
+  // That is a governance-plane capability. The flag defaults on (ADR-038
+  // Decision 7: this fallback and the registry default are a pinned
+  // pair, enforced by governanceGaDefaults.unit.test.ts), so the gate
+  // fires only for orgs whose flag evaluates false (switched off in
+  // PostHog or via an operator override), where /me is a 404 and
+  // refusing device login is correct. The refusal points at project
+  // login, which writes a real project's API key to `.env`; the
+  // device-session flow silently capturing evaluations into a personal
+  // project (customer report) stays impossible for gated orgs.
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,
       organizationId: organization_id,
-      defaultValue: false,
+      defaultValue: true,
     })
-    .catch(() => false);
+    .catch(() => true);
   if (!governanceEnabled) {
     return c.json(
       {

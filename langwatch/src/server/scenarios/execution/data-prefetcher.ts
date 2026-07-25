@@ -660,15 +660,32 @@ async function hydrateLlmParameters({
   const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
   if (nodes.length === 0) return { success: true, dsl };
 
-  // Resolve the fallback model: workflow.default_llm.model or DEFAULT_MODEL
+  // Legacy fallback. `default_llm` only exists on raw persisted DSLs from
+  // spec_version <= 1.4 (nodes own their config since 1.5); this reader
+  // keeps tolerating it because scenario agents can reference old workflow
+  // versions that were never re-saved. On 1.5+ DSLs a modelless llm
+  // parameter is stale state and must NOT be silently substituted — leave
+  // it unhydrated so the engine raises its typed llm_model_not_set error.
+  const specParts =
+    typeof dsl.spec_version === "string"
+      ? dsl.spec_version.split(".").map(Number)
+      : [];
+  const specMajor = specParts[0] ?? NaN;
+  const specMinor = specParts[1] ?? 0;
+  const legacyDsl =
+    !Number.isFinite(specMajor) ||
+    !Number.isFinite(specMinor) ||
+    specMajor < 1 ||
+    (specMajor === 1 && specMinor < 5);
   const defaultLlm =
-    typeof dsl.default_llm === "object" && dsl.default_llm !== null
+    legacyDsl && typeof dsl.default_llm === "object" && dsl.default_llm !== null
       ? (dsl.default_llm as Record<string, unknown>)
       : null;
-  const defaultModel =
-    typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
+  const defaultModel = legacyDsl
+    ? typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
       ? defaultLlm.model
-      : DEFAULT_MODEL;
+      : DEFAULT_MODEL
+    : undefined;
 
   // Collect unique models needed before hitting the provider
   const modelsNeeded = new Set<string>();
@@ -692,7 +709,7 @@ async function hydrateLlmParameters({
         typeof value?.model === "string" && value.model.length > 0
           ? value.model
           : defaultModel;
-      modelsNeeded.add(model);
+      if (model) modelsNeeded.add(model);
     }
   }
 
@@ -747,6 +764,7 @@ async function hydrateLlmParameters({
         typeof existingValue?.model === "string" && existingValue.model.length > 0
           ? existingValue.model
           : defaultModel;
+      if (!model) return param;
 
       const litellmParams = litellmParamsByModel.get(model);
       if (!litellmParams) return param;

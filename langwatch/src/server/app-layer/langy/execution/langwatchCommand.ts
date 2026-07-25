@@ -125,9 +125,20 @@ function tokenize(command: string): string[] {
   return tokens;
 }
 
-/** `langwatch`, `./bin/langwatch`, `/opt/homebrew/bin/langwatch`. */
+/**
+ * `langwatch`, `./bin/langwatch`, `/opt/homebrew/bin/langwatch` — and `lw`,
+ * which the package ships as a second bin and the CLI's own help calls "the
+ * advertised name". Recognising only the long spelling meant every `lw <noun>
+ * <verb>` the agent ran stayed an anonymous `bash` frame: no rename, no card,
+ * no digest.
+ */
 function isLangwatchProgram(token: string): boolean {
-  return token === "langwatch" || token.endsWith("/langwatch");
+  return (
+    token === "langwatch" ||
+    token === "lw" ||
+    token.endsWith("/langwatch") ||
+    token.endsWith("/lw")
+  );
 }
 
 /**
@@ -150,6 +161,17 @@ function isInCommandPosition(tokens: string[], index: number): boolean {
 function isFlagToken(token: string): boolean {
   return token.startsWith("-") && token.length > 1 && !/^-\d/.test(token);
 }
+
+/**
+ * Root-position global flags that consume the token after them.
+ *
+ * Only these, and only for skipping past the globals to find the resource. The
+ * CLI's other globals (`--agent`, and `--json`, whose field list is optional)
+ * are treated as boolean here: mistaking a boolean for a value-taker swallows
+ * the resource, whereas the reverse merely leaves the command unrecognised —
+ * which is what happens today anyway.
+ */
+const VALUE_TAKING_GLOBAL_FLAGS = new Set(["--output", "-o", "--jq"]);
 
 /**
  * The invocation's flags and positionals, from the tokens after the verb up to
@@ -217,11 +239,37 @@ export function parseLangwatchCommand(command: string): LangwatchCommand | null 
     if (!isLangwatchProgram(tokens[i]!)) continue;
     if (!isInCommandPosition(tokens, i)) continue;
 
-    const resource = tokens[i + 1];
-    const verb = tokens[i + 2];
+    // Skip root-position global flags before the resource. `lw --output json
+    // monitor list` is the spelling the CLI's own help text teaches (the root's
+    // copies are what render under "Global Options:"), and reading `--output`
+    // as the resource failed the identifier test and threw away the whole
+    // command rather than the flag.
+    //
+    // Which flags take a value is read from a list rather than guessed from
+    // "the next token is not a flag": guessing swallows the resource whenever a
+    // BOOLEAN global precedes it (`lw --agent monitor list` would read `list`
+    // as the resource and find no verb).
+    let at = i + 1;
+    while (at < tokens.length && isFlagToken(tokens[at]!)) {
+      const flag = tokens[at]!;
+      const name = flag.includes("=") ? flag.slice(0, flag.indexOf("=")) : flag;
+      const takesValue =
+        !flag.includes("=") && VALUE_TAKING_GLOBAL_FLAGS.has(name);
+      const next = tokens[at + 1];
+      at +=
+        takesValue &&
+        next !== undefined &&
+        !isFlagToken(next) &&
+        !COMMAND_SEPARATORS.has(next)
+          ? 2
+          : 1;
+    }
+
+    const resource = tokens[at];
+    const verb = tokens[at + 1];
     if (!resource || !verb) return null;
     if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
-    return { resource, verb, args: parseArgs(tokens, i + 3) };
+    return { resource, verb, args: parseArgs(tokens, at + 2) };
   }
   return null;
 }

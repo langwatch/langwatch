@@ -11,7 +11,7 @@
  *     .schema  -> response envelope `schema` field
  *     .plan    -> getAllTracesForProject options.projection
  *     .project -> per-trace serializer (replaces formatTrace when active)
- *   ProjectionValidationError -> map to HTTP 400
+ *   ProjectionValidationError -> raise as a RequestValidationError (422)
  */
 
 export { compileProjection } from "./compile-projection";

@@ -54,8 +54,6 @@ function buildTraceDeps(
   const store = {} as any;
   return {
     spanAppendStore: store,
-    logRecordAppendStore: store,
-    metricRecordAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
@@ -71,7 +69,6 @@ function buildTraceDeps(
       graphActivityHandler: vi.fn().mockResolvedValue(undefined),
     },
     spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
-    claudeCodeSpanSyncReactor: reactorStub("claudeCodeSpanSync"),
     ...overrides,
   };
 }
@@ -215,6 +212,27 @@ describe("trace-processing pipeline span-command sharding", () => {
       expect(
         recordSpanCommand({ spanCommandShardCount: 8 }).options?.deduplication,
       ).toBe(RECORD_SPAN_DEDUPLICATION);
+    });
+  });
+});
+
+describe("given the retired stored_log_records write chain", () => {
+  describe("when the trace pipeline is built", () => {
+    /** @scenario Ingested log telemetry reaches only the canonical store */
+    it("registers no legacy log write machinery", () => {
+      // The recordLog command + logRecordStorage map projection were the
+      // stored_log_records write chain. Canonical `log_records` is now the
+      // only log write path, so neither is registered on the trace pipeline.
+      // recordLogContribution (the trace-fold contribution command) survives,
+      // so assert the exact "recordLog" name rather than a prefix.
+      const definition = createTraceProcessingPipeline(buildTraceDeps());
+
+      expect(
+        definition.commands.find((c) => c.name === "recordLog"),
+      ).toBeUndefined();
+      expect(
+        definition.mapProjections.get("logRecordStorage"),
+      ).toBeUndefined();
     });
   });
 });

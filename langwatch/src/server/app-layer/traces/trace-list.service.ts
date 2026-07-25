@@ -2,8 +2,14 @@ import { createLogger } from "@langwatch/observability";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
-import type { TopicService } from "~/server/app-layer/topics/topic.service";
+import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
 import { TtlCache } from "~/server/utils/ttlCache";
+import {
+  parseMediaRefs,
+  RESERVED_INPUT_MEDIA_REFS,
+  RESERVED_OUTPUT_MEDIA_REFS,
+  type TraceMediaRef,
+} from "~/shared/traces/media-refs";
 import {
   deriveTraceOrigin,
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -23,8 +29,8 @@ import type {
   BatchedFacetResult,
   CategoricalFacetResult,
   DiscreteFacetResult,
-  TraceListRepository,
   TraceListCursor,
+  TraceListRepository,
   TraceListSort,
   TraceListSortColumn,
 } from "./repositories/trace-list.repository";
@@ -80,6 +86,9 @@ export interface TraceListItem {
   sizeBytes: number;
   input: string | null;
   output: string | null;
+  /** Compact fold-derived media refs for the winning IO; absent when media-free. */
+  inputMediaRefs?: TraceMediaRef[];
+  outputMediaRefs?: TraceMediaRef[];
   error: string | null;
   conversationId: string | null;
   userId: string | null;
@@ -490,7 +499,7 @@ export class TraceListService {
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
     if (ids.length === 0) return result;
-    const names = await this.topicService.getNamesByIds(projectId, ids);
+    const names = await this.topicService.getNamesByIds({ projectId, ids });
     return {
       ...result,
       values: result.values.map((v) => {
@@ -1284,6 +1293,14 @@ function cursorForTraceRow(
   };
 }
 
+/** Parsed refs, or undefined so media-free rows serialize without the field. */
+function presentMediaRefs(
+  serialized: string | undefined,
+): TraceMediaRef[] | undefined {
+  const refs = parseMediaRefs(serialized);
+  return refs.length > 0 ? refs : undefined;
+}
+
 function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
   const status = deriveTraceStatus(row);
 
@@ -1327,6 +1344,10 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     sizeBytes: row.sizeBytes ?? 0,
     input: row.computedInput,
     output: row.computedOutput,
+    inputMediaRefs: presentMediaRefs(row.attributes[RESERVED_INPUT_MEDIA_REFS]),
+    outputMediaRefs: presentMediaRefs(
+      row.attributes[RESERVED_OUTPUT_MEDIA_REFS],
+    ),
     error: row.errorMessage,
     conversationId: row.attributes["gen_ai.conversation.id"] ?? null,
     userId: row.attributes["langwatch.user_id"] ?? null,

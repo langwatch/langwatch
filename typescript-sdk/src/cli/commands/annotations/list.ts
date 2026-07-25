@@ -4,11 +4,16 @@ import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotat
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the listing rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts). The `table` closure
+ * is the human form, byte-identical to what this command printed before.
+ */
 export const listAnnotationsCommand = async (options: {
   traceId?: string;
-  format?: string;
-}): Promise<void> => {
+}): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new AnnotationsApiService();
@@ -31,50 +36,50 @@ export const listAnnotationsCommand = async (options: {
       `Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(annotations, null, 2));
-      return;
-    }
+    return {
+      data: annotations,
+      table: () => {
+        if (annotations.length === 0) {
+          console.log();
+          console.log(chalk.gray("No annotations found."));
+          console.log(chalk.gray("Create one with:"));
+          console.log(
+            chalk.cyan(
+              '  langwatch annotation create <traceId> --comment "Great response!"',
+            ),
+          );
+          return;
+        }
 
-    if (annotations.length === 0) {
-      console.log();
-      console.log(chalk.gray("No annotations found."));
-      console.log(chalk.gray("Create one with:"));
-      console.log(
-        chalk.cyan(
-          '  langwatch annotation create <traceId> --comment "Great response!"',
-        ),
-      );
-      return;
-    }
+        console.log();
 
-    console.log();
+        const tableData = annotations.map((a) => ({
+          ID: a.id ?? "—",
+          "Trace ID": a.traceId ? a.traceId.substring(0, 20) : "—",
+          Comment: truncate(a.comment ?? "—", 40),
+          Rating: a.isThumbsUp === true ? "👍" : a.isThumbsUp === false ? "👎" : "—",
+          Created: a.createdAt ? formatRelativeTime(a.createdAt) : "—",
+        }));
 
-    const tableData = annotations.map((a) => ({
-      ID: a.id ?? "—",
-      "Trace ID": a.traceId ? a.traceId.substring(0, 20) : "—",
-      Comment: truncate(a.comment ?? "—", 40),
-      Rating: a.isThumbsUp === true ? "👍" : a.isThumbsUp === false ? "👎" : "—",
-      Created: a.createdAt ? formatRelativeTime(a.createdAt) : "—",
-    }));
+        formatTable({
+          data: tableData,
+          headers: ["ID", "Trace ID", "Comment", "Rating", "Created"],
+          colorMap: {
+            ID: chalk.green,
+            "Trace ID": chalk.cyan,
+          },
+        });
 
-    formatTable({
-      data: tableData,
-      headers: ["ID", "Trace ID", "Comment", "Rating", "Created"],
-      colorMap: {
-        ID: chalk.green,
-        "Trace ID": chalk.cyan,
+        console.log();
+        console.log(
+          chalk.gray(
+            `Use ${chalk.cyan("langwatch annotation get <id>")} to view full details`,
+          ),
+        );
       },
-    });
-
-    console.log();
-    console.log(
-      chalk.gray(
-        `Use ${chalk.cyan("langwatch annotation get <id>")} to view full details`,
-      ),
-    );
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch annotations", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch annotations" });
     process.exit(1);
   }
 };

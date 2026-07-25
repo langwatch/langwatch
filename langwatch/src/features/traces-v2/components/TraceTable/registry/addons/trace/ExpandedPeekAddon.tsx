@@ -258,11 +258,7 @@ const PeekSpanRow: React.FC<{
         >
           {icon}
         </Text>
-        <Text
-          textStyle="2xs"
-          color={isError ? "red.fg" : "fg"}
-          truncate
-        >
+        <Text textStyle="2xs" color={isError ? "red.fg" : "fg"} truncate>
           {span.name}
         </Text>
         {span.model && (

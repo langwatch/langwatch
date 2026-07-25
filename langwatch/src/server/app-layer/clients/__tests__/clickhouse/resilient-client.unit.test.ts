@@ -554,3 +554,49 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 });
+
+describe("query error translation after retries are exhausted", () => {
+  it("throws QueryMemoryExceededError for a 241 driver error, preserving the raw error in reasons", async () => {
+    const raw = new Error(
+      "Code: 241. DB::Exception: Memory limit (for query) exceeded. (MEMORY_LIMIT_EXCEEDED)",
+    );
+    const mock = makeMockClient({
+      query: vi.fn().mockRejectedValue(raw),
+    });
+    const client = createResilientClickHouseClient({
+      client: mock,
+      maxRetries: 1,
+      baseDelayMs: 1,
+    });
+
+    const { QueryMemoryExceededError } = await import(
+      "~/server/app-layer/traces/errors"
+    );
+    const rejection = await client
+      .query({ query: "SELECT 1" })
+      .catch((e) => e);
+
+    expect(rejection).toBeInstanceOf(QueryMemoryExceededError);
+    expect(rejection.reasons).toEqual([raw]);
+    // Retries happened first — translation only fires after exhaustion.
+    expect(mock.query).toHaveBeenCalledTimes(2);
+  });
+
+  it("rethrows unmapped driver errors unchanged", async () => {
+    const raw = new Error("Code: 62. DB::Exception: Syntax error");
+    const mock = makeMockClient({
+      query: vi.fn().mockRejectedValue(raw),
+    });
+    const client = createResilientClickHouseClient({
+      client: mock,
+      maxRetries: 1,
+      baseDelayMs: 1,
+    });
+
+    const rejection = await client
+      .query({ query: "SELECT 1" })
+      .catch((e) => e);
+
+    expect(rejection).toBe(raw);
+  });
+});

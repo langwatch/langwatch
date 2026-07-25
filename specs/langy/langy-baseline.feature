@@ -43,32 +43,50 @@ Feature: Langy in-product AI assistant — baseline (v1)
     And no evaluator from another project is included
 
   Scenario: Permission gate at chat entry
-    Given I do not have "evaluations:view" permission for project "demo"
+    Given I do not have "langy:create" permission for project "demo"
     When I send a message to Langy in project "demo"
     Then the request is rejected with a 403
 
   # ============================================================================
   # Access and rollout gating
-  # Covered by src/server/routes/__tests__/langy-route-auth.test.ts
+  # Covered by src/server/app-layer/langy/__tests__/langyAccessGate.unit.test.ts,
+  # src/features/langy/__tests__/ProjectLangyLayout.integration.test.tsx, and
+  # src/features/langy/hooks/__tests__/useShowLangy.integration.test.tsx
   # ============================================================================
 
-  Scenario: Staff always have Langy regardless of rollout
-    Given I am a LangWatch staff member
-    And Langy has not been rolled out beyond staff
+  Scenario: Without a rollout, Langy stays closed
+    Given Langy has not been rolled out to my account
+    When I send a message to Langy in project "demo"
+    Then the request is rejected by the rollout gate
+
+  Scenario: A rollout opens Langy
+    Given Langy has been rolled out to my account
     When I send a message to Langy in project "demo"
     Then the request is not rejected by the rollout gate
 
-  Scenario: Non-staff without rollout are blocked
-    Given I am not a LangWatch staff member
+  # A rollout can target a whole organization, not only a single project. The
+  # panel's visibility gate must honor an org-wide rollout the same way the API
+  # gate does — otherwise the org is authorized server-side but the handle never
+  # appears, because the gate resolved the flag with project context alone.
+  Scenario: An organization-wide rollout reveals the handle, not just the API
+    Given Langy has been rolled out to my whole organization
+    And no project-level rollout applies to project "demo"
+    When I navigate to any "/[project]/*" route in project "demo"
+    Then the Langy handle is visible
+
+  # There is no identity that grants Langy on its own — no staff bypass, no
+  # allowlisted address. The rollout is the only way in, so it also works as a
+  # complete kill switch.
+  Scenario: Working at LangWatch is not a way in
+    Given I am signed in with a verified LangWatch email address
     And Langy has not been rolled out to my account
     When I send a message to Langy in project "demo"
-    Then the request is rejected with a 403
+    Then the request is rejected by the rollout gate
 
-  Scenario: Rollout opens Langy to non-staff
-    Given I am not a LangWatch staff member
-    And Langy has been rolled out to my account
-    When I send a message to Langy in project "demo"
-    Then the request is not rejected by the rollout gate
+  Scenario: A closed rollout hides the panel as well as the API
+    Given Langy has not been rolled out to my account
+    When I navigate to any "/[project]/*" route in project "demo"
+    Then the Langy handle is not visible
 
   # ============================================================================
   # Read-only tools (information retrieval)

@@ -2,9 +2,9 @@ import { Box, Flex } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
-import { SPAN_TYPE_COLORS } from "../../../utils/formatters";
 import {
   BAR_HEIGHT,
+  getSpanBarColor,
   GROUP_ROW_HEIGHT,
   MIN_BAR_PX,
   type SiblingGroup,
@@ -46,8 +46,10 @@ export const TimelineBar = memo(function TimelineBar({
   );
   const isError = span.status === "error";
   const duration = span.durationMs;
-  const color =
-    (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  // Mirrors TreeRow's purple skill accent so the tree/timeline twins of a
+  // skill invocation agree — the timeline pane is the wider (default 62%)
+  // half of the split view, so leaving it unstyled undersells the promotion.
+  const color = getSpanBarColor(span.type, span.name);
   const isZeroDuration = duration === 0;
 
   const leftPct =
@@ -148,7 +150,7 @@ export const GroupTimelineBar = memo(function GroupTimelineBar({
   rootStart: number;
   rootDuration: number;
 }) {
-  const color = (SPAN_TYPE_COLORS[group.type] as string) ?? "gray.solid";
+  const color = getSpanBarColor(group.type, group.name);
   const leftPct =
     rootDuration > 0 ? ((group.minStart - rootStart) / rootDuration) * 100 : 0;
   const widthPct =

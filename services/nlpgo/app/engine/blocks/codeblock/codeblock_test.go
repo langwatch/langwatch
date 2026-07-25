@@ -84,6 +84,60 @@ func TestCodeBlock_ExtraOutputKeysPreserved(t *testing.T) {
 	assert.Equal(t, []any{float64(1), float64(2), float64(3)}, scratch)
 }
 
+// TestCodeBlock_WithholdsPodEnvironment is the regression guard for the
+// env-exfiltration hotfix: user code must NOT see credential-bearing
+// variables from the pod environment, while the interpreter still receives
+// the allowlisted plumbing it needs. A secret set in the parent process
+// must be invisible to the subprocess; PATH (allowlisted) must be visible.
+func TestCodeBlock_WithholdsPodEnvironment(t *testing.T) {
+	requirePython(t)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "super-secret-should-not-leak")
+	t.Setenv("LANGWATCH_INTERNAL_TOKEN", "also-secret")
+
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code: "import os\n" +
+			"def execute():\n" +
+			"    return {\n" +
+			"        'aws': os.environ.get('AWS_SECRET_ACCESS_KEY', '<absent>'),\n" +
+			"        'token': os.environ.get('LANGWATCH_INTERNAL_TOKEN', '<absent>'),\n" +
+			"        'has_path': bool(os.environ.get('PATH')),\n" +
+			"    }\n",
+		DeclaredOutputs: []string{"aws", "token", "has_path"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "<absent>", res.Outputs["aws"], "AWS secret leaked into user code env")
+	assert.Equal(t, "<absent>", res.Outputs["token"], "internal token leaked into user code env")
+	assert.Equal(t, true, res.Outputs["has_path"], "allowlisted PATH should still be present")
+}
+
+// TestCodeBlock_EmptyAllowlistPassesNothing verifies the explicit
+// lock-everything-down configuration: a non-nil empty allowlist yields a
+// subprocess with no environment at all (not an inherited one).
+func TestCodeBlock_EmptyAllowlistPassesNothing(t *testing.T) {
+	requirePython(t)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "super-secret-should-not-leak")
+
+	e, err := codeblock.New(codeblock.Options{EnvAllowlist: []string{}})
+	require.NoError(t, err)
+	res, err := e.Execute(context.Background(), codeblock.Request{
+		// PATH is allowlisted by the default set but NOT by an explicit
+		// empty allowlist, so its absence proves nothing from the parent
+		// environment (allowlisted or otherwise) was propagated.
+		Code: "import os\n" +
+			"def execute():\n" +
+			"    return {\n" +
+			"        'aws': os.environ.get('AWS_SECRET_ACCESS_KEY', '<absent>'),\n" +
+			"        'path': os.environ.get('PATH', '<absent>'),\n" +
+			"    }\n",
+		DeclaredOutputs: []string{"aws", "path"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "<absent>", res.Outputs["aws"], "secret must not leak under empty allowlist")
+	assert.Equal(t, "<absent>", res.Outputs["path"], "empty allowlist must pass no parent env vars, not even PATH")
+}
+
 func TestCodeBlock_RaisesAreStructured(t *testing.T) {
 	requirePython(t)
 	res, err := newExec(t).Execute(context.Background(), codeblock.Request{

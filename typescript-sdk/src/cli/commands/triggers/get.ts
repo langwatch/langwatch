@@ -6,10 +6,18 @@ import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import type { CommandResult } from "../../utils/output";
+import { redactTriggerSecrets } from "./redact";
+
+/**
+ * Returns the trigger rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts). `data` is the raw
+ * record, so a machine caller keeps `actionParams` and `updatedAt`, which the
+ * human view omits.
+ */
 export const getTriggerCommand = async (
   id: string,
-  options?: { format?: string },
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
@@ -24,7 +32,7 @@ export const getTriggerCommand = async (
 
     if (!response.ok) {
       const message = await formatFetchError(response);
-      spinner.fail(`Failed to fetch trigger "${id}": ${message}`);
+      failSpinner({ spinner, error: new Error(message), action: `fetch trigger "${id}"` });
       process.exit(1);
     }
 
@@ -44,33 +52,35 @@ export const getTriggerCommand = async (
 
     spinner.succeed(`Found trigger "${trigger.name}"`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(trigger, null, 2));
-      return;
-    }
+    return {
+      // actionParams holds plaintext webhook URLs and delivery secrets that
+      // the human block never prints — see ./redact.ts.
+      data: redactTriggerSecrets(trigger),
+      table: () => {
+        console.log();
+        console.log(chalk.bold("  Trigger Details:"));
+        console.log(`    ${chalk.gray("ID:")}      ${chalk.green(trigger.id)}`);
+        console.log(`    ${chalk.gray("Name:")}    ${chalk.cyan(trigger.name)}`);
+        console.log(`    ${chalk.gray("Action:")}  ${trigger.action}`);
+        console.log(`    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`);
+        console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
+        console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
+        console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
+        if (trigger.platformUrl) {
+          console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
+        }
 
-    console.log();
-    console.log(chalk.bold("  Trigger Details:"));
-    console.log(`    ${chalk.gray("ID:")}      ${chalk.green(trigger.id)}`);
-    console.log(`    ${chalk.gray("Name:")}    ${chalk.cyan(trigger.name)}`);
-    console.log(`    ${chalk.gray("Action:")}  ${trigger.action}`);
-    console.log(`    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`);
-    console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
-    console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
-    console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
-    if (trigger.platformUrl) {
-      console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
-    }
+        if (Object.keys(trigger.filters).length > 0) {
+          console.log();
+          console.log(chalk.bold("  Filters:"));
+          console.log(`    ${JSON.stringify(trigger.filters, null, 2).split("\n").join("\n    ")}`);
+        }
 
-    if (Object.keys(trigger.filters).length > 0) {
-      console.log();
-      console.log(chalk.bold("  Filters:"));
-      console.log(`    ${JSON.stringify(trigger.filters, null, 2).split("\n").join("\n    ")}`);
-    }
-
-    console.log();
+        console.log();
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch trigger", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch trigger" });
     process.exit(1);
   }
 };

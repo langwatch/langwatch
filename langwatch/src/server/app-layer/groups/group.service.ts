@@ -76,6 +76,16 @@ export class GroupRestService {
     }>;
     memberIds?: string[];
   }): Promise<Group> {
+    const uniqueMemberIds = [...new Set(memberIds ?? [])];
+    const allMembersInOrganization = await this.repo.areUsersInOrganization({
+      organizationId,
+      userIds: uniqueMemberIds,
+    });
+    if (!allMembersInOrganization) {
+      throw new UserNotInOrganizationError(
+        "All users must belong to the organization before joining a group",
+      );
+    }
     const baseSlug = slugify(name, { lower: true, strict: true });
     const slug = await this.repo.findUniqueSlug({
       organizationId,

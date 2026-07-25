@@ -33,12 +33,12 @@ Feature: Per-tenant soft cap on in-flight dispatch
   Scenario: Explicit env=0 disables the tenant cap entirely (kill switch)
     Given the env var "LANGWATCH_DISPATCH_TENANT_CAP" is set to "0"
     When readTenantCap() is invoked
-    Then it returns 0 and DISPATCH_LUA skips all cap-related branches
+    Then it returns 0 and DISPATCH_BATCH_LUA skips all cap-related branches
 
   @integration @tenant-cap @lifecycle
   Scenario: An in-flight slot is added on dispatch and removed on completion
     Given a tenant "proj_acme" with no in-flight groups
-    When DISPATCH_LUA dispatches one of its groups under cap=10
+    When DISPATCH_BATCH_LUA dispatches one of its groups under cap=10
     Then "proj_acme" has 1 live in-flight slot
     When COMPLETE_LUA completes that group
     Then "proj_acme" has 0 live in-flight slots
@@ -62,10 +62,10 @@ Feature: Per-tenant soft cap on in-flight dispatch
     Then "proj_acme"'s in-flight slot expiry is set to the retry window
 
   @integration @tenant-cap @enforcement
-  Scenario: DISPATCH_LUA refuses to dispatch when tenant is at cap
+  Scenario: DISPATCH_BATCH_LUA refuses to dispatch when tenant is at cap
     Given a tenant "proj_acme" with cap=2 and 2 groups already in-flight
     And a third dispatchable group for the same tenant is on the ready zset
-    When DISPATCH_LUA is invoked
+    When DISPATCH_BATCH_LUA is invoked
     Then no group is dispatched for "proj_acme"
     And the third group is parked out of the ready scan
 
@@ -73,7 +73,7 @@ Feature: Per-tenant soft cap on in-flight dispatch
   Scenario: Over-cap tenant at the head of the zset does not starve other tenants
     Given a tenant "proj_noisy" with cap=2 and 200 over-cap groups at the head of ready
     And a tenant "proj_quiet" with 1 group later in the zset
-    When DISPATCH_LUA is invoked
+    When DISPATCH_BATCH_LUA is invoked
     Then the widened scan budget walks past the over-cap groups
     And "proj_quiet"'s group is dispatched
 

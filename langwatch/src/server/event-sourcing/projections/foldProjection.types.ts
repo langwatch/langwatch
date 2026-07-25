@@ -146,6 +146,26 @@ export interface FoldProjectionOptions {
    */
   coalesceMaxBatch?: number;
   /**
+   * Bound the store's read-back to a time window around the folded event's
+   * business time.
+   *
+   * Declared here — once, on the fold — instead of every store forwarding an
+   * occurredAt hint by hand and every repository widening it with its own
+   * arithmetic and its own (sometimes forgotten) unwindowed fallback. The
+   * executor computes `context.readWindow = occurredAt ± widthMs` and, when a
+   * windowed read misses, retries once without the window before treating the
+   * aggregate as new — so a row outside the window (long-lived aggregate,
+   * clock skew, backfill) is still found rather than silently overwritten by
+   * a batch folded onto `init()`. Stores pass `context.readWindow` through to
+   * their repository verbatim.
+   *
+   * Pick `widthMs` from the drift between the event's business time and the
+   * backing table's partition column, not from the partition size: the window
+   * is a pruning optimisation, the unwindowed retry is the correctness net.
+   * Omit for stores whose backing read is not time-partitioned.
+   */
+  readWindow?: { widthMs: number };
+  /**
    * Re-fold from the event log when `store.get()` returns null instead of
    * starting from `init()`.
    *
@@ -203,4 +223,21 @@ export interface FoldProjectionStore<State> {
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<State | null>;
+
+  /**
+   * Retrieves the stored state together with the ids of the events already
+   * folded into it.
+   *
+   * Implemented by stores that persist the applied-event-id set durably next to
+   * the state row (first adopter: the codingAgentSession ClickHouse store) — and
+   * by the Redis cache wrapper, which serves the set from its entry. The
+   * executor prefers it over `get()` so redelivery dedup survives cache loss: a
+   * retry that reaches a cold cache can still read the durable set and recognise
+   * a batch it already committed. Stores that keep no such set omit it; the
+   * executor then reads `get()` and treats the applied set as empty.
+   */
+  getWithApplied?(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{ state: State | null; appliedEventIds: string[] }>;
 }

@@ -5,6 +5,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { ChipDef } from "./ChipBar";
+import { useIsReadOnlyTrace } from "../../context/TraceViewerContext";
 
 /**
  * Plain data describing the scenario run a trace belongs to. Returned by
@@ -34,6 +35,7 @@ export function useScenarioChipData(
   scenarioRunId: string | null | undefined,
 ): ScenarioChipData | null {
   const { project } = useOrganizationTeamProject();
+  const isReadOnly = useIsReadOnlyTrace();
   const { openDrawer } = useDrawer();
 
   const { data, isLoading } = api.scenarios.getRunState.useQuery(
@@ -42,7 +44,7 @@ export function useScenarioChipData(
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project?.id && !!scenarioRunId,
+      enabled: !!project?.id && !!scenarioRunId && !isReadOnly,
       staleTime: 30_000,
     },
   );

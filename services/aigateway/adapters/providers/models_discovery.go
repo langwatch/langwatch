@@ -122,13 +122,10 @@ func (p customerEndpointPolicy) allowsDialAddress(address string) error {
 	if ip == nil {
 		return fmt.Errorf("customer endpoint did not resolve to an IP address")
 	}
-	if isAlwaysBlockedEndpointIP(ip) {
-		return fmt.Errorf("customer endpoint resolves to a reserved address")
-	}
-	if p.blockLocal && !isPublicEndpointIP(ip) {
-		return fmt.Errorf("customer endpoint resolves to a non-public address")
-	}
-	return nil
+	// Same classifier the pre-flight check runs, so a dial cannot reach an
+	// address the URL check would have refused. Not allowlisted: the
+	// allowlist names hosts, and by this point the name is gone.
+	return endpointAddressError(ip, p.blockLocal, false)
 }
 
 // modelsDiscoveryCache memoises discovered catalogs per credential chain

@@ -117,7 +117,8 @@ class ServiceBuilder<TProject, TProviders extends Record<string, unknown>> {
       app.use("*", middleware);
     }
 
-    const onError = this._config.onError ?? createErrorHandler();
+    const onError =
+      this._config.onError ?? createErrorHandler();
     mountResolvedRoutes({
       app,
       onError,

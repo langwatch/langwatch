@@ -16,7 +16,7 @@ import {
   redactActionParamsFor,
 } from "~/server/app-layer/automations/providers/registry";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
@@ -192,7 +192,7 @@ function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
 /**
  * Wraps any thrown value as a `TRPCError` whose `cause` is preserved when the
  * value is a `HandledError`. The shared `errorFormatter` in `trpc.ts` serialises
- * that cause as `error.data.domainError = { code, meta, traceId, spanId, … }` so the
+ * that cause as `error.data.error = { code, meta, traceId, spanId, … }` so the
  * client gets the full structured payload — that is the "incredibly good error
  * handling" surface (see ADR-036 follow-up).
  */
@@ -202,7 +202,7 @@ function toTemplateTRPCError(err: unknown): TRPCError {
   // as a DispatchError with an already-actionable message — lift it onto the
   // typed HandledError channel so the UI shows a clean 4xx, not a generic 500.
   const domainError =
-    err instanceof HandledError
+    HandledError.isHandled(err)
       ? err
       : isDispatchError(err)
         ? new NotificationDeliveryError(err.message)

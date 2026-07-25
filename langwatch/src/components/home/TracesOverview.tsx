@@ -1,20 +1,28 @@
 import {
   Box,
-  Button,
+  chakra,
   Grid,
-  Heading,
   HStack,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { LuArrowRight, LuSparkles } from "react-icons/lu";
+import { useState } from "react";
+import {
+  LuArrowRight,
+  LuChevronDown,
+  LuChevronRight,
+} from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "~/server/analytics/registry";
 import { CustomGraph, type CustomGraphInput } from "../analytics/CustomGraph";
 import { usePeriodSelector } from "../PeriodSelector";
 import { Link } from "../ui/link";
 import { HomeCard } from "./HomeCard";
+import {
+  HOME_SECTION_PADDING,
+  HomeSectionHeader,
+} from "./HomeSectionHeader";
 
 const QUICK_STARTS = [
   {
@@ -96,14 +104,78 @@ function NewProjectQuickView({ projectSlug }: { projectSlug: string }) {
  * Shows a summary of traces performance metrics on the home page, labelled
  * with the time window the numbers cover — an unlabelled delta is noise.
  */
+/**
+ * How the overview presents itself.
+ *
+ * `full` is the page-wide card the classic home has always had. The other two
+ * are the Langy home's, and they answer the same question differently:
+ *
+ *   - `strip`   the figures alone, with the chart one labelled click away. The
+ *               lit block above wants the fold, and a reader glancing at
+ *               "how is my project doing" is answered by the figures and their
+ *               deltas without a curve.
+ *   - `trend`   the figures with a short curve under them, always visible. For
+ *               the reader whose question is really "and which way is it
+ *               going", where making them click is making them ask twice.
+ *
+ * Both are offered rather than one being declared correct, because which is
+ * right depends on how the reader uses the page. The dev state switcher flips
+ * between them.
+ */
+export type TracesOverviewVariant = "full" | "strip" | "trend";
+
+/**
+ * How many daily readings a curve needs before it is telling the truth.
+ *
+ * One point is a dot. Two is a slope with no evidence behind it, and a slope
+ * is exactly what a reader takes away from a chart, so a two-point line is
+ * worse than no line: it manufactures a direction out of a single change that
+ * might be a weekday. Four readings is the first window where a curve shows
+ * shape rather than noise, so below that the figures carry it alone and the
+ * card offers the thing that would actually help, which is a wider window.
+ */
+const MIN_POINTS_FOR_A_TREND = 4;
+
+/** What "wide enough to compare" resolves to when the reader takes the offer. */
+const WIDER_WINDOW = { key: "30d", label: "Last 30 days" } as const;
+
+/**
+ * How tall the curve under the figures is drawn, in pixels.
+ *
+ * Not the chart default. That default is sized for a dashboard, where the
+ * chart IS the page and a reader is measuring values off it. Here the curve
+ * answers one question the figures cannot — which way it is going — and at the
+ * dashboard height a handful of daily readings become a thin line adrift in
+ * white space, with the sections below it pushed off the fold. Sized to the
+ * figures it belongs to instead: tall enough to show shape, short enough that
+ * the row of numbers stays the thing being read.
+ */
+const TREND_HEIGHT = 160;
+
 export function TracesOverview({
-  showInvestigateSignal = false,
+  variant = "full",
 }: {
-  showInvestigateSignal?: boolean;
+  /** See `TracesOverviewVariant`. Nothing is ever removed, only re-presented. */
+  variant?: TracesOverviewVariant;
 }) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const canViewCost = hasPermission("cost:view");
-  const { daysDifference } = usePeriodSelector();
+  const { daysDifference, setRelativePeriod } = usePeriodSelector();
+  const [chartOpen, setChartOpen] = useState(false);
+
+  const compact = variant !== "full";
+  // Two forms of one fact: the chip above the figures, and the same window
+  // read as part of a sentence in the control that opens the trend.
+  const periodLabel =
+    daysDifference === 1 ? "Last day" : `Last ${daysDifference} days`;
+  const periodPhrase =
+    daysDifference === 1 ? "the last day" : `the last ${daysDifference} days`;
+  // The window is bucketed daily for the curve, so its length IS the number of
+  // readings the curve would be drawn through.
+  const trendIsMeaningful = daysDifference >= MIN_POINTS_FOR_A_TREND;
+  const showTrend =
+    trendIsMeaningful &&
+    (variant === "trend" || (variant === "strip" && chartOpen));
 
   const tracesOverviewGraph: CustomGraphInput = {
     graphId: "tracesOverview",
@@ -159,62 +231,112 @@ export function TracesOverview({
   }
 
   return (
-    <HomeCard width="full" padding={4} _hover={{ boxShadow: "2xs" }}>
-      <HStack width="full" gap={2} marginBottom={2}>
-        <Heading size="sm" color="fg">
-          Traces Overview
-        </Heading>
-        <Text fontSize="xs" color="fg.muted">
-          {daysDifference === 1 ? "Last day" : `Last ${daysDifference} days`}
-        </Text>
-        <Spacer />
-        <Link
-          href={`/${project.slug}/analytics`}
-          fontSize="xs"
-          color="fg.muted"
-          _hover={{ color: "orange.500" }}
-        >
-          View dashboards <LuArrowRight size={12} />
-        </Link>
-        {showInvestigateSignal ? (
-          <Button
-            asChild
-            size="xs"
-            variant="subtle"
-            colorPalette="purple"
-            css={{
-              "&:hover .investigate-icon, &:focus-visible .investigate-icon": {
-                width: "13px",
-                opacity: 1,
-                marginLeft: "3px",
-              },
-            }}
+    <HomeCard
+      width="full"
+      // `compact` tightens the CONTENT below, never the header: a title that
+      // starts at a different inset from its neighbours is exactly the
+      // inconsistency this padding constant exists to remove.
+      padding={HOME_SECTION_PADDING}
+      _hover={{ boxShadow: "2xs" }}
+    >
+      <HomeSectionHeader title="Traces overview" qualifier={periodLabel}>
+        <HStack gap={2} align="center">
+          <Link
+            href={`/${project.slug}/analytics`}
+            fontSize="xs"
+            color="fg.muted"
+            _hover={{ color: "orange.500" }}
           >
-            <Link
-              href={`/${project.slug}/langy?auto=1&prompt=${encodeURIComponent(
-                "Investigate the most important signal in this project from the last 24 hours. Explain what changed, show the affected traces, and suggest the next action.",
-              )}`}
-            >
-              Investigate signal
-              <Box
-                as="span"
-                className="investigate-icon"
-                width="0"
-                opacity={0}
-                overflow="hidden"
-                display="inline-flex"
-                transition="width 160ms ease, opacity 160ms ease, margin-left 160ms ease"
-              >
-                <LuSparkles size={13} />
-              </Box>
-            </Link>
-          </Button>
-        ) : null}
-      </HStack>
+            View dashboards <LuArrowRight size={12} />
+          </Link>
+        </HStack>
+      </HomeSectionHeader>
       <CustomGraph
         input={tracesOverviewGraph}
         emptyState={<NewProjectQuickView projectSlug={project.slug} />}
       />
+      {/* One footer, always carrying both halves of what the figures mean.
+          It used to be an either/or: a reader on a window wide enough for a
+          trend was offered the chart but never told what the deltas were
+          measured against, and a reader on a window too short was told, but
+          left with a single sentence under a wide row of numbers. Both halves
+          are true in both cases, so both are shown: what the comparison is, on
+          the left, and the one thing worth doing about this window, on the
+          right. The band is the same shape either way, which is what stops it
+          reading as a leftover. */}
+      {compact ? (
+        <HStack gap={3} flexWrap="wrap" width="full" align="center">
+          <Text fontSize="xs" color="fg.subtle">
+            Each figure is compared with the period before it.
+          </Text>
+          <Spacer />
+          {/* The chart is never deleted, only moved. In `strip` it waits behind
+              a named control that says what it will show and over what window,
+              so the click is worth taking rather than a mystery chevron; in
+              `trend` it is simply already there, and needs no control. */}
+          {trendIsMeaningful ? (
+            variant === "strip" ? (
+              <chakra.button
+                type="button"
+                onClick={() => setChartOpen((open) => !open)}
+                aria-expanded={chartOpen}
+                display="inline-flex"
+                alignItems="center"
+                gap={1}
+                fontSize="xs"
+                color="fg.muted"
+                background="transparent"
+                borderWidth={0}
+                cursor="pointer"
+                _hover={{ color: "fg" }}
+              >
+                {chartOpen ? (
+                  <LuChevronDown size={12} />
+                ) : (
+                  <LuChevronRight size={12} />
+                )}
+                {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
+              </chakra.button>
+            ) : null
+          ) : (
+            // Not enough readings to draw a shape. Rather than a chart that
+            // invents one, offer the window that would show a real trend. The
+            // offer is the better thing, not an explanation of the absence.
+            <chakra.button
+              type="button"
+              onClick={() => setRelativePeriod(WIDER_WINDOW.key)}
+              fontSize="xs"
+              color="fg.muted"
+              background="transparent"
+              borderWidth={0}
+              cursor="pointer"
+              textDecoration="underline"
+              textUnderlineOffset="3px"
+              _hover={{ color: "orange.fg" }}
+            >
+              See {WIDER_WINDOW.label.toLowerCase()}
+            </chakra.button>
+          )}
+        </HStack>
+      ) : null}
+      {showTrend ? (
+        <Box width="full">
+          {/* Bucketed by day, not aggregated whole: the summary above is the
+              one number, this is how it got there. `timeScale: 1` is also what
+              makes the window's length equal the number of readings the curve
+              is drawn through, which is what the threshold above counts. */}
+          <CustomGraph
+            input={{
+              ...tracesOverviewGraph,
+              graphType: "line",
+              timeScale: 1,
+              includePrevious: false,
+              height: TREND_HEIGHT,
+            }}
+            titleProps={{ fontSize: "xs", color: "fg.muted" }}
+          />
+        </Box>
+      ) : null}
     </HomeCard>
   );
 }

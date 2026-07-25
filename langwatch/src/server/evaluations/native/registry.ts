@@ -1,7 +1,7 @@
 import {
   findRedactionMarkers,
   SECRET_MARKER_ENTITY,
-} from "../../data-privacy/redaction/markers";
+} from "@langwatch/redaction";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,

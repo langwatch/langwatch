@@ -6,11 +6,14 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
 // egressAdapter is the per-worker outbound forward proxy (ADR-043). It is the
@@ -56,7 +59,8 @@ type egressAdapterConfig struct {
 	monitor        egressMonitor
 	// dial reaches the real upstream. Injected so tests can redirect any
 	// authority to a loopback listener; production uses a bounded net.Dialer.
-	dial func(ctx context.Context, network, addr string) (net.Conn, error)
+	dial    func(ctx context.Context, network, addr string) (net.Conn, error)
+	resolve func(ctx context.Context, host string) ([]net.IP, error)
 	// requireTLS refuses cleartext forwards and CONNECT to any port other than
 	// tlsPort (rung 1a). On by default in production — worker egress is HTTPS
 	// already, so this rung is the always-safe one.
@@ -229,7 +233,12 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	upstream, err := a.cfg.dial(ctx, "tcp", authority)
+	dialAddress, err := a.checkedDialAddress(ctx, host, port)
+	if err != nil {
+		a.record(fqdn, port, egressDeniedPrivateAddress, "destination address rejected: "+err.Error(), 0)
+		return
+	}
+	upstream, err := a.cfg.dial(ctx, "tcp", dialAddress)
 	if err != nil {
 		a.record(fqdn, port, decision, "upstream dial failed: "+err.Error(), 0)
 		return
@@ -238,6 +247,28 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	bytesUp := a.tunnel(ctx, clientConn, upstream, fqdn)
 	a.record(fqdn, port, decision, "tunnel closed", bytesUp)
+}
+
+func (a *egressAdapter) checkedDialAddress(ctx context.Context, host, port string) (string, error) {
+	if a.cfg.resolve == nil {
+		return net.JoinHostPort(host, port), nil
+	}
+	addresses, err := a.cfg.resolve(ctx, host)
+	if err != nil {
+		return "", fmt.Errorf("resolve host: %w", err)
+	}
+	for _, ip := range addresses {
+		addr, ok := netip.AddrFromSlice(ip)
+		// pkg/ssrf.IsPublicAddress is the canonical, cross-service rule set
+		// (Unmap()s IPv4-mapped IPv6 and rejects metadata, private, CGNAT,
+		// benchmarking, documentation, NAT64, 6to4 and reserved ranges). Pinning
+		// the dial to the first resolved public address closes the DNS-rebinding
+		// window between policy decision and connect.
+		if ok && ssrf.IsPublicAddress(addr) {
+			return net.JoinHostPort(addr.Unmap().String(), port), nil
+		}
+	}
+	return "", fmt.Errorf("host has no public address")
 }
 
 // tunnel splices client<->upstream opaquely. The client→upstream direction

@@ -2,10 +2,10 @@ import { useEffect, useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useSamplePreview } from "../onboarding";
+import type { TraceListCursor } from "../stores/filterStore";
 import { useFilterStore } from "../stores/filterStore";
 import { useViewStore } from "../stores/viewStore";
 import type { TraceListItem } from "../types/trace";
-import type { TraceListCursor } from "../stores/filterStore";
 import { mapTraceListPayload } from "../utils/mapTraceListPayload";
 
 export interface TraceListQueryResult {

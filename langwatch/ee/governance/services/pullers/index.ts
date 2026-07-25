@@ -2,7 +2,7 @@
 
 /**
  * PullerAdapter registry bootstrap. Importing this module wires the
- * built-in adapters into the singleton registry — the BullMQ worker
+ * built-in adapters into the singleton registry — the pull effect
  * imports it once at startup and then dispatches lookups by adapter id.
  *
  * Add new adapters by registering them here AND exporting them from

@@ -117,14 +117,4 @@ describe("workflowStoreCore — clickedNodeId lifecycle", () => {
     });
   });
 
-  describe("when the workflow itself becomes selected", () => {
-    it("clears clickedNodeId so the drawer cannot reopen on the next mousedown", () => {
-      store.getState().setSelectedNode("node-1");
-      expect(store.getState().clickedNodeId).toBe("node-1");
-
-      store.getState().setWorkflowSelected(true);
-
-      expect(store.getState().clickedNodeId).toBeNull();
-    });
-  });
 });

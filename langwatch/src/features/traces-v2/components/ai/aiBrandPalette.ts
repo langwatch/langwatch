@@ -12,6 +12,15 @@ export const aiBrandPalette: string[] = [
 // (the purple survives only inside the gradient itself).
 export const AI_ACCENT = "#ED8926";
 
+// The ORIGINAL hot ramp (orange → hot pink → violet). On a light surface the
+// langy ramp above reads washed out, so the Ask AI button keeps its heat from
+// this one in light mode; dark stays on the langy identity ramp.
+export const aiBrandPaletteHot: string[] = [
+  "#FF5F1F", // brand orange
+  "#FF1F8A", // hot pink
+  "#A855F7", // vivid violet
+];
+
 // ── HDR / Display-P3 forms (task #25) ───────────────────────────────────────
 // The hex forms above stay the source of truth: they feed the WebGL MeshGradient
 // (`colors={aiBrandPalette}`, which parses hex, not `color(display-p3 …)`) and

@@ -19,7 +19,10 @@ import (
 // values, so a service that registers HTTP statuses for these strings — directly,
 // or via RegisterStatuses — gets the right status back from herr.WriteHTTP.
 const (
-	CodeBadRequest      = herr.Code("bad_request")
+	CodeBadRequest = herr.Code("bad_request")
+	// CodeUnprocessable is a syntactically valid request whose fields fail
+	// validation — 422, distinct from CodeBadRequest (unreadable/unparseable).
+	CodeUnprocessable   = herr.Code("unprocessable_entity")
 	CodePayloadTooLarge = herr.Code("payload_too_large")
 )
 
@@ -28,6 +31,7 @@ const (
 // herr's status registry is process-global.
 func RegisterStatuses() {
 	herr.RegisterStatus(CodeBadRequest, http.StatusBadRequest)
+	herr.RegisterStatus(CodeUnprocessable, http.StatusUnprocessableEntity)
 	herr.RegisterStatus(CodePayloadTooLarge, http.StatusRequestEntityTooLarge)
 }
 
@@ -76,14 +80,14 @@ func validateStruct(ctx context.Context, v any) error {
 	if !ok {
 		// Non-field validator failure (a misconfigured tag). Keep the detail in a
 		// logged reason; the client still gets a generic message.
-		return herr.New(ctx, CodeBadRequest, herr.M{"message": "the request body was invalid"}, err)
+		return herr.New(ctx, CodeUnprocessable, herr.M{"message": "the request body was invalid"}, err)
 	}
 	fields := make([]string, 0, len(ve))
 	for _, fe := range ve {
 		fields = append(fields, validationFieldPath(fe))
 	}
 	clog.Get(ctx).Warn("request validation failed", zap.Strings("fields", fields))
-	return herr.New(ctx, CodeBadRequest, herr.M{
+	return herr.New(ctx, CodeUnprocessable, herr.M{
 		"message": "the request was missing or contained invalid required fields",
 		"fields":  fields,
 	})

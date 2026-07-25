@@ -32,7 +32,7 @@ describe("prompt sync fidelity — langwatch prompt create", () => {
 
   /** @scenario Creating a prompt via the CLI does not inject a temperature */
   it("writes a modern model and no modelParameters temperature", async () => {
-    await createCommand("my-prompt", {});
+    await createCommand("my-prompt");
 
     expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
     const written = vi.mocked(fs.writeFileSync).mock.calls[0]![1] as string;

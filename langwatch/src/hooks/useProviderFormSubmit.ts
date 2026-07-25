@@ -13,6 +13,10 @@ import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../utils/modelProviderHelpers";
+import {
+  broadcastModelProvidersUpdated,
+  invalidateModelProviderQueries,
+} from "../utils/modelProviderSync";
 import type { ExtraHeader } from "./useExtraHeaders";
 
 /** Snapshot of all form state needed at submission time. */
@@ -115,6 +119,8 @@ export function useProviderFormSubmit({
           customEmbeddingsModels:
             snapshot.provider.customEmbeddingsModels ?? [],
         });
+        await invalidateModelProviderQueries(utils);
+        broadcastModelProvidersUpdated();
         onSuccess?.();
       } catch (err) {
         onError?.(err);
@@ -127,7 +133,7 @@ export function useProviderFormSubmit({
         });
       }
     },
-    [getFormSnapshot, onSuccess, onError, updateMutation],
+    [getFormSnapshot, onSuccess, onError, updateMutation, utils],
   );
 
   const submit = useCallback(async () => {
@@ -440,14 +446,13 @@ export function useProviderFormSubmit({
       // affordance), which reads as "the save didn't take" and drives
       // users to re-add the same provider (the other duplicate-row path
       // in #5380).
-      await Promise.all([
-        utils.modelProvider.getAllForProject.invalidate(),
-        utils.modelProvider.getAllForProjectForFrontend.invalidate(),
-        utils.modelProvider.listAllForProjectForFrontend.invalidate(),
-        utils.modelProvider.listAllForOrganizationForFrontend.invalidate(),
-        utils.modelProvider.getResolvedDefault.invalidate(),
-        utils.modelProvider.getDefaultModelsForProject.invalidate(),
-      ]);
+      await invalidateModelProviderQueries(utils);
+      // This save may have happened in a tab opened by
+      // NoModelsConfiguredCallout's "Set up" link — broadcast so the
+      // opener tab's picker (a different QueryClient instance) refreshes
+      // immediately instead of waiting on a window-focus event that,
+      // for a window.open'd tab pair, often never reliably fires (#5827).
+      broadcastModelProvidersUpdated();
 
       toaster.create({
         title: "Model Provider Updated",

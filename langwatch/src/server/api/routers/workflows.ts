@@ -27,6 +27,8 @@ import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
+import { pMapLimited } from "../../event-sourcing/replay/pMapLimited";
+import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -201,7 +203,7 @@ export const workflowRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ ctx, input }) => {
-      return ctx.prisma.workflow.findMany({
+      const workflows = await ctx.prisma.workflow.findMany({
         where: { projectId: input.projectId, archivedAt: null },
         orderBy: { updatedAt: "desc" },
         select: {
@@ -245,16 +247,51 @@ export const workflowRouter = createTRPCRouter({
               },
             },
           },
-          _count: {
-            select: {
-              copiedWorkflows: {
-                where: {
-                  archivedAt: null,
-                },
-              },
-            },
+          copiedWorkflows: {
+            where: { archivedAt: null },
+            select: { projectId: true },
           },
         },
+      });
+
+      const relatedProjectIds = [
+        ...new Set(
+          workflows.flatMap((workflow) => [
+            ...(workflow.copiedFrom ? [workflow.copiedFrom.projectId] : []),
+            ...workflow.copiedWorkflows.map((copy) => copy.projectId),
+          ]),
+        ),
+      ];
+      // Each related project needs its own RBAC check; cap concurrency so a
+      // workflow with many copies can't exhaust the DB connection pool.
+      const visibleProjects = new Map<string, boolean>();
+      await pMapLimited({
+        items: relatedProjectIds,
+        concurrency: 5,
+        fn: async (projectId) => {
+          const isVisible =
+            projectId === input.projectId ||
+            (await hasProjectPermission(ctx, projectId, "workflows:view"));
+          visibleProjects.set(projectId, isVisible);
+        },
+      });
+
+      return workflows.map(({ copiedWorkflows, ...workflow }) => {
+        const canSeeSource =
+          workflow.copiedFrom &&
+          visibleProjects.get(workflow.copiedFrom.projectId);
+        return {
+          ...workflow,
+          copiedFromWorkflowId: canSeeSource
+            ? workflow.copiedFromWorkflowId
+            : null,
+          copiedFrom: canSeeSource ? workflow.copiedFrom : null,
+          _count: {
+            copiedWorkflows: copiedWorkflows.filter((copy) =>
+              visibleProjects.get(copy.projectId),
+            ).length,
+          },
+        };
       });
     }),
 
@@ -1318,6 +1355,11 @@ export const saveOrCommitWorkflowVersion = async ({
     nodes: mergeLocalConfigsIntoDsl(input.dsl.nodes as any) as any,
     state: {},
   };
+  await materializeNodeLlmConfigs({
+    prisma: ctx.prisma,
+    projectId: input.projectId,
+    dsl: dslWithMergedConfigs,
+  });
   const dslWithoutStates = JSON.parse(JSON.stringify(dslWithMergedConfigs));
   const data = {
     commitMessage,

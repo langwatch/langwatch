@@ -146,20 +146,25 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 // must react to (cache invalidation, in practice). Mirrors the wire shape
 // emitted by GET /api/internal/gateway/changes.
 type Change struct {
-	Kind                 string
-	VirtualKeyID         string
-	BudgetID             string
-	ProviderCredentialID string
-	ProjectID            string
-	Revision             string
+	Kind            string
+	VirtualKeyID    string
+	BudgetID        string
+	ModelProviderID string
+	ProjectID       string
+	Revision        string
 }
 
 // Change kinds — keep in sync with the control-plane ChangeEventKind enum
 // in langwatch/src/server/gateway/changeEvent.repository.ts.
 const (
-	ChangeKindProviderBindingUpdated = "PROVIDER_BINDING_UPDATED"
+	ChangeKindProviderBindingUpdated = "MODEL_PROVIDER_UPDATED"
+	ChangeKindBudgetCreated          = "BUDGET_CREATED"
 	ChangeKindBudgetUpdated          = "BUDGET_UPDATED"
-	ChangeKindVirtualKeyUpdated      = "VIRTUAL_KEY_UPDATED"
+	ChangeKindBudgetDeleted          = "BUDGET_DELETED"
+	ChangeKindVirtualKeyCreated      = "VK_CREATED"
+	ChangeKindVirtualKeyConfigUpdate = "VK_CONFIG_UPDATED"
+	ChangeKindVirtualKeyRotated      = "VK_ROTATED"
+	ChangeKindVirtualKeyRevoked      = "VK_REVOKED"
 )
 
 // PollChanges does one /changes long-poll. Returns the events the control
@@ -227,12 +232,12 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 	var wire struct {
 		CurrentRevision string `json:"current_revision"`
 		Changes         []struct {
-			Kind                 string `json:"kind"`
-			VirtualKeyID         string `json:"virtual_key_id"`
-			BudgetID             string `json:"budget_id"`
-			ProviderCredentialID string `json:"provider_credential_id"`
-			ProjectID            string `json:"project_id"`
-			Revision             string `json:"revision"`
+			Kind            string `json:"kind"`
+			VirtualKeyID    string `json:"virtual_key_id"`
+			BudgetID        string `json:"budget_id"`
+			ModelProviderID string `json:"model_provider_id"`
+			ProjectID       string `json:"project_id"`
+			Revision        string `json:"revision"`
 		} `json:"changes"`
 	}
 	if err := json.Unmarshal(body, &wire); err != nil {
@@ -241,12 +246,12 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 	out := make([]Change, len(wire.Changes))
 	for i, ch := range wire.Changes {
 		out[i] = Change{
-			Kind:                 ch.Kind,
-			VirtualKeyID:         ch.VirtualKeyID,
-			BudgetID:             ch.BudgetID,
-			ProviderCredentialID: ch.ProviderCredentialID,
-			ProjectID:            ch.ProjectID,
-			Revision:             ch.Revision,
+			Kind:            ch.Kind,
+			VirtualKeyID:    ch.VirtualKeyID,
+			BudgetID:        ch.BudgetID,
+			ModelProviderID: ch.ModelProviderID,
+			ProjectID:       ch.ProjectID,
+			Revision:        ch.Revision,
 		}
 	}
 	return out, wire.CurrentRevision, nil
@@ -326,6 +331,53 @@ func (c *Client) setCommonHeaders(req *http.Request) {
 	if c.userAgent != "" {
 		req.Header.Set("User-Agent", c.userAgent)
 	}
+}
+
+// RefreshCodexToken asks the control plane — the codex OAuth session's owner —
+// to refresh the provider row's stored tokens and hand back a fresh access
+// token. Implements domain.CodexTokenRefresher; a dead session (the control
+// plane answers 401 codex_session_expired) wraps domain.ErrCodexSessionDead
+// so the dispatcher stops retrying and surfaces the sign-in-again error.
+func (c *Client) RefreshCodexToken(ctx context.Context, providerRowID string) (string, string, error) {
+	payload, err := json.Marshal(map[string]string{"provider_row_id": providerRowID})
+	if err != nil {
+		return "", "", err
+	}
+	resp, err := c.signedPost(ctx, "/api/internal/gateway/codex/refresh", payload)
+	if err != nil {
+		return "", "", fmt.Errorf("codex refresh call: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", "", fmt.Errorf("codex refresh read: %w", err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized {
+		// herr carries the typed code for surfacing; ErrCodexSessionDead rides
+		// as a reason so the dispatcher's errors.Is sentinel check still fires.
+		return "", "", herr.New(ctx, domain.ErrCodexSessionExpired, nil, domain.ErrCodexSessionDead)
+	}
+	if resp.StatusCode != http.StatusOK {
+		snippet := body
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
+		return "", "", herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+			"reason":      "codex refresh failed",
+			"http_status": resp.StatusCode,
+			"body":        string(snippet),
+		})
+	}
+	var parsed struct {
+		AccessToken string `json:"access_token"`
+		AccountID   string `json:"account_id"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil || parsed.AccessToken == "" {
+		return "", "", herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+			"reason": "codex refresh: malformed response",
+		})
+	}
+	return parsed.AccessToken, parsed.AccountID, nil
 }
 
 // signedPost is a helper for POST requests to the control plane.

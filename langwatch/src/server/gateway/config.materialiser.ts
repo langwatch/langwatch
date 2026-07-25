@@ -18,8 +18,12 @@ import type {
 } from "@prisma/client";
 
 import { decrypt } from "../../utils/encryption";
+import {
+  resolveLangyMirrorTier,
+  type LangyMirrorTier,
+} from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
-import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import {
   eligibleModelProvidersForVk,
@@ -139,6 +143,13 @@ export type GatewayConfigPayload = {
       salt?: string;
     };
   }>;
+  /**
+   * ADR-061 mirror tier. Present and non-skip ONLY for Langy virtual keys, so
+   * the gateway never mirrors ordinary customer traffic. The gateway reads this
+   * (never a client header) to decide whether to duplicate the gen_ai span into
+   * the mirror project.
+   */
+  langy_mirror_tier: LangyMirrorTier;
   metadata: Record<string, unknown>;
 };
 
@@ -172,6 +183,14 @@ export class GatewayConfigMaterialiser {
       project_otlp_token: traceProject?.apiKey ?? null,
       team_id: traceProject?.teamId ?? null,
       principal_id: vk.principalUserId,
+      // ADR-061: only a Langy VK's calls are mirrored — the gen_ai span is the
+      // one part of a Langy turn's trace the manager's relay never sees. Every
+      // other VK resolves to skip, so ordinary customer traffic is never
+      // duplicated into LangWatch's mirror project.
+      langy_mirror_tier:
+        vk.purpose === "LANGY" && traceProject?.id
+          ? resolveLangyMirrorTier({ projectId: traceProject.id })
+          : "skip",
       providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
       fallback: {
         on: config.fallback.on,
@@ -210,7 +229,9 @@ export class GatewayConfigMaterialiser {
   private async applicableCacheRules(
     organizationId: string,
   ): Promise<GatewayCacheRule[]> {
-    return GatewayCacheRuleService.create(this.prisma).bundleFor(organizationId);
+    return GatewayCacheRuleService.create(this.prisma).bundleFor(
+      organizationId,
+    );
   }
 
   /**
@@ -353,7 +374,10 @@ function decryptCustomKeys(raw: unknown): Record<string, unknown> {
 // resolver gets a stable structure (ariana R-lane CR pin from step (i)).
 type BundlePolicyRules = GatewayConfigPayload["policy_rules"];
 
-const EMPTY_POLICY_RULE_DIM = { deny: [] as string[], allow: null as string[] | null };
+const EMPTY_POLICY_RULE_DIM = {
+  deny: [] as string[],
+  allow: null as string[] | null,
+};
 
 function emptyPolicyRules(): BundlePolicyRules {
   return {
@@ -364,12 +388,15 @@ function emptyPolicyRules(): BundlePolicyRules {
   };
 }
 
-function mergePolicyDim(
-  raw: unknown,
-): { deny: string[]; allow: string[] | null } {
+function mergePolicyDim(raw: unknown): {
+  deny: string[];
+  allow: string[] | null;
+} {
   if (!raw || typeof raw !== "object") return { ...EMPTY_POLICY_RULE_DIM };
   const r = raw as { deny?: unknown; allow?: unknown };
-  const deny = Array.isArray(r.deny) ? r.deny.filter((x): x is string => typeof x === "string") : [];
+  const deny = Array.isArray(r.deny)
+    ? r.deny.filter((x): x is string => typeof x === "string")
+    : [];
   const allow =
     r.allow === null || r.allow === undefined
       ? null
@@ -431,11 +458,9 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
       return {
         api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
         endpoint:
-          pick("AZURE_OPENAI_ENDPOINT") ||
-          pick("AZURE_API_GATEWAY_BASE_URL"),
+          pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
         api_version:
-          pick("AZURE_OPENAI_API_VERSION") ||
-          pick("AZURE_API_GATEWAY_VERSION"),
+          pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
       };
     }
     case "bedrock": {
@@ -455,6 +480,18 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
         auth_credentials:
           pick("GOOGLE_APPLICATION_CREDENTIALS") ||
           pick("VERTEXAI_SERVICE_ACCOUNT_JSON"),
+      };
+    }
+    case "openai_codex": {
+      // OAuth session, not an API key: the gateway sends the access token as
+      // the bearer and the ChatGPT account id as a header, and calls back to
+      // the control plane (by row id) to refresh a 401'd token once. See
+      // services/aigateway codex dispatch + /api/gateway/internal codex
+      // refresh route.
+      return {
+        access_token: pick("CODEX_ACCESS_TOKEN"),
+        account_id: pick("CODEX_ACCOUNT_ID"),
+        provider_row_id: mp.id,
       };
     }
     case "anthropic":
@@ -550,12 +587,7 @@ function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
 }
 
 function scopeToWire(
-  scope:
-    | "ORGANIZATION"
-    | "TEAM"
-    | "PROJECT"
-    | "VIRTUAL_KEY"
-    | "PRINCIPAL",
+  scope: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL",
 ): "organization" | "team" | "project" | "virtual_key" | "principal" {
   switch (scope) {
     case "ORGANIZATION":

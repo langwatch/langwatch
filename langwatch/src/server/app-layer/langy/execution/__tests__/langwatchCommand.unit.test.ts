@@ -177,4 +177,68 @@ describe("parseLangwatchCommand", () => {
       expect(parseLangwatchCommand("langwatch trace --help")).toBeNull();
     });
   });
+
+  /**
+   * The package ships two bins and the CLI's help calls `lw` "the advertised
+   * name", so an agent that follows the docs writes `lw`. Recognising only the
+   * long spelling left every one of those an anonymous `bash` frame.
+   */
+  describe("given the short `lw` bin", () => {
+    it("reads the resource and the verb", () => {
+      expect(parseLangwatchCommand("lw monitor list")).toMatchObject({
+        resource: "monitor",
+        verb: "list",
+      });
+    });
+
+    it("finds it when invoked by path", () => {
+      expect(
+        parseLangwatchCommand("/opt/homebrew/bin/lw trace search"),
+      ).toMatchObject({ resource: "trace", verb: "search" });
+    });
+
+    it("does not mistake a word merely ending in lw for the bin", () => {
+      expect(parseLangwatchCommand("flw monitor list")).toBeNull();
+    });
+  });
+
+  /**
+   * Root-position globals are the spelling the CLI's own help teaches, because
+   * the root's copies are what render under "Global Options:". Reading the flag
+   * as the resource threw away the entire command rather than the flag.
+   */
+  describe("given globals in root position, before the resource", () => {
+    it("skips a value-taking global and its value", () => {
+      expect(
+        parseLangwatchCommand("langwatch --output json monitor list"),
+      ).toMatchObject({ resource: "monitor", verb: "list" });
+    });
+
+    it("skips the short form too", () => {
+      expect(parseLangwatchCommand("lw -o json trace search")).toMatchObject({
+        resource: "trace",
+        verb: "search",
+      });
+    });
+
+    it("skips a boolean global without swallowing the resource", () => {
+      // The reason the value-taking flags are listed rather than guessed: a
+      // "consume the next token" heuristic reads `monitor` as `--agent`'s value
+      // and then finds no verb.
+      expect(parseLangwatchCommand("lw --agent monitor list")).toMatchObject({
+        resource: "monitor",
+        verb: "list",
+      });
+    });
+
+    it("skips an --flag=value global", () => {
+      expect(
+        parseLangwatchCommand("lw --output=json monitor list"),
+      ).toMatchObject({ resource: "monitor", verb: "list" });
+    });
+
+    it("still returns null when the globals name no resource at all", () => {
+      expect(parseLangwatchCommand("lw --output json")).toBeNull();
+    });
+  });
 });

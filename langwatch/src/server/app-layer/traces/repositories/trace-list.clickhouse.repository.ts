@@ -39,6 +39,8 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrCacheCreationTokens: string;
   AttrReasoningTokens: string;
   AttrLabels: string;
+  AttrInputMediaRefs: string;
+  AttrOutputMediaRefs: string;
   LastEventOccurredAt: number;
 }
 
@@ -174,6 +176,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrOrigin,
           AttrNonBillable,
           AttrCacheReadTokens,
+          AttrInputMediaRefs,
+          AttrOutputMediaRefs,
           AttrCacheCreationTokens,
           AttrReasoningTokens,
           AttrLabels,
@@ -226,6 +230,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['langwatch.origin'] AS AttrOrigin,
             Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,
             Attributes['langwatch.reserved.cache_read_tokens'] AS AttrCacheReadTokens,
+            Attributes['langwatch.reserved.media_refs.input'] AS AttrInputMediaRefs,
+            Attributes['langwatch.reserved.media_refs.output'] AS AttrOutputMediaRefs,
             Attributes['langwatch.reserved.cache_creation_tokens'] AS AttrCacheCreationTokens,
             Attributes['langwatch.reserved.reasoning_tokens'] AS AttrReasoningTokens,
             Attributes['langwatch.labels'] AS AttrLabels,
@@ -1119,6 +1125,13 @@ function buildListAttributes(
   if (row.AttrCacheReadTokens) {
     attributes["langwatch.reserved.cache_read_tokens"] =
       row.AttrCacheReadTokens;
+  }
+  if (row.AttrInputMediaRefs) {
+    attributes["langwatch.reserved.media_refs.input"] = row.AttrInputMediaRefs;
+  }
+  if (row.AttrOutputMediaRefs) {
+    attributes["langwatch.reserved.media_refs.output"] =
+      row.AttrOutputMediaRefs;
   }
   if (row.AttrCacheCreationTokens) {
     attributes["langwatch.reserved.cache_creation_tokens"] =

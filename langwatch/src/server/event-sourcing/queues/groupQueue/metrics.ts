@@ -31,6 +31,12 @@ const metricNames = [
   "gq_retry_encode_failures_total",
   // #5538
   "gq_jobs_dropped_total",
+  "gq_group_attempt_read_failures_total",
+  // 2026-07-22 blob-retention fix
+  "gq_blob_release_grace_total",
+  "gq_blob_sweep_total",
+  // ADR-066 pillar 2 mixed-command isolation
+  "gq_foreign_siblings_restaged_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -151,6 +157,21 @@ export const gqRetryBackoffMilliseconds = new Histogram({
 });
 
 // --- Per-job duration metric ---
+/**
+ * Failed reads of the group retry-chain counter.
+ *
+ * Matters more than it looks. A failed read returns 0, so a sibling-led retry
+ * resolves to attempt 1 — byte-identical to a genuine fresh delivery in the
+ * span, the metrics, and the `deliveryAttempt` reaching the fold. That both
+ * restarts the retry budget AND makes the fold discard its record of what the
+ * chain already applied. Without this counter the two are indistinguishable.
+ */
+export const gqGroupAttemptReadFailuresTotal = new Counter({
+  name: "gq_group_attempt_read_failures_total",
+  help: "Failed reads of the group retry-chain counter; a retry may read as a fresh delivery",
+  labelNames: ["queue_name"] as const,
+});
+
 export const gqJobDurationMilliseconds = new Histogram({
   name: "gq_job_duration_milliseconds",
   help: "Duration of individual job processing in milliseconds",
@@ -169,13 +190,6 @@ export const gqOldestPendingAgeMilliseconds = new Gauge({
 });
 
 // --- Blob lifecycle observability (ADR-030 hardening + review 2026-06-24) ---
-
-/** S3-tier reclaim throw (network / 5xx). Warn-only; TTL / bucket-lifecycle backstop. */
-export const gqBlobReclaimS3FailuresTotal = new Counter({
-  name: "gq_blob_reclaim_s3_failures_total",
-  help: "Blob s3-tier reclaim failures (relies on TTL / bucket-lifecycle backstop)",
-  labelNames: ["queue_name"] as const,
-});
 
 /** A stored blob exceeded the decode cap — possible tamper / zip-bomb. Distinct from a missing blob. */
 export const gqBlobDecodeCapExceededTotal = new Counter({
@@ -206,7 +220,7 @@ export const gqPayloadTooLargeTotal = new Counter({
  */
 export const gqGroupsPoisonParkedTotal = new Counter({
   name: "gq_groups_poison_parked_total",
-  help: "Groups parked into the blocked set by the claim-side poison guard",
+  help: "Groups parked into the blocked set by a poison guard (reason: claim_strikes | oversized_payload | failure_streak)",
   labelNames: ["queue_name", "reason"] as const,
 });
 
@@ -269,4 +283,71 @@ export const gqJobsDroppedTotal = new Counter({
     "job_name",
     "reason",
   ] as const,
+});
+
+/**
+ * A release retired a blob's LAST lease, so its expiry dropped from the 4-day
+ * backstop to the release grace window.
+ *
+ * This is the liveness signal for blob reclaim, and it exists because the
+ * failure mode it guards against is silence. When releases left the full
+ * backstop on unreferenced blobs, nothing in this module said so; the only
+ * evidence was Redis memory climbing for four days, which the lease rollout had
+ * already told operators to expect. A rate near zero while jobs complete means
+ * reclaim is not happening — read it beside `gq_jobs_completed_total`, not
+ * alone.
+ *
+ * ⚠️ Scope: terminal retirement only — the TS release and transfer paths. The
+ * dedup-squash release inside `STAGE_LUA` applies the same grace window but is
+ * NOT counted, because reporting it would mean widening the stage scripts'
+ * return contract on the hot path. So this is a liveness signal ("is reclaim
+ * happening at all"), not a complete ledger of graced blobs: treat the count as
+ * a floor, and do not compute a reclaim ratio from it. The squash path's own
+ * coverage is the integration tests plus Redis memory itself.
+ */
+export const gqBlobReleaseGraceTotal = new Counter({
+  name: "gq_blob_release_grace_total",
+  help: "Blobs whose last lease was retired via terminal retirement, moving them from the 4-day backstop onto the release grace window (excludes the dedup-squash release path — a floor, not a total)",
+  labelNames: ["queue_name", "tier"] as const,
+});
+
+/**
+ * Every blob the reclaim runner examined, by what it decided.
+ *
+ * Unlike `gq_blob_release_grace_total` this accounts for the WHOLE keyspace: the
+ * outcomes partition it, so `sum by (outcome)` is the full picture rather than a
+ * floor. That is what makes it the signal to read when retention climbs anyway.
+ *
+ * How to read it:
+ * - `repaired` rising steadily means blobs are reaching the runner unreferenced
+ *   but NOT on the grace window — i.e. releases are being missed or withheld
+ *   (holders dying mid-flight, orphaned holder tokens). Healthy at first; a
+ *   persistently high rate means the release path is not doing its job.
+ * - `reclaimed` is the only outcome that frees bytes. Flat while `repaired`
+ *   climbs means the margin is never being reached — look for something
+ *   re-arming blobs between sweeps.
+ * - `leased` dominating is normal and healthy: most blobs are in use.
+ */
+export const gqBlobSweepTotal = new Counter({
+  name: "gq_blob_sweep_total",
+  help: "Blobs examined by the reclaim runner, by outcome (leased, repaired, reclaimed, bookkeeping, pending) — outcomes partition the keyspace, so this is a total, not a floor",
+  labelNames: ["queue_name", "outcome"] as const,
+});
+
+/**
+ * Drained siblings restaged because their `__jobName` differed from the
+ * dispatched job's (ADR-066 pillar 2 mixed-command isolation).
+ *
+ * Distinct from the batch-failure restage paths (transient decode, oversized
+ * poison) that share `restageDrainedSiblings`: those restage the WHOLE batch
+ * because dispatch aborted, whereas this restages only foreign-command siblings
+ * that were coalesced into a group whose key namespace is shared across command
+ * types under `serializeByAggregate`. A steady rate means genuinely mixed
+ * command traffic hitting one aggregate; a spike can flag a group-key collision
+ * or a misrouted producer. Counts siblings restaged, not restage calls.
+ */
+export const gqForeignSiblingsRestagedTotal = new Counter({
+  name: "gq_foreign_siblings_restaged_total",
+  help: "Drained siblings restaged untouched because their __jobName differed from the dispatched job (ADR-066 mixed-command isolation) — excludes the batch-failure restage paths",
+  labelNames: ["queue_name"] as const,
 });

@@ -10,6 +10,26 @@ import { normalizeToSnakeCase } from "../components/properties/llm-configs/norma
 import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
 
+/**
+ * An llm parameter reached dispatch without a model. Persisted DSLs are
+ * materialized at save time and legacy ones are migrated on read, so this
+ * only fires for stale client state (e.g. a tab predating the node-owned
+ * LLM config migration). Mapped to a 422 by the post_event route — it is a
+ * fixable configuration problem, not a server fault.
+ */
+export class LlmModelNotSetError extends Error {
+  public readonly cause = "LLM_MODEL_NOT_SET" as const;
+
+  constructor(nodeName?: string) {
+    super(
+      `LLM node ${
+        nodeName ? `"${nodeName}" ` : ""
+      }has no model selected. Open the node and choose a model.`,
+    );
+    this.name = "LlmModelNotSetError";
+  }
+}
+
 export const addEnvs = async (
   event: StudioClientEvent,
   projectId: string,
@@ -49,18 +69,6 @@ export const addEnvs = async (
     event.type === "execute_optimization" ||
     event.type === "execute_evaluation";
 
-  const getDefaultLLM = async () => {
-    if (!("workflow" in event.payload)) {
-      throw new Error("Workflow is required");
-    }
-    return await addLiteLLMParams({
-      llm: event.payload.workflow.default_llm,
-      modelProviders,
-      customKeysOnly: onlyCustomKeys,
-      projectId,
-    });
-  };
-
   const workflow: ServerWorkflow = {
     ...(event.payload.workflow as Workflow),
     workflow_id,
@@ -72,16 +80,17 @@ export const addEnvs = async (
         const parameters = await Promise.all(
           node.data.parameters?.map(async (p) => {
             if (p.type === "llm") {
+              if (!(p.value as LLMConfig | undefined | null)?.model) {
+                throw new LlmModelNotSetError(node.data.name ?? node.id);
+              }
               return {
                 ...p,
-                value: p.value
-                  ? await addLiteLLMParams({
-                      llm: p.value as LLMConfig,
-                      modelProviders,
-                      customKeysOnly: onlyCustomKeys,
-                      projectId,
-                    })
-                  : await getDefaultLLM(),
+                value: await addLiteLLMParams({
+                  llm: p.value as LLMConfig,
+                  modelProviders,
+                  customKeysOnly: onlyCustomKeys,
+                  projectId,
+                }),
               };
             }
             return p;
@@ -93,15 +102,17 @@ export const addEnvs = async (
     ),
   };
 
-  if (event.type === "execute_optimization" && "llm" in event.payload.params) {
-    event.payload.params.llm = event.payload.params.llm
-      ? await addLiteLLMParams({
-          llm: event.payload.params.llm,
-          modelProviders,
-          customKeysOnly: onlyCustomKeys,
-          projectId,
-        })
-      : await getDefaultLLM();
+  if (
+    event.type === "execute_optimization" &&
+    "llm" in event.payload.params &&
+    event.payload.params.llm
+  ) {
+    event.payload.params.llm = await addLiteLLMParams({
+      llm: event.payload.params.llm,
+      modelProviders,
+      customKeysOnly: onlyCustomKeys,
+      projectId,
+    });
   }
 
   return {
@@ -124,6 +135,9 @@ const addLiteLLMParams = async ({
   customKeysOnly: boolean;
   projectId: string;
 }) => {
+  if (!llm.model) {
+    throw new LlmModelNotSetError();
+  }
   const provider = llm.model.split("/")[0]!;
   const modelProvider = modelProviders[provider];
   if (!modelProvider) {

@@ -47,6 +47,12 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
    * Use with caution - should not bypass security or validation.
    */
   raw?: Record<string, unknown>;
+  /**
+   * Which delivery of the job carrying this read is being processed: 1 for a
+   * fresh delivery, higher for a retry of a chain that has not acked. Absent
+   * outside the queue, e.g. during replay.
+   */
+  deliveryAttempt?: number;
 }
 
 /**
@@ -83,6 +89,26 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>,
     aggregateType: AggregateType,
     anchorOccurredAtMs?: number,
+  ): Promise<readonly EventType[]>;
+
+  /**
+   * Retrieves events with an EXPLICIT occurred-at lower bound (ms), applied
+   * verbatim for ANY aggregate type — unlike `getEvents`, whose anchor is
+   * gated to time-local aggregate types.
+   *
+   * For reads that hold a provable bound of their own, e.g. a cursor tail
+   * catch-up that only wants events accepted after its cursor. The caller
+   * owns the safety margin: the bound MUST sit far enough below the wanted
+   * range that no delayed or replayed event's occurred-at can fall under it.
+   *
+   * **Security:** Implementations MUST validate tenantId exactly as for
+   * `getEvents`.
+   */
+  getEventsOccurredSince(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    occurredAtFromMs: number,
   ): Promise<readonly EventType[]>;
 
   /**

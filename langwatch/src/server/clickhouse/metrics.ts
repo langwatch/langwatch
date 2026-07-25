@@ -39,6 +39,39 @@ export const incrementClickHouseQueryCount = (
   status: "success" | "error",
 ) => clickhouseQueryTotal.labels(queryType, status).inc();
 
+// Counter for windowed reads: the partition-pruning-window-with-fallback read
+// pattern (see app-layer/clients/clickhouse/windowed-read.ts). One increment
+// per queryWindowed call, tagged with the path it took:
+//   hit             - hinted window sufficed (cheap, no widening)
+//   widened_hit     - hinted window empty; a bounded lookback re-scan found rows
+//   widened_empty   - hinted window empty; bounded lookback re-scan also empty
+//   unbounded_hit   - hinted window empty; unbounded re-scan found rows
+//   unbounded_empty - hinted window empty; unbounded re-scan also empty
+//   unwindowed      - no hint; ran the fallback window directly
+//   error           - an attempt threw; the read failed rather than resolved
+// Exists to size how often reads fall off the cheap path before a rate limit is
+// chosen for the expensive ones.
+export type WindowedReadOutcome =
+  | "hit"
+  | "widened_hit"
+  | "widened_empty"
+  | "unbounded_hit"
+  | "unbounded_empty"
+  | "unwindowed"
+  | "error";
+
+register.removeSingleMetric("clickhouse_windowed_read_total");
+const clickhouseWindowedReadTotal = new Counter({
+  name: "clickhouse_windowed_read_total",
+  help: "Total number of ClickHouse windowed reads by table and outcome",
+  labelNames: ["table", "outcome"] as const,
+});
+
+export const incrementWindowedReadCount = (
+  table: string,
+  outcome: WindowedReadOutcome,
+) => clickhouseWindowedReadTotal.labels(table, outcome).inc();
+
 // ============================================================================
 // Storage Metrics
 // ============================================================================
@@ -342,6 +375,16 @@ export async function collectStorageStats(
 
     const rows = await result.json<TableStats>();
 
+    // Reset before repopulating (mirrors the per-disk gauges below). Without
+    // this, a table that TTL-drops to zero active parts — or is simply absent
+    // from one tick's `system.parts` result — keeps its last non-zero value
+    // forever, so `clickhouse_table_bytes`/`_rows`/`_parts` report phantom size
+    // long after the data is gone (these feed the DB-size and trace_summaries
+    // alerts). Placed after the query resolves so a query error keeps the last
+    // known values rather than zeroing them.
+    clickhouseTableRows.reset();
+    clickhouseTableBytes.reset();
+    clickhouseTableParts.reset();
     for (const row of rows.data) {
       setClickHouseTableRows(row.table, parseInt(row.total_rows, 10));
       setClickHouseTableBytes(row.table, parseInt(row.total_bytes, 10));

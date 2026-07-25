@@ -1,14 +1,14 @@
-import type { ResolvedDataPrivacy } from "../dataPrivacy.types";
-import {
-  ESSENTIAL_PII_ENTITIES,
-  redactEssentialPiiInText,
-} from "./essentialPii";
 import {
   compileSecretPatterns,
   isSensitiveAttributeKey,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
-} from "./secretsRedaction";
+} from "@langwatch/redaction";
+import type { ResolvedDataPrivacy } from "../dataPrivacy.types";
+import {
+  ESSENTIAL_PII_ENTITIES,
+  redactEssentialPiiInText,
+} from "./essentialPii";
 
 const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
   ESSENTIAL_PII_ENTITIES,

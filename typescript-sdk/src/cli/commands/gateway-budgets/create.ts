@@ -8,6 +8,7 @@ import {
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 export interface CreateGatewayBudgetOptions {
   name: string;
@@ -22,7 +23,6 @@ export interface CreateGatewayBudgetOptions {
   limit: string;
   onBreach?: "block" | "warn";
   timezone?: string;
-  format?: string;
 }
 
 const ALLOWED_WINDOWS: BudgetWindow[] = ["MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "TOTAL"];
@@ -49,9 +49,13 @@ function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetSco
   }
 }
 
+/**
+ * Returns the created budget rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts).
+ */
 export const createGatewayBudgetCommand = async (
   options: CreateGatewayBudgetOptions,
-): Promise<void> => {
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const upperWindow = options.window.toUpperCase() as BudgetWindow;
@@ -90,21 +94,21 @@ export const createGatewayBudgetCommand = async (
 
     spinner.succeed(`Created budget "${chalk.cyan(budget.name)}"`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(budget, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`${chalk.bold("ID:")}       ${budget.id}`);
-    console.log(`${chalk.bold("Scope:")}    ${budget.scope_type.toLowerCase()}:${budget.scope_id}`);
-    console.log(`${chalk.bold("Window:")}   ${budget.window.toLowerCase()}`);
-    console.log(`${chalk.bold("Limit:")}    $${budget.limit_usd}`);
-    console.log(`${chalk.bold("Breach:")}   ${budget.on_breach.toLowerCase()}`);
-    console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
-    console.log();
+    return {
+      data: budget,
+      table: () => {
+        console.log();
+        console.log(`${chalk.bold("ID:")}       ${budget.id}`);
+        console.log(`${chalk.bold("Scope:")}    ${budget.scope_type.toLowerCase()}:${budget.scope_id}`);
+        console.log(`${chalk.bold("Window:")}   ${budget.window.toLowerCase()}`);
+        console.log(`${chalk.bold("Limit:")}    $${budget.limit_usd}`);
+        console.log(`${chalk.bold("Breach:")}   ${budget.on_breach.toLowerCase()}`);
+        console.log(`${chalk.bold("Resets:")}   ${new Date(budget.resets_at).toLocaleString()}`);
+        console.log();
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "create gateway budget", format: options?.format });
+    failSpinner({ spinner, error, action: "create gateway budget" });
     process.exit(1);
   }
 };

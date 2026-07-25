@@ -73,8 +73,9 @@ haven seed       reseed this stack's database (refuses non-local database URLs);
 haven git        embedded git TUI (moron) for any worktree — `haven git <slug>`
                  inspects another stack's worktree without cd or checkout;
                  `--list`/`--json` print the per-worktree overview instead
-haven prune      reclaim disk + drop pruned worktrees' databases (dry-run
-                 without --yes; the standing lw_main database is always kept)
+haven prune      interactive worktree cleanup — scans every worktree (size,
+                 databases, idle time, origin-gone), pre-ticks the 5+-day-stale
+                 ones, sort + pick + delete; `--artifacts` is the old disk reclaim
 haven down       stop this worktree's stack (launcher, routes, registry entry);
                  databases are kept — --drop-db for a fresh one, and the daemon
                  background-prunes databases idle past HAVEN_DB_TTL (14d)
@@ -194,8 +195,20 @@ registry, and dashboard stay the same.
   `LANGY_WORKER_GATEWAY_URL`), and the host reaches the manager over a published
   loopback port. Production is never any of these — it always runs sandboxed under
   gVisor.
-- **`haven prune`.** Reclaim regenerable disk (node_modules, dist, caches) from
-  worktrees that are neither up nor dirty. Dry-run by default; `--yes` to act.
+- **`haven prune`.** Interactive worktree cleanup. It scans every worktree at
+  once — two concurrent queues, a fast one for git + database facts (idle time,
+  which `lw_<slug>` databases it owns, uncommitted changes, whether the branch was
+  merged and its upstream deleted) and a slower one for disk size (`du`) — behind
+  a loading state, pre-ticks everything idle 5+ days (`--stale-days N` /
+  `HAVEN_PRUNE_STALE_DAYS`), lets you sort (most-idle / size / name / uncommitted /
+  origin-gone, `s` cycles) and tick the ones to delete, then removes exactly those
+  (reusing `DestroyWorktree`: stack stopped, databases dropped, directory removed).
+  The primary checkout, the current worktree, and `lw_main` are never touched; the
+  shared ClickHouse / Postgres / Redis / observability servers are machine-wide and
+  never removed. Agents (and any non-TTY) get the read-only report instead and
+  delete nothing. `haven prune --artifacts [--yes]` is the older, conservative
+  reclaim: regenerable disk (node_modules, dist, caches) from worktrees that are
+  neither up nor dirty, no worktree deleted, dry-run without `--yes`.
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
   tsgo runs across worktrees don't exhaust RAM (bounded by memory / CPU).
 - **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an

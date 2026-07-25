@@ -1,4 +1,4 @@
-import { HandledError } from "../handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 export class LiteMemberRestrictedError extends HandledError {
   declare readonly code: "lite_member_restricted";

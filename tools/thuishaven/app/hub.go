@@ -73,14 +73,30 @@ func (o *Orchestrator) DestroyWorktree(ctx context.Context, gitDir, dir, selfDir
 		return fmt.Errorf("%s is not a worktree of this repository", dir)
 	}
 
-	// Resolve the slug whose databases we may drop from the registry (which haven
-	// controls) rather than the worktree-local slug cache (which a hostile branch
-	// can forge) — do it before downing, while the registry entries still exist.
-	dbSlug := o.resolveDestroySlug(dir)
+	o.stopAndDropForDir(ctx, dir)
+	if err := o.hyg.RemoveWorktree(gitDir, dir); err != nil {
+		return fmt.Errorf("removing worktree: %w", err)
+	}
+	o.hyg.PruneGitWorktrees(gitDir)
+	return nil
+}
+
+// stopAndDropForDir stops every stack running from a (canonicalised) worktree
+// dir, waits for the launchers to actually exit, and drops the worktree's
+// ClickHouse + Postgres databases — the shared "make this worktree's data go
+// away" sequence both DestroyWorktree (single) and DestroyWorktrees (batch) run
+// before removing the directory. The database slug is resolved from the registry
+// BEFORE downing (which deletes registry entries), so a forged .langwatch-slug
+// cannot redirect the drop. It intentionally does not touch the git worktree
+// admin — the callers decide whether to remove one worktree or rm many and prune
+// once. Safe to run concurrently across distinct dirs: each downs only its own
+// stacks and drops only its own databases.
+func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) {
+	dbSlug := o.resolveDestroySlug(canonDir)
 
 	var downedPIDs []int
 	for _, st := range o.store.Stacks() {
-		if canonicalPath(st.WorktreeDir) != dir {
+		if canonicalPath(st.WorktreeDir) != canonDir {
 			continue
 		}
 		downedPIDs = append(downedPIDs, st.LauncherPID)
@@ -90,15 +106,9 @@ func (o *Orchestrator) DestroyWorktree(ctx context.Context, gitDir, dir, selfDir
 	}
 	// DownStack signals the launchers asynchronously (they die with their process
 	// group); wait for them to actually exit before touching the databases or the
-	// directory, so RemoveWorktree does not race a node/vite stack still writing.
+	// directory, so the removal does not race a node/vite stack still writing.
 	o.waitForProcessesDead(downedPIDs)
-
 	o.dropWorktreeDatabases(ctx, dbSlug)
-	if err := o.hyg.RemoveWorktree(gitDir, dir); err != nil {
-		return fmt.Errorf("removing worktree: %w", err)
-	}
-	o.hyg.PruneGitWorktrees(gitDir)
-	return nil
 }
 
 // resolveDestroySlug picks the slug whose databases DestroyWorktree may drop.

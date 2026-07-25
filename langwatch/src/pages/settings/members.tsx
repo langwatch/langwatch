@@ -326,6 +326,7 @@ function MembersList({
                         <RandomColorAvatar
                           size="2xs"
                           name={member.user.name ?? ""}
+                          image={member.user.image}
                         />
                       </Table.Cell>
                       <Table.Cell>

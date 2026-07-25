@@ -260,8 +260,8 @@ export class TieredBlobStore {
       await this.objectStoreFor(projectId).put(uri, data, mediaType);
       return { tier: "s3", projectId, hash };
     }
-    // GQ2 blobs are refcounted (holder-set eager reclaim), so the TTL is only
-    // the orphan backstop — 4 days, not GQ1's 7-day staged-residence window.
+    // GQ2 Redis blobs reclaim lazily when their renewable lease/backstop window
+    // goes untouched — 4 days, not GQ1's 7-day staged-residence window.
     await this.redisBlobs.put({
       id: redisBlobId({ projectId, hash }),
       data,
@@ -368,10 +368,8 @@ export class TieredBlobStore {
   }
 
   /**
-   * Deletes a blob. A redis-tier blob is normally reclaimed inside the holder
-   * Lua (UNLINK in the same eval as the last release); this method is the
-   * general-purpose / out-of-band delete — the s3 reclaim path, or a direct
-   * caller holding a ref — so it handles both tiers.
+   * Explicitly deletes a blob for administrative/direct callers. GQ2 lease
+   * release and transfer paths never call this; normal reclaim is lazy.
    */
   async delete(ref: BlobRef): Promise<void> {
     if (ref.tier === "redis") {

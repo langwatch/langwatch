@@ -11,13 +11,19 @@ export type LangyTurnAdmissionClaim =
       turnId: string;
     }
   | { kind: "pending" }
-  | { kind: "busy" };
+  | { kind: "busy" }
+  /**
+   * The idempotency key exists but was admitted with DIFFERENT content: the
+   * derived turn id no longer matches the receipt's. Callers must error —
+   * silently replaying the original send would swallow the new content.
+   */
+  | { kind: "mismatch" };
 
 export interface LangyTurnAdmissionRepository {
   claim(input: {
     projectId: string;
     userId: string;
-    requestId: string;
+    idempotencyKey: string;
     conversationId: string;
     turnId: string;
   }): Promise<LangyTurnAdmissionClaim>;
@@ -25,7 +31,7 @@ export interface LangyTurnAdmissionRepository {
   commit(input: {
     projectId: string;
     userId: string;
-    requestId: string;
+    idempotencyKey: string;
     conversationId: string;
     turnId: string;
     claimToken: string;
@@ -41,7 +47,7 @@ export interface LangyTurnAdmissionRepository {
   abort(input: {
     projectId: string;
     userId: string;
-    requestId: string;
+    idempotencyKey: string;
     conversationId: string;
     turnId: string;
     claimToken: string;

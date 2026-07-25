@@ -48,6 +48,29 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
+// These banner tests exercise the inline Ask AI composer path, so Langy is
+// gated off — the gate hooks carry session/tRPC wiring this suite doesn't
+// mount. The Langy-owned affordance is covered by SearchBar.integration.
+vi.mock("~/features/langy/hooks/useShowLangy", () => ({
+  useShowLangy: () => false,
+}));
+vi.mock("~/features/langy/hooks/useCanAskLangy", () => ({
+  useCanAskLangy: () => false,
+}));
+vi.mock("~/features/langy/stores/langyStore", () => {
+  const state = () => ({
+    isOpen: false,
+    askLangy: () => undefined,
+    openPanel: () => undefined,
+    attachContext: () => undefined,
+  });
+  const useLangyStore = (
+    selector: (s: ReturnType<typeof state>) => unknown,
+  ) => selector(state());
+  useLangyStore.getState = state;
+  return { useLangyStore };
+});
+
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { useFilterStore } from "../../../stores/filterStore";
 import { SearchBar } from "../SearchBar";

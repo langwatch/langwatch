@@ -19,6 +19,7 @@ from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
 from .errors import DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError
+from langwatch.utils.exceptions import extract_api_error_detail
 
 _tracer = trace.get_tracer(__name__)
 
@@ -43,7 +44,7 @@ def _raise_for_api_status(
     body: dict = {}
     try:
         body = response.json()
-        detail = body.get("message") or body.get("error") or ""
+        detail = extract_api_error_detail(body)
     except Exception:
         detail = response.text or ""
 

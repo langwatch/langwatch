@@ -285,6 +285,8 @@ For self-hosted (`npx @langwatch/server`), nothing leaves your machine. Postgres
 
 ## Troubleshooting
 
+**Device login approval fails with "AI-tools (device) login needs governance enabled" (self-hosted).** Your server runs a LangWatch version that ships governance off by default. Update it (`npx @langwatch/server@latest`) or set `RELEASE_UI_AI_GOVERNANCE_ENABLED=1` in `~/.langwatch/.env` and restart the server, then re-run `langwatch login --device`.
+
 **Nothing in Recent activity after 30 seconds.** Confirm the wrapper spawned with the right env. Open `~/.langwatch/config.json`: Path 1 needs a `default_personal_vk` block, Path 2 needs the wrapper to have minted an ingestion key (`sk-lw-…`) on first run. If neither shows up, re-run `langwatch login --device` and then `langwatch claude` again. `langwatch init-shell` prints the eval-able shell snippet showing exactly which env vars the wrapper injects.
 
 **401 from the gateway (Path 1).** Your Virtual Key probably rotated. Re-run `langwatch login --device` or re-mint the Virtual Key from `/me` → Model providers.

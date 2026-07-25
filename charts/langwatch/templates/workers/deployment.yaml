@@ -121,8 +121,35 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            # See the app deployment — named per role so worker telemetry is
+            # separable from the app's.
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.workers.otel.serviceName | default "langwatch-workers" | quote }}
+
             - name: LANGWATCH_ENDPOINT
               value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+
+            {{- /* Langy turns are dispatched from HERE, not from the app: the
+                   process outbox in the event-sourcing runtime POSTs the turn to
+                   the Go manager and the liveness subscriber re-drives a stalled
+                   one (see startWorkers.ts, "Langy turns self-drive"). Both run
+                   in the worker stack, so a workers pod without this pair builds
+                   its Langy port with an empty URL and every turn dies where no
+                   one is looking — the app pod, which HAS the pair, never makes
+                   that call. Same Secret and same Service as the app block. */}}
+            {{- if (index .Values "langyagent").chartManaged }}
+            - name: OPENCODE_AGENT_URL
+              value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
+            - name: LANGY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
+                  key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+            {{- include "langwatch.langyCallbackUrlEnv" . | nindent 12 }}
+            {{- /* Re-dispatching a stalled turn re-resolves the worker's
+                   credentials, which needs the gateway the same way the app does. */}}
+            {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
+            {{- end }}
 
             {{- with .Values.workers.extraEnvs}}
             {{- toYaml . | nindent 12 }}

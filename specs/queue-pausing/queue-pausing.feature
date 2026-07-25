@@ -32,6 +32,14 @@ Feature: Queue pipeline pausing
     Then those jobs are not dispatched
     And when the pipeline is unpaused, the queued jobs dispatch immediately
 
+  Scenario: Pause applies regardless of the staged value's envelope format
+    Given a pipeline is paused
+    When jobs for that pipeline are staged as legacy bare JSON, GQ1 envelopes, or GQ2 envelopes
+    Then none of them are dispatched
+    # The dispatcher reads routing from the envelope header without decoding
+    # the body; every format the queue has ever written must be readable there,
+    # or a pause silently stops applying to the unreadable format.
+
   # ============================================================================
   # Per-tenant pause — added 2026-05-11 post-incident
   # ============================================================================

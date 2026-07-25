@@ -10,6 +10,7 @@ import {
   trace,
 } from "@opentelemetry/api";
 import {
+  incrementEsProcessIntentsSuppressed,
   incrementEsProcessManagerTotal,
   observeEsProcessManagerDuration,
 } from "~/server/metrics";
@@ -106,7 +107,7 @@ export class ProcessManagerService<State> {
         const existing = await this.store.findByRef<State>({ ref });
         const evolution = this.definition.evolve({
           previousState: existing?.state ?? this.definition.initialState,
-          input: { kind: "event", event: envelope },
+          input: { kind: "event", event: envelope, now },
           ref,
         });
 
@@ -154,7 +155,7 @@ export class ProcessManagerService<State> {
 
         const evolution = this.definition.evolve({
           previousState: existing.state,
-          input: { kind: "wake", scheduledFor: wake.wakeAt },
+          input: { kind: "wake", scheduledFor: wake.wakeAt, now },
           ref: wake.ref,
         });
 
@@ -200,7 +201,7 @@ export class ProcessManagerService<State> {
       };
     });
 
-    return await this.store.commit({
+    const result = await this.store.commit({
       ref,
       tenantId: params.tenantId,
       userId: params.userId,
@@ -211,6 +212,34 @@ export class ProcessManagerService<State> {
       messages,
       now: params.now,
     });
+
+    if (
+      result.outcome === "committed" &&
+      result.duplicateMessageKeys.length > 0
+    ) {
+      incrementEsProcessIntentsSuppressed({
+        processName: ref.processName,
+        count: result.duplicateMessageKeys.length,
+      });
+      // The state commit succeeded but one or more intents were suppressed as
+      // already-dispatched. That is legitimate idempotency on redelivery, and
+      // it is ALSO how a scheduling bug hides: the process believes work is in
+      // flight while nothing was ever enqueued. Never let it pass silently.
+      this.logger.warn(
+        {
+          processName: ref.processName,
+          processKey: ref.processKey,
+          projectId: ref.projectId,
+          tenantId: params.tenantId,
+          sourceEventId: params.sourceEventId,
+          duplicateMessageKeys: result.duplicateMessageKeys,
+          insertedCount: result.insertedMessageKeys.length,
+        },
+        "Process-manager commit suppressed already-dispatched intents",
+      );
+    }
+
+    return result;
   }
 
   /**

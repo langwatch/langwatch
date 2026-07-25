@@ -37,7 +37,8 @@ describe("tagListCommand", () => {
         { name: "canary", createdAt: "2024-01-04T00:00:00Z" },
       ]);
 
-      await tagListCommand();
+      const result = await tagListCommand();
+      result?.table();
 
       expect(formatTable).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -58,7 +59,8 @@ describe("tagListCommand", () => {
       mockListTags.mockResolvedValue([]);
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
 
-      await tagListCommand();
+      const result = await tagListCommand();
+      result?.table();
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("No custom tags found"),

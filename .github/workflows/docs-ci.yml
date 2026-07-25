@@ -94,7 +94,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-workspace
         working-directory: skills
 
-      - name: Regenerate prompts-data.jsx
+      - name: Regenerate docs/skills pages
         run: bash docs/scripts/sync-prompts.sh
 
       - name: Regenerate llms.txt
@@ -102,7 +102,7 @@ jobs:
 
       - name: Check for stale generated files
         run: |
-          if ! git diff --exit-code docs/snippets/prompts-data.jsx docs/llms.txt docs/llms-full.txt; then
+          if ! git diff --exit-code docs/skills/directory.mdx docs/skills/pms-and-domain-experts.mdx docs/llms.txt docs/llms-full.txt; then
             echo ""
             echo "ERROR: Generated files are stale. Please run:"
             echo "  bash docs/scripts/sync-prompts.sh"

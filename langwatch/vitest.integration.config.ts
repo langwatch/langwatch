@@ -54,5 +54,10 @@ export default defineConfig({
       "@ee/": join(__dirname, "./ee/"),
       "@app/": join(__dirname, "./src/server/app-layer/"),
     },
+    // ONE zod instance for the app AND linked workspace packages
+    // (@langwatch/langy): zod v3 instanceof-checks its own classes (e.g.
+    // z.record's key/value overload detection), so a second physical copy
+    // resolved from a package's own node_modules silently mis-parses.
+    dedupe: ["zod"],
   },
 });

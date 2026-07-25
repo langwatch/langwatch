@@ -102,7 +102,11 @@ export const addCommand = async (
       const prompt = await promptsApiService.get(name, { version });
 
       if (!prompt) {
-        spinner.fail(chalk.red(`Prompt "${name}" not found`));
+        failSpinner({
+          spinner,
+          error: new Error(`Prompt "${name}" not found`),
+          action: "add prompt",
+        });
         process.exit(1);
       }
 

@@ -49,7 +49,6 @@ export const _useWorkflowStore = create<WorkflowStore>()(
           icon: state.icon,
           description: state.description,
           version: undefined,
-          default_llm: state.default_llm,
           edges: state.edges.map((edge) => {
             const edge_ = { ...edge };
             delete edge_.selected;

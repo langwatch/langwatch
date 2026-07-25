@@ -1,4 +1,4 @@
-import { NotFoundError } from "../app-layer/handled-error";
+import { NotFoundError } from "@langwatch/handled-error";
 
 export class ExperimentNotFoundError extends NotFoundError {
   declare readonly code: "experiment_not_found";

@@ -30,23 +30,33 @@ const validEvaluatorTypes = new Set(Object.keys(AVAILABLE_EVALUATORS));
 
 export const createEvaluatorInputSchema = z.object({
   name: z.string().min(1).max(255),
-  config: z
-    .record(z.unknown())
-    .refine(
-      (config) =>
-        typeof config.evaluatorType === "string" &&
-        config.evaluatorType.length > 0,
-      {
+  config: z.record(z.unknown()).superRefine((config, ctx) => {
+    const evaluatorType = config.evaluatorType;
+    if (typeof evaluatorType !== "string" || evaluatorType.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
         message:
           'config must include an "evaluatorType" field (e.g. "langevals/exact_match")',
-      },
-    )
-    .refine(
-      (config) => validEvaluatorTypes.has(config.evaluatorType as string),
-      (config) => ({
-        message: `Unknown evaluatorType "${String(config.evaluatorType)}". Use GET /api/evaluators to list valid evaluator configurations, or refer to the docs for available evaluator types.`,
-      }),
-    ),
+      });
+      return;
+    }
+    if (!validEvaluatorTypes.has(evaluatorType)) {
+      // The accepted set rides as `params`, which the boundary validator
+      // surfaces as the reason's `meta.expected`/`meta.received` — the same
+      // channel enum failures use. The catalog is ~40 slugs, small enough to
+      // carry whole; the message stays one sentence and never inlines it,
+      // because prose is what gets truncated on its way to a model.
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["evaluatorType"],
+        message: `Unknown evaluatorType "${evaluatorType}". Pick one of the types in this error's expected list and retry.`,
+        params: {
+          expected: [...validEvaluatorTypes].sort(),
+          received: evaluatorType,
+        },
+      });
+    }
+  }),
 });
 
 export const updateEvaluatorInputSchema = z.object({

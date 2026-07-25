@@ -59,6 +59,16 @@ export interface PresenceConfig {
   projectEnabled: boolean;
 }
 
+/**
+ * Trace-sharing kill switch as stored on the project's parent org and the
+ * project itself. Effective sharing = org AND project (see ADR-057). Same shape
+ * as {@link PresenceConfig} but kept separate so the two features can diverge.
+ */
+export interface TraceSharingConfig {
+  orgEnabled: boolean;
+  projectEnabled: boolean;
+}
+
 export interface ProjectRepository {
   getById(id: string): Promise<Project | null>;
   getWithTeam(id: string): Promise<ProjectWithTeam | null>;
@@ -70,6 +80,12 @@ export interface ProjectRepository {
    * (every presence heartbeat) from pulling the full project row.
    */
   getPresenceConfig(id: string): Promise<PresenceConfig | null>;
+  /**
+   * Returns the trace-sharing flags for a project + its org, or null when the
+   * project doesn't exist. Dedicated select so the share-create guard doesn't
+   * pull the full project row. See ADR-057.
+   */
+  getTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(params: {
     query: string;
     organizationId?: string;
@@ -131,6 +147,12 @@ export class NullProjectRepository implements ProjectRepository {
   }
 
   async getPresenceConfig(_id: string): Promise<PresenceConfig | null> {
+    return null;
+  }
+
+  async getTraceSharingConfig(
+    _id: string,
+  ): Promise<TraceSharingConfig | null> {
     return null;
   }
 

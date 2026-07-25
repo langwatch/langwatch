@@ -18,7 +18,7 @@ LangWatch already has top-level CLI commands for trace ingestion (`langwatch ing
 
 ## Availability
 
-Once you install the CLI, the `governance` subcommand is available out of the box, no env flag needed. Per-account governance entitlement is enforced server-side: if your account doesn't have governance enabled, the server returns a clear error pointing you at your admin.
+Per-account governance entitlement is enforced server-side: if your account doesn't have governance enabled, `governance` commands return a clear error pointing you at your admin.
 
 ```bash
 langwatch governance --help

@@ -1,6 +1,5 @@
 import scenario, { type ScenarioExecutionStateLike } from "@langwatch/scenario";
 import fs from "fs";
-import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
 import os from "os";
@@ -8,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
+  copyFixtureToWorkDir,
   createClaudeCodeAgent,
   toolCallFix,
   SKILL_TESTS_SET_ID,
@@ -45,9 +45,10 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         path.join(os.tmpdir(), "langwatch-cli-prompts-version-")
       );
 
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/cli-prompts/python-with-prompts")}/* ${tempFolder}/`
-      );
+      copyFixtureToWorkDir({
+        fixtureSubpath: "cli-prompts/python-with-prompts",
+        workingDirectory: tempFolder,
+      });
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),

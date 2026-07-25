@@ -25,12 +25,7 @@ function pluralise(count: number, singular: string, plural: string): string {
 export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
   const endTime = endTimestamp(group);
   return (
-    <HStack
-      gap={3}
-      flexWrap="wrap"
-      textStyle="xs"
-      color="fg.subtle"
-    >
+    <HStack gap={3} flexWrap="wrap" textStyle="xs" color="fg.subtle">
       <Text>{group.traces.length} turns</Text>
       <Separator />
       <Text>{formatWallClock(group.earliestTimestamp, endTime)}</Text>

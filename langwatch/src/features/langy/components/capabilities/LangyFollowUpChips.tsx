@@ -5,8 +5,9 @@
  * A capability card answers "what did Langy find"; these chips answer "what is
  * that result worth doing next". WHICH offers to make is `cliFollowUps.ts`'s job
  * (driven by the feature map's produces/consumes relation); WHERE each offer
- * lands is `logic/traceQueryIntent.ts`'s (it recompiles the search into a
- * destination URL). `LangyCapabilityRenderer` joins the two and hands the
+ * lands is `followUpChips.ts`'s (via the shared `traceExplorerLink` reader, so
+ * a carried chip means the destination really holds the search).
+ * `LangyCapabilityRenderer` joins the two and hands the
  * already-resolved chips here — this component only draws them.
  *
  * Two rules it holds to, both from the spec:
@@ -26,8 +27,9 @@
  *
  * @see specs/langy/langy-followup-suggestions.feature
  */
-import { chakra, HStack } from "@chakra-ui/react";
+import { HStack } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
+import { LangySpaAnchor } from "../LangySpaAnchor";
 import type { FollowUpChip } from "./followUpChips";
 
 export function LangyFollowUpChips({ chips }: { chips: FollowUpChip[] }) {
@@ -42,7 +44,7 @@ export function LangyFollowUpChips({ chips }: { chips: FollowUpChip[] }) {
       paddingX={0.5}
     >
       {chips.map((chip) => (
-        <chakra.a
+        <LangySpaAnchor
           key={chip.id}
           href={chip.href}
           display="inline-flex"
@@ -68,7 +70,7 @@ export function LangyFollowUpChips({ chips }: { chips: FollowUpChip[] }) {
         >
           {chip.label}
           <ArrowUpRight size={10} />
-        </chakra.a>
+        </LangySpaAnchor>
       ))}
     </HStack>
   );

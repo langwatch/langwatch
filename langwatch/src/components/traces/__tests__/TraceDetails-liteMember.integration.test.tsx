@@ -81,7 +81,6 @@ vi.mock("~/components/traces/Events", () => ({ Events: () => <div>Events</div> }
 vi.mock("~/components/traces/SequenceDiagram", () => ({ SequenceDiagramContainer: () => <div>Sequence</div> }));
 vi.mock("~/components/traces/SpanTree", () => ({ SpanTree: () => <div>SpanTree</div> }));
 vi.mock("~/components/traces/Summary", () => ({ TraceSummary: () => <div>Summary</div> }));
-vi.mock("~/components/traces/ShareButton", () => ({ ShareButton: NullStub }));
 vi.mock("~/components/traces/PinButton", () => ({ PinButton: NullStub }));
 vi.mock("~/components/traces/AddParticipants", () => ({ AddParticipants: NullStub }));
 vi.mock("~/components/AddAnnotationQueueDrawer", () => ({ AddAnnotationQueueDrawer: NullStub }));

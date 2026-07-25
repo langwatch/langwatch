@@ -3,6 +3,8 @@ title: Quick Start
 mode: "wide"
 ---
 
+import AgentReportNotice from "/snippets/agent-report-notice.mdx";
+
 <Tip>
   **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
 </Tip>
@@ -136,3 +138,5 @@ const result = await generateText({
 
 - **Need org-wide controls?** See [AI Governance](/ai-governance/overview) for per-user workspaces, anomaly detection, OCSF/SIEM export, and ingestion sources for non-gateway telemetry, paired with the AI Gateway data plane.
 - **Routing every LLM call through a single endpoint?** See [AI Gateway](/ai-gateway/overview): virtual keys, budgets, fallback chains, guardrails.
+
+<AgentReportNotice />

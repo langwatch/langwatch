@@ -13,6 +13,8 @@ import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Square, X } from "lucide-react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import { buildDisplayTitle } from "./run-history-transforms";
 import { formatRunStatusLabel } from "./format-run-status-label";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
@@ -148,9 +150,18 @@ export function ScenarioTargetRow({
   const handlePrefetch = () => prefetchRunState(scenarioRun.scenarioRunId);
 
   return (
+    // Armed, the run can be handed to Langy. Same chip id the run drawer
+    // derives, so the row and the drawer opened from it are one chip.
+    <LangyContextTarget
+      target={scenarioContextChip({
+        scenarioId: scenarioRun.scenarioRunId,
+        name: displayName,
+      })}
+    >
     <Box
       position="relative"
       className="group"
+      borderRadius="lg"
       borderBottom="1px solid"
       _last={{ border: "none" }}
       borderColor="border.subtle"
@@ -246,5 +257,6 @@ export function ScenarioTargetRow({
         )}
       </HStack>
     </Box>
+    </LangyContextTarget>
   );
 }

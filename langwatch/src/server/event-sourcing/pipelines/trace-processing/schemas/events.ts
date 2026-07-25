@@ -1,13 +1,15 @@
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
-import { metricTypeSchema, piiRedactionLevelSchema } from "./commands";
+import { logTraceContributionSchema } from "../../log-processing/schemas/logRecord";
+import { piiRedactionLevelSchema } from "./commands";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_REMOVED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
+  LOG_CONTRIBUTED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_TYPE,
-  METRIC_RECORD_RECEIVED_EVENT_TYPE,
+  METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
@@ -15,6 +17,7 @@ import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "./constants";
+import { metricCorrelationFields } from "./metricCorrelationFields";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
 /**
@@ -145,44 +148,59 @@ export function isLogRecordReceivedEvent(
   return event.type === LOG_RECORD_RECEIVED_EVENT_TYPE;
 }
 
+export const logContributedEventDataSchema = logTraceContributionSchema.omit({
+  tenantId: true,
+  occurredAt: true,
+});
+
+export const logContributedEventSchema = EventSchema.extend({
+  type: z.literal(LOG_CONTRIBUTED_EVENT_TYPE),
+  data: logContributedEventDataSchema,
+  metadata: eventMetadataBaseSchema,
+});
+
+export type LogContributedEventData = z.infer<
+  typeof logContributedEventDataSchema
+>;
+export type LogContributedEvent = z.infer<typeof logContributedEventSchema>;
+
+export function isLogContributedEvent(
+  event: TraceProcessingEvent,
+): event is LogContributedEvent {
+  return event.type === LOG_CONTRIBUTED_EVENT_TYPE;
+}
+
 /**
- * Zod schema for MetricRecordReceivedEvent metadata.
+ * A valid exemplar correlation is deliberately separate from the canonical
+ * metric event. Only this trace-scoped event is visible to trace folds.
  */
-export const metricRecordReceivedEventMetadataSchema = z
+export const metricDataPointCorrelatedEventMetadataSchema = z
   .object({
     processingTraceparent: z.string().optional(),
   })
   .passthrough();
 
-export const metricRecordReceivedEventDataSchema = z.object({
-  traceId: z.string(),
-  spanId: z.string(),
-  metricName: z.string(),
-  metricUnit: z.string(),
-  metricType: metricTypeSchema,
-  value: z.number(),
-  timeUnixMs: z.number(),
-  attributes: z.record(z.string(), z.string()),
-  resourceAttributes: z.record(z.string(), z.string()),
+export const metricDataPointCorrelatedEventDataSchema = z.object(
+  metricCorrelationFields,
+);
+
+export const metricDataPointCorrelatedEventSchema = EventSchema.extend({
+  type: z.literal(METRIC_DATA_POINT_CORRELATED_EVENT_TYPE),
+  data: metricDataPointCorrelatedEventDataSchema,
+  metadata: metricDataPointCorrelatedEventMetadataSchema,
 });
 
-export const metricRecordReceivedEventSchema = EventSchema.extend({
-  type: z.literal(METRIC_RECORD_RECEIVED_EVENT_TYPE),
-  data: metricRecordReceivedEventDataSchema,
-  metadata: metricRecordReceivedEventMetadataSchema,
-});
-
-export type MetricRecordReceivedEventData = z.infer<
-  typeof metricRecordReceivedEventDataSchema
+export type MetricDataPointCorrelatedEventData = z.infer<
+  typeof metricDataPointCorrelatedEventDataSchema
 >;
-export type MetricRecordReceivedEvent = z.infer<
-  typeof metricRecordReceivedEventSchema
+export type MetricDataPointCorrelatedEvent = z.infer<
+  typeof metricDataPointCorrelatedEventSchema
 >;
 
-export function isMetricRecordReceivedEvent(
+export function isMetricDataPointCorrelatedEvent(
   event: TraceProcessingEvent,
-): event is MetricRecordReceivedEvent {
-  return event.type === METRIC_RECORD_RECEIVED_EVENT_TYPE;
+): event is MetricDataPointCorrelatedEvent {
+  return event.type === METRIC_DATA_POINT_CORRELATED_EVENT_TYPE;
 }
 
 /**
@@ -357,10 +375,7 @@ export const traceNameChangedEventMetadataSchema = z
 export const traceNameChangedEventDataSchema = z.object({
   traceId: z.string(),
   /** New name. Trim happens at the command boundary; the event stores the canonical form. */
-  newName: z
-    .string()
-    .min(TRACE_NAME_MIN_LENGTH)
-    .max(TRACE_NAME_MAX_LENGTH),
+  newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),
   /** User who made the change, if available — for audit + UI attribution. */
   changedByUserId: z.string().nullable(),
 });
@@ -392,7 +407,8 @@ export type TraceProcessingEvent =
   | SpanReceivedEvent
   | TopicAssignedEvent
   | LogRecordReceivedEvent
-  | MetricRecordReceivedEvent
+  | LogContributedEvent
+  | MetricDataPointCorrelatedEvent
   | OriginResolvedEvent
   | AnnotationAddedEvent
   | AnnotationRemovedEvent

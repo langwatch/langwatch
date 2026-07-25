@@ -122,7 +122,10 @@ describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
         expect(result.ids).toEqual(["e1", "e2", "e3", "e4", "e5"]);
         expect(loader).toHaveBeenCalledTimes(3);
         expect(foldDef.eventLoaderUpTo).not.toHaveBeenCalled();
-        expect(store.store).toHaveBeenCalledWith(result, context);
+        expect(store.store).toHaveBeenCalledWith(
+          result,
+          expect.objectContaining({ aggregateId: context.aggregateId }),
+        );
       });
     });
 

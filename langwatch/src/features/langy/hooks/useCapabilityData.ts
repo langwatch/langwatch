@@ -27,7 +27,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CLI_SUBRESOURCE_VERBS,
   type CliResultDigest,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {

@@ -6,8 +6,10 @@ import { defineCommandSchema } from "../../../commands/commandSchema";
 import type { CommandType } from "../../../domain/commandType";
 import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
-import type { DeduplicationStrategy } from "../../../queues";
-import type { EventSourcedQueueProcessor } from "../../../queues";
+import type {
+  DeduplicationStrategy,
+  EventSourcedQueueProcessor,
+} from "../../../queues";
 import {
   createTestAggregateType,
   createTestEvent,
@@ -28,8 +30,11 @@ function createMockEventHandlerDefinition(
     delay?: number;
     deduplication?: DeduplicationStrategy<Event>;
     concurrency?: number;
-    spanAttributes?: (event: Event) => Record<string, string | number | boolean>;
+    spanAttributes?: (
+      event: Event,
+    ) => Record<string, string | number | boolean>;
     disabled?: boolean;
+    coalesceMaxBatch?: number;
   },
 ) {
   return {
@@ -59,7 +64,9 @@ function createMockProjectionDefinition(
     // here because the registry guard lives on the public service
     // signature, not on the queue-manager input shape.
     options: options?.killSwitch
-      ? ({ killSwitch: options.killSwitch } as { killSwitch: { customKey?: any } })
+      ? ({ killSwitch: options.killSwitch } as {
+          killSwitch: { customKey?: any };
+        })
       : undefined,
   };
 }
@@ -244,7 +251,9 @@ describe("QueueManager", () => {
       );
 
       // Projection job groupKey — hierarchical: tenantId/fold/name/domainKey
-      const projectionEntry = globalJobRegistry.get("test-pipeline:projection:p1");
+      const projectionEntry = globalJobRegistry.get(
+        "test-pipeline:projection:p1",
+      );
       const projectionGroupKey = projectionEntry?.groupKeyFn(event);
       expect(projectionGroupKey).toBe(
         `${tenantId}/fold/p1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
@@ -339,7 +348,9 @@ describe("QueueManager", () => {
         tenantId,
       );
 
-      const projectionEntry = globalJobRegistry.get("test-pipeline:projection:p1");
+      const projectionEntry = globalJobRegistry.get(
+        "test-pipeline:projection:p1",
+      );
       const attrs = projectionEntry?.spanAttributes?.(event);
       expect(attrs).toEqual(
         expect.objectContaining({
@@ -366,7 +377,9 @@ describe("QueueManager", () => {
       );
 
       // Verify that a nonexistent key is not in the registry
-      expect(globalJobRegistry.has("test-pipeline:handler:nonexistent")).toBe(false);
+      expect(globalJobRegistry.has("test-pipeline:handler:nonexistent")).toBe(
+        false,
+      );
     });
   });
 
@@ -407,11 +420,46 @@ describe("QueueManager", () => {
       manager.initializeHandlerQueues(handlers, handleEventCallback);
 
       // Registry entries exist for each handler
-      expect(globalJobRegistry.has("test-pipeline:handler:handler1")).toBe(true);
-      expect(globalJobRegistry.has("test-pipeline:handler:handler2")).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:handler:handler1")).toBe(
+        true,
+      );
+      expect(globalJobRegistry.has("test-pipeline:handler:handler2")).toBe(
+        true,
+      );
       // Facades exist for each handler
       expect(manager.getHandlerQueue("handler1")).toBeDefined();
       expect(manager.getHandlerQueue("handler2")).toBeDefined();
+    });
+
+    it("registers an opted-in handler batch processor", async () => {
+      const mockQueueProcessor = createMockSharedQueue();
+      const globalJobRegistry = new Map<string, JobRegistryEntry>();
+      const manager = new QueueManager({
+        aggregateType,
+        pipelineName: "test-pipeline",
+        globalQueue: mockQueueProcessor,
+        globalJobRegistry,
+      });
+      const onBatch = vi.fn(async () => undefined);
+      manager.initializeHandlerQueues(
+        {
+          handler1: createMockEventHandlerDefinition("handler1", undefined, {
+            coalesceMaxBatch: 256,
+          }),
+        },
+        vi.fn(),
+        onBatch,
+      );
+      const entry = globalJobRegistry.get("test-pipeline:handler:handler1")!;
+      const events = [
+        createTestEvent("one", aggregateType, tenantId),
+        createTestEvent("two", aggregateType, tenantId),
+      ];
+
+      await entry.processBatch!(events);
+
+      expect(entry.coalesceMaxBatch).toBe(256);
+      expect(onBatch).toHaveBeenCalledWith("handler1", events, { tenantId });
     });
 
     it("facade injects __pipelineName, __jobType and __jobName on send", async () => {
@@ -471,8 +519,16 @@ describe("QueueManager", () => {
 
       expect(mockQueueProcessor.sendBatch).toHaveBeenCalledWith(
         expect.arrayContaining([
-          expect.objectContaining({ __pipelineName: "test-pipeline", __jobType: "handler", __jobName: "handler1" }),
-          expect.objectContaining({ __pipelineName: "test-pipeline", __jobType: "handler", __jobName: "handler1" }),
+          expect.objectContaining({
+            __pipelineName: "test-pipeline",
+            __jobType: "handler",
+            __jobName: "handler1",
+          }),
+          expect.objectContaining({
+            __pipelineName: "test-pipeline",
+            __jobType: "handler",
+            __jobName: "handler1",
+          }),
         ]),
         expect.any(Object),
       );
@@ -670,8 +726,12 @@ describe("QueueManager", () => {
       );
 
       // Registry entries exist for each projection
-      expect(globalJobRegistry.has("test-pipeline:projection:projection1")).toBe(true);
-      expect(globalJobRegistry.has("test-pipeline:projection:projection2")).toBe(true);
+      expect(
+        globalJobRegistry.has("test-pipeline:projection:projection1"),
+      ).toBe(true);
+      expect(
+        globalJobRegistry.has("test-pipeline:projection:projection2"),
+      ).toBe(true);
       // Facades exist for each projection
       expect(manager.getProjectionQueue("projection1")).toBeDefined();
       expect(manager.getProjectionQueue("projection2")).toBeDefined();
@@ -727,7 +787,9 @@ describe("QueueManager", () => {
         vi.fn(),
       );
 
-      const entry = globalJobRegistry.get("test-pipeline:projection:projection1");
+      const entry = globalJobRegistry.get(
+        "test-pipeline:projection:projection1",
+      );
       expect(entry?.groupKeyFn).toBeDefined();
 
       const event = createTestEvent(
@@ -796,8 +858,12 @@ describe("QueueManager", () => {
       );
 
       // Registry entries exist for each command
-      expect(globalJobRegistry.has("test-pipeline:command:command1")).toBe(true);
-      expect(globalJobRegistry.has("test-pipeline:command:command2")).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:command:command1")).toBe(
+        true,
+      );
+      expect(globalJobRegistry.has("test-pipeline:command:command2")).toBe(
+        true,
+      );
       // Facades exist for each command
       expect(manager.getCommandQueues().size).toBe(2);
       const command1Processor = manager.getCommandQueue("command1");
@@ -965,8 +1031,12 @@ describe("QueueManager", () => {
         vi.fn(),
       );
 
-      expect(globalJobRegistry.has("test-pipeline:reactor:reactor1")).toBe(true);
-      expect(globalJobRegistry.has("test-pipeline:reactor:reactor2")).toBe(true);
+      expect(globalJobRegistry.has("test-pipeline:reactor:reactor1")).toBe(
+        true,
+      );
+      expect(globalJobRegistry.has("test-pipeline:reactor:reactor2")).toBe(
+        true,
+      );
       expect(manager.getReactorQueue("reactor1")).toBeDefined();
       expect(manager.getReactorQueue("reactor2")).toBeDefined();
       expect(manager.hasReactorQueues()).toBe(true);
@@ -1022,7 +1092,12 @@ describe("QueueManager", () => {
       });
 
       manager.initializeReactorQueues(
-        { reactor1: createMockReactorDefinition("reactor1", undefined, { parentProjection: "traceSummary", parentType: "fold" }) },
+        {
+          reactor1: createMockReactorDefinition("reactor1", undefined, {
+            parentProjection: "traceSummary",
+            parentType: "fold",
+          }),
+        },
         vi.fn(),
       );
 

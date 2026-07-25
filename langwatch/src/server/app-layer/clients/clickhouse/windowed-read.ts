@@ -1,0 +1,154 @@
+import { incrementWindowedReadCount } from "~/server/clickhouse/metrics";
+
+/**
+ * Half-width (±) of the default partition-pruning window, in milliseconds.
+ *
+ * Every partition-hinted read in the codebase narrowed its scan to ±2 days
+ * around an approximate trace/turn time. Shared here so adopters stop
+ * copy-pasting `2 * 24 * 60 * 60 * 1000`. Generous on purpose: it dwarfs any
+ * real trace duration and clock skew, so a hinted read reliably lands inside
+ * the window; when it doesn't, the fallback covers correctness.
+ */
+export const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * The time predicate for one windowed read attempt. A `null` fragment (never a
+ * `WindowFragment`) means an unbounded read — no time predicate, the wide scan.
+ */
+export interface WindowFragment {
+  /** Inclusive lower bound, epoch ms. */
+  fromMs: number;
+  /** Inclusive upper bound, epoch ms. */
+  toMs: number;
+  /** Params for the `{fromMs:Int64}` / `{toMs:Int64}` placeholders `sqlFor` emits. */
+  params: { fromMs: number; toMs: number };
+  /**
+   * Renders `AND <column> >= fromUnixTimestamp64Milli({fromMs:Int64}) AND
+   * <column> <= fromUnixTimestamp64Milli({toMs:Int64})` for `column`. Pass the
+   * same column to the inner and outer scopes of a dedup subquery so both prune
+   * to identical partitions.
+   */
+  sqlFor: (column: string) => string;
+}
+
+/**
+ * What a windowed read does when the hinted window comes back empty, and what a
+ * hint-less read runs directly:
+ *   - `"unbounded"` — widen to a time-unbounded scan (`null` fragment).
+ *   - `"none"`      — accept the hinted result as authoritative; never widen.
+ *                     (Only meaningful with a hint; hint-less reads run unbounded.)
+ *   - `{ lookbackMs }` — widen to a fixed `[now - lookbackMs, now + windowMs]`
+ *                     frame, for reads whose rows cluster near now (e.g. retained
+ *                     recent logs) rather than near a hint.
+ */
+export type WindowFallback = "unbounded" | "none" | { lookbackMs: number };
+
+export interface QueryWindowedOptions<T> {
+  /** Table label for the `clickhouse_windowed_read_total{table}` metric. */
+  table: string;
+  /** Centre of the hinted window (epoch ms), or `null` when the caller has none. */
+  hintMs: number | null;
+  /** Half-width of the hinted window. Defaults to {@link DEFAULT_PARTITION_WINDOW_MS}. */
+  windowMs?: number;
+  /** Behaviour when the hinted read is empty / when there is no hint. */
+  fallback: WindowFallback;
+  /** True when `result` has no rows and (unless `fallback` is `"none"`) should widen. */
+  isEmpty: (result: T) => boolean;
+  /** Runs one attempt against the given window; `null` = unbounded (no predicate). */
+  run: (window: WindowFragment | null) => Promise<T>;
+}
+
+function windowFragment(fromMs: number, toMs: number): WindowFragment {
+  return {
+    fromMs,
+    toMs,
+    params: { fromMs, toMs },
+    sqlFor: (column) =>
+      `AND ${column} >= fromUnixTimestamp64Milli({fromMs:Int64}) ` +
+      `AND ${column} <= fromUnixTimestamp64Milli({toMs:Int64})`,
+  };
+}
+
+/**
+ * The window a fallback widens to: `null` (unbounded) for `"unbounded"`/`"none"`,
+ * or a fixed lookback frame for `{ lookbackMs }`. The frame's upper bound carries
+ * the same `windowMs` clock-skew headroom as the hinted path, so a client clock
+ * running slightly fast can't push a just-written row past the ceiling.
+ */
+function fallbackFragment(
+  fallback: WindowFallback,
+  windowMs: number,
+): WindowFragment | null {
+  if (typeof fallback === "object") {
+    const now = Date.now();
+    return windowFragment(now - fallback.lookbackMs, now + windowMs);
+  }
+  return null;
+}
+
+/**
+ * Runs a ClickHouse read with a partition-pruning time window and a graceful
+ * fallback to a wider scan, recording the outcome on
+ * `clickhouse_windowed_read_total` exactly once.
+ *
+ * Orchestration:
+ *   - No hint (`hintMs === null`): run the fallback window directly (a lookback
+ *     frame, or unbounded). Outcome `unwindowed`.
+ *   - Hint present: prune to `±windowMs` around it.
+ *       - Non-empty, or `fallback === "none"`: accept it — we stayed on the
+ *         cheap path. Outcome `hit` (regardless of row count).
+ *       - Empty and allowed to widen: re-run with the fallback window. Outcome
+ *         `unbounded_{hit,empty}` for `"unbounded"`, `widened_{hit,empty}` for a
+ *         lookback frame.
+ *   - Any attempt that throws: outcome `error`, and the error is rethrown —
+ *     every logical read emits exactly one outcome, failures included.
+ *
+ * The caller's `run` closure issues each attempt against its own resilient
+ * client, so retries and error translation apply per attempt.
+ */
+export async function queryWindowed<T>(
+  opts: QueryWindowedOptions<T>,
+): Promise<T> {
+  const { table, hintMs, fallback, isEmpty, run } = opts;
+  const windowMs = opts.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
+
+  try {
+    if (hintMs === null) {
+      const result = await run(fallbackFragment(fallback, windowMs));
+      incrementWindowedReadCount(table, "unwindowed");
+      return result;
+    }
+
+    const hinted = await run(
+      windowFragment(hintMs - windowMs, hintMs + windowMs),
+    );
+
+    // `none` treats the hinted window as authoritative (empty means genuinely
+    // absent within the window), so it never widens. A non-empty hinted read on
+    // any fallback likewise needs no widening. Both stayed cheap: count as `hit`.
+    if (fallback === "none" || !isEmpty(hinted)) {
+      incrementWindowedReadCount(table, "hit");
+      return hinted;
+    }
+
+    const widened = await run(fallbackFragment(fallback, windowMs));
+    const isWidenedEmpty = isEmpty(widened);
+    if (fallback === "unbounded") {
+      incrementWindowedReadCount(
+        table,
+        isWidenedEmpty ? "unbounded_empty" : "unbounded_hit",
+      );
+    } else {
+      incrementWindowedReadCount(
+        table,
+        isWidenedEmpty ? "widened_empty" : "widened_hit",
+      );
+    }
+    return widened;
+  } catch (error) {
+    // A failed attempt still emits exactly one outcome — the future limiter's
+    // baseline must see failures, not undercount them as absent reads.
+    incrementWindowedReadCount(table, "error");
+    throw error;
+  }
+}

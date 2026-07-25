@@ -3,7 +3,6 @@ import {
   Grid,
   HStack,
   Progress,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -25,6 +24,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { HomeCard } from "./HomeCard";
+import {
+  HOME_SECTION_GAP,
+  HOME_SECTION_PADDING,
+  HomeSectionHeader,
+} from "./HomeSectionHeader";
 
 export type OnboardingStepKey =
   | "createProject"
@@ -92,7 +96,7 @@ export const buildOnboardingSteps = (
   data: {
     workflows: number;
     datasets: number;
-    evaluations: number;
+    onlineEvaluations: number;
     simulations: number;
     modelProviders: number;
     prompts: number;
@@ -140,9 +144,9 @@ export const buildOnboardingSteps = (
     },
     {
       key: "setupEvaluation",
-      title: "Set up your first evaluation",
-      href: `/${projectSlug}/evaluations`,
-      complete: (data.evaluations ?? 0) > 0,
+      title: "Set up your first online evaluation",
+      href: `/${projectSlug}/online-evaluations`,
+      complete: (data.onlineEvaluations ?? 0) > 0,
     },
     {
       key: "createWorkflow",
@@ -249,7 +253,7 @@ export function OnboardingProgress() {
       has_model_providers: (checkStatus.modelProviders ?? 0) > 0,
       has_prompts: (checkStatus.prompts ?? 0) > 0,
       has_simulations: (checkStatus.simulations ?? 0) > 0,
-      has_evaluations: (checkStatus.evaluations ?? 0) > 0,
+      has_online_evaluations: (checkStatus.onlineEvaluations ?? 0) > 0,
       has_workflows: (checkStatus.workflows ?? 0) > 0,
       has_datasets: (checkStatus.datasets ?? 0) > 0,
 
@@ -258,7 +262,7 @@ export function OnboardingProgress() {
       count_model_providers: checkStatus.modelProviders ?? 0,
       count_prompts: checkStatus.prompts ?? 0,
       count_simulations: checkStatus.simulations ?? 0,
-      count_evaluations: checkStatus.evaluations ?? 0,
+      count_online_evaluations: checkStatus.onlineEvaluations ?? 0,
       count_workflows: checkStatus.workflows ?? 0,
       count_datasets: checkStatus.datasets ?? 0,
     });
@@ -297,21 +301,14 @@ export function OnboardingProgress() {
     <HomeCard
       cursor="default"
       width="full"
-      padding={3}
-      gap={2}
+      padding={HOME_SECTION_PADDING}
+      gap={HOME_SECTION_GAP}
       _hover={{ boxShadow: "xs" }}
     >
-      {/* Header with progress */}
-      <HStack justify="space-between" align="center" width="full">
-        <HStack gap={3}>
-          <Text fontSize="sm" fontWeight="medium" color="fg">
-            Get started with LangWatch
-          </Text>
-        </HStack>
-        <Spacer />
-        <Text fontSize="xs" color="fg.muted">
-          {completionPercentage}% completed
-        </Text>
+      <HomeSectionHeader
+        title="Get started with LangWatch"
+        qualifier={`${completionPercentage}% done`}
+      >
         <Box width="80px">
           <Progress.Root
             value={completionPercentage}
@@ -323,7 +320,7 @@ export function OnboardingProgress() {
             </Progress.Track>
           </Progress.Root>
         </Box>
-      </HStack>
+      </HomeSectionHeader>
 
       {/* Steps in columns */}
       <Grid

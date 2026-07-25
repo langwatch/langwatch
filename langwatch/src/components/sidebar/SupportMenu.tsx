@@ -11,6 +11,7 @@ import {
   LuMessageCircle,
 } from "react-icons/lu";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { toggleSupportChat } from "~/utils/crispBubblePolicy";
 import { DiscordOutlineIcon } from "../icons/DiscordOutline";
 import { Link } from "../ui/link";
 import { Menu } from "../ui/menu";
@@ -54,16 +55,9 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
           aria-label="Chat"
           onClick={(e) => {
             e.preventDefault();
-            (
-              window as unknown as {
-                $crisp?: { push: (args: unknown[]) => void };
-              }
-            ).$crisp?.push(["do", "chat:show"]);
-            (
-              window as unknown as {
-                $crisp?: { push: (args: unknown[]) => void };
-              }
-            ).$crisp?.push(["do", "chat:toggle"]);
+            // Lifts the bubble suppression before toggling, so the policy's
+            // CSS backstop never hides a deliberately opened chat.
+            toggleSupportChat();
           }}
         >
           <SideMenuItem

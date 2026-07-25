@@ -59,6 +59,21 @@ export const PERMISSION_CATEGORIES: readonly PermissionCategory[] = [
     writePermissions: ["evaluations:view", "evaluations:manage"],
   },
   {
+    key: "langy",
+    label: "Langy",
+    accessLevels: ["read", "write"],
+    // Write here means "may run the assistant" — starting a turn provisions
+    // credentials and spends model budget, so it is deliberately not part of
+    // the read level.
+    readPermissions: ["langy:view"],
+    writePermissions: [
+      "langy:view",
+      "langy:create",
+      "langy:update",
+      "langy:delete",
+    ],
+  },
+  {
     key: "datasets",
     label: "Datasets",
     accessLevels: ["read", "write"],

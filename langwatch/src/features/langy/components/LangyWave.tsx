@@ -121,11 +121,13 @@ function ropePath(pts: RopePoint[], w: number, h: number): string {
 /**
  * Build one frame of the rope from the smoothed motion vector.
  *
- * Absolute amplitudes are deliberately TINY: at full streaming energy the wind
- * peaks around 0.9% of the panel width, and idle sits at roughly a third of
- * that — under the threshold of a movement that pulls the eye. At rest the fold
- * should read as a still shape you only notice breathing if you look for it;
- * only while Langy works does it bloom to a legible (but still subtle) motion.
+ * Absolute amplitudes stay small, but no longer so small that working states are
+ * indistinguishable from rest. At full streaming energy the wind peaks around
+ * 3% of the panel width and idle sits near a tenth of that: the resting fold is
+ * still a shape you only notice breathing if you look for it, while a turn in
+ * flight is unmistakably moving. The short component also runs a shorter
+ * wavelength (11 vs 9) so high flutter reads as a WIGGLE rather than a second,
+ * slower swell riding the first.
  */
 function sampleRope(
   w: number,
@@ -158,8 +160,8 @@ function sampleRope(
     x +=
       env *
       amp *
-      (w * 0.013 * Math.sin(ny * 4.2 - windPhase) +
-        motion.flutter * w * 0.008 * Math.sin(ny * 9.0 + windPhase * 0.62));
+      (w * 0.019 * Math.sin(ny * 4.2 - windPhase) +
+        motion.flutter * w * 0.014 * Math.sin(ny * 11.0 + windPhase * 0.62));
     // The wake ripple: one gaussian bump travelling top→bottom once, easing in
     // and out over its life.
     if (ripple !== null) {

@@ -116,6 +116,22 @@ func TestValidateCustomerEndpointRejectsMetadataAliasesInPermissiveMode(t *testi
 	}
 }
 
+func TestValidateCustomerEndpointAlwaysBlocksUnspecifiedAndLinkLocalInPermissiveMode(t *testing.T) {
+	t.Parallel()
+
+	// Even with private egress opted in (blockLocal=false, no allowlist), these
+	// stay refused: 0.0.0.0/:: collapse to localhost on many stacks, and
+	// link-local is where undocumented instance-metadata surfaces appear.
+	for _, address := range []string{"0.0.0.0", "::", "169.254.0.1", "fe80::1"} {
+		err := validateCustomerEndpoint(
+			t.Context(),
+			"http://customer-endpoint.example/v1",
+			policyWithResolver(false, nil, staticResolver(address)),
+		)
+		require.Error(t, err, "unspecified/link-local %s must remain blocked in permissive mode", address)
+	}
+}
+
 func TestValidateCustomerEndpointHostedCloudCanRequireHTTPS(t *testing.T) {
 	t.Parallel()
 

@@ -10,7 +10,7 @@
  *  C. Govern → Governance bird-eye + Tool Catalog + Anomaly Rules + Ingestion + Routing
  *  D. Settings → Members + Teams + Roles + Audit Log
  *  E. Tile install drawer (Claude Code)
- *  F. AI Tools Portal cold visit (workspace switcher, /me/sessions, /me/settings)
+ *  F. AI Tools Portal cold visit (workspace switcher, /me/devices, /me/settings)
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -78,8 +78,8 @@ void (async () => {
     await page.waitForTimeout(300);
   }
 
-  await tryGoto(page, "A3-me-sessions", "/me/sessions");
-  await shoot(page, "A3-me-sessions");
+  await tryGoto(page, "A3-me-devices", "/me/devices");
+  await shoot(page, "A3-me-devices");
 
   await tryGoto(page, "A4-me-settings", "/me/settings");
   await shoot(page, "A4-me-settings");

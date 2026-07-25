@@ -107,8 +107,30 @@ describe("langyThinkingLine", () => {
         ],
         elapsedMs: 5_000,
       });
-      // Nothing is running and nothing has been written, so we are waiting.
-      expect(line.tone).toBe("waiting");
+      // The settled call must not be narrated as though it were still running.
+      expect(line.text.toLowerCase()).not.toContain("trace");
+    });
+
+    it("never claims the turn is starting up once a tool has settled", () => {
+      // The bug this pins: `elapsedMs` runs from the START of the turn, so the
+      // gap BETWEEN two tool calls — nothing running, no tokens, no reasoning —
+      // fell through to the startup ladder. The panel said "Starting up…"
+      // directly beneath "4 actions completed".
+      const line = langyThinkingLine({
+        messages: [
+          user,
+          assistant([
+            {
+              type: "tool-bash",
+              state: "output-available",
+              input: { command: "langwatch analytics query" },
+            },
+          ]),
+        ],
+        elapsedMs: 5_000,
+      });
+      expect(line.text).not.toContain("Starting up");
+      expect(line.tone).toBe("working");
     });
   });
 

@@ -1,7 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import {
+  RequestValidationError,
+  validator as zValidator,
+} from "~/server/api/validation";
 import { z } from "zod";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
@@ -158,14 +162,27 @@ export function registerTracesRoutes(
       // When `select` is present, compile the projection up front. The compiled
       // plan drives column pruning + child-collection joins in the ENGINE; the
       // resolved schema goes into the response envelope; the projector replaces
-      // formatTrace per row. Invalid paths surface as a 400 with every offender.
+      // formatTrace per row.
+      //
+      // An unknown select path is a validation failure like any other — the body
+      // parsed, and a field in it names something that does not exist — so it
+      // travels the same channel as a schema failure rather than as an anonymous
+      // 400: same code, same 422, one reason per offending path.
       let projection: CompiledProjection | undefined;
       if (select && select.length > 0) {
         try {
           projection = compileProjection({ from, select, protections });
         } catch (err) {
           if (err instanceof ProjectionValidationError) {
-            throw new HTTPException(400, { message: err.message });
+            throw new RequestValidationError({
+              target: "json",
+              violations: err.invalidPaths.map((path) => ({
+                field: "select",
+                type: "unknown_path",
+                message: `Unknown or unsupported select path: ${path}`,
+                received: path,
+              })),
+            });
           }
           throw err;
         }

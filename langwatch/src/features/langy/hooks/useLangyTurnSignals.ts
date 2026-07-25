@@ -10,6 +10,12 @@ export interface LangyTurnMetric {
   label: string;
   /** Optional unit appended after the number, e.g. "%". */
   suffix?: string;
+  /**
+   * Full formatter, when a suffix cannot express the value — currency needs a
+   * PREFIX, and a cost rendered as a bare `0.433` says nothing about what it
+   * is. Wins over `suffix` when both are set.
+   */
+  format?: (value: number) => string;
 }
 
 export interface LangyTurnSignals {

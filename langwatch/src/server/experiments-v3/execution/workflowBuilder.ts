@@ -6,16 +6,7 @@ import type {
   LocalPromptConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
-import type {
-  Code,
-  Entry,
-  Evaluator,
-  Field,
-  HttpComponentConfig,
-  LlmPromptConfigComponent,
-  Signature,
-  Workflow,
-} from "~/optimization_studio/types/dsl";
+import { LATEST_SPEC_VERSION, type Code, type Entry, type Evaluator, type Field, type HttpComponentConfig, type LlmPromptConfigComponent, type Signature, type Workflow } from "~/optimization_studio/types/dsl";
 
 /**
  * HTTP node data structure - uses parameters like other nodes.
@@ -103,17 +94,12 @@ export const buildCellWorkflow = (
   );
 
   const workflow: Workflow = {
-    spec_version: "1.4",
+    spec_version: LATEST_SPEC_VERSION,
     workflow_id: workflowId,
     name: `Evaluation V3 - Row ${rowIndex}`,
     icon: "🧪",
     description: `Single cell execution for row ${rowIndex}`,
     version: "1.0",
-    default_llm: {
-      model: "openai/gpt-4o-mini",
-      temperature: 0,
-      max_tokens: 2048,
-    },
     template_adapter: "default",
     enable_tracing: true,
     nodes: [entryNode, targetNode, ...evaluatorNodes] as Workflow["nodes"],

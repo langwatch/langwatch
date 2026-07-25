@@ -57,4 +57,9 @@ const (
 	// Without this guard the dispatcher would hand Bifrost a zero-value
 	// Credential and the caller would see an opaque "provider is required".
 	ErrNoProviderConfigured = herr.Code("no_provider_configured")
+	// ErrCodexSessionExpired means the codex provider's OAuth session is
+	// dead (refresh rejected) — the user must sign in with OpenAI again.
+	// Clients receive it as a 401 with this code so Langy can render the
+	// re-authenticate card instead of a generic provider error.
+	ErrCodexSessionExpired = herr.Code("codex_session_expired")
 )

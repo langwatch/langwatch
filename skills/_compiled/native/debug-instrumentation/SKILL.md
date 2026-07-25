@@ -25,15 +25,17 @@ langwatch scenario-docs                           # Scenario docs index
 
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
-If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
 
 ## Step 1: Fetch Recent Traces
 
 ```bash
-langwatch trace search --limit 25 --start-date 2026-01-01 --format json
+langwatch trace search --limit 25 --start-date "$(date -u -Iseconds -d '7 days ago')" --format json
 ```
 
-(Adjust `--start-date` to "last 24h" or "last 7d" — the CLI accepts ISO strings.)
+(Widen or narrow the window as needed — the CLI accepts ISO strings for `--start-date`.)
 
 For each trace, ask:
 

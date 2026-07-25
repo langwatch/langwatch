@@ -52,6 +52,7 @@ describe("graph alert sweep process", () => {
           { lastSweepAt: null },
           {
             at: 10_000,
+            now: 10_000,
             key: "graphAlertSweep",
             projectId: "__global__",
             intents: buildIntentFactories(definition.config.intents),

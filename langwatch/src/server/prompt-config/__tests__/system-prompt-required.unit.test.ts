@@ -21,7 +21,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptVersionService } from "~/server/prompt-config/prompt-version.service";
 
