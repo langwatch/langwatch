@@ -45,6 +45,22 @@ func audioContentType(format string) string {
 	return "audio/mpeg"
 }
 
+// speechResponseFormatFor maps the OpenAI wire response_format onto what the
+// provider should actually be asked for. OpenAI's "pcm" means raw PCM16 @
+// 24kHz, but Bifrost translates pcm to ElevenLabs pcm_44100, which is gated
+// to the ElevenLabs Pro tier AND the wrong sample rate for the OpenAI
+// contract; pcm_24000 is available on every tier and matches OpenAI's
+// semantics. Bifrost passes formats outside its translation table through to
+// output_format verbatim, so the rewrite lands on the ElevenLabs API as-is.
+// The response Content-Type stays keyed on the wire format ("pcm" ->
+// audio/pcm) regardless.
+func speechResponseFormatFor(provider bfschemas.ModelProvider, wireFormat string) string {
+	if provider == bfschemas.Elevenlabs && strings.EqualFold(wireFormat, "pcm") {
+		return "pcm_24000"
+	}
+	return wireFormat
+}
+
 // dispatchSpeech routes /v1/audio/speech traffic through Bifrost's
 // SpeechRequest endpoint (openai + elevenlabs providers). The inbound body is
 // OpenAI-shape; ElevenLabs callers put their voice id in the same `voice`
@@ -67,7 +83,7 @@ func (r *BifrostRouter) dispatchSpeech(
 
 	params := &bfschemas.SpeechParameters{
 		Instructions:   wire.Instructions,
-		ResponseFormat: wire.ResponseFormat,
+		ResponseFormat: speechResponseFormatFor(provider, wire.ResponseFormat),
 		Speed:          wire.Speed,
 	}
 	if wire.Voice != "" {

@@ -204,11 +204,15 @@ func TestAudio_ElevenLabs_SpeechToOpenAITranscription(t *testing.T) {
 		model = "eleven_flash_v2"
 	}
 
-	audio := speak(t, elVK, "elevenlabs/"+model, voice, "mp3")
+	// pcm on purpose: the gateway must ask ElevenLabs for pcm_24000 (every
+	// tier, OpenAI's 24kHz semantics), not Bifrost's default pcm_44100
+	// (Pro-tier-gated, wrong rate). Re-containering at 24kHz and having
+	// OpenAI STT still hear the sentence proves both halves.
+	audio := speak(t, elVK, "elevenlabs/"+model, voice, "pcm")
 
 	// Cross-provider proof: EL speaks, OpenAI listens. Needs an OpenAI VK too.
 	oaVK := requireEnv(t, "TEST_VK_OPENAI")
-	transcript := transcribe(t, oaVK, "openai/gpt-4o-transcribe", "el.mp3", audio)
+	transcript := transcribe(t, oaVK, "openai/gpt-4o-transcribe", "el.wav", wavFromPCM(audio, 24000))
 	t.Logf("elevenlabs->openai transcript: %q", transcript)
 	assertHeardTheFox(t, transcript)
 }

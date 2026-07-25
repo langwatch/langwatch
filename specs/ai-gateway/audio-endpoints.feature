@@ -37,6 +37,13 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
     And no JSON wrapping or base64 encoding is applied
     # Scenario's voice harness consumes exactly this shape (pcm16/24000).
 
+  @unit
+  Scenario: PCM means 24kHz on every provider, matching OpenAI semantics
+    When the client requests response_format "pcm" for an elevenlabs model
+    Then the gateway asks ElevenLabs for output_format "pcm_24000"
+    # Bifrost's own mapping picks pcm_44100, which is gated to the ElevenLabs
+    # Pro tier and is the wrong sample rate for the OpenAI pcm contract.
+
   @integration
   Scenario: ElevenLabs TTS through the same OpenAI wire shape
     When the client POSTs /v1/audio/speech with model "elevenlabs/eleven_flash_v2" and a voice id in `voice`
