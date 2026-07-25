@@ -91,6 +91,25 @@ type SuiteRouting = {
   highlightBatchId: string | null;
 };
 
+/**
+ * Route params, rebuilt from the target selection rather than carried over.
+ */
+const ROUTE_PARAM_KEYS = new Set(["project", "path"]);
+
+/**
+ * Whether a query param carries over when the sidebar selection changes.
+ *
+ * The date window (`period`, or `startDate` plus `endDate`) and the
+ * run-history view state (`groupBy`, `scenarioId`, `passFailStatus`) describe
+ * what the user is looking at rather than which set they picked, so they
+ * follow the selection. Dropping `period` snapped a widened window back to
+ * the 30-day default and hid the older run the user had widened the window to
+ * reach. An open drawer is the exception: it holds a run from the set being
+ * navigated away from.
+ */
+const survivesSelectionChange = (key: string): boolean =>
+  !ROUTE_PARAM_KEYS.has(key) && !key.startsWith("drawer");
+
 export function useSuiteRouting(): SuiteRouting {
   const router = useRouter();
 
@@ -108,10 +127,11 @@ export function useSuiteRouting(): SuiteRouting {
     (slug: string | typeof ALL_RUNS_ID) => {
       if (!projectSlug) return;
 
-      // Preserve date params so period survives navigation
-      const dateParams: Record<string, string> = {};
-      if (typeof router.query.startDate === "string") dateParams.startDate = router.query.startDate;
-      if (typeof router.query.endDate === "string") dateParams.endDate = router.query.endDate;
+      const carriedParams: Record<string, string | string[]> = {};
+      for (const [key, value] of Object.entries(router.query)) {
+        if (value === undefined || !survivesSelectionChange(key)) continue;
+        carriedParams[key] = value;
+      }
 
       let pathSegments: string[];
       if (slug === ALL_RUNS_ID) {
@@ -122,14 +142,23 @@ export function useSuiteRouting(): SuiteRouting {
         pathSegments = ["run-plans", slug];
       }
 
-      const displayPath = pathSegments.length > 0
-        ? `/${projectSlug}/simulations/${pathSegments.join("/")}`
-        : `/${projectSlug}/simulations`;
+      const displayPath =
+        pathSegments.length > 0
+          ? `/${projectSlug}/simulations/${pathSegments.join("/")}`
+          : `/${projectSlug}/simulations`;
 
-      const dateQueryString = Object.entries(dateParams)
-        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-        .join("&");
-      const asUrl = dateQueryString ? `${displayPath}?${dateQueryString}` : displayPath;
+      const search = new URLSearchParams();
+      for (const [key, value] of Object.entries(carriedParams)) {
+        if (Array.isArray(value)) {
+          for (const item of value) search.append(key, item);
+        } else {
+          search.set(key, value);
+        }
+      }
+      const carriedQueryString = search.toString();
+      const asUrl = carriedQueryString
+        ? `${displayPath}?${carriedQueryString}`
+        : displayPath;
 
       // All routes are handled by the same [[...path]] page, so shallow works
       void router.push(
@@ -138,7 +167,7 @@ export function useSuiteRouting(): SuiteRouting {
           query: {
             project: projectSlug,
             ...(pathSegments.length > 0 ? { path: pathSegments } : {}),
-            ...dateParams,
+            ...carriedParams,
           },
         },
         asUrl,
@@ -158,13 +187,18 @@ export function deriveFromPath({
 }: {
   isReady: boolean;
   path: string | string[] | undefined;
-}): { selectedSuiteSlug: string | typeof ALL_RUNS_ID | null; highlightBatchId: string | null } {
+}): {
+  selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
+  highlightBatchId: string | null;
+} {
   if (!isReady) return { selectedSuiteSlug: null, highlightBatchId: null };
 
   const rawSegments = Array.isArray(path) ? path : path ? [path] : [];
   // Drop segments that are actually query strings leaking in from the URL
   // (e.g. when a redirect fires before the catch-all has stripped "?foo=bar").
-  const segments = rawSegments.filter((s) => s && !s.startsWith("?") && !s.includes("="));
+  const segments = rawSegments.filter(
+    (s) => s && !s.startsWith("?") && !s.includes("="),
+  );
 
   // [] → All Runs
   if (segments.length === 0) {

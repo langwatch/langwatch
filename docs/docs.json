@@ -622,6 +622,7 @@
               "ai-gateway/api/chat-completions",
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
+              "ai-gateway/api/audio",
               "ai-gateway/api/models",
               "ai-gateway/api/errors",
               "ai-gateway/api/management"
@@ -761,6 +762,7 @@
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
+              "self-hosting/configuration/langy-assistant",
               "self-hosting/configuration/observability",
               "self-hosting/configuration/third-party-integrations"
             ]
@@ -1255,7 +1257,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1784910845",
+      "source": "/ci/cache/busted/1784998254",
       "destination": "/"
     },
     {

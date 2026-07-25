@@ -10,6 +10,6 @@ dependencies:
   version: 3.5.0
 - name: langwatch-langyagent
   repository: file://../langyagent
-  version: 3.3.0
-digest: sha256:763e36ee4d85807ce658abc08f0d7d33fadd1fcdd6b66ec2932682ef5c735621
-generated: "2026-07-11T03:54:23.377345+02:00"
+  version: 3.5.0
+digest: sha256:a1dc84b9aea920faa8c9cdb25e303ce68094db2203d30afcaae0f9b1b3a051b8
+generated: "2026-07-24T21:29:18.794326+02:00"

@@ -16,7 +16,10 @@ import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
+import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
+import { ensureLangyCli } from "./langy-cli.ts";
 import { startNlpgo } from "./nlpgo.ts";
+import { featureEnv, resolveEffectiveFeatures } from "../shared/features.ts";
 import { runMigrations } from "./migrate.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { startPostgres } from "./postgres.ts";
@@ -54,9 +57,12 @@ const runtimeImpl: RuntimeApi = {
     // uv sync + langwatch node_modules + prepare:files run in parallel.
     // Each helper is idempotent and prints "already cached" + early-returns
     // when its lockfile hash matches the previous run.
+    const features = resolveEffectiveFeatures(ctx.envFile);
     await Promise.all([
       syncVenvs(ctx, bus),
       ensureLangwatchDeps(ctx, bus),
+      // The assistant's CLI: only an install running it needs the download.
+      ...(features.isLangyEnabled ? [ensureLangyCli(ctx, bus)] : []),
     ]);
   },
 
@@ -87,8 +93,71 @@ const runtimeImpl: RuntimeApi = {
 
     // Phase 3: app-tier services in parallel. The langwatch app receives
     // userEnv overlay so the user's provider keys (OPENAI_API_KEY etc.)
-    // win over the blank .env entries written by scaffoldEnvFile.
-    const childEnv = { ...envFromFile, ...ctx.userEnv };
+    // win over the blank .env entries written by scaffoldEnvFile. The
+    // resolved feature toggles ride along explicitly (see featureEnv) so the
+    // app describes exactly the install this process just built.
+    const features = resolveEffectiveFeatures(ctx.envFile);
+    // The assistant is OPTIONAL: nothing else depends on it, so no failure of
+    // its own may take the install down. It boots (or declines to) BEFORE the
+    // app tier, because the app must be told the truth about it: an agent URL
+    // with no agent behind it turns every send into a hang. Two ways it
+    // declines, each with its own notice:
+    //   - the mono-binary predates the langyagent service (the npm package
+    //     and the release binary move in lockstep, but a smoke run of an
+    //     unreleased CLI, or an install mid release-window, gets the previous
+    //     release's binary, which answers "unknown service");
+    //   - it started but never reached healthy.
+    let isLangyRunnable = features.isLangyEnabled;
+    let langyHandle: SupervisedHandle | null = null;
+    if (isLangyRunnable) {
+      const binary = ctx.predeps.aigateway?.resolvedPath;
+      isLangyRunnable = !!binary && (await monobinarySupportsLangyagent(binary));
+      if (!isLangyRunnable) {
+        bus.emit({
+          type: "log",
+          service: "langyagent",
+          stream: "stderr",
+          line:
+            "langy assistant disabled: the installed ai-gateway binary predates it. The next release's binary includes it and will be picked up automatically.",
+        });
+      }
+    }
+    if (isLangyRunnable) {
+      try {
+        langyHandle = await startLangyagent(ctx, bus, {
+          ...envFromFile,
+          ...ctx.userEnv,
+        });
+        handles.push(langyHandle);
+      } catch (err) {
+        isLangyRunnable = false;
+        bus.emit({
+          type: "log",
+          service: "langyagent",
+          stream: "stderr",
+          line: `langy assistant disabled: it failed to start (${err instanceof Error ? err.message : String(err)}). Everything else continues without it.`,
+        });
+      }
+    }
+    const effective = { ...features, isLangyEnabled: isLangyRunnable };
+    const childEnv: Record<string, string> = {
+      ...envFromFile,
+      ...ctx.userEnv,
+      ...featureEnv(effective),
+    };
+    if (!effective.isLangyEnabled) {
+      // With the assistant off, the app must not think it exists: an agent
+      // URL with no agent behind it turns every send into a hang, and the
+      // forced rollout flag would render the panel. The .env keeps its lines
+      // (they are the user's knobs); only the running processes lose them.
+      delete childEnv.OPENCODE_AGENT_URL;
+      const forced = (childEnv.FEATURE_FLAG_FORCE_ENABLE ?? "")
+        .split(",")
+        .map((f) => f.trim())
+        .filter((f) => f && f !== "release_langy_enabled");
+      if (forced.length > 0) childEnv.FEATURE_FLAG_FORCE_ENABLE = forced.join(",");
+      else delete childEnv.FEATURE_FLAG_FORCE_ENABLE;
+    }
 
     try {
       // nlpgo is the only NLP runtime — the Go service from the aigateway

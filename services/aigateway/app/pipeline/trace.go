@@ -50,7 +50,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
 				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
-				call.Meta.CustomerTraceparent = tp
+				call.Meta.Update(func(m *Meta) { m.CustomerTraceparent = tp })
+				gatewayRequestID := call.Meta.GatewayRequestID()
 				internalModel, internalProviderID := internalTraceMetadata(call.Bundle.Config, call.Request.Model)
 
 				resp, err := next(spanCtx, call)
@@ -69,7 +70,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
 							VKTags:             call.Bundle.Config.VKTags,
-							GatewayRequestID:   call.Meta.GatewayRequestID,
+							GatewayRequestID:   gatewayRequestID,
 							RequestBody:        call.Request.Body,
 							UpstreamStatusCode: status,
 							UpstreamErrorType:  errType,
@@ -90,7 +91,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						RequestType:        call.Request.Type,
 						VirtualKeyID:       call.Bundle.VirtualKeyID,
 						VKTags:             call.Bundle.Config.VKTags,
-						GatewayRequestID:   call.Meta.GatewayRequestID,
+						GatewayRequestID:   gatewayRequestID,
 						RequestBody:        call.Request.Body,
 						ResponseBody:       resp.Body,
 						MirrorTier:         call.Bundle.Config.MirrorTier,
@@ -103,7 +104,8 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
 				spanCtx, tp := begin(ctx, call.Bundle.Config.TraceProjectID, call.Request.Type)
-				call.Meta.CustomerTraceparent = tp
+				call.Meta.Update(func(m *Meta) { m.CustomerTraceparent = tp })
+				gatewayRequestID := call.Meta.GatewayRequestID()
 				internalModel, internalProviderID := internalTraceMetadata(call.Bundle.Config, call.Request.Model)
 
 				iter, err := next(spanCtx, call)
@@ -122,7 +124,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 							RequestType:        call.Request.Type,
 							VirtualKeyID:       call.Bundle.VirtualKeyID,
 							VKTags:             call.Bundle.Config.VKTags,
-							GatewayRequestID:   call.Meta.GatewayRequestID,
+							GatewayRequestID:   gatewayRequestID,
 							RequestBody:        call.Request.Body,
 							UpstreamStatusCode: status,
 							UpstreamErrorType:  errType,
@@ -140,7 +142,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					end:                end,
 					bundle:             call.Bundle,
 					req:                call.Request,
-					meta:               call.Meta,
+					gatewayRequestID:   gatewayRequestID,
 					spanCtx:            spanCtx,
 					internalModel:      internalModel,
 					internalProviderID: internalProviderID,
@@ -184,7 +186,7 @@ type traceStreamWrapper struct {
 	end                EndSpanFunc
 	bundle             *domain.Bundle
 	req                *domain.Request
-	meta               *Meta
+	gatewayRequestID   string
 	spanCtx            context.Context
 	internalModel      string
 	internalProviderID domain.ProviderID
@@ -275,7 +277,7 @@ func (w *traceStreamWrapper) onClose() {
 				RequestType:        w.req.Type,
 				VirtualKeyID:       w.bundle.VirtualKeyID,
 				VKTags:             w.bundle.Config.VKTags,
-				GatewayRequestID:   w.meta.GatewayRequestID,
+				GatewayRequestID:   w.gatewayRequestID,
 				RequestBody:        w.req.Body,
 				ResponseBody:       body,
 				UpstreamStatusCode: status,

@@ -53,7 +53,7 @@ func TestTracePassesVKTagsToEndParams(t *testing.T) {
 		_, err := interceptor.Sync(next)(context.Background(), &Call{
 			Bundle:  bundleWithVKTags(),
 			Request: request,
-			Meta:    &Meta{},
+			Meta:    &MetaAccumulator{},
 		})
 
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestTracePassesVKTagsToEndParams(t *testing.T) {
 		_, err := interceptor.Sync(next)(context.Background(), &Call{
 			Bundle:  bundleWithVKTags(),
 			Request: request,
-			Meta:    &Meta{},
+			Meta:    &MetaAccumulator{},
 		})
 
 		require.Error(t, err)
@@ -90,7 +90,7 @@ func TestTracePassesVKTagsToEndParams(t *testing.T) {
 		_, err := interceptor.Stream(next)(context.Background(), &Call{
 			Bundle:  bundleWithVKTags(),
 			Request: request,
-			Meta:    &Meta{},
+			Meta:    &MetaAccumulator{},
 		})
 
 		require.Error(t, err)
@@ -108,7 +108,7 @@ func TestTracePassesVKTagsToEndParams(t *testing.T) {
 		iter, err := interceptor.Stream(next)(context.Background(), &Call{
 			Bundle:  bundleWithVKTags(),
 			Request: request,
-			Meta:    &Meta{},
+			Meta:    &MetaAccumulator{},
 		})
 
 		require.NoError(t, err)
@@ -137,7 +137,7 @@ func TestTraceLeavesVKTagsEmptyForUntaggedKey(t *testing.T) {
 			Type:     domain.RequestTypeChat,
 			Resolved: &domain.ResolvedModel{ModelID: "gpt-5-mini"},
 		},
-		Meta: &Meta{},
+		Meta: &MetaAccumulator{},
 	})
 
 	require.NoError(t, err)

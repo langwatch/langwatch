@@ -236,17 +236,39 @@ spec:
                   key: LW_GATEWAY_JWT_SECRET
             {{- end }}
 
+            {{- if (index .Values "langyagent").chartManaged }}
             # Langy agent pod. The app POSTs chats to OPENCODE_AGENT_URL with
             # LANGY_INTERNAL_SECRET as the Bearer token; the agent verifies it
             # against the same Secret. Subchart values key read via index (aliased subchart).
-            {{- if (index .Values "langyagent").chartManaged }}
             - name: OPENCODE_AGENT_URL
               value: {{ (index .Values "langyagent").controlPlane.agentUrl | default (printf "http://%s-langyagent:80" .Release.Name) | quote }}
             - name: LANGY_INTERNAL_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default "langwatch-langyagent-auth" }}
+                  name: {{ (index .Values "langyagent").secrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
                   key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+            {{- include "langwatch.langyCallbackUrlEnv" . | nindent 12 }}
+            {{- end }}
+            {{- /* Langy's rollout flag is SYSTEM-scoped and defaults off, because
+                   the hosted product opens it one cohort at a time. A self-hosted
+                   install has a single cohort — the people who installed it — so
+                   deploying the agent and then finding no assistant anywhere in
+                   the product is a dead end whose only lever is an internal ops
+                   screen. Deploying the pod IS the decision to enable it; the
+                   operator keeps the staged path by setting
+                   langyagent.enableForAllUsers=false, which hands authority back
+                   to the flag store (/ops/feature-flags). Operator-forced flags
+                   are joined with it, never clobbered by it. */}}
+            {{- $forcedFlags := list }}
+            {{- with .Values.app.featureFlagForceEnable }}
+            {{- $forcedFlags = append $forcedFlags . }}
+            {{- end }}
+            {{- if and (index .Values "langyagent").chartManaged (index .Values "langyagent").enableForAllUsers }}
+            {{- $forcedFlags = append $forcedFlags "release_langy_enabled" }}
+            {{- end }}
+            {{- if $forcedFlags }}
+            - name: FEATURE_FLAG_FORCE_ENABLE
+              value: {{ join "," $forcedFlags | quote }}
             {{- end }}
 
             # LW_GATEWAY_PUBLIC_URL — the externally-reachable AI Gateway URL
@@ -271,6 +293,16 @@ spec:
             - name: LW_GATEWAY_PUBLIC_URL
               value: {{ $gwPublic | quote }}
             {{- end }}
+
+            {{- /* LW_GATEWAY_BASE_URL — where the CONTROL PLANE itself reaches the
+                   gateway, over cluster DNS. Distinct from the public URL above,
+                   which is what browsers and laptops use: an install with no
+                   gateway ingress (the common self-hosted shape) has no public URL
+                   at all, and the control plane still has to reach the gateway.
+                   Langy needs it to mint the worker's virtual key, and without it
+                   the assistant refuses every turn with a credential-resolution
+                   error naming this variable. */}}
+            {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
 
             # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
             # every app-image consumer needs it, see _helpers.tpl)

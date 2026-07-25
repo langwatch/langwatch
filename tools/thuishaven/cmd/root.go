@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -100,7 +101,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	worktree := gitTopLevel(cwd)
 	lwDir := filepath.Join(worktree, "langwatch")
 
-	naming := domain.DefaultNaming(os.Getenv("LANGWATCH_LOCAL_TLD"))
+	naming := domain.DefaultNaming(devEnv("LANGWATCH_LOCAL_TLD"))
 	proxy := portlessproxy.New(naming, lwDir)
 	store := fileregistry.New(havenHome())
 	sup := procsupervisor.New(isAgent)
@@ -137,7 +138,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	// needs what wants a human. LW_OBS_CONSOLE_LEVEL overrides it; "off"/"none"/""
 	// opts out and leaves the console to .env.
 	obsConsoleLevel := "warn"
-	if v, ok := os.LookupEnv("LW_OBS_CONSOLE_LEVEL"); ok {
+	if v, ok := dotenvLookup("LW_OBS_CONSOLE_LEVEL"); ok {
 		obsConsoleLevel = v
 	}
 	if obsConsoleLevel == "off" || obsConsoleLevel == "none" {
@@ -152,13 +153,13 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		HeartbeatEvery:           30 * time.Second,
 		DaemonArgv:               selfArgv(worktree, "daemon"),
 		IsAgent:                  isAgent,
-		ShouldManageClickHouse:   os.Getenv("LANGWATCH_HAVEN_CH") != "0",
-		ShouldStopClickHouseIdle: os.Getenv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
-		ShouldManagePostgres:     os.Getenv("LANGWATCH_HAVEN_PG") != "0",
-		ShouldManageRedis:        os.Getenv("LANGWATCH_HAVEN_REDIS") != "0",
+		ShouldManageClickHouse:   devEnv("LANGWATCH_HAVEN_CH") != "0",
+		ShouldStopClickHouseIdle: devEnv("LANGWATCH_HAVEN_CH_STOP_IDLE") == "1",
+		ShouldManagePostgres:     devEnv("LANGWATCH_HAVEN_PG") != "0",
+		ShouldManageRedis:        devEnv("LANGWATCH_HAVEN_REDIS") != "0",
 		// Observability shares CH's colima VM, so it defaults ON now — the VM is
 		// already paying for itself. LANGWATCH_HAVEN_OBS=0 opts out.
-		ShouldStartObservability:  os.Getenv("LANGWATCH_HAVEN_OBS") != "0",
+		ShouldStartObservability:  devEnv("LANGWATCH_HAVEN_OBS") != "0",
 		LocalAPIKey:               envOr("LANGWATCH_LOCAL_API_KEY", domain.DefaultLocalAPIKey),
 		RepoRoot:                  worktree,
 		ObservabilityConsoleLevel: obsConsoleLevel,
@@ -344,18 +345,18 @@ func (d deps) dispatch(ctx context.Context, sub string, rest []string) error {
 
 func optionsFromEnv(repoRoot string) app.PlanOptions {
 	return app.PlanOptions{
-		ShouldGoWatch:      os.Getenv("LANGWATCH_GO_WATCH") == "1",
-		ShouldStartWorkers: os.Getenv("START_WORKERS") != "false" && os.Getenv("START_WORKERS") != "0",
+		ShouldGoWatch:      devEnv("LANGWATCH_GO_WATCH") == "1",
+		ShouldStartWorkers: devEnv("START_WORKERS") != "false" && devEnv("START_WORKERS") != "0",
 		// Under haven the worker stack defaults to IN-PROCESS (hosted in the app
 		// process), saving the RAM of a second Node process — the sensible default on
 		// a laptop juggling several worktrees. Workers keep their own logger name
 		// ("langwatch:workers"), so their lines stay identifiable even without a
 		// separate lane. Opt back into a standalone `workers` lane with
 		// WORKERS_IN_PROCESS=0.
-		ShouldRunWorkersInProcess: os.Getenv("WORKERS_IN_PROCESS") != "0" && os.Getenv("WORKERS_IN_PROCESS") != "false",
-		ShouldSkipNLP:             os.Getenv("LANGWATCH_SKIP_NLP") == "1",
-		ShouldSkipGateway:         os.Getenv("LANGWATCH_SKIP_AIGATEWAY") == "1",
-		ShouldSkipLangyAgent:      os.Getenv("LANGWATCH_SKIP_LANGYAGENT") == "1",
+		ShouldRunWorkersInProcess: devEnv("WORKERS_IN_PROCESS") != "0" && devEnv("WORKERS_IN_PROCESS") != "false",
+		ShouldSkipNLP:             devEnv("LANGWATCH_SKIP_NLP") == "1",
+		ShouldSkipGateway:         devEnv("LANGWATCH_SKIP_AIGATEWAY") == "1",
+		ShouldSkipLangyAgent:      devEnv("LANGWATCH_SKIP_LANGYAGENT") == "1",
 		ShouldSeed:                os.Getenv("LANGWATCH_SEED") == "1",
 		// The langyagent worker's local isolation posture. Default (neither flag) is
 		// the sandboxed, production-like tier: the worker runs in colima with the
@@ -387,7 +388,7 @@ func resolveAgent() bool {
 }
 
 func havenHome() string {
-	if v := os.Getenv("LANGWATCH_PORTLESS_HOME"); v != "" {
+	if v := devEnv("LANGWATCH_PORTLESS_HOME"); v != "" {
 		return v
 	}
 	home, _ := os.UserHomeDir()
@@ -596,7 +597,7 @@ func runLogs(ctx context.Context, d deps, shouldFollow bool) error {
 // set, else the sibling `worktrees/` dir next to the main checkout (matching the
 // existing layout, e.g. .../langwatch/worktrees).
 func prWorktreeBase(dir string) string {
-	if v := os.Getenv("HAVEN_WORKTREE_DIR"); v != "" {
+	if v := devEnv("HAVEN_WORKTREE_DIR"); v != "" {
 		return v
 	}
 	return filepath.Join(filepath.Dir(gitMainWorktree(dir)), "worktrees")
@@ -705,22 +706,78 @@ func hasFlag(args []string, flag string) bool {
 	return false
 }
 
+// devEnv reads one of haven's own knobs: the process environment first, then
+// the merged dotenv layers (langwatch/.env, then langwatch/.env.portless).
+//
+// The same precedence Prisma and tsx give the app's settings, and for the same
+// reason: a preference like "never manage ClickHouse, this machine runs a
+// native one" belongs next to the CLICKHOUSE_URL it goes with, travels into
+// every new worktree with the .env the checkout hook copies, and is still
+// overridable by exporting the variable for a single run.
+//
+// Deliberately not used for the switches that describe one run rather than one
+// machine: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED, HAVEN_SEED_TRACES,
+// HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR. Every worktree inherits the
+// same .env, so a slug or a baseline marker pinned there would claim all of
+// them at once, and a seed flag would re-seed on every up. Keep this list and
+// the ENVIRONMENT section of help.go in step.
+func devEnv(key string) string {
+	v, _ := resolveKnob(key, os.LookupEnv, dotenvKnobs)
+	return v
+}
+
+// dotenvLookup is devEnv's two-value form, for knobs that distinguish "set to
+// empty" from "not set at all".
+func dotenvLookup(key string) (string, bool) {
+	return resolveKnob(key, os.LookupEnv, dotenvKnobs)
+}
+
+// resolveKnob is the precedence itself, kept pure so it can be tested without a
+// checkout on disk. dotenv is a thunk so the file is never read when the
+// process environment already answers.
+func resolveKnob(
+	key string,
+	lookup func(string) (string, bool),
+	dotenv func() map[string]string,
+) (string, bool) {
+	if v, ok := lookup(key); ok {
+		return v, true
+	}
+	v, ok := dotenv()[key]
+	return v, ok
+}
+
+// dotenvKnobs loads the dotenv layers once per process, from the langwatch/
+// directory of the checkout haven was invoked in.
+func dotenvKnobs() map[string]string {
+	dotenvOnce.Do(func() {
+		cwd, _ := os.Getwd()
+		dotenvVars = domain.LoadDotenv(filepath.Join(gitTopLevel(cwd), "langwatch"))
+	})
+	return dotenvVars
+}
+
+var (
+	dotenvOnce sync.Once
+	dotenvVars map[string]string
+)
+
 // envTruthy reports whether an env var is set to a common "on" value. Accepts the
 // two spellings haven's flags already use across the codebase ("1" / "true").
 func envTruthy(key string) bool {
-	v := os.Getenv(key)
+	v := devEnv(key)
 	return v == "1" || v == "true"
 }
 
 func envOr(key, def string) string {
-	if v := os.Getenv(key); v != "" {
+	if v := devEnv(key); v != "" {
 		return v
 	}
 	return def
 }
 
 func envInt(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
+	if v := devEnv(key); v != "" {
 		var n int
 		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
 			return n
@@ -730,7 +787,7 @@ func envInt(key string, def int) int {
 }
 
 func envDuration(key string, def time.Duration) time.Duration {
-	if v := os.Getenv(key); v != "" {
+	if v := devEnv(key); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
 			return d
 		}

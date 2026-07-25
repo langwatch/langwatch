@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildScopeHierarchy,
   firstEligibleDefaultModel,
   type OrgModelProvider,
+  resolveEligible,
   resolveProviderDefaultModel,
 } from "../eligibleModelProviders";
 
@@ -63,6 +65,7 @@ describe("firstEligibleDefaultModel", () => {
     id: "mp-1",
     name: "Self-hosted vLLM",
     provider: "custom",
+    enabled: true,
     scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
     models: [],
     customModels: [{ modelId: "Qwen2.5-0.5B-Instruct" }],
@@ -92,6 +95,120 @@ describe("firstEligibleDefaultModel", () => {
           organizationId: "org-1",
         }),
       ).toBeUndefined();
+    });
+  });
+});
+
+describe("resolveEligible", () => {
+  const ORG_ID = "org-1";
+  const TEAM_ID = "team-1";
+  const PROJECT_ID = "project-1";
+  const hierarchy = buildScopeHierarchy(
+    [{ id: PROJECT_ID, teamId: TEAM_ID }],
+    ORG_ID,
+  );
+  const keyAtProject = [
+    { scopeType: "PROJECT" as const, scopeId: PROJECT_ID },
+  ];
+  const orgProvider: OrgModelProvider = {
+    id: "mp-org",
+    name: "Central OpenAI",
+    provider: "openai",
+    enabled: true,
+    scopes: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+    models: ["gpt-5-mini"],
+  };
+
+  describe("when the provider lives at the organization and the key at a project", () => {
+    /** @scenario An org-scoped provider inherited into a project is attributed to the organization */
+    it("attributes the provider to the organization it is defined at", () => {
+      const [row] = resolveEligible(keyAtProject, [orgProvider], hierarchy);
+
+      expect(row?.definedAt).toEqual({
+        scopeType: "ORGANIZATION",
+        scopeId: ORG_ID,
+      });
+    });
+  });
+
+  describe("when the provider is attached at every tier the key reaches", () => {
+    /** @scenario A provider reachable through several tiers is attributed to the broadest one */
+    it("attributes it to the broadest tier", () => {
+      const [row] = resolveEligible(
+        keyAtProject,
+        [
+          {
+            ...orgProvider,
+            scopes: [
+              { scopeType: "PROJECT", scopeId: PROJECT_ID },
+              { scopeType: "TEAM", scopeId: TEAM_ID },
+              { scopeType: "ORGANIZATION", scopeId: ORG_ID },
+            ],
+          },
+        ],
+        hierarchy,
+      );
+
+      expect(row?.definedAt).toEqual({
+        scopeType: "ORGANIZATION",
+        scopeId: ORG_ID,
+      });
+    });
+
+    /** @scenario The same provider is never listed twice */
+    it("returns it once", () => {
+      expect(
+        resolveEligible(
+          keyAtProject,
+          [
+            {
+              ...orgProvider,
+              scopes: [
+                { scopeType: "PROJECT", scopeId: PROJECT_ID },
+                { scopeType: "TEAM", scopeId: TEAM_ID },
+                { scopeType: "ORGANIZATION", scopeId: ORG_ID },
+              ],
+            },
+          ],
+          hierarchy,
+        ),
+      ).toHaveLength(1);
+    });
+  });
+
+  describe("when a provider in scope has been switched off", () => {
+    /** @scenario A provider an admin turned off is not offered to a new key */
+    it("leaves it out", () => {
+      expect(
+        resolveEligible(
+          keyAtProject,
+          [{ ...orgProvider, enabled: false }],
+          hierarchy,
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a provider in scope has been withdrawn", () => {
+    /** @scenario A provider an admin removed is not offered to a new key */
+    it("leaves it out", () => {
+      expect(
+        resolveEligible(
+          keyAtProject,
+          [{ ...orgProvider, disabledAt: new Date("2026-07-01T00:00:00Z") }],
+          hierarchy,
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a row arrives without a routability signal", () => {
+    it("fails closed rather than advertising it", () => {
+      const { enabled: _dropped, ...noSignal } = orgProvider;
+
+      expect(
+        resolveEligible(keyAtProject, [noSignal], hierarchy),
+      ).toEqual([]);
     });
   });
 });

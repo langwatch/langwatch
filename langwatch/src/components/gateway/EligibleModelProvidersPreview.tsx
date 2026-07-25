@@ -1,54 +1,51 @@
-import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Link } from "~/components/ui/link";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
 import {
   buildScopeHierarchy,
+  type ModelProviderScopeEntry,
   type OrgModelProvider,
   resolveEligible,
 } from "./eligibleModelProviders";
 import type { VirtualKeyScopeEntry } from "./VirtualKeyScopePicker";
 
-function scopeChipLabel(
-  scope: VirtualKeyScopeEntry,
-  names: {
-    organizationName?: string;
-    teamNames: Map<string, string>;
-    projectNames: Map<string, string>;
-  },
-): string {
+type ScopeNames = {
+  organizationName?: string;
+  teamNames: Map<string, string>;
+  projectNames: Map<string, string>;
+};
+
+function scopeName(
+  scope: ModelProviderScopeEntry | VirtualKeyScopeEntry,
+  names: ScopeNames,
+): string | undefined {
   switch (scope.scopeType) {
     case "ORGANIZATION":
-      return `via ORG${names.organizationName ? `:${names.organizationName}` : ""}`;
+      return names.organizationName;
     case "TEAM":
-      return `via TEAM:${names.teamNames.get(scope.scopeId) ?? scope.scopeId}`;
+      return names.teamNames.get(scope.scopeId);
     case "PROJECT":
-      return `via PROJECT:${names.projectNames.get(scope.scopeId) ?? scope.scopeId}`;
+      return names.projectNames.get(scope.scopeId);
   }
 }
 
-function summariseScopes(
+/**
+ * "Doc Chat", "Doc Chat and Growth", "Doc Chat, Growth and Support" — the
+ * scopes named the way the user picked them in the chips right above, so
+ * the sentence reads back their own choice rather than a scope type.
+ */
+function listScopeNames(
   scopes: VirtualKeyScopeEntry[],
-  names: {
-    organizationName?: string;
-    teamNames: Map<string, string>;
-    projectNames: Map<string, string>;
-  },
+  names: ScopeNames,
 ): string {
-  return scopes
-    .map((s) => {
-      const tail =
-        s.scopeType === "ORGANIZATION"
-          ? names.organizationName ?? s.scopeId
-          : s.scopeType === "TEAM"
-          ? names.teamNames.get(s.scopeId) ?? s.scopeId
-          : names.projectNames.get(s.scopeId) ?? s.scopeId;
-      return `${s.scopeType}:${tail}`;
-    })
-    .join(" + ");
+  const labels = scopes.map((s) => scopeName(s, names) ?? s.scopeId);
+  if (labels.length <= 1) return labels[0] ?? "";
+  return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]!}`;
 }
 
 export function EligibleModelProvidersPreview({
@@ -204,9 +201,16 @@ export function EligibleModelProvidersPreview({
               </Text>
             )}
             <Box flex={1} />
-            <Badge variant="subtle" colorPalette="gray" fontSize="2xs">
-              {scopeChipLabel(mp.inheritedFrom, names)}
-            </Badge>
+            <ProviderScopeChips
+              size="xs"
+              scopes={[
+                {
+                  scopeType: mp.definedAt.scopeType,
+                  scopeId: mp.definedAt.scopeId,
+                  name: scopeName(mp.definedAt, names),
+                },
+              ]}
+            />
           </HStack>
         );
       })}
@@ -263,12 +267,12 @@ export function EligibleModelProvidersSummary({
 
   if (scopes.length === 0 || isLoading || eligible.length === 0) return null;
 
-  const scopeSummary = summariseScopes(scopes, names);
+  const scopeSummary = listScopeNames(scopes, names);
   const totalModels = eligible.reduce((sum, p) => sum + p.modelCount, 0);
 
   return (
     <Text fontSize="xs" color="fg.muted">
-      This VK will be usable within {scopeSummary} and can fall back to{" "}
+      This key works in {scopeSummary} and can route to{" "}
       {eligible.length === 1 ? "1 provider" : `${eligible.length} providers`}
       {totalModels > 0
         ? ` (${totalModels} ${totalModels === 1 ? "model" : "models"})`

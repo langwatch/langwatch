@@ -70,6 +70,14 @@ interface CreateContextOptions {
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
   opsScope?: OpsScope;
+  /**
+   * Aborts when the client goes away. Long-lived subscriptions must pass this
+   * to whatever they wait on, otherwise a disconnected client leaves the
+   * generator suspended forever: tRPC v10 callers do not populate
+   * `opts.signal`, and the SSE transport cannot interrupt a pending `await`
+   * from the outside.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -92,6 +100,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
     opsScope: opts.opsScope,
+    signal: opts.signal,
   };
 };
 

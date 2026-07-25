@@ -36,6 +36,11 @@ const (
 	// themselves (vLLM, LiteLLM proxy, ...). Requires a base URL; the
 	// API key is optional (many self-hosted servers run unauthenticated).
 	ProviderCustom ProviderID = "custom"
+	// ElevenLabs is a Bifrost-native provider (enum value "elevenlabs",
+	// plain API key). It ships speech (TTS) and transcription (STT) only;
+	// chat-family calls against an ElevenLabs credential surface the
+	// provider's reject directly, same policy as Anthropic embeddings.
+	ProviderElevenLabs ProviderID = "elevenlabs"
 	// OpenAICodex is the user's own ChatGPT subscription, reached through
 	// OpenAI's codex backend (chatgpt.com/backend-api/codex) with an OAuth
 	// access token instead of an API key. Responses-API + SSE only; the

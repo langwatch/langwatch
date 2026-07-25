@@ -75,6 +75,21 @@ type ChangePoller interface {
 }
 
 // Service is the three-tier auth resolver.
+// CacheMetrics counts how well the key cache is serving. Declared here
+// rather than imported so the resolver stays free of a metrics
+// dependency; the gateway's Prometheus recorder satisfies it.
+type CacheMetrics interface {
+	RecordAuthCacheLookup()
+	RecordAuthCacheHit(tier string)
+	RecordAuthCacheMiss(tier string)
+}
+
+// Cache tier names reported on the auth-cache metrics.
+const (
+	tierL1      = "l1"
+	tierL2Redis = "l2_redis"
+)
+
 type Service struct {
 	l1            *lru.Cache[[64]byte, *entry]
 	l2            L2Store
@@ -82,6 +97,7 @@ type Service struct {
 	configFetcher ConfigFetcher
 	changePoller  ChangePoller
 	logger        *zap.Logger
+	metrics       CacheMetrics
 
 	refreshThreshold time.Duration
 	softBump         time.Duration
@@ -257,6 +273,9 @@ type Options struct {
 	// change-event kind) — this TTL is the safety net that bounds config
 	// staleness without a process restart. Default 60s. Negative disables.
 	ConfigTTL time.Duration
+	// Metrics counts cache lookups, hits and misses. Optional; nil skips
+	// the counting entirely.
+	Metrics CacheMetrics
 	// ChangePoller is the optional control-plane /changes subscriber.
 	// When non-nil, the service spawns a per-org poll loop on Start that
 	// evicts L1 entries whose cached config has been invalidated by an
@@ -308,6 +327,7 @@ func New(opts Options) (*Service, error) {
 		configFetcher:    opts.ConfigFetcher,
 		changePoller:     opts.ChangePoller,
 		logger:           logger,
+		metrics:          opts.Metrics,
 		refreshThreshold: opts.RefreshThreshold,
 		softBump:         opts.SoftBump,
 		hardGrace:        opts.HardGrace,
@@ -328,12 +348,14 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 	}
 
 	h := hashKey(rawKey)
+	s.recordLookup()
 
 	// L1: in-memory
 	if e, ok := s.l1.Get(h); ok {
 		switch {
 		case !e.softExpired():
 			// Fresh: serve, maybe trigger background refresh on near-expiry.
+			s.recordHit(tierL1)
 			if e.nearSoftExpiry(s.refreshThreshold) {
 				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 			} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
@@ -342,31 +364,60 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			return e.bundle, nil
 
 		case !e.hardExpired():
-			// Soft-expired but within hard grace. Try foreground refresh;
-			// stale-while-error on transport failure.
+			// Soft-expired but within hard grace. A foreground refresh is
+			// needed before the entry can serve, so it counts as a miss
+			// even when stale-while-error ends up serving the old bundle.
+			s.recordMiss(tierL1)
 			return s.refreshOrServeStale(ctx, rawKey, h, e)
 
 		default:
 			// Past hard cap: evict, fall through to fresh resolve.
+			s.recordMiss(tierL1)
 			s.l1.Remove(h)
 			s.logger.Error("auth_cache_hard_evict",
 				zap.String("vk_id", e.bundle.VirtualKeyID),
 				zap.String("reason", "hard_cap_exceeded_on_lookup"),
 			)
 		}
+	} else {
+		s.recordMiss(tierL1)
 	}
 
 	// L2: optional store
 	if s.l2 != nil {
 		hStr := string(h[:])
 		if bundle, err := s.l2.Get(ctx, hStr); err == nil && bundle != nil {
+			s.recordHit(tierL2Redis)
 			s.storeL1(h, bundle)
 			return bundle, nil
 		}
+		s.recordMiss(tierL2Redis)
 	}
 
 	// L3: upstream resolver
 	return s.resolveFresh(ctx, rawKey, h)
+}
+
+// CacheLen reports how many virtual keys L1 is currently holding, so the
+// gateway can publish it as a gauge.
+func (s *Service) CacheLen() int { return s.l1.Len() }
+
+func (s *Service) recordLookup() {
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheLookup()
+	}
+}
+
+func (s *Service) recordHit(tier string) {
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheHit(tier)
+	}
+}
+
+func (s *Service) recordMiss(tier string) {
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheMiss(tier)
+	}
 }
 
 // resolveFresh calls the upstream resolver and caches the result.

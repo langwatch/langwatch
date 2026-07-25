@@ -1,18 +1,18 @@
 ---
-title: AI Tools Portal sessions, devices
-description: See where your CLI is signed in across machines (laptop, workstation, dev container, CI runner), identify each session by device, see when it was last used, revoke any session in one click. Mirrors the macOS "Logged-in devices", GitHub "Active sessions", Apple ID "Trusted devices" pattern.
-sidebarTitle: Sessions
+title: AI Tools Portal devices
+description: See where your CLI is signed in across machines (laptop, workstation, dev container, CI runner), identify each session by device, see when it was last used, revoke any device in one click. Mirrors the macOS "Logged-in devices", GitHub "Active sessions", Apple ID "Trusted devices" pattern.
+sidebarTitle: Devices
 ---
 
 When you run `langwatch login` on a new machine, the device-flow exchange
 mints a Personal Virtual Key bound to your identity + the machine.
-**Sessions** is the inventory of where those keys are currently active —
+**Devices** is the inventory of where those keys are currently active —
 who you are on which device, when each session was started, when it was
-last used, and how to revoke any session you no longer need.
+last used, and how to revoke any device you no longer need.
 
 <Info>**Pairs with:** [Personal IDE keys](/ai-gateway/governance/personal-keys) (the device-flow login that creates each session) and [Tile interactions → Coding-assistant tiles](/ai-governance/personal-portal/end-user#coding-assistant-tiles) (the wrapper commands that consume each session's VK).</Info>
 
-## What you see at /me/sessions
+## What you see at /me/devices
 
 ```
 ┌─ Your CLI sessions ─────────────────────────────────────────────────┐

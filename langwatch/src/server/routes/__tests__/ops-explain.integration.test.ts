@@ -11,24 +11,27 @@
  * api-router.ts would show up as a 404 here instead of a green CI and a
  * 404 in production.
  *
- * ClickHouse comes from @testcontainers/clickhouse (same image and
- * .withReuse() pattern as src/server/clickhouse/__tests__/
- * clickhouseClient.integration.test.ts).
+ * ClickHouse comes from startTestClickHouseEndpoints: the native local server
+ * when one is configured, a container otherwise. Either way the suite gets its
+ * own database, so the EXPLAIN targets here can never be confused with, or
+ * create a stub table inside, a developer's real `langwatch` database on a
+ * shared native server.
  */
-import {
-  ClickHouseContainer,
-  type StartedClickHouseContainer,
-} from "@testcontainers/clickhouse";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { _resetOpsClickHouseClientForTesting } from "~/server/ops/explain-core";
 import { createApiRouter } from "~/server/api-router";
+import { _resetOpsClickHouseClientForTesting } from "~/server/ops/explain-core";
+import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
 
 const API_KEY = "integration-test-key";
-let container: StartedClickHouseContainer;
+/** This suite's database, resolved in beforeAll and templated into every query. */
+let DB: string;
 let router: ReturnType<typeof createApiRouter>;
 
-async function post(path: string, body: unknown, headers: Record<string, string> = {}) {
+async function post(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+) {
   return router.request(path, {
     method: "POST",
     headers: {
@@ -42,17 +45,15 @@ async function post(path: string, body: unknown, headers: Record<string, string>
 
 describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
   beforeAll(async () => {
-    container = await new ClickHouseContainer("clickhouse/clickhouse-server:25.10.2.65")
-      .withLabels({ "langwatch.test.ops-explain": "http" })
-      .withReuse()
-      .withStartupTimeout(120_000)
-      .start();
-    const url = container.getConnectionUrl();
+    const [ops] = await startTestClickHouseEndpoints({
+      suite: "ops-explain",
+      names: ["http"],
+    });
+    DB = ops!.database;
     const { createClient } = await import("@clickhouse/client");
-    const c = createClient({ url });
-    await c.command({ query: "CREATE DATABASE IF NOT EXISTS langwatch" });
+    const c = createClient({ url: ops!.url });
     await c.command({
-      query: `CREATE TABLE IF NOT EXISTS langwatch.stored_spans (
+      query: `CREATE TABLE IF NOT EXISTS ${DB}.stored_spans (
         TenantId String,
         SpanId String,
         OccurredAt DateTime,
@@ -62,7 +63,7 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
     await c.close();
 
     process.env.LANGWATCH_OPS_API_KEY = API_KEY;
-    process.env.CLICKHOUSE_OPS_URL = url;
+    process.env.CLICKHOUSE_OPS_URL = ops!.url;
     process.env.NODE_ENV = "test";
     _resetOpsClickHouseClientForTesting();
 
@@ -79,7 +80,7 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
 
   it("is mounted at /api/ops/clickhouse/explain and serves EXPLAIN PLAN rows", async () => {
     const res = await post("/api/ops/clickhouse/explain", {
-      query: "SELECT count() FROM langwatch.stored_spans WHERE TenantId = 'p_test'",
+      query: `SELECT count() FROM ${DB}.stored_spans WHERE TenantId = 'p_test'`,
       type: "PLAN",
     });
     expect(res.status).toBe(200);
@@ -91,18 +92,18 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
 
   it("accepts a cross-tenant query — operator endpoint by design", async () => {
     const res = await post("/api/ops/clickhouse/explain", {
-      query: "SELECT count() FROM langwatch.stored_spans",
+      query: `SELECT count() FROM ${DB}.stored_spans`,
     });
     expect(res.status).toBe(200);
   });
 
   it("honours the EXPLAIN type (PIPELINE returns different rows than PLAN)", async () => {
     const plan = await post("/api/ops/clickhouse/explain", {
-      query: "SELECT TenantId, count() FROM langwatch.stored_spans GROUP BY TenantId",
+      query: `SELECT TenantId, count() FROM ${DB}.stored_spans GROUP BY TenantId`,
       type: "PLAN",
     });
     const pipe = await post("/api/ops/clickhouse/explain", {
-      query: "SELECT TenantId, count() FROM langwatch.stored_spans GROUP BY TenantId",
+      query: `SELECT TenantId, count() FROM ${DB}.stored_spans GROUP BY TenantId`,
       type: "PIPELINE",
     });
     expect(plan.status).toBe(200);
@@ -114,7 +115,7 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
 
   it("rejects a multi-statement query at the input filter (never reaches CH)", async () => {
     const res = await post("/api/ops/clickhouse/explain", {
-      query: "SELECT 1 FROM langwatch.stored_spans WHERE TenantId='x'; DROP TABLE langwatch.stored_spans",
+      query: `SELECT 1 FROM ${DB}.stored_spans WHERE TenantId='x'; DROP TABLE ${DB}.stored_spans`,
     });
     expect(res.status).toBe(400);
     expect((await res.json()).message).toMatch(/single statement/i);
@@ -122,7 +123,8 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
 
   it("rejects a table function (SSRF surface)", async () => {
     const res = await post("/api/ops/clickhouse/explain", {
-      query: "SELECT * FROM url('http://evil.example/x', CSV, 'a String') WHERE TenantId = 'p_x'",
+      query:
+        "SELECT * FROM url('http://evil.example/x', CSV, 'a String') WHERE TenantId = 'p_x'",
     });
     expect(res.status).toBe(400);
     expect((await res.json()).message).toMatch(/table function/i);
@@ -130,14 +132,16 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
 
   it("rejects the string-vs-comment ordering bypass end-to-end", async () => {
     const res = await post("/api/ops/clickhouse/explain", {
-      query: `SELECT * FROM langwatch.stored_spans WHERE '/*' = 'literal' OR SpanId IN (SELECT SpanId FROM url('http://127.0.0.1:9/', CSV)) /* trailing */`,
+      query: `SELECT * FROM ${DB}.stored_spans WHERE '/*' = 'literal' OR SpanId IN (SELECT SpanId FROM url('http://127.0.0.1:9/', CSV)) /* trailing */`,
     });
     expect(res.status).toBe(400);
     expect((await res.json()).message).toMatch(/table function/i);
   });
 
   it("rejects the system.* schema", async () => {
-    const res = await post("/api/ops/clickhouse/explain", { query: "SELECT * FROM system.parts" });
+    const res = await post("/api/ops/clickhouse/explain", {
+      query: "SELECT * FROM system.parts",
+    });
     expect(res.status).toBe(400);
     expect((await res.json()).message).toMatch(/system/i);
   });
@@ -146,7 +150,9 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
     const res = await router.request("/api/ops/clickhouse/explain", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query: "SELECT 1 FROM langwatch.stored_spans WHERE TenantId='x'" }),
+      body: JSON.stringify({
+        query: `SELECT 1 FROM ${DB}.stored_spans WHERE TenantId='x'`,
+      }),
     });
     expect(res.status).toBe(401);
   });
@@ -154,7 +160,7 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
   it("returns 401 with a wrong API key", async () => {
     const res = await post(
       "/api/ops/clickhouse/explain",
-      { query: "SELECT 1 FROM langwatch.stored_spans WHERE TenantId='x'" },
+      { query: `SELECT 1 FROM ${DB}.stored_spans WHERE TenantId='x'` },
       { authorization: "Bearer totally-wrong" },
     );
     expect(res.status).toBe(401);
@@ -172,7 +178,7 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
 
   it("returns 502 on a syntactically valid SELECT against a missing table", async () => {
     const res = await post("/api/ops/clickhouse/explain", {
-      query: "SELECT 1 FROM langwatch.does_not_exist_table WHERE TenantId='x'",
+      query: `SELECT 1 FROM ${DB}.does_not_exist_table WHERE TenantId='x'`,
     });
     expect(res.status).toBe(502);
     expect((await res.json()).message).toMatch(/ClickHouse error/i);
@@ -181,7 +187,7 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
   it("realistic arrayJoin shape the optimizer agent actually runs", async () => {
     const res = await post("/api/ops/clickhouse/explain", {
       query: `SELECT arrayJoin(mapKeys(SpanAttributes)) AS key, count() AS n
-              FROM langwatch.stored_spans
+              FROM ${DB}.stored_spans
               WHERE OccurredAt > now() - INTERVAL 1 DAY
               GROUP BY key ORDER BY n DESC LIMIT 50`,
       type: "PLAN",
