@@ -19,6 +19,37 @@ If no feature file exists for your task, create one before writing code.
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
 
+### Running with no container runtime
+
+Nothing in the day-to-day loop needs Docker or colima. If you run ClickHouse,
+Postgres and Redis natively (brew, or a LaunchAgent), point `.env` at them and
+set these three, and a full `pnpm dev:haven` stack comes up with no container
+runtime installed at all:
+
+```bash
+LANGWATCH_HAVEN_CH=0          # use .env CLICKHOUSE_URL instead of a managed container
+LANGWATCH_HAVEN_OBS=0         # skip the LGTM telemetry stack
+LANGY_UNSAFE_HOST_ACCESS=1    # run the langyagent worker on the host, not in colima
+```
+
+haven resolves its own knobs from `langwatch/.env` (then `.env.portless`) as
+well as the shell, so these travel with the worktree; an exported variable still
+wins for a single run. Postgres and Redis stay haven-managed either way — it
+starts them through brew, not a container.
+
+Tests follow the same rule. `pnpm test:unit` never needed a container, and
+`pnpm test:integration` runs against native services when
+`LANGWATCH_TEST_CLICKHOUSE_URL`, `LANGWATCH_TEST_REDIS_URL` and
+`LANGWATCH_TEST_DATABASE_URL` are set, using dedicated test databases so dev
+data is untouched (`specs/ci/no-docker-integration-tests.feature`). Suites that
+need several mutually isolated ClickHouse endpoints ask
+`startTestClickHouseEndpoints` for them rather than starting their own
+containers. `CI=1` disables the native mode and forces testcontainers, so locally
+use `pnpm test:integration <path> --watch=false` and never `CI=1`.
+
+What still wants a container: `make observability` (the Grafana LGTM stack) and
+the sandboxed/container langy tiers. Both are opt-in.
+
 ### Local dev by hostname — thuishaven / portless (recommended)
 
 Stop juggling ports. Opt in with `pnpm dev:haven` and traffic routes through

@@ -12,6 +12,7 @@ import {
   type StartedRedisContainer,
 } from "@testcontainers/redis";
 import { migrateUp } from "~/server/clickhouse/goose";
+import { nativeClickHouseBaseUrl } from "~/test-utils/clickhouseTestEndpoints";
 import { shardSawFailure } from "~/test-utils/shardFailureReporter";
 
 const TEST_DATABASE = "test_langwatch";
@@ -134,8 +135,7 @@ type LocalServiceUrls = {
  * touch dev data. Never active in CI.
  */
 function localServiceUrls(): LocalServiceUrls | null {
-  if (process.env.CI) return null;
-  const clickHouseBaseUrl = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
+  const clickHouseBaseUrl = nativeClickHouseBaseUrl();
   const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
   if (!clickHouseBaseUrl || !redisUrl) return null;
   return {

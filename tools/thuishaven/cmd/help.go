@@ -169,6 +169,12 @@ COMMANDS
     help          This text.
 
 ENVIRONMENT
+    Everything below except LANGWATCH_SLUG, HAVEN_AGENT and the colour switches
+    also resolves from langwatch/.env (then .env.portless), so a lasting
+    preference — "this machine runs native ClickHouse, never provision one" —
+    lives next to the URL it belongs with and travels into every new worktree.
+    An exported variable still wins, for overriding a single run.
+
     LANGWATCH_SLUG=<slug>        Pin this worktree's slug (else the sanitised
                                  worktree directory name, cached).
     LANGWATCH_LOCAL_TLD=test     Use a different TLD (default: localhost).
@@ -228,6 +234,13 @@ ENVIRONMENT
     LANGWATCH_HAVEN_OBS=0        Skip starting the observability stack on "up".
                                  On by default: it shares ClickHouse's colima VM,
                                  which is already paying for itself.
+    LANGY_UNSAFE_CONTAINER=1     Run the langyagent worker in colima with the
+                                 per-worker UID sandbox off. Default (neither
+                                 flag) keeps the sandbox on, mirroring production.
+    LANGY_UNSAFE_HOST_ACCESS=1   Run the langyagent worker as a bare host process
+                                 — no colima, no VM boundary, full host access.
+                                 The fast-iteration tier, and the one that lets a
+                                 stack come up with no container runtime at all.
     HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on
                                  (default: default). A profile haven creates is
                                  capped; one that already exists is never resized.

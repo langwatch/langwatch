@@ -34,3 +34,29 @@ Feature: Integration tests against native local services
   Scenario: CI is unaffected
     Given the suite runs in CI
     Then CI service containers are used regardless of LANGWATCH_TEST_* variables
+
+  # Suites that assert per-organization ClickHouse routing need two or more
+  # endpoints that cannot see each other's rows. They ask for those endpoints
+  # instead of starting their own containers, so the native mode covers them too.
+
+  @unimplemented
+  Scenario: Routing suites get isolated endpoints without docker
+    Given a suite needs two mutually isolated ClickHouse endpoints
+    And the native local ClickHouse is configured
+    When the suite starts
+    Then each endpoint is a separate database on the native server
+    And a row written through one endpoint is invisible to the other
+    And no docker container is started
+
+  @unimplemented
+  Scenario: A suite never writes into the developer's own database
+    Given the native server also holds the developer's dev ClickHouse database
+    When a suite provisions its endpoints
+    Then every database it creates is named for that suite
+    And the dev database is neither read nor written
+
+  @unimplemented
+  Scenario: The same suites still run on containers in CI
+    Given the suite runs in CI
+    When it asks for two isolated endpoints
+    Then each endpoint is a separate ClickHouse container
