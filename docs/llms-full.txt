@@ -25684,7 +25684,7 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 Langy, the automated AI engineer, runs as a separate agent pod that is off by default. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
 
 <Note>
-See [Langy environment variables](/langy/self-hosting/environment-variables) for the full `LANGY_*` and `GITHUB_LANGY_*` reference, and [Enable Langy via Helm](/langy/self-hosting/helm) for the `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
+See [Langy environment variables](/self-hosting/langy/environment-variables) for the full `LANGY_*` and `GITHUB_LANGY_*` reference, and [Setup](/self-hosting/langy/setup) for the `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
 </Note>
 
 ## Helm Chart Mapping
@@ -25726,160 +25726,6 @@ app:
       key: credentialsEncryptionKey
 ```
 </Tip>
-
----
-
-# FILE: ./self-hosting/configuration/langy-assistant.mdx
-
----
-title: Langy Assistant
-description: "Run LangWatch's in-product AI assistant on your own cluster"
----
-
-Langy is the assistant inside LangWatch: it answers questions about your traces,
-runs LangWatch's own CLI on your behalf, and can open pull requests against your
-repositories. On a self-hosted install it runs as one extra pod, alongside the
-app, and it is off until you turn it on.
-
-## What it needs
-
-| Requirement | Why |
-|-------------|-----|
-| The `langyagent` pod | Runs one isolated OpenCode worker per conversation |
-| A model provider | Langy talks to a model like every other LangWatch feature |
-| A sandboxed runtime, or an explicit acceptance | The workers execute model-written shell |
-
-Everything else is handled by the chart: the secret the app and the agent use to
-authenticate to each other, and the in-cluster addresses they use to reach the
-gateway and to send answers back.
-
-## Turning it on
-
-```yaml
-langyagent:
-  chartManaged: true
-```
-
-```bash
-helm upgrade langwatch langwatch/langwatch -n langwatch -f values.yaml
-```
-
-That deploys the agent, wires the app and the workers to it, and makes the
-assistant available to everyone in your install. Give it a model to talk to by
-configuring a [model provider](/platform/model-providers) for the project, then
-open the assistant from any page.
-
-<Note>
-Langy is single-tenant by nature here: every person with access to your
-LangWatch install can use it, and it runs with the permissions of whoever is
-asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
-</Note>
-
-## Clusters without a sandboxed runtime
-
-Langy's workers run shell written by a language model, so the chart asks for a
-sandboxed runtime, [gVisor](https://gvisor.dev/docs/user_guide/install/), and
-refuses to install without one rather than dropping the sandbox quietly. Managed
-offerings like GKE Sandbox provide it; most self-managed clusters do not.
-
-If yours cannot, say so explicitly and the install proceeds:
-
-```yaml
-langyagent:
-  chartManaged: true
-  runtimeClassName: ""
-  acceptUnsandboxedRuntime: true
-```
-
-What you keep either way: each conversation's worker runs under its own UID with
-its own credentials, workers cannot read each other's, and a NetworkPolicy bounds
-what any of them can reach. What the sandbox adds on top is protection of the
-node itself from a worker that escapes its container. An install whose users are
-all colleagues carries a very different risk here than one exposed to
-untrusted users, and that judgement is yours to make.
-
-## Letting Langy reach the internet
-
-Langy's tools shell out to `git`, `gh`, and package managers. Egress to the
-internet is off by default, because these workers hold the requesting user's API
-key and GitHub token:
-
-```yaml
-langyagent:
-  networkPolicy:
-    allowExternalHttps: true
-```
-
-Private address ranges and the cloud metadata endpoint stay blocked either way,
-so a worker cannot use this to reach your internal services. Without it, Langy
-still answers questions about your data; what stops working is anything that
-talks to GitHub or installs a package.
-
-## Watching Langy work
-
-Langy's own turns can be traced into one of your own LangWatch projects, so you
-can see the model calls it made, the tools it ran, and what each one cost.
-
-Create an API key in the project you want to mirror into, then:
-
-```bash
-read -rsp "Mirror project API key: " KEY
-kubectl -n langwatch create secret generic langwatch-langyagent-mirror \
-  --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"
-unset KEY
-```
-
-Reading the key rather than passing it as an argument keeps it out of your
-shell history and out of the process list on the machine you run this from.
-
-```yaml
-langyagent:
-  mirror:
-    existingSecretName: langwatch-langyagent-mirror
-```
-
-The endpoint resolves to your own install automatically. Set
-`langyagent.mirror.traceEndpoint` only to mirror into a different LangWatch
-deployment.
-
-## Staged rollout
-
-To open Langy to a few projects before everyone, keep the rollout flag
-authoritative:
-
-```yaml
-langyagent:
-  chartManaged: true
-  enableForAllUsers: false
-```
-
-Langy then stays dark until you enable `release_langy_enabled`, or add targeting
-rules for specific projects and organizations, from `/ops/feature-flags` in your
-install.
-
-## Bringing your own secrets
-
-With `autogen.enabled: false` you supply the app Secret yourself. Add a
-`LANGY_INTERNAL_SECRET` key to it, which the app, the workers, and the agent all
-read to authenticate to each other:
-
-```bash
-kubectl -n langwatch patch secret langwatch-app-secrets \
-  -p "{\"stringData\":{\"LANGY_INTERNAL_SECRET\":\"$(openssl rand -hex 32)\"}}"
-```
-
-The install checks for the key and stops with a message naming it, rather than
-leaving three pods in `CreateContainerConfigError`.
-
-## Turning it off
-
-```yaml
-langyagent:
-  chartManaged: false
-```
-
-The agent pod and every reference to it are removed on the next upgrade. Nothing
-else in your install changes.
 
 ---
 
@@ -28074,6 +27920,557 @@ For Cloud Enterprise or Hybrid, [contact the LangWatch team](https://langwatch.a
 
 ---
 
+# FILE: ./self-hosting/langy/environment-variables.mdx
+
+---
+title: Langy Environment Variables
+description: The environment variable reference for the Langy agent pod and its control-plane integration, grouped by core, workers, egress, mirror lane, and GitHub.
+sidebarTitle: Environment variables
+keywords:
+  - langy environment variables
+  - langyagent config
+  - langy_internal_secret
+---
+
+The agent-side variables (`LANGY_*`, `OPENCODE_*`) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret; the control-plane variables (`GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
+
+<Info>
+**Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub App](/self-hosting/langy/github-app), [Networking and egress](/self-hosting/langy/networking-and-egress).
+</Info>
+
+<Note>
+Many `LANGY_*` names in the `packages/langy` and frontend code are exported TypeScript constants, Zod discriminators, and event-type identifiers, not deploy knobs. The variables below are the runtime configuration. The GitHub PR rate limit `LANGY_GITHUB_PRS_PER_DAY` is 20, hardcoded, not configurable.
+</Note>
+
+## Core
+
+| Variable | Description | Required | Default |
+|---|---|---|---|
+| `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
+| `OPENCODE_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
+| `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass and is security-load-bearing, so keep it production-like. | No | `production` |
+
+<Warning>
+`LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it in a secrets manager and never commit it or log it.
+</Warning>
+
+## Workers
+
+| Variable | Description | Required | Default |
+|---|---|---|---|
+| `LANGY_MAX_WORKERS` | Max concurrent opencode subprocesses before the pod returns 503. | No | `20` |
+| `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
+| `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker's opencode to bind. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
+| `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | Yes | `/workspace` |
+
+## Egress
+
+See [Networking and egress](/self-hosting/langy/networking-and-egress) for how these fit together and the honest limit on enforcement.
+
+| Variable | Description | Required | Default |
+|---|---|---|---|
+| `LANGY_EGRESS_FQDN_FLOOR` | Operator always-allowed FQDNs (the adapter floor). | No | `github.com,api.github.com,codeload.github.com` |
+| `LANGY_EGRESS_REQUIRE_TLS` | Refuse cleartext and non-`:443` forwards. | No | `true` |
+| `LANGY_EGRESS_ENFORCE_FLOOR` | Make the floor a hard ceiling for projects with no allow-list. | No | `false` (monitor-only) |
+| `LANGY_EGRESS_SNI_CROSSCHECK` | Cross-check the TLS SNI against the CONNECT authority (anti-domain-fronting). | No | `true` |
+
+## Mirror lane
+
+The mirror lane copies each turn's trace into a LangWatch project you designate, so whoever runs the install can watch Langy work. It stays off until `langyagent.mirror.existingSecretName` names a Secret holding the mirror project's API key; the endpoint resolves to the install's own app automatically. See [Watching Langy work](/self-hosting/langy/setup#watching-langy-work).
+
+| Variable | Description | Required | Default |
+|---|---|---|---|
+| `LANGY_MIRROR_TRACE_ENDPOINT` | LangWatch base URL the mirror ships to. Set via `langyagent.mirror.traceEndpoint` only to mirror into a different deployment. | No | the install's own app |
+| `LANGY_MIRROR_TRACE_KEY` | The mirror project's API key (a normal project key), read from the Secret named by `langyagent.mirror.existingSecretName`. | No | unset (mirror off) |
+| `LANGY_MIRROR_PROJECT_ID` | The mirror project id referenced in the mirror config. | No | unset |
+
+<Warning>
+`LANGY_MIRROR_TRACE_KEY` is a project API key. Store it in a Secret (`mirror.existingSecretName`), not inline in `values.yaml`.
+</Warning>
+
+## GitHub
+
+Set these on the control plane to enable bot-authored pull requests. If `GITHUB_LANGY_PRIVATE_KEY` is unset, the GitHub feature is silently off. See [Register the Langy GitHub App](/self-hosting/langy/github-app) for the registration walkthrough.
+
+| Variable | Description | Required | Default |
+|---|---|---|---|
+| `GITHUB_LANGY_APP_ID` | GitHub App id (JWT `iss`). | For GitHub | unset (feature off) |
+| `GITHUB_LANGY_PRIVATE_KEY` | App RSA private key PEM (mints install tokens). The only credential; control-plane only. Escape newlines as `\n` in a single-line value. | For GitHub | unset (feature off) |
+| `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. | For GitHub | unset |
+| `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link (`github.com/apps/<slug>`). | For GitHub | unset |
+| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so nothing new is needed for GitHub. | Yes (prod) | none |
+
+<Warning>
+`GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets manager and never let it reach a worker.
+</Warning>
+
+---
+
+# FILE: ./self-hosting/langy/github-app.mdx
+
+---
+title: Register the Langy GitHub App
+description: Deployment-time guide for the GitHub App that lets Langy open bot-authored pull requests, covering registration, permissions, the GITHUB_LANGY env vars, install, verify, and disconnect.
+sidebarTitle: GitHub App
+keywords:
+  - langy github app
+  - github_langy_app_id
+  - bot-authored pull requests
+---
+
+Langy opens pull requests through a GitHub App you register and install. PRs are authored by the app and credit the requesting user via a `Co-authored-by` trailer and a `Requested by @<login> via LangWatch` note in the body.
+
+There is no per-user OAuth and no stored token: the app private key is the only credential, it lives only in the control-plane env, and 1-hour installation tokens are minted on demand and never persisted.
+
+To set it up: register a GitHub App, put its id, private key, webhook secret, and slug into the deployment env, and have org admins install it on the repos Langy may touch from **Settings > Integrations**.
+
+<Info>
+**Also check:** [What Langy can do in your GitHub](/langy/security/github-access), [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables).
+</Info>
+
+<Note>
+Registering the app does not enable the Langy runtime. The agent pod is off by default in the umbrella chart. See [Setup](/self-hosting/langy/setup) first if you have not enabled the pod yet. If the private key is unset, the GitHub feature is silently off and Langy returns findings without opening PRs.
+</Note>
+
+## Register the app
+
+Go to GitHub, then your **org settings > Developer settings > GitHub Apps > New GitHub App**. Self-hosted registration is manual for now; the App Manifest one-click flow is a deferred follow-up.
+
+Fill in these fields:
+
+| Field | Value |
+|---|---|
+| App name | `LangWatch Langy` (or per environment, e.g. `LangWatch Langy (dev)`) |
+| Homepage URL | `https://app.langwatch.ai` (or your control-plane URL) |
+| Setup URL | `<BASE_URL>/api/github-langy/setup` |
+| Redirect on update | ON (so re-configuring an install returns to the Setup URL) |
+| Request user authorization (OAuth) during installation | OFF. Langy is bot-authored, no user OAuth. |
+| Webhook > Active | ON |
+| Webhook URL | `<BASE_URL>/api/github-langy/webhook` |
+| Webhook secret | Generate one (`openssl rand -hex 32`). You set it as `GITHUB_LANGY_WEBHOOK_SECRET`. |
+| Where can this GitHub App be installed? | Any account (recommended) or only this org |
+
+Set the repository permissions to exactly these, nothing more. Tighter scope means a smaller blast radius.
+
+| Permission | Access |
+|---|---|
+| Contents | Read & write |
+| Pull requests | Read & write |
+| Metadata | Read |
+
+Subscribe to no events beyond the installation lifecycle, which GitHub sends automatically (`installation`, `installation_repositories`).
+
+Click **Create GitHub App**. On the resulting page:
+
+- copy the **App ID**
+- note the **app slug** (in the app's URL: `github.com/apps/<slug>`)
+- **Generate a private key** and download the `.pem`
+
+## Plumb the secrets
+
+Add these to the control-plane env (`.env`, `values.yaml`, or your secret manager). All are optional in the schema (`langwatch/src/env-create.mjs`); when the private key is unset the feature is silently off, the connect card reports the integration as unavailable, and no token can be minted.
+
+```bash title=".env"
+GITHUB_LANGY_APP_ID="<App ID from registration>"
+GITHUB_LANGY_APP_SLUG="<app slug from the app URL>"
+GITHUB_LANGY_WEBHOOK_SECRET="<the webhook secret you generated>"
+# The private key PEM. In a single-line env value, escape newlines as \n;
+# the token service normalises them back.
+GITHUB_LANGY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+```
+
+<Warning>
+`GITHUB_LANGY_PRIVATE_KEY` is the only credential for the whole GitHub integration and grants write access to installed repos. Keep it in a secrets manager, never in version control, and never expose it to a worker. It stays in the control plane.
+</Warning>
+
+There is no client id or secret; the bot-authored flow uses no user OAuth. `CREDENTIALS_SECRET` (already required for any production install) signs the install round-trip's state, so nothing new is needed there.
+
+For the full env-var reference, see [Environment variables](/self-hosting/langy/environment-variables#github).
+
+## Install the app
+
+An org admin installs the app from **Settings > Integrations > GitHub > Install the LangWatch GitHub App**, or from the in-chat card the first time Langy needs GitHub access. GitHub walks them through choosing the repositories, then redirects to the Setup URL, which records the installation against their LangWatch organization.
+
+The installation is the access boundary: Langy can only open PRs on repositories the app is installed on. A single LangWatch organization can install the app on several GitHub accounts; each installation is listed separately in settings.
+
+## Verify
+
+In a session, ask Langy something like "open a PR on `<a repo the app is installed on>`". You should see:
+
+<Steps>
+  <Step title="Install card (if not yet installed)">
+    The "Install the LangWatch GitHub App" card appears in chat if the org has not installed the app yet.
+  </Step>
+  <Step title="Chat continues">
+    After installing, the popup closes and the chat continues.
+  </Step>
+  <Step title="PR card">
+    Langy clones the repo into the per-session worker home, branches, commits, pushes, and posts the PR URL, rendered as a PR card. The PR is authored by the app, with the requester credited as co-author.
+  </Step>
+</Steps>
+
+If anything goes wrong, the audit log (`langy.github.install`, `langy.github.disconnect`) and Sentry capture the failure paths.
+
+## Disconnect
+
+Go to **Settings > Integrations > Disconnect**, which opens GitHub's uninstall page (GitHub cannot be uninstalled via the API). Once GitHub confirms, the `installation.deleted` webhook removes the local record.
+
+## Operational notes
+
+- **Token in worker, not on disk.** Workers receive a 1-hour installation token via `GH_TOKEN` env. The github skill wires `git config credential.helper '!gh auth git-credential'` so git pushes read it from env, with no `.gitconfig` and no `.git-credentials`. The clone directory lives inside the per-worker home that the idle reaper deletes (within 10 min).
+- **Nothing at rest.** No token or refresh token is stored control-plane side. The app private key is the only credential; it never leaves the control plane and never goes near a worker. Tokens are minted per turn, cached in Redis a hair under their 1h lifetime, and self-expire.
+- **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories (or a single repository when the turn targets one).
+- **Sticky worker tokens.** A worker spawned with token T keeps T until the idle reaper kills it. Removing the installation cuts off new turns immediately; a live worker may hold a token for up to the idle TTL (within 10 min) or until it self-expires (within 1h).
+- **Egress.** The control plane reaches `api.github.com` to mint installation tokens and read installation metadata. Workers need `github.com`, `api.github.com`, and `codeload.github.com` to clone and push, which requires outbound egress to be enabled. See [Networking and egress](/self-hosting/langy/networking-and-egress).
+
+---
+
+# FILE: ./self-hosting/langy/networking-and-egress.mdx
+
+---
+title: Langy Networking and Egress
+description: The NetworkPolicy and L7 egress adapter that govern what the Langy agent pod can reach, the GitHub FQDN floor, and the cooperative-vs-mandatory enforcement limit.
+sidebarTitle: Networking and egress
+keywords:
+  - langy network policy
+  - ai agent egress
+  - langy firewall
+---
+
+The Langy agent pod has **no outbound HTTPS by default**: `networkPolicy.allowExternalHttps` is `false`, so a fresh install cannot reach GitHub, npm, or any external host.
+
+To let Langy clone and push (open PRs), you enable egress. The pod's traffic then passes through an L7 egress adapter that requires TLS, allow-lists destinations, and enforces a GitHub FQDN floor.
+
+LLM traffic never uses this path; it goes to the in-cluster [LangWatch AI Gateway](/ai-gateway/self-hosting/helm).
+
+The one boundary to understand before you rely on this in a regulated environment: the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is designed but not shipped. The details are below and in [The sandbox](/langy/security/sandbox).
+
+<Info>
+**Also check:** [Self-hosting overview](/self-hosting/langy/overview), [Environment variables](/self-hosting/langy/environment-variables), [The sandbox](/langy/security/sandbox).
+</Info>
+
+## Why egress is L7, not iptables
+
+The pod runs under gVisor. gVisor's user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table.
+
+That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
+
+## What the agent needs to reach
+
+| Destination | Why | Path |
+|---|---|---|
+| In-cluster LangWatch AI Gateway | All LLM traffic (traced, budgeted, policed) | Always, in-cluster |
+| In-cluster LangWatch app | The `langwatch` CLI (per-session key) | Always, in-cluster |
+| `github.com`, `api.github.com`, `codeload.github.com` | Clone and push for pull requests | Only when egress is on |
+| `api.github.com` (from the control plane, not the worker) | Mint 1-hour installation tokens | Control plane |
+
+Private ranges (RFC 1918), CGNAT (`100.64.0.0/10`), and the cloud metadata service are blocked at L3/L4 regardless of the egress toggle, which is the SSRF and IMDS protection.
+
+## Enable outbound egress
+
+The stock `charts/langyagent` chart keeps `networkPolicy.allowExternalHttps: false`. To allow `git`, `gh`, and `npm`, turn it on:
+
+```bash title="values.langyagent.yaml"
+networkPolicy:
+  allowExternalHttps: true
+```
+
+With it on, the pod may open `:443` to anywhere at L3/L4, and the L7 adapter is what narrows that to the allowed destinations. The FQDN floor (`github.com`, `api.github.com`, `codeload.github.com`) works without further changes.
+
+Make sure `privateExcept` and `privateExceptV6` include any non-RFC1918 service or VPC CIDR you actually need to reach. The defaults already include `100.64.0.0/10` (CGNAT) for EKS custom networking.
+
+## The L7 egress adapter
+
+When egress is on, each worker's outbound traffic is forced through a per-worker CONNECT proxy (ADR-043, Draft) that applies, in order:
+
+| Control | Env var | Default | Effect |
+|---|---|---|---|
+| Require TLS | `LANGY_EGRESS_REQUIRE_TLS` | `true` | Refuse cleartext and non-`:443` forwards. |
+| FQDN floor | `LANGY_EGRESS_FQDN_FLOOR` | `github.com,api.github.com,codeload.github.com` | Operator always-allowed FQDNs, on top of a project's own allow-list. |
+| Enforce floor | `LANGY_EGRESS_ENFORCE_FLOOR` | `false` | When on, the floor becomes a hard ceiling for projects that have no allow-list of their own. Default is monitor-only. |
+| SNI cross-check | `LANGY_EGRESS_SNI_CROSSCHECK` | `true` | Cross-check the TLS SNI against the CONNECT authority to block domain-fronting. |
+
+See [Environment variables](/self-hosting/langy/environment-variables#egress) for the full table.
+
+## Hardened installs
+
+For a tighter perimeter than "`:443` to anywhere, narrowed at L7", flip `allowExternalHttps` back to `false` and add an explicit allow-list of the three GitHub FQDNs at the CNI layer, so the L3/L4 policy itself only permits GitHub:
+
+```bash title="values.langyagent.yaml"
+networkPolicy:
+  allowExternalHttps: false
+egress:
+  enforceFloor: true
+  cilium:
+    enabled: true
+```
+
+An operator can also place the pod on an opt-in public-subnet node group (a node group with no route to the private data tier) via `nodeSelector`, `affinity`, and `tolerations`.
+
+## The cooperative-vs-mandatory limit
+
+State this plainly for a regulated review. Today (ADR-053, Proposed):
+
+- **Shipped.** The L3/L4 NetworkPolicy is deny-by-default: `:443` to anywhere is off unless you enable it, and private ranges, CGNAT, and cloud metadata are blocked regardless. The default service-account token is dropped. Node placement on a public subnet with no route to the data tier is available. The L7 adapter's require-TLS, SNI cross-check, and FQDN floor apply to traffic that goes through the proxy.
+- **Cooperative, not mandatory.** The L7 egress adapter is cooperative by default. A prompt-injected worker that ignores `HTTPS_PROXY` can dial an external IP on `:443` directly and bypass the adapter. In the stock pod that bypass is **monitored, not blocked**.
+- **Designed, not shipped.** Mandatory enforcement, which would make the bypass impossible, is the Cilium `toFQDNs` policy on the floor or a per-worker network namespace (ADR-033 Fix B, which needs `CAP_SYS_ADMIN`). These are designed and not shipped in the stock chart.
+
+If your threat model requires that a compromised worker cannot reach an arbitrary external host, enable the Cilium `toFQDNs` path rather than relying on the cooperative adapter alone. See [The sandbox](/langy/security/sandbox) for the full boundary map.
+
+---
+
+# FILE: ./self-hosting/langy/overview.mdx
+
+---
+title: Self-Hosting Langy
+description: Requirements and architecture for running Langy on your own Kubernetes cluster, including the separate agent pod and the gVisor requirement.
+sidebarTitle: Overview
+keywords:
+  - self-host langy
+  - langy kubernetes
+  - langy helm
+  - ai agent self hosting
+---
+
+Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, that ships in the LangWatch umbrella Helm chart but is **off by default**.
+
+One value turns it on: `langyagent.chartManaged: true`. The chart materialises the shared secret, wires the app and workers to the agent, and opens Langy to everyone in the install. The one infrastructure requirement is a sandboxed runtime, a `gvisor` RuntimeClass; clusters without one accept unsandboxed mode explicitly. See [Setup](/self-hosting/langy/setup).
+
+The GitHub App and outbound network egress are both optional and off until you configure them.
+
+The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [opencode](/langy/how-langy-works) worker per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
+
+<Info>
+**Also check:** [Setup](/self-hosting/langy/setup), [Environment variables](/self-hosting/langy/environment-variables), [Networking and egress](/self-hosting/langy/networking-and-egress), [The sandbox](/langy/security/sandbox).
+</Info>
+
+<Note>
+**Turning Langy off.** Set `langyagent.chartManaged: false` (its default): the agent pod and every reference to it are removed on the next upgrade, and nothing else in the install changes. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
+</Note>
+
+## At a glance
+
+| | |
+|---|---|
+| Deployment | Separate `langyagent` Deployment + ConfigMap + Service + NetworkPolicy in the umbrella chart |
+| Default state | Off (`langyagent.chartManaged: false` at the umbrella level) |
+| Access once deployed | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
+| Replicas | 1 (render-time guard blocks more until conversation-sticky routing exists) |
+| Update strategy | `Recreate`, no HPA. Scale vertically. |
+| Sandbox | gVisor (`runtimeClassName: gvisor`); clusters without it set `acceptUnsandboxedRuntime: true` explicitly |
+| Sizing | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi |
+| Shared secret | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
+| GitHub App | Optional, for bot-authored pull requests |
+| Outbound egress | Off by default (`networkPolicy.allowExternalHttps: false`) |
+
+## Hard requirements
+
+- **A sandboxed runtime, or an explicit acceptance.** The pod runs under gVisor (`runsc`), a user-space kernel that shrinks the pod-to-host escape surface, because the workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`). Without a `gvisor` RuntimeClass in the cluster, pods fail to schedule with `FailedCreatePodSandBox ... runtimeclasses.node.k8s.io "gvisor" not found`; install it with the gVisor operator or a RuntimeClass manifest. On a cluster that cannot provide one, set `runtimeClassName: ""` together with `acceptUnsandboxedRuntime: true`; the chart refuses to render without the explicit acceptance. You then lose pod-to-host sandboxing but keep the in-pod per-worker isolation. See [The sandbox](/langy/security/sandbox).
+- **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
+- **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
+
+## Optional components
+
+- **GitHub App** for bot-authored pull requests. Register a GitHub App and set the `GITHUB_LANGY_*` env vars. If the private key is unset, the GitHub feature is silently off and Langy returns findings without opening PRs. See [Register the Langy GitHub App](/self-hosting/langy/github-app).
+- **Outbound HTTPS egress** for `git`, `gh`, and `npm`. `networkPolicy.allowExternalHttps` is `false` by default; the pod cannot reach GitHub until you enable egress. See [Networking and egress](/self-hosting/langy/networking-and-egress).
+- **Operator mirror lane** to copy Langy's own turn traces into a LangWatch project you designate, so whoever runs the install can watch Langy work. Off until `langyagent.mirror.existingSecretName` names a Secret holding the mirror project's API key. See [Watching Langy work](/self-hosting/langy/setup#watching-langy-work).
+
+## Architecture
+
+```mermaid
+graph LR
+    Browser["Browser<br/>(event-sourced UI)"] -->|"HTTPS"| App["LangWatch App<br/>(control plane)"]
+    App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
+    Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>opencode worker"]
+    Worker -->|"langwatch CLI<br/>(per-session key)"| App
+    Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
+    Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
+    Worker -->|"git / gh<br/>(if egress on)"| GitHub["github.com<br/>api.github.com<br/>codeload.github.com"]
+    App -->|"install tokens"| GitHubAPI["api.github.com"]
+```
+
+The control plane reaches the agent over cluster DNS at `http://<release>-langyagent:80` (`OPENCODE_AGENT_URL`), authenticated with `LANGY_INTERNAL_SECRET`. The Service is ClusterIP only; a render-time guard blocks any other type, so the agent is never exposed outside the cluster. Each worker's only path to LangWatch data is the `langwatch` CLI, and its only path to the internet is the [L7 egress adapter](/self-hosting/langy/networking-and-egress). LLM traffic goes through the [LangWatch AI Gateway](/ai-gateway/self-hosting/helm), never direct to providers, so every Langy LLM call is traced, budgeted, and policed like any other.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Setup" icon="ship" href="/self-hosting/langy/setup">
+    One chart value deploys the agent; unsandboxed acceptance, egress, mirror, and staged rollout.
+  </Card>
+  <Card title="Register the GitHub App" icon="github" href="/self-hosting/langy/github-app">
+    Register the app, set the `GITHUB_LANGY_*` env vars, and install it on the repos Langy may touch.
+  </Card>
+  <Card title="Environment variables" icon="rectangle-list" href="/self-hosting/langy/environment-variables">
+    The full `LANGY_*` and `GITHUB_LANGY_*` reference with defaults.
+  </Card>
+  <Card title="Networking and egress" icon="network-wired" href="/self-hosting/langy/networking-and-egress">
+    The NetworkPolicy, the FQDN floor, and the cooperative-vs-mandatory egress limit.
+  </Card>
+  <Card title="The sandbox" icon="shield-halved" href="/langy/security/sandbox">
+    What the gVisor sandbox can and cannot reach, and where the boundaries sit.
+  </Card>
+  <Card title="Platform self-hosting" icon="server" href="/self-hosting/overview">
+    Deploy the rest of the LangWatch stack that Langy runs alongside.
+  </Card>
+</CardGroup>
+
+---
+
+# FILE: ./self-hosting/langy/setup.mdx
+
+---
+title: Langy Assistant
+description: "Run LangWatch's in-product AI assistant on your own cluster"
+sidebarTitle: Setup
+---
+
+Langy is the assistant inside LangWatch: it answers questions about your traces,
+runs LangWatch's own CLI on your behalf, and can open pull requests against your
+repositories. On a self-hosted install it runs as one extra pod, alongside the
+app, and it is off until you turn it on.
+
+## What it needs
+
+| Requirement | Why |
+|-------------|-----|
+| The `langyagent` pod | Runs one isolated OpenCode worker per conversation |
+| A model provider | Langy talks to a model like every other LangWatch feature |
+| A sandboxed runtime, or an explicit acceptance | The workers execute model-written shell |
+
+Everything else is handled by the chart: the secret the app and the agent use to
+authenticate to each other, and the in-cluster addresses they use to reach the
+gateway and to send answers back.
+
+## Turning it on
+
+```yaml
+langyagent:
+  chartManaged: true
+```
+
+```bash
+helm upgrade langwatch langwatch/langwatch -n langwatch -f values.yaml
+```
+
+That deploys the agent, wires the app and the workers to it, and makes the
+assistant available to everyone in your install. Give it a model to talk to by
+configuring a [model provider](/platform/model-providers) for the project, then
+open the assistant from any page.
+
+<Note>
+Langy is single-tenant by nature here: every person with access to your
+LangWatch install can use it, and it runs with the permissions of whoever is
+asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
+</Note>
+
+## Clusters without a sandboxed runtime
+
+Langy's workers run shell written by a language model, so the chart asks for a
+sandboxed runtime, [gVisor](https://gvisor.dev/docs/user_guide/install/), and
+refuses to install without one rather than dropping the sandbox quietly. Managed
+offerings like GKE Sandbox provide it; most self-managed clusters do not.
+
+If yours cannot, say so explicitly and the install proceeds:
+
+```yaml
+langyagent:
+  chartManaged: true
+  runtimeClassName: ""
+  acceptUnsandboxedRuntime: true
+```
+
+What you keep either way: each conversation's worker runs under its own UID with
+its own credentials, workers cannot read each other's, and a NetworkPolicy bounds
+what any of them can reach. What the sandbox adds on top is protection of the
+node itself from a worker that escapes its container. An install whose users are
+all colleagues carries a very different risk here than one exposed to
+untrusted users, and that judgement is yours to make.
+
+## Letting Langy reach the internet
+
+Langy's tools shell out to `git`, `gh`, and package managers. Egress to the
+internet is off by default, because these workers hold the requesting user's API
+key and GitHub token:
+
+```yaml
+langyagent:
+  networkPolicy:
+    allowExternalHttps: true
+```
+
+Private address ranges and the cloud metadata endpoint stay blocked either way,
+so a worker cannot use this to reach your internal services. Without it, Langy
+still answers questions about your data; what stops working is anything that
+talks to GitHub or installs a package.
+
+## Watching Langy work
+
+Langy's own turns can be traced into one of your own LangWatch projects, so you
+can see the model calls it made, the tools it ran, and what each one cost.
+
+Create an API key in the project you want to mirror into, then:
+
+```bash
+read -rsp "Mirror project API key: " KEY
+kubectl -n langwatch create secret generic langwatch-langyagent-mirror \
+  --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"
+unset KEY
+```
+
+Reading the key rather than passing it as an argument keeps it out of your
+shell history and out of the process list on the machine you run this from.
+
+```yaml
+langyagent:
+  mirror:
+    existingSecretName: langwatch-langyagent-mirror
+```
+
+The endpoint resolves to your own install automatically. Set
+`langyagent.mirror.traceEndpoint` only to mirror into a different LangWatch
+deployment.
+
+## Staged rollout
+
+To open Langy to a few projects before everyone, keep the rollout flag
+authoritative:
+
+```yaml
+langyagent:
+  chartManaged: true
+  enableForAllUsers: false
+```
+
+Langy then stays dark until you enable `release_langy_enabled`, or add targeting
+rules for specific projects and organizations, from `/ops/feature-flags` in your
+install.
+
+## Bringing your own secrets
+
+With `autogen.enabled: false` you supply the app Secret yourself. Add a
+`LANGY_INTERNAL_SECRET` key to it, which the app, the workers, and the agent all
+read to authenticate to each other:
+
+```bash
+kubectl -n langwatch patch secret langwatch-app-secrets \
+  -p "{\"stringData\":{\"LANGY_INTERNAL_SECRET\":\"$(openssl rand -hex 32)\"}}"
+```
+
+The install checks for the key and stops with a message naming it, rather than
+leaving three pods in `CreateContainerConfigError`.
+
+## Turning it off
+
+```yaml
+langyagent:
+  chartManaged: false
+```
+
+The agent pod and every reference to it are removed on the next upgrade. Nothing
+else in your install changes.
+
+---
+
 # FILE: ./self-hosting/ops/dashboard.mdx
 
 ---
@@ -28752,7 +29149,7 @@ graph LR
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
 <Note>
-Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional, gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting Langy](/langy/self-hosting/overview).
+Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional, gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting Langy](/self-hosting/langy/overview).
 </Note>
 
 ## Deployment Models

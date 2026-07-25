@@ -760,8 +760,7 @@
               "langy/chat",
               "langy/scenario-tests-and-evals",
               "langy/pull-requests",
-              "langy/insights",
-              "langy/skills-and-cli"
+              "langy/insights"
             ]
           },
           {
@@ -781,21 +780,10 @@
             ]
           },
           {
-            "group": "Self-Hosting",
-            "pages": [
-              "langy/self-hosting/overview",
-              "langy/self-hosting/helm",
-              "langy/self-hosting/github-app",
-              "langy/self-hosting/environment-variables",
-              "langy/self-hosting/networking-and-egress"
-            ]
-          },
-          {
             "group": "Reference",
             "pages": [
               "langy/reference/supported-models",
               "langy/reference/limits",
-              "langy/reference/api",
               "langy/reference/troubleshooting"
             ]
           }
@@ -820,9 +808,18 @@
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
-              "self-hosting/configuration/langy-assistant",
               "self-hosting/configuration/observability",
               "self-hosting/configuration/third-party-integrations"
+            ]
+          },
+          {
+            "group": "Langy",
+            "pages": [
+              "self-hosting/langy/overview",
+              "self-hosting/langy/setup",
+              "self-hosting/langy/github-app",
+              "self-hosting/langy/environment-variables",
+              "self-hosting/langy/networking-and-egress"
             ]
           },
           {

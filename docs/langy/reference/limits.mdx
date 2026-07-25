@@ -25,7 +25,7 @@ Langy opens at most 20 pull requests per project per day. The count is a code co
 
 ### Max concurrent workers
 
-Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how many workers run at once; the default is 20. Past the cap the agent returns 503 rather than spawning another worker. Raise it by giving the agent pod more resources and increasing the value. See [Self-hosting overview](/langy/self-hosting/overview).
+Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how many workers run at once; the default is 20. Past the cap the agent returns 503 rather than spawning another worker. Raise it by giving the agent pod more resources and increasing the value. See [Self-hosting overview](/self-hosting/langy/overview).
 
 ### Idle worker reap
 
@@ -40,15 +40,15 @@ Each chat mints its own LangWatch API key, owned by the requesting user, project
 Langy mints a fresh 1-hour GitHub App installation token per turn, hands it to the worker as an environment variable only, and never stores it at rest. The token carries only `contents:write` and `pull_requests:write`, scoped to the installation's repositories. See [GitHub access](/langy/security/github-access).
 
 <Note>
-Only the max-workers cap and the idle-reap timeout are configurable. The 20-PRs-per-day cap is hardcoded, and the two token lifetimes are fixed (one by design, one by GitHub). For the full environment-variable reference, see [Environment variables](/langy/self-hosting/environment-variables).
+Only the max-workers cap and the idle-reap timeout are configurable. The 20-PRs-per-day cap is hardcoded, and the two token lifetimes are fixed (one by design, one by GitHub). For the full environment-variable reference, see [Environment variables](/self-hosting/langy/environment-variables).
 </Note>
 
 <Info>
-**Also check:** [Environment variables](/langy/self-hosting/environment-variables), [Pull requests](/langy/pull-requests), [Sandbox](/langy/security/sandbox).
+**Also check:** [Environment variables](/self-hosting/langy/environment-variables), [Pull requests](/langy/pull-requests), [Sandbox](/langy/security/sandbox).
 </Info>
 
 ## Reference
 
-- [Environment variables](/langy/self-hosting/environment-variables)
+- [Environment variables](/self-hosting/langy/environment-variables)
 - [Supported models](/langy/reference/supported-models)
 - [Troubleshooting](/langy/reference/troubleshooting)

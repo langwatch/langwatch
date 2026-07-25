@@ -11,7 +11,7 @@ keywords:
 The agent-side variables (`LANGY_*`, `OPENCODE_*`) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret; the control-plane variables (`GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
 
 <Info>
-**Also check:** [Enable Langy via Helm](/langy/self-hosting/helm), [Register the GitHub App](/langy/self-hosting/github-app), [Networking and egress](/langy/self-hosting/networking-and-egress).
+**Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub App](/self-hosting/langy/github-app), [Networking and egress](/self-hosting/langy/networking-and-egress).
 </Info>
 
 <Note>
@@ -22,7 +22,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
-| `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Held in the `langwatch-langyagent-auth` Secret, injected into both the agent pod and the app. Create it out-of-band. | Yes | none |
+| `LANGY_INTERNAL_SECRET` | Shared bearer secret for app-to-agent auth (and the per-frame HMAC base). Lives in the app Secret and is injected into the app, the workers, and the agent pod. The chart generates it when `autogen.enabled` is on; with your own Secret, add the key yourself. | Yes | chart-generated |
 | `OPENCODE_AGENT_URL` | App-side URL of the agent pod (`http://<release>-langyagent:80`). Turns on the Langy backend when set. Wired automatically when `langyagent.chartManaged=true`. | When agent on | unset (chart-set) |
 | `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass and is security-load-bearing, so keep it production-like. | No | `production` |
 
@@ -41,7 +41,7 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 
 ## Egress
 
-See [Networking and egress](/langy/self-hosting/networking-and-egress) for how these fit together and the honest limit on enforcement.
+See [Networking and egress](/self-hosting/langy/networking-and-egress) for how these fit together and the honest limit on enforcement.
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
@@ -52,12 +52,12 @@ See [Networking and egress](/langy/self-hosting/networking-and-egress) for how t
 
 ## Mirror lane
 
-The mirror lane copies each turn's trace into a LangWatch project you designate, so whoever runs the install can watch Langy work. It is dormant unless both the endpoint and the key are set, and it is off by default for a self-hoster.
+The mirror lane copies each turn's trace into a LangWatch project you designate, so whoever runs the install can watch Langy work. It stays off until `langyagent.mirror.existingSecretName` names a Secret holding the mirror project's API key; the endpoint resolves to the install's own app automatically. See [Watching Langy work](/self-hosting/langy/setup#watching-langy-work).
 
 | Variable | Description | Required | Default |
 |---|---|---|---|
-| `LANGY_MIRROR_TRACE_ENDPOINT` | Base URL of the operator ops project for the mirror lane. Set together with `_KEY`. | No | unset (dormant) |
-| `LANGY_MIRROR_TRACE_KEY` | The mirror project's API key (a normal project key). Set together with `_ENDPOINT`. | No | unset (dormant) |
+| `LANGY_MIRROR_TRACE_ENDPOINT` | LangWatch base URL the mirror ships to. Set via `langyagent.mirror.traceEndpoint` only to mirror into a different deployment. | No | the install's own app |
+| `LANGY_MIRROR_TRACE_KEY` | The mirror project's API key (a normal project key), read from the Secret named by `langyagent.mirror.existingSecretName`. | No | unset (mirror off) |
 | `LANGY_MIRROR_PROJECT_ID` | The mirror project id referenced in the mirror config. | No | unset |
 
 <Warning>
@@ -66,7 +66,7 @@ The mirror lane copies each turn's trace into a LangWatch project you designate,
 
 ## GitHub
 
-Set these on the control plane to enable bot-authored pull requests. If `GITHUB_LANGY_PRIVATE_KEY` is unset, the GitHub feature is silently off. See [Register the Langy GitHub App](/langy/self-hosting/github-app) for the registration walkthrough.
+Set these on the control plane to enable bot-authored pull requests. If `GITHUB_LANGY_PRIVATE_KEY` is unset, the GitHub feature is silently off. See [Register the Langy GitHub App](/self-hosting/langy/github-app) for the registration walkthrough.
 
 | Variable | Description | Required | Default |
 |---|---|---|---|

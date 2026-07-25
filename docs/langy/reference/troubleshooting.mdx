@@ -10,14 +10,14 @@ Each problem below lists the check that resolves it. Start with the one that mat
 <AccordionGroup>
   <Accordion title="Langy is not available in my org">
     - **Cloud:** Langy is available. Open the panel to get started.
-    - **Self-hosted:** the agent pod is off by default until you enable it. Confirm the agent pod is chart-managed (`langyagent.chartManaged=true`) and running. Once the pod is up, Langy is available. See [Self-hosting overview](/langy/self-hosting/overview) and [Helm](/langy/self-hosting/helm).
+    - **Self-hosted:** the agent pod is off by default until you enable it. Confirm the agent pod is chart-managed (`langyagent.chartManaged=true`) and running. Once the pod is up, Langy is available. See [Self-hosting overview](/self-hosting/langy/overview) and [Helm](/self-hosting/langy/setup).
   </Accordion>
 
   <Accordion title="Langy can't open a PR">
     Two common causes.
 
     - **The GitHub App is not installed.** Langy opens pull requests only on repositories where its GitHub App is installed. When it reaches for `git` or `gh` and no install exists, it stops the turn and shows an Install card in chat. Use that card to install the app, then re-run the turn. See [GitHub access](/langy/security/github-access).
-    - **Outbound HTTPS is off (self-hosted).** A hardened install with `networkPolicy.allowExternalHttps` set to `false` blocks `github.com`, `api.github.com`, and `codeload.github.com`. Allow those FQDNs (or turn `allowExternalHttps` on) so the worker can push and open the PR. See [Networking and egress](/langy/self-hosting/networking-and-egress).
+    - **Outbound HTTPS is off (self-hosted).** A hardened install with `networkPolicy.allowExternalHttps` set to `false` blocks `github.com`, `api.github.com`, and `codeload.github.com`. Allow those FQDNs (or turn `allowExternalHttps` on) so the worker can push and open the PR. See [Networking and egress](/self-hosting/langy/networking-and-egress).
     - Also check you are under the daily PR cap. Langy opens at most 20 pull requests per project per day. See [Limits](/langy/reference/limits).
   </Accordion>
 
@@ -49,7 +49,7 @@ When Langy touches GitHub, it writes audit-log events. Use these to confirm what
 
 ## Reference
 
-- [Self-hosting overview](/langy/self-hosting/overview)
+- [Self-hosting overview](/self-hosting/langy/overview)
 - [GitHub access](/langy/security/github-access)
 - [Supported models](/langy/reference/supported-models)
 - [Limits](/langy/reference/limits)

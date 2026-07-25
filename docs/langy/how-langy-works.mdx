@@ -13,7 +13,7 @@ Langy runs on [opencode](https://github.com/anomalyco/opencode) as a separate se
 The worker does the actual reading, testing, and code editing. Every tool call it makes streams back into the chat as a typed activity, and every turn is a traced run in your project.
 
 <Info>
-  **Also check:** [Security and the sandbox](/langy/security/sandbox), [Self-hosting overview](/langy/self-hosting/overview)
+  **Also check:** [Security and the sandbox](/langy/security/sandbox), [Self-hosting overview](/self-hosting/langy/overview)
 </Info>
 
 ## The architecture
@@ -44,7 +44,7 @@ graph LR
 | `langyagent` | The agent service. Spawns one opencode worker per conversation. Single replica; scale vertically. |
 | opencode worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
 
-The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/langy/self-hosting/overview).
+The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/self-hosting/langy/overview).
 
 The worker has exactly three ways out:
 
@@ -79,4 +79,4 @@ The worker has exactly three ways out:
   Every turn Langy takes re-enters LangWatch as its own traced, costed run in your project. You debug Langy with the same traces and evals you use to debug your own agents.
 </Note>
 
-For how the sandbox isolates each worker and exactly what it can and cannot reach on the network, see [Security and the sandbox](/langy/security/sandbox). For running this stack yourself, see the [self-hosting overview](/langy/self-hosting/overview).
+For how the sandbox isolates each worker and exactly what it can and cannot reach on the network, see [Security and the sandbox](/langy/security/sandbox). For running this stack yourself, see the [self-hosting overview](/self-hosting/langy/overview).

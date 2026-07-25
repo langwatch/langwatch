@@ -91,7 +91,7 @@ The lane is allow-list based (never a denylist), with three tiers set per organi
 | `skip` | Nothing. |
 
 <Note>
-On a self-hosted install the mirror lane is **off** unless you set both variables, and you choose the tier. On LangWatch SaaS the default is the `content` tier, with specific organizations restricted. If you are self-hosting and do not want any operator copy of Langy's traces, leave `LANGY_MIRROR_TRACE_ENDPOINT` and `LANGY_MIRROR_TRACE_KEY` unset.
+On a self-hosted install the mirror lane is **off** unless `langyagent.mirror.existingSecretName` names a Secret with the mirror project's API key, and you choose the tier. On LangWatch SaaS the default is the `content` tier, with specific organizations restricted. If you are self-hosting and do not want any operator copy of Langy's traces, leave the mirror Secret unset.
 </Note>
 
 <Info>
@@ -102,5 +102,5 @@ On a self-hosted install the mirror lane is **off** unless you set both variable
 
 - [How Langy is isolated](/langy/security/sandbox)
 - [What Langy can do in your GitHub](/langy/security/github-access)
-- [Self-hosting: environment variables](/langy/self-hosting/environment-variables)
+- [Self-hosting: environment variables](/self-hosting/langy/environment-variables)
 - [Token usage and cost](/langy/token-usage-and-cost)
