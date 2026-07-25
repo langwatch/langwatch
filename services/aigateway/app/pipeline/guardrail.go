@@ -33,10 +33,14 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 					return nil, err
 				}
 				verdict, err := pre(ctx, call.Bundle, call.Request)
-				if err != nil {
-					logger.Warn("guardrail_pre_error", zap.Error(err))
-				} else if verdict.Action == domain.GuardrailBlock {
-					return nil, herr.New(ctx, domain.ErrGuardrailBlocked, herr.M{"message": verdict.Message})
+				if blockErr := guardrailOutcome(ctx, guardrailOutcomeInput{
+					direction: "request",
+					verdict:   verdict,
+					err:       err,
+					failOpen:  call.Bundle.Config.Guardrails.RequestFailOpen,
+					logger:    logger,
+				}); blockErr != nil {
+					return nil, blockErr
 				}
 
 				resp, err := next(ctx, call)
@@ -45,10 +49,14 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 				}
 
 				verdict, err = post(ctx, call.Bundle, call.Request, resp)
-				if err != nil {
-					logger.Warn("guardrail_post_error", zap.Error(err))
-				} else if verdict.Action == domain.GuardrailBlock {
-					return nil, herr.New(ctx, domain.ErrGuardrailBlocked, herr.M{"message": verdict.Message})
+				if blockErr := guardrailOutcome(ctx, guardrailOutcomeInput{
+					direction: "response",
+					verdict:   verdict,
+					err:       err,
+					failOpen:  call.Bundle.Config.Guardrails.ResponseFailOpen,
+					logger:    logger,
+				}); blockErr != nil {
+					return nil, blockErr
 				}
 				return resp, nil
 			}
@@ -60,10 +68,14 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 				}
 
 				verdict, err := pre(ctx, call.Bundle, call.Request)
-				if err != nil {
-					logger.Warn("guardrail_pre_error", zap.Error(err))
-				} else if verdict.Action == domain.GuardrailBlock {
-					return nil, herr.New(ctx, domain.ErrGuardrailBlocked, herr.M{"message": verdict.Message})
+				if blockErr := guardrailOutcome(ctx, guardrailOutcomeInput{
+					direction: "request",
+					verdict:   verdict,
+					err:       err,
+					failOpen:  call.Bundle.Config.Guardrails.RequestFailOpen,
+					logger:    logger,
+				}); blockErr != nil {
+					return nil, blockErr
 				}
 
 				iter, err := next(ctx, call)
@@ -79,6 +91,42 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 			}
 		},
 	}
+}
+
+type guardrailOutcomeInput struct {
+	direction string
+	verdict   domain.GuardrailVerdict
+	err       error
+	failOpen  bool
+	logger    *zap.Logger
+}
+
+// guardrailOutcome turns a guardrail evaluation into either nil (proceed) or the
+// error that stops the request.
+//
+// An evaluation that could not complete is not the same as one that passed.
+// Guardrails default to fail-closed so that a control plane outage or a wire
+// mismatch cannot quietly disable a protection the operator switched on. A
+// virtual key opts into fail-open per direction when availability matters more
+// than enforcement. Stream chunks are the deliberate exception and always fail
+// open, so a slow policy service never stalls a user's stream.
+func guardrailOutcome(ctx context.Context, in guardrailOutcomeInput) error {
+	if in.err != nil {
+		if in.failOpen {
+			in.logger.Warn("guardrail_fail_open",
+				zap.String("direction", in.direction), zap.Error(in.err))
+			return nil
+		}
+		in.logger.Error("guardrail_fail_closed",
+			zap.String("direction", in.direction), zap.Error(in.err))
+		return herr.New(ctx, domain.ErrGuardrailUpstreamUnavailable, herr.M{
+			"message": "guardrail could not be evaluated: " + in.err.Error(),
+		})
+	}
+	if in.verdict.Action == domain.GuardrailBlock {
+		return herr.New(ctx, domain.ErrGuardrailBlocked, herr.M{"message": in.verdict.Message})
+	}
+	return nil
 }
 
 // guardrailStreamWrapper evaluates chunk-level guardrails on each chunk.

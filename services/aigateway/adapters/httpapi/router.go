@@ -910,6 +910,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrRateLimited, http.StatusTooManyRequests)
 	herr.RegisterStatus(domain.ErrBudgetExceeded, http.StatusPaymentRequired)
 	herr.RegisterStatus(domain.ErrGuardrailBlocked, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrGuardrailUpstreamUnavailable, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrPolicyViolation, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrModelNotAllowed, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)

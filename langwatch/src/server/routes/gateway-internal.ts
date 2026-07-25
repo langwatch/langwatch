@@ -27,6 +27,10 @@ import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.click
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
+import {
+  GatewayGuardrailEvaluationService,
+  GUARDRAIL_WIRE_DIRECTIONS,
+} from "~/server/gateway/guardrailEvaluation.service";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import { resolveTraceProject } from "~/server/gateway/scopeResolver";
 import {
@@ -53,11 +57,27 @@ const gatewayPolicy = () =>
 
 const logger = createLogger("langwatch:gateway-internal");
 
+/**
+ * Contract 4.6. The directions are the wire vocabulary the data plane sends,
+ * which is deliberately not the Prisma enum: an earlier version of this schema
+ * used the storage values, so every real gateway call failed validation and the
+ * data plane fell back to allowing the request.
+ */
 const guardrailCheckRequestSchema = z.object({
   vk_id: z.string().min(1),
-  direction: z.enum(["pre", "post", "stream_chunk"]),
+  project_id: z.string().min(1),
+  gateway_request_id: z.string().optional(),
+  direction: z.enum(GUARDRAIL_WIRE_DIRECTIONS),
   guardrail_ids: z.array(z.string()).default([]),
-  content: z.unknown().optional(),
+  content: z
+    .object({
+      messages: z.unknown().optional(),
+      output: z.unknown().optional(),
+      chunk: z.unknown().optional(),
+      tools: z.unknown().optional(),
+      mcps: z.unknown().optional(),
+    })
+    .optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -719,20 +739,25 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
       400,
     );
   }
-  logger.info(
-    {
-      vkId: parsed.data.vk_id,
-      direction: parsed.data.direction,
-      guardrailIds: parsed.data.guardrail_ids,
-    },
-    "guardrail/check plumbing stub — returning allow",
-  );
-  return c.json({
-    decision: "allow" as const,
-    reason: null,
-    modified_content: null,
-    policies_triggered: [],
+  const verdict = await GatewayGuardrailEvaluationService.create(prisma).check({
+    projectId: parsed.data.project_id,
+    guardrailIds: parsed.data.guardrail_ids,
+    direction: parsed.data.direction,
+    content: parsed.data.content,
   });
+  if (verdict.decision !== "allow") {
+    logger.info(
+      {
+        vkId: parsed.data.vk_id,
+        projectId: parsed.data.project_id,
+        direction: parsed.data.direction,
+        decision: verdict.decision,
+        policiesTriggered: verdict.policies_triggered,
+      },
+      "guardrail check did not allow the request",
+    );
+  }
+  return c.json(verdict);
 });
 
 /**

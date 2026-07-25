@@ -34,16 +34,67 @@ func (c *Client) EvaluateChunk(ctx context.Context, bundle *domain.Bundle, _ *do
 }
 
 type guardrailCheckRequest struct {
-	VirtualKeyID string   `json:"vk_id"`
-	ProjectID    string   `json:"project_id"`
-	Direction    string   `json:"direction"`
-	Content      []byte   `json:"content"`
-	GuardrailIDs []string `json:"guardrail_ids"`
+	VirtualKeyID string                `json:"vk_id"`
+	ProjectID    string                `json:"project_id"`
+	Direction    string                `json:"direction"`
+	Content      guardrailCheckContent `json:"content"`
+	GuardrailIDs []string              `json:"guardrail_ids"`
 }
 
+// guardrailCheckContent carries the payload under the key the direction
+// implies, per contract 4.6.
+type guardrailCheckContent struct {
+	Messages json.RawMessage `json:"messages,omitempty"`
+	Output   string          `json:"output,omitempty"`
+	Chunk    string          `json:"chunk,omitempty"`
+}
+
+// guardrailCheckResponse must stay byte-compatible with the control plane's
+// response schema in gateway-internal.ts. The verdict field is "decision": an
+// earlier version of this struct read "action", which is absent from the
+// response, so every verdict fell through to the allow default and guardrails
+// never blocked anything. contract_test.go pins both names.
 type guardrailCheckResponse struct {
-	Action  string `json:"action"`
-	Message string `json:"message,omitempty"`
+	Decision          string   `json:"decision"`
+	Reason            string   `json:"reason,omitempty"`
+	PoliciesTriggered []string `json:"policies_triggered,omitempty"`
+}
+
+// contentFor packs the raw payload into the contract's content object.
+func contentFor(direction string, payload []byte) guardrailCheckContent {
+	switch direction {
+	case "request":
+		var body struct {
+			Messages json.RawMessage `json:"messages"`
+		}
+		if err := json.Unmarshal(payload, &body); err == nil && len(body.Messages) > 0 {
+			return guardrailCheckContent{Messages: body.Messages}
+		}
+		return guardrailCheckContent{Messages: json.RawMessage(payload)}
+	case "response":
+		return guardrailCheckContent{Output: assistantText(payload)}
+	default:
+		return guardrailCheckContent{Chunk: string(payload)}
+	}
+}
+
+// assistantText pulls the generated text out of an OpenAI-shaped response so
+// evaluators score the completion rather than the envelope. Falls back to the
+// raw body when the shape is not recognised.
+func assistantText(payload []byte) string {
+	var body struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(payload, &body); err == nil && len(body.Choices) > 0 {
+		if text := body.Choices[0].Message.Content; text != "" {
+			return text
+		}
+	}
+	return string(payload)
 }
 
 func (c *Client) evaluateGuardrail(ctx context.Context, bundle *domain.Bundle, direction string, content []byte, timeout time.Duration) (domain.GuardrailVerdict, error) {
@@ -54,7 +105,7 @@ func (c *Client) evaluateGuardrail(ctx context.Context, bundle *domain.Bundle, d
 		VirtualKeyID: bundle.VirtualKeyID,
 		ProjectID:    bundle.ProjectID,
 		Direction:    direction,
-		Content:      content,
+		Content:      contentFor(direction, content),
 		GuardrailIDs: bundle.Config.Guardrails.IDs(direction),
 	})
 	if err != nil {
@@ -77,12 +128,18 @@ func (c *Client) evaluateGuardrail(ctx context.Context, bundle *domain.Bundle, d
 		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, err
 	}
 
-	switch result.Action {
+	switch result.Decision {
 	case "block":
-		return domain.GuardrailVerdict{Action: domain.GuardrailBlock, Message: result.Message}, nil
+		return domain.GuardrailVerdict{Action: domain.GuardrailBlock, Message: result.Reason}, nil
 	case "modify":
-		return domain.GuardrailVerdict{Action: domain.GuardrailModify, Message: result.Message}, nil
-	default:
+		return domain.GuardrailVerdict{Action: domain.GuardrailModify, Message: result.Reason}, nil
+	case "allow":
 		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, nil
+	default:
+		// An unrecognised verdict means the two sides disagree about the wire
+		// shape. Surface it as an error so the caller's failure mode decides,
+		// rather than silently allowing the request.
+		return domain.GuardrailVerdict{Action: domain.GuardrailAllow},
+			fmt.Errorf("guardrail check returned unknown decision %q", result.Decision)
 	}
 }
