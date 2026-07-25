@@ -132,6 +132,8 @@ describe("POST /api/internal/gateway/guardrail/check", () => {
   };
 
   describe("given the directions the data plane actually sends", () => {
+    /** @scenario "the endpoint accepts the directions the gateway actually sends" */
+    /** @scenario "every contract direction is accepted" */
     it.each(["request", "response", "stream_chunk"])(
       "accepts direction %s",
       async (direction) => {
@@ -155,11 +157,14 @@ describe("POST /api/internal/gateway/guardrail/check", () => {
       expect(body.error.code).toBe("validation_error");
     });
 
+    /** @scenario "a direction outside the contract is rejected" */
     it("rejects a direction outside the contract", async () => {
       const response = await app.request(
         signedRequest({ ...basePayload, direction: "sideways" }),
       );
       expect(response.status).toBe(400);
+      const body = (await response.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("validation_error");
     });
   });
 
@@ -184,14 +189,19 @@ describe("POST /api/internal/gateway/guardrail/check", () => {
     });
   });
 
-  describe("given the response body", () => {
+  describe("given the response body of a check a guardrail blocks", () => {
+    /** @scenario "the verdict field is named decision, not action" */
     it("names the verdict field decision, which is what the Go client reads", async () => {
       const response = await app.request(
-        signedRequest({ ...basePayload, direction: "request" }),
+        signedRequest({
+          ...basePayload,
+          direction: "request",
+          guardrail_ids: [GUARDRAIL_ID],
+        }),
       );
       const body = (await response.json()) as Record<string, unknown>;
 
-      expect(body).toHaveProperty("decision");
+      expect(body.decision).toBe("block");
       expect(body).toHaveProperty("reason");
       expect(body).toHaveProperty("policies_triggered");
       // The Go client used to read "action". If it ever comes back, the two

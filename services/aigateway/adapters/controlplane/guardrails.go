@@ -61,21 +61,26 @@ type guardrailCheckResponse struct {
 }
 
 // contentFor packs the raw payload into the contract's content object.
-func contentFor(direction string, payload []byte) guardrailCheckContent {
+//
+// Every direction is named explicitly. A catch-all default would pack an
+// unrecognised direction under "chunk", so a typo or a direction the control
+// plane rejects would be evaluated as a stream chunk instead of failing.
+func contentFor(direction string, payload []byte) (guardrailCheckContent, error) {
 	switch direction {
 	case "request":
 		var body struct {
 			Messages json.RawMessage `json:"messages"`
 		}
 		if err := json.Unmarshal(payload, &body); err == nil && len(body.Messages) > 0 {
-			return guardrailCheckContent{Messages: body.Messages}
+			return guardrailCheckContent{Messages: body.Messages}, nil
 		}
-		return guardrailCheckContent{Messages: json.RawMessage(payload)}
+		return guardrailCheckContent{Messages: json.RawMessage(payload)}, nil
 	case "response":
-		return guardrailCheckContent{Output: assistantText(payload)}
-	default:
-		return guardrailCheckContent{Chunk: string(payload)}
+		return guardrailCheckContent{Output: assistantText(payload)}, nil
+	case "stream_chunk":
+		return guardrailCheckContent{Chunk: string(payload)}, nil
 	}
+	return guardrailCheckContent{}, fmt.Errorf("unknown guardrail direction %q", direction)
 }
 
 // assistantText pulls the generated text out of an OpenAI-shaped response so
@@ -101,11 +106,16 @@ func (c *Client) evaluateGuardrail(ctx context.Context, bundle *domain.Bundle, d
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	packed, err := contentFor(direction, content)
+	if err != nil {
+		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, err
+	}
+
 	body, err := json.Marshal(guardrailCheckRequest{
 		VirtualKeyID: bundle.VirtualKeyID,
 		ProjectID:    bundle.ProjectID,
 		Direction:    direction,
-		Content:      contentFor(direction, content),
+		Content:      packed,
 		GuardrailIDs: bundle.Config.Guardrails.IDs(direction),
 	})
 	if err != nil {
@@ -128,6 +138,13 @@ func (c *Client) evaluateGuardrail(ctx context.Context, bundle *domain.Bundle, d
 		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, err
 	}
 
+	return verdictFor(result)
+}
+
+// verdictFor maps the control plane's decision onto the data plane's verdict.
+// The accepted values are the other half of the contract, so the contract test
+// drives this function with every decision the control plane can emit.
+func verdictFor(result guardrailCheckResponse) (domain.GuardrailVerdict, error) {
 	switch result.Decision {
 	case "block":
 		return domain.GuardrailVerdict{Action: domain.GuardrailBlock, Message: result.Reason}, nil
@@ -135,11 +152,10 @@ func (c *Client) evaluateGuardrail(ctx context.Context, bundle *domain.Bundle, d
 		return domain.GuardrailVerdict{Action: domain.GuardrailModify, Message: result.Reason}, nil
 	case "allow":
 		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, nil
-	default:
-		// An unrecognised verdict means the two sides disagree about the wire
-		// shape. Surface it as an error so the caller's failure mode decides,
-		// rather than silently allowing the request.
-		return domain.GuardrailVerdict{Action: domain.GuardrailAllow},
-			fmt.Errorf("guardrail check returned unknown decision %q", result.Decision)
 	}
+	// An unrecognised verdict means the two sides disagree about the wire
+	// shape. Surface it as an error so the caller's failure mode decides,
+	// rather than silently allowing the request.
+	return domain.GuardrailVerdict{Action: domain.GuardrailAllow},
+		fmt.Errorf("guardrail check returned unknown decision %q", result.Decision)
 }

@@ -3,6 +3,8 @@ package pipeline
 import (
 	"context"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -115,18 +117,42 @@ func guardrailOutcome(ctx context.Context, in guardrailOutcomeInput) error {
 		if in.failOpen {
 			in.logger.Warn("guardrail_fail_open",
 				zap.String("direction", in.direction), zap.Error(in.err))
+			recordGuardrailDegradation(ctx, in.direction, in.err)
 			return nil
 		}
 		in.logger.Error("guardrail_fail_closed",
 			zap.String("direction", in.direction), zap.Error(in.err))
+		// The client gets a fixed message. The underlying error names the
+		// control plane host and its failure detail, which belongs in the log
+		// and the span, not in a response body an API caller can read.
 		return herr.New(ctx, domain.ErrGuardrailUpstreamUnavailable, herr.M{
-			"message": "guardrail could not be evaluated: " + in.err.Error(),
-		})
+			"message": "guardrail could not be evaluated",
+		}, in.err)
 	}
 	if in.verdict.Action == domain.GuardrailBlock {
 		return herr.New(ctx, domain.ErrGuardrailBlocked, herr.M{"message": in.verdict.Message})
 	}
 	return nil
+}
+
+// recordGuardrailDegradation stamps a fail-open bypass onto the active span.
+// A key that opted into fail-open trades enforcement for availability, and the
+// operator has to be able to see when that trade actually fired. A log line
+// alone is not enough: the request that skipped its guardrail is the one being
+// traced.
+func recordGuardrailDegradation(ctx context.Context, direction string, cause error) {
+	span := trace.SpanFromContext(ctx)
+	if !span.SpanContext().IsValid() {
+		return
+	}
+	span.SetAttributes(
+		attribute.Bool("langwatch.guardrail.fail_open", true),
+		attribute.String("langwatch.guardrail.direction", direction),
+	)
+	span.AddEvent("guardrail_fail_open", trace.WithAttributes(
+		attribute.String("langwatch.guardrail.direction", direction),
+		attribute.String("langwatch.guardrail.cause", cause.Error()),
+	))
 }
 
 // guardrailStreamWrapper evaluates chunk-level guardrails on each chunk.

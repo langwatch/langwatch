@@ -50,6 +50,10 @@ const erroring: SingleEvaluationResult = {
   details: "evaluator exploded",
   traceback: [],
 };
+const skipped: SingleEvaluationResult = {
+  status: "skipped",
+  details: "input below the minimum length",
+};
 
 const serviceReturning = (result: SingleEvaluationResult) =>
   GatewayGuardrailEvaluationService.create(prisma, async () => result);
@@ -157,6 +161,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
   });
 
   describe("given a guardrail whose evaluator fails the content", () => {
+    /** @scenario "an evaluator that fails the content blocks the request" */
     it("blocks the request and names the policy", async () => {
       const id = `gr-block-${suffix}`;
       await createGuardrail({
@@ -181,6 +186,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
   });
 
   describe("given a guardrail whose evaluator passes", () => {
+    /** @scenario "an evaluator that passes allows the request" */
     it("allows the request", async () => {
       const id = `gr-allow-${suffix}`;
       await createGuardrail({
@@ -203,7 +209,35 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
     });
   });
 
+  describe("given the evaluator skipped the content", () => {
+    /** @scenario "a skipped evaluator does not block" */
+    it("allows the request rather than treating the skip as a failure", async () => {
+      const id = `gr-skipped-${suffix}`;
+      await createGuardrail({
+        id,
+        projectId: PROJECT_ID,
+        evaluatorId: EVALUATOR_ID,
+        direction: "PRE",
+        // Fail-closed, so a skip that fell through to the failure path would
+        // block. It must not: a skip is the evaluator declining to judge, not
+        // an evaluator that could not run.
+        failureMode: "FAIL_CLOSED",
+      });
+
+      const verdict = await serviceReturning(skipped).check({
+        projectId: PROJECT_ID,
+        guardrailIds: [id],
+        direction: "request",
+        content: { messages: [{ role: "user", content: "hi" }] },
+      });
+
+      expect(verdict.decision).toBe("allow");
+      expect(verdict.policies_triggered).toEqual([]);
+    });
+  });
+
   describe("given the evaluator errors", () => {
+    /** @scenario "a fail-closed guardrail blocks when its evaluator errors" */
     it("blocks when the guardrail is fail-closed", async () => {
       const id = `gr-failclosed-${suffix}`;
       await createGuardrail({
@@ -224,6 +258,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
       expect(verdict.reason).toContain("evaluator exploded");
     });
 
+    /** @scenario "a fail-open guardrail allows when its evaluator errors" */
     it("allows when the guardrail is fail-open", async () => {
       const id = `gr-failopen-${suffix}`;
       await createGuardrail({
@@ -245,6 +280,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
   });
 
   describe("given several guardrails in one direction", () => {
+    /** @scenario "any blocking guardrail blocks the whole check" */
     it("blocks when any of them blocks, naming only the one that failed", async () => {
       const passId = `gr-multi-pass-${suffix}`;
       const failId = `gr-multi-fail-${suffix}`;
@@ -293,6 +329,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
   });
 
   describe("given a guardrail that must not be evaluated", () => {
+    /** @scenario "guardrails from another project are never evaluated" */
     it("ignores one from another project", async () => {
       const id = `gr-other-proj-${suffix}`;
       await prisma.evaluator.create({
@@ -321,6 +358,7 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
       expect(verdict.decision).toBe("allow");
     });
 
+    /** @scenario "an archived guardrail is not evaluated" */
     it("ignores an archived one", async () => {
       const id = `gr-archived-${suffix}`;
       await createGuardrail({
