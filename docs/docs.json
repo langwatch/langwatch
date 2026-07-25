@@ -761,6 +761,7 @@
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
+              "self-hosting/configuration/langy-assistant",
               "self-hosting/configuration/observability",
               "self-hosting/configuration/third-party-integrations"
             ]

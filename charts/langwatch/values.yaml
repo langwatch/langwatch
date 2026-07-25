@@ -569,6 +569,16 @@ app:
     strategy: {}
     ## @param app.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
     revisionHistoryLimit: 10
+  # Release flags this install forces ON, comma-separated, regardless of the
+  # flag store. Reach for it to switch on a feature that ships dark by default;
+  # the flag keys are listed in the app's /ops/feature-flags screen. Forcing a
+  # flag on here also means it cannot be turned off from that screen — the env
+  # var wins — so prefer the store for anything you want to toggle later.
+  # The Langy assistant appends its own key here when the agent is deployed;
+  # see the langyagent section at the bottom of this file.
+  ## @param app.featureFlagForceEnable [string, default: ""] Comma-separated feature flag keys to force on for this install.
+  featureFlagForceEnable: ""
+
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
@@ -1580,6 +1590,9 @@ gateway:
   ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
   publicUrl: ""
 
+  ## @param gateway.internalUrl [string, default: ""] URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.
+  internalUrl: ""
+
   # The gateway needs its OWN externally-reachable endpoint, separate from
   # the main app — point a second ingress / load balancer at gateway.ingress
   # below (the LLM clients hit the gateway, the browser hits the app). The
@@ -1628,29 +1641,60 @@ gateway:
 ## assistant. Internal-only (no ingress); the control plane reaches it over
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
-## `langyagent.chartManaged: false` (the default) disables the agent and the
-## app's wiring to it; flip to true once the prerequisite secret + opt-in
-## steps are done (see docs/langy-github-app.md).
 ##
-## WHY default off: the agent + app Deployments both reference a `secretKeyRef`
-## to `langwatch-langyagent-auth` (created out-of-band — terraform / external-
-## secrets / a manual `kubectl create secret`). The umbrella chart does NOT
-## materialise that secret, so an upgrade with chartManaged=true on top of a
-## values file that hasn't been prepared yields `CreateContainerConfigError`
-## on the main app pod — turning an optional, dark-by-flag feature into a
-## blocker for every operator's next upgrade. Default-off keeps existing
-## installs unaffected; operators flip the switch when they're ready.
+## TURNING LANGY ON is one value:
+##
+##   langyagent:
+##     chartManaged: true
+##
+## and, on a cluster with no sandboxed runtime available (most self-managed
+## ones — see langyagent.runtimeClassName in the subchart), two more:
+##
+##     runtimeClassName: ""
+##     acceptUnsandboxedRuntime: true
+##
+## Everything else is materialised by this chart: the shared LANGY_INTERNAL_SECRET
+## lands in the app Secret alongside the gateway's pair, the app and workers pods
+## both get the agent URL, and the assistant is opened to the install's users.
+## There is no out-of-band `kubectl create secret` step and no internal screen to
+## visit. What Langy still needs from you is a model to talk to: configure a model
+## provider for the project as you would for any other LangWatch feature.
+##
+## WHY default off: enabling it adds a pod that runs LLM-written shell under a
+## deliberate security posture (root in-container for per-worker UID handoff, a
+## sandboxed runtime where one exists). That is a decision an operator should
+## make on purpose rather than inherit from a chart upgrade, so the default
+## leaves existing installs exactly as they are.
 ## NOTE: hyphenated key — reference as (index .Values "langyagent") in templates.
 langyagent:
-  ## @param langyagent.chartManaged [default: false] Lift the Langy agent pod as part of this chart. Default off so existing upgrades aren't broken by the absent shared Secret; opt in once the LANGY_INTERNAL_SECRET secret is created out-of-band.
+  ## @param langyagent.chartManaged [default: false] Lift the Langy agent pod as part of this chart, wire the app and workers to it, and open the assistant to this install. Off by default so an upgrade never adds this workload on its own.
   chartManaged: false
 
-  ## @param langyagent.controlPlane.agentUrl [string, default: http://<release>-langyagent:80] URL the app uses to reach the agent Service. Leave empty to auto-derive from the release name.
+  ## @param langyagent.enableForAllUsers [default: true] Make Langy available to everyone in this install as soon as the agent is deployed. Set false to keep the rollout flag authoritative and open Langy to chosen projects/orgs from /ops/feature-flags instead — the staged path the hosted product uses.
+  enableForAllUsers: true
+
+  ## @param langyagent.controlPlane.agentUrl [string, default: http://<release>-langyagent:80] URL the app and workers use to reach the agent Service. Leave empty to auto-derive from the release name.
   controlPlane:
     agentUrl: ""
 
-  ## @param langyagent.secrets.existingSecretName [string, default: langwatch-langyagent-auth] Secret carrying LANGY_INTERNAL_SECRET, shared between the app and the agent pod. Created out-of-band (terraform / external-secrets); the umbrella chart does NOT materialise it.
-  ## @param langyagent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside the existing Secret that holds the shared internal secret.
+  ## @param langyagent.secrets.existingSecretName [string, default: the app Secret] Secret carrying LANGY_INTERNAL_SECRET, shared by the app, the workers, and the agent pod. Defaults to this chart's own app Secret, which materialises the key for you (generated when autogen.enabled, supplied by you otherwise — add LANGY_INTERNAL_SECRET to your existing Secret in that case). Point it elsewhere only if the value is managed by external-secrets or terraform.
+  ## @param langyagent.secrets.internalSecretKey [string, default: LANGY_INTERNAL_SECRET] Key inside that Secret holding the shared value.
   secrets:
-    existingSecretName: langwatch-langyagent-auth
+    existingSecretName: langwatch-app-secrets
     internalSecretKey: LANGY_INTERNAL_SECRET
+
+  # Watch Langy work with LangWatch itself. Point the mirror at one of your own
+  # projects and every Langy turn lands there as a trace: the model calls it
+  # made, the tools it ran, what each cost. Two steps, because only you can say
+  # which project: create an API key in that project, put it in a Secret, and
+  # name the Secret here. The endpoint resolves to this install automatically.
+  #
+  #   read -rsp "Mirror project API key: " KEY
+  #   kubectl -n <namespace> create secret generic langwatch-langyagent-mirror \
+  #     --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
+  #
+  ## @param langyagent.mirror.existingSecretName [string, default: ""] Secret holding the mirror project's API key. Empty leaves the mirror off.
+  ## @param langyagent.mirror.traceEndpoint [string, default: ""] LangWatch base URL to mirror into. Empty means this install's own app Service; set it to mirror into a different deployment.
+  mirror:
+    existingSecretName: ""
+    traceEndpoint: ""
