@@ -26,10 +26,18 @@ Feature: Hand a scenario run to the simulations tab that is already open
     And the refresh is driven server-side so background-tab timer throttling cannot expire it
 
   @integration
-  Scenario: Presence is dropped as soon as the tab goes away
+  Scenario: A tab that is only reconnecting keeps its place
     Given a simulations tab is registered
-    When the SSE subscription disconnects
-    Then the presence entry is removed for that scenario tab key
+    When its subscription ends because the tab routed to another run
+    Then the tab is still offered runs for a short grace window
+    And reconnecting inside that window restores it outright
+
+  @integration
+  Scenario: A tab that really went away stops taking runs
+    Given a simulations tab whose subscription ended
+    When the grace window passes without it reconnecting
+    Then it is no longer offered runs
+    And the next run opens a browser tab again
 
   @integration
   Scenario: A simulations tab without a scenario tab key never registers
@@ -63,10 +71,11 @@ Feature: Hand a scenario run to the simulations tab that is already open
     And project A's tab is not navigated
 
   @integration
-  Scenario: The handoff endpoint refuses callers without scenario write access
-    Given an API key that only holds "scenarios:view"
+  Scenario: The handoff endpoint refuses an unauthenticated caller
+    Given a request with no API key
     When it posts a browser-tab handoff
     Then the request is declined
+    And nothing is broadcast
 
   @integration
   Scenario: The handoff URL must belong to this LangWatch instance
@@ -74,6 +83,20 @@ Feature: Hand a scenario run to the simulations tab that is already open
     When the SDK posts a handoff whose URL points at another host
     Then the request is rejected
     And nothing is broadcast
+
+  @integration
+  Scenario: A handoff sent while the tab was reloading is not lost
+    Given a simulations tab is registered for scenario tab key "abc"
+    When the SDK posts a handoff and the tab reconnects a moment later
+    Then the reconnecting subscription is handed the parked run
+    And the parked run is handed over only once
+    And it expires quickly so a tab opened much later does not jump to a stale run
+
+  @integration
+  Scenario: Nothing is parked when no tab was listening
+    Given no simulations tab is registered for scenario tab key "abc"
+    When the SDK posts a browser-tab handoff for key "abc"
+    Then nothing is parked for that key
 
   # ---------------------------------------------------------------------------
   # The tab follows

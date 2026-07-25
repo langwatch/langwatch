@@ -82,6 +82,7 @@ describe("scenarioTabRegistry", () => {
     expect(ttl).toBeLessThanOrEqual(SCENARIO_TAB_TTL_SECONDS);
   });
 
+  /** @scenario "Presence is refreshed while the subscription stays open" */
   it("re-registering pushes the TTL back out", async () => {
     const tabKey = `tab-${nanoid(8)}`;
     const key = track(projectId, tabKey);
@@ -101,6 +102,7 @@ describe("scenarioTabRegistry", () => {
      * this feature does to it on purpose. Retiring instantly would make the run
      * right after a followed run open a new tab.
      */
+    /** @scenario "A tab that is only reconnecting keeps its place" */
     it("keeps the tab claimable for the grace window", async () => {
       const tabKey = `tab-${nanoid(8)}`;
       track(projectId, tabKey);
@@ -124,6 +126,7 @@ describe("scenarioTabRegistry", () => {
       ).resolves.toBe(true);
     });
 
+    /** @scenario "A tab that really went away stops taking runs" */
     it("stops claiming runs once the grace window passes", async () => {
       const tabKey = `tab-${nanoid(8)}`;
       track(projectId, tabKey);
@@ -274,6 +277,7 @@ describe("scenarioTabRegistry", () => {
      * Broadcasts are fire-and-forget: a tab that is mid-reload when one goes
      * out would miss a run the SDK was already told had been delivered.
      */
+    /** @scenario "A handoff sent while the tab was reloading is not lost" */
     it("hands a parked run to the next subscription", async () => {
       const tabKey = `tab-${nanoid(8)}`;
       pendingKeys.push(`scenario_tab:v1:pending:${projectId}:${tabKey}`);

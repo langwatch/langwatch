@@ -179,6 +179,7 @@ beforeEach(() => {
 describe("POST /api/scenario-events/browser-tab", () => {
   describe("when no tab from that machine is listening", () => {
     /** @scenario "The handoff is not delivered when no tab is listening" */
+    /** @scenario "Nothing is parked when no tab was listening" */
     it("reports the handoff as undelivered and broadcasts nothing", async () => {
       const tabKey = `tab-${nanoid(8)}`;
       const res = await handoff({
@@ -320,6 +321,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       expect(res.status).toBe(422);
     });
 
+    /** @scenario "The handoff endpoint refuses an unauthenticated caller" */
     it("rejects an unauthenticated caller", async () => {
       const res = await handoff(
         { tabKey: `tab-${nanoid(8)}`, batchRunId: "batch-1" },
