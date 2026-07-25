@@ -38,6 +38,10 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { GatewayGuardrailService } from "../guardrail.service";
+import {
+  VK_TAG_MAX_LENGTH,
+  VK_TAGS_MAX_COUNT,
+} from "../virtualKey.config";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 
 const suffix = nanoid(8);
@@ -59,6 +63,7 @@ const GUARDRAIL_ID = `gr-mat-${suffix}`;
 const VK_ID = `vk-mat-${suffix}`;
 const VK_NO_RP_ID = `vk-mat-norp-${suffix}`;
 const VK_NO_PROJECT_ID = `vk-mat-noproj-${suffix}`;
+const VK_TAGSTORM_ID = `vk-mat-tagstorm-${suffix}`;
 
 describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
   beforeAll(async () => {
@@ -249,6 +254,36 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         },
       },
     });
+    // VK 4 — a config row written straight to PG with a tag list no UI
+    // would produce: hundreds of tags, one enormous tag, duplicates and
+    // blanks. Rows like this predate the tag bounds and the REST API can
+    // still post one, so materialise has to hand the gateway something
+    // bounded regardless.
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_TAGSTORM_ID,
+        organizationId: ORG_ID,
+        name: "vk-tagstorm",
+        hashedSecret: `hash-tagstorm-${suffix}`,
+        displayPrefix: "lw_vk_live_xxx_4",
+        principalUserId: USER_ID,
+        createdById: USER_ID,
+        config: {
+          metadata: {
+            tags: [
+              "team=ml",
+              " team=ml ",
+              "",
+              "x".repeat(5_000),
+              ...Array.from({ length: 500 }, (_, i) => `noise-${i}`),
+            ],
+          },
+        },
+        scopes: {
+          create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }],
+        },
+      },
+    });
     // VK 2 — no RP, no attachments. Exercises the empty-state path.
     await prisma.virtualKey.create({
       data: {
@@ -287,7 +322,9 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
 
   afterAll(async () => {
     await prisma.virtualKey.deleteMany({
-      where: { id: { in: [VK_ID, VK_NO_RP_ID, VK_NO_PROJECT_ID] } },
+      where: {
+        id: { in: [VK_ID, VK_NO_RP_ID, VK_NO_PROJECT_ID, VK_TAGSTORM_ID] },
+      },
     });
     await prisma.gatewayGuardrail.deleteMany({
       where: { projectId: PROJECT_ID },
@@ -378,6 +415,25 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       const mat = new GatewayConfigMaterialiser(prisma, null);
       const bundle = await mat.materialise(vk!);
       expect(bundle.vk_tags).toEqual(["app=nexttrace", "team=offsecops"]);
+    });
+
+    // Every tag is stamped on every span this VK produces and aggregated by
+    // the Label facet, so the bundle is the last place to bound them before
+    // they become per-request ClickHouse cardinality.
+    it("bounds vk_tags for a stored config the drawer could never have written", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_TAGSTORM_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+
+      const bundle = await mat.materialise(vk!);
+
+      expect(bundle.vk_tags).toHaveLength(VK_TAGS_MAX_COUNT);
+      expect(bundle.vk_tags[0]).toBe("team=ml");
+      expect(new Set(bundle.vk_tags).size).toBe(bundle.vk_tags.length);
+      for (const tag of bundle.vk_tags) {
+        expect(tag).not.toBe("");
+        expect([...tag].length).toBeLessThanOrEqual(VK_TAG_MAX_LENGTH);
+      }
     });
 
     it("hydrates model_aliases + policy_rules from the linked RoutingPolicy", async () => {

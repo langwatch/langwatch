@@ -30,9 +30,18 @@ import {
 } from "./eligibleModelProviders";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import {
+  VK_TAG_MAX_LENGTH,
+  VK_TAGS_MAX_COUNT,
+} from "~/server/gateway/virtualKey.config";
+import {
   VirtualKeyScopePicker,
   type VirtualKeyScopeEntry,
 } from "./VirtualKeyScopePicker";
+
+// The field is one comma-separated line, so its own cap is the tag caps plus
+// a separator per tag. Anything past this is trimmed by normalizeVkTags on
+// save regardless; the input cap just stops a runaway paste getting that far.
+const TAGS_CSV_MAX_LENGTH = VK_TAGS_MAX_COUNT * (VK_TAG_MAX_LENGTH + 2);
 
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;
@@ -217,7 +226,7 @@ export function VirtualKeyCreateDrawer({
               <Field.Label>
                 Tags
                 <FieldInfoTooltip
-                  description="Comma-separated tags attached to this VK. Cache-control rules match VKs on tags using AND-subset semantics — a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag."
+                  description="Comma-separated tags attached to this VK. Every trace this key produces carries its tags as labels, so you can filter gateway traffic by team or app in the Trace Explorer. Cache-control rules also match VKs on tags using AND-subset semantics, so a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag. Duplicates are dropped."
                   docHref="/ai-gateway/cache-control#cache-rules"
                 />
               </Field.Label>
@@ -225,9 +234,12 @@ export function VirtualKeyCreateDrawer({
                 value={tagsCsv}
                 onChange={(e) => setTagsCsv(e.target.value)}
                 placeholder="e.g. tier=enterprise, team=ml"
+                maxLength={TAGS_CSV_MAX_LENGTH}
               />
               <Field.HelperText>
-                Comma-separated. Cache-control rules match VKs on tags as
+                Comma-separated, up to {VK_TAGS_MAX_COUNT} tags of{" "}
+                {VK_TAG_MAX_LENGTH} characters. Tags become labels on this
+                key&apos;s traces, and cache-control rules match VKs on tags as
                 AND-subset.
               </Field.HelperText>
             </Field.Root>

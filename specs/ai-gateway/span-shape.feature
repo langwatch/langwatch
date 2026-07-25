@@ -193,6 +193,29 @@ Feature: Gateway span shape — mandatory attributes per completed request
     When a request completes through the gateway
     Then the exported customer span has no langwatch.labels attribute
 
+  # Tags are stamped on every span of every request the key makes, and the
+  # Label filter aggregates every distinct value it finds. That makes the tag
+  # list a cardinality surface rather than a free-form notes field, so the
+  # bundle the gateway receives is normalised before any of it reaches a span.
+
+  Scenario: Blank and repeated tags do not reach the span
+    Given the VK's tags contain a blank entry and the same tag written twice
+    When a request completes through the gateway
+    Then the exported customer span carries each distinct tag exactly once
+    And the blank entry is absent
+
+  Scenario: An oversized tag list is capped before it reaches the span
+    Given the VK's tags were set through the API to hundreds of entries
+    When a request completes through the gateway
+    Then the exported customer span carries a capped number of labels
+    And each label is no longer than the per-tag limit
+
+  Scenario: A virtual key stored before the tag limits existed stays servable
+    Given a stored virtual key whose tags exceed the limits
+    When the gateway fetches that key's configuration
+    Then the configuration resolves with its tags normalised
+    And the request is served rather than failing on the oversized tag list
+
   # ─────────────────────────────────────────────────────────────────────────
   # §9. Out of scope (for now)
   # ─────────────────────────────────────────────────────────────────────────
