@@ -1,4 +1,5 @@
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -150,8 +151,48 @@ function BudgetDetailPage() {
             <Text color="fg.muted">Budget not found.</Text>
           ) : (
             <VStack align="stretch" gap={6} maxWidth="960px">
+              {!budget.spendAvailable && (
+                <Alert.Root
+                  status="warning"
+                  data-testid="budget-spend-unavailable"
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Spend figures are unavailable</Alert.Title>
+                    <Alert.Description>
+                      Spend cannot be totalled right now, so this budget is
+                      not stopping or warning about anything.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+              {budget.unreachableByAnyKey && (
+                <Alert.Root
+                  status="warning"
+                  data-testid="budget-unreachable-alert"
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>No key sends traffic here</Alert.Title>
+                    <Alert.Description>
+                      Traffic is attributed to the project a key is scoped to.
+                      No active key is scoped so that its traffic reaches this
+                      budget, so it will stay at zero and never stop a request.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
               <Section title="Utilization">
                 <VStack align="stretch" gap={2}>
+                  {!budget.spendAvailable ? (
+                  <HStack>
+                    <Text fontWeight="medium" fontSize="2xl" color="fg.muted">
+                      Unavailable
+                    </Text>
+                    <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+                  </HStack>
+                  ) : (
+                  <>
                   <HStack>
                     <Text fontWeight="medium" fontSize="2xl">
                       {formatBudgetUsd(spent)}
@@ -177,6 +218,8 @@ function BudgetDetailPage() {
                       <Progress.Range />
                     </Progress.Track>
                   </Progress.Root>
+                  </>
+                  )}
                   <HStack fontSize="xs" color="fg.muted">
                     <Text>
                       Window: <strong>{budget.window.toLowerCase()}</strong>

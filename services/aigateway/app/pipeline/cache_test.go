@@ -39,13 +39,13 @@ func TestCacheInterceptor(t *testing.T) {
 					Body:     largeChatBody(t),
 					Resolved: &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic},
 				},
-				Meta: &Meta{},
+				Meta: &MetaAccumulator{},
 			}
 
 			runCacheInterceptor(t, call, neverEvaluate(t))
 
 			assert.Contains(t, string(call.Request.Body), `"cache_control"`)
-			assert.Equal(t, "auto", call.Meta.CacheMode)
+			assert.Equal(t, "auto", call.Meta.Snapshot().CacheMode)
 		})
 
 		t.Run("openai chat requests are left untouched", func(t *testing.T) {
@@ -57,13 +57,13 @@ func TestCacheInterceptor(t *testing.T) {
 					Body:     append([]byte(nil), body...),
 					Resolved: &domain.ResolvedModel{ProviderID: domain.ProviderOpenAI},
 				},
-				Meta: &Meta{},
+				Meta: &MetaAccumulator{},
 			}
 
 			runCacheInterceptor(t, call, neverEvaluate(t))
 
 			assert.Equal(t, body, call.Request.Body)
-			assert.Empty(t, call.Meta.CacheMode)
+			assert.Empty(t, call.Meta.Snapshot().CacheMode)
 		})
 	})
 
@@ -78,7 +78,7 @@ func TestCacheInterceptor(t *testing.T) {
 					Body:     largeChatBody(t),
 					Resolved: &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic},
 				},
-				Meta: &Meta{},
+				Meta: &MetaAccumulator{},
 			}
 			evaluate := func(_ context.Context, rules []domain.CacheRule, _ domain.CacheEvalContext) *domain.CacheDecision {
 				return &domain.CacheDecision{Action: rules[0].Action, RuleID: rules[0].ID}
@@ -87,7 +87,7 @@ func TestCacheInterceptor(t *testing.T) {
 			runCacheInterceptor(t, call, evaluate)
 
 			assert.NotContains(t, string(call.Request.Body), `"cache_control"`)
-			assert.Equal(t, string(domain.CacheActionDisable), call.Meta.CacheMode)
+			assert.Equal(t, string(domain.CacheActionDisable), call.Meta.Snapshot().CacheMode)
 		})
 	})
 
@@ -102,7 +102,7 @@ func TestCacheInterceptor(t *testing.T) {
 					Body:     largeChatBody(t),
 					Resolved: &domain.ResolvedModel{ProviderID: domain.ProviderAnthropic},
 				},
-				Meta: &Meta{},
+				Meta: &MetaAccumulator{},
 			}
 			evaluate := func(context.Context, []domain.CacheRule, domain.CacheEvalContext) *domain.CacheDecision {
 				return nil
@@ -111,7 +111,7 @@ func TestCacheInterceptor(t *testing.T) {
 			runCacheInterceptor(t, call, evaluate)
 
 			assert.Contains(t, string(call.Request.Body), `"cache_control"`)
-			assert.Equal(t, "auto", call.Meta.CacheMode)
+			assert.Equal(t, "auto", call.Meta.Snapshot().CacheMode)
 		})
 	})
 }

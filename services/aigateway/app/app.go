@@ -25,6 +25,8 @@ type App struct {
 	cache      CacheEvaluator
 	models     ModelResolver
 	traces     AITraceEmitter
+	metrics    MetricsRecorder
+	breaker    CircuitBreaker
 	logger     *zap.Logger
 
 	pipeline pipeline.Pipeline
@@ -42,6 +44,8 @@ func WithPolicy(p PolicyMatcher) Option          { return func(app *App) { app.p
 func WithCache(c CacheEvaluator) Option          { return func(app *App) { app.cache = c } }
 func WithModels(m ModelResolver) Option          { return func(app *App) { app.models = m } }
 func WithTraces(t AITraceEmitter) Option         { return func(app *App) { app.traces = t } }
+func WithMetrics(m MetricsRecorder) Option       { return func(app *App) { app.metrics = m } }
+func WithCircuitBreaker(b CircuitBreaker) Option { return func(app *App) { app.breaker = b } }
 func WithLogger(l *zap.Logger) Option            { return func(app *App) { app.logger = l } }
 
 // New creates an App with the given options and builds the dispatch pipeline.
@@ -52,6 +56,9 @@ func New(opts ...Option) *App {
 	}
 	if app.logger == nil {
 		app.logger, _ = zap.NewProduction()
+	}
+	if app.metrics == nil {
+		app.metrics = discardMetrics{}
 	}
 
 	app.pipeline = pipeline.Build(
@@ -75,7 +82,7 @@ func (a *App) buildInterceptors() []pipeline.Interceptor {
 		chain = append(chain, pipeline.ModelResolve(a.models.Resolve))
 	}
 	if a.cache != nil {
-		chain = append(chain, pipeline.Cache(a.cache.Evaluate))
+		chain = append(chain, pipeline.Cache(a.evaluateCache))
 	}
 	if a.budget != nil {
 		chain = append(chain, pipeline.Budget(a.budget.Precheck, a.logger))
@@ -94,12 +101,41 @@ func (a *App) buildInterceptors() []pipeline.Interceptor {
 	return chain
 }
 
+// evaluateCache runs cache-rule evaluation and counts the rules that
+// fire. A non-nil decision is always applied by the interceptor, so a
+// decision here is a rule hit.
+func (a *App) evaluateCache(ctx context.Context, rules []domain.CacheRule, eval domain.CacheEvalContext) *domain.CacheDecision {
+	decision := a.cache.Evaluate(ctx, rules, eval)
+	if decision != nil {
+		a.metrics.RecordCacheRuleHit(decision.RuleID, string(decision.Action))
+	}
+	return decision
+}
+
 // Auth returns the auth resolver (for use by transport middleware).
 func (a *App) Auth() AuthResolver { return a.auth }
 
+// discardMetrics is the default recorder, so the app never has to
+// nil-check the port. Tests and partial wirings get it for free.
+type discardMetrics struct{}
+
+func (discardMetrics) RecordProviderAttempt(_, _, _, _ string, _ float64) {}
+func (discardMetrics) RecordFallback(_, _ string)                         {}
+func (discardMetrics) SetCircuitState(_ string, _ int)                    {}
+func (discardMetrics) RecordCacheOutcome(_ domain.Usage)                  {}
+func (discardMetrics) RecordCacheRuleHit(_, _ string)                     {}
+func (discardMetrics) SetRequestLabels(_ context.Context, _, _ string)    {}
+func (discardMetrics) ModelLabel(_ domain.BundleConfig, model string) string {
+	return model
+}
+
+func (discardMetrics) WrapStream(iter domain.StreamIterator, _, _ string) domain.StreamIterator {
+	return iter
+}
+
 // ListModels returns models available to the bundle's virtual key:
 // alias names, plus either the configured allowlist (authoritative when
-// set — anything outside it is blocked at dispatch, so upstream endpoints
+// set, anything outside it is blocked at dispatch, so upstream endpoints
 // are not queried) or models discovered from self-hosted endpoints in the
 // credential chain. Models matching a deny policy rule are filtered out.
 func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.Model, error) {

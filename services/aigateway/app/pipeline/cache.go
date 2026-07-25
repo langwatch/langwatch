@@ -24,7 +24,7 @@ func Cache(evaluate EvaluateCacheFunc) Interceptor {
 				VKTags:          call.Bundle.Config.VKTags,
 			})
 			if decision != nil {
-				call.Meta.CacheMode = string(decision.Action)
+				call.Meta.Update(func(m *Meta) { m.CacheMode = string(decision.Action) })
 				if err := call.MaterializeBody(); err != nil {
 					return err
 				}
@@ -41,7 +41,7 @@ func Cache(evaluate EvaluateCacheFunc) Interceptor {
 		}
 		body, applied := applyDefaultCacheControl(call.Request.Body, action, call.Request.Type)
 		if applied {
-			call.Meta.CacheMode = "auto"
+			call.Meta.Update(func(m *Meta) { m.CacheMode = "auto" })
 			call.Request.Body = body
 		}
 		return nil

@@ -31,6 +31,21 @@ import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 export type AuthzContext = { prisma: PrismaClient; session: Session | null };
 
 /**
+ * A provider row this service materialized, as opposed to a form-time shape.
+ *
+ * `MaybeStoredModelProvider` leaves `scopes` optional because the same type
+ * also describes a provider being filled in before it has any. Every row this
+ * service hands out has them: stored rows map `mp.scopes`, and synthesized
+ * system rows set `[]`. Saying so in the type is what lets the VK drawer
+ * consume the list without a cast, and a cast there would be load-bearing in
+ * the wrong direction, since `resolveEligible` iterates `provider.scopes`
+ * unguarded.
+ */
+export type MaterializedModelProvider = MaybeStoredModelProvider & {
+  scopes: NonNullable<MaybeStoredModelProvider["scopes"]>;
+};
+
+/**
  * Input types for service operations
  */
 export type UpdateModelProviderInput = {
@@ -280,9 +295,19 @@ export class ModelProviderService {
    * the env-fed provider, all of them do, so the row shows once at
    * org scope.
    */
+  /**
+   * Both row shapes this returns always carry scopes: stored rows get them
+   * from `toMaybeStoredProvider`, which maps `mp.scopes`, and synthesized
+   * system rows set `scopes: []` explicitly. `MaybeStoredModelProvider`
+   * leaves the field optional because the same type also describes form-time
+   * shapes that have no scopes yet, so saying so here is what lets the VK
+   * drawer consume this without a cast. The drawer's `resolveEligible`
+   * iterates `provider.scopes` unguarded, so an optional field there is the
+   * difference between a compile error and a runtime crash.
+   */
   async listOrgModelProvidersForFrontend(
     organizationId: string,
-  ): Promise<MaybeStoredModelProvider[]> {
+  ): Promise<MaterializedModelProvider[]> {
     const teams = await this.prisma.team.findMany({
       where: { organizationId },
       include: { projects: true },
@@ -300,7 +325,7 @@ export class ModelProviderService {
       await this.repository.findAllInOrganization(organizationId);
     const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
 
-    const systemRows: MaybeStoredModelProvider[] = [];
+    const systemRows: MaterializedModelProvider[] = [];
     for (const [providerKey, provider_] of Object.entries(defaultProviders)) {
       if (savedProviderKeys.has(providerKey)) continue;
       if (!provider_.enabled) continue;
@@ -799,7 +824,7 @@ export class ModelProviderService {
     mp: ModelProviderWithScopes,
     defaultProviders: Record<string, MaybeStoredModelProvider>,
     includeKeys: boolean,
-  ): MaybeStoredModelProvider {
+  ): MaterializedModelProvider {
     // Always use registry models for models/embeddingsModels
     const defaultProvider = defaultProviders[mp.provider];
 
@@ -820,6 +845,11 @@ export class ModelProviderService {
       name: mp.name,
       provider: mp.provider,
       enabled: mp.enabled,
+      // Whether the credential has been withdrawn. The gateway already
+      // refuses to route to a withdrawn provider; surfacing it lets the
+      // frontend surfaces that preview routing agree with that decision
+      // instead of advertising reach the key does not have.
+      disabledAt: mp.disabledAt,
       customKeys: includeKeys ? mp.customKeys : null,
       models: defaultProvider?.models ?? null,
       embeddingsModels: defaultProvider?.embeddingsModels ?? null,

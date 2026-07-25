@@ -21,6 +21,7 @@ import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { authFailureMessage } from "./authFailureMessage";
 import { isStableAuthError, normalizeErrorCode, SignInError } from "./error";
 
 export default function SignIn() {
@@ -91,7 +92,6 @@ export default function SignIn() {
 
 function SignInForm() {
   const query = useSearchParams();
-  const error = query?.get("error");
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
   const schema = z.object({
@@ -104,28 +104,40 @@ function SignInForm() {
   });
 
   const [signInLoading, setSignInLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
+    setSubmitError(null);
+    setSignInLoading(true);
+
+    let message: string | null = null;
     try {
-      setSignInLoading(true);
       const response = await signIn("credentials", {
         email: values.email,
         password: values.password,
         callbackUrl: callbackUrl,
       });
+
+      if (response?.error ?? (response?.status && response.status >= 400)) {
+        message = authFailureMessage({
+          code: response.code,
+          message: response.error,
+          status: response.status,
+        });
+      }
+    } catch (error) {
+      message = authFailureMessage({
+        message: error instanceof Error ? error.message : void 0,
+      });
+    } finally {
       setSignInLoading(false);
+    }
 
-      if (response?.error) {
-        throw new Error("Sign in failed");
-      }
-
-      if (response?.status && response.status >= 400) {
-        throw new Error("Network response was not ok");
-      }
-    } catch {
+    if (message) {
+      setSubmitError(message);
       toaster.create({
-        title: "Error",
-        description: "Failed to sign in",
+        title: "Could not sign in",
+        description: message,
         type: "error",
         meta: {
           closable: true,
@@ -179,14 +191,10 @@ function SignInForm() {
                   </HStack>
                 </VStack>
               </HorizontalFormControl>
-              {error && (
+              {submitError && (
                 <Alert.Root status="error">
                   <Alert.Indicator />
-                  <Alert.Content>
-                    {error === "CredentialsSignin"
-                      ? "Invalid email or password"
-                      : error}
-                  </Alert.Content>
+                  <Alert.Content>{submitError}</Alert.Content>
                 </Alert.Root>
               )}
               <HStack width="full" paddingTop={4}>

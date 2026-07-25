@@ -2,14 +2,25 @@ import { modelProviderRegistry } from "~/features/onboarding/regions/model-provi
 
 import type { VirtualKeyScopeEntry } from "./VirtualKeyScopePicker";
 
+/**
+ * A scope a ModelProvider is attached to. Same triad as the VK's own
+ * scopes, but a different axis: this says where the *provider* lives,
+ * not where the key may be used.
+ */
+export type ModelProviderScopeEntry = {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId: string;
+};
+
 export type OrgModelProvider = {
   id?: string | null;
   name?: string | null;
   provider: string;
-  scopes: Array<{
-    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-    scopeId: string;
-  }>;
+  /** Whether an admin has this credential switched on. */
+  enabled?: boolean;
+  /** Set once the credential has been withdrawn. */
+  disabledAt?: Date | string | null;
+  scopes: ModelProviderScopeEntry[];
   models?: string[] | null;
   customModels?: Array<{ modelId: string }> | null;
 };
@@ -19,7 +30,13 @@ export type EligibleModelProvider = {
   provider: string;
   label: string;
   modelCount: number;
-  inheritedFrom: VirtualKeyScopeEntry;
+  /**
+   * The scope the provider itself is attached to — the broadest one that
+   * reaches the key. This is where the provider was configured, never the
+   * key's own scope: an organization-wide credential inherited by a
+   * project key still comes from the organization.
+   */
+  definedAt: ModelProviderScopeEntry;
   defaultModel: string;
 };
 
@@ -77,6 +94,18 @@ export function buildScopeHierarchy(
 }
 
 /**
+ * A provider is only offered to a key when the gateway would actually
+ * dispatch to it: `enabled: true, disabledAt: null`, the same predicate
+ * `scopeResolver.eligibleModelProvidersForVk` runs against Postgres.
+ * Fails closed — a row that arrives without the flag is not advertised,
+ * because listing a credential an admin has withdrawn overstates the
+ * key's reach and is a governance problem, not a cosmetic one.
+ */
+function isRoutable(provider: OrgModelProvider): boolean {
+  return provider.enabled === true && !provider.disabledAt;
+}
+
+/**
  * Resolves the union eligible-ModelProvider set for a multi-scope VirtualKey
  * client-side, mirroring `scopeResolver.eligibleModelProvidersForVk` on the
  * server. Inheritance rule from specs/ai-gateway/governance/vk-scope-inheritance.feature:
@@ -84,8 +113,9 @@ export function buildScopeHierarchy(
  *   "A VK at scope S sees a ModelProvider P iff P's scope is an ancestor
  *    of S OR equal to S. ORG is the broadest, then TEAM, then PROJECT."
  *
- * Each surviving MP carries the broadest VK scope that admitted it (the
- * "inheritedFrom" chip in the picker UI).
+ * Each surviving MP carries the broadest of its OWN scopes that the key
+ * reaches, which is what the scope chip in the picker UI names. Keyed by
+ * row id, so a provider attached at several scopes resolves once.
  */
 export function resolveEligible(
   scopes: VirtualKeyScopeEntry[],
@@ -94,7 +124,7 @@ export function resolveEligible(
 ): EligibleModelProvider[] {
   if (scopes.length === 0 || providers.length === 0) return [];
   const matchesScope = (
-    mpScope: { scopeType: string; scopeId: string },
+    mpScope: ModelProviderScopeEntry,
     vkScope: VirtualKeyScopeEntry,
   ): boolean => {
     if (mpScope.scopeType === "ORGANIZATION") {
@@ -115,24 +145,24 @@ export function resolveEligible(
     return false;
   };
 
-  // Rank the VK scope tiers so a provider admitted at several scopes shows the
-  // broadest one (ORG > TEAM > PROJECT) in its "inheritedFrom" badge.
+  // Rank the tiers so a provider attached at several scopes is attributed to
+  // the broadest one (ORG > TEAM > PROJECT) it reaches the key through.
   const scopeBreadth = { ORGANIZATION: 0, TEAM: 1, PROJECT: 2 } as const;
   const result = new Map<string, EligibleModelProvider>();
   for (const provider of providers) {
     if (!provider.id) continue;
-    let bestWinner: VirtualKeyScopeEntry | undefined;
+    if (!isRoutable(provider)) continue;
+    let definedAt: ModelProviderScopeEntry | undefined;
     for (const mpScope of provider.scopes) {
-      const winner = scopes.find((vkScope) => matchesScope(mpScope, vkScope));
-      if (!winner) continue;
+      if (!scopes.some((vkScope) => matchesScope(mpScope, vkScope))) continue;
       if (
-        !bestWinner ||
-        scopeBreadth[winner.scopeType] < scopeBreadth[bestWinner.scopeType]
+        !definedAt ||
+        scopeBreadth[mpScope.scopeType] < scopeBreadth[definedAt.scopeType]
       ) {
-        bestWinner = winner;
+        definedAt = mpScope;
       }
     }
-    if (!bestWinner) continue;
+    if (!definedAt) continue;
     const chatModels = provider.models ?? [];
     const customCount = provider.customModels?.length ?? 0;
     const label = provider.name ?? provider.provider;
@@ -141,7 +171,7 @@ export function resolveEligible(
       provider: provider.provider,
       label,
       modelCount: chatModels.length + customCount,
-      inheritedFrom: bestWinner,
+      definedAt,
       defaultModel: resolveProviderDefaultModel(
         provider.provider,
         label,

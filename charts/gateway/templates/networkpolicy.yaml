@@ -9,8 +9,8 @@
 #
 # Egress (what the gateway can talk to):
 #   - DNS (kube-system:53 TCP+UDP).
-#   - Control plane (langwatch-app) — resolve-key, config, changes,
-#     budget/check, budget/debit, guardrail/check all hit this one.
+#   - Control plane (langwatch-app): resolve-key, config, changes,
+#     guardrail-check and codex-refresh all hit this one.
 #   - Redis (L2 auth cache) — optional; only when values.redis.url set.
 #   - OpenAI / Anthropic / provider upstreams on 443. These don't live
 #     in-cluster so we allow :443 to any IP. Customers who want a
