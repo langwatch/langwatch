@@ -7,6 +7,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { SeriesInputType } from "../../server/analytics/registry";
 import { readSummaryMetric } from "../../server/analytics/timeseriesSummary";
 import { api } from "../../utils/api";
+import { formatMoney } from "../../utils/formatMoney";
 import { ModelSelector } from "../ModelSelector";
 import {
   estimateReferenceCost,
@@ -28,10 +29,10 @@ const SERIES: SeriesInputType[] = [
   { metric: "performance.total_cost", aggregation: "sum" },
 ];
 
-const money = (value: number) =>
-  value >= 0.01 || value === 0
-    ? numeral(value).format("$0.00a")
-    : numeral(value).format("$0.0000a");
+// The same formatter the cost metrics on this page use, so a four-figure
+// period reads as $1,043.27 rather than an abbreviated $1.04k. A number headed
+// for a finance conversation has to keep its digits.
+const money = (value: number) => formatMoney({ amount: value, currency: "USD" });
 
 const signedMoney = (value: number) =>
   value < 0 ? `-${money(Math.abs(value))}` : money(value);
@@ -110,8 +111,13 @@ export function ModelCostComparisonCard() {
   // with an explanation underneath, rather than a skeleton that promises a
   // number still on its way.
   const asIs = (value: string) => value;
-  const cell = (value: number | undefined, format: (value: number) => string) =>
-    !isLoaded ? undefined : value === undefined ? "-" : format(value);
+  const cell = ({
+    value,
+    format,
+  }: {
+    value: number | undefined;
+    format: (value: number) => string;
+  }) => (!isLoaded ? undefined : value === undefined ? "-" : format(value));
 
   return (
     <VStack align="stretch" gap={4}>
@@ -145,7 +151,7 @@ export function ModelCostComparisonCard() {
           <HStack align="start" gap={0}>
             <SummaryMetric
               label="Actual Cost"
-              current={cell(actualCost, money)}
+              current={cell({ value: actualCost, format: money })}
               format={asIs}
               increaseIs="neutral"
               tooltip="What this period's traffic cost, across every model in it. Models with no published price, self-hosted ones included, are recorded at $0."
@@ -153,7 +159,7 @@ export function ModelCostComparisonCard() {
             />
             <SummaryMetric
               label="Estimated Cost"
-              current={cell(referenceCost, money)}
+              current={cell({ value: referenceCost, format: money })}
               format={asIs}
               increaseIs="neutral"
               tooltip="Every input, output and cached token recorded in this period, priced at the selected model's published rates."
@@ -161,7 +167,7 @@ export function ModelCostComparisonCard() {
             />
             <SummaryMetric
               label="Estimated Savings"
-              current={cell(savings, signedMoney)}
+              current={cell({ value: savings, format: signedMoney })}
               format={asIs}
               increaseIs="good"
               tooltip="Estimated cost on the selected model minus the actual cost. Negative means the current setup costs more."

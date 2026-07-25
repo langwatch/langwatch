@@ -211,6 +211,27 @@ describe("<ModelCostComparisonCard />", () => {
     });
   });
 
+  describe("given a period that runs into four figures", () => {
+    it("keeps the digits instead of abbreviating them away", () => {
+      state.values = {
+        "performance.prompt_tokens": 400_000_000,
+        "performance.completion_tokens": 0,
+        "performance.cache_read_tokens": 0,
+        "performance.cache_write_tokens": 0,
+        "performance.total_cost": 200,
+      };
+      renderCard();
+
+      // 400M x $3/M = $1200, against $200 actually spent. Abbreviated to
+      // "$1.2k" and "$1k" these stop being figures anyone can put in front of
+      // a finance team.
+      expect(screen.getByText("$1200.00")).toBeInTheDocument();
+      expect(screen.getByText("$200.00")).toBeInTheDocument();
+      expect(screen.getByText("$1000.00")).toBeInTheDocument();
+      expect(screen.queryByText(/k$/)).not.toBeInTheDocument();
+    });
+  });
+
   describe("given traffic that genuinely cost nothing", () => {
     it("shows $0.00 as the actual cost rather than claiming there is no data", () => {
       state.values = CACHED_PERIOD;
