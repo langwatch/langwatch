@@ -22,7 +22,7 @@ export const SCENARIO_TAB_REFRESH_MS = 10_000;
  * away: it routes to another run (including the run this very feature just
  * handed it), the project context re-resolves, the dev server hot-reloads. With
  * an instant de-registration, the run right after a followed run would find no
- * tab and open a new one — the exact thing this exists to prevent. A few
+ * tab and open a new one, the exact thing this exists to prevent. A few
  * seconds of grace covers every one of those, while a genuinely closed tab
  * still stops taking runs almost immediately.
  *
@@ -40,7 +40,7 @@ if (SCENARIO_TAB_DISCONNECT_GRACE_SECONDS >= SCENARIO_TAB_TTL_SECONDS) {
 
 /**
  * How long a handed-off run stays claimable by a tab that was not connected at
- * the moment it was broadcast — a reload, a route change, a laptop waking up.
+ * the moment it was broadcast: a reload, a route change, a laptop waking up.
  * Short enough that a tab opened much later does not jump to a stale run.
  */
 export const SCENARIO_TAB_PENDING_TTL_SECONDS = 20;

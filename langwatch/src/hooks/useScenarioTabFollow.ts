@@ -108,7 +108,7 @@ export function useScenarioTabFollow(): ScenarioTabFollowState {
     try {
       window.localStorage.setItem(OPT_OUT_KEY, "true");
     } catch {
-      // Best effort — the in-memory flag below still takes this tab out.
+      // Best effort: the in-memory flag below still takes this tab out.
     }
     setIsDisabled(true);
   }, []);
