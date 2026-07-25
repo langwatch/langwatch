@@ -208,7 +208,10 @@ describe("given the eligible model providers summary at a project scope", () => 
       expect(container.textContent).toContain("2 models");
     });
 
-    /** @scenario Never expose internal technical details (dev/docs/best_practices/copywriting.md) */
+    // Enforces the copy rule "never expose internal technical details" from
+    // dev/docs/best_practices/copywriting.md. That is a doc, not a feature
+    // file, so this test carries no spec binding: the parity scanner only
+    // resolves titles that exist as scenarios under specs/.
     it("stays clear of internal routing jargon", () => {
       const { container } = renderSummary([orgProvider, projectProvider]);
 
