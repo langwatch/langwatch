@@ -97,6 +97,7 @@ describe("given the OpenAI chat model tier grammar", () => {
       );
     });
 
+    /** @scenario A generation shipping both an unsuffixed model and a named flagship */
     it("breaks a same-generation tie in favour of the named tier", () => {
       expect(
         sorted(["openai/gpt-5.7", "openai/gpt-5.7-sol"], "flagship")[0],

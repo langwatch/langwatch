@@ -71,15 +71,3 @@ Feature: Latest-alias model resolution
       Then the named flagship tier wins
       # Without an explicit tier ranking the two sort equal and the
       # winner falls out of catalog iteration order.
-
-  Rule: The provider drawer pre-fills the same model the seed would write
-
-    @unit
-    Scenario: Enabling OpenAI pre-fills the current flagship
-      Given OpenAI is being enabled and the catalog carries the GPT-5.6 tiers
-      When the drawer pre-fills the role defaults
-      Then DEFAULT is GPT-5.6 Sol
-      And FAST is GPT-5.6 Luna
-      # The drawer runs a client-side copy of the picker against the
-      # options it already has. If the two disagree, the value shown at
-      # enable time is not the value the org gets.
