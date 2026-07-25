@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -23,14 +25,38 @@ func (c *Client) EvaluatePost(ctx context.Context, bundle *domain.Bundle, _ *dom
 	return c.evaluateGuardrail(ctx, bundle, "response", resp.Body, c.guardrailTimeouts.Post)
 }
 
-// EvaluateChunk runs stream-chunk guardrails (fail-open on timeout or error).
+// EvaluateChunk runs stream-chunk guardrails.
+//
+// This direction always fails open, deliberately: a slow or unreachable policy
+// service must never stall a stream a user is already reading. The error is
+// swallowed so the caller proceeds, but the verdict now says so, because an
+// allow the gateway could not justify and an allow a guardrail actually
+// granted are not the same thing to whoever is watching enforcement.
 func (c *Client) EvaluateChunk(ctx context.Context, bundle *domain.Bundle, _ *domain.Request, chunk []byte) (domain.GuardrailVerdict, error) {
 	verdict, err := c.evaluateGuardrail(ctx, bundle, "stream_chunk", chunk, c.guardrailTimeouts.StreamChunk)
 	if err != nil {
 		c.logger.Debug("guardrail_chunk_fail_open", zap.Error(err))
-		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, nil
+		recordStreamChunkFailOpen(ctx, err)
+		return domain.GuardrailVerdict{
+			Action:         domain.GuardrailAllow,
+			FailedOpen:     true,
+			FailOpenReason: err.Error(),
+		}, nil
 	}
 	return verdict, nil
+}
+
+// recordStreamChunkFailOpen stamps the bypass on the active span, per contract
+// 7b. The reason is unbounded text, so it belongs here and not on a metric
+// label.
+func recordStreamChunkFailOpen(ctx context.Context, cause error) {
+	span := trace.SpanFromContext(ctx)
+	if !span.SpanContext().IsValid() {
+		return
+	}
+	span.SetAttributes(
+		attribute.String("langwatch.guardrail.stream_chunk_fail_open", cause.Error()),
+	)
 }
 
 type guardrailCheckRequest struct {

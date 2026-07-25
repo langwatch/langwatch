@@ -1,13 +1,21 @@
 package controlplane
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+
+	"github.com/langwatch/langwatch/pkg/jwtverify"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -230,4 +238,83 @@ func controlPlaneDecisions(t *testing.T, service string) []string {
 		t.Fatal("the GuardrailDecision union is empty")
 	}
 	return decisions
+}
+
+// The stream-chunk direction is the one that fails open by design, so a slow
+// or unreachable policy service never stalls a stream a user is already
+// reading. That behaviour must not change. What must be visible is that the
+// allow was a bypass and not a verdict: an operator watching enforcement
+// cannot tell an outage from healthy traffic otherwise, which is the same
+// class of silent non-enforcement as the stub this changeset replaced.
+//
+// Driven through the real client against a control plane that refuses the
+// call, rather than asserting on a message string.
+func TestEvaluateChunkFailsOpenVisibly(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	signer, err := NewSigner("test-secret", "node-1")
+	require.NoError(t, err)
+	client := NewClient(ClientOptions{
+		BaseURL:    srv.URL,
+		Sign:       signer.Sign,
+		Verifier:   jwtverify.NewJWTVerifier("jwt-secret", ""),
+		HTTPClient: srv.Client(),
+	})
+
+	exporter := tracetest.NewInMemoryExporter()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	t.Cleanup(func() { _ = provider.Shutdown(context.Background()) })
+	ctx, span := provider.Tracer("test").Start(context.Background(), "gateway.request")
+
+	bundle := &domain.Bundle{Config: domain.BundleConfig{
+		Guardrails: domain.GuardrailsConfig{
+			StreamChunk: []domain.GuardrailEntry{{ID: "guard_1", Evaluator: "pii"}},
+		},
+	}}
+	verdict, err := client.EvaluateChunk(ctx, bundle, &domain.Request{}, []byte("partial"))
+
+	// The stream keeps flowing. This is the deliberate part.
+	require.NoError(t, err, "a stream chunk must never stall on the policy service")
+	require.Equal(t, domain.GuardrailAllow, verdict.Action)
+
+	// And the bypass is now legible rather than inferred.
+	require.True(t, verdict.FailedOpen, "an allow the gateway could not justify must say so")
+	require.NotEmpty(t, verdict.FailOpenReason, "the bypass must carry why it happened")
+
+	span.End()
+	spans := exporter.GetSpans()
+	require.Len(t, spans, 1)
+	var stamped string
+	for _, attr := range spans[0].Attributes {
+		if attr.Key == "langwatch.guardrail.stream_chunk_fail_open" {
+			stamped = attr.Value.AsString()
+		}
+	}
+	require.NotEmpty(t, stamped, "contract 7b requires the bypass on the span: %+v", spans[0].Attributes)
+}
+
+// A chunk the control plane actually cleared must not be reported as a bypass.
+func TestEvaluateChunkGenuineAllowIsNotAFailOpen(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"decision":"allow","reason":null,"policies_triggered":[]}`))
+	}))
+	defer srv.Close()
+
+	signer, err := NewSigner("test-secret", "node-1")
+	require.NoError(t, err)
+	client := NewClient(ClientOptions{
+		BaseURL:    srv.URL,
+		Sign:       signer.Sign,
+		Verifier:   jwtverify.NewJWTVerifier("jwt-secret", ""),
+		HTTPClient: srv.Client(),
+	})
+
+	verdict, err := client.EvaluateChunk(context.Background(), &domain.Bundle{}, &domain.Request{}, []byte("partial"))
+	require.NoError(t, err)
+	require.Equal(t, domain.GuardrailAllow, verdict.Action)
+	require.False(t, verdict.FailedOpen, "a cleared chunk is not a bypass")
 }

@@ -262,6 +262,44 @@ func TestGuardrailCounter_UnreachableGuardrailCountsAsFailOpen(t *testing.T) {
 	assert.Equal(t, 0.0, testutil.ToFloat64(r.guardrails.WithLabelValues(DirectionRequest, VerdictAllow)))
 }
 
+// The stream-chunk direction swallows its own error on purpose, so a slow
+// policy service never stalls a stream a user is already reading. It returns
+// an allow with no error, and before the verdict carried FailedOpen that was
+// indistinguishable from a guardrail that actually passed the chunk.
+func TestGuardrailCounter_StreamChunkFailOpenCountsAsFailOpenNotAllow(t *testing.T) {
+	r := New()
+	g := WithGuardrailMetrics(stubGuardrails{
+		verdict: domain.GuardrailVerdict{
+			Action:         domain.GuardrailAllow,
+			FailedOpen:     true,
+			FailOpenReason: "guardrail check: control plane unreachable",
+		},
+	}, r)
+
+	// No error surfaces: the stream proceeds, which is the required behaviour.
+	verdict, err := g.EvaluateChunk(context.Background(), &domain.Bundle{}, &domain.Request{}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, domain.GuardrailAllow, verdict.Action)
+
+	assert.Equal(t, 1.0, testutil.ToFloat64(r.guardrails.WithLabelValues(DirectionStreamChunk, VerdictFailOpen)))
+	assert.Equal(t, 0.0, testutil.ToFloat64(r.guardrails.WithLabelValues(DirectionStreamChunk, VerdictAllow)))
+}
+
+// A genuine allow must stay an allow. Without this, "count fail_open" could be
+// satisfied by counting every stream chunk as degraded.
+func TestGuardrailCounter_StreamChunkGenuineAllowStaysAllow(t *testing.T) {
+	r := New()
+	g := WithGuardrailMetrics(stubGuardrails{
+		verdict: domain.GuardrailVerdict{Action: domain.GuardrailAllow},
+	}, r)
+
+	_, err := g.EvaluateChunk(context.Background(), &domain.Bundle{}, &domain.Request{}, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1.0, testutil.ToFloat64(r.guardrails.WithLabelValues(DirectionStreamChunk, VerdictAllow)))
+	assert.Equal(t, 0.0, testutil.ToFloat64(r.guardrails.WithLabelValues(DirectionStreamChunk, VerdictFailOpen)))
+}
+
 // stubTransport answers every request with a fixed status or error.
 type stubTransport struct {
 	status int

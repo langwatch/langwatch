@@ -255,7 +255,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards â
     {
       "type": "timeseries",
       "title": "Guardrail fail-open rate",
-      "description": "Emitted for the request and response directions when the control-plane guardrail call fails and the gateway fails open. Sustained > 0 means the evaluator is missing its SLO. The stream_chunk path also fails open but swallows the error internally, so it is not counted here; use the langwatch.guardrail.stream_chunk_fail_open trace attribute for that.",
+      "description": "Emitted on any direction when the control-plane guardrail call fails and the gateway lets the traffic through unchecked. Sustained > 0 means the evaluator is missing its SLO. The stream_chunk series is expected to be the noisy one, because that direction always fails open so a slow policy service never stalls a stream; treat it as the chunk-level enforcement gap. Use the langwatch.guardrail.stream_chunk_fail_open trace attribute to see why an individual bypass happened.",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 47, "w": 12, "h": 7 },
       "targets": [{

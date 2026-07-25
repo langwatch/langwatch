@@ -29,10 +29,12 @@ type guardrailEvaluator interface {
 //
 // An evaluation the gateway could not complete is counted as fail_open
 // rather than as an allow: the caller's traffic did pass, but it passed
-// unchecked, and an operator has to be able to tell those apart. Note that
-// the stream-chunk path fails open inside the control-plane client, which
-// returns a plain allow, so fail_open is only observable here for the
-// request and response directions.
+// unchecked, and an operator has to be able to tell those apart.
+//
+// Two shapes reach that conclusion. The request and response directions
+// surface the failure as an error. The stream-chunk direction swallows its
+// error by design, so a slow policy service never stalls a stream, and
+// reports the bypass on the verdict instead. Both count as fail_open.
 type GuardrailCounter struct {
 	inner    guardrailEvaluator
 	recorder *Recorder
@@ -62,7 +64,7 @@ func (g GuardrailCounter) EvaluateChunk(ctx context.Context, bundle *domain.Bund
 }
 
 func (g GuardrailCounter) record(direction string, verdict domain.GuardrailVerdict, err error) {
-	if err != nil {
+	if err != nil || verdict.FailedOpen {
 		g.recorder.RecordGuardrailVerdict(direction, VerdictFailOpen)
 		return
 	}

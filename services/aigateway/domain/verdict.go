@@ -22,6 +22,19 @@ const (
 type GuardrailVerdict struct {
 	Action  GuardrailAction
 	Message string
+
+	// FailedOpen marks an allow the gateway could not actually justify: the
+	// evaluation did not complete and the traffic passed unchecked. Only the
+	// stream-chunk direction reports one, because it is the direction that
+	// swallows its own error by design so a slow policy service never stalls a
+	// stream. Without this flag that allow is indistinguishable from a
+	// guardrail that genuinely passed the content, which is exactly the kind
+	// of invisible non-enforcement this changeset exists to remove.
+	FailedOpen bool
+	// FailOpenReason is why the evaluation could not complete. Empty unless
+	// FailedOpen is set. Operator-facing, so it goes on the span rather than
+	// into a metric label, where an unbounded value would explode cardinality.
+	FailOpenReason string
 }
 
 // CacheDecision is the result of cache rule evaluation.
