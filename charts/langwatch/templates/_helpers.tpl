@@ -1234,9 +1234,9 @@ Explicit name wins; otherwise the release name when we create one; otherwise
 empty, which callers treat as "omit serviceAccountName and use `default`".
 */}}
 {{- define "langwatch.serviceAccountName" -}}
-{{- if .Values.global.serviceAccount.name -}}
-{{- .Values.global.serviceAccount.name -}}
-{{- else if .Values.global.serviceAccount.create -}}
+{{- if ((.Values.global).serviceAccount).name -}}
+{{- ((.Values.global).serviceAccount).name -}}
+{{- else if ((.Values.global).serviceAccount).create -}}
 {{- .Release.Name -}}
 {{- end -}}
 {{- end }}

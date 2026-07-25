@@ -31,13 +31,33 @@ function hasHelm(): boolean {
 
 const describeHelm = hasHelm() ? describe : describe.skip;
 
-/** Renders the chart, returning stdout. Throws with stderr on failure. */
+/** Renders the chart, returning stdout. Throws on a failed render. */
 function render(setArgs: string[]): string {
   return execFileSync(
     "helm",
     ["template", "t", CHART_DIR, "-f", BASE_VALUES, ...setArgs],
     { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"], maxBuffer: 32 * 1024 * 1024 },
   );
+}
+
+/**
+ * Renders expecting FAILURE, returning helm's own diagnostic text.
+ *
+ * Deliberately not asserting on the thrown Error's `message`: Node only folds
+ * stderr into that message on some versions, so a test written against it
+ * passes locally and fails in CI against the useless "Command failed: helm
+ * template …". helm's actual complaint is always on stderr.
+ */
+function renderExpectingFailure(setArgs: string[]): string {
+  try {
+    render(setArgs);
+  } catch (error: unknown) {
+    const e = error as { stderr?: Buffer | string; stdout?: Buffer | string; message?: string };
+    return [e.stderr, e.stdout, e.message]
+      .map((part) => (part == null ? "" : String(part)))
+      .join("\n");
+  }
+  throw new Error("expected the chart render to fail, but it succeeded");
 }
 
 /** Every workload that touches object storage, so none is silently skipped. */
@@ -133,49 +153,41 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
     /** @scenario "The chart does not require an account key under a token-based mode" */
     it("refuses a stray account key that would be silently ignored", () => {
-      expect(() =>
-        render([
+      expect(renderExpectingFailure([
           ...AZURE,
           "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
           "--set", "global.serviceAccount.create=true",
           "--set", "app.dataplane.providers.azureBlob.accountKey.value=leftover",
-        ]),
-      ).toThrow(/accountKey is also configured/);
+        ])).toMatch(/accountKey is also configured/)
     });
 
     /** @scenario "The chart does not require an account key under a token-based mode" */
     it("refuses workload identity with no service account to bind the identity to", () => {
-      expect(() =>
-        render([
+      expect(renderExpectingFailure([
           ...AZURE,
           "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-        ]),
-      ).toThrow(/requires global\.serviceAccount/);
+        ])).toMatch(/requires global\.serviceAccount/)
     });
 
     /** @scenario "An unrecognized AZURE_BLOB_AUTH_MODE value is rejected, not ignored" */
     it("refuses an auth mode outside the supported set", () => {
-      expect(() =>
-        render([
+      expect(renderExpectingFailure([
           ...AZURE,
           "--set", "app.dataplane.providers.azureBlob.authMode=nonsense",
-        ]),
-      ).toThrow(/must be one of sharedKey, workloadIdentity, managedIdentity, azureCli/);
+        ])).toMatch(/must be one of sharedKey, workloadIdentity, managedIdentity, azureCli/)
     });
   });
 
   describe("given the azureBlob provider under shared-key auth", () => {
     /** @scenario "The chart still demands an account key under shared-key auth" */
     it("fails with an error naming the missing accountKey", () => {
-      expect(() =>
-        render([
+      expect(renderExpectingFailure([
           "--set", "app.dataplane.enabled=true",
           "--set", "app.dataplane.provider=azureBlob",
           "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
           "--set", "app.dataplane.providers.azureBlob.container.value=cont",
           "--set", "app.storedObjects.localFilesystem.enabled=false",
-        ]),
-      ).toThrow(/accountKey is not configured/);
+        ])).toMatch(/accountKey is not configured/)
     });
   });
 
