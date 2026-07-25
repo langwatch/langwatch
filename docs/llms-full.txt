@@ -1509,6 +1509,102 @@ For additional help, contact us at [support@langwatch.ai](mailto:support@langwat
 
 ---
 
+# FILE: ./ai-gateway/api/audio.mdx
+
+---
+title: POST /v1/audio/*
+description: OpenAI-compatible text to speech and transcription through the LangWatch AI Gateway, for OpenAI and ElevenLabs voice models.
+sidebarTitle: Audio (TTS + STT)
+---
+
+OpenAI-compatible audio endpoints. Any client that speaks OpenAI's audio API (the official SDKs, LiveKit and Pipecat voice agents, [Scenario](https://scenario.langwatch.ai)'s voice testing harness) works with zero code change by pointing its `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Voice traffic gets the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits, and per-call observability.
+
+Two providers ship today:
+
+| Provider | TTS (`/v1/audio/speech`) | STT (`/v1/audio/transcriptions`) |
+|---|---|---|
+| OpenAI | `openai/gpt-4o-mini-tts`, `openai/tts-1`, `openai/tts-1-hd` | `openai/gpt-4o-transcribe`, `openai/gpt-4o-mini-transcribe`, `openai/whisper-1` |
+| ElevenLabs | `elevenlabs/eleven_flash_v2`, `elevenlabs/eleven_turbo_v2_5`, `elevenlabs/eleven_multilingual_v2` | `elevenlabs/scribe_v1` |
+
+Configure the provider key once in **Settings → Model Providers** (OpenAI and ElevenLabs both take a plain API key); every virtual key routed to that provider can then call its voice models.
+
+## Text to speech
+
+```
+POST /v1/audio/speech
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: application/json
+```
+
+Body matches OpenAI's [speech schema](https://platform.openai.com/docs/api-reference/audio/createSpeech). For ElevenLabs models, put the ElevenLabs **voice id** in the same `voice` field.
+
+```json
+{
+  "model": "elevenlabs/eleven_flash_v2",
+  "voice": "cjVigY5qzO86Huf0OWal",
+  "input": "Hello! How can I help you today?",
+  "response_format": "mp3"
+}
+```
+
+The response body is the **raw audio bytes** with the matching `Content-Type` (`audio/mpeg`, `audio/wav`, `audio/pcm`, …) with no JSON envelope, exactly like OpenAI, so `client.audio.speech.create(...)` consumes it unchanged. `response_format: "pcm"` returns raw PCM16 for realtime consumers.
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key="vk-lw-...",
+)
+audio = client.audio.speech.create(
+    model="openai/gpt-4o-mini-tts",
+    voice="nova",
+    input="Hello from the gateway.",
+    response_format="pcm",
+)
+pcm_bytes = audio.read()
+```
+
+## Transcription
+
+```
+POST /v1/audio/transcriptions
+Authorization: Bearer vk-lw-<ULID>
+Content-Type: multipart/form-data
+```
+
+Form matches OpenAI's [transcription schema](https://platform.openai.com/docs/api-reference/audio/createTranscription): a `file` part plus `model`, and optionally `language`, `prompt`, `response_format`, `temperature`. Uploads are capped at 25 MB (matching OpenAI's own limit); larger uploads get a `413` before any provider is contacted.
+
+```python
+transcript = client.audio.transcriptions.create(
+    model="elevenlabs/scribe_v1",
+    file=open("call-recording.wav", "rb"),
+)
+print(transcript.text)
+```
+
+The response is the standard JSON transcript with `text`, plus whatever the provider reports (duration, segments, token usage).
+
+## Observability and cost measures
+
+Every audio call lands as a gateway trace like chat does. Providers that report token usage (`gpt-4o-mini-tts`, `gpt-4o-transcribe`) fill the standard `gen_ai.usage.*` token attributes; character- and duration-priced providers are measured by two audio-specific attributes:
+
+| Attribute | Meaning |
+|---|---|
+| `gen_ai.usage.input_chars` | Characters synthesized by a TTS call |
+| `gen_ai.usage.audio_seconds` | Seconds of audio transcribed by an STT call |
+
+## Errors
+
+Same error surface as every other endpoint; see [Errors](/ai-gateway/api/errors). Provider rejections (an invalid ElevenLabs voice id, an unsupported format) pass through with the provider's own status code and body. A model outside the virtual key's allowlist returns the standard `model_not_allowed`; a provider with no key configured returns `no_provider_configured`.
+
+## Not yet supported
+
+- **Streaming TTS/STT** (`stream=true`): requests are served complete; streaming is a follow-up.
+- **Realtime voice websockets** (OpenAI Realtime, ElevenLabs ConvAI): connect directly to the provider for realtime sessions; the gateway serves the request/response audio endpoints.
+
+---
+
 # FILE: ./ai-gateway/api/chat-completions.mdx
 
 ---
@@ -2716,34 +2812,29 @@ The ClickHouse path is the primary read when CH is enabled (SaaS and any self-ho
 
 ## Pre-request check
 
-Before dispatching to the provider, the gateway runs a **two-tier precheck** designed to keep the hot path free while avoiding stale-snapshot races as budgets approach their caps:
+Before dispatching to the provider, the gateway runs a **purely local precheck**. There is no control-plane round trip on the hot path.
 
-### Tier 1: cached snapshot (always)
+The gateway evaluates the VK's in-memory budget snapshot, which arrives baked into the cached bundle and is refreshed via the `/changes` long-poll. For each applicable scope it compares `spent_usd` against `limit_usd`:
 
-The gateway checks the VK's in-memory budget snapshot (refreshed via the `/changes` long-poll on every debit). If the snapshot already shows a hard-breach, the request is rejected immediately with `402 budget_exceeded`, saving the provider spend and the wall-clock round-trip entirely. This costs ~0 μs: it's an in-process map lookup.
+- `on_breach: block` and nothing remaining → reject with `402 budget_exceeded`, saving the provider spend and the wall-clock round-trip entirely.
+- `on_breach: warn` and at or over 90% used → allow, flagged as a warn verdict.
+- Otherwise → allow.
 
-### Tier 2: live reconciliation (near-limit only)
-
-If any scope applicable to the request has `spent_usd / limit_usd >= 0.90`, the gateway makes a signed `POST /api/internal/gateway/budget/check` call to the control plane with ONLY those hot scopes. The control plane returns the real-time `spent_usd` from the authoritative ledger, and the gateway re-evaluates. Timeout is 200 ms; if the call fails, tier 1's decision is used (fail-open).
-
-This closes the **stale-snapshot race** where two gateway nodes each see a cached `spent=$24.90 / limit=$25.00` and both admit a $0.50 request, producing $25.80 in actual spend against a $25 cap. With tier 2 active on the near-limit 10% band, the control plane sees both requests and rejects the second based on the live ledger.
-
-Cold scopes (under 90%) skip the live call entirely, no latency tax on the common case.
+This costs ~0 μs: it's an in-process map lookup.
 
 ```
-request → tier 1 (always, ~0μs) → pass?
-                                → breach? → 402 (saved provider spend)
-
-tier 1 pass, any scope ≥ 90%? → tier 2 (live, ~5-50ms via HMAC-signed POST)
-                              → live spent says breach? → 402
-                              → live says OK? → dispatch
-                              → timeout / 5xx? → dispatch (fail-open)
+request → precheck against cached snapshot (always, ~0μs)
+            → hard breach on a block scope? → 402 (saved provider spend)
+            → otherwise                     → dispatch
 ```
 
-Gateway env knobs:
+Rejections are counted by `gateway_budget_blocks_total{scope}`, the single gateway-side signal that enforcement fired.
 
-- `LW_GATEWAY_BUDGET_LIVE_THRESHOLD`, default `0.9` (90%). Lower it for stricter enforcement at some latency cost.
-- `LW_GATEWAY_BUDGET_LIVE_TIMEOUT`, Go duration string, default `200ms`. Accepts `200ms`, `500ms`, `1s`, etc.
+### The stale-snapshot trade-off
+
+Because the check is local and the snapshot lags the ledger by one `/changes` refresh, two replicas can each see `spent=$24.90 / limit=$25.00` and both admit a $0.50 request, producing $25.80 against a $25 cap. This is a deliberate trade: a control-plane call on every near-limit request would put the gateway's availability and latency at the mercy of the control plane, and the overshoot is bounded by one refresh interval of traffic.
+
+Precheck is permissive by design. A stale or missing snapshot allows requests through rather than rejecting them, so a control-plane outage degrades enforcement accuracy, never availability. Spend reconciles once the ledger catches up.
 
 ## What "USD cost" means
 
@@ -2945,7 +3036,7 @@ Each matcher is optional; all non-null matchers must match for the rule to apply
 
 - **First-match wins**, sorted by `priority` descending.
 - Rules evaluated once per request, AT auth-resolve time (bundled with VK config), so zero additional upstream latency.
-- Rule hits exposed in observability via `langwatch.cache.rule_id` span attribute + `gateway_cache_rule_hits_total{rule_id, mode, provider}` counter.
+- Rule hits exposed in observability via `langwatch.cache.rule_id` span attribute + `gateway_cache_rule_hits_total{rule_id, mode_applied}` counter.
 
 ### Concrete example: "force 5-min cache on all prod internal-api calls"
 
@@ -4715,8 +4806,8 @@ Eight rows, top to bottom:
 | Request health | rate, p50/p95/p99, error % | primary SLI row; everything else is causal |
 | Provider health | circuit state, upstream latency, fallback count | which provider is degrading and how often we're saved by fallback |
 | Auth cache | L1 hit rate, L2 hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
-| Budgets & debits | outbox fill-pct, flush failures, 4xx drops | outbox pressure before silent data loss |
-| Guardrails | verdicts by direction, blocks by reason | catches both legit policy enforcement and regressions |
+| Budgets | blocks by scope | which scope is actually rejecting traffic |
+| Guardrails | verdicts by direction, blocks by direction | catches both legit policy enforcement and regressions |
 | Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
 | Cache (passthrough) | hits, bypass, forced, Anthropic discount proxy | cache outcome vs expectation |
 | Infrastructure | pod replicas, CPU, memory, goroutines | k8s-side correlates for everything above |
@@ -4826,7 +4917,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     },
     {
       "type": "timeseries",
-      "title": "Circuit state by credential (0=closed 1=half 2=open)",
+      "title": "Circuit state by credential (0=closed 1=open 2=half-open)",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 9, "w": 12, "h": 7 },
       "targets": [{
@@ -4867,8 +4958,8 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 23, "w": 12, "h": 7 },
       "targets": [
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", layer=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L1 hit rate" },
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", layer=\"l2\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L2 hit rate" }
+        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L1 hit rate" },
+        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l2_redis\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L2 hit rate" }
       ],
       "fieldConfig": { "defaults": { "unit": "percentunit" } }
     },
@@ -4885,14 +4976,15 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
 
     {
       "type": "row",
-      "title": "Budgets & debits",
+      "title": "Budgets",
       "gridPos": { "x": 0, "y": 30, "w": 24, "h": 1 }
     },
     {
       "type": "timeseries",
       "title": "Budget blocks by scope",
+      "description": "The gateway does not debit budgets: cost rides the OTel span and the control plane's trace-fold reactor writes the ledger. This counter is the only gateway-side signal that a hard cap actually rejected traffic.",
       "datasource": "$datasource",
-      "gridPos": { "x": 0, "y": 31, "w": 6, "h": 7 },
+      "gridPos": { "x": 0, "y": 31, "w": 12, "h": 7 },
       "targets": [{
         "expr": "sum by (scope) (rate(gateway_budget_blocks_total{namespace=\"$namespace\"}[$__rate_interval]))",
         "legendFormat": "{{scope}}"
@@ -4900,59 +4992,15 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     },
     {
       "type": "timeseries",
-      "title": "Outbox fill-pct (depth / capacity)",
-      "description": "Iter 21: capacity gauge is static per-pod, depth is live. Ratio = headroom. > 50% sustained = warn, > 80% = page.",
+      "title": "Bundle refresh round-trips",
+      "description": "Budget precheck is local against the cached bundle snapshot, so spend only moves as the bundle refreshes. A flat line here with a climbing ledger means the gateway is prechecking against stale spend.",
       "datasource": "$datasource",
-      "gridPos": { "x": 6, "y": 31, "w": 6, "h": 7 },
+      "gridPos": { "x": 12, "y": 31, "w": 12, "h": 7 },
       "targets": [{
-        "expr": "max(gateway_budget_debit_outbox_depth{namespace=\"$namespace\"}) / max(gateway_budget_debit_outbox_capacity{namespace=\"$namespace\"})",
-        "legendFormat": "fill-pct"
+        "expr": "sum by (status) (rate(gateway_control_plane_requests_total{namespace=\"$namespace\", endpoint=\"changes\"}[$__rate_interval]))",
+        "legendFormat": "{{status}}"
       }],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.5 },
-              { "color": "red", "value": 0.8 }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Flush failures / sec (control-plane degraded)",
-      "description": "Iter 21: control-plane slow/unreachable → events re-enqueued, fill-pct climbs slowly. This panel leads fill-pct.",
-      "datasource": "$datasource",
-      "gridPos": { "x": 12, "y": 31, "w": 6, "h": 7 },
-      "targets": [{
-        "expr": "sum(rate(gateway_budget_debit_outbox_flush_failures_total{namespace=\"$namespace\"}[$__rate_interval]))"
-      }]
-    },
-    {
-      "type": "stat",
-      "title": "4xx drops (silent data loss)",
-      "description": "Iter 21: any non-zero rate is a page. Signing / payload bug — debits are terminally rejected by the control plane and dropped from the ring.",
-      "datasource": "$datasource",
-      "gridPos": { "x": 18, "y": 31, "w": 6, "h": 7 },
-      "targets": [{
-        "expr": "sum(increase(gateway_budget_debit_outbox_4xx_drops_total{namespace=\"$namespace\"}[5m]))"
-      }],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
-            ]
-          }
-        }
-      }
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
 
     {
@@ -4972,12 +5020,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     },
     {
       "type": "timeseries",
-      "title": "Blocks by reason",
+      "title": "Blocks by direction",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 39, "w": 12, "h": 7 },
       "targets": [{
-        "expr": "sum by (reason) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", verdict=\"block\"}[$__rate_interval]))",
-        "legendFormat": "{{reason}}"
+        "expr": "sum by (direction) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", verdict=\"block\"}[$__rate_interval]))",
+        "legendFormat": "{{direction}}"
       }]
     },
 
@@ -4997,12 +5045,13 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
     },
     {
       "type": "timeseries",
-      "title": "Stream chunk guardrail fail-open rate",
-      "description": "Stream-chunk guardrails fail OPEN by contract. This panel is the only place you see that happening — if it's sustained > 0, investigate the evaluator SLO.",
+      "title": "Guardrail fail-open rate",
+      "description": "Emitted on any direction when the control-plane guardrail call fails and the gateway lets the traffic through unchecked. Sustained > 0 means the evaluator is missing its SLO. The stream_chunk series is expected to be the noisy one, because that direction always fails open so a slow policy service never stalls a stream; treat it as the chunk-level enforcement gap. Use the langwatch.guardrail.stream_chunk_fail_open trace attribute to see why an individual bypass happened.",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 47, "w": 12, "h": 7 },
       "targets": [{
-        "expr": "sum(rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", direction=\"stream_chunk\", verdict=\"fail_open\"}[$__rate_interval]))"
+        "expr": "sum by (direction) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", verdict=\"fail_open\"}[$__rate_interval]))",
+        "legendFormat": "{{direction}}"
       }]
     },
 
@@ -5096,9 +5145,9 @@ The panels are deliberately ordered so an on-call engineer scans top-down:
 1. **Request health**: is this user-impacting? Latency + error rate together answer it.
 2. **Provider health**: if error rate is up, which provider? If circuit is open, we're degraded but not down (fallback is handling it).
 3. **Auth cache**: if latency is up with upstreams happy, L1 miss spike points at control-plane pressure.
-4. **Budgets & debits**: outbox shelf > 0 for minutes means debits are failing persistently; correlate with control-plane errors.
-5. **Guardrails**: block spikes are either a legit policy enforcement or a regression. `direction` + `reason` disambiguate.
-6. **Streaming**: active streams shows concurrency; fail-open rate is the stream_chunk guardrail escape hatch firing (by design).
+4. **Budgets**: blocks climbing on a scope means a hard cap is rejecting traffic. Blocks flat on a scope you know is over its limit means the bundle has not refreshed, check the round-trips panel next to it.
+5. **Guardrails**: block spikes are either a legit policy enforcement or a regression. `direction` + `verdict` disambiguate.
+6. **Streaming**: active streams shows concurrency; fail-open rate is the request and response guardrail escape hatch firing (by design).
 7. **Cache (passthrough)**: Anthropic `cache_control` discount is only visible here; a drop to near-zero hits on a prefix-heavy workload is a regression.
 8. **Infrastructure**: goroutines climbing monotonically is the leak signal. Replicas + CPU correlate HPA pressure to everything above.
 
@@ -5123,7 +5172,7 @@ When a page fires, the engineer lands on the dashboard, narrows the cause to a r
 
 ## Skipping panels you don't have metrics for
 
-If you haven't deployed Redis, the L2 hit-rate line is flat at zero, harmless. If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
+The default deployment ships without an L2 Redis tier, so the L2 hit-rate line sits flat at zero, harmless. If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
 
 ## See also
 
@@ -5778,7 +5827,7 @@ Shipped in current chart versions. Older chart versions pre-date the field, upgr
 
 ## Recipe 1: p99 latency spike
 
-**Symptom:** `gateway_http_request_duration_seconds{quantile="0.99"}` jumps from ~300 ms to several seconds. Traces show no single slow upstream.
+**Symptom:** `histogram_quantile(0.99, sum by (le) (rate(gateway_http_request_duration_seconds_bucket[5m])))` jumps from ~300 ms to several seconds. Traces show no single slow upstream.
 
 **Diagnose:**
 
@@ -5839,7 +5888,7 @@ go tool pprof http://localhost:6060/debug/pprof/heap
 
 - `internal/auth.(*Cache).Put` holding more than ~1 MB per cached bundle, unusual, a bundle should be ≤ 50 KB. Oversized `policy_rules.urls.allow` with thousands of entries can trigger this.
 - `internal/dispatch` buffered responses, if streaming responses are being accumulated instead of flushed per-chunk, every request consumes full response size. Check for `bufio.NewWriter` wrapping a streaming writer anywhere.
-- Outbox shelving (`LW_GATEWAY_BUDGET_DEBIT_SHELF_BYTES`), a long control-plane outage can push debits to disk. Check the outbox directory size.
+- Cached bundles never being evicted, a very large tenant count with long `HARD_GRACE` keeps every bundle resident. Check `gateway_auth_cache_size{tier="l1"}` against your expected VK count.
 
 ## Recipe 4: Mutex or block profiling for contention
 
@@ -5878,58 +5927,29 @@ go tool pprof http://localhost:6060/debug/pprof/allocs
 - JSON encoding of large `/v1/messages` requests, expected, but if it dominates consider enabling `LW_GATEWAY_MAX_BODY_BYTES` enforcement to reject pathologically large bodies earlier.
 - Per-request compilation of the same regex, should never happen; if it does, Lane A has a caching regression.
 
-## Recipe 6: Debit outbox backlog
+## Recipe 6: Budget spend not accumulating
 
-**Symptom:** `gateway_budget_debit_outbox_depth` climbing, or `_4xx_drops_total` increasing, or `_flush_failures_total` non-zero. Budgets may drift from actual spend.
+**Symptom:** Budget scopes never approach their limit even though traffic is flowing, or `gateway_budget_blocks_total{scope}` stays flat on a scope you expect to be capped.
 
-The outbox is the gateway's async spend-accounting path: every request produces a debit that batches into a ring buffer and flushes to the control plane. Four failure classes exist, each with its own signal:
+The gateway does not send debits. Cost is captured as attributes on the OTel span the gateway emits; the control plane's trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans and writes the ClickHouse ledger rows. Budget enforcement on the gateway is a purely local precheck against the budget snapshot baked into the cached bundle, so spend only moves when the whole chain runs:
 
-| Signal | Metric | Severity | Meaning |
-|---|---|---|---|
-| Depth rising | `gateway_budget_debit_outbox_depth`, `_capacity` | warn | Normal under burst; watch fill-pct |
-| Flush failures | `gateway_budget_debit_outbox_flush_failures_total` | warn | Control-plane is slow/unreachable; events re-enqueued, depth climbs slowly |
-| 4xx drops | `gateway_budget_debit_outbox_4xx_drops_total` | **page** | Silent data loss, signing or payload bug, terminally rejected |
-| Capacity drops | `gateway_budget_debit_outbox_dropped_total` | warn | Ring is full, newest events being evicted, fill-pct was already at 100% |
+```
+gateway request -> OTel span (cost attrs) -> collector -> langwatch-workers
+  -> trace-fold reactor -> ClickHouse ledger -> bundle snapshot -> gateway precheck
+```
 
 **Diagnose, in order:**
 
-```bash
-# 1. Fill percentage right now
-kubectl exec -n langwatch deploy/langwatch-gateway -- \
-  wget -qO- http://127.0.0.1:5590/metrics | \
-  grep -E '^gateway_budget_debit_outbox_(depth|capacity)'
+| Check | How | If it fails |
+|---|---|---|
+| Spans leaving the gateway | `sum(rate(gateway_http_requests_total[5m]))` against your collector's received-spans counter | OTLP export is broken; see [Observability](/ai-gateway/observability) |
+| Workers running | `kubectl -n langwatch get deploy langwatch-workers` | `workers.enabled: false` means the ledger is never written and hard caps never fire |
+| Ledger advancing | Query `gateway_budget_ledger_events` in ClickHouse for the scope | Reactor is stalled or the span carried no cost attrs |
+| Gateway seeing the new totals | Watch `gateway_internal_rtt_seconds{endpoint="changes"}` and `gateway_control_plane_requests_total{endpoint="changes"}` | The bundle is not refreshing, so the gateway is prechecking against stale spend |
 
-# 2. Last 15 min of flush failures (delta)
-# Graph this in Grafana with:
-#   rate(gateway_budget_debit_outbox_flush_failures_total[5m])
+**Operator signal:** `gateway_budget_blocks_total{scope}` is the counter that tells you enforcement actually fired. A scope configured with `on_breach: block` whose ledger is past the limit but whose block counter is flat means the gateway has not received a refreshed bundle yet.
 
-# 3. 4xx drops, any non-zero delta is a page
-#   increase(gateway_budget_debit_outbox_4xx_drops_total[15m])
-```
-
-**Interpretation ladder:**
-
-- **Only depth is rising, flush_failures is 0**: normal burst. Fill-pct will self-heal when traffic subsides. Only page if sustained > 80% for > 10m.
-- **flush_failures > 0 and depth is rising**: control plane is unavailable or slow. Check control-plane `/api/internal/gateway/budget` handler latency and error rate. Debits are safe (re-enqueued); they'll drain once the control plane recovers.
-- **4xx_drops > 0**: immediate page. Likely causes, in order of probability:
-  1. HMAC secret drift between gateway and control plane (`LW_GATEWAY_INTERNAL_SECRET` mismatch after rotation).
-  2. Payload schema drift (gateway and control plane deployed with incompatible contract versions).
-  3. Rare: control plane returning 4xx for a specific tenant (archived organization, deleted project).
-- **dropped_total > 0**: the ring filled up and the oldest pending events were evicted before they could flush. Always follows a prolonged control-plane outage. Lost debits are unrecoverable, document the outage window for post-hoc spend reconciliation.
-
-**Fix:**
-
-| Cause | Action |
-|---|---|
-| HMAC drift | Check both env vars point at the same secret; rotate via the dual-secret overlap window described in [Config → Secrets](/ai-gateway/self-hosting/config#secrets) |
-| Control-plane slow | Scale the control plane; ratchet up `LW_GATEWAY_BUDGET_DEBIT_RETRY_MAX` as a temporary buffer |
-| Payload drift | Pin gateway + control-plane to matching versions per the compatibility matrix |
-
-**Alerting** (wire these directly into Alertmanager, see [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts)):
-
-- `rate(gateway_budget_debit_outbox_4xx_drops_total[5m]) > 0` → **page** (silent data loss).
-- `rate(gateway_budget_debit_outbox_flush_failures_total[5m]) > 0 for 5m` → **warn**.
-- `(max(gateway_budget_debit_outbox_depth) / max(gateway_budget_debit_outbox_capacity)) > 0.5 for 5m` → **warn**.
+<Note>Because the precheck is local and permissive, a stale snapshot allows requests through rather than rejecting them. Overspend during a workers outage is expected and reconciles once the ledger catches up.</Note>
 
 ## Recipe 7: Stuck drain
 
@@ -5939,8 +5959,8 @@ The pod received SIGTERM but at least one request handler never returned before 
 
 | Metric | During healthy drain | During stuck drain |
 |---|---|---|
-| `gateway_draining{pod}` | 1 → 0 at shutdown | 1 until SIGKILL |
-| `gateway_in_flight_requests{pod}` | monotonically → 0 | flat at N > 0 for > grace |
+| `gateway_draining` | 1 → 0 at shutdown | 1 until SIGKILL |
+| `gateway_in_flight_requests` | monotonically → 0 | flat at N > 0 for > grace |
 
 **Diagnose:**
 
@@ -6041,7 +6061,7 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Outbox re-enqueues debits safely; they flush on recovery. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Spend accounting is unaffected: cost rides the OTel span and the ledger catches up once the control plane returns. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite, circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
 | Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite, L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
 | Gateway pod (crash, eviction) | None, HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
@@ -6099,7 +6119,7 @@ groups:
         annotations:
           summary: "Gateway 5xx rate > 5% over 5m"
           description: |
-            End-user requests to the gateway are returning 5xx at {{ printf "%.1f" (mulScalar $value 100) }}%.
+            End-user requests to the gateway are returning 5xx at {{ $value | humanizePercentage }}.
             Check /readyz on pods, then upstream provider status.
 
       - alert: GatewayReadinessFlapping
@@ -6118,7 +6138,7 @@ groups:
       # ─── Provider health ─────────────────────────────────────────────────
 
       - alert: CircuitOpenTooLong
-        expr: gateway_circuit_state == 2
+        expr: gateway_circuit_state == 1
         for: 5m
         labels: { severity: page, team: ai-platform }
         annotations:
@@ -6130,7 +6150,7 @@ groups:
 
       - alert: ExcessiveFallback
         expr: |
-          sum(rate(gateway_provider_attempts_total{outcome="fallback"}[10m]))
+          sum(rate(gateway_provider_attempts_total{outcome="fallback_success"}[10m]))
             / sum(rate(gateway_provider_attempts_total[10m])) > 0.1
         for: 10m
         labels: { severity: warn, team: ai-platform }
@@ -6151,75 +6171,29 @@ groups:
         annotations:
           summary: "Streaming requests without usage reported"
           description: |
-            Streaming request completing without token counts means $0 is
-            being debited to the budget — budgets are silently bypassed.
-            OpenAI requires stream_options.include_usage=true on the client.
+            A streaming request completing without token counts records $0 of
+            cost on the span, so the ledger never accumulates it and budgets
+            are silently bypassed. OpenAI requires stream_options.include_usage
+            =true on the client.
             See /ai-gateway/streaming#usage-extraction-critical-for-streaming-budgets.
 
-      - alert: BudgetDebitOutboxBacklog
-        expr: gateway_budget_debit_outbox_depth > 1000
-        for: 5m
-        labels: { severity: page, team: ai-platform }
-        annotations:
-          summary: "Budget debit outbox depth > 1000 for 5m"
-          description: |
-            Gateway can't reach the control plane /budget/debit endpoint fast
-            enough. Customer budgets are NOT being debited in real-time;
-            near-limit customers may be over-consuming. Check control-plane
-            health + gateway_budget_debit_outbox_dropped_total rate.
-
-      # --- Iter 21 outbox leading-indicator rules
-      # Fill-pct (depth/capacity) leads the absolute-depth rule above and
-      # catches pods with different capacities consistently.
-      - alert: BudgetOutboxFillPctHigh
+      # The gateway does not debit budgets. Cost rides the OTel span and the
+      # control plane's trace-fold reactor writes the ClickHouse ledger, so
+      # there is no gateway-side queue to alert on. The signal that
+      # enforcement is actually firing is the block counter below.
+      - alert: BudgetBlockSpike
         expr: |
-          max by (pod) (gateway_budget_debit_outbox_depth)
-            / max by (pod) (gateway_budget_debit_outbox_capacity) > 0.5
-        for: 5m
+          sum by (scope) (rate(gateway_budget_blocks_total[10m])) > 1
+        for: 10m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "Outbox fill-pct > 50% on {{ $labels.pod }} for 5m"
+          summary: "Budget scope {{ $labels.scope }} is blocking > 1 req/s over 10m"
           description: |
-            Approaching capacity. See production runbook Recipe 6, normal
-            bursts self-heal; sustained climb is usually flush failure.
-
-      # Flush-failure rate leads depth climb, catches slow/unreachable
-      # control plane BEFORE events back up enough to alert on depth.
-      - alert: BudgetOutboxFlushFailures
-        expr: rate(gateway_budget_debit_outbox_flush_failures_total[5m]) > 0
-        for: 5m
-        labels: { severity: warn, team: ai-platform }
-        annotations:
-          summary: "Outbox flush failures for 5m on {{ $labels.pod }}"
-          description: |
-            Control plane is slow/unreachable; debits are re-enqueued and
-            safe, but latency to reconcile is growing. Investigate control-
-            plane /budget/debit latency before this turns into a depth alert.
-
-      # 4xx drops = silent data loss. Any non-zero rate is immediately
-      # actionable (signing drift / payload drift / control-plane bug).
-      - alert: BudgetOutbox4xxDrops
-        expr: increase(gateway_budget_debit_outbox_4xx_drops_total[15m]) > 0
-        labels: { severity: page, team: ai-platform }
-        annotations:
-          summary: "Outbox debits are being terminally dropped with 4xx"
-          description: |
-            Silent data loss. Debits are being permanently rejected by the
-            control plane. Most common: LW_GATEWAY_INTERNAL_SECRET drift
-            after rotation. See production runbook Recipe 6.
-
-      - alert: BudgetCheckLiveFailRate
-        expr: |
-          sum(rate(gateway_budget_check_live_total{outcome="transport_error"}[5m]))
-            / sum(rate(gateway_budget_check_live_total[5m])) > 0.2
-        for: 5m
-        labels: { severity: warn, team: ai-platform }
-        annotations:
-          summary: "Live /budget/check failing open > 20%"
-          description: |
-            Live reconciliation for near-limit scopes is timing out or erroring
-            and falling back to the cached snapshot. Near-limit customers may
-            briefly over-consume. Check control-plane /budget/check latency.
+            A hard-cap scope is rejecting sustained traffic. Either the limit
+            needs raising or a caller is looping. Precheck is local against the
+            cached bundle snapshot, so a scope that should be blocking but is
+            not means the bundle has not refreshed; check
+            gateway_control_plane_requests_total{endpoint="changes"}.
 
       # ─── Auth cache ──────────────────────────────────────────────────────
 
@@ -6239,11 +6213,10 @@ groups:
 
       # ─── Cost & anomaly ──────────────────────────────────────────────────
 
-      # Note: per-request cost anomaly detection requires a cost metric
-      # (e.g. gateway_cost_usd_total) that isn't in the current collector set.
-      # It's easier to derive cost anomalies from the GatewayBudgetLedger
-      # table in the control-plane warehouse rather than Prometheus, since
-      # cost attribution happens on the control-plane side after debit.
+      # Note: the registry carries no per-request cost metric, by design.
+      # Cost anomalies are easier to derive from the ledger table in the
+      # control-plane warehouse than from Prometheus, since cost attribution
+      # happens control-plane side when the trace-fold reactor folds the span.
       # See /gateway/usage UI for the visual equivalent.
 
       # ─── Blocked-by-policy noise ────────────────────────────────────────
@@ -6256,7 +6229,7 @@ groups:
         for: 5m
         labels: { severity: warn, team: ai-platform }
         annotations:
-          summary: "> 10 req/s blocked by policy reason={{ $labels.reason }}"
+          summary: "> 10 req/s blocked by policy on direction={{ $labels.direction }}"
           description: |
             Legit block storm (a customer's runtime is trying a banned tool
             repeatedly) or a regression in the policy_rules config.
@@ -6269,7 +6242,7 @@ groups:
 The temptation with Prometheus rules is to alert on everything. Don't. Each rule above either:
 
 - **Represents real impact** (5xx rate, circuit open, usage missing), customers or budgets are actively affected.
-- **Is a leading indicator of incoming impact** (excessive fallback, L1 cache drop, outbox stale), things get worse soon if ignored.
+- **Is a leading indicator of incoming impact** (excessive fallback, L1 cache drop, stale bundle), things get worse soon if ignored.
 - **Is a cost guardrail** (streaming usage missing, cost anomaly), silent over-spend is a real failure mode for AI infra.
 
 Rules we explicitly **do NOT** have:
@@ -6320,17 +6293,54 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
+  # 5xx rate: every request errors, so the ratio pins at 1.0
   - interval: 1m
     input_series:
-      - series: 'gateway_http_requests_total{status="500"}'
-        values: '0 1 2 3 4 5 6 7 8 9 10'
-      - series: 'gateway_http_requests_total{status="200"}'
-        values: '0 0 0 0 0 0 0 0 0 0 0'
+      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="500", provider="openai", model="gpt-4o"}'
+        values: '0+1x15'
+      - series: 'gateway_http_requests_total{route="/v1/chat/completions", status="200", provider="openai", model="gpt-4o"}'
+        values: '0+0x15'
     alert_rule_test:
       - eval_time: 10m
         alertname: GatewayHighErrorRate
         exp_alerts:
           - exp_labels: { severity: page, team: ai-platform }
+
+  # gateway_circuit_state encodes the state in the value: 0 closed, 1 open,
+  # 2 half-open. Only value 1 means "open and short-circuiting".
+  - interval: 1m
+    input_series:
+      - series: 'gateway_circuit_state{credential_id="cred_openai_primary"}'
+        values: '1+0x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CircuitOpenTooLong
+        exp_alerts:
+          - exp_labels: { credential_id: cred_openai_primary, severity: page, team: ai-platform }
+
+  # Half the attempts land on a fallback slot, well past the 10% threshold.
+  - interval: 1m
+    input_series:
+      - series: 'gateway_provider_attempts_total{credential_id="cred_openai_primary", outcome="success"}'
+        values: '0+1x30'
+      - series: 'gateway_provider_attempts_total{credential_id="cred_anthropic_backup", outcome="fallback_success"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: ExcessiveFallback
+        exp_alerts:
+          - exp_labels: { severity: warn, team: ai-platform }
+
+  # Budget precheck rejecting sustained traffic on one scope.
+  - interval: 1m
+    input_series:
+      - series: 'gateway_budget_blocks_total{scope="project:proj_acme"}'
+        values: '0+120x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: BudgetBlockSpike
+        exp_alerts:
+          - exp_labels: { scope: "project:proj_acme", severity: warn, team: ai-platform }
 ```
 
 ## Grafana dashboard
@@ -6342,7 +6352,7 @@ A matching Grafana dashboard JSON is at [/ai-gateway/self-hosting/helm#monitorin
 - [Troubleshooting](/ai-gateway/troubleshooting): paged-at-3am runbook for each symptom.
 - [Observability](/ai-gateway/observability): span attributes + metric names surface.
 - [Streaming](/ai-gateway/streaming): the include_usage gotcha these alerts catch.
-- [Budgets](/ai-gateway/budgets): why budget_debit_outbox_age matters.
+- [Budgets](/ai-gateway/budgets): how spend reaches the ledger and what the precheck can see.
 
 ---
 
@@ -7578,7 +7588,7 @@ Decisions:
   The channel is closed immediately after; subsequent upstream chunks are discarded. Same wire shape as a provider-failure terminator, distinguishable by `error.code` (`stream_chunk_blocked` vs `provider_error`). See [Streaming → Mid-stream error shapes](/ai-gateway/streaming#terminal-error-shapes).
 - `modify`, **not implemented in v1.** Chunk-level content rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events have different shapes). For v1, "redact on stream" = block and let the client retry without the offending input. A future iter may add provider-aware chunk rewriting once a real customer asks.
 
-Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, or the upstream guardrail errors, the gateway **fails open**: the chunk passes through with an OTel warning (the WARN log carries the reason) and a bump to `gateway_guardrail_verdicts_total{direction="stream_chunk",verdict="fail_open"}`. This is an explicit contract decision: blocking the user's stream on a slow policy service is worse than occasional pass-through, but the metric makes slow/flaky services visible before they become reliability problems.
+Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, or the upstream guardrail errors, the gateway **fails open**: the chunk passes through with an OTel warning (the WARN log carries the reason). This is an explicit contract decision: blocking the user's stream on a slow policy service is worse than occasional pass-through. Note that this path swallows the error internally, so no `fail_open` verdict is counted for it; the WARN log and the `langwatch.guardrail.stream_chunk_fail_open` span attribute are the signals for slow or flaky evaluators on stream chunks.
 
 Use cases: real-time PII termination (credit card numbers, emails, phone numbers) where the correct behaviour on detection is "stop sending and the user retries." For best-effort redaction that doesn't interrupt the stream, use `post` on the reassembled response instead.
 
@@ -7588,7 +7598,7 @@ The VK create/edit drawer has three direction sections, **Pre-request**, **Post-
 
 Each direction section also has a **Default-block on evaluator failure** toggle. Off (default) = fail closed (matches `guardrails.request_fail_open: false`, `response_fail_open: false`). On = fail open; the gateway WARN-logs the evaluator failure and proceeds. The helper copy cites the concrete enforcement shapes so you know what the toggle actually does:
 
-- Pre: blocks return `403 guardrail_blocked` with a zero-cost debit.
+- Pre: blocks return `403 guardrail_blocked` with zero cost recorded on the span.
 - Post: non-stream blocks replace the response with 403; stream responses flag only (the bytes are already out).
 - Stream chunk: blocks emit a byte-locked terminal SSE error with `code=stream_chunk_blocked`; the 50 ms per-chunk budget fails OPEN by contract regardless of the toggle (stream-chunk fail-open is a performance invariant, not a policy choice).
 
@@ -7619,7 +7629,7 @@ A VK can have multiple guardrails in each direction; the gateway runs them in pa
 
 **Modify decisions.** When more than one guardrail in the same direction returns `modify`, the dispatcher applies them sequentially in `config.guardrails[direction]` array order (the order you set on the VK). Each `modify` rewrites the payload and the next `modify` sees the rewritten version. Modifies do NOT chain across directions: `request` modifies are applied before dispatch, `response` modifies are applied after the upstream response returns.
 
-**Stream chunks.** `stream_chunk` guardrails currently run in `block`-only mode in v1: a `modify` verdict on a stream chunk is accepted by the contract but the dispatcher rewrites are not yet wired (tracked alongside the metric-emission gap below, same hot-path). Use `request`/`response` `modify` for now if you need payload rewrites; `stream_chunk` is best used for `block` (e.g. cut a stream the moment a regex match appears on the way out).
+**Stream chunks.** `stream_chunk` guardrails currently run in `block`-only mode in v1: a `modify` verdict on a stream chunk is accepted by the contract but the dispatcher rewrites are not yet wired. Use `request`/`response` `modify` for now if you need payload rewrites; `stream_chunk` is best used for `block` (e.g. cut a stream the moment a regex match appears on the way out).
 
 ## Observability
 
@@ -7628,7 +7638,9 @@ A VK can have multiple guardrails in each direction; the gateway runs them in pa
 - `direction`, `request` | `response` | `stream_chunk`
 - `verdict`, `allow` | `block` | `modify` | `fail_open`
 
-<Info>**v1 wiring caveat**: in the Go data plane, only the `stream_chunk` direction currently emits this metric from the dispatcher hot path. The `request` and `response` directions run the guardrails correctly (block, modify logic works), but the dispatcher doesn't yet call `Metrics.RecordGuardrailVerdict` at those sites. Tracked as a v1 follow-up (finding #17); operators who need per-direction allow-rate dashboards today can proxy from `gateway_http_requests_total{status="403"}` which flips on every block verdict regardless of direction.</Info>
+`fail_open` is emitted on all three directions, whenever the control-plane guardrail call fails and the gateway lets the traffic through unchecked. The `request` and `response` directions do so only when the virtual key opts into fail-open; the default is fail closed and the request is refused instead. The `stream_chunk` direction always fails open by design, so a slow policy service never stalls a stream a user is already reading, which means a `direction="stream_chunk", verdict="fail_open"` series is the one to watch: it is the only signal that chunk-level policy stopped being enforced. The `langwatch.guardrail.stream_chunk_fail_open` span attribute carries the reason for an individual bypass, which the counter deliberately does not, since the reason is unbounded text.
+
+<Info>`gateway_http_requests_total{status="403"}` is a useful cross-check: it flips on every block verdict regardless of direction, so a divergence between it and `sum(rate(gateway_guardrail_verdicts_total{verdict="block"}[5m]))` points at a direction that is blocking without being counted.</Info>
 
 **Span attributes**: the gateway declares `langwatch.guardrail.verdict` as a canonical span attribute for the aggregate verdict, but it is not yet emitted from the dispatcher in v1. Per-guardrail decision detail is visible by clicking through to the evaluator's run in the LangWatch Messages view, the evaluator's own trace carries the policies triggered + reasoning.
 
@@ -7980,18 +7992,66 @@ Attribute-based filters in the Messages view compose into dashboards:
 
 ## Metrics (Prometheus)
 
-The gateway exposes `/metrics` for Prometheus:
+The gateway serves `GET /metrics` on its main HTTP port (`5563` by default, the same listener that serves `/v1/*` and the health probes). No separate admin port.
 
-- `gateway_requests_total{provider, model, status}`, request counts.
-- `gateway_request_duration_seconds`, end-to-end latency histogram.
-- `gateway_provider_duration_seconds{provider}`, upstream latency histogram.
-- `gateway_cache_hits_total{outcome}`, cache outcome counts.
-- `gateway_budget_blocks_total{scope}`, budget rejections.
-- `gateway_guardrail_blocks_total{direction}`, guardrail rejections.
-- `gateway_circuit_state{provider}`, 0 closed, 1 half-open, 2 open.
-- `gateway_auth_cache_size{layer=l1|l2}`.
-- `gateway_auth_cache_hits_total{layer}`.
-- `gateway_internal_rtt_seconds{endpoint}`, control-plane round-trip times.
+### Traffic and lifecycle
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_http_requests_total` | counter | `route`, `status`, `provider`, `model` | Requests served. `route` is the chi route pattern (`/v1/chat/completions`), `status` is the numeric HTTP status as a string (`"200"`, `"429"`, `"500"`) |
+| `gateway_http_request_duration_seconds` | histogram | `route`, `provider` | End-to-end latency, client connect to last byte |
+| `gateway_in_flight_requests` | gauge | none | Requests currently being served |
+| `gateway_draining` | gauge | none | `1` while the pod is draining after SIGTERM, `0` otherwise |
+
+### Provider dispatch and fallback
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_provider_duration_seconds` | histogram | `provider`, `model` | Upstream round-trip per attempt (excludes gateway overhead) |
+| `gateway_provider_attempts_total` | counter | `credential_id`, `outcome` | One increment per attempt against a credential slot |
+| `gateway_fallback_events_total` | counter | `from_credential`, `to_credential` | Chain hops taken |
+| `gateway_circuit_state` | gauge | `credential_id` | Breaker state encoded in the value: `0` closed, `1` open, `2` half-open |
+
+`outcome` is one of `success`, `fallback_success`, `retryable_5xx`, `not_found`, `rate_limit`, `timeout`, `network`, `circuit_open`, `non_retryable`, `chain_exhausted`, `context_done`.
+
+### Auth cache
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_auth_cache_hits_total` | counter | `tier` | Virtual-key resolutions served from cache |
+| `gateway_auth_cache_misses_total` | counter | `tier` | Resolutions that fell through to the control plane |
+| `gateway_auth_cache_lookups_total` | counter | none | Hits plus misses |
+| `gateway_auth_cache_size` | gauge | `tier` | Entries currently held |
+
+`tier` is `l1` (in-process) or `l2_redis`. Only `l1` is populated in the default deployment, which ships without an L2 Redis tier.
+
+### Governance
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_budget_blocks_total` | counter | `scope` | Requests rejected by the local budget precheck |
+| `gateway_cache_hits_total` | counter | `outcome` | Prompt-cache outcome (`hit` or `miss`), derived from provider cache-read token counts |
+| `gateway_cache_rule_hits_total` | counter | `rule_id`, `mode_applied` | Bundle-baked cache rule matches. `mode_applied` is `RESPECT`, `FORCE`, or `DISABLE` |
+| `gateway_guardrail_verdicts_total` | counter | `direction`, `verdict` | Guardrail decisions. `direction` is `request`, `response`, or `stream_chunk`; `verdict` is `allow`, `block`, `modify`, or `fail_open`. `fail_open` means the traffic passed unchecked, on any direction. It is the default outcome for `stream_chunk`, which never stalls a stream on policy, and opt-in for the other two |
+| `gateway_rate_limit_denied_total` | counter | `dimension`, `vk_id` | Requests denied by the virtual-key rate limiter. `dimension` is `rpm` or `rpd` |
+
+### Streaming
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_streaming_usage_missing_total` | counter | `provider`, `model` | Streams that finished without the provider reporting usage. These debit nothing, so they bypass budget enforcement silently: alert on any positive rate |
+| `gateway_streaming_active` | gauge | none | Streams currently open |
+
+### Control plane
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `gateway_internal_rtt_seconds` | histogram | `endpoint` | Round-trip to the control plane |
+| `gateway_control_plane_requests_total` | counter | `endpoint`, `status` | Control-plane calls by outcome |
+
+`endpoint` is one of `resolve-key`, `guardrail-check`, `config`, `codex-refresh`. The change-feed long poll is deliberately excluded: it blocks until an event or its own timeout, so timing it would say nothing about control-plane health.
+
+The registry also carries the standard Go runtime and process collectors (`go_*`, `process_*`).
 
 Scrape with a `ServiceMonitor` (Prometheus Operator) or standard scrape config, see [Self-Hosting → Helm](/ai-gateway/self-hosting/helm#monitoring).
 
@@ -8844,7 +8904,7 @@ See [Streaming → pre-connection fallback, mid-stream failure](/ai-gateway/stre
 
 Fallback attribution today:
 
-- Prometheus counter `gateway_provider_attempts_total{outcome}` increments once per attempt, with `outcome` in `primary_success | fallback_success | retryable_5xx | rate_limit | timeout | network | circuit_open | non_retryable`.
+- Prometheus counter `gateway_provider_attempts_total{credential_id, outcome}` increments once per attempt, with `outcome` in `success | fallback_success | retryable_5xx | not_found | rate_limit | timeout | network | circuit_open | non_retryable | chain_exhausted | context_done`.
 - Response header `X-LangWatch-Fallback-Count: N`, how many fallbacks were attempted before success.
 - Request-id correlation via `X-LangWatch-Request-Id`, join the metric + log line back to the specific trace.
 
@@ -8873,7 +8933,7 @@ Override at the service level:
 
 **Per-replica, not shared**: each gateway replica maintains its own breaker state. This is deliberate, under a large-scale outage, N replicas rediscovering the recovered provider independently is resilient; depending on Redis for breaker consensus is not.
 
-Per-provider circuit state is emitted as a Prometheus metric `gateway_circuit_state{provider,state}` where `state ∈ {closed, half_open, open}`. Alert on "primary circuit has been `open` for > 5 minutes" to catch real provider outages (as distinct from transient blips).
+Circuit state is emitted as a Prometheus gauge `gateway_circuit_state{credential_id}`, one series per credential slot. The state is encoded in the gauge **value**, not in a label: `0` closed, `1` open, `2` half-open. Alert on `gateway_circuit_state == 1 for 5m` to catch real provider outages (as distinct from transient blips).
 
 When a request hits a circuit that's currently `open`, the gateway skips to the next entry in the fallback chain immediately, no wasted round-trip to a provider we already know is down.
 
@@ -9390,14 +9450,15 @@ Leave a field blank to inherit the upstream provider's own limit (i.e., no gatew
 
 ## Observability
 
-Rate-limit events surface via the gateway's standard observability primitives, there is no dedicated rate-limit counter in v1:
+Rate-limit events surface via a dedicated counter plus the gateway's standard observability primitives:
 
+- **Rate-limit metric** `gateway_rate_limit_denied_total{dimension, vk_id}`, increments once per gateway-enforced denial. `dimension` is `rpm` or `rpd`, `vk_id` identifies the virtual key that hit the limit.
 - **HTTP metric** `gateway_http_requests_total{status="429"}`, counts 429s including both gateway-enforced and upstream-reported.
 - **Upstream attempt metric** `gateway_provider_attempts_total{outcome="rate_limit"}`, increments when a 429 came back from the provider (not from gateway-side enforcement). Joining on `status="429"` vs `outcome="rate_limit"` distinguishes gateway-enforced (status 429, no provider_attempts increment on that dimension) from upstream-enforced.
 - **Response header** `X-LangWatch-RateLimit-Dimension`, the downstream key-switch signal (also included in the span error message for trace-level analysis).
 - **Trace error**: the rejected request's span carries `error.type="rate_limit_exceeded"` with the dimension in the message string.
 
-<Info>A dedicated `gateway_rate_limit_rejects_total{dimension}` counter that slices by dimension without needing to parse the trace stream is a v1.1 observability follow-up. Until then, dashboards can filter `gateway_http_requests_total{status="429"}` by the `Retry-After` header or check the `X-LangWatch-RateLimit-Dimension` value in trace attributes at query time.</Info>
+<Info>`gateway_rate_limit_denied_total` is the metric to build dashboards on: `sum by (dimension) (rate(gateway_rate_limit_denied_total[5m]))` slices gateway-enforced denials by dimension without parsing the trace stream, and adding `vk_id` pinpoints the noisy key. Subtracting it from `gateway_http_requests_total{status="429"}` leaves the 429s that came back from the provider.</Info>
 
 ## Cross-replica coordination
 
@@ -10884,8 +10945,8 @@ See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation
 
 Two control-plane components must be running for the gateway to function fully:
 
-- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/changes`, and `/budget/check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
-- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly, the workers' trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and `/budget/check` reads from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
+- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/config`, `/changes`, and `/guardrail-check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP`, `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
+- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly, the workers' trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and the bundle the gateway long-polls for is built from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
 
 ## Networking
 
@@ -11058,8 +11119,8 @@ gateway:
 
 **Ingress**:
 
-- `ingress-nginx` namespace → port `5590` (customer traffic via your Ingress).
-- `monitoring` namespace Prometheus pod → port `5590` `/metrics`.
+- `ingress-nginx` namespace → port `5563` (customer traffic via your Ingress).
+- `monitoring` namespace Prometheus pod → port `5563` `/metrics`.
 
 Everything else is rejected, including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
 
@@ -11090,7 +11151,7 @@ To confirm the policy is active at runtime:
 
 ```bash
 # Ingress check, should succeed from ingress-nginx, fail from elsewhere
-kubectl exec -n langwatch deploy/langwatch-gateway -- curl -sS http://localhost:5590/healthz
+kubectl exec -n langwatch deploy/langwatch-gateway -- curl -sS http://localhost:5563/healthz
 
 # Egress check, should succeed to api.openai.com, fail to a lateral pod
 kubectl exec -n langwatch deploy/langwatch-gateway -- \
@@ -11134,8 +11195,10 @@ gateway:
 
 Two gauges, always exported:
 
-- `gateway_draining{pod}`, 0 normally, 1 during shutdown. A stuck pod (draining but never dying) shows as this being 1 for > grace.
-- `gateway_in_flight_requests{pod}`, monotonic counter minus completions, so concretely the count of currently-executing handlers. During drain this should curve down to 0.
+- `gateway_draining`, 0 normally, 1 during shutdown. A stuck pod (draining but never dying) shows as this being 1 for > grace.
+- `gateway_in_flight_requests`, the count of currently-executing handlers. During drain this should curve down to 0.
+
+Both are unlabelled in the registry; per-pod series come from the `pod` target label your Prometheus attaches during Kubernetes service discovery.
 
 Pairing the two during drain gives two operationally distinct patterns:
 
@@ -11148,7 +11211,7 @@ See [Production runbook → Recipe 7](/ai-gateway/cookbooks/production-runbook#r
 
 ## Security
 
-Edge protection lives under a dedicated `security` stanza separate from per-upstream budgets or the debit outbox. First (and currently only) knob is the request body cap:
+Edge protection lives under a dedicated `security` stanza separate from per-upstream budgets or budget accounting. First (and currently only) knob is the request body cap:
 
 ```yaml
 gateway:
@@ -11158,7 +11221,7 @@ gateway:
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
 - `security`, edge, fails fast with 413, operator bumps when large base64 images are legitimate;
-- `budget`, accounting, fails async via outbox, operator investigates debit flow (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6--debit-outbox-backlog));
+- `budget`, accounting, reconciles asynchronously via the span-to-ledger path, operator investigates spend accumulation (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6-budget-spend-not-accumulating));
 - `upstream`, per-provider, fails mid-flight with circuit-breaker trips.
 
 The chart's ConfigMap renders the int as `%d` (the chart's test render catches a YAML scientific-notation gotcha, Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.
@@ -11205,7 +11268,7 @@ Gateway and control plane are versioned in **lockstep**: release-please bumps bo
 
 1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
 2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` and gateway Deployments roll concurrently, both use Kubernetes' standard `RollingUpdate` strategy and the chart does not enforce ordering. Safety during the overlap window is handled by the dual-key signature contract documented under [Secret rotation](#secret-rotation): the new control-plane image accepts both old and new signatures, so a brief window where gateway pods on the new image talk to control-plane pods still on the old image (or vice versa) does not break authentication. If you want to enforce ordering for an extra-cautious rollout, run `helm upgrade ... --set gateway.enabled=false` first to roll the app alone, then re-enable the gateway in a second `helm upgrade`, but for the standard upgrade path the dual-key contract is what makes the concurrent roll safe.
-3. Monitor `gateway_provider_duration_seconds` and `gateway_requests_total{status!="2xx"}` for ~30 min.
+3. Monitor `gateway_provider_duration_seconds` and `gateway_http_requests_total{status=~"5.."}` for ~30 min.
 4. Roll back via `helm rollback langwatch <revision>` if anomalies appear, the gateway's cache survives restarts and requests resume immediately. Both sub-charts roll back together.
 
 ---
@@ -11596,7 +11659,7 @@ When the primary returns a retryable error **before** any chunk has been sent to
 
 Guardrails with `direction: stream_chunk` run on **chunks with visible delta text** before emission. Frames without visible text, role-only (`{"delta":{"role":"assistant"}}`), tool-call deltas, terminal usage, skip the guardrail call entirely, so ~95% of stream frames are near-zero overhead. See [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas).
 
-- **Budget ≤50 ms per chunk.** Slow or errored guardrails **fail open**: the chunk passes through, `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=fail_open}` increments, and `langwatch.guardrail.stream_chunk_fail_open=<reason>` is set on the trace. Blocking the user's stream on a slow policy service is worse than occasional pass-through, but the metric surfaces degraded services.
+- **Budget ≤50 ms per chunk.** Slow or errored guardrails **fail open**: the chunk passes through and `langwatch.guardrail.stream_chunk_fail_open=<reason>` is set on the trace. Blocking the user's stream on a slow policy service is worse than occasional pass-through. Note that this path swallows the error internally, so it does **not** emit `gateway_guardrail_verdicts_total{verdict="fail_open"}`; the trace attribute is the signal for degraded policy services on stream chunks. Only the `request` and `response` directions count fail-open verdicts.
 - **Decision `block`** → terminal `event: error` frame with `type=guardrail_blocked`, `code=stream_chunk_blocked` (see [Terminal error shapes](#terminal-error-shapes)). Channel closed immediately.
 - **Decision `modify`** is **not implemented in v1**: chunk-level rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events differ). For v1, "redact on stream" = block + client-retry. A future iter can add provider-aware chunk rewriting.
 
@@ -11714,7 +11777,7 @@ const stream = await openai.chat.completions.create({
 In Prometheus, Grafana:
 
 ```promql
-rate(gateway_requests_total{usage_reported="false"}[5m]) > 0
+sum(rate(gateway_streaming_usage_missing_total[5m])) > 0
 ```
 
 After the gateway-side auto-injection landed, this should sit at zero in steady state for OpenAI, Azure streaming traffic. If it spikes, capture the request body via `LW_LOG_MESSAGE_BODY=1` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) and check whether the caller is opting out of usage explicitly.
@@ -11864,7 +11927,7 @@ curl -s https://gateway.langwatch.ai/readyz | jq
 Non-`ok` checks pinpoint the layer:
 - `control_plane: error: timeout ...` → control-plane degraded; gateway is refusing traffic correctly.
 - `auth_cache_bootstrap: error: ...` → startup failed; pod will be restarted.
-- `outbox_writer: stale ...` → budget debits aren't flushing; budgets are stale.
+- `bundle_refresh: stale ...` → the bundle snapshot is not refreshing, so budget prechecks run against stale spend.
 
 **Fix:**
 - If control plane is down, wait, investigate control plane.
@@ -12107,7 +12170,7 @@ If none of the above narrows it: post in `#ai-gateway-support` with the request 
 **Symptoms:**
 - Requests that previously worked return 503 with `type=service_unavailable` when a guardrail evaluator fails and the VK is fail-closed (the default).
 - The LangWatch evaluator dashboard shows errors or timeouts on evaluators attached to the VK.
-- Metric `gateway_guardrail_verdicts_total{verdict="block"}` climbs on the affected direction (request, response), or `{verdict="fail_open"}` if the VK opts in.
+- Metric `gateway_guardrail_verdicts_total{verdict="block"}` climbs on the affected direction (request, response), or `{verdict="fail_open"}` if the VK opts in. The same evaluator outage also shows as `{direction="stream_chunk", verdict="fail_open"}`, which climbs whether or not the VK opted in, because that direction always fails open rather than stall a stream.
 
 **Root cause:** a `pre` or `post` guardrail's evaluator service (LangEvals, custom webhook evaluator, etc.) is unreachable or erroring, and the VK's fail-open toggle is `false`. The gateway's default is **fail closed**: if policy can't be evaluated, the request is refused rather than passed through ungoverned.
 
@@ -12231,7 +12294,7 @@ Restart the entry point (the validator runs at import time, so no incremental re
 - [Observability](/ai-gateway/observability): what every span attribute means.
 - [Health Checks](/ai-gateway/self-hosting/health-checks): interpreting `/readyz` output.
 - [Cookbook: CI smoke test](/ai-gateway/cookbooks/ci-smoke-test): automate validation.
-- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook): on-call playbook (graceful drain, outbox backlog, pprof diagnostics).
+- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook): on-call playbook (graceful drain, budget spend accumulation, pprof diagnostics).
 - [Cookbook: Grafana dashboard](/ai-gateway/cookbooks/grafana-dashboard): importable JSON to visualise every metric referenced on this page.
 
 ---

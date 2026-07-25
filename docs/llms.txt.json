@@ -15,7 +15,6 @@
     "integration/java/**/*.mdx",
     "integration/opentelemetry/*.mdx",
     "integration/rest-api.mdx",
-    "integration/rags-context-tracking.mdx",
     "integration/langflow.mdx",
     "integration/flowise.mdx",
     "integration/n8n.mdx",
