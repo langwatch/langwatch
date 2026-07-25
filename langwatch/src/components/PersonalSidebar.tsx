@@ -46,7 +46,7 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
 
   const isUsageActive = router.pathname === "/me";
   const isConfigureActive = router.pathname.startsWith("/me/configure");
-  const isSessionsActive = router.pathname.startsWith("/me/sessions");
+  const isDevicesActive = router.pathname.startsWith("/me/devices");
   const isOrgSettingsActive =
     router.pathname === "/settings" ||
     (router.pathname.startsWith("/settings") &&
@@ -183,9 +183,9 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
             )}
             <SideMenuLink
               icon={Smartphone}
-              label="Sessions"
-              href="/me/sessions"
-              isActive={isSessionsActive}
+              label="Devices"
+              href="/me/devices"
+              isActive={isDevicesActive}
               showLabel={showExpanded}
             />
             <SideMenuLink
