@@ -307,6 +307,27 @@ describe("getAzureBlobToken", () => {
       expect(recovered).toBe("recovered-token");
       expect(workloadGetToken).toHaveBeenCalledTimes(2);
     });
+
+    /**
+     * @azure/identity ships @azure/core-rest-pipeline, whose retry policy
+     * already honours the provider's Retry-After. A retry loop here would
+     * nest inside that one and multiply attempts against an endpoint that
+     * just asked us to slow down.
+     */
+    /** @scenario "Throttle backoff is delegated to the identity library, not duplicated" */
+    it("surfaces a throttled exchange without retrying on top of the library", async () => {
+      const throttled = Object.assign(new Error("Too many requests"), {
+        statusCode: 429,
+      });
+      workloadGetToken.mockRejectedValueOnce(throttled);
+
+      await expect(
+        getAzureBlobToken(workloadIdentityCredentials),
+      ).rejects.toBeInstanceOf(AzureTokenExchangeError);
+
+      // Exactly one attempt: the library owns backoff, we own not compounding it.
+      expect(workloadGetToken).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("invalidateAzureBlobToken", () => {

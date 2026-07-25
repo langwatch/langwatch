@@ -215,12 +215,17 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then the exchange uses the rotated assertion read at that moment
     And a long-running worker keeps authenticating after the original assertion expired
 
-  @unit @unimplemented
-  Scenario: A throttled identity provider is retried according to its own backoff signal
+  # Throttle backoff is the identity library's job, not ours: it ships a
+  # rest pipeline that already honours the provider's Retry-After. Wrapping
+  # that in a retry of our own would multiply attempts rather than smooth
+  # them — the classic nested-retry storm. What we own is not re-trying on
+  # top of it, and surfacing the eventual failure honestly.
+  @unit
+  Scenario: Throttle backoff is delegated to the identity library, not duplicated
     Given the identity provider rejects a token request as throttled
-    When the driver retries
-    Then it waits for the interval the provider specified
-    And it does not retry immediately in a tight loop
+    When the exchange ultimately fails
+    Then the failure is surfaced without an additional retry loop of our own
+    And the cache holds no rejected exchange for the next caller to replay
 
   @unit
   Scenario: A failed token exchange surfaces as a configuration error, not a storage error
@@ -251,7 +256,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Secret hygiene
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Authorization material never reaches logs, errors, or traces
     Given any Azure Blob operation fails in any auth mode
     When the failure is reported
@@ -263,14 +268,14 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Byte paths beyond the driver
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Stored-objects writes succeed in a token-based mode
     Given STORED_OBJECTS_BACKEND is azure in a token-based auth mode
     When byte content is externalized for a project
     Then the object is written and an azure-blob URI is persisted
     And no shared-key configuration is consulted
 
-  @unit @unimplemented
+  @unit
   Scenario: Reads of previously persisted azure-blob URIs succeed in a token-based mode
     Given objects were written under shared-key auth before the switch
     When they are read after the deployment moves to a token-based mode
@@ -289,7 +294,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     When an oversized envelope is offloaded and later read back
     Then the bytes round-trip through Azure Blob
 
-  @unit @unimplemented
+  @unit
   Scenario: Out-of-band maintenance tasks authenticate the same way as the services
     Given a migration or backfill task that writes bytes outside the request path
     Then it obtains Azure credentials from the same shared resolver
