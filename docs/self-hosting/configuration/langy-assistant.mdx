@@ -16,8 +16,9 @@ app, and it is off until you turn it on.
 | A model provider | Langy talks to a model like every other LangWatch feature |
 | A sandboxed runtime, or an explicit acceptance | The workers execute model-written shell |
 
-Everything else, including the secret the app and the agent use to authenticate
-to each other, is handled by the chart.
+Everything else is handled by the chart: the secret the app and the agent use to
+authenticate to each other, and the in-cluster addresses they use to reach the
+gateway and to send answers back.
 
 ## Turning it on
 

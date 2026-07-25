@@ -247,6 +247,7 @@ spec:
                 secretKeyRef:
                   name: {{ (index .Values "langyagent").secrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
                   key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+            {{- include "langwatch.langyCallbackUrlEnv" . | nindent 12 }}
             {{- end }}
             {{- /* Langy's rollout flag is SYSTEM-scoped and defaults off, because
                    the hosted product opens it one cohort at a time. A self-hosted
@@ -292,6 +293,16 @@ spec:
             - name: LW_GATEWAY_PUBLIC_URL
               value: {{ $gwPublic | quote }}
             {{- end }}
+
+            {{- /* LW_GATEWAY_BASE_URL — where the CONTROL PLANE itself reaches the
+                   gateway, over cluster DNS. Distinct from the public URL above,
+                   which is what browsers and laptops use: an install with no
+                   gateway ingress (the common self-hosted shape) has no public URL
+                   at all, and the control plane still has to reach the gateway.
+                   Langy needs it to mint the worker's virtual key, and without it
+                   the assistant refuses every turn with a credential-resolution
+                   error naming this variable. */}}
+            {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
 
             # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
             # every app-image consumer needs it, see _helpers.tpl)

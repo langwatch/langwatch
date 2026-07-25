@@ -145,6 +145,10 @@ spec:
                 secretKeyRef:
                   name: {{ (index .Values "langyagent").secrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
                   key: {{ (index .Values "langyagent").secrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+            {{- include "langwatch.langyCallbackUrlEnv" . | nindent 12 }}
+            {{- /* Re-dispatching a stalled turn re-resolves the worker's
+                   credentials, which needs the gateway the same way the app does. */}}
+            {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
             {{- end }}
 
             {{- with .Values.workers.extraEnvs}}

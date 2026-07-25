@@ -62,6 +62,55 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- .Values.secrets.existingSecret | default (.Values.autogen.secretNames.app | default "langwatch-app-secrets") -}}
 {{- end -}}
 
+{{/*
+  LW_GATEWAY_BASE_URL env entry for the pods that talk to the gateway from
+  inside the cluster (the app and the workers, which both resolve Langy's
+  credentials). Renders nothing when there is no gateway to point at.
+
+  gateway.internalUrl wins for non-standard topologies (a gateway run outside
+  this release, a service mesh address). Otherwise it is the Service this chart
+  renders, whose name follows the release like the other sibling Services and
+  whose port comes from the subchart's own value so the two cannot drift.
+*/}}
+{{- define "langwatch.gatewayBaseUrlEnv" -}}
+{{- $gw := .Values.gateway | default dict }}
+{{- $url := $gw.internalUrl | default "" }}
+{{- if and (not $url) $gw.chartManaged }}
+{{- $port := (($gw.service) | default dict).port | default 80 }}
+{{- $url = printf "http://%s-gateway:%v" .Release.Name $port }}
+{{- end }}
+{{- if $url }}
+- name: LW_GATEWAY_BASE_URL
+  value: {{ $url | quote }}
+{{- end }}
+{{- end -}}
+
+{{/*
+  LANGY_WORKER_CALLBACK_URL env entry — the origin the Langy agent's workers dial
+  back on: the relay frame push, the durable turn finalize, the session-key
+  revoke, and the LANGWATCH_ENDPOINT the langwatch CLI uses for every tool call.
+
+  Without it the app hands the worker its own PUBLIC base URL, which is the
+  wrong address for a pod on the same cluster to use. At best the traffic
+  leaves the cluster and comes back; at worst that hostname means something
+  else entirely inside the pod, and every callback fails while the model calls
+  keep succeeding — a turn that costs tokens, produces an answer, and then
+  never delivers it.
+
+  langyagent.controlPlane.callbackUrl overrides it for split topologies.
+*/}}
+{{- define "langwatch.langyCallbackUrlEnv" -}}
+{{- $langy := (index .Values "langyagent") | default dict }}
+{{- $cp := $langy.controlPlane | default dict }}
+{{- $url := $cp.callbackUrl | default "" }}
+{{- if not $url }}
+{{- $port := ((.Values.app).service | default dict).port | default 5560 }}
+{{- $url = printf "http://%s-app:%v" .Release.Name $port }}
+{{- end }}
+- name: LANGY_WORKER_CALLBACK_URL
+  value: {{ $url | quote }}
+{{- end -}}
+
 {{/* Secret validation function */}}
 {{- define "langwatch.validateSecrets" }}
 {{- $errors := list }}
@@ -407,6 +456,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- $langySecrets := $langy.secrets | default dict }}
   {{- $langySecretName := $langySecrets.existingSecretName | default (include "langwatch.appSecretName" .) }}
   {{- $langyKey := $langySecrets.internalSecretKey | default "LANGY_INTERNAL_SECRET" }}
+  {{/* Subchart values are literal YAML, so langyagent.secrets.existingSecretName
+       is a static string while the app Secret's name resolves dynamically. An
+       operator who renames the app Secret and leaves this at its stock default
+       sends all three pods to a Secret that no longer exists. Pointing Langy at
+       a genuinely different Secret stays legitimate (external-secrets,
+       terraform); only the untouched default is treated as an oversight. */}}
+  {{- $appSecretName := include "langwatch.appSecretName" . }}
+  {{- if and (ne $appSecretName "langwatch-app-secrets") (eq ($langySecrets.existingSecretName | default "") "langwatch-app-secrets") }}
+    {{- $errors = append $errors (printf "langyagent.secrets.existingSecretName is still the default %q but the app Secret is named %q. The app, the workers, and the agent pod would all mount a Secret this install does not have. Set langyagent.secrets.existingSecretName to %q, or to whichever Secret holds %s." "langwatch-app-secrets" $appSecretName $appSecretName $langyKey) }}
+  {{- end }}
   {{- $chartWritesIt := and .Values.autogen.enabled (empty .Values.secrets.existingSecret) (eq $langySecretName (include "langwatch.appSecretName" .)) }}
   {{- if not $chartWritesIt }}
     {{- $found := lookup "v1" "Secret" .Release.Namespace $langySecretName }}

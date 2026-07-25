@@ -46,6 +46,27 @@ Feature: Langy comes up with a self-hosted LangWatch install
     Then it is the agent version that shipped with that release
     And not an older one left behind by a previous release
 
+  # The pieces of an install have to address each other by names that mean the
+  # same thing from inside the cluster. Both failures below were invisible from
+  # the outside: every pod healthy, and either no answer at all or an answer
+  # that cost real tokens and was then thrown away.
+  Scenario: Langy can reach the model provider the install already configured
+    Given an operator has installed LangWatch with the Langy agent enabled
+    And a model provider is configured for the project
+    When someone asks Langy a question
+    Then Langy reaches the model
+    And it does not refuse the turn over a setting the operator was never asked for
+
+  Scenario: An answer Langy produces makes it back to the person who asked
+    Given someone has asked Langy a question
+    When Langy finishes working
+    Then the answer arrives in the conversation
+    And the tools it ran along the way arrive with it
+    # The reply, the tool results, and the turn's traces all travel the same way
+    # back to the control plane. Pointing that route at an address that only
+    # means something outside the cluster loses all three at once, after the
+    # model has already been paid for.
+
   # ===========================================================================
   # Installed means usable
   # ===========================================================================
