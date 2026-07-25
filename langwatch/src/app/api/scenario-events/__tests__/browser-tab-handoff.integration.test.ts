@@ -180,8 +180,9 @@ describe("POST /api/scenario-events/browser-tab", () => {
   describe("when no tab from that machine is listening", () => {
     /** @scenario "The handoff is not delivered when no tab is listening" */
     it("reports the handoff as undelivered and broadcasts nothing", async () => {
+      const tabKey = `tab-${nanoid(8)}`;
       const res = await handoff({
-        tabKey: `tab-${nanoid(8)}`,
+        tabKey,
         batchRunId: "batch-1",
         scenarioSetId: "checkout-flow",
       });
@@ -189,6 +190,11 @@ describe("POST /api/scenario-events/browser-tab", () => {
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toMatchObject({ delivered: false });
       expect(mockBroadcastToTenant).not.toHaveBeenCalled();
+      // Nothing parked either: a tab that opens later must not be yanked to a
+      // run the SDK already showed in its own browser tab.
+      await expect(
+        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
+      ).resolves.toBeNull();
     });
   });
 
@@ -243,6 +249,24 @@ describe("POST /api/scenario-events/browser-tab", () => {
       ) as { url: string };
       expect(payload.url).toBe(
         `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-8`,
+      );
+    });
+
+    /** @scenario "The handoff is delivered when a tab is listening" */
+    it("parks the run so a tab that was reloading can still claim it", async () => {
+      const tabKey = `tab-${nanoid(8)}`;
+      await registerTab({ projectId, tabKey });
+
+      await handoff({
+        tabKey,
+        batchRunId: "batch-parked",
+        scenarioSetId: "checkout-flow",
+      });
+
+      await expect(
+        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
+      ).resolves.toBe(
+        `${BASE_HOST}/${projectSlug}/simulations/checkout-flow/batch-parked`,
       );
     });
 

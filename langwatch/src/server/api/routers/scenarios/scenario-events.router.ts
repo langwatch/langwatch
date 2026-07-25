@@ -5,6 +5,10 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
+  SCENARIO_TAB_NAVIGATE_EVENT,
+  type ScenarioTabNavigatePayload,
+} from "~/server/scenarios/browser-tab/scenario-tab-events";
+import {
   SCENARIO_TAB_REFRESH_MS,
   scenarioTabRegistry,
 } from "~/server/scenarios/browser-tab/scenario-tab-registry";
@@ -436,12 +440,37 @@ export const scenarioEventsRouter = createTRPCRouter({
         refreshTimer = setInterval(() => {
           void scenarioTabRegistry.register(tabRegistration);
         }, SCENARIO_TAB_REFRESH_MS);
+
+        // A handoff broadcast while this tab was reloading would have been
+        // lost, even though the SDK was told it was delivered. Claim it now.
+        const pending = await scenarioTabRegistry.takePendingNavigate({
+          projectId,
+          tabKey: tabRegistration.tabKey,
+        });
+        if (pending) {
+          const payload: ScenarioTabNavigatePayload = {
+            event: SCENARIO_TAB_NAVIGATE_EVENT,
+            tabKey: tabRegistration.tabKey,
+            url: pending,
+          };
+          // Same envelope the broadcast path emits, so the client has one
+          // shape to parse.
+          yield { event: JSON.stringify(payload), timestamp: Date.now() };
+        }
       }
+
+      // tRPC v10 callers leave `opts.signal` undefined, so the request's own
+      // signal rides in on the context. Without it a disconnected client keeps
+      // this generator suspended, its emitter listener attached, and its tab
+      // registered forever.
+      const signal =
+        (opts.ctx as { signal?: AbortSignal }).signal ??
+        // @ts-expect-error - signal is not typed
+        (opts.signal as AbortSignal | undefined);
 
       try {
         for await (const eventArgs of on(emitter, "simulation_updated", {
-          // @ts-expect-error - signal is not typed
-          signal: opts.signal,
+          signal,
         })) {
           logger.debug(
             { projectId, event: eventArgs[0] },
@@ -449,6 +478,10 @@ export const scenarioEventsRouter = createTRPCRouter({
           );
           yield eventArgs[0];
         }
+      } catch (error) {
+        // A disconnect aborts the wait; that is the normal end of a
+        // subscription, not something to surface as a stream error.
+        if ((error as { name?: string })?.name !== "AbortError") throw error;
       } finally {
         if (refreshTimer) clearInterval(refreshTimer);
         if (tabRegistration) {

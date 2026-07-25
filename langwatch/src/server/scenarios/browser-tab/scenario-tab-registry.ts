@@ -15,8 +15,32 @@ export const SCENARIO_TAB_TTL_SECONDS = 30;
 /** Server-side refresh cadence, comfortably inside the TTL. */
 export const SCENARIO_TAB_REFRESH_MS = 10_000;
 
+/**
+ * How long a tab stays claimable after its subscription ends.
+ *
+ * A tab drops its subscription for reasons that have nothing to do with going
+ * away: it routes to another run (including the run this very feature just
+ * handed it), the project context re-resolves, the dev server hot-reloads. With
+ * an instant de-registration, the run right after a followed run would find no
+ * tab and open a new one — the exact thing this exists to prevent. A few
+ * seconds of grace covers every one of those, while a genuinely closed tab
+ * still stops taking runs almost immediately.
+ */
+export const SCENARIO_TAB_DISCONNECT_GRACE_SECONDS = 5;
+
+/**
+ * How long a handed-off run stays claimable by a tab that was not connected at
+ * the moment it was broadcast — a reload, a route change, a laptop waking up.
+ * Short enough that a tab opened much later does not jump to a stale run.
+ */
+export const SCENARIO_TAB_PENDING_TTL_SECONDS = 20;
+
 function tabSetKey(projectId: string, tabKey: string): string {
   return `${KEY_PREFIX}:${projectId}:${tabKey}`;
+}
+
+function pendingKey(projectId: string, tabKey: string): string {
+  return `${KEY_PREFIX}:pending:${projectId}:${tabKey}`;
 }
 
 /**
@@ -25,6 +49,7 @@ function tabSetKey(projectId: string, tabKey: string): string {
  * subscription the same way Redis would.
  */
 const memoryTabs = new Map<string, Map<string, number>>();
+const memoryPending = new Map<string, { url: string; expiresAt: number }>();
 
 function memoryEntry(key: string): Map<string, number> {
   let entry = memoryTabs.get(key);
@@ -83,27 +108,40 @@ export const scenarioTabRegistry = {
     }
   },
 
-  /** Drop a tab as soon as its subscription ends. */
+  /**
+   * Retire a tab when its subscription ends, leaving it claimable for
+   * {@link SCENARIO_TAB_DISCONNECT_GRACE_SECONDS} in case it is only
+   * reconnecting. Re-registering within the window restores it outright.
+   */
   async unregister({
     projectId,
     tabKey,
     tabId,
+    now = Date.now(),
   }: {
     projectId: string;
     tabKey: string;
     tabId: string;
+    now?: number;
   }): Promise<void> {
     const key = tabSetKey(projectId, tabKey);
+    // Age the entry so it falls out of the live window `grace` from now.
+    const retiredScore =
+      now -
+      (SCENARIO_TAB_TTL_SECONDS - SCENARIO_TAB_DISCONNECT_GRACE_SECONDS) * 1000;
 
     if (!connection) {
-      memoryTabs.get(key)?.delete(tabId);
+      const entry = memoryTabs.get(key);
+      if (entry?.has(tabId)) entry.set(tabId, retiredScore);
       return;
     }
 
     try {
-      await connection.zrem(key, tabId);
+      // XX: only re-score a member that is still there; never resurrect one
+      // that already aged out.
+      await connection.zadd(key, "XX", retiredScore, tabId);
     } catch (error) {
-      logger.warn({ error, projectId }, "Failed to unregister scenario tab");
+      logger.warn({ error, projectId }, "Failed to retire scenario tab");
     }
   },
 
@@ -136,9 +174,78 @@ export const scenarioTabRegistry = {
       return false;
     }
   },
+
+  /**
+   * Park the handed-off run so a tab that is mid-reload when the broadcast goes
+   * out still finds it. Broadcasts are fire-and-forget: without this, a run
+   * reported as delivered could land in the gap between two subscriptions and
+   * be seen by nobody.
+   */
+  async setPendingNavigate({
+    projectId,
+    tabKey,
+    url,
+    now = Date.now(),
+  }: {
+    projectId: string;
+    tabKey: string;
+    url: string;
+    now?: number;
+  }): Promise<void> {
+    const key = pendingKey(projectId, tabKey);
+
+    if (!connection) {
+      memoryPending.set(key, {
+        url,
+        expiresAt: now + SCENARIO_TAB_PENDING_TTL_SECONDS * 1000,
+      });
+      return;
+    }
+
+    try {
+      await connection.set(key, url, "EX", SCENARIO_TAB_PENDING_TTL_SECONDS);
+    } catch (error) {
+      logger.warn(
+        { error, projectId },
+        "Failed to park a scenario tab handoff",
+      );
+    }
+  },
+
+  /** Read and clear whatever a reconnecting tab still owes itself. */
+  async takePendingNavigate({
+    projectId,
+    tabKey,
+    now = Date.now(),
+  }: {
+    projectId: string;
+    tabKey: string;
+    now?: number;
+  }): Promise<string | null> {
+    const key = pendingKey(projectId, tabKey);
+
+    if (!connection) {
+      const entry = memoryPending.get(key);
+      memoryPending.delete(key);
+      return entry && entry.expiresAt > now ? entry.url : null;
+    }
+
+    try {
+      const url = await connection.get(key);
+      if (url) await connection.del(key);
+      return url;
+    } catch (error) {
+      logger.warn(
+        { error, projectId },
+        "Failed to read a parked scenario tab handoff",
+      );
+      return null;
+    }
+  },
 };
 
 /** Test seam: forget every in-memory registration. */
 export function resetScenarioTabMemoryRegistry(): void {
   memoryTabs.clear();
+  memoryPending.clear();
 }

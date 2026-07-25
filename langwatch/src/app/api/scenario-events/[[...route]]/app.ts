@@ -2,9 +2,9 @@ import { createLogger } from "@langwatch/observability";
 import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import {
   SCENARIO_TAB_NAVIGATE_EVENT,
@@ -180,7 +180,7 @@ secured.access(requires("scenarios:create")).post(
       tabKey: z.string().min(1).max(200),
       batchRunId: z.string().min(1).max(200),
       scenarioSetId: z.string().min(1).max(200).optional(),
-    })
+    }),
   ),
   async (c) => {
     const { project } = c.var;
@@ -216,6 +216,14 @@ secured.access(requires("scenarios:create")).post(
       tabKey,
       url,
     };
+
+    // Parked before the broadcast so a tab reconnecting right now cannot slip
+    // between the two and miss a run we already reported as delivered.
+    await scenarioTabRegistry.setPendingNavigate({
+      projectId: project.id,
+      tabKey,
+      url,
+    });
 
     await getApp().broadcast.broadcastToTenant(
       project.id,
