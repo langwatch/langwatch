@@ -77,6 +77,17 @@ export const spanReferencedEventDataSchema = z.object({
   spanId: z.string(),
   /** The raw wire span name, mirrored so gates and debugging never need the store. */
   spanName: z.string(),
+  /**
+   * The span's own start, epoch ms, parsed off the wire `startTimeUnixNano`.
+   * The resolution read centers its partition window here: the stored row's
+   * StartTime IS this value, so the read stays a pruned point-read no matter
+   * how long the span ran or how late it exported — `occurredAt` is ingest
+   * time, which trails a long-lived span's start by the span's whole
+   * duration, and a fixed window around it goes permanently blind past that.
+   * Null when the wire span carried no parseable start; the reader then
+   * falls back to `occurredAt`, matching the store's own fallback stamping.
+   */
+  startTimeUnixMs: z.number().nullable(),
 });
 
 export const spanReferencedEventSchema = EventSchema.extend({
@@ -103,9 +114,7 @@ export function parseSpanReferencedEvent(
   value: unknown,
 ): SpanReferencedEvent | null {
   if (typeof value !== "object" || value === null) return null;
-  if (
-    (value as { type?: unknown }).type !== SPAN_REFERENCED_EVENT_TYPE
-  ) {
+  if ((value as { type?: unknown }).type !== SPAN_REFERENCED_EVENT_TYPE) {
     return null;
   }
   return spanReferencedEventSchema.parse(value);
@@ -121,7 +130,11 @@ export function parseSpanReferencedEvent(
 export function makeSpanReferencedEvent(
   event: SpanReceivedEvent,
 ): SpanReferencedEvent | SpanReceivedEvent {
-  const span = event.data.span as { spanId?: unknown; name?: unknown };
+  const span = event.data.span as {
+    spanId?: unknown;
+    name?: unknown;
+    startTimeUnixNano?: unknown;
+  };
   if (typeof span.spanId !== "string" || span.spanId.length === 0) {
     return event;
   }
@@ -138,9 +151,27 @@ export function makeSpanReferencedEvent(
       traceId: String(event.aggregateId),
       spanId: span.spanId,
       spanName: typeof span.name === "string" ? span.name : "",
+      startTimeUnixMs: parseStartTimeUnixMs(span.startTimeUnixNano),
     },
     metadata: event.metadata,
   };
+}
+
+/**
+ * ns→ms off the wire `startTimeUnixNano` (string or number), total: null on
+ * anything unparseable or non-positive. Parsing a 19-digit ns string as a
+ * double loses sub-microsecond precision, which is sub-millisecond after the
+ * divide — well inside what partition windowing tolerates.
+ */
+function parseStartTimeUnixMs(value: unknown): number | null {
+  const nano =
+    typeof value === "string" && /^\d+$/.test(value)
+      ? Number(value)
+      : typeof value === "number"
+        ? value
+        : Number.NaN;
+  if (!Number.isFinite(nano) || nano <= 0) return null;
+  return Math.floor(nano / 1e6);
 }
 
 /**

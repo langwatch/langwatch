@@ -101,7 +101,12 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
           tenantId: ref.tenantId,
           traceId: ref.data.traceId,
           spanId: ref.data.spanId,
-          occurredAtMs: ref.occurredAt,
+          // Center the store's partition window on the span's OWN start (the
+          // stored row's StartTime is this exact value), not on ingest time:
+          // a span that ran longer than the window and exported on end would
+          // otherwise sit permanently outside an occurredAt-centered read and
+          // exhaust its retries into a blocked group.
+          occurredAtMs: ref.data.startTimeUnixMs ?? ref.occurredAt,
         });
         if (span === null) {
           // Not readable YET — the reference raced the sibling span write.
@@ -162,6 +167,14 @@ function liftContribution({
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
     facts["service.version"] = serviceVersion;
+  } else if (
+    // The store read-back deserializes numeric-looking versions ("1.0",
+    // "2024") as numbers — keep the fact instead of silently dropping it on
+    // the claim-check path only.
+    typeof serviceVersion === "number" &&
+    Number.isFinite(serviceVersion)
+  ) {
+    facts["service.version"] = String(serviceVersion);
   }
 
   return {

@@ -9,6 +9,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import {
+  deserializeAttributes,
+  serializeAttributes,
+} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import { createTenantId } from "~/server/event-sourcing";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../../trace-processing/schemas/constants";
@@ -28,6 +32,7 @@ function rawSpanEvent({
   name,
   spanId,
   attributes = {},
+  resourceAttributes = {},
   startMs = 1_000,
   endMs = 2_000,
   statusCode = 0,
@@ -35,6 +40,7 @@ function rawSpanEvent({
   name: string;
   spanId: string;
   attributes?: Record<string, string | number>;
+  resourceAttributes?: Record<string, string>;
   startMs?: number;
   endMs?: number;
   /** OTLP status: 0 UNSET, 1 OK, 2 ERROR. */
@@ -67,7 +73,12 @@ function rawSpanEvent({
         events: [],
         links: [],
       },
-      resource: { attributes: [] },
+      resource: {
+        attributes: Object.entries(resourceAttributes).map(([key, value]) => ({
+          key,
+          value: { stringValue: value },
+        })),
+      },
       instrumentationScope: { name: "com.anthropic.claude_code.tracing" },
     },
   } as unknown as TraceProcessingEvent;
@@ -87,6 +98,26 @@ function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
   );
 }
 
+/**
+ * What the claim-check path actually reads: the normalized span AFTER its
+ * attributes round-tripped ClickHouse's Map(String, String) columns — the
+ * deliberately lossy deserialize turns "true"/"1.0"/"90210" style strings
+ * into booleans and numbers, which is exactly the divergence the
+ * identical-command contract has to absorb.
+ */
+function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
+  const span = normalizedFrom(event);
+  return {
+    ...span,
+    spanAttributes: deserializeAttributes(
+      serializeAttributes(span.spanAttributes),
+    ),
+    resourceAttributes: deserializeAttributes(
+      serializeAttributes(span.resourceAttributes),
+    ),
+  };
+}
+
 function makeSubscriber(
   spanStore: (params: {
     tenantId: string;
@@ -96,13 +127,21 @@ function makeSubscriber(
   }) => Promise<NormalizedSpan | null> = async () => null,
 ) {
   const dispatched: ContributeSpanFactsCommandData[] = [];
-  const reads: Array<{ traceId: string; spanId: string }> = [];
+  const reads: Array<{
+    traceId: string;
+    spanId: string;
+    occurredAtMs?: number;
+  }> = [];
   const subscriber = createCodingAgentSpanFactsDispatchSubscriber({
     contributeSpanFacts: async (data) => {
       dispatched.push(data);
     },
     getNormalizedSpanById: async (params) => {
-      reads.push({ traceId: params.traceId, spanId: params.spanId });
+      reads.push({
+        traceId: params.traceId,
+        spanId: params.spanId,
+        occurredAtMs: params.occurredAtMs,
+      });
       return spanStore(params);
     },
   });
@@ -269,9 +308,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         }
 
         expect(
-          dedup.makeId(
-            makeSpanReferencedEvent(event) as TraceProcessingEvent,
-          ),
+          dedup.makeId(makeSpanReferencedEvent(event) as TraceProcessingEvent),
         ).toBe(dedup.makeId(event));
       });
     });
@@ -294,7 +331,7 @@ describe("codingAgentSpanFactsDispatch", () => {
         const fullPath = makeSubscriber();
         await fullPath.subscriber.handle(event, context);
 
-        const refPath = makeSubscriber(async () => normalizedFrom(event));
+        const refPath = makeSubscriber(async () => storeReadBackFrom(event));
         await refPath.subscriber.handle(
           makeSpanReferencedEvent(event) as TraceProcessingEvent,
           context,
@@ -303,10 +340,105 @@ describe("codingAgentSpanFactsDispatch", () => {
         expect(refPath.dispatched).toHaveLength(1);
         expect(refPath.dispatched[0]).toEqual(fullPath.dispatched[0]);
         expect(refPath.reads).toEqual([
-          { traceId: TRACE_ID, spanId: "llm-ref" },
+          { traceId: TRACE_ID, spanId: "llm-ref", occurredAtMs: 1_000 },
         ]);
         // The full-event path never touches the store.
         expect(fullPath.reads).toHaveLength(0);
+      });
+    });
+
+    describe("when the store read-back deserialized numeric-looking scalars", () => {
+      /** @scenario a matched event's heavy payload travels as a claim-check, not inline */
+      it("keys the session and keeps the version fact identically to the full-event path", async () => {
+        // A purely numeric session key and a numeric-looking service.version:
+        // the Map(String, String) round-trip hands them back as NUMBERS, and
+        // the lift must land on the same command either way — not fall back
+        // to trace-keyed sessions or silently drop the fact.
+        const event = rawSpanEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm-numeric",
+          attributes: { "gen_ai.conversation.id": "175335720123" },
+          resourceAttributes: { "service.version": "1.0" },
+        }) as SpanReceivedEvent;
+
+        const fullPath = makeSubscriber();
+        await fullPath.subscriber.handle(event, context);
+
+        const refPath = makeSubscriber(async () => storeReadBackFrom(event));
+        await refPath.subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        // The session key — the field that decides which aggregate the facts
+        // land on — is identical across paths.
+        expect(fullPath.dispatched[0]?.sessionId).toBe("175335720123");
+        expect(fullPath.dispatched[0]?.sessionKeySource).toBe("provider");
+        expect(refPath.dispatched[0]?.sessionId).toBe("175335720123");
+        expect(refPath.dispatched[0]?.sessionKeySource).toBe("provider");
+        // The version fact survives, canonicalized: the Map(String, String)
+        // round-trip collapses "1.0" to the number 1, so the claim-check path
+        // reports "1" — kept (not dropped), with the numeric formatting lost.
+        expect(fullPath.dispatched[0]?.facts["service.version"]).toBe("1.0");
+        expect(refPath.dispatched[0]?.facts["service.version"]).toBe("1");
+      });
+    });
+
+    describe("when the referenced span outlived the ingest-time window", () => {
+      /** @scenario a reference that cannot be resolved yet retries, never drops */
+      it("centers the store read on the span's own start, not on ingest time", async () => {
+        const threeDays = 3 * 24 * 60 * 60 * 1000;
+        const startMs = 1_000_000;
+        const base = rawSpanEvent({
+          name: "claude_code.blocked_on_user",
+          spanId: "long-span",
+          startMs,
+          endMs: startMs + threeDays,
+        }) as SpanReceivedEvent;
+        // Ingest happened when the span ENDED — three days after it started,
+        // which is outside a fixed window centered on ingest time.
+        const event = { ...base, occurredAt: startMs + threeDays };
+
+        const { subscriber, reads } = makeSubscriber(async () =>
+          normalizedFrom(event),
+        );
+        await subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(reads).toEqual([
+          { traceId: TRACE_ID, spanId: "long-span", occurredAtMs: startMs },
+        ]);
+      });
+
+      it("falls back to ingest time when the wire span carried no parseable start", async () => {
+        const valid = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "no-start",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const base = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "no-start",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        const span = base.data.span as { startTimeUnixNano?: unknown };
+        span.startTimeUnixNano = "not-a-timestamp";
+        const event = { ...base, occurredAt: 5_000 };
+
+        // Only the read HINT is under test; the stub's span content just has
+        // to be a well-formed store row (a garbage start can't normalize, so
+        // the store never holds one).
+        const { subscriber, reads } = makeSubscriber(async () =>
+          normalizedFrom(valid),
+        );
+        await subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        expect(reads[0]?.occurredAtMs).toBe(5_000);
       });
     });
 
