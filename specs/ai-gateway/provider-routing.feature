@@ -111,8 +111,8 @@ Feature: Model → provider routing via VK config
       And the endpoint's catalog holds "claude-haiku-4-5-20251001" and "claude-opus-4-20250514"
       When I GET /v1/models
       Then the response includes "claude-haiku-4-5-20251001"
-      And "claude-haiku-*" itself is absent — a client cannot request a pattern
-      And "claude-opus-4-20250514" is absent — the allowlist still applies to discovered models
+      And "claude-haiku-*" itself is absent, a client cannot request a pattern
+      And "claude-opus-4-20250514" is absent, the allowlist still applies to discovered models
 
     @unit
     Scenario: GET /v1/models filters models denied by policy rules

@@ -734,7 +734,7 @@ func TestRouter_ModelsEndpoint_EmitsOpenAIListShape(t *testing.T) {
 		ids[m.ID] = m.Object
 		ownedBy[m.ID] = m.OwnedBy
 		// `created` and `owned_by` are required fields of the OpenAI
-		// Model object — the openai SDKs type them as int / str, so a
+		// Model object. The openai SDKs type them as int / str, so a
 		// missing one lands as a null the client did not ask for.
 		assert.NotNil(t, m.Created, "model %q is missing the required `created` field", m.ID)
 		assert.NotEmpty(t, m.OwnedBy, "model %q is missing the required `owned_by` field", m.ID)
@@ -746,7 +746,7 @@ func TestRouter_ModelsEndpoint_EmitsOpenAIListShape(t *testing.T) {
 }
 
 // A model the gateway cannot attribute to a provider still needs a
-// non-empty `owned_by` — it is a required string in the OpenAI Model
+// non-empty `owned_by`: it is a required string in the OpenAI Model
 // object, and a blank one renders as an unlabelled row in model pickers.
 func TestRouter_ModelsEndpoint_AttributesUnownedModelsToGateway(t *testing.T) {
 	bundle := testBundle()

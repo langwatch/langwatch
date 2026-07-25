@@ -295,7 +295,7 @@ func TestListModels_RejectsRebindingToLocalAddress(t *testing.T) {
 	defer srv.Close()
 
 	// "localhost" really resolves to loopback, but the pre-flight check
-	// uses the policy's resolver — stubbed here to answer with a public
+	// uses the policy's resolver, stubbed here to answer with a public
 	// address, which is exactly what a rebinding host does on the first
 	// lookup.
 	policy := newCustomerEndpointPolicy(true, false, nil)
@@ -355,7 +355,7 @@ func TestListModels_CachesDiscoveryBetweenCalls(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	if probes != 1 {
-		t.Fatalf("upstream probed %d times across 5 calls, want 1 — discovery is not cached", probes)
+		t.Fatalf("upstream probed %d times across 5 calls, want 1; discovery is not cached", probes)
 	}
 }
 
@@ -385,7 +385,7 @@ func TestListModels_CacheKeyedByCredentialChain(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	if probes != 2 {
-		t.Fatalf("upstream probed %d times, want 2 — a rotated key must not hit the previous key's cache entry", probes)
+		t.Fatalf("upstream probed %d times, want 2; a rotated key must not hit the previous key's cache entry", probes)
 	}
 }
 

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Integration coverage for GET /api/internal/gateway/config/:vk_id — the
+ * Integration coverage for GET /api/internal/gateway/config/:vk_id, the
  * route the Go gateway calls on every bundle cache miss.
  *
  * Hits the real Hono app and real PG, no mocks. The materialiser reads

@@ -96,7 +96,7 @@ func newModelsDiscoveryClient(policy customerEndpointPolicy) *http.Client {
 // allowsDialAddress applies the endpoint policy to a resolved
 // "host:port" the dialer is about to connect to. Host allowlisting is
 // intentionally not consulted here: the allowlist names hosts, and by
-// this point the name is gone — the pre-flight check is where an
+// this point the name is gone. The pre-flight check is where an
 // allowlisted host earns its exemption.
 func (p customerEndpointPolicy) allowsDialAddress(address string) error {
 	host, _, err := net.SplitHostPort(address)
@@ -191,7 +191,7 @@ func (c *modelsDiscoveryCache) get(ctx context.Context, key string, fetch func()
 
 // evictLocked keeps the cache bounded: expired entries go first, and if
 // that is not enough the oldest completed entries are dropped. In-flight
-// entries are never dropped — a waiter is blocked on them.
+// entries are never dropped: a waiter is blocked on them.
 func (c *modelsDiscoveryCache) evictLocked(now time.Time) {
 	if len(c.entries) < modelsDiscoveryCacheMaxEntries {
 		return

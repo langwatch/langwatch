@@ -156,7 +156,7 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 // addDiscovered asks the credential chain's endpoints for their catalogs
 // and feeds the models the VK may actually request into add. Discovery
 // answers with whatever the endpoint serves, so the allowlist is applied
-// here too — dispatch rejects anything outside it, and listing a model
+// here too: dispatch rejects anything outside it, and listing a model
 // the VK cannot call is worse than omitting it.
 func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg domain.BundleConfig, add func(domain.Model)) error {
 	if a.providers == nil {
