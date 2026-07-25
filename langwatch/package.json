@@ -90,7 +90,7 @@
     "@dnd-kit/utilities": "3.2.2",
     "@emotion/react": "^11.14.0",
     "@google-cloud/dlp": "^6.7.0",
-    "@hono/node-server": "^2.0.6",
+    "@hono/node-server": "^2.0.10",
     "@hono/zod-validator": "^0.4.3",
     "@hookform/resolvers": "^5.4.0",
     "@langwatch/automations": "workspace:*",
