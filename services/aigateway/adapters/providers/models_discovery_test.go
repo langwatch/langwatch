@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -253,9 +254,9 @@ func TestListModels_RejectsOversizedResponse(t *testing.T) {
 // Authorization across hosts, not custom headers).
 // Spec: specs/ai-gateway/provider-routing.feature
 func TestListModels_DoesNotFollowRedirects(t *testing.T) {
-	var redirectTargetHit bool
+	var redirectTargetHit atomic.Bool
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		redirectTargetHit = true
+		redirectTargetHit.Store(true)
 		_, _ = w.Write([]byte(`{"data":[{"id":"internal-only"}]}`))
 	}))
 	defer target.Close()
@@ -272,7 +273,7 @@ func TestListModels_DoesNotFollowRedirects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListModels returned error: %v", err)
 	}
-	if redirectTargetHit {
+	if redirectTargetHit.Load() {
 		t.Fatal("discovery followed a redirect to an address the endpoint policy never validated")
 	}
 	if len(models) != 0 {
@@ -287,9 +288,9 @@ func TestListModels_DoesNotFollowRedirects(t *testing.T) {
 // address must be re-checked immediately before connect.
 // Spec: specs/ai-gateway/provider-routing.feature
 func TestListModels_RejectsRebindingToLocalAddress(t *testing.T) {
-	var hit bool
+	var hit atomic.Bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		hit = true
+		hit.Store(true)
 		_, _ = w.Write([]byte(`{"data":[{"id":"internal-only"}]}`))
 	}))
 	defer srv.Close()
@@ -315,7 +316,7 @@ func TestListModels_RejectsRebindingToLocalAddress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListModels returned error: %v", err)
 	}
-	if hit {
+	if hit.Load() {
 		t.Fatal("discovery connected to a loopback address that passed the pre-flight check by rebinding")
 	}
 	if len(models) != 0 {
@@ -432,6 +433,62 @@ func TestListModels_CollapsesConcurrentDiscovery(t *testing.T) {
 	}
 }
 
+// Whoever misses the cache probes on behalf of every concurrent waiter,
+// so their client hanging up must not abort the fetch the others are
+// blocked on, nor cache the empty catalog that abort would produce.
+func TestListModels_ProbeSurvivesCallerCancellation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		_, _ = w.Write([]byte(`{"data":[{"id":"qwen3-14b"}]}`))
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	router := &BifrostRouter{}
+	models, err := router.ListModels(ctx, []domain.Credential{
+		{ID: "mp-1", ProviderID: domain.ProviderCustom, Extra: map[string]string{"base_url": srv.URL}},
+	})
+	if err != nil {
+		t.Fatalf("ListModels returned error: %v", err)
+	}
+	if len(models) != 1 || models[0].ID != "qwen3-14b" {
+		t.Fatalf("models = %v, want the probe to finish despite the caller canceling", models)
+	}
+}
+
+// An empty catalog is usually a transient upstream failure, so it must not
+// hold the full TTL and blank the model list for a minute.
+func TestModelsDiscoveryCache_ExpiresEmptyResultsQuickly(t *testing.T) {
+	cache := &modelsDiscoveryCache{}
+
+	before := time.Now()
+	if _, err := cache.get(context.Background(), "empty", func() []domain.Model { return nil }); err != nil {
+		t.Fatalf("get returned error: %v", err)
+	}
+	if _, err := cache.get(context.Background(), "full", func() []domain.Model {
+		return []domain.Model{{ID: "qwen3-14b"}}
+	}); err != nil {
+		t.Fatalf("get returned error: %v", err)
+	}
+
+	// The entries stamp their own time.Now(), so compare against the
+	// window the calls ran in rather than a single instant.
+	elapsed := time.Since(before)
+	emptyTTL := cache.entries["empty"].expiresAt.Sub(before)
+	fullTTL := cache.entries["full"].expiresAt.Sub(before)
+	if emptyTTL > modelsDiscoveryEmptyTTL+elapsed {
+		t.Fatalf("empty catalog cached for %v, want at most %v", emptyTTL, modelsDiscoveryEmptyTTL)
+	}
+	if fullTTL < modelsDiscoveryTTL {
+		t.Fatalf("populated catalog cached for %v, want the full %v", fullTTL, modelsDiscoveryTTL)
+	}
+}
+
 // A cache entry nobody completes would block every later caller for that
 // key until their context expires. A panicking discovery must release its
 // waiters and drop the entry so the next call retries.
@@ -474,9 +531,9 @@ func TestModelsDiscoveryCache_RecoversFromPanickingFetch(t *testing.T) {
 // a base URL that BlockLocalHTTPCalls would reject at dispatch time must
 // not be contacted by the model probe either (SSRF + key exfiltration).
 func TestListModels_HonorsCustomerEndpointPolicy(t *testing.T) {
-	var hit bool
+	var hit atomic.Bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		hit = true
+		hit.Store(true)
 		_, _ = w.Write([]byte(`{"data":[{"id":"m"}]}`))
 	}))
 	defer srv.Close()
@@ -490,7 +547,7 @@ func TestListModels_HonorsCustomerEndpointPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListModels returned error: %v", err)
 	}
-	if hit {
+	if hit.Load() {
 		t.Fatal("local endpoint was contacted despite BlockLocalHTTPCalls — discovery bypasses the SSRF policy")
 	}
 	if len(models) != 0 {

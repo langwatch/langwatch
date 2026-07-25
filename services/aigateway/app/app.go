@@ -125,7 +125,7 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 		// guessing among multiple candidate providers would be more
 		// misleading than reporting none.
 		providerID := soleCredentialProviderID(bundle.Credentials)
-		wildcards := false
+		hasWildcards := false
 		for _, id := range cfg.AllowedModels {
 			// A wildcard entry ("claude-haiku-*") is a pattern, not a
 			// model a client can request: listing it verbatim puts a
@@ -134,12 +134,12 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 			// provider has. Concrete IDs behind the pattern come from
 			// discovery instead.
 			if domain.ModelPatternIsWildcard(id) {
-				wildcards = true
+				hasWildcards = true
 				continue
 			}
 			add(domain.Model{ID: id, Name: id, ProviderID: providerID})
 		}
-		if wildcards {
+		if hasWildcards {
 			if err := a.addDiscovered(ctx, bundle, cfg, add); err != nil {
 				return nil, err
 			}

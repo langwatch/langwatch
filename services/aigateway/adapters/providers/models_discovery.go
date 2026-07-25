@@ -2,12 +2,13 @@ package providers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"sort"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -41,6 +42,20 @@ const modelsDiscoveryConcurrency = 8
 // matches the auth cache's default ConfigTTL so a credential change
 // takes effect on the model list about as fast as it does on dispatch.
 const modelsDiscoveryTTL = 60 * time.Second
+
+// modelsDiscoveryEmptyTTL is how long an empty catalog stays fresh. Short,
+// because "no models" is far more often a transient upstream failure than
+// an answer, and caching it for a full minute blanks the model list for
+// every caller on that credential chain.
+const modelsDiscoveryEmptyTTL = 5 * time.Second
+
+// modelsDiscoveryProbeCeiling bounds one whole round of discovery. Each
+// probe is already capped by the client's own timeout; this guards the
+// pathological case of a bundle wide enough to need many batches through
+// the concurrency semaphore. The round runs detached from the caller that
+// happened to miss the cache, so a client hanging up mid-probe cannot
+// abort the fetch that every other waiter is blocked on.
+const modelsDiscoveryProbeCeiling = 30 * time.Second
 
 // modelsDiscoveryCacheMaxEntries bounds the cache so a gateway serving
 // many distinct credential chains cannot grow it without limit. Entries
@@ -167,25 +182,34 @@ func (c *modelsDiscoveryCache) get(ctx context.Context, key string, fetch func()
 	c.mu.Unlock()
 
 	// An entry nobody ever completes would block every later caller for
-	// this key until their context expires, so a panicking fetch has to
-	// release its waiters and drop the entry on the way out.
+	// this key until their context expires, so the close has to happen
+	// even when fetch panics, and a panicking entry is dropped so the
+	// next caller retries instead of reading a result that never arrived.
 	completed := false
 	defer func() {
-		if completed {
-			return
+		if !completed {
+			c.mu.Lock()
+			if c.entries[key] == entry {
+				delete(c.entries, key)
+			}
+			c.mu.Unlock()
 		}
-		c.mu.Lock()
-		if c.entries[key] == entry {
-			delete(c.entries, key)
-		}
-		c.mu.Unlock()
 		close(entry.done)
 	}()
 
 	entry.models = fetch()
-	entry.expiresAt = time.Now().Add(modelsDiscoveryTTL)
+	// An empty catalog is usually a transient upstream failure rather than
+	// a real answer (every endpoint down, or the probe cut short), and
+	// holding it for the full TTL blanks the model list for everyone on
+	// this credential chain for a minute. Let it expire quickly so the
+	// next caller retries. A bundle with genuinely nothing to discover
+	// re-probes nothing: with no base URLs there is no request to make.
+	ttl := modelsDiscoveryTTL
+	if len(entry.models) == 0 {
+		ttl = modelsDiscoveryEmptyTTL
+	}
+	entry.expiresAt = time.Now().Add(ttl)
 	completed = true
-	close(entry.done)
 	return entry.models, nil
 }
 
@@ -231,18 +255,20 @@ func (c *modelsDiscoveryCache) evictLocked(now time.Time) {
 // serving a catalog fetched with the old one; it is hashed with the rest
 // into an opaque key that is only ever compared, never logged.
 func modelsDiscoveryCacheKey(creds []domain.Credential) string {
-	var b strings.Builder
+	sum := sha256.New()
 	for _, cred := range creds {
-		b.WriteString(cred.ID)
-		b.WriteByte('\x1f')
-		b.WriteString(string(cred.ProviderID))
-		b.WriteByte('\x1f')
-		b.WriteString(credBaseURL(cred))
-		b.WriteByte('\x1f')
-		b.WriteString(cred.APIKey)
-		b.WriteByte('\x1e')
+		for _, field := range []string{
+			cred.ID,
+			string(cred.ProviderID),
+			credBaseURL(cred),
+			cred.APIKey,
+		} {
+			_, _ = sum.Write([]byte(field))
+			_, _ = sum.Write([]byte{0x1f})
+		}
+		_, _ = sum.Write([]byte{0x1e})
 	}
-	return b.String()
+	return hex.EncodeToString(sum.Sum(nil))
 }
 
 // ListModels discovers models from credentials that carry a base URL
@@ -252,7 +278,15 @@ func modelsDiscoveryCacheKey(creds []domain.Credential) string {
 // too: one dead server must not blank out the whole list.
 func (r *BifrostRouter) ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, error) {
 	return r.discoveryCache().get(ctx, modelsDiscoveryCacheKey(creds), func() []domain.Model {
-		return r.discoverModels(ctx, creds)
+		// Detached from the calling request: whoever misses the cache runs
+		// the probe on behalf of every concurrent waiter, so their client
+		// hanging up must not cancel it out from under the others (and
+		// cache the resulting empty catalog). Values still ride along, only
+		// the cancellation is dropped.
+		probeCtx, cancel := context.WithTimeout(
+			context.WithoutCancel(ctx), modelsDiscoveryProbeCeiling)
+		defer cancel()
+		return r.discoverModels(probeCtx, creds)
 	})
 }
 
