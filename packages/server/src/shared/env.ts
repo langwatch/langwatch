@@ -110,13 +110,19 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   set("FEATURE_FLAG_FORCE_ENABLE", "release_langy_enabled");
 
   sectionBreak("OPTIONAL PIECES — flip one of these and restart the server");
-  // Both of these are read by the installer AND by the app, so the same line
-  // decides what gets downloaded and what the product says about it.
+  // These are read by the installer AND by the app, so the same line decides
+  // what gets downloaded and what the product says about it.
   set("LANGWATCH_ENABLE_LANGY", "true");
   // The PII detection evaluator ships a ~670MB language model — larger than
   // the rest of the evaluator environment put together. Off by default; the
   // product points anyone who reaches for that evaluator back at this line.
   set("LANGWATCH_ENABLE_PRESIDIO", "false");
+  // The language detection evaluator: ~95MB of language models, same deal.
+  set("LANGWATCH_ENABLE_LINGUA", "false");
+  // The deprecated legacy evaluators (old Ragas API), kept only so
+  // evaluations saved years ago keep running. When off they are hidden from
+  // the product entirely, not just disabled.
+  set("LANGWATCH_ENABLE_LEGACY_EVALUATORS", "false");
 
   sectionBreak("ENVIRONMENT");
   set("ENVIRONMENT", "local");

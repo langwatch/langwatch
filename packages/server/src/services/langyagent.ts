@@ -7,7 +7,7 @@ import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
 /**
- * The Langy assistant's manager — the process that owns one opencode worker
+ * The Langy assistant's manager, the process that owns one opencode worker
  * per conversation. Same `cmd/service` mono-binary as the gateway and the NLP
  * engine, dispatched as `langyagent`, so the assistant adds no download of its
  * own beyond the opencode runtime predep.
@@ -16,7 +16,7 @@ import { supervise, type SupervisedHandle } from "./spawn.ts";
  *
  * WHAT IS DIFFERENT ABOUT A LAPTOP. In a cluster this pod runs under a
  * sandboxed container runtime, as root, handing every conversation's worker
- * its own UID — because there the workers belong to different people and a
+ * its own UID, because there the workers belong to different people and a
  * prompt-injected one must not be able to read a colleague's credentials off
  * disk. Here there is one person, on their own machine, and each worker
  * already runs as them with their own credentials. The UID handoff would need
@@ -58,8 +58,8 @@ export async function startLangyagent(
         SESSIONS_ROOT: sessionsRoot,
         LANGY_WORKSPACE_ROOT: workspaceRoot,
         // Workers spawn as the user who ran the installer. The manager refuses
-        // this unless ENVIRONMENT is local-like, which the scaffolded .env sets
-        // — a production deployment cannot reach this path by accident.
+        // this unless ENVIRONMENT is local-like, which the scaffolded .env sets,
+        // so a production deployment cannot reach this path by accident.
         LANGY_UNSAFE_DEV_DISABLE_ISOLATION: "true",
         // Each worker is an opencode process holding a real conversation; two
         // at a time is as much as a laptop should be asked to hold, and idle

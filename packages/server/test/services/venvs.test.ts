@@ -48,25 +48,43 @@ describe("evaluator environment", () => {
     delete process.env.LANGWATCH_ENABLE_PRESIDIO;
   });
 
-  describe("when the PII model has not been asked for", () => {
-    it("installs every evaluator except the PII detector", async () => {
+  describe("when none of the heavyweight evaluators were asked for", () => {
+    it("installs the base set and skips PII, language detection, and legacy", async () => {
       await syncVenvs(ctxWith("ENVIRONMENT=local\n"), bus);
 
       const extras = extrasFrom(execCalls[0]!.args);
       expect(extras).not.toContain("presidio");
+      expect(extras).not.toContain("lingua");
+      expect(extras).not.toContain("legacy");
       expect(extras).not.toContain("all");
       // The rest still have to be there — a missing extra means that
       // evaluator's route is never registered and every call 404s.
       expect(extras).toEqual(
-        expect.arrayContaining(["azure", "langevals", "legacy", "lingua", "openai", "ragas", "topic_clustering"]),
+        expect.arrayContaining(["azure", "langevals", "openai", "ragas", "topic_clustering"]),
       );
     });
   });
 
-  describe("when the PII model has been asked for", () => {
-    it("installs the complete set", async () => {
+  describe("when a heavyweight evaluator has been asked for", () => {
+    it("adds exactly the one asked for", async () => {
       await syncVenvs(ctxWith("LANGWATCH_ENABLE_PRESIDIO=true\n"), bus);
-      expect(extrasFrom(execCalls[0]!.args)).toEqual(["all"]);
+      const extras = extrasFrom(execCalls[0]!.args);
+      expect(extras).toContain("presidio");
+      expect(extras).not.toContain("lingua");
+      expect(extras).not.toContain("legacy");
+    });
+
+    it("supports all three together", async () => {
+      await syncVenvs(
+        ctxWith(
+          "LANGWATCH_ENABLE_PRESIDIO=true\nLANGWATCH_ENABLE_LINGUA=true\nLANGWATCH_ENABLE_LEGACY_EVALUATORS=true\n",
+        ),
+        bus,
+      );
+      const extras = extrasFrom(execCalls[0]!.args);
+      expect(extras).toEqual(
+        expect.arrayContaining(["presidio", "lingua", "legacy"]),
+      );
     });
   });
 
@@ -80,7 +98,7 @@ describe("evaluator environment", () => {
       // silently keeping the lean environment.
       await syncVenvs(ctxWith("LANGWATCH_ENABLE_PRESIDIO=true\n"), bus);
       expect(execCalls).toHaveLength(2);
-      expect(extrasFrom(execCalls[1]!.args)).toEqual(["all"]);
+      expect(extrasFrom(execCalls[1]!.args)).toContain("presidio");
     });
   });
 });

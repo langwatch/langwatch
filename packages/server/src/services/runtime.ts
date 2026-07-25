@@ -19,7 +19,7 @@ import { startLangwatchWorkers } from "./langwatch-workers.ts";
 import { startLangyagent } from "./langyagent.ts";
 import { ensureLangyCli } from "./langy-cli.ts";
 import { startNlpgo } from "./nlpgo.ts";
-import { resolveFeatures } from "../shared/features.ts";
+import { featureEnv, resolveFeatures } from "../shared/features.ts";
 import { runMigrations } from "./migrate.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { startPostgres } from "./postgres.ts";
@@ -93,14 +93,33 @@ const runtimeImpl: RuntimeApi = {
 
     // Phase 3: app-tier services in parallel. The langwatch app receives
     // userEnv overlay so the user's provider keys (OPENAI_API_KEY etc.)
-    // win over the blank .env entries written by scaffoldEnvFile.
-    const childEnv = { ...envFromFile, ...ctx.userEnv };
+    // win over the blank .env entries written by scaffoldEnvFile. The
+    // resolved feature toggles ride along explicitly (see featureEnv) so the
+    // app describes exactly the install this process just built.
+    const features = resolveFeatures({ ...envFromFile, ...process.env });
+    const childEnv: Record<string, string> = {
+      ...envFromFile,
+      ...ctx.userEnv,
+      ...featureEnv(features),
+    };
+    if (!features.langy) {
+      // With the assistant off, the app must not think it exists: an agent
+      // URL with no agent behind it turns every send into a hang, and the
+      // forced rollout flag would render the panel. The .env keeps its lines
+      // (they are the user's knobs); only the running processes lose them.
+      delete childEnv.OPENCODE_AGENT_URL;
+      const forced = (childEnv.FEATURE_FLAG_FORCE_ENABLE ?? "")
+        .split(",")
+        .map((f) => f.trim())
+        .filter((f) => f && f !== "release_langy_enabled");
+      if (forced.length > 0) childEnv.FEATURE_FLAG_FORCE_ENABLE = forced.join(",");
+      else delete childEnv.FEATURE_FLAG_FORCE_ENABLE;
+    }
 
     try {
       // nlpgo is the only NLP runtime — the Go service from the aigateway
       // monobinary, dispatched as `nlpgo`. It binds to ctx.ports.nlp; the
       // langwatch app's /studio/* routing always targets /go/*.
-      const features = resolveFeatures({ ...envFromFile, ...process.env });
       const [nlp, langevals, gw, lw, langy] = await Promise.all([
         startNlpgo(ctx, bus, childEnv),
         startLangevals(ctx, bus, childEnv),

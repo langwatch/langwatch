@@ -5,7 +5,7 @@ Feature: The assistant works on a laptop install
     can only get by running Kubernetes
 
   See _shared/contract.md for paths, ports, secrets, supervision rules.
-  See specs/langy/langy-selfhost-install.feature for the cluster story — the
+  See specs/langy/langy-selfhost-install.feature for the cluster story, the
   same feature, a very different set of prerequisites.
 
   # Context. Langy was built for a cluster: a pod per install, a sandboxed

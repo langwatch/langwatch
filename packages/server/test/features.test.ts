@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { LANGY_ENV_KEY, PRESIDIO_ENV_KEY, resolveFeatures } from "../src/shared/features.ts";
+import {
+  featureEnv,
+  LANGY_ENV_KEY,
+  LEGACY_EVALUATORS_ENV_KEY,
+  LINGUA_ENV_KEY,
+  PRESIDIO_ENV_KEY,
+  resolveFeatures,
+} from "../src/shared/features.ts";
 
 describe("optional install pieces", () => {
   describe("when nothing is set", () => {
-    it("installs the assistant and skips the PII model", () => {
+    it("installs the assistant and skips every heavyweight evaluator", () => {
       const f = resolveFeatures({});
       expect(f.langy).toBe(true);
       expect(f.presidio).toBe(false);
+      expect(f.lingua).toBe(false);
+      expect(f.legacyEvaluators).toBe(false);
     });
   });
 
@@ -17,6 +26,13 @@ describe("optional install pieces", () => {
 
     it("honours an explicit opt-out of the assistant", () => {
       expect(resolveFeatures({ [LANGY_ENV_KEY]: "false" }).langy).toBe(false);
+    });
+
+    it("honours opting into language detection and legacy evaluators", () => {
+      expect(resolveFeatures({ [LINGUA_ENV_KEY]: "true" }).lingua).toBe(true);
+      expect(
+        resolveFeatures({ [LEGACY_EVALUATORS_ENV_KEY]: "true" }).legacyEvaluators,
+      ).toBe(true);
     });
 
     it("accepts the spellings people actually type", () => {
@@ -39,6 +55,18 @@ describe("optional install pieces", () => {
 
     it("treats an empty value as unset", () => {
       expect(resolveFeatures({ [LANGY_ENV_KEY]: "" }).langy).toBe(true);
+    });
+  });
+
+  describe("featureEnv", () => {
+    it("spells every toggle out so a child process never falls back to a default", () => {
+      const env = featureEnv(resolveFeatures({ [PRESIDIO_ENV_KEY]: "true" }));
+      expect(env).toEqual({
+        [LANGY_ENV_KEY]: "true",
+        [PRESIDIO_ENV_KEY]: "true",
+        [LINGUA_ENV_KEY]: "false",
+        [LEGACY_EVALUATORS_ENV_KEY]: "false",
+      });
     });
   });
 });

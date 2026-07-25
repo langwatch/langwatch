@@ -5,7 +5,7 @@ import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { resolvePnpm } from "./node-deps.ts";
 
-// The `langwatch` CLI is the assistant's ONLY interface to LangWatch — every
+// The `langwatch` CLI is the assistant's ONLY interface to LangWatch, every
 // skill is written against its command grammar, and a worker with no CLI can
 // answer from the model alone but cannot look anything up. Pinned rather than
 // tracking latest so the grammar the skills were written against is the
@@ -20,7 +20,7 @@ export const LANGY_CLI_VERSION = "1.0.0";
  * only an install running the assistant needs, and fetching it here keeps it
  * out of every install that does not.
  *
- * Idempotent — a marker file records the version installed, so re-running the
+ * Idempotent, a marker file records the version installed, so re-running the
  * server is a no-op until the pin moves.
  */
 export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promise<void> {

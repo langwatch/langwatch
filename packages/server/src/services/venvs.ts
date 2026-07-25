@@ -62,14 +62,13 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
   );
 }
 
-// Every extra langevals declares (see langevals/pyproject.toml), minus
-// presidio. `--extra all` is the union of these plus presidio; naming them
-// individually is how we drop one without dropping the rest.
-const LANGEVALS_EXTRAS_WITHOUT_PRESIDIO = [
+// The extras every install gets (see langevals/pyproject.toml for the full
+// set). `--extra all` is the union of these plus the three optional ones
+// below; naming them individually is how we drop some without dropping the
+// rest.
+const LANGEVALS_BASE_EXTRAS = [
   "azure",
   "langevals",
-  "legacy",
-  "lingua",
   "openai",
   "ragas",
   "topic_clustering",
@@ -77,16 +76,25 @@ const LANGEVALS_EXTRAS_WITHOUT_PRESIDIO = [
 
 function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   const root = appRoot();
-  // The PII detector brings a natural-language model that is larger than the
-  // rest of this environment put together (~670MB of a ~1.6GB venv, most of it
-  // one spacy model). Most first installs never evaluate PII, so it is opt-in
-  // and the product tells anyone who reaches for that evaluator how to get it.
-  // Nothing else about redaction depends on this: LangWatch's own secret and
+  // Three evaluator families are opt-in. Two for weight: the PII detector
+  // brings a ~620MB spacy model and language detection ~95MB of language
+  // models. The deprecated legacy evaluators are opt-in for a different
+  // reason: they exist only so evaluations saved years ago keep running, and
+  // deprecated things should vanish rather than nag (most of their heavy
+  // dependencies are shared with the current ragas family anyway). The
+  // product tells anyone who reaches for one of these how to get it. Nothing
+  // about redaction depends on the PII toggle: LangWatch's own secret and
   // PII redaction in the ingestion pipeline is not implemented with presidio.
-  const presidio = resolveFeatures({
+  const features = resolveFeatures({
     ...readEnvFile(ctx.envFile),
     ...process.env,
-  }).presidio;
+  });
+  const extras = [
+    ...LANGEVALS_BASE_EXTRAS,
+    ...(features.lingua ? ["lingua"] : []),
+    ...(features.legacyEvaluators ? ["legacy"] : []),
+    ...(features.presidio ? ["presidio"] : []),
+  ];
   // langevals is the only Python venv we build — nlpgo runs from the
   // aigateway monobinary and needs no uv environment.
   const specs: VenvSpec[] = [
@@ -105,9 +113,9 @@ function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
       // and `/openapi.json` reports just `/healthcheck` and `/` — every
       // evaluator request 404s, langwatch app's runEvaluation throws
       // `404 {"detail":"Not Found"}`, and the experiments workbench column
-      // shows 'Internal error' for every row. So we always install the full
-      // set, with presidio the one member that has to be asked for.
-      extras: presidio ? ["all"] : LANGEVALS_EXTRAS_WITHOUT_PRESIDIO,
+      // shows 'Internal error' for every row. So the base set always
+      // installs, and only the three opt-in members have to be asked for.
+      extras,
     },
   ];
 

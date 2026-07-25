@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   evaluatorUnavailability,
   unavailableEvaluatorMessage,
+  LEGACY_EVALUATORS_ENABLE_ENV_VAR,
+  LINGUA_ENABLE_ENV_VAR,
   PRESIDIO_ENABLE_ENV_VAR,
 } from "../installedEvaluators";
 
@@ -9,8 +11,10 @@ describe("evaluator availability on this install", () => {
   describe("when nothing says otherwise", () => {
     it("treats every evaluator as available", () => {
       // Container and Kubernetes installs build the evaluator environment with
-      // every extra and never set this variable, so silence must mean present.
+      // every extra and never set these variables, so silence must mean present.
       expect(evaluatorUnavailability("presidio/pii_detection", {})).toBeUndefined();
+      expect(evaluatorUnavailability("lingua/language_detection", {})).toBeUndefined();
+      expect(evaluatorUnavailability("legacy/ragas_faithfulness", {})).toBeUndefined();
       expect(evaluatorUnavailability("ragas/faithfulness", {})).toBeUndefined();
     });
   });
@@ -56,6 +60,40 @@ describe("evaluator availability on this install", () => {
       const message = unavailableEvaluatorMessage(result);
       expect(message).toContain(result.reason);
       expect(message).toContain(result.howToEnable);
+    });
+  });
+
+  describe("when the install skipped language detection", () => {
+    const env = { [LINGUA_ENABLE_ENV_VAR]: "false" };
+
+    it("reports it as not installed, naming the switch", () => {
+      const result = evaluatorUnavailability("lingua/language_detection", env);
+      expect(result).toBeDefined();
+      expect(result!.reason).toMatch(/not installed/i);
+      expect(result!.howToEnable).toContain(LINGUA_ENABLE_ENV_VAR);
+      // It stays visible as a disabled card; only deprecated families hide.
+      expect(result!.hideFromUi).toBeUndefined();
+    });
+  });
+
+  describe("when the install skipped the legacy evaluators", () => {
+    const env = { [LEGACY_EVALUATORS_ENABLE_ENV_VAR]: "false" };
+
+    it("hides them from pickers entirely", () => {
+      const result = evaluatorUnavailability("legacy/ragas_faithfulness", env);
+      expect(result).toBeDefined();
+      expect(result!.hideFromUi).toBe(true);
+    });
+
+    it("still explains itself when a saved evaluation runs one", () => {
+      const result = evaluatorUnavailability("legacy/ragas_faithfulness", env)!;
+      const message = unavailableEvaluatorMessage(result);
+      expect(message).toMatch(/not installed/i);
+      expect(message).toContain(LEGACY_EVALUATORS_ENABLE_ENV_VAR);
+    });
+
+    it("does not touch the current ragas family", () => {
+      expect(evaluatorUnavailability("ragas/faithfulness", env)).toBeUndefined();
     });
   });
 });

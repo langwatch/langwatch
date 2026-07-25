@@ -77,7 +77,8 @@ vi.mock("../../src/services/app-dir.ts", () => ({
   ensureAppDir: ensureAppDirFn,
   appRoot: () => "/tmp/.langwatch-test/app",
 }));
-vi.mock("../../src/services/env-file.ts", () => ({ readEnvFile: () => ({}) }));
+let envFileContent: Record<string, string> = {};
+vi.mock("../../src/services/env-file.ts", () => ({ readEnvFile: () => envFileContent }));
 
 // Import AFTER vi.mock so the runtime resolves the stubs.
 const { runtime } = await import("../../src/services/runtime.ts");
@@ -212,6 +213,36 @@ describe("services/runtime", () => {
       } finally {
         delete process.env.LANGWATCH_ENABLE_LANGY;
       }
+    });
+
+    it("strips the assistant out of the app's env so nothing points at a service that is not there", async () => {
+      process.env.LANGWATCH_ENABLE_LANGY = "false";
+      // Simulate a .env scaffolded while the assistant was on: the file keeps
+      // its lines (they are the user's knobs), the processes must not see them.
+      envFileContent = {
+        OPENCODE_AGENT_URL: "http://localhost:5564",
+        FEATURE_FLAG_FORCE_ENABLE: "release_langy_enabled,other_flag",
+      };
+      try {
+        await runtime.startAll(fakeCtx());
+        const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<string, string>;
+        expect(childEnv.OPENCODE_AGENT_URL).toBeUndefined();
+        expect(childEnv.FEATURE_FLAG_FORCE_ENABLE).toBe("other_flag");
+        expect(childEnv.LANGWATCH_ENABLE_LANGY).toBe("false");
+      } finally {
+        envFileContent = {};
+        delete process.env.LANGWATCH_ENABLE_LANGY;
+      }
+    });
+
+    it("tells the app exactly which evaluators this install skipped", async () => {
+      await runtime.startAll(fakeCtx());
+      const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<string, string>;
+      // Explicit values, so an install whose .env predates a toggle still
+      // gets the truth rather than the app's assume-available default.
+      expect(childEnv.LANGWATCH_ENABLE_PRESIDIO).toBe("false");
+      expect(childEnv.LANGWATCH_ENABLE_LINGUA).toBe("false");
+      expect(childEnv.LANGWATCH_ENABLE_LEGACY_EVALUATORS).toBe("false");
     });
   });
 

@@ -9,7 +9,7 @@ import type { Predep } from "./types.ts";
 // rather than tracking latest: this binary executes model-written shell with
 // the user's own credentials in its environment, so every rebuild silently
 // re-evaluating trust in an upstream release is not a trade worth making.
-// Keep in lockstep with the OPENCODE_VERSION pin in Dockerfile.langyagent —
+// Keep in lockstep with the OPENCODE_VERSION pin in Dockerfile.langyagent:
 // the skills and AGENTS.md are written against one grammar, not two.
 export const OPENCODE_VERSION = "1.17.11";
 
@@ -49,7 +49,7 @@ async function resolveVersion(bin: string): Promise<string | null> {
  * The Langy assistant's worker runtime.
  *
  * Skipped entirely when the assistant is turned off, because it is the only
- * part of the install that exists solely for it — everything else Langy needs
+ * part of the install that exists solely for it, everything else Langy needs
  * (the manager itself) already ships inside the mono-binary we download for
  * the gateway.
  */

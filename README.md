@@ -63,9 +63,11 @@ Two pieces are yours to decide on, in `~/.langwatch/.env`:
 | Variable | Default | What it changes |
 |---|---|---|
 | `LANGWATCH_ENABLE_LANGY` | `true` | The Langy assistant. Adds ~45MB for its runtime; the workers run unsandboxed as you, on your own machine. |
-| `LANGWATCH_ENABLE_PRESIDIO` | `false` | The PII detection evaluator. Adds ~670MB of language model, larger than the rest of the evaluator environment put together. Every other evaluator is installed either way, and LangWatch's own secret and PII redaction of your traces does not depend on it. |
+| `LANGWATCH_ENABLE_PRESIDIO` | `false` | The PII detection evaluator. Adds ~670MB of language model, larger than the rest of the evaluator environment put together. LangWatch's own secret and PII redaction of your traces does not depend on it. |
+| `LANGWATCH_ENABLE_LINGUA` | `false` | The language detection evaluator. Adds ~95MB of language models. |
+| `LANGWATCH_ENABLE_LEGACY_EVALUATORS` | `false` | The deprecated legacy evaluators, kept only for evaluations saved long ago. Hidden from the product entirely while off. |
 
-Change either and restart the server.
+Every other evaluator is installed either way. Change any of these in `~/.langwatch/.env` and restart the server.
 
 Prefer Docker? You can still use docker compose:
 
