@@ -180,7 +180,7 @@ describe("POST /api/internal/gateway/guardrail/check", () => {
         policies_triggered: string[];
       };
       expect(body.decision).toBe("block");
-      expect(body.policies_triggered).toContain(`GRC guardrail ${suffix}`);
+      expect(body.policies_triggered).toContain(GUARDRAIL_ID);
     });
   });
 

@@ -95,7 +95,14 @@ export function evaluationDataFor({
   };
 
   if (direction === "request") {
-    return { input: asText(content?.messages), output: "" };
+    // tools and mcps are part of what a request-direction guardrail is meant
+    // to inspect. Scoring only the messages would let a policy that exists to
+    // catch a dangerous tool call pass on an empty string.
+    const parts = [content?.messages, content?.tools, content?.mcps]
+      .filter((part) => part !== undefined && part !== null)
+      .map(asText)
+      .filter((part) => part !== "");
+    return { input: parts.join("\n"), output: "" };
   }
   if (direction === "response") {
     return { input: "", output: asText(content?.output) };
@@ -257,7 +264,7 @@ export class GatewayGuardrailEvaluationService {
         decision: "block",
         reason: result.details ?? `${guardrail.name} did not pass`,
         modified_content: null,
-        policies_triggered: [guardrail.name],
+        policies_triggered: [guardrail.id],
       };
     }
     return ALLOW;
@@ -272,7 +279,7 @@ export class GatewayGuardrailEvaluationService {
     guardrail,
     reason,
   }: {
-    guardrail: { name: string; failureMode: string };
+    guardrail: { id: string; failureMode: string };
     reason: string;
   }): GuardrailCheckVerdict {
     if (guardrail.failureMode === "FAIL_OPEN") return ALLOW;
@@ -280,7 +287,9 @@ export class GatewayGuardrailEvaluationService {
       decision: "block",
       reason,
       modified_content: null,
-      policies_triggered: [guardrail.name],
+      // The id, not the name: names are user-editable and not unique, while
+      // the data plane and the audit trail treat the id as the policy handle.
+      policies_triggered: [guardrail.id],
     };
   }
 }

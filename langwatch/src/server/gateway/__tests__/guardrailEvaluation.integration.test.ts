@@ -141,7 +141,12 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
           executionMode: "AS_GUARDRAIL",
           enabled: true,
           preconditions: [],
-          parameters: {},
+          // Distinct parameters per evaluator so a test can route a verdict
+          // to one guardrail and not the other within a single check.
+          parameters:
+            evaluatorId === SECOND_EVALUATOR_ID
+              ? { verdict: "fail" }
+              : { verdict: "pass" },
         },
       });
     }
@@ -258,28 +263,31 @@ describe("GatewayGuardrailEvaluationService against real PG", () => {
         failureMode: "FAIL_CLOSED",
       });
 
-      const service = GatewayGuardrailEvaluationService.create(
-        prisma,
-        async ({ evaluatorType: _type, settings: _settings, projectId: _p, data: _d }) =>
-          passing,
-      );
-      const allAllowed = await service.check({
+      const allAllowed = await serviceReturning(passing).check({
         projectId: PROJECT_ID,
         guardrailIds: [passId, failId],
         direction: "request",
       });
       expect(allAllowed.decision).toBe("allow");
 
-      // Only the second guardrail's evaluator fails.
-      const mixed = GatewayGuardrailEvaluationService.create(prisma, async () =>
-        failing,
+      // Both guardrails are in the request and only one fails. The runner
+      // routes on the monitor parameters, which differ per evaluator, so the
+      // two guardrails genuinely behave differently in a single check.
+      const routed = GatewayGuardrailEvaluationService.create(
+        prisma,
+        async ({ settings }) =>
+          (settings as { verdict?: string })?.verdict === "fail"
+            ? failing
+            : passing,
       );
-      const blocked = await mixed.check({
+      const blocked = await routed.check({
         projectId: PROJECT_ID,
-        guardrailIds: [failId],
+        guardrailIds: [passId, failId],
         direction: "request",
       });
+
       expect(blocked.decision).toBe("block");
+      // The id, not the display name, and only the guardrail that failed.
       expect(blocked.policies_triggered).toEqual([failId]);
     });
   });

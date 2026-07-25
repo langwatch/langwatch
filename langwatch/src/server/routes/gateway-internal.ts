@@ -699,16 +699,18 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
 /**
  * §4.6 — inline guardrail pipeline.
  *
- * Request:  { vk_id, direction, guardrail_ids, content, metadata }
+ * Request:  { vk_id, project_id, direction, guardrail_ids, content, metadata }
  * Response: { decision: allow|block|modify, reason, modified_content, policies_triggered }
  *
- * Current implementation is a plumbing stub: validates the request shape,
- * returns `allow` with no policies triggered, and logs so the Go gateway can
- * exercise the full control-plane round-trip while real evaluator wiring
- * lands. When the langwatch/langwatch_nlp evaluator SDK is connected here,
- * this body swaps for a parallel fan-out with first-block short-circuit
- * (contract §4.6, and @sergey's iter 3 gateway-side fan-out mirrors this
- * contract).
+ * Runs every guardrail the virtual key references for this direction in
+ * parallel and aggregates them: any block blocks. A guardrail whose evaluator
+ * cannot produce a verdict falls to its own failure mode rather than passing,
+ * so a broken evaluator cannot quietly disable an active protection.
+ *
+ * project_id is required. It scopes the guardrail lookup, which is what stops
+ * one project's key from naming another project's guardrail. A key with no
+ * trace project materialises no guardrails, so the data plane never reaches
+ * this endpoint for one.
  */
 secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
   let body: unknown;
