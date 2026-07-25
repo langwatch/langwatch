@@ -1,6 +1,8 @@
+import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { InternalServerError } from "../../shared/errors";
 import { handleError } from "../error-handler";
 
@@ -82,6 +84,74 @@ describe("handleError()", () => {
       expect(body).toHaveProperty("limitType", "prompts");
       expect(body).toHaveProperty("current", 5);
       expect(body).toHaveProperty("max", 5);
+    });
+  });
+
+  describe("when error carries remediation fields", () => {
+    it("emits tips, docsUrl and fault in the body", async () => {
+      const error = new (class extends HandledError {
+        constructor() {
+          super("query_memory_exceeded", "Query exceeded its memory limit", {
+            httpStatus: 422,
+            fault: "customer",
+            tips: ["Narrow the time range"],
+            docsUrl: "https://docs.langwatch.ai/traces",
+          });
+        }
+      })();
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(422);
+      const body = await res.json();
+      expect(body.error).toBe("query_memory_exceeded");
+      expect(body.tips).toEqual(["Narrow the time range"]);
+      expect(body.docsUrl).toBe("https://docs.langwatch.ai/traces");
+      expect(body.fault).toBe("customer");
+    });
+
+    it("omits remediation keys when the error has none", async () => {
+      const error = new (class extends HandledError {
+        constructor() {
+          super("plain_handled", "nothing to add", { httpStatus: 400 });
+        }
+      })();
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      const body = await res.json();
+      expect(body).not.toHaveProperty("tips");
+      expect(body).not.toHaveProperty("docsUrl");
+      expect(body.fault).toBe("customer");
+    });
+  });
+
+  describe("when error is a ModelNotConfiguredError", () => {
+    it("returns 400 with the missing-model cause instead of a generic 500", async () => {
+      const error = new ModelNotConfiguredError(
+        "evaluator.create_default",
+        "DEFAULT",
+        "Evaluator default model",
+        "project_123",
+      );
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      // ModelNotConfiguredError is a HandledError, so it goes through the
+      // generic HandledError branch — `error` carries the same discriminant
+      // the legacy `cause` field used to (see modelNotConfiguredError.ts).
+      expect(body.error).toBe("MODEL_NOT_CONFIGURED");
+      expect(body.featureKey).toBe("evaluator.create_default");
+      expect(body.role).toBe("DEFAULT");
+      expect(body.featureDisplayName).toBe("Evaluator default model");
+      expect(body.projectId).toBe("project_123");
+      expect(body.message).toContain("No model configured");
+      expect(body.fault).toBe("customer");
     });
   });
 

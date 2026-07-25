@@ -1,11 +1,16 @@
 import { api } from "~/utils/api";
+import {
+  asSharedQueryResult,
+  useSharedTrace,
+} from "../context/SharedTraceContext";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 export function useSpansFull(enabled: boolean) {
+  const shared = useSharedTrace();
   const { isReady, queryArgs } = useTraceQueryArgs();
 
-  return api.tracesV2.spansFull.useQuery(queryArgs, {
-    enabled: enabled && isReady,
+  const query = api.tracesV2.spansFull.useQuery(queryArgs, {
+    enabled: enabled && isReady && !shared,
     staleTime: 300_000,
     // Hold the span tree in cache for 30 min after the last observer
     // unmounts. Lets users flip between recently-viewed traces in the
@@ -16,4 +21,7 @@ export function useSpansFull(enabled: boolean) {
     // back instantly when navigating between siblings.
     keepPreviousData: true,
   });
+
+  if (shared) return asSharedQueryResult(shared.spansFull) as unknown as typeof query;
+  return query;
 }

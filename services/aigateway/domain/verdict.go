@@ -32,11 +32,17 @@ type CacheDecision struct {
 
 // AITraceParams holds data for a customer AI trace.
 type AITraceParams struct {
-	ProjectID   string
-	Model       string
-	ProviderID  ProviderID
-	Usage       Usage
-	RequestType RequestType
+	ProjectID  string
+	Model      string
+	ProviderID ProviderID
+	// InternalModel and InternalProviderID are safe to copy to LangWatch's
+	// operational span because they came from manager-owned gateway config.
+	// Model and ProviderID above remain customer-trace fields: callers can
+	// control them when a virtual key permits arbitrary model names.
+	InternalModel      string
+	InternalProviderID ProviderID
+	Usage              Usage
+	RequestType        RequestType
 
 	// VirtualKeyID is the id of the VK that authorized this request. Stamped
 	// on the customer span so the control plane's trace-processing pipeline
@@ -61,4 +67,15 @@ type AITraceParams struct {
 	// UpstreamErrorType is a short error-class token (e.g. provider_timeout,
 	// bad_request) recorded as the span's error.type when the request failed.
 	UpstreamErrorType string
+
+	// MirrorTier is the ADR-061 mirror fidelity resolved for this VK's
+	// organization ("content" | "structural" | "skip" | ""), materialized into
+	// the bundle by the control plane. Non-skip only for Langy virtual keys, so
+	// ordinary customer traffic is never mirrored. content ⇒ the gateway emits a
+	// SECOND gen_ai span (with prompt/completion) into the mirror project;
+	// structural ⇒ the same span with content stripped; skip/"" ⇒ nothing.
+	MirrorTier string
+	// MirrorSourceOrgID is the customer organization the mirrored call belongs
+	// to, stamped on the mirror copy for per-customer attribution (ADR-061 §5).
+	MirrorSourceOrgID string
 }

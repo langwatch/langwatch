@@ -48,6 +48,12 @@ export interface FeatureFlagDefinition {
    * setups to keep working.
    */
   legacyEnvVar?: string;
+  /**
+   * Set to `false` to opt the flag out of the auto-derived
+   * UPPERCASE(key) env-var override, leaving the operator store (and,
+   * for PRODUCT flags, PostHog) as the only runtime levers.
+   */
+  envOverridable?: false;
 }
 
 export interface FeatureFlagFamily {
@@ -148,15 +154,38 @@ export const FEATURE_FLAGS = [
     description:
       "Routes over-threshold OTLP spans via a transient S3 spool at the ingestion edge (ADR-022). Off = current behavior (full value flows through the command queue; capOversizedAttributes(256 KB) is the only cap).",
   },
+  // Externalizes inline media (base64 audio turns, data-URI images, file
+  // attachments) from span attributes into the content-addressed
+  // stored-objects store at the ingestion edge, before the command is staged.
+  // Fail-open by construction (any error keeps the original inline payload)
+  // and skipped for projects with data-privacy content-drop rules.
+  //
+  // Default OFF: the stored-objects store is not yet covered by the
+  // data-retention deletion path or the storage meter, so extracted media
+  // would outlive the trace's retention policy uncounted. The default flips
+  // on once stored-objects retention lands (#5951); until then the flag is a
+  // per-project / per-deployment opt-in.
+  {
+    key: "release_trace_media_extraction",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media rides inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
+  },
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
-    // ADR-038 ships dark behind this flag: it additionally gates the
-    // onboarding intent fork and the org "Primary use" setting. GA is a
-    // later PostHog rollout (SaaS) + flipping this default (self-hosted).
-    defaultValue: false,
+    // On by default (ADR-038 Decision 7): self-hosted installations get
+    // governance (AI-tools device login, /me, admin surfaces, the
+    // onboarding intent fork, the org "Primary use" setting) with zero
+    // configuration. SaaS stays PostHog-governed: a per-org off-condition
+    // (or an operator store row / RELEASE_UI_AI_GOVERNANCE_ENABLED=0)
+    // re-arms every gate for that org. This default and the auth-cli
+    // device-login fallback are a pinned pair, move them together
+    // (governanceGaDefaults.unit.test.ts enforces it).
+    defaultValue: true,
     description:
-      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
+      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via PostHog or the operator store to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
@@ -185,12 +214,18 @@ export const FEATURE_FLAGS = [
   // NOTE: `release_es_graph_triggers_firing` (ADR-034 Phase 5) was retired —
   // the event-sourced graph-alert path is now unconditional and the K8s cron
   // was removed, so there is no longer a cron/ES choice to gate.
+  // SYSTEM on purpose despite being a product surface: the Langy rollout is
+  // decided solely by the internal flag store — never PostHog, never an env
+  // var (envOverridable: false) — so the /ops/feature-flags toggle is the one
+  // authoritative lever.
   {
     key: "release_langy_enabled",
-    scope: "PRODUCT",
+    scope: "SYSTEM",
     defaultValue: false,
+    envOverridable: false,
+    family: "Langy",
     description:
-      "Opens the Langy in-product assistant. Default off: only LangWatch staff (isLangwatchStaff() — @langwatch.ai email) get Langy out of the box. To open it for a specific project/org/user, flip the flag on via a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=true for a blanket on. Staff always bypass the flag so a global kill switch still leaves us able to debug.",
+      "Opens the Langy in-product assistant, and is the only lever that does — there is no staff or other identity bypass, so this is a true kill switch. Default off, so Langy is dark until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. PostHog and the RELEASE_LANGY_ENABLED env var are deliberately not consulted. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_langy_enabled.",
   },
   {
     key: "release_langy_promo_enabled",
@@ -198,6 +233,21 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Shows the Langy teaser banner on the home page to users who do NOT have Langy yet (spec: specs/home/langy-home-banner.feature). Purely promotional — it never grants access; users who already have Langy (staff or release_langy_enabled) see the activation banner instead, regardless of this flag. Target the promo audience via a PostHog rule.",
+  },
+  {
+    key: "release_ui_home_signal_focused_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: specs/home/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
+  },
+  {
+    key: "release_ui_langy_peek_dock_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    family: "Langy",
+    description:
+      "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
   },
   {
     key: "release_webhook_automations",

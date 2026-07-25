@@ -89,6 +89,30 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     Then a progress bar reflects the percent or segment
     And the shimmer thinking indicator remains while no status is present
 
+  # The working indicator (thinking line / status line) is driven by two
+  # signals: the live stream and the durable conversation state. The durable
+  # state finalizes asynchronously, so the indicator must never outlive the
+  # answer just because a refetch cached a stale in-flight flag.
+
+  @unit
+  Scenario: The working indicator retires the moment the turn stream ends with the answer
+    Given Langy is answering my message
+    When the turn stream ends with the final answer
+    Then the working indicator disappears immediately
+    And it does not wait for the durable conversation state to catch up
+
+  @integration
+  Scenario: The durable turn state is re-checked on a short interval only while in flight
+    Given the durable conversation state says a turn is in flight
+    Then the message history query re-checks it on a short interval
+    And the polling stops as soon as the durable state settles
+    And no interval runs while no turn is in flight
+
+  @integration
+  Scenario: The feedback ask never shows while the working indicator is up
+    Given a turn is in flight by either the live stream or the durable state
+    Then the feedback ask is not shown under the latest reply
+
   @integration @unimplemented
   Scenario: A turn in flight resumes after a page refresh
     # Depends on the PR3 Redis token-buffer transport; the UI reads turn state

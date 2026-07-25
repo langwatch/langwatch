@@ -9,7 +9,7 @@ import {
 import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
 import {
   type LangyContextChip,
-  selectDismissedChips,
+  selectAddableChips,
   selectVisibleChips,
   useLangyStore,
 } from "../stores/langyStore";
@@ -40,10 +40,12 @@ import { useLangyTraceViewContext } from "./useLangyTraceViewContext";
  *      Last, so a chip Langy already derived for itself keeps its richer label
  *      and the two collapse into one instead of stacking.
  *
- * Returns the visible chips (undismissed) plus the dismissed candidates that
- * the composer's "+ context" control can add back. A chip stays dismissed only
- * while its underlying context is unchanged; a new id (new trace, new dataset,
- * a changed selection / filter) produces a new chip id and re-surfaces it.
+ * Everything above is an OFFER, not context. `chips` is the subset the user has
+ * actually chosen — by arming the page and clicking a target, or from the
+ * composer's "+ context" control, which is what `addableChips` fills. Merely
+ * being on a page, or having a drawer open, adds nothing: the agent is handed
+ * what someone decided to hand it, and the chips in the composer are the whole
+ * truth about what that is.
  *
  * Also PUBLISHES the resulting chip ids back to the target store, which is what
  * lets a target on the page know it is already in context and render as added
@@ -63,7 +65,7 @@ export function useLangyPageContext(): {
   const location = inRouter ? useLocation() : undefined;
   const pathname = location?.pathname ?? "";
   const search = location?.search ?? "";
-  const dismissed = useLangyStore((s) => s.dismissedChipIds);
+  const chosen = useLangyStore((s) => s.chosenChipIds);
 
   // Sub-hooks subscribe to their own sources (the drawer URL param, the Trace
   // Explorer selection/filter stores). They're always called (rules of hooks);
@@ -126,8 +128,8 @@ export function useLangyPageContext(): {
   );
 
   const chips = useMemo(
-    () => selectVisibleChips(candidates, dismissed),
-    [candidates, dismissed],
+    () => selectVisibleChips(candidates, chosen),
+    [candidates, chosen],
   );
 
   // Tell the page which chips are live, so a registered target can render as
@@ -139,7 +141,7 @@ export function useLangyPageContext(): {
 
   return {
     chips,
-    addableChips: selectDismissedChips(candidates, dismissed),
+    addableChips: selectAddableChips(candidates, chosen),
   };
 }
 
@@ -182,7 +184,44 @@ function routeChips(pathname: string): LangyContextChip[] {
       // Shared with the dataset list rows that register as context targets, so
       // a clicked dataset and a routed one are the same chip.
       return [datasetContextChip({ datasetId: rest[0]! })];
-    default:
-      return [];
+    default: {
+      const spec = SIMPLE_ROUTE_CHIPS[surface];
+      if (!spec) return [];
+      const ref = rest[0]!;
+      // Index-ish tails (`/prompts/new`) name no resource — offering "prompt:
+      // new" as context would be a chip that resolves to nothing.
+      if (RESOURCELESS_TAILS.has(ref)) return [];
+      return [
+        { id: `${spec.kind}:${ref}`, kind: spec.kind, label: `${spec.noun} ${ref}`, ref },
+      ];
+    }
   }
 }
+
+/**
+ * Surfaces whose `/<surface>/<id>` route names exactly one resource, so the
+ * chip is a mechanical `kind:id`. The ones with shapes of their own — traces,
+ * experiments (`/workbench/<slug>`), datasets — are handled above.
+ *
+ * This is the list of things Langy can be pointed at, and it is meant to grow:
+ * a resource the agent can act on but that never appears here is a resource the
+ * user has to describe in prose instead of naming.
+ */
+const SIMPLE_ROUTE_CHIPS: Record<
+  string,
+  { kind: LangyContextChip["kind"]; noun: string }
+> = {
+  prompts: { kind: "prompt", noun: "prompt" },
+  evaluations: { kind: "evaluation", noun: "evaluation" },
+  evaluators: { kind: "evaluation", noun: "evaluator" },
+  "online-evaluations": { kind: "evaluation", noun: "evaluation" },
+  simulations: { kind: "scenario", noun: "simulation" },
+  workflows: { kind: "workflow", noun: "workflow" },
+  studio: { kind: "workflow", noun: "workflow" },
+  agents: { kind: "agent", noun: "agent" },
+  automations: { kind: "automation", noun: "automation" },
+  annotations: { kind: "annotation", noun: "annotation" },
+};
+
+/** Tails that are a page, not a resource. */
+const RESOURCELESS_TAILS = new Set(["new", "index", "create"]);

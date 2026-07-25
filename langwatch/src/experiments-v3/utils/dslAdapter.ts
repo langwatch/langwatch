@@ -13,15 +13,7 @@
 
 import type { Edge, Node } from "@xyflow/react";
 
-import type {
-  Code,
-  Entry,
-  Evaluator,
-  Field,
-  HttpComponentConfig,
-  Signature,
-  Workflow,
-} from "~/optimization_studio/types/dsl";
+import { LATEST_SPEC_VERSION, type Code, type Entry, type Evaluator, type Field, type HttpComponentConfig, type Signature, type Workflow } from "~/optimization_studio/types/dsl";
 import type {
   DatasetColumn,
   DatasetReference,
@@ -96,16 +88,11 @@ export const stateToWorkflow = (
   );
 
   return {
-    spec_version: "1.4",
+    spec_version: LATEST_SPEC_VERSION,
     name: state.name,
     icon: "🧪",
     description: "Evaluation workflow",
     version: "1.0",
-    default_llm: {
-      model: "openai/gpt-4o-mini",
-      temperature: 0,
-      max_tokens: 2048,
-    },
     template_adapter: "default",
     enable_tracing: true,
     nodes: [entryNode, ...targetNodes, ...evaluatorNodes] as Workflow["nodes"],

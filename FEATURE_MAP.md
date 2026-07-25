@@ -18,7 +18,8 @@ prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
 dashboards/          — Custom analytics dashboards
 triggers/            — Automations / alerts
-settings/            — Model Providers, Project Secrets
+ai-gateway/          — Virtual Keys, Budgets, Governance, Ingestion Sources
+settings/            — Model Providers, Model Defaults, Project Secrets
 ```
 
 Design principles:
@@ -81,16 +82,26 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | **Cross-cutting** | | | | | | | | | |
 | Dashboards | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
 | Triggers | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| **AI Gateway** | | | | | | | | | |
+| Virtual Keys | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| Budgets | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| Governance | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| Ingestion Sources | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
 | **Settings** | | | | | | | | | |
 | Model Providers | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |
+| Model Defaults | — | — | ✅ | — | ✅ | — | — | ✅ | — |
 | Project Secrets | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
+| Agent Skills | — | — | ✅ | — | — | — | — | — | ✅ |
 
 ### Coverage notes
 
 - **User Events** — Python-only SDK (`langwatch.track_event`). No TS, CLI, UI, or MCP by design.
 - **Prompt Playground** — Pure UI feature; no SDK/CLI/MCP planned.
+- **AI Gateway** — CLI/UI/API only (no SDK or MCP surface yet). `ingest` is read-only by design; `ingest install` is a hidden scripting primitive and deliberately not in the map.
+- **Agent Skills** — CLI-only by design: `langwatch skills list/get/install/uninstall/update` installs the bundled agent skills (compiled from `skills/` into the CLI at build time) into `~/.agents/skills`. No platform surface — the skills repo (`langwatch/skills`) and `npx skills add` remain the browser-side distribution.
 - **Skills (platform side)** — Only `analytics`, `scenarios`, and `evaluators` have dedicated platform-side skills. Most features use shared platform skill conventions through MCP tools directly.
-- **Docs** — A handful of features (agents, suites, dashboards, triggers, secrets) still lack canonical public docs pages.
+- **Docs** — A handful of features (agents, suites, dashboards, triggers, secrets, model defaults) still lack canonical public docs pages.
+- **CLI hints** — `surfaces.code.hints` is an optional per-command map (`"trace search" → example invocation`) on the agent-critical groups. It powers the CLI's machine-readable catalog (`langwatch commands`) and compact help tree (`langwatch help-tree`); additive only, consumers that don't know it ignore it.
 
 ## Where to Find Things
 
@@ -111,7 +122,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 ### CLI
 - **Entry point** — `typescript-sdk/src/cli/index.ts`
 - **Commands** — `typescript-sdk/src/cli/commands/`
-- Meta commands: `login`, `status`, `docs`, `scenario-docs`
+- Meta/plumbing commands (no feature-map coverage by design) are owned by `PLUMBING_COMMANDS` in `typescript-sdk/src/cli/utils/commandCatalog.ts` — the single list, enforced by the feature-map drift test.
 
 ### SDKs
 - **Python** — `python-sdk/src/langwatch/` (lazy-loaded facades in `__init__.py`)

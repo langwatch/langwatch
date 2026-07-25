@@ -1313,5 +1313,83 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("spec-version gating of the legacy default fallback", () => {
+      // Nodes own their model since spec_version 1.5: a modelless llm param
+      // on a modern DSL is stale state that must NOT be silently substituted
+      // with DEFAULT_MODEL — it stays unhydrated so the engine raises its
+      // typed llm_model_not_set error. The comparison is component-wise, so
+      // a hypothetical "1.10" is newer than "1.5", not parseFloat's 1.1.
+      const modellessDsl = (spec_version: string) => ({
+        spec_version,
+        workflow_id: "wf_1",
+        nodes: [
+          {
+            id: "llm_call",
+            type: "signature",
+            data: {
+              name: "LLM Call",
+              parameters: [
+                { identifier: "llm", type: "llm", value: undefined },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      });
+
+      const setupFor = (dsl: Record<string, unknown>) => {
+        const prepareFn = vi.fn().mockResolvedValue(defaultModelParamsResult);
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(workflowAgent),
+          },
+          workflowVersionFetcher: {
+            getLatestDsl: vi
+              .fn()
+              .mockResolvedValue({ workflowId: "wf_1", dsl }),
+          },
+          modelParamsProvider: { prepare: prepareFn },
+        });
+        return { deps, prepareFn };
+      };
+
+      it.each(["1.5", "1.10"])(
+        "does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param",
+        async (specVersion) => {
+          const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
+
+          const result = await prefetchScenarioData(
+            defaultContext,
+            workflowTarget,
+            deps,
+          );
+
+          expect(result.success).toBe(true);
+          expect(
+            prepareFn.mock.calls.some(
+              (call) => (call[1] as string) === DEFAULT_MODEL,
+            ),
+          ).toBe(false);
+        },
+      );
+
+      it("still falls back to DEFAULT_MODEL on a 1.4 DSL", async () => {
+        const { deps, prepareFn } = setupFor(modellessDsl("1.4"));
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(true);
+        expect(
+          prepareFn.mock.calls.some(
+            (call) => (call[1] as string) === DEFAULT_MODEL,
+          ),
+        ).toBe(true);
+      });
+    });
+
 });
 });

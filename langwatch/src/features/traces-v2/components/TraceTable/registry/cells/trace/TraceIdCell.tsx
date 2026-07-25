@@ -6,12 +6,7 @@ export const TraceIdCell = {
   id: "trace-id",
   label: "Trace ID",
   render: ({ row }) => (
-    <Text
-      textStyle="xs"
-      color="fg.subtle"
-      truncate
-      userSelect="all"
-    >
+    <Text textStyle="xs" color="fg.subtle" truncate userSelect="all">
       {row.traceId}
     </Text>
   ),

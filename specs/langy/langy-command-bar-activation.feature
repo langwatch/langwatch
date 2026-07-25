@@ -5,10 +5,13 @@ Feature: Ask Langy from the command bar
   So that I can ask about my project without first finding the panel
 
   # The command bar (Cmd/Ctrl+K) grows a Langy activation: an "Ask Langy" entry
-  # that turns the bar into an AI composer (a liquid-glass shimmer/ripple marks
-  # the switch), and Enter hands the typed question off to the Langy panel, which
-  # opens and answers it. Gated on the same visibility as the panel itself
-  # (useShowLangy) so the bar never offers an assistant the user can't open.
+  # that carries the live query. With a question already typed, selecting it
+  # hands the question straight to the Langy panel — one Enter, the panel opens
+  # and answers it. Only an empty bar turns the field into an AI composer first
+  # (a liquid-glass shimmer/ripple marks the switch), because there is nothing
+  # to send yet; Enter from that composer performs the same handoff. Gated on
+  # the same visibility as the panel itself (useShowLangy) so the bar never
+  # offers an assistant the user can't open.
 
   Background:
     Given I am authenticated
@@ -39,15 +42,23 @@ Feature: Ask Langy from the command bar
     Then no Ask Langy activation is shown
 
   # ============================================================================
-  # AI mode — the liquid-glass transition
+  # Selecting the activation — one Enter with a question, AI mode without one
   # ============================================================================
 
-  Scenario: Selecting Ask Langy turns the bar into AI mode
+  Scenario: Selecting Ask Langy with a typed question hands it off in one step
     Given the command bar is open with "summarise last night's runs" typed
+    When I select the Ask Langy activation by Enter or by click
+    Then the command bar fades out and closes
+    And the Langy panel opens
+    And Langy starts a fresh conversation and asks "summarise last night's runs"
+    And no intermediate composer step appears in between
+
+  Scenario: Selecting Ask Langy on an empty bar turns it into AI mode
+    Given the command bar is open with nothing typed
     When I select the Ask Langy activation
     Then the command bar switches into AI mode
     And a shimmer-and-ripple plays across the surface
-    And the typed text is carried into the AI composer
+    And nothing is sent to Langy yet
 
   Scenario: Reduced motion drops the shimmer
     Given I prefer reduced motion
@@ -86,6 +97,11 @@ Feature: Ask Langy from the command bar
     Given a Langy turn is already streaming
     When I hand a new question off from the command bar
     Then the queued question is sent once the current turn finishes
+
+  Scenario: The composer is ready to keep typing after a handoff
+    Given I hand a question to Langy from the command bar
+    When the Langy panel opens with the question sent
+    Then the panel's composer holds keyboard focus
 
   # ============================================================================
   # Model picker while a turn is pending

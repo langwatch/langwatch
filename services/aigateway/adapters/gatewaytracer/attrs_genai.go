@@ -1,28 +1,29 @@
 package gatewaytracer
 
+// These are the gen_ai keys the GATEWAY'S OWN operational span may carry:
+// shape and cost metadata only — which model, how many tokens, what finished.
+//
+// The content keys (gen_ai.input.messages, gen_ai.output.messages,
+// gen_ai.system_instructions) are deliberately ABSENT and must not be added
+// back. Prompt and completion bodies belong to the customer and are set only by
+// the customer trace bridge, on spans bound for the customer's own project,
+// using that package's private keys. A constant declared here is one autocomplete
+// away from being stamped on internal telemetry, so the key names do not exist
+// in this package at all. ForbiddenInternalSpanAttrs and the tests in
+// internal_span_test.go pin the boundary.
 const (
-	AttrGenAIOperationName      = "gen_ai.operation.name"
-	AttrGenAISystem             = "gen_ai.system"
-	AttrGenAIRequestModel       = "gen_ai.request.model"
-	AttrGenAIRequestTemp        = "gen_ai.request.temperature"
-	AttrGenAIRequestMaxTokens   = "gen_ai.request.max_tokens"
-	AttrGenAIRequestTopP        = "gen_ai.request.top_p"
-	AttrGenAIRequestFreqPen     = "gen_ai.request.frequency_penalty"
-	AttrGenAIRequestPresPen     = "gen_ai.request.presence_penalty"
-	AttrGenAIRequestStopSeqs    = "gen_ai.request.stop_sequences"
-	AttrGenAIResponseID         = "gen_ai.response.id"
-	AttrGenAIResponseModel      = "gen_ai.response.model"
-	AttrGenAIResponseFinish     = "gen_ai.response.finish_reasons"
-	AttrGenAIInputMessages      = "gen_ai.input.messages"
-	AttrGenAIOutputMessages     = "gen_ai.output.messages"
-	AttrGenAISystemInstructions = "gen_ai.system_instructions"
-	AttrGenAIUsageIn            = "gen_ai.usage.input_tokens"
-	AttrGenAIUsageOut           = "gen_ai.usage.output_tokens"
-	AttrGenAIUsageTotal         = "gen_ai.usage.total_tokens"
-	AttrGenAIUsageCacheRead     = "gen_ai.usage.cache_read.input_tokens"
-	AttrGenAIUsageCacheCreate   = "gen_ai.usage.cache_creation.input_tokens"
-	// AttrGenAIConversationID is the wrapped tool's own session / thread id,
-	// lifted from a request header (claude-code / codex / opencode) so the
-	// gateway-path trace carries a real conversation id the fold groups on.
-	AttrGenAIConversationID = "gen_ai.conversation.id"
+	AttrGenAIOperationName    = "gen_ai.operation.name"
+	AttrGenAISystem           = "gen_ai.system"
+	AttrGenAIRequestModel     = "gen_ai.request.model"
+	AttrGenAIRequestTemp      = "gen_ai.request.temperature"
+	AttrGenAIRequestMaxTokens = "gen_ai.request.max_tokens"
+	AttrGenAIRequestTopP      = "gen_ai.request.top_p"
+	AttrGenAIRequestFreqPen   = "gen_ai.request.frequency_penalty"
+	AttrGenAIRequestPresPen   = "gen_ai.request.presence_penalty"
+	AttrGenAIRequestStopSeqs  = "gen_ai.request.stop_sequences"
+	AttrGenAIResponseID       = "gen_ai.response.id"
+	AttrGenAIResponseModel    = "gen_ai.response.model"
+	AttrGenAIResponseFinish   = "gen_ai.response.finish_reasons"
+	AttrGenAIUsageOut         = "gen_ai.usage.output_tokens"
+	AttrGenAIUsageTotal       = "gen_ai.usage.total_tokens"
 )

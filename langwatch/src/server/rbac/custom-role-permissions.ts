@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
-import { HandledError } from "../app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { Actions, Resources } from "../api/rbac";
 
 const VALID_PERMISSIONS: Set<string> = new Set(
@@ -46,6 +46,7 @@ export class MalformedCustomRolePermissionsError extends HandledError {
       {
         meta: { customRoleId, ...options.meta },
         httpStatus: 500, // infrastructural / data-integrity, not a user error
+        fault: "platform",
         reasons: options.reasons,
       },
     );

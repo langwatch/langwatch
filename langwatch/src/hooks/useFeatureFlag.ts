@@ -37,15 +37,15 @@ interface UseFeatureFlagResult {
  *
  * ```tsx
  * // Basic usage - user-level flag
- * const { enabled } = useFeatureFlag("release_ui_simulations_menu_enabled");
+ * const { enabled } = useFeatureFlag("release_ui_ai_gateway_menu_enabled");
  *
  * // Project-level targeting
- * const { enabled } = useFeatureFlag("release_ui_simulations_menu_enabled", {
+ * const { enabled } = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
  *   projectId: project.id,
  * });
  *
  * // Conditional fetching (e.g., wait for project to load)
- * const { enabled } = useFeatureFlag("release_ui_simulations_menu_enabled", {
+ * const { enabled } = useFeatureFlag("release_ui_ai_gateway_menu_enabled", {
  *   projectId: project?.id,
  *   enabled: !!project,
  * });

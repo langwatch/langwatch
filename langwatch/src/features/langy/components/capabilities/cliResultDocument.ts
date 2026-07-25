@@ -8,7 +8,7 @@
  *
  * This module used to duck-type that document: it guessed which key held the rows,
  * guessed how the total was spelled, and tolerated everything because it had no
- * contract with the producer. It has one now. `@langwatch/cli-cards` is the shared
+ * contract with the producer. It has one now. `@langwatch/langy` is the shared
  * package the CLI publishes its result shapes in and the panel reads them back
  * with, so the shape is stated ONCE and both ends compile against it.
  *
@@ -23,7 +23,7 @@ import {
   asJsonDocument,
   paginationSchema,
   textValueSchema,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy";
 
 /** Keys whose array value is the result list in a LangWatch JSON document. */
 const COLLECTION_KEYS = ["traces", "items", "records", "results", "data"];

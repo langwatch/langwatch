@@ -12,7 +12,7 @@ import {
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
   SerializedPromptConfigAdapter,
-} from "../serialized.adapters";
+} from "../serialized-adapters";
 
 describe("createAdapter", () => {
   const defaultModelParams: LiteLLMParams = {

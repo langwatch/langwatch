@@ -20,7 +20,10 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { authorizeInResolver, type PermissionMiddleware } from "~/server/api/rbac";
+import {
+  checkOrganizationPermission,
+  type PermissionMiddleware,
+} from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
 import { auditLog } from "~/server/auditLog";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -41,14 +44,19 @@ async function ensureOrganizationMember(
 }
 
 /**
- * Prove org membership BEFORE the Langy rollout gate runs. `authorizeInResolver`
- * only defers the generic permission check to the resolver; it does not
- * authorize the organization. If `enforceLangyAccess` ran first, a signed-in
- * non-member could pass a guessed org id and tell that org's rollout state apart
- * from the response — FORBIDDEN when the flag is on (gate passes, membership
- * fails) vs NOT_FOUND when it is off (gate denies) — a cross-tenant probe of an
- * arbitrary tenant's Langy rollout. Running membership first makes a
- * non-member's response independent of the org's flag value.
+ * Defence in depth behind `checkOrganizationPermission("langy:manage")`, and
+ * the reason the ordering matters: both run BEFORE the Langy rollout gate. If
+ * `enforceLangyAccess` ran first, a signed-in non-member could pass a guessed
+ * org id and tell that org's rollout state apart from the response — FORBIDDEN
+ * when the flag is on (gate passes, membership fails) vs NOT_FOUND when it is
+ * off (gate denies) — a cross-tenant probe of an arbitrary tenant's Langy
+ * rollout. Authorizing first makes a non-member's response independent of the
+ * org's flag value.
+ *
+ * This used to be the ONLY gate, paired with `authorizeInResolver` — which
+ * authorizes nothing, it just marks the check as done. Membership alone is
+ * role-blind, so an EXTERNAL lite member could enumerate the org's private
+ * repositories through `listRepos`. The permission check is the real gate now.
  */
 const enforceOrganizationMembership: PermissionMiddleware<{
   organizationId: string;
@@ -73,7 +81,7 @@ function uninstallUrl(installation: {
 export const langyGithubRouter = createTRPCRouter({
   getInstallStatus: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(authorizeInResolver)
+    .use(checkOrganizationPermission("langy:manage"))
     .use(enforceOrganizationMembership)
     .use(enforceLangyAccess)
     .query(async ({ input }) => {
@@ -101,7 +109,7 @@ export const langyGithubRouter = createTRPCRouter({
 
   listRepos: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(authorizeInResolver)
+    .use(checkOrganizationPermission("langy:manage"))
     .use(enforceOrganizationMembership)
     .use(enforceLangyAccess)
     .query(async ({ input }) => {
@@ -114,7 +122,7 @@ export const langyGithubRouter = createTRPCRouter({
     .input(
       z.object({ organizationId: z.string(), installationId: z.string() }),
     )
-    .use(authorizeInResolver)
+    .use(checkOrganizationPermission("langy:manage"))
     .use(enforceOrganizationMembership)
     .use(enforceLangyAccess)
     .mutation(async ({ ctx, input }) => {

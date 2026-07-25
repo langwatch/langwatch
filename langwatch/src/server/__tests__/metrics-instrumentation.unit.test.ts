@@ -118,6 +118,18 @@ describe("ES pipeline metrics", () => {
       );
       expect(metric).toBeDefined();
     });
+
+    /**
+     * Pinned by name: a rename or accidental removal would break the redelivery
+     * dashboard silently, and this counter is the only signal that separates a
+     * fold failure that left durable state behind from one that did not.
+     */
+    it("registers es_fold_post_store_failure_total counter", () => {
+      const metric = register.getSingleMetric(
+        "es_fold_post_store_failure_total",
+      );
+      expect(metric).toBeDefined();
+    });
   });
 
   describe("when deprecated metrics are removed", () => {

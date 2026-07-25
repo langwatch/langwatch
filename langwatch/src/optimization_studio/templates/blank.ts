@@ -1,8 +1,12 @@
 const DEFAULT_DATASET_NAME = "Draft Dataset";
 
-import { DEFAULT_MODEL } from "../../utils/constants";
-import type { End, Entry, Signature, Workflow } from "../types/dsl";
-import { DEFAULT_MAX_TOKENS } from "../utils/registryUtils";
+import {
+  LATEST_SPEC_VERSION,
+  type End,
+  type Entry,
+  type Signature,
+  type Workflow,
+} from "../types/dsl";
 
 export const entryNode = () => ({
   id: "entry",
@@ -32,16 +36,14 @@ export const entryNode = () => ({
 });
 
 export const blankTemplate: Workflow = {
-  spec_version: "1.4",
+  spec_version: LATEST_SPEC_VERSION,
   name: "Blank Template",
   icon: "🧩",
   description: "Start a new workflow from scratch",
   version: "1.0",
-  default_llm: {
-    model: DEFAULT_MODEL,
-    // Temperature omitted - reasoning models don't support temperature (uses reasoning_effort instead)
-    max_tokens: DEFAULT_MAX_TOKENS,
-  },
+  // The LLM node ships without a model on purpose: workflow creation
+  // materializes it from the project's resolved default (or the registry
+  // flagship when nothing is configured), so the template never pins one.
   template_adapter: "default",
   workflow_type: "workflow",
   enable_tracing: true,

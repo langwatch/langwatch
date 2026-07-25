@@ -34,13 +34,13 @@ Feature: Telemetry — every span carries the correct origin
     And the request body does NOT redundantly carry the origin (header is the source of truth)
 
     Examples:
-      | call_site                                                    | origin            |
-      | langwatch/src/server/workflows/runWorkflow.ts                | workflow          |
-      | langwatch/src/server/routes/playground.ts                    | playground        |
-      | langwatch/src/server/scenarios/.../workflow-agent.adapter.ts | scenario          |
-      | langwatch/src/server/scenarios/.../code-agent.adapter.ts     | scenario          |
-      | langwatch/src/server/topicClustering/topicClustering.ts      | topic_clustering  |
-      | langwatch/src/server/evaluations/runEvaluation.ts            | evaluation        |
+      | call_site                                                     | origin           |
+      | langwatch/src/server/workflows/runWorkflow.ts                 | workflow         |
+      | langwatch/src/server/routes/playground.ts                     | playground       |
+      | langwatch/src/server/scenarios/.../workflow-agent.adapter.ts  | scenario         |
+      | langwatch/src/server/scenarios/.../code-agent.adapter.ts      | scenario         |
+      | langwatch/src/server/app-layer/topic-clustering/clustering.ts | topic_clustering |
+      | langwatch/src/server/evaluations/runEvaluation.ts             | evaluation       |
 
   @integration @v1 @unimplemented
   Scenario: missing X-LangWatch-Origin header defaults to "unknown" and emits a warning log

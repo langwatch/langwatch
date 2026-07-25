@@ -4,6 +4,11 @@ import "github.com/langwatch/langwatch/services/aigateway/domain"
 
 // configWire matches the JSON shape returned by GET /api/internal/gateway/config/:vk_id.
 type configWire struct {
+	// ProjectID is the trace-export project, emitted by the control-plane
+	// materialiser as the sibling of project_otlp_token and resolved from the
+	// same object (config.materialiser.ts). The pair must travel together —
+	// see domain.BundleConfig.TraceProjectID.
+	ProjectID        string             `json:"project_id"`
 	ProjectOTLPToken string             `json:"project_otlp_token"`
 	DisplayPrefix    string             `json:"display_prefix"`
 	Providers        []providerSlotWire `json:"providers"`
@@ -19,6 +24,11 @@ type configWire struct {
 	PolicyRules          policyRulesWire           `json:"policy_rules"`
 	Budgets              []budgetWire              `json:"budgets"`
 	CacheRules           []cacheRuleWire           `json:"cache_rules"`
+	// LangyMirrorTier is the ADR-061 mirror fidelity the control-plane
+	// materialiser resolved for this VK's organization ("content" | "structural"
+	// | "skip"). Present and non-skip only for Langy virtual keys, so ordinary
+	// customer traffic is never mirrored. Empty/absent ⇒ no mirror.
+	LangyMirrorTier string `json:"langy_mirror_tier"`
 }
 
 type providerSlotWire struct {
@@ -126,7 +136,9 @@ func (w *configWire) toDomain() domain.BundleConfig {
 
 	cfg := domain.BundleConfig{
 		Credentials:      creds,
+		TraceProjectID:   w.ProjectID,
 		ProjectOTLPToken: w.ProjectOTLPToken,
+		MirrorTier:       w.LangyMirrorTier,
 		VKDisplayPrefix:  w.DisplayPrefix,
 		AllowedModels:    w.ModelsAllowed,
 		Fallback: domain.FallbackConfig{
@@ -329,6 +341,15 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"region":           getString("region"),
 			"auth_credentials": getString("auth_credentials"),
 		}
+	case domain.ProviderOpenAICodex:
+		// OAuth session, not an API key: the access token rides APIKey (it
+		// is the bearer), the ChatGPT account id becomes a request header,
+		// and the provider row id is the refresh callback's address.
+		cred.APIKey = getString("access_token")
+		cred.Extra = map[string]string{
+			"account_id":      getString("account_id"),
+			"provider_row_id": getString("provider_row_id"),
+		}
 	default:
 		cred.APIKey = getString("api_key")
 	}
@@ -357,6 +378,8 @@ func normalizeProviderType(t string) domain.ProviderID {
 		return domain.ProviderAnthropic
 	case "openai":
 		return domain.ProviderOpenAI
+	case "openai_codex":
+		return domain.ProviderOpenAICodex
 	default:
 		return domain.ProviderID(t)
 	}

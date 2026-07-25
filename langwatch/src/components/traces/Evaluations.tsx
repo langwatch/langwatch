@@ -7,8 +7,8 @@ import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Link } from "../ui/link";
 import { EvaluationStatusItem } from "./EvaluationStatusItem";
 import {
-  groupEvaluationsByEvaluator,
   type EvaluationGroup,
+  groupEvaluationsByEvaluator,
 } from "./groupEvaluations";
 
 interface TraceEval {
@@ -102,7 +102,7 @@ export function Evaluations(trace: TraceEval & { anyGuardrails: boolean }) {
             <>
               Setup evaluations{" "}
               <Link
-                href={`/${trace.project?.slug}/evaluations`}
+                href={`/${trace.project?.slug}/online-evaluations`}
                 textDecoration="underline"
               >
                 here
@@ -127,7 +127,7 @@ export const Guardrails = (trace: TraceEval) => {
         <Text>
           No guardrails ran for this message. Setup guardrails{" "}
           <Link
-            href={`/${trace.project?.slug}/evaluations`}
+            href={`/${trace.project?.slug}/online-evaluations`}
             textDecoration="underline"
           >
             here
@@ -148,12 +148,11 @@ export const EvaluationsCount = (
 
   const groups = groupEvaluationsByEvaluator(evaluations);
 
-  const totalErrors =
-    groups.filter(
-      (group) =>
-        group.latest.status === "error" ||
-        evaluationPassed(group.latest) === false,
-    ).length;
+  const totalErrors = groups.filter(
+    (group) =>
+      group.latest.status === "error" ||
+      evaluationPassed(group.latest) === false,
+  ).length;
 
   if (totalErrors > 0) {
     if (trace.countGuardrails) {

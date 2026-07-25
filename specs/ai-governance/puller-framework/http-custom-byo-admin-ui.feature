@@ -126,8 +126,8 @@ Feature: http_custom — BYO HTTP-polling ingestion source admin UI
       }
       """
     And the admin has saved an http_custom source pointing at it (with the standard mapping)
-    And `scheduleIngestionPullers` has registered the BullMQ repeat job
-    When the puller worker fires the next tick
+    And the ingestion-pull process has registered its durable next wake
+    When the process outbox fires the next tick
     Then `HttpPollingPullerAdapter.runOnce` calls the fixture endpoint
     And one normalized event lands in `governance_ocsf_events` with `class_uid=6003` and `actor.user.email_addr="alex@acme.com"`
 

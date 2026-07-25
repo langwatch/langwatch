@@ -19,7 +19,12 @@ const traceItem: LangyAttachedContext = {
 
 describe("attachContext", () => {
   beforeEach(() => {
-    useLangyStore.getState().resetForProject();
+    // Each test starts as a fresh page load into the project: without
+    // clearing `scopeAnnounced` (never persisted — false on a real load),
+    // a repeated same-project reset is a deliberate heartbeat no-op and
+    // state would bleed between tests.
+    useLangyStore.setState({ scopeAnnounced: false });
+    useLangyStore.getState().resetForProject("project-test");
   });
 
   describe("given a surface attaches a piece of context", () => {
@@ -60,8 +65,18 @@ describe("attachContext", () => {
   describe("when the store resets for a new project", () => {
     it("clears attached context so it cannot bleed across projects", () => {
       useLangyStore.getState().attachContext(traceItem);
-      useLangyStore.getState().resetForProject();
+      // A genuinely different project — a same-project re-announcement is a
+      // heartbeat and deliberately keeps the user's grabbed context.
+      useLangyStore.getState().resetForProject("project-other");
       expect(useLangyStore.getState().attachedContext).toEqual([]);
+    });
+  });
+
+  describe("when the same project is re-announced mid-conversation", () => {
+    it("keeps the attached context — a heartbeat is not a move", () => {
+      useLangyStore.getState().attachContext(traceItem);
+      useLangyStore.getState().resetForProject("project-test");
+      expect(useLangyStore.getState().attachedContext).toEqual([traceItem]);
     });
   });
 

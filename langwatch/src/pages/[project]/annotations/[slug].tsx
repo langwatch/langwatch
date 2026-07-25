@@ -1,5 +1,5 @@
 import {
-  Avatar,
+  Box,
   Container,
   Heading,
   HStack,
@@ -8,6 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "~/utils/compat/next-router";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
+import { UserAvatar } from "~/components/UserAvatar";
 
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -40,9 +41,13 @@ export default function Annotations() {
           {queueMembers?.map((member) => {
             return (
               <Tooltip key={member.id} content={member.name}>
-                <Avatar.Root size="xs">
-                  <Avatar.Fallback name={member.name ?? ""} />
-                </Avatar.Root>
+                <Box display="inline-flex">
+                  <UserAvatar
+                    size="xs"
+                    name={member.name ?? ""}
+                    image={member.image}
+                  />
+                </Box>
               </Tooltip>
             );
           })}

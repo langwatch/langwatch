@@ -3,11 +3,16 @@ import { createSpinner } from "../../utils/spinner";
 import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the created annotation rather than printing it: the output port
+ * renders it in whatever format the caller asked for (utils/output.ts).
+ */
 export const createAnnotationCommand = async (
   traceId: string,
-  options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string; format?: string },
-): Promise<void> => {
+  options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new AnnotationsApiService();
@@ -34,11 +39,14 @@ export const createAnnotationCommand = async (
       `Created annotation${ratingStr} ${chalk.gray(`(id: ${annotation.id ?? "—"})`)}`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(annotation, null, 2));
-    }
+    return {
+      data: annotation,
+      table: () => {
+        // The spinner's success line is the human output.
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "create annotation", format: options?.format });
+    failSpinner({ spinner, error, action: "create annotation" });
     process.exit(1);
   }
 };

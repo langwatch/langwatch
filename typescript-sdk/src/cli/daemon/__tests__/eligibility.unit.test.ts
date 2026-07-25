@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 import {
   collectForwardedEnv,
   evaluateEligibility,
   isAutoSpawnEnabled,
+  isDaemonDisabledByConfig,
   resolveColorLevel,
   type EligibilityInput,
 } from "../eligibility";
@@ -62,6 +66,25 @@ describe("evaluateEligibility", () => {
     });
   });
 
+  describe("when the user opts out persistently (`config set daemon off`)", () => {
+    it("refuses", () => {
+      expect(
+        evaluateEligibility(piped({ daemonDisabledByConfig: true })),
+      ).toEqual({ eligible: false, reason: "disabled-by-config" });
+    });
+
+    it("lets the per-invocation env opt-out keep its own reason", () => {
+      expect(
+        evaluateEligibility(
+          piped({
+            env: { LANGWATCH_NO_DAEMON: "1" },
+            daemonDisabledByConfig: true,
+          }),
+        ),
+      ).toEqual({ eligible: false, reason: "disabled-by-env" });
+    });
+  });
+
   describe("when the command mutates identity or takes over stdio", () => {
     it.each([
       ["login"],
@@ -76,6 +99,7 @@ describe("evaluateEligibility", () => {
       ["opencode"],
       ["daemon"],
       ["init-shell"],
+      ["report"],
     ])("refuses %s", (command) => {
       expect(evaluateEligibility(piped({ args: [command] }))).toEqual({
         eligible: false,
@@ -196,5 +220,55 @@ describe("isAutoSpawnEnabled", () => {
 
   it("is off when LANGWATCH_DAEMON_NO_SPAWN is set", () => {
     expect(isAutoSpawnEnabled({ LANGWATCH_DAEMON_NO_SPAWN: "1" })).toBe(false);
+  });
+});
+
+describe("isDaemonDisabledByConfig", () => {
+  let dir: string;
+  let configFile: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-elig-"));
+    configFile = path.join(dir, "config.json");
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("disables the daemon when the persisted config says daemon off", () => {
+    fs.writeFileSync(configFile, JSON.stringify({ daemon: "off" }));
+
+    expect(
+      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
+    ).toBe(true);
+  });
+
+  it("keeps the daemon enabled when the config says on, or the field is absent", () => {
+    fs.writeFileSync(configFile, JSON.stringify({ daemon: "on" }));
+    expect(
+      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
+    ).toBe(false);
+
+    fs.writeFileSync(configFile, JSON.stringify({ control_plane_url: "x" }));
+    expect(
+      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
+    ).toBe(false);
+  });
+
+  it("keeps the daemon enabled when the config file does not exist", () => {
+    expect(
+      isDaemonDisabledByConfig({
+        LANGWATCH_CLI_CONFIG: path.join(dir, "missing.json"),
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps the daemon enabled when the config file is corrupt — never breaks a command", () => {
+    fs.writeFileSync(configFile, "not json {");
+
+    expect(
+      isDaemonDisabledByConfig({ LANGWATCH_CLI_CONFIG: configFile }),
+    ).toBe(false);
   });
 });

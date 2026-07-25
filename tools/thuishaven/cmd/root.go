@@ -231,9 +231,7 @@ var commands = map[string]command{
 	"postgres": func(ctx context.Context, d deps, rest []string) error {
 		return d.orch.RunPostgres(ctx, d.params, rest)
 	},
-	"prune": func(ctx context.Context, d deps, rest []string) error {
-		return d.orch.Prune(ctx, d.worktree, hasFlag(rest, "--yes"))
-	},
+	"prune": runPrune,
 	"cleanup": func(ctx context.Context, d deps, rest []string) error {
 		if !hasFlag(rest, "--force") {
 			return fmt.Errorf("refusing cleanup without --force")
@@ -325,6 +323,10 @@ func clickHouseLimits() domain.ClickHouseLimits {
 		l.ContainerMemoryMB = mb
 		l.MaxServerMemory = int64(mb) * 9 / 10 * (1 << 20)
 	}
+	if envTruthy("HAVEN_CLICKHOUSE_FULL_LOGS") {
+		l.LightweightLogsEnabled = false
+	}
+	l.SystemLogTTLDays = envInt("HAVEN_CLICKHOUSE_LOG_TTL_DAYS", l.SystemLogTTLDays)
 	return l
 }
 

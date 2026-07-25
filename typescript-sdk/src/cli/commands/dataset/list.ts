@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { checkApiKey } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { createCommandEvents } from "../../telemetry/events";
 import { createDatasetService } from "./service-factory";
@@ -10,7 +11,7 @@ import { handleDatasetCommandError } from "./error-handler";
  * Lists all datasets for the current project.
  * Displays a table with name, slug, record count, and last updated.
  */
-export const listCommand = async (options?: { format?: string }): Promise<void> => {
+export const listCommand = async (): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = createDatasetService();
@@ -35,46 +36,49 @@ export const listCommand = async (options?: { format?: string }): Promise<void> 
       `Found ${pagination.total} dataset${pagination.total !== 1 ? "s" : ""}`,
     );
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify({ data: datasets, pagination }, null, 2));
-    } else if (datasets.length === 0) {
-      console.log();
-      console.log(chalk.gray("No datasets found."));
-      console.log(chalk.gray("Create your first dataset with:"));
-      console.log(
-        chalk.cyan('  langwatch dataset create "My Dataset" --columns input:string,output:string'),
-      );
-    } else {
-      console.log();
-
-      const tableData = datasets.map((ds) => ({
-        Name: ds.name,
-        Slug: ds.slug,
-        Records: String(ds.recordCount),
-        Updated: ds.updatedAt ? formatRelativeTime(ds.updatedAt) : "N/A",
-      }));
-
-      formatTable({
-        data: tableData,
-        headers: ["Name", "Slug", "Records", "Updated"],
-        colorMap: { Name: chalk.cyan },
-      });
-
-      if (pagination.totalPages > 1) {
-        console.log();
-        console.log(
-          chalk.gray(
-            `Showing page ${pagination.page} of ${pagination.totalPages} (${pagination.total} total)`,
-          ),
-        );
-      }
-    }
-
     events.completed({
       count: datasets.length,
       total: pagination.total,
       message: `Returned ${datasets.length} of ${pagination.total.toLocaleString()} dataset${pagination.total === 1 ? "" : "s"}`,
     });
+
+    return {
+      data: { data: datasets, pagination },
+      table: () => {
+        if (datasets.length === 0) {
+          console.log();
+          console.log(chalk.gray("No datasets found."));
+          console.log(chalk.gray("Create your first dataset with:"));
+          console.log(
+            chalk.cyan('  langwatch dataset create "My Dataset" --columns input:string,output:string'),
+          );
+        } else {
+          console.log();
+
+          const tableData = datasets.map((ds) => ({
+            Name: ds.name,
+            Slug: ds.slug,
+            Records: String(ds.recordCount),
+            Updated: ds.updatedAt ? formatRelativeTime(ds.updatedAt) : "N/A",
+          }));
+
+          formatTable({
+            data: tableData,
+            headers: ["Name", "Slug", "Records", "Updated"],
+            colorMap: { Name: chalk.cyan },
+          });
+
+          if (pagination.totalPages > 1) {
+            console.log();
+            console.log(
+              chalk.gray(
+                `Showing page ${pagination.page} of ${pagination.totalPages} (${pagination.total} total)`,
+              ),
+            );
+          }
+        }
+      },
+    };
   } catch (error) {
     events.failed({ error, message: "Dataset list failed" });
     // `handleDatasetCommandError` exits the process, so flush first.

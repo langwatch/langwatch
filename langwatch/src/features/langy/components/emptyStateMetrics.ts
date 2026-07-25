@@ -11,12 +11,13 @@
  * So the FLOATING metrics interpolate on real width instead: they sit at the
  * current look at full width and ease DOWN toward a compact anchor as the card
  * narrows, which keeps the long suggestion row on one line and stops the hero
- * from feeling oversized in a split-screen / mobile card. The full-width look is
- * unchanged (roomy anchor == the previous floating values).
+ * from feeling oversized in a split-screen / mobile card.
  *
  * The SIDEBAR is a fixed width and wants a calmer hero regardless (it's a panel
- * you keep open, not a momentary overlay), so it keeps its own tuned constants —
- * the previous sidebar look, verbatim.
+ * you keep open, not a momentary overlay), so it keeps its own tuned constants.
+ *
+ * The hero mark (the LangWatch logo) runs ~16-18% larger than the original
+ * anchors at every size — the logo carried the pane's identity too quietly.
  */
 
 export interface EmptyStateMetrics {
@@ -49,7 +50,7 @@ const FLOATING_ROOMY_WIDTH = 416;
 
 /** The compact end — the tightest useful floating card (~split-screen / mobile). */
 const FLOATING_NARROW: EmptyStateMetrics = {
-  markSize: 36,
+  markSize: 42,
   greetingSize: 24,
   heroGapTop: 16,
   heroMarginBottom: 26,
@@ -59,9 +60,9 @@ const FLOATING_NARROW: EmptyStateMetrics = {
   subtitleMaxWidth: 280,
 };
 
-/** The roomy end — verbatim the previous floating look, so full width is unchanged. */
+/** The roomy end — the previous floating look with the hero mark stepped up ~16%. */
 const FLOATING_ROOMY: EmptyStateMetrics = {
-  markSize: 44,
+  markSize: 51,
   greetingSize: 27,
   heroGapTop: 21,
   heroMarginBottom: 34,
@@ -71,9 +72,9 @@ const FLOATING_ROOMY: EmptyStateMetrics = {
   subtitleMaxWidth: 300,
 };
 
-/** The docked panel — verbatim the previous sidebar look, calmer on purpose. */
+/** The docked panel — the previous sidebar look, calmer on purpose, mark stepped up ~18%. */
 const SIDEBAR_METRICS: EmptyStateMetrics = {
-  markSize: 34,
+  markSize: 40,
   greetingSize: 23,
   heroGapTop: 12,
   heroMarginBottom: 24,

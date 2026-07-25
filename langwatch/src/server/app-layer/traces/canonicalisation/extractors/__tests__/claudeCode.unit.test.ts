@@ -3,21 +3,22 @@ import { describe, expect, it } from "vitest";
 import {
   buildInputMessagesFromRequestBody,
   ClaudeCodeExtractor,
-  collectToolResultsFromRequestBody,
   extractAssistantOutputFromResponseBody,
   extractAssistantTextFromResponseBody,
-  extractUserTextFromRequestBody,
   isConversationalQuerySource,
 } from "../claudeCode";
-import { createLogExtractorContext } from "./_testHelpers";
+import {
+  createExtractorContext,
+  createLogExtractorContext,
+} from "./_testHelpers";
 
 const SCOPE = "com.anthropic.claude_code.events";
 
 describe("ClaudeCodeExtractor.applyLog", () => {
   // The model-call events (api_request / api_request_body / api_response_body)
-  // are trapped at ingest and converted to a gen_ai span by
-  // claude-code-log-to-span.ts — they never reach this log extractor. The only
-  // claude_code event the log side lifts is user_prompt.
+  // are folded downstream from the log path itself, not lifted onto canonical
+  // attributes here. The only claude_code event this extractor lifts is
+  // user_prompt.
 
   it("lifts the user-typed prompt onto langwatch.input from a user_prompt event", () => {
     // claude-code 2.x only emits the `prompt` attribute when
@@ -64,10 +65,9 @@ describe("ClaudeCodeExtractor.applyLog", () => {
     expect(ctx.recordRule).not.toHaveBeenCalled();
   });
 
-  it("does NOT lift the converted model-call events on the log path", () => {
-    // api_request is trapped + converted to a span upstream; if one ever
-    // reached this extractor it must NOT re-lift cost/tokens onto the fold
-    // (that would double-count). The extractor ignores it.
+  it("does NOT lift the model-call events on the log path", () => {
+    // api_request is folded downstream; this extractor must NOT re-lift
+    // cost/tokens onto the fold (that would double-count). It ignores it.
     const ctx = createLogExtractorContext(SCOPE, {
       "event.name": "api_request",
       model: "claude-opus-4-7",
@@ -92,11 +92,72 @@ describe("ClaudeCodeExtractor.applyLog", () => {
     expect(ctx.out).toEqual({});
     expect(ctx.recordRule).not.toHaveBeenCalled();
   });
+});
 
-  it("span-side apply is a no-op (Path A flows through GenAIExtractor)", () => {
-    const extractor = new ClaudeCodeExtractor();
-    expect(extractor.id).toBe("claude-code");
-    expect(typeof extractor.apply).toBe("function");
+describe("ClaudeCodeExtractor.apply (span side)", () => {
+  it("lifts the CLI's bare-named token + model attrs onto canonical gen_ai.usage.* on the native llm_request span", () => {
+    const ctx = createExtractorContext(
+      {
+        model: "claude-opus-4-7",
+        input_tokens: 120,
+        output_tokens: 45,
+        cache_read_tokens: 900,
+        cache_creation_tokens: 30,
+      },
+      { name: "claude_code.llm_request" },
+    );
+
+    new ClaudeCodeExtractor().apply(ctx);
+
+    expect(ctx.out).toEqual({
+      "gen_ai.request.model": "claude-opus-4-7",
+      "gen_ai.usage.input_tokens": 120,
+      "gen_ai.usage.output_tokens": 45,
+      "gen_ai.usage.cache_read.input_tokens": 900,
+      "gen_ai.usage.cache_creation.input_tokens": 30,
+    });
+    expect(ctx.recordRule).toHaveBeenCalledWith("claude-code/llm_request");
+  });
+
+  it("does nothing for a span that isn't claude_code.llm_request", () => {
+    // Gateway-proxied traffic (and every other claude_code span, like the
+    // tool span) must not be touched here — this method exists ONLY for the
+    // CLI's own native model-call span.
+    const ctx = createExtractorContext(
+      { model: "claude-opus-4-7", input_tokens: 120 },
+      { name: "claude_code.tool" },
+    );
+
+    new ClaudeCodeExtractor().apply(ctx);
+
+    expect(ctx.out).toEqual({});
+    expect(ctx.recordRule).not.toHaveBeenCalled();
+  });
+
+  it("never overwrites a canonical attribute a gateway-proxied gen_ai.* span already set", () => {
+    // setAttrIfAbsent semantics: if GenAIExtractor (or an earlier rule) already
+    // claimed the canonical key, this extractor must not clobber it.
+    const ctx = createExtractorContext(
+      { input_tokens: 999 },
+      { name: "claude_code.llm_request" },
+    );
+    ctx.out["gen_ai.usage.input_tokens"] = 10;
+
+    new ClaudeCodeExtractor().apply(ctx);
+
+    expect(ctx.out["gen_ai.usage.input_tokens"]).toBe(10);
+  });
+
+  it("does not fire for a zero-valued token count", () => {
+    const ctx = createExtractorContext(
+      { input_tokens: 0, output_tokens: 0 },
+      { name: "claude_code.llm_request" },
+    );
+
+    new ClaudeCodeExtractor().apply(ctx);
+
+    expect(ctx.out).toEqual({});
+    expect(ctx.recordRule).not.toHaveBeenCalled();
   });
 });
 
@@ -178,61 +239,6 @@ describe("extractAssistantTextFromResponseBody (exported helper)", () => {
   });
 });
 
-describe("extractUserTextFromRequestBody (exported helper)", () => {
-  it("lifts the latest user turn's text from an array content message", () => {
-    const body = JSON.stringify({
-      model: "claude-opus-4-7",
-      messages: [
-        { role: "user", content: [{ type: "text", text: "first turn" }] },
-        { role: "assistant", content: [{ type: "text", text: "reply" }] },
-        {
-          role: "user",
-          content: [{ type: "text", text: "Reply with PONG-Y" }],
-        },
-      ],
-    });
-    expect(extractUserTextFromRequestBody(body)).toBe("Reply with PONG-Y");
-  });
-
-  it("supports a plain-string user content", () => {
-    const body = JSON.stringify({
-      messages: [{ role: "user", content: "just a string prompt" }],
-    });
-    expect(extractUserTextFromRequestBody(body)).toBe("just a string prompt");
-  });
-
-  it("concatenates multiple text blocks of the last user message", () => {
-    const body = JSON.stringify({
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "line one" },
-            { type: "image", source: {} },
-            { type: "text", text: "line two" },
-          ],
-        },
-      ],
-    });
-    expect(extractUserTextFromRequestBody(body)).toBe("line one\n\nline two");
-  });
-
-  it("returns null for truncated / malformed / message-less bodies", () => {
-    expect(extractUserTextFromRequestBody(undefined)).toBeNull();
-    expect(extractUserTextFromRequestBody("")).toBeNull();
-    // claude truncates large request bodies inline -> invalid JSON tail.
-    expect(
-      extractUserTextFromRequestBody('{"model":"x","messages":[{"role":"u'),
-    ).toBeNull();
-    expect(extractUserTextFromRequestBody(JSON.stringify({}))).toBeNull();
-    expect(
-      extractUserTextFromRequestBody(
-        JSON.stringify({ messages: [{ role: "assistant", content: "x" }] }),
-      ),
-    ).toBeNull();
-  });
-});
-
 describe("buildInputMessagesFromRequestBody (exported helper)", () => {
   it("parses system + every turn into a role/content conversation", () => {
     const body = JSON.stringify({
@@ -309,7 +315,12 @@ describe("extractAssistantOutputFromResponseBody", () => {
     const body = JSON.stringify({
       content: [
         { type: "text", text: "Let me check." },
-        { type: "tool_use", id: "toolu_1", name: "Bash", input: { command: "ls /tmp" } },
+        {
+          type: "tool_use",
+          id: "toolu_1",
+          name: "Bash",
+          input: { command: "ls /tmp" },
+        },
       ],
     });
     const out = extractAssistantOutputFromResponseBody(body) ?? "";
@@ -319,7 +330,9 @@ describe("extractAssistantOutputFromResponseBody", () => {
   });
 
   it("matches the text-only extractor for a plain text reply", () => {
-    const body = JSON.stringify({ content: [{ type: "text", text: "PONG-Z" }] });
+    const body = JSON.stringify({
+      content: [{ type: "text", text: "PONG-Z" }],
+    });
     expect(extractAssistantOutputFromResponseBody(body)).toBe("PONG-Z");
     expect(extractAssistantTextFromResponseBody(body)).toBe("PONG-Z");
   });
@@ -328,88 +341,5 @@ describe("extractAssistantOutputFromResponseBody", () => {
     expect(extractAssistantOutputFromResponseBody("")).toBeNull();
     expect(extractAssistantOutputFromResponseBody("{not json")).toBeNull();
     expect(extractAssistantOutputFromResponseBody(null)).toBeNull();
-  });
-});
-
-describe("collectToolResultsFromRequestBody", () => {
-  // Real wire shape (from raw dumps): the tool_result block keys are
-  // `tool_use_id`, `type`, `content` (a plain string for Bash), `is_error`.
-  const bashResult = (toolUseId: string, content: string) => ({
-    tool_use_id: toolUseId,
-    type: "tool_result",
-    content,
-    is_error: false,
-  });
-
-  it("maps each tool_use_id to its result text from a whole, parseable body", () => {
-    const body = JSON.stringify({
-      model: "claude-opus-4-7",
-      messages: [
-        {
-          role: "assistant",
-          content: [{ type: "tool_use", id: "toolu_a", name: "Bash", input: {} }],
-        },
-        { role: "user", content: [bashResult("toolu_a", "       0")] },
-      ],
-    });
-    const map = collectToolResultsFromRequestBody(body);
-    expect(map.get("toolu_a")).toBe("       0");
-  });
-
-  it("handles array-form content (Read-style) as well as string content", () => {
-    const body = JSON.stringify({
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              tool_use_id: "toolu_read",
-              type: "tool_result",
-              content: [{ type: "text", text: "file contents here" }],
-            },
-          ],
-        },
-      ],
-    });
-    expect(collectToolResultsFromRequestBody(body).get("toolu_read")).toBe(
-      "file contents here",
-    );
-  });
-
-  it("recovers complete tool_results from a 60KB-truncated body and skips the cut-off tail", () => {
-    // Claude truncates the request body inline (~60KB, body_truncated=true), so
-    // the whole body does NOT JSON.parse. Everything before the cut is still
-    // recoverable; the final, half-written tool_result is not.
-    const full = JSON.stringify({
-      model: "claude-opus-4-7",
-      messages: [
-        {
-          role: "assistant",
-          content: [{ type: "tool_use", id: "toolu_first", name: "Bash", input: {} }],
-        },
-        { role: "user", content: [bashResult("toolu_first", "first-result")] },
-        {
-          role: "assistant",
-          content: [{ type: "tool_use", id: "toolu_last", name: "Bash", input: {} }],
-        },
-        { role: "user", content: [bashResult("toolu_last", "SECOND_RESULT_CUT_HERE")] },
-      ],
-    });
-    const truncated = full.slice(0, full.indexOf("SECOND_RESULT_CUT_HERE") + 6);
-    // Sanity: the truncated body is genuinely not valid JSON.
-    expect(() => JSON.parse(truncated)).toThrow();
-
-    const map = collectToolResultsFromRequestBody(truncated);
-    expect(map.get("toolu_first")).toBe("first-result");
-    expect(map.has("toolu_last")).toBe(false);
-  });
-
-  it("returns an empty map for a body with no tool_results", () => {
-    const body = JSON.stringify({
-      messages: [{ role: "user", content: [{ type: "text", text: "hi" }] }],
-    });
-    expect(collectToolResultsFromRequestBody(body).size).toBe(0);
-    expect(collectToolResultsFromRequestBody("").size).toBe(0);
-    expect(collectToolResultsFromRequestBody(null).size).toBe(0);
   });
 });

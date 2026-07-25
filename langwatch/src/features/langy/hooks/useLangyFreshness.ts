@@ -1,11 +1,13 @@
+import {
+  compareLangyEventCursors,
+  isLangyTurnProjectionTerminal,
+} from "@langwatch/langy";
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type {
-  LangyConversationListItemDto,
-  LangyConversationUpdateSignal,
-} from "../data/langy.dtos";
-import { getLangyConversationListInput } from "../data/useLangyConversationListQuery";
+import type { LangyConversationUpdateSignal } from "../data/langy.dtos";
+import { useLangyDevLog } from "../stores/langyDevLog";
+import { useLangyStore } from "../stores/langyStore";
 import { useLangyConversationUpdateListener } from "./useLangyConversationUpdateListener";
 
 /**
@@ -14,108 +16,119 @@ import { useLangyConversationUpdateListener } from "./useLangyConversationUpdate
  * / detail consumer (tRPC subscriptions aren't deduped across hook instances —
  * one-per-consumer would starve the browser's connection pool).
  *
- * Perceived-latency optimization (per product direction): the freshness signal
- * carries the low-sensitivity operational spine the worker already holds, so we
- * APPLY it in place with `setInfiniteData` and skip a database round-trip. We only
- * fall back to cancel()+invalidate() when:
- *   - the conversation isn't already in the (server-filtered) list cache — a
- *     new/foreign conversation must go through the server visibility gate, or
- *   - the signal carries no operational payload.
- * The result: instant for the conversation you're looking at, correct for
- * everything else. Content-derived fields (title, messages) are never on the
- * wire, so a title change also routes through invalidate.
+ * Contract: the freshness signal is ID-ONLY. The broadcast subscriber
+ * (`langy-conversation-update-broadcast.subscriber.ts`) deliberately lets "no
+ * folded conversation state cross" its port — no status, no counts, no content
+ * ride the wire, only the `conversationId`. So this coordinator is pure
+ * signal-then-refetch (`specs/langy/langy-frontend-realtime.feature`): a signal
+ * says "conversation X changed", and we invalidate the queries it affects and
+ * let the server re-decide visibility. We never try to apply pushed state in
+ * place — there is none to apply.
+ *
+ * Two queries are affected by a signal:
+ *   - the recents LIST (title / counts / ordering) — always refetched, once per
+ *     debounced batch, through the server visibility gate;
+ *   - the OPEN conversation's MESSAGES, when a signal names it — refetched so a
+ *     turn it did not itself initiate (another tab, a recovered/again-driven
+ *     turn, a programmatic caller) still lands. Without this the open thread has
+ *     no live turn stream to attach to and stays stale until a remount. The
+ *     panel re-hydrates its engine from this query when it is not mid-stream.
  */
 export function useLangyFreshness(activeConversationId: string | null): void {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
+
+  /**
+   * The OPEN conversation's live path (ADR-059): the signal carries the
+   * projection's CURSOR; compare it with the local fold's and, when behind,
+   * fetch the durable event tail and fold it in place — turn state lands
+   * event-by-event without re-downloading the projection. Message CONTENT
+   * still lives in the messages query, which is refetched only at a folded
+   * TERMINAL (that is when the answer reaches the message projection) or when
+   * the signal predates cursors.
+   */
+  const catchUpOpenConversation = useCallback(
+    async (
+      projectId: string,
+      conversationId: string,
+      signalCursor: LangyConversationUpdateSignal["cursor"],
+    ) => {
+      const store = useLangyStore.getState();
+      // A signal naming the conversation is durable proof it exists — the
+      // projection updated. Confirms a freshly-minted conversation so the
+      // history read's not-found stops presenting as pending (see
+      // `unconfirmedConversations`).
+      store.confirmConversation(conversationId);
+      const local = store.turnProjection.cursor;
+      if (!signalCursor || !local) {
+        // Pre-cursor server build, or the snapshot has not seeded the local
+        // fold yet — the old signal-then-refetch path is the honest fallback.
+        void trpcUtils.langy.messages.invalidate({ projectId, conversationId });
+        return;
+      }
+      if (compareLangyEventCursors(signalCursor, local) <= 0) return;
+
+      // Bounded catch-up: each page advances the cursor; three pages is far
+      // beyond any real burst (the ceiling is a defensive log, not a path).
+      let after = local;
+      for (let page = 0; page < 3; page++) {
+        const tail = await trpcUtils.langy.conversationEventsAfter.fetch({
+          projectId,
+          conversationId,
+          after,
+        });
+        // The inspector's durable lane: the EVENT LOG as this client received
+        // it, recorded before the fold so the tape shows what arrived even if
+        // applying it turns out to be the bug.
+        for (const event of tail.events) {
+          useLangyDevLog.getState().recordDurableEvent(event);
+        }
+        useLangyStore.getState().applyTurnEvents(tail.events);
+        after = tail.cursor;
+        if (!tail.truncated) break;
+      }
+
+      if (
+        isLangyTurnProjectionTerminal(useLangyStore.getState().turnProjection)
+      ) {
+        void trpcUtils.langy.messages.invalidate({ projectId, conversationId });
+      }
+    },
+    [trpcUtils],
+  );
 
   const onConversationUpdated = useCallback(
     (signals: LangyConversationUpdateSignal[]) => {
       const projectId = project?.id;
       if (!projectId) return;
 
-      const listInput = getLangyConversationListInput(projectId);
-      const known = new Set(
-        (
-          trpcUtils.langy.list
-            .getInfiniteData(listInput)
-            ?.pages.flatMap((page) => page.items) ?? []
-        ).map((item) => item.id),
-      );
-
-      let needsListRefetch = false;
-
       for (const signal of signals) {
-        const hasOperationalPayload =
-          signal.status !== undefined ||
-          signal.messageCount !== undefined ||
-          signal.lastActivityAtMs !== undefined;
-
-        // A title change carries no title text on the wire (privacy), so an
-        // in-place apply can't pick it up — force a visibility-gated refetch
-        // that re-reads the new title from the server.
-        if (
-          known.has(signal.conversationId) &&
-          hasOperationalPayload &&
-          !signal.titleChanged
-        ) {
-          // Apply in place — no network round-trip.
-          trpcUtils.langy.list.setInfiniteData(listInput, (old) => {
-            if (!old) return old;
-            return {
-              ...old,
-              pages: old.pages.map((page) => ({
-                ...page,
-                items: page.items.map((item) =>
-                  item.id === signal.conversationId
-                    ? applySignal(item, signal)
-                    : item,
-                ),
-              })),
-            };
+        useLangyDevLog.getState().recordSignal({
+          conversationId: signal.conversationId,
+          cursor: signal.cursor ?? null,
+        });
+        if (signal.conversationId === activeConversationId) {
+          catchUpOpenConversation(
+            projectId,
+            signal.conversationId,
+            signal.cursor,
+          ).catch(() => {
+            // A failed catch-up must not strand the open thread — fall back to
+            // the plain refetch the signal used to mean.
+            void trpcUtils.langy.messages.invalidate({
+              projectId,
+              conversationId: signal.conversationId,
+            });
           });
-
-          // Patch the open conversation's detail cache too so its status
-          // (running/idle/failed) reflects immediately.
-          if (signal.conversationId === activeConversationId) {
-            // A terminal status must also refresh the MESSAGES query — its
-            // `isTurnInFlight` keeps the thinking line mounted, and this
-            // signal is the only wake-up a tab with no live turn stream gets
-            // (e.g. reloaded mid-turn). Invalidate, not setData: the durable
-            // answer parts ride the same query.
-            if (signal.status === "idle" || signal.status === "failed") {
-              void trpcUtils.langy.messages.invalidate({
-                projectId,
-                conversationId: signal.conversationId,
-              });
-            }
-            trpcUtils.langy.detail.setData(
-              { projectId, conversationId: signal.conversationId },
-              (old) =>
-                old
-                  ? {
-                      ...old,
-                      status: signal.status ?? old.status,
-                      messageCount: signal.messageCount ?? old.messageCount,
-                      lastActivityAtMs:
-                        signal.lastActivityAtMs ?? old.lastActivityAtMs,
-                    }
-                  : old,
-            );
-          }
-        } else {
-          // Unknown conversation (new / foreign) or no payload — let the
-          // server re-decide visibility via a refetch.
-          needsListRefetch = true;
         }
       }
 
-      if (needsListRefetch) {
-        void trpcUtils.langy.list.cancel();
-        void trpcUtils.langy.list.invalidate();
-      }
+      // The list carries no content and the signal no spine, so a change always
+      // routes through a single server-gated refetch per debounced batch.
+      void trpcUtils.langy.list.cancel();
+      void trpcUtils.langy.list.invalidate();
     },
-    [trpcUtils, project?.id, activeConversationId],
+    [trpcUtils, project?.id, activeConversationId, catchUpOpenConversation],
   );
 
   useLangyConversationUpdateListener({
@@ -125,16 +138,4 @@ export function useLangyFreshness(activeConversationId: string | null): void {
     debounceMs: 1500,
     maxWaitMs: 1500,
   });
-}
-
-/** Patch a list item with a freshness signal's operational fields. */
-function applySignal(
-  item: LangyConversationListItemDto,
-  signal: LangyConversationUpdateSignal,
-): LangyConversationListItemDto {
-  return {
-    ...item,
-    messageCount: signal.messageCount ?? item.messageCount,
-    lastActivityAtMs: signal.lastActivityAtMs ?? item.lastActivityAtMs,
-  };
 }

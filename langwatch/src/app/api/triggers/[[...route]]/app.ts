@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { Prisma, Trigger } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
-import { resolver, validator as zValidator } from "hono-openapi/zod";
+import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
@@ -174,7 +175,9 @@ secured.access(requires("triggers:view")).get(
 );
 
 // ── Create Trigger ─────────────────────────────────────────
-secured.access(requires("triggers:manage")).post(
+// Creating asks for `triggers:create`; `:manage` still implies it, so no
+// existing caller changes and a viewer is declined as before.
+secured.access(requires("triggers:create")).post(
   "/",
   resourceLimitMiddleware("automations"),
   describeRoute({
@@ -227,7 +230,7 @@ secured.access(requires("triggers:manage")).post(
 );
 
 // ── Update Trigger ─────────────────────────────────────────
-secured.access(requires("triggers:manage")).patch(
+secured.access(requires("triggers:update")).patch(
   "/:id",
   describeRoute({
     description: "Update a trigger (name, active state, message, filters)",
@@ -290,6 +293,7 @@ secured.access(requires("triggers:manage")).patch(
 );
 
 // ── Delete Trigger ─────────────────────────────────────────
+// Destruction deliberately stays at `:manage`.
 secured.access(requires("triggers:manage")).delete(
   "/:id",
   describeRoute({

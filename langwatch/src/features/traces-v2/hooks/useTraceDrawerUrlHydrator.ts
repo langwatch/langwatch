@@ -32,10 +32,7 @@ export function useTraceDrawerUrlHydrator(): void {
     const store = useDrawerStore.getState();
 
     if (wantsOpen && traceId) {
-      if (
-        store.traceId === traceId &&
-        store.occurredAtMs === validTimestamp
-      ) {
+      if (store.traceId === traceId && store.occurredAtMs === validTimestamp) {
         return;
       }
       store.openTrace(traceId, validTimestamp);

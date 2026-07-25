@@ -55,6 +55,7 @@ type Principal = {
   userId: string | null;
   userName: string | null;
   userEmail: string | null;
+  userImage: string | null;
   groupId: string | null;
   groupName: string | null;
   groupScimSource: string | null;
@@ -72,6 +73,7 @@ function groupByPrincipal(bindings: Binding[]): Principal[] {
         userId: b.userId,
         userName: b.userName,
         userEmail: b.userEmail,
+        userImage: b.userImage,
         groupId: b.groupId,
         groupName: b.groupName,
         groupScimSource: b.groupScimSource,
@@ -97,6 +99,7 @@ function PrincipalCell({ principal }: { principal: Principal }) {
         <RandomColorAvatar
           id={principal.userId}
           name={principal.userName ?? principal.userEmail ?? "?"}
+          image={principal.userImage}
           size="xs"
         />
         <VStack gap={0} align="start">

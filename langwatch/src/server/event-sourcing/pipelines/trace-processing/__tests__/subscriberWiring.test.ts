@@ -28,8 +28,6 @@ function buildTraceDeps(
   const store = {} as any;
   return {
     spanAppendStore: store,
-    logRecordAppendStore: store,
-    metricRecordAppendStore: store,
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
@@ -45,7 +43,6 @@ function buildTraceDeps(
       graphActivityHandler: vi.fn().mockResolvedValue(undefined),
     },
     spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
-    claudeCodeSpanSyncReactor: reactorStub("claudeCodeSpanSync"),
     ...overrides,
   };
 }

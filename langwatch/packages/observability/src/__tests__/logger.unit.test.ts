@@ -182,6 +182,33 @@ describe("createLogger", () => {
     });
   });
 
+  describe("when a log line is emitted in production", () => {
+    it("stamps the service field fluent-bit promotes to the Loki label", () => {
+      const written: string[] = [];
+      const spy = vi
+        .spyOn(process.stdout, "write")
+        .mockImplementation((chunk: unknown) => {
+          written.push(String(chunk));
+          return true;
+        });
+
+      try {
+        const logger = createLogger("service-field-test");
+        logger.error("boom");
+      } finally {
+        spy.mockRestore();
+      }
+
+      const parsed = JSON.parse(written[0]!);
+      expect(parsed.service).toBe("langwatch-app");
+      // `base` replaces pino's defaults — prod queries filter on hostname.
+      expect(parsed.hostname).toBeTruthy();
+      expect(parsed.pid).toBeTruthy();
+      // The per-module label stays distinct from the process identity.
+      expect(parsed.name).toBe("service-field-test");
+    });
+  });
+
   describe("console context fields", () => {
     it("hides heavy business context when OTel export is enabled", () => {
       const ignored = consoleIgnoreFields(true).split(",");
@@ -194,7 +221,7 @@ describe("createLogger", () => {
     });
 
     it("keeps business context when the console is the only output", () => {
-      expect(consoleIgnoreFields(false)).toBe("pid,hostname");
+      expect(consoleIgnoreFields(false)).toBe("pid,hostname,service");
     });
   });
 });

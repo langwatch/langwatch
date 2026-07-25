@@ -1,5 +1,5 @@
 import { type LangwatchApiClient } from "@/internal/api/client";
-import { isLangWatchDomainError } from "@/internal/api/errors";
+import { isLangWatchHandledError } from "@/internal/api/errors";
 import { type Logger } from "@/logger";
 import {
   type Dataset,
@@ -74,12 +74,12 @@ export class DatasetService {
 
     const errorMessage = this.extractErrorMessage(error, status);
 
-    // NO domain-error throw here, deliberately.
+    // NO handled-error throw here, deliberately.
     //
     // Datasets is the one service that already HAS a typed error taxonomy —
     // `DatasetNotFoundError`, `DatasetPlanLimitError`, and a `DatasetApiError`
     // that carries the status — and all three are public API that callers catch
-    // by class. Raising a `LangWatchDomainError` in their place would be a
+    // by class. Raising a `LangWatchHandledError` in their place would be a
     // breaking change dressed up as an improvement (a 409 would stop being a
     // `DatasetApiError`), so this service keeps its own classes and the
     // transport's throw is folded back into them by `asResponseEnvelope` above.
@@ -139,7 +139,7 @@ export class DatasetService {
     try {
       return await request;
     } catch (error) {
-      if (isLangWatchDomainError(error)) {
+      if (isLangWatchHandledError(error)) {
         return { error: error.body, response: { status: error.httpStatus } };
       }
       throw error;

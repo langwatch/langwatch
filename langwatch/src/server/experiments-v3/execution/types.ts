@@ -8,7 +8,7 @@ import {
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
-import type { SerializedHandledError } from "~/server/app-layer/handled-error";
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================

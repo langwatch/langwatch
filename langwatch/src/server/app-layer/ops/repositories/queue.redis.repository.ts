@@ -830,7 +830,7 @@ export class QueueRedisRepository implements QueueRepository {
   }
 
   // Tenant pause: encoded as a special "tenant:<id>" entry in the same
-  // paused-jobs SET that DISPATCH_LUA already consults. The Lua dispatcher
+  // paused-jobs SET that DISPATCH_BATCH_LUA already consults. The Lua dispatcher
   // extracts the tenantId from each groupId (everything before the first
   // "/") and checks SISMEMBER for "tenant:<id>". Added post-2026-05-11
   // incident so an operator can halt ALL processing for a runaway tenant

@@ -46,7 +46,7 @@ describe("LangyCard taxonomy", () => {
       );
       // LangyPanelSurface stacks the panel textures behind the content.
       expect(container.querySelector(".langy-root")).not.toBeNull();
-      expect(container.querySelector(".langy-grain")).not.toBeNull();
+      expect(container.querySelector(".langy-signal-grid")).not.toBeNull();
       expect(container.querySelector(".langy-accent-wash")).not.toBeNull();
     });
   });

@@ -10,6 +10,7 @@ import {
 } from "@opentelemetry/api";
 import {
   incrementEsProcessOutboxTotal,
+  observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
 } from "~/server/metrics";
 import { toSafeFailureDiagnostic } from "../failureDiagnostic";
@@ -60,6 +61,18 @@ export interface OutboxDispatcherServiceOptions {
    * them for lack of a handler. Omitted means unfiltered.
    */
   processNames?: readonly string[];
+  /**
+   * How many leased messages this dispatcher may have in flight at once.
+   * Default 1 (strictly sequential), which is what every caller got before
+   * this option existed. Raise it only for a domain whose effect is slow and
+   * genuinely parallel-safe. The lease fences each message individually, but
+   * NOTHING serializes two pending messages for the same processKey within a
+   * batch — they dispatch concurrently and in no guaranteed order — so above
+   * 1 the domain must also guarantee at most one in-flight intent per key by
+   * construction (as topic clustering's in-flight guard and one-page-at-a-
+   * time chaining do), or tolerate reordering.
+   */
+  concurrency?: number;
   tracer?: Tracer;
   logger?: Logger;
 }
@@ -101,6 +114,7 @@ export class OutboxDispatcherService {
   private readonly retryDelayMs: (params: { attempt: number }) => number;
   private readonly leaseDurationMs: number;
   private readonly processNames: readonly string[] | undefined;
+  private readonly concurrency: number;
   private readonly tracer: Tracer;
   private readonly logger: Logger;
 
@@ -111,6 +125,7 @@ export class OutboxDispatcherService {
     this.retryDelayMs = options.retryDelayMs ?? defaultRetryDelayMs;
     this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
     this.processNames = options.processNames;
+    this.concurrency = Math.max(1, options.concurrency ?? 1);
     this.tracer =
       options.tracer ?? trace.getTracer("langwatch.process-manager");
     this.logger =
@@ -129,9 +144,27 @@ export class OutboxDispatcherService {
     });
 
     const report: DispatchReport = { dispatched: [], retried: [], dead: [] };
-    for (const message of leased) {
-      await this.dispatchOne({ message, now: params.now, report });
+    if (this.concurrency <= 1) {
+      for (const message of leased) {
+        await this.dispatchOne({ message, now: params.now, report });
+      }
+      return report;
     }
+
+    // Bounded pool over the leased batch. Each message is independently
+    // lease-fenced, so the only thing being bounded here is concurrent load on
+    // whatever the handlers call.
+    let cursor = 0;
+    const workers = Array.from(
+      { length: Math.min(this.concurrency, leased.length) },
+      async () => {
+        while (cursor < leased.length) {
+          const message = leased[cursor++]!;
+          await this.dispatchOne({ message, now: params.now, report });
+        }
+      },
+    );
+    await Promise.all(workers);
     return report;
   }
 
@@ -171,6 +204,15 @@ export class OutboxDispatcherService {
       remoteParent,
       async (span) => {
         const startedAt = performance.now();
+        // Commit → first-dispatch delay (ADR-054): the substrate's direct
+        // "is the outbox draining" signal. First attempt only — retries
+        // re-enter with deliberate backoff, which is not queueing delay.
+        if (attempt === 1) {
+          observeEsProcessOutboxDispatchLag({
+            processName: message.processName,
+            lagMs: now - message.createdAt,
+          });
+        }
         try {
           const handler = this.handlers[message.intentType];
           if (!handler) {

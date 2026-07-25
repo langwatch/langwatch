@@ -16,41 +16,42 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
-import { toaster } from "~/components/ui/toaster";
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import { useTargetNameMap } from "~/hooks/useTargetNameMap";
-import { useDrawer } from "~/hooks/useDrawer";
-import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { Period } from "~/components/PeriodSelector";
+import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
+import { toaster } from "~/components/ui/toaster";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
+import { GroupRow } from "./GroupRow";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
 } from "./RunHistoryFilters";
-import { RunRow } from "./RunRow";
-import { GroupRow } from "./GroupRow";
 import { RunHistorySkeleton } from "./RunHistorySkeleton";
-import { ShadowDivider } from "~/components/ui/ShadowDivider";
+import { RunRow } from "./RunRow";
 import { RunSummaryCounts } from "./RunSummaryCounts";
-import { useRunHistoryStore } from "./useRunHistoryStore";
-import { useRunHistoryPagination } from "./useRunHistoryPagination";
-import { useAutoExpansion } from "./useAutoExpansion";
-import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import {
   computeBatchRunSummary,
   computeGroupSummary,
   computeRunHistoryTotals,
-  resolveOriginLabel,
   groupRunsByBatchId,
   groupRunsByScenarioId,
   groupRunsByTarget,
+  resolveOriginLabel,
 } from "./run-history-transforms";
-import { isOnPlatformSet } from "~/server/scenarios/internal-set-id";
-import { isSuiteSetId } from "~/server/suites/suite-set-id";
+import { useAutoExpansion } from "./useAutoExpansion";
+import { useCancelScenarioRun } from "./useCancelScenarioRun";
+import { useRunHistoryPagination } from "./useRunHistoryPagination";
+import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useScrollToBatch } from "./useScrollToBatch";
 
 export type RunHistoryStats = {
@@ -167,36 +168,38 @@ export function RunHistoryPanel({
   // Track the specific job ID currently being cancelled for per-button loading state
   const [cancellingJobId, setCancellingJobId] = useState<string | null>(null);
 
-  const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun({
-    onCancelJobSuccess: () => {
-      setCancellingJobId(null);
-      void refetch();
-      toaster.create({
-        title: "Cancellation requested",
-        type: "info",
-      });
+  const { cancelJob, cancelBatchRun, isCancellingBatch } = useCancelScenarioRun(
+    {
+      onCancelJobSuccess: () => {
+        setCancellingJobId(null);
+        void refetch();
+        toaster.create({
+          title: "Cancellation requested",
+          type: "info",
+        });
+      },
+      onCancelJobError: (error) => {
+        setCancellingJobId(null);
+        void refetch();
+        toaster.create({
+          title: "Failed to cancel job",
+          description: error.message,
+          type: "error",
+        });
+      },
+      onCancelBatchSuccess: () => {
+        void refetch();
+        toaster.create({ title: "Jobs cancelled", type: "success" });
+      },
+      onCancelBatchError: (error) => {
+        toaster.create({
+          title: "Failed to cancel jobs",
+          description: error.message,
+          type: "error",
+        });
+      },
     },
-    onCancelJobError: (error) => {
-      setCancellingJobId(null);
-      void refetch();
-      toaster.create({
-        title: "Failed to cancel job",
-        description: error.message,
-        type: "error",
-      });
-    },
-    onCancelBatchSuccess: () => {
-      void refetch();
-      toaster.create({ title: "Jobs cancelled", type: "success" });
-    },
-    onCancelBatchError: (error) => {
-      toaster.create({
-        title: "Failed to cancel jobs",
-        description: error.message,
-        type: "error",
-      });
-    },
-  });
+  );
 
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
@@ -297,7 +300,11 @@ export function RunHistoryPanel({
   const handleCancelAll = useCallback(
     (batchRunId: string, batchRunScenarioSetId: string) => {
       if (!project?.id) return;
-      cancelBatchRun({ projectId: project.id, scenarioSetId: batchRunScenarioSetId, batchRunId });
+      cancelBatchRun({
+        projectId: project.id,
+        scenarioSetId: batchRunScenarioSetId,
+        batchRunId,
+      });
     },
     [project?.id, cancelBatchRun],
   );
@@ -362,33 +369,33 @@ export function RunHistoryPanel({
           {isLoading ? (
             <Skeleton height="20px" width="220px" marginTop={0.5} />
           ) : (
-          <HStack gap={2} data-testid="all-runs-header-totals">
-            <Text fontSize="sm" color="fg.muted">
-              {groupBy === "none"
-                ? `${batchRuns.length} ${batchRuns.length === 1 ? "execution" : "executions"} · `
-                : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
-              {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
-            </Text>
-            <RunSummaryCounts
-              summary={{
-                passedCount: totals.passedCount,
-                failedCount: totals.failedCount,
-                stalledCount: 0,
-                cancelledCount: 0,
-                completedCount: totals.passedCount + totals.failedCount,
-                inProgressCount: totals.pendingCount,
-                queuedCount: 0,
-                passRate: 0,
-                totalCount: totals.runCount,
-                totalCost: null,
-                averageAgentLatencyMs: null,
-                totalDurationMs: null,
-                agentLatencyStats: null,
-                agentCostStats: null,
-                averageAgentCost: null,
-              }}
-            />
-          </HStack>
+            <HStack gap={2} data-testid="all-runs-header-totals">
+              <Text fontSize="sm" color="fg.muted">
+                {groupBy === "none"
+                  ? `${batchRuns.length} ${batchRuns.length === 1 ? "execution" : "executions"} · `
+                  : `${groups.length} ${groups.length === 1 ? "group" : "groups"} · `}
+                {totals.runCount} {totals.runCount === 1 ? "run" : "runs"}
+              </Text>
+              <RunSummaryCounts
+                summary={{
+                  passedCount: totals.passedCount,
+                  failedCount: totals.failedCount,
+                  stalledCount: 0,
+                  cancelledCount: 0,
+                  completedCount: totals.passedCount + totals.failedCount,
+                  inProgressCount: totals.pendingCount,
+                  queuedCount: 0,
+                  passRate: 0,
+                  totalCount: totals.runCount,
+                  totalCost: null,
+                  averageAgentLatencyMs: null,
+                  totalDurationMs: null,
+                  agentLatencyStats: null,
+                  agentCostStats: null,
+                  averageAgentCost: null,
+                }}
+              />
+            </HStack>
           )}
         </Box>
       )}
@@ -409,7 +416,8 @@ export function RunHistoryPanel({
           right: 0,
           height: "5px",
           borderTop: "1px solid var(--chakra-colors-border-muted)",
-          background: "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
+          background:
+            "linear-gradient(to bottom, color-mix(in srgb, var(--chakra-colors-border-muted) 40%, transparent), transparent)",
           pointerEvents: "none",
         }}
       >
@@ -448,13 +456,23 @@ export function RunHistoryPanel({
                   ? "Run this suite to see results here."
                   : "Execute a suite to see results here."}
             </EmptyState.Description>
+            {/* Only when the project truly has nothing to run yet — a
+                filtered-empty list is a search miss, not a setup gap. */}
+            {!hasFiltersApplied ? (
+              <SetupWithAgentButton surface="simulationRuns" />
+            ) : null}
           </EmptyState.Content>
         </EmptyState.Root>
       ) : (
-        <VStack ref={runListRef} align="stretch" gap={0} flex={1} minH={0} overflow="auto">
-          {showInitPlaceholder && (
-            <RunRow loading />
-          )}
+        <VStack
+          ref={runListRef}
+          align="stretch"
+          gap={0}
+          flex={1}
+          minH={0}
+          overflow="auto"
+        >
+          {showInitPlaceholder && <RunRow loading />}
           {groupBy === "none"
             ? batchRuns.map((batchRun) => {
                 const summary = computeBatchRunSummary({ batchRun });
@@ -480,8 +498,22 @@ export function RunHistoryPanel({
                     expectedJobCount={expectedJobCount}
                     suiteName={suiteName}
                     viewMode={viewMode}
-                    onCancelRun={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? createCancelRunHandler(batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
-                    onCancelAll={isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId) ? () => handleCancelAll(batchRun.batchRunId, batchRun.scenarioSetId ?? scenarioSetId ?? "") : undefined}
+                    onCancelRun={
+                      isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId)
+                        ? createCancelRunHandler(
+                            batchRun.scenarioSetId ?? scenarioSetId ?? "",
+                          )
+                        : undefined
+                    }
+                    onCancelAll={
+                      isPlatformManaged(batchRun.scenarioSetId ?? scenarioSetId)
+                        ? () =>
+                            handleCancelAll(
+                              batchRun.batchRunId,
+                              batchRun.scenarioSetId ?? scenarioSetId ?? "",
+                            )
+                        : undefined
+                    }
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
                     isHighlighted={highlightedBatchId === batchRun.batchRunId}
@@ -500,7 +532,11 @@ export function RunHistoryPanel({
                     onScenarioRunClick={handleScenarioRunClick}
                     resolveTargetName={resolveTargetName}
                     viewMode={viewMode}
-                    onCancelRun={isPlatformManaged(scenarioSetId) ? createCancelRunHandler(scenarioSetId ?? "") : undefined}
+                    onCancelRun={
+                      isPlatformManaged(scenarioSetId)
+                        ? createCancelRunHandler(scenarioSetId ?? "")
+                        : undefined
+                    }
                     cancellingJobId={cancellingJobId}
                   />
                 );
@@ -524,4 +560,3 @@ export function RunHistoryPanel({
     </VStack>
   );
 }
-

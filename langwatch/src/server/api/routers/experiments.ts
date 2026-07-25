@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
@@ -19,7 +20,6 @@ import {
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
 import { getApp } from "../../app-layer/app";
-import { HandledError } from "../../app-layer/handled-error";
 import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { DatasetService } from "../../datasets/dataset.service";
 import { prisma } from "../../db";
@@ -31,6 +31,7 @@ import type {
   ESBatchEvaluation,
 } from "../../experiments/types";
 import {
+  isLegacyOnlineEvaluationWorkbenchState,
   type WizardState,
   workbenchStateSchema,
 } from "../../experiments/workbenchState";
@@ -53,7 +54,7 @@ type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
 /** Maps experiment handled errors to TRPCError using the code discriminant. */
 const mapExperimentError = (error: unknown): never => {
-  if (error instanceof HandledError && error.code === "experiment_not_found") {
+  if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
   throw error;
@@ -507,12 +508,6 @@ export const experimentsRouter = createTRPCRouter({
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
 
-      // Helper to check if an experiment is a real_time evaluation (old wizard)
-      const isRealTimeEvaluation = (workbenchState: JsonValue | null) => {
-        if (!workbenchState || typeof workbenchState !== "object") return false;
-        return (workbenchState as Record<string, unknown>).task === "real_time";
-      };
-
       // Fetch every active experiment with its workflow+currentVersion join,
       // then filter/paginate in JS. Prisma JSON-path filtering is unreliable
       // for the `task` field inside `workbenchState`, so the count and the
@@ -520,14 +515,17 @@ export const experimentsRouter = createTRPCRouter({
       const allExperiments = await experimentService().listForEvaluationsBoard({
         projectId: input.projectId,
       });
-      const totalHits = allExperiments.filter(
-        (e) => !isRealTimeEvaluation(e.workbenchState),
-      ).length;
+      const nonLegacyExperiments = allExperiments.filter(
+        (experiment) =>
+          !isLegacyOnlineEvaluationWorkbenchState(experiment.workbenchState),
+      );
+      const totalHits = nonLegacyExperiments.length;
 
-      // Filter out real_time evaluations and apply pagination
-      const experiments = allExperiments
-        .filter((e) => !isRealTimeEvaluation(e.workbenchState))
-        .slice(pageOffset, pageOffset + pageSize);
+      // Apply pagination after excluding legacy online evaluations.
+      const experiments = nonLegacyExperiments.slice(
+        pageOffset,
+        pageOffset + pageSize,
+      );
 
       const getDatasetId = (dsl: JsonValue | undefined) => {
         return (

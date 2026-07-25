@@ -1,5 +1,5 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { HandledError, NotFoundError } from "~/server/app-layer/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { isAdmin } from "./isAdmin";
 
 /** Impersonation window handed to the UI once a start call succeeds. */

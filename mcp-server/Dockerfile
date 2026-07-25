@@ -9,6 +9,7 @@ WORKDIR /app
 
 # Build from repo root: docker build -t langwatch-mcp -f mcp-server/Dockerfile .
 COPY mcp-server/package.json mcp-server/pnpm-lock.yaml mcp-server/pnpm-workspace.yaml ./mcp-server/
+COPY packages/handled-error ./packages/handled-error
 WORKDIR /app/mcp-server
 RUN pnpm install --frozen-lockfile
 

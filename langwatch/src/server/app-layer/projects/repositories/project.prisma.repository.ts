@@ -4,6 +4,7 @@ import type {
   CreateTeamWithBindingInput,
   PaginatedResult,
   PresenceConfig,
+  TraceSharingConfig,
   ProjectRepository,
   ProjectWithOrgAdmin,
   ProjectWithTeam,
@@ -77,6 +78,25 @@ export class PrismaProjectRepository implements ProjectRepository {
     return {
       orgEnabled: project.team.organization.presenceEnabled,
       projectEnabled: project.presenceEnabled,
+    };
+  }
+
+  async getTraceSharingConfig(
+    id: string,
+  ): Promise<TraceSharingConfig | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        traceSharingEnabled: true,
+        team: {
+          select: { organization: { select: { traceSharingEnabled: true } } },
+        },
+      },
+    });
+    if (!project) return null;
+    return {
+      orgEnabled: project.team.organization.traceSharingEnabled,
+      projectEnabled: project.traceSharingEnabled,
     };
   }
 

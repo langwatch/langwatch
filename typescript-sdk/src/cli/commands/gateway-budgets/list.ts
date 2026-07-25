@@ -4,8 +4,15 @@ import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
-export const listGatewayBudgetsCommand = async (options?: { format?: string }): Promise<void> => {
+/**
+ * Returns the listing rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts). `data` is the raw
+ * budget list, so a machine caller keeps the full scope ids the table
+ * truncates and the exact decimal amounts it rounds for display.
+ */
+export const listGatewayBudgetsCommand = async (): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new GatewayBudgetsApiService();
@@ -16,51 +23,51 @@ export const listGatewayBudgetsCommand = async (options?: { format?: string }): 
 
     spinner.succeed(`Found ${budgets.length} budget${budgets.length !== 1 ? "s" : ""}`);
 
-    if (options?.format === "json") {
-      console.log(JSON.stringify(budgets, null, 2));
-      return;
-    }
+    return {
+      data: budgets,
+      table: () => {
+        if (budgets.length === 0) {
+          console.log();
+          console.log(chalk.gray("No gateway budgets configured."));
+          console.log(chalk.gray("Create one with:"));
+          console.log(
+            chalk.cyan('  langwatch gateway-budgets create --scope project --project <id> --window day --limit 100 --name "daily cap"'),
+          );
+          return;
+        }
 
-    if (budgets.length === 0) {
-      console.log();
-      console.log(chalk.gray("No gateway budgets configured."));
-      console.log(chalk.gray("Create one with:"));
-      console.log(
-        chalk.cyan('  langwatch gateway-budgets create --scope project --project <id> --window day --limit 100 --name "daily cap"'),
-      );
-      return;
-    }
+        console.log();
 
-    console.log();
+        const tableData = budgets.map((b) => {
+          const limit = Number.parseFloat(b.limit_usd);
+          const spent = Number.parseFloat(b.spent_usd);
+          const pct = limit > 0 ? (spent / limit) * 100 : 0;
+          const pctLabel = `${pct.toFixed(0)}%`;
+          const coloredPct = pct >= 100 ? chalk.red(pctLabel) : pct >= 80 ? chalk.yellow(pctLabel) : chalk.green(pctLabel);
+          return {
+            ID: b.id,
+            Name: b.name,
+            Scope: `${b.scope_type.toLowerCase()}:${b.scope_id.slice(0, 10)}...`,
+            Window: b.window.toLowerCase(),
+            Breach: b.on_breach === "BLOCK" ? chalk.red("block") : chalk.yellow("warn"),
+            Limit: `$${limit.toFixed(2)}`,
+            Spent: `$${spent.toFixed(2)} (${coloredPct})`,
+            Resets: new Date(b.resets_at).toLocaleString(),
+            Archived: b.archived_at ? chalk.gray("yes") : "",
+          };
+        });
 
-    const tableData = budgets.map((b) => {
-      const limit = Number.parseFloat(b.limit_usd);
-      const spent = Number.parseFloat(b.spent_usd);
-      const pct = limit > 0 ? (spent / limit) * 100 : 0;
-      const pctLabel = `${pct.toFixed(0)}%`;
-      const coloredPct = pct >= 100 ? chalk.red(pctLabel) : pct >= 80 ? chalk.yellow(pctLabel) : chalk.green(pctLabel);
-      return {
-        ID: b.id,
-        Name: b.name,
-        Scope: `${b.scope_type.toLowerCase()}:${b.scope_id.slice(0, 10)}...`,
-        Window: b.window.toLowerCase(),
-        Breach: b.on_breach === "BLOCK" ? chalk.red("block") : chalk.yellow("warn"),
-        Limit: `$${limit.toFixed(2)}`,
-        Spent: `$${spent.toFixed(2)} (${coloredPct})`,
-        Resets: new Date(b.resets_at).toLocaleString(),
-        Archived: b.archived_at ? chalk.gray("yes") : "",
-      };
-    });
+        formatTable({
+          data: tableData,
+          headers: ["ID", "Name", "Scope", "Window", "Breach", "Limit", "Spent", "Resets", "Archived"],
+          colorMap: { Name: chalk.cyan, ID: chalk.gray },
+        });
 
-    formatTable({
-      data: tableData,
-      headers: ["ID", "Name", "Scope", "Window", "Breach", "Limit", "Spent", "Resets", "Archived"],
-      colorMap: { Name: chalk.cyan, ID: chalk.gray },
-    });
-
-    console.log();
+        console.log();
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "fetch gateway budgets", format: options?.format });
+    failSpinner({ spinner, error, action: "fetch gateway budgets" });
     process.exit(1);
   }
 };

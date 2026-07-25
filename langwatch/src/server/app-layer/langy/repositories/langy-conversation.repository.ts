@@ -4,12 +4,26 @@ export interface LangyConversationRow {
   title: string | null;
   isShared: boolean;
   status: string;
+  /**
+   * The turn the conversation has IN FLIGHT right now, or null when none is.
+   *
+   * The durable answer to "which turn would a Stop stop?". A browser tab only
+   * learns a turn id from its own send, so without this a turn adopted from the
+   * record — another tab's, or one rejoined after a refresh — had a Stop button
+   * with no id behind it.
+   */
+  currentTurnId: string | null;
   lastError: string | null;
   messageCount: number;
   lastActivityAtMs: number;
   /** Raw nullable sort value; unlike lastActivityAtMs, this never falls back. */
   cursorActivityAtMs?: number | null;
   createdAtMs: number;
+  /**
+   * The projection's event cursor (ADR-059): the snapshot position the client
+   * folds its durable tail from. Optional so list reads may omit it.
+   */
+  eventCursor?: { acceptedAt: number; eventId: string } | null;
 }
 
 /** Stable keyset cursor for the recent-conversations ordering. */
@@ -54,6 +68,21 @@ export interface LangyConversationRepository {
     projectId: string;
     conversationId: string;
   }): Promise<string | null>;
+
+  /**
+   * True when a turn projection row exists for this exact
+   * (projectId, conversationId, turnId) triple — i.e. the turn was really
+   * accepted under this conversation in this project. The durable
+   * result-ingest uses it to reject a forged or mismatched triple before
+   * writing (the relay proves the same thing with an HMAC; this path has only
+   * the bearer). A turn row exists the moment `acceptTurn` is projected, long
+   * before any result arrives.
+   */
+  turnExists(params: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean>;
 }
 
 export class NullLangyConversationRepository
@@ -81,5 +110,9 @@ export class NullLangyConversationRepository
 
   async findRunToken(): Promise<null> {
     return null;
+  }
+
+  async turnExists(): Promise<boolean> {
+    return false;
   }
 }

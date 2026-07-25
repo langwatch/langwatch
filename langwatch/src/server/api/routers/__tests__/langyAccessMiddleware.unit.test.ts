@@ -1,13 +1,19 @@
-import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the ONE collaborator: the authoritative decision. This test covers only
-// the transport wrapper (deny -> NOT_FOUND, allow -> next, scope forwarding);
-// the decision itself is covered by langyAccessGate.unit.test.ts.
-const { hasLangyAccess } = vi.hoisted(() => ({ hasLangyAccess: vi.fn() }));
+// the transport wrapper (deny -> LangyNotEnabledError, allow -> next, scope
+// forwarding); the decision itself is covered by langyAccessGate.unit.test.ts.
+const { hasLangyAccess, resolveOrganizationId } = vi.hoisted(() => ({
+  hasLangyAccess: vi.fn(),
+  resolveOrganizationId: vi.fn(),
+}));
 vi.mock("~/server/app-layer/langy/langyAccessGate", () => ({ hasLangyAccess }));
+vi.mock("~/server/organizations/resolveOrganizationId", () => ({
+  resolveOrganizationId,
+}));
 
 import { enforceLangyAccess } from "../langyAccessMiddleware";
+import { LangyNotEnabledError } from "~/server/app-layer/langy/errors";
 
 const user = { id: "user-1", email: "user@example.com", emailVerified: true };
 
@@ -39,13 +45,19 @@ describe("enforceLangyAccess", () => {
   });
 
   describe("when the gate denies the caller", () => {
-    it("throws NOT_FOUND and never calls next", async () => {
+    it("throws a handled LangyNotEnabledError (kind + 404) and never calls next", async () => {
       hasLangyAccess.mockResolvedValue(false);
 
       const { result, next } = invoke({ projectId: "project-1" });
 
-      await expect(result).rejects.toBeInstanceOf(TRPCError);
-      await expect(result).rejects.toMatchObject({ code: "NOT_FOUND" });
+      // A typed handled error, not a bare TRPCError: handledErrorMiddleware maps
+      // its 404 to NOT_FOUND downstream and serialises `code: langy_not_enabled`
+      // so the client renders a real "not enabled" state, not a load failure.
+      await expect(result).rejects.toBeInstanceOf(LangyNotEnabledError);
+      await expect(result).rejects.toMatchObject({
+        code: "langy_not_enabled",
+        httpStatus: 404,
+      });
       expect(next).not.toHaveBeenCalled();
     });
   });
@@ -74,5 +86,51 @@ describe("enforceLangyAccess", () => {
         organizationId: "org-1",
       });
     });
+  });
+});
+
+describe("given a project-scoped call and an org-scoped rollout rule", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hasLangyAccess.mockResolvedValue(true);
+  });
+
+  // The bug: the project-scoped procedures only ever carry a projectId, so
+  // reading the scope straight off the input evaluated the flag with NO
+  // organization — every org-targeted rule missed, and an opted-in account was
+  // told Langy was not enabled.
+  it("resolves the organization from the project and passes it to the gate", async () => {
+    resolveOrganizationId.mockResolvedValue("org-9");
+
+    const { result } = invoke({ projectId: "project-1" });
+    await result;
+
+    expect(resolveOrganizationId).toHaveBeenCalledWith("project-1");
+    expect(hasLangyAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: "project-1", organizationId: "org-9" }),
+    );
+  });
+
+  it("keeps an explicit organizationId, which the org-scoped routers already carry", async () => {
+    const { result } = invoke({ organizationId: "org-explicit" });
+    await result;
+
+    expect(resolveOrganizationId).not.toHaveBeenCalled();
+    expect(hasLangyAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: "org-explicit" }),
+    );
+  });
+
+  it("still evaluates the flag when the project has no organization", async () => {
+    // An orphan project must not become an unhandled failure; the gate simply
+    // decides without an org scope, exactly as it did before.
+    resolveOrganizationId.mockResolvedValue(undefined);
+
+    const { result } = invoke({ projectId: "project-orphan" });
+    await result;
+
+    expect(hasLangyAccess).toHaveBeenCalledWith(
+      expect.not.objectContaining({ organizationId: expect.anything() }),
+    );
   });
 });

@@ -1659,21 +1659,22 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
 
   // Governance gate: the device-session flow provisions a personal
   // workspace (Team + Project) and a personal virtual key for the user.
-  // That is a governance-plane capability; for an org without governance
-  // enabled it silently created a personal project that then captured the
-  // user's evaluations (customer report). Refuse it and point at project
-  // login, which writes a real project's API key to `.env`.
-  //
-  // ADR-038 GA note: at GA this fallback flips to true together with the
-  // registry default; the gate then only fires for orgs kill-switched off
-  // in PostHog, where /me is a 404 and refusing device login is correct.
+  // That is a governance-plane capability. The flag defaults on (ADR-038
+  // Decision 7: this fallback and the registry default are a pinned
+  // pair, enforced by governanceGaDefaults.unit.test.ts), so the gate
+  // fires only for orgs whose flag evaluates false (switched off in
+  // PostHog or via an operator override), where /me is a 404 and
+  // refusing device login is correct. The refusal points at project
+  // login, which writes a real project's API key to `.env`; the
+  // device-session flow silently capturing evaluations into a personal
+  // project (customer report) stays impossible for gated orgs.
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,
       organizationId: organization_id,
-      defaultValue: false,
+      defaultValue: true,
     })
-    .catch(() => false);
+    .catch(() => true);
   if (!governanceEnabled) {
     return c.json(
       {

@@ -232,6 +232,266 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("given a graceful shutdown with a job in flight", () => {
+      describe("when close() begins while the handler is still running", () => {
+        /** @scenario graceful shutdown mid-job does not count as a poison strike */
+        it("sweeps the group's claim strike while the job is still in flight", async () => {
+          let releaseHandler!: () => void;
+          const handlerGate = new Promise<void>((resolve) => {
+            releaseHandler = resolve;
+          });
+          let signalEntered!: () => void;
+          const handlerEntered = new Promise<void>((resolve) => {
+            signalEntered = resolve;
+          });
+          const { queue, name } = createQueue(async () => {
+            signalEntered();
+            await handlerGate;
+          });
+          await queue.waitUntilReady();
+
+          await queue.send({ id: "job-1", groupId: "slow", value: "x" });
+          await handlerEntered;
+
+          // The claim recorded its strike before the handler ran — this is
+          // the strike a hard death would leave behind.
+          expect(await redis.get(strikesKey(name, "slow"))).toBe("1");
+
+          // Begin the graceful shutdown WITHOUT waiting for the drain: the
+          // sweep must clear the strike while the job is still in flight, so
+          // even a drain the budget abandons leaves nothing behind.
+          const closing = queue.close();
+          await vi.waitFor(
+            async () => {
+              expect(await redis.get(strikesKey(name, "slow"))).toBeNull();
+            },
+            { timeout: 5000, interval: 50 },
+          );
+
+          releaseHandler();
+          await closing;
+
+          // The group was never mistaken for poison.
+          expect(await blockedMembers(name)).not.toContain("slow");
+        });
+      });
+
+      describe("when close() takes its sweep snapshot before the claim finishes recording", () => {
+        /** @scenario graceful shutdown mid-job does not count as a poison strike */
+        it("clears the strike via the post-claim recheck even though the sweep missed the group", async () => {
+          let releaseStrike!: () => void;
+          const strikeGate = new Promise<void>((resolve) => {
+            releaseStrike = resolve;
+          });
+          let signalStrikeRecorded!: () => void;
+          const strikeRecorded = new Promise<void>((resolve) => {
+            signalStrikeRecorded = resolve;
+          });
+          let releaseHandler!: () => void;
+          const handlerGate = new Promise<void>((resolve) => {
+            releaseHandler = resolve;
+          });
+          let signalHandlerEntered!: () => void;
+          const handlerEntered = new Promise<void>((resolve) => {
+            signalHandlerEntered = resolve;
+          });
+
+          const { queue, name } = createQueue(async () => {
+            signalHandlerEntered();
+            await handlerGate;
+          });
+          await queue.waitUntilReady();
+
+          const internals = queue as unknown as {
+            scripts: {
+              recordClaimStrike: (groupId: string) => Promise<number>;
+            };
+            drainAndDisconnect: () => Promise<void>;
+          };
+
+          // Park the claim AFTER its strike lands in Redis but BEFORE
+          // processWithRetries adds the group to the in-flight set, so close()'s
+          // sweep snapshot runs against a set that does not yet hold the group.
+          const realRecordStrike =
+            internals.scripts.recordClaimStrike.bind(internals.scripts);
+          let gatedOnce = false;
+          vi.spyOn(internals.scripts, "recordClaimStrike").mockImplementation(
+            async (groupId: string) => {
+              const strikes = await realRecordStrike(groupId);
+              if (groupId === "raced" && !gatedOnce) {
+                gatedOnce = true;
+                signalStrikeRecorded();
+                await strikeGate;
+              }
+              return strikes;
+            },
+          );
+
+          // drainAndDisconnect() is invoked synchronously right after the sweep
+          // snapshot, so this fires only once close() has provably passed it -
+          // with the group still unswept.
+          let signalDrainReached!: () => void;
+          const drainReached = new Promise<void>((resolve) => {
+            signalDrainReached = resolve;
+          });
+          const realDrain = internals.drainAndDisconnect.bind(internals);
+          internals.drainAndDisconnect = () => {
+            signalDrainReached();
+            return realDrain();
+          };
+
+          await queue.send({ id: "job-1", groupId: "raced", value: "x" });
+          await strikeRecorded;
+          // The strike a hard death would leave behind is present in Redis.
+          expect(await redis.get(strikesKey(name, "raced"))).toBe("1");
+
+          // Begin the shutdown: it flips shutdownRequested synchronously, then
+          // snapshots the still-group-less in-flight set before the drain.
+          const closing = queue.close();
+          await drainReached;
+
+          // Let the claim finish - it adds the group to the set now, after the
+          // sweep already ran, then runs the shutdown recheck.
+          releaseStrike();
+          await handlerEntered;
+
+          // The recheck cleared the strike while the handler is still in flight,
+          // so a drain the budget abandons leaves nothing behind. Without it the
+          // strike would survive until the finally the abandon path never runs.
+          await vi.waitFor(
+            async () => {
+              expect(await redis.get(strikesKey(name, "raced"))).toBeNull();
+            },
+            { timeout: 5000, interval: 50 },
+          );
+
+          releaseHandler();
+          await closing;
+
+          // The group was never mistaken for poison.
+          expect(await blockedMembers(name)).not.toContain("raced");
+        });
+      });
+    });
+
+    describe("given the failure-streak quarantine breaker", () => {
+      const failStreakKey = (name: string, groupId: string) =>
+        `${name}:gq:group:${groupId}:failstreak`;
+      const ENV = "LANGWATCH_GQ_QUARANTINE_FAILSTREAK_THRESHOLD";
+
+      describe("when one group's jobs keep failing with no success", () => {
+        /** @scenario a group that fails on every attempt without draining is quarantined */
+        it("blocks the group so one poison producer can't monopolise the shared queue", async () => {
+          const previous = process.env[ENV];
+          process.env[ENV] = "2";
+          try {
+            const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+            processed.mockRejectedValue(new Error("downstream always down"));
+            const { queue, name } = createQueue(processed);
+            await queue.waitUntilReady();
+
+            // Distinct jobs for ONE group, none of which can succeed. Each
+            // failure adds to the group's streak; once it exceeds 2 the group is
+            // blocked (via the exhausted-retry path) instead of churning — the
+            // per-JOB maxAttempts cap never fires because these are fresh jobs.
+            // (A generous timeout: failures accrue at the group's re-dispatch
+            // cadence, not instantly.)
+            for (let i = 0; i < 10; i++) {
+              await queue.send({
+                id: `job-${i}`,
+                groupId: "runaway",
+                value: "x",
+              });
+            }
+
+            await vi.waitFor(
+              async () => {
+                expect(await blockedMembers(name)).toContain("runaway");
+              },
+              { timeout: 25000, interval: 100 },
+            );
+
+            const error = await storedError(name, "runaway");
+            expect(error).toContain("quarantined");
+            // Cleared as the group parks, so an operator's unblock gets a fresh
+            // run rather than re-quarantining on the very next failure.
+            expect(await redis.get(failStreakKey(name, "runaway"))).toBeNull();
+            // The job is re-staged for inspection, not dropped.
+            expect(
+              await redis.zcard(`${name}:gq:group:runaway:jobs`),
+            ).toBeGreaterThan(0);
+          } finally {
+            if (previous === undefined) delete process.env[ENV];
+            else process.env[ENV] = previous;
+          }
+        });
+      });
+
+      describe("given the quarantine kill switch is set to 0", () => {
+        /** @scenario the failure-streak quarantine is disabled by setting the threshold to 0 */
+        it("keeps dispatching a persistently-failing group instead of quarantining it", async () => {
+          const previous = process.env[ENV];
+          process.env[ENV] = "0";
+          try {
+            const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+            processed.mockRejectedValue(new Error("downstream always down"));
+            const { queue, name } = createQueue(processed);
+            await queue.waitUntilReady();
+
+            // Pre-seed a streak far above the old default; with the breaker off
+            // it is never consulted and never enforced.
+            await redis.set(failStreakKey(name, "runaway"), "999");
+            for (let i = 0; i < 4; i++) {
+              await queue.send({
+                id: `job-${i}`,
+                groupId: "runaway",
+                value: "x",
+              });
+            }
+
+            await vi.waitFor(
+              () => {
+                expect(processed).toHaveBeenCalled();
+              },
+              { timeout: 5000, interval: 50 },
+            );
+            // The group is retried, never parked into the blocked set.
+            expect(await blockedMembers(name)).not.toContain("runaway");
+          } finally {
+            if (previous === undefined) delete process.env[ENV];
+            else process.env[ENV] = previous;
+          }
+        });
+      });
+
+      describe("when a group's job succeeds", () => {
+        /** @scenario a group's success clears its failure streak */
+        it("clears the failure streak", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed);
+          await queue.waitUntilReady();
+
+          // A streak left by earlier failures, below the (default) threshold.
+          await redis.set(failStreakKey(name, "group-a"), "2");
+          await queue.send({ id: "job-1", groupId: "group-a", value: "x" });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 5000, interval: 50 },
+          );
+          await vi.waitFor(
+            async () => {
+              expect(await redis.get(failStreakKey(name, "group-a"))).toBeNull();
+            },
+            { timeout: 5000, interval: 50 },
+          );
+        });
+      });
+    });
+
     describe("given a group whose job always throws", () => {
       describe("when an attempt fails with the process alive", () => {
         /** @scenario a failing-but-not-crashing job does not accumulate claim strikes */
@@ -325,8 +585,10 @@ describe.skipIf(!hasTestcontainers)(
 
           // Stage BOTH jobs atomically as legacy bare-JSON so the small one is
           // the dispatched job (earliest score) and decodes fine, while the
-          // oversized one is drained as a coalesce sibling and blows the decode
-          // cap. Both due now; the small one sorts first.
+          // oversized one stays a staged sibling. Anything over the decode cap
+          // is necessarily over the drain's byte budget too, so it is never
+          // folded into a batch — it becomes its own dispatch and blows the
+          // decode cap there. Both due now; the small one sorts first.
           const scripts = new GroupStagingScripts(redis, name);
           const now = Date.now();
           const small = JSON.stringify({
@@ -365,16 +627,20 @@ describe.skipIf(!hasTestcontainers)(
             { timeout: 10000, interval: 100 },
           );
 
-          // The batch was parked before any handler ran (the oversized sibling
-          // is never JSON-parsed, so neither process nor processBatch fires).
-          expect(processed).not.toHaveBeenCalled();
-          expect(processBatch).not.toHaveBeenCalled();
+          // The byte budget kept the poison out of the batch: the small job's
+          // work completed exactly once, and the oversized value was parked on
+          // its own dispatch without ever being JSON-parsed — so no handler
+          // saw anything but the small payload.
+          const handledIds = [
+            ...processed.mock.calls.map(([p]) => p.id),
+            ...processBatch.mock.calls.flatMap(([ps]) => ps.map((p) => p.id)),
+          ];
+          expect(handledIds).toEqual(["job-small"]);
           const error = await storedError(name, "fat");
           expect(error).toContain("Poison guard");
           expect(error).toContain("parked unparsed");
-          // The batch's other work is not lost: the group still holds staged
-          // jobs (the re-staged siblings + the parked dispatched value), ready
-          // for operator inspection or replay on unblock, not dropped.
+          // The parked value is not lost: the group still holds it staged,
+          // ready for operator inspection or replay on unblock, not dropped.
           expect(
             await redis.zcard(`${name}:gq:group:fat:jobs`),
           ).toBeGreaterThan(0);

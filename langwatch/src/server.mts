@@ -4,6 +4,11 @@ import events from "events";
 import { existsSync } from "fs";
 import Module from "module";
 
+// Registers the Grafana trace-link builder with @langwatch/handled-error.
+// Registration only stores a function (env is read per serialize()), so a
+// static import is safe despite the dotenv dance below.
+import "./server/handled-error-wiring";
+
 // `override: true` lets `.env` win over values that scripts/start.sh exported
 // before this entry runs. start.sh defaults LW_GATEWAY_BASE_URL,
 // LW_GATEWAY_PUBLIC_URL, LANGWATCH_API_URL etc. based on $PORT when those vars

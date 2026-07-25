@@ -14,6 +14,7 @@ import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
+import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 
@@ -99,13 +100,12 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     return {
       api_key: this.apiKey,
       workflow_id: `scenario-code-${this.config.agentId}`,
-      spec_version: "1.4",
+      spec_version: LATEST_SPEC_VERSION,
       name: "Scenario Code Execution",
       icon: "🔧",
       description: "Minimal workflow for scenario code agent execution",
       version: "1.0",
       template_adapter: "default" as const,
-      default_llm: null,
       secrets: this.config.secrets,
       nodes: [
         this.buildEntryNode(inputs),

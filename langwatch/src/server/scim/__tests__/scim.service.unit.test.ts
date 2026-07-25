@@ -51,6 +51,7 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     lastLoginAt: null,
     deactivatedAt: null,
     lastHomePath: null,
+    tracesExplorerTourDismissedAt: null,
     ...overrides,
   };
 }

@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { PRODUCT_FLOW_CONFIG } from "../constants/product-flow";
 import {
   OnboardingFlowDirection,
@@ -16,12 +16,27 @@ const VALID_PRODUCTS: ProductSelection[] = [
   "manually",
 ];
 
-const PRODUCT_TO_SCREEN: Record<ProductSelection, ProductScreenIndex> = {
-  "via-claude-code": ProductScreenIndex.VIA_CLAUDE_CODE,
-  "via-platform": ProductScreenIndex.VIA_PLATFORM,
-  "via-claude-desktop": ProductScreenIndex.VIA_CLAUDE_DESKTOP,
-  manually: ProductScreenIndex.MANUALLY,
+/**
+ * The screens each flavour walks through after the selection screen. The
+ * platform flavour passes through the model provider step first so the AI
+ * assistant and AI assists have a model to run on; the step is skippable,
+ * and the coding-agent flavours go straight to their setup screen.
+ */
+const PRODUCT_TO_SCREENS: Record<
+  ProductSelection,
+  [ProductScreenIndex, ...ProductScreenIndex[]]
+> = {
+  "via-claude-code": [ProductScreenIndex.VIA_CLAUDE_CODE],
+  "via-platform": [
+    ProductScreenIndex.MODEL_PROVIDER,
+    ProductScreenIndex.VIA_PLATFORM,
+  ],
+  "via-claude-desktop": [ProductScreenIndex.VIA_CLAUDE_DESKTOP],
+  manually: [ProductScreenIndex.MANUALLY],
 };
+
+const firstScreenFor = (product: ProductSelection): ProductScreenIndex =>
+  PRODUCT_TO_SCREENS[product][0];
 
 export function useProductFlow() {
   const router = useRouter();
@@ -80,6 +95,7 @@ export function useProductFlow() {
       [ProductScreenIndex.VIA_PLATFORM, "via-platform"],
       [ProductScreenIndex.VIA_CLAUDE_DESKTOP, "via-claude-desktop"],
       [ProductScreenIndex.MANUALLY, "manually"],
+      [ProductScreenIndex.MODEL_PROVIDER, "model-provider"],
     ]);
 
     const idToIndex = new Map<string, ProductScreenIndex>();
@@ -93,13 +109,13 @@ export function useProductFlow() {
   // Update flow config when product is selected
   useEffect(() => {
     if (selectedProduct) {
-      const productScreen = PRODUCT_TO_SCREEN[selectedProduct];
+      const productScreens = PRODUCT_TO_SCREENS[selectedProduct];
       setFlowConfig({
         variant: "product",
-        visibleScreens: [ProductScreenIndex.SELECTION, productScreen],
+        visibleScreens: [ProductScreenIndex.SELECTION, ...productScreens],
         first: ProductScreenIndex.SELECTION,
-        last: productScreen,
-        total: 2,
+        last: productScreens[productScreens.length - 1] ?? productScreens[0],
+        total: 1 + productScreens.length,
       });
     } else {
       setFlowConfig(PRODUCT_FLOW_CONFIG);
@@ -122,14 +138,15 @@ export function useProductFlow() {
     firstScreenId: "product-selection",
   });
 
-  // If product inferred but step missing, land on product screen and sync URL
+  // If product inferred but step missing, land on the flavour's first screen
+  // after selection and sync URL
   useEffect(() => {
     if (!selectedProduct) return;
     // If user is navigating backward to the selection screen, do not auto-advance
     if (direction === OnboardingFlowDirection.BACKWARD) return;
     if (typeof router.query.step === "string") return;
 
-    setCurrentScreenIndex(PRODUCT_TO_SCREEN[selectedProduct]);
+    setCurrentScreenIndex(firstScreenFor(selectedProduct));
   }, [selectedProduct, router.query.step, direction, setCurrentScreenIndex]);
 
   // Handle product selection
@@ -137,10 +154,24 @@ export function useProductFlow() {
     (product: ProductSelection) => {
       setSelectedProduct(product);
 
-      // Update URL with product parameter, dropping stale product param
+      const firstScreen = firstScreenFor(product);
+      const stepId = screenIdMap.indexToId.get(firstScreen) ?? product;
+
+      // Update URL, dropping stale product param
       const currentQuery = { ...router.query };
       delete currentQuery.product;
-      currentQuery.step = product; // Use product name as step ID
+      currentQuery.step = stepId;
+      // When the flavour starts on an intermediate step (model-provider),
+      // the step id alone no longer names the flavour: keep it in the
+      // product param so a reload restores the full flow.
+      if (stepId !== product) {
+        currentQuery.product = product;
+      }
+
+      // Navigate to the flavour's first screen after selection. This pushes
+      // a URL from a query snapshot that predates the product param, so the
+      // full push below must come after it to win the final URL.
+      setCurrentScreenIndex(firstScreen);
 
       void router.push(
         {
@@ -150,11 +181,8 @@ export function useProductFlow() {
         undefined,
         { shallow: true },
       );
-
-      // Navigate to the product screen
-      setCurrentScreenIndex(PRODUCT_TO_SCREEN[product]);
     },
-    [router, setCurrentScreenIndex],
+    [router, screenIdMap, setCurrentScreenIndex],
   );
 
   return {

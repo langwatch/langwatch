@@ -282,7 +282,9 @@ code {
 }
 /* highlighted is intentionally unstyled — star prefix handles emphasis */
 
-/* Header / summary */
+/* Header. A div with role="button": open/close state lives on the
+   data-open attribute, toggled by the delegated handler in posthog.js
+   (Mintlify strips <details>/<summary> from server-rendered pages). */
 .lw-accordion-header {
   display: flex;
   align-items: center;
@@ -292,7 +294,6 @@ code {
   transition: background 0.15s;
   list-style: none;
 }
-.lw-accordion-header::-webkit-details-marker { display: none; }
 .lw-accordion-header:hover { background: #f9fafb; }
 
 .lw-accordion-title { font-size: 14px; }
@@ -302,13 +303,20 @@ code {
   transition: transform 0.2s;
   color: #9ca3af;
 }
-.lw-accordion[open] .lw-accordion-chevron { transform: rotate(180deg); }
+.lw-accordion[data-open] .lw-accordion-chevron { transform: rotate(180deg); }
 
-/* Body */
+/* Body: server-rendered but hidden until opened, so crawlers index the
+   install commands and prompts without any JavaScript. */
 .lw-accordion-body {
+  display: none;
   padding: 0 16px 16px;
   border-top: 1px solid #e5e7eb;
 }
+.lw-accordion[data-open] .lw-accordion-body { display: block; }
+
+/* Server-rendered prompt text backing the "Copy Full Prompt" action.
+   Kept in the DOM (crawlable, copyable via posthog.js) but never shown. */
+.lw-prompt-source { display: none; }
 
 /* Install + Usage command row */
 .lw-accordion-commands {

@@ -1,14 +1,12 @@
-import {
-  Box,
-  type IconProps,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, type IconProps, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
+import {
+  type IconSizeKey,
+  iconSizeToPixels,
+} from "../../../../../utils/iconSize";
 import type { IconData } from "../../../regions/shared/types";
-import { iconSizeToPixels, type IconSizeKey } from "../../../../../utils/iconSize";
 
 interface SelectableIconCardProps {
   label: string;
@@ -18,6 +16,8 @@ interface SelectableIconCardProps {
   selected: boolean;
   onClick: () => void;
   ariaLabel: string;
+  /** A small chip riding the card's top edge (e.g. "Recommended"). */
+  badge?: string;
 }
 
 export function SelectableIconCard(
@@ -31,6 +31,7 @@ export function SelectableIconCard(
     selected,
     onClick,
     ariaLabel,
+    badge,
   } = props;
 
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
@@ -63,7 +64,10 @@ export function SelectableIconCard(
       <Box
         role="button"
         tabIndex={0}
-        aria-label={ariaLabel}
+        // Fold the badge into the accessible name — aria-label overrides the
+        // subtree, so the "Recommended" chip is otherwise invisible to
+        // assistive tech that sighted users can see.
+        aria-label={badge ? `${ariaLabel}, ${badge}` : ariaLabel}
         aria-pressed={selected}
         onClick={onClick}
         onKeyDown={(e) => {
@@ -73,6 +77,7 @@ export function SelectableIconCard(
           }
         }}
         cursor="pointer"
+        position="relative"
         w={cardSize}
         h={cardSize}
         flexShrink={0}
@@ -107,11 +112,35 @@ export function SelectableIconCard(
           transform: "translateY(-1px)",
         }}
       >
+        {badge ? (
+          <Text
+            position="absolute"
+            top="-8px"
+            left="50%"
+            transform="translateX(-50%)"
+            fontSize="9px"
+            fontWeight="600"
+            letterSpacing="0.02em"
+            lineHeight="1"
+            paddingX={1.5}
+            paddingY="3px"
+            borderRadius="full"
+            background="orange.solid"
+            color="white"
+            whiteSpace="nowrap"
+            pointerEvents="none"
+          >
+            {badge}
+          </Text>
+        ) : null}
         <VStack
           gap={iconLabel ? 1 : 0}
           align="center"
           justify="center"
-          style={{ filter: selected ? "grayscale(0%)" : "grayscale(100%)", transition: "filter 0.2s ease" }}
+          style={{
+            filter: selected ? "grayscale(0%)" : "grayscale(100%)",
+            transition: "filter 0.2s ease",
+          }}
         >
           {icon ? (
             <>
@@ -120,7 +149,12 @@ export function SelectableIconCard(
                 <img
                   src={iconSrc}
                   alt={iconAlt}
-                  style={{ width: resolvedSize, height: resolvedSize, objectFit: "contain", display: "block" }}
+                  style={{
+                    width: resolvedSize,
+                    height: resolvedSize,
+                    objectFit: "contain",
+                    display: "block",
+                  }}
                 />
               ) : (
                 <Box w={resolvedSize} h={resolvedSize} aria-hidden />

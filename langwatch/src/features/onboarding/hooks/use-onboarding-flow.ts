@@ -38,7 +38,7 @@ export const useOnboardingFlow = () => {
   const [selectedDesires, setDesires] = useState<DesireType[]>([]);
   const [role, setRole] = useState<RoleType | undefined>(void 0);
 
-  // The whole intent fork ships dark behind the governance flag (ADR-038
+  // The intent fork rides the governance flag, on by default (ADR-038
   // v5): flag off (or loading, which reports enabled=false) = the exact
   // pre-fork flow. User-level evaluation — there is no org yet during
   // onboarding.

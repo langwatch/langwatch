@@ -85,7 +85,7 @@ describe("<ScenarioAIGeneration/>", () => {
   it("shows prompt view by default", () => {
     render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-    expect(screen.getByText("Draft with Langy")).toBeInTheDocument();
+    expect(screen.getByText("Draft with AI")).toBeInTheDocument();
     expect(
       screen.getByText("Start from an idea, not a form."),
     ).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { HandledError } from "../handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * Domain error thrown when an organization has reached its scenario set limit.

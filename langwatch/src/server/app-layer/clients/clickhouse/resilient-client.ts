@@ -6,17 +6,24 @@ import {
 } from "~/server/clickhouse/metrics";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { detectColdScan } from "./cold-scan-detector";
+import {
+  TRANSIENT_NETWORK_CODES,
+  translateClickHouseQueryError,
+} from "./translate-query-error";
+import { queryWindowed } from "./windowed-read";
+
+/**
+ * A resilient ClickHouse client: a {@link ClickHouseClient} whose `query`/`insert`
+ * carry retry + error translation, plus {@link queryWindowed} for the
+ * partition-pruning-window-with-fallback read pattern. Repositories resolve one
+ * of these and call `queryWindowed` without a cast.
+ */
+export type ResilientClickHouseClient = ClickHouseClient & {
+  queryWindowed: typeof queryWindowed;
+};
 
 const logger = createLogger("langwatch:clickhouse:resilient");
 const queryLogger = createLogger("langwatch:clickhouse:query");
-
-const TRANSIENT_NETWORK_CODES = new Set([
-  "ECONNRESET",
-  "ECONNREFUSED",
-  "EPIPE",
-  "ENOTFOUND",
-  "ETIMEDOUT",
-]);
 
 /**
  * Reuses the canonical transient-message list from
@@ -379,8 +386,8 @@ export function createResilientClickHouseClient({
   maxRetries?: number;
   baseDelayMs?: number;
   maxDelayMs?: number;
-}): ClickHouseClient {
-  const wrapper = Object.create(client) as ClickHouseClient;
+}): ResilientClickHouseClient {
+  const wrapper = Object.create(client) as ResilientClickHouseClient;
 
   wrapper.query = async (params) => {
     const cleanedParams = stripLangwatchSettings(params as Record<string, unknown>);
@@ -405,7 +412,12 @@ export function createResilientClickHouseClient({
       logFailure({ operation: "query", error, durationMs, params });
       observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
       incrementClickHouseQueryCount(queryType, "error");
-      throw error;
+      // Retries are exhausted at this point: translate known ClickHouse
+      // failures (memory limit, timeout, connection) into typed HandledErrors
+      // so callers get actionable errors with remediation tips. The raw error
+      // rides along in `reasons` for the retry classifiers (see
+      // translate-query-error.ts).
+      throw translateClickHouseQueryError(error, durationMs);
     }
   };
 
@@ -432,6 +444,11 @@ export function createResilientClickHouseClient({
       throw error;
     }
   };
+
+  // Orchestration only — the caller's `run` closure issues each attempt through
+  // this same wrapper's `query`, so retry + error translation apply per windowed
+  // attempt. Assigned by reference to preserve the generic signature.
+  wrapper.queryWindowed = queryWindowed;
 
   return wrapper;
 }

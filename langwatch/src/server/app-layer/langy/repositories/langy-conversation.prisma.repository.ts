@@ -15,11 +15,13 @@ function toRow(row: Row): LangyConversationRow {
     title: row.Title,
     isShared: row.IsShared,
     status: row.Status,
+    currentTurnId: row.CurrentTurnId,
     lastError: row.LastError,
     messageCount: row.MessageCount,
     lastActivityAtMs: row.LastActivityAt ?? 0,
     cursorActivityAtMs: row.LastActivityAt,
     createdAtMs: row.CreatedAt,
+    eventCursor: { acceptedAt: row.AcceptedAt, eventId: row.LastEventId },
   };
 }
 
@@ -168,5 +170,21 @@ export class PrismaLangyConversationRepository
       select: { RunToken: true },
     });
     return row?.RunToken ?? null;
+  }
+
+  async turnExists({
+    projectId,
+    conversationId: ConversationId,
+    turnId: TurnId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    const row = await this.prisma.langyConversationTurnProjection.findFirst({
+      where: { projectId, ConversationId, TurnId },
+      select: { id: true },
+    });
+    return row !== null;
   }
 }

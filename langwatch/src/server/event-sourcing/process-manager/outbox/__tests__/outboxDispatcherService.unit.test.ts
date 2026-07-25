@@ -198,4 +198,63 @@ describe("OutboxDispatcherService", () => {
     });
   });
 
+  describe("given several pending intents", () => {
+    async function commitTurns(count: number): Promise<void> {
+      for (let index = 0; index < count; index++) {
+        await service.handleEvent({
+          envelope: pilotEvent({
+            eventId: `evt_start_${index}`,
+            processKey: `conv_${index}`,
+            payload: { turnId: `turn_${index}` },
+          }),
+          now: T0,
+        });
+      }
+    }
+
+    /** Dispatcher whose handler records the peak number of in-flight calls. */
+    function trackingDispatcher(concurrency?: number) {
+      const seen = { inFlight: 0, peak: 0 };
+      const dispatcher = new OutboxDispatcherService({
+        store,
+        ...(concurrency === undefined ? {} : { concurrency }),
+        handlers: {
+          "worker-dispatch": async () => {
+            seen.inFlight += 1;
+            seen.peak = Math.max(seen.peak, seen.inFlight);
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            seen.inFlight -= 1;
+          },
+        },
+      });
+      return { dispatcher, seen };
+    }
+
+    describe("when concurrency is left at its default", () => {
+      it("dispatches the batch one message at a time", async () => {
+        await commitTurns(3);
+        const { dispatcher, seen } = trackingDispatcher();
+
+        const report = await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(report.dispatched).toHaveLength(3);
+        expect(seen.peak).toBe(1);
+      });
+    });
+
+    describe("when concurrency is raised", () => {
+      it("keeps that many dispatches in flight at once", async () => {
+        await commitTurns(3);
+        const { dispatcher, seen } = trackingDispatcher(3);
+
+        const report = await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(report.dispatched).toHaveLength(3);
+        // Leasing three at a time but awaiting them in a loop still peaks at
+        // one, which is how ADR-051's "~3 concurrent" claim went unmet: the
+        // batch size bounded the lease, never the dispatch.
+        expect(seen.peak).toBe(3);
+      });
+    });
+  });
 });

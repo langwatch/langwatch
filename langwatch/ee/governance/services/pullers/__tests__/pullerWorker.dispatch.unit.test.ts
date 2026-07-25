@@ -129,12 +129,9 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         ),
       );
 
-      const { runIngestionPullerJob } = await import("../pullerWorker");
+      const { runIngestionPull } = await import("../pullerWorker");
 
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: sourceId, scheduledAt: Date.now() },
-      } as any);
+      const outcome = await runIngestionPull({ sourceId, cursor: null });
 
       // Two OCSF rows landed
       expect(ocsfInsert).toHaveBeenCalledTimes(2);
@@ -144,36 +141,27 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         // resolved by the worker — same key as the trace-fold reactor +
         // OCSF export service. Org id is NOT used.
         tenantId: "gov-proj-1",
-        eventId: "http_polling:evt-1",
-        traceId: "pull:http_polling:evt-1",
+        eventId: `http_polling:${sourceId}:evt-1`,
+        traceId: `pull:http_polling:${sourceId}:evt-1`,
         sourceId,
         sourceType: "http_polling",
         actorEmail: "alice@acme.test",
         actionName: "completion",
         targetName: "gpt-5-mini",
       });
-      expect(ensureGovProject).toHaveBeenCalledWith(
-        expect.anything(),
-        "org-1",
-      );
-      // Cursor advanced + status promoted to active + lastEventAt stamped
-      expect(sourceUpdate).toHaveBeenCalledTimes(1);
-      const updateCall = sourceUpdate.mock.calls[0]![0];
-      expect(updateCall.where).toEqual({ id: sourceId });
-      expect(updateCall.data.status).toBe("active");
-      expect(updateCall.data.lastEventAt).toBeInstanceOf(Date);
-      expect(updateCall.data.errorCount).toBe(0);
+      expect(ensureGovProject).toHaveBeenCalledWith(expect.anything(), "org-1");
+      expect(outcome).toEqual({ nextCursor: null, eventCount: 2 });
+      expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe("source lookup fails: bail without adapter dispatch", () => {
     it("logs + returns when IngestionSource is missing", async () => {
       sourceFindUnique.mockResolvedValueOnce(null);
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "missing-src", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPull } = await import("../pullerWorker");
+      await expect(
+        runIngestionPull({ sourceId: "missing-src", cursor: null }),
+      ).rejects.toThrow("not found");
       expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();
     });
@@ -187,18 +175,15 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         parserConfig: HTTP_POLLING_CONFIG,
         pollerCursor: null,
       });
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "src-disabled", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPull } = await import("../pullerWorker");
+      await runIngestionPull({ sourceId: "src-disabled", cursor: null });
       expect(fetchStub).not.toHaveBeenCalled();
       expect(ocsfInsert).not.toHaveBeenCalled();
     });
   });
 
-  describe("unknown adapter id: increments errorCount + skips", () => {
-    it("logs + bumps errorCount when pullConfig.adapter doesn't resolve", async () => {
+  describe("unknown adapter id", () => {
+    it("fails without mutating the compatibility projection", async () => {
       sourceFindUnique.mockResolvedValueOnce({
         id: "src-unknown",
         organizationId: "org-1",
@@ -207,19 +192,15 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         parserConfig: { adapter: "definitely_not_registered" },
         pollerCursor: null,
       });
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "src-unknown", scheduledAt: Date.now() },
-      } as any);
-      expect(sourceUpdate).toHaveBeenCalledTimes(1);
-      expect(sourceUpdate.mock.calls[0]![0].data).toEqual({
-        errorCount: { increment: 1 },
-      });
+      const { runIngestionPull } = await import("../pullerWorker");
+      await expect(
+        runIngestionPull({ sourceId: "src-unknown", cursor: null }),
+      ).rejects.toThrow("Unknown ingestion pull adapter");
+      expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });
 
-  describe("adapter throws: leaves cursor untouched + bumps errorCount", () => {
+  describe("adapter failure", () => {
     it("does not advance cursor when runOnce surfaces a transport error", async () => {
       sourceFindUnique.mockResolvedValueOnce({
         id: "src-error",
@@ -231,32 +212,25 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       });
       // 3x 503 — exhausts the adapter's retry budget; runOnce returns
       // a PullResult with errorCount=1 (does NOT throw — adapter swallows
-      // and surfaces via errorCount). Worker sees errorCount>0 and bumps.
+      // and surfaces via errorCount). The effect fails so the outbox retries.
       const r503 = () =>
         new Response(JSON.stringify({ error: "down" }), { status: 503 });
       fetchStub.mockResolvedValueOnce(r503());
       fetchStub.mockResolvedValueOnce(r503());
       fetchStub.mockResolvedValueOnce(r503());
 
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "src-error", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPull } = await import("../pullerWorker");
+      await expect(
+        runIngestionPull({ sourceId: "src-error", cursor: "starting-cursor" }),
+      ).rejects.toThrow();
 
       expect(ocsfInsert).not.toHaveBeenCalled();
-      // Adapter returned errorCount=1 + cursor=options.cursor;
-      // worker preserves the cursor (passes-through) + increments errorCount.
-      const updateCall = sourceUpdate.mock.calls[0]![0];
-      expect(updateCall.data.errorCount).toEqual({ increment: 1 });
-      // pollerCursor in the update equals the original cursor (it was never advanced)
-      // — Prisma.JsonNull only used when cursor === null
-      expect(updateCall.data.pollerCursor).toBe("starting-cursor");
+      expect(sourceUpdate).not.toHaveBeenCalled();
     });
   });
 
   describe("idempotent EventId composition", () => {
-    it("composes <sourceType>:<source_event_id> so replays collapse on the CH key", async () => {
+    it("includes source id so same-type sources cannot collide", async () => {
       sourceFindUnique.mockResolvedValueOnce({
         id: "src-idem",
         organizationId: "org-x",
@@ -284,15 +258,12 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         ),
       );
 
-      const { runIngestionPullerJob } = await import("../pullerWorker");
-      await runIngestionPullerJob({
-        id: "job-1",
-        data: { ingestionSourceId: "src-idem", scheduledAt: Date.now() },
-      } as any);
+      const { runIngestionPull } = await import("../pullerWorker");
+      await runIngestionPull({ sourceId: "src-idem", cursor: null });
 
       const row = ocsfInsert.mock.calls[0]![0];
-      expect(row.eventId).toBe("copilot_studio:uuid-deadbeef");
-      expect(row.traceId).toBe("pull:copilot_studio:uuid-deadbeef");
+      expect(row.eventId).toBe("copilot_studio:src-idem:uuid-deadbeef");
+      expect(row.traceId).toBe("pull:copilot_studio:src-idem:uuid-deadbeef");
     });
   });
 });

@@ -13,6 +13,7 @@ import {
   getTeamRolePermissions,
 } from "~/server/api/rbac";
 import type { RoleService } from "~/server/role/role.service";
+import { assertUsersInOrganization } from "~/server/organizations/assertUsersInOrganization";
 
 export class RoleBindingService {
   constructor(
@@ -48,6 +49,32 @@ export class RoleBindingService {
       roleIds: customRoleIds,
       organizationId,
     });
+  }
+
+  private async validatePrincipalInOrganization({
+    organizationId,
+    userId,
+    groupId,
+  }: {
+    organizationId: string;
+    userId?: string;
+    groupId?: string;
+  }): Promise<void> {
+    if (userId) {
+      await assertUsersInOrganization(this.prisma, organizationId, [userId]);
+    }
+    if (groupId) {
+      const group = await this.prisma.group.findFirst({
+        where: { id: groupId, organizationId },
+        select: { id: true },
+      });
+      if (!group) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Group is not in this organization",
+        });
+      }
+    }
   }
 
   async listForUser({ organizationId, userId }: { organizationId: string; userId: string }) {
@@ -95,9 +122,19 @@ export class RoleBindingService {
 
   async listForOrg({ organizationId }: { organizationId: string }) {
     const bindings = await this.prisma.roleBinding.findMany({
-      where: { organizationId },
+      where: {
+        organizationId,
+        OR: [
+          {
+            userId: { not: null },
+            user: { orgMemberships: { some: { organizationId } } },
+          },
+          { groupId: { not: null }, group: { organizationId } },
+          { apiKeyId: { not: null }, apiKey: { organizationId } },
+        ],
+      },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, image: true } },
         group: { select: { id: true, name: true, scimSource: true } },
         customRole: { select: { id: true, name: true } },
       },
@@ -140,7 +177,11 @@ export class RoleBindingService {
     const groupMemberships =
       groupIds.length > 0
         ? await this.prisma.groupMembership.findMany({
-            where: { groupId: { in: groupIds } },
+            where: {
+              groupId: { in: groupIds },
+              group: { organizationId },
+              user: { orgMemberships: { some: { organizationId } } },
+            },
             select: { groupId: true, userId: true },
           })
         : [];
@@ -155,6 +196,7 @@ export class RoleBindingService {
       userId: b.userId,
       userName: b.user?.name ?? null,
       userEmail: b.user?.email ?? null,
+      userImage: b.user?.image ?? null,
       groupId: b.groupId,
       groupName: b.group?.name ?? null,
       groupScimSource: b.group?.scimSource ?? null,
@@ -356,6 +398,11 @@ export class RoleBindingService {
     }
 
     await this.repo.validateScopeInOrg({ organizationId, scopeType, scopeId });
+    await this.validatePrincipalInOrganization({
+      organizationId,
+      userId,
+      groupId,
+    });
     await this.validateCustomRolesAssignable({
       organizationId,
       bindings: [{ role, customRoleId }],
@@ -445,6 +492,7 @@ export class RoleBindingService {
   }) {
     // Validate scopes and role assignability up front so a bad input fails
     // the whole batch before we open the transaction.
+    await assertUsersInOrganization(this.prisma, organizationId, [userId]);
     for (const b of bindingsToCreate) {
       await this.repo.validateScopeInOrg({
         organizationId,

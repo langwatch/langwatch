@@ -184,3 +184,57 @@ func gitInitTemp(t *testing.T) string {
 	run("commit", "--allow-empty", "-m", "init")
 	return dir
 }
+
+// @scenario "The managed ClickHouse keeps its own telemetry lightweight"
+func TestClickHouseLimitsEnvWiring(t *testing.T) {
+	t.Run("given no ClickHouse log env vars", func(t *testing.T) {
+		t.Setenv("HAVEN_CLICKHOUSE_FULL_LOGS", "")
+		t.Setenv("HAVEN_CLICKHOUSE_LOG_TTL_DAYS", "")
+
+		t.Run("when resolving the limits", func(t *testing.T) {
+			l := clickHouseLimits()
+
+			t.Run("keeps lightweight logs on by default", func(t *testing.T) {
+				if !l.LightweightLogsEnabled {
+					t.Error("lightweight logs off without any env opt-out")
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_CLICKHOUSE_FULL_LOGS=1", func(t *testing.T) {
+		t.Setenv("HAVEN_CLICKHOUSE_FULL_LOGS", "1")
+
+		t.Run("when resolving the limits", func(t *testing.T) {
+			t.Run("restores full stock logging", func(t *testing.T) {
+				if clickHouseLimits().LightweightLogsEnabled {
+					t.Error("FULL_LOGS=1 did not disable lightweight logs")
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_CLICKHOUSE_FULL_LOGS=0", func(t *testing.T) {
+		t.Setenv("HAVEN_CLICKHOUSE_FULL_LOGS", "0")
+
+		t.Run("when resolving the limits", func(t *testing.T) {
+			t.Run("keeps lightweight logs on — only a truthy value opts out", func(t *testing.T) {
+				if !clickHouseLimits().LightweightLogsEnabled {
+					t.Error("FULL_LOGS=0 disabled lightweight logs; the flag is documented as =1")
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_CLICKHOUSE_LOG_TTL_DAYS=3", func(t *testing.T) {
+		t.Setenv("HAVEN_CLICKHOUSE_LOG_TTL_DAYS", "3")
+
+		t.Run("when resolving the limits", func(t *testing.T) {
+			t.Run("carries the override into the TTL", func(t *testing.T) {
+				if got := clickHouseLimits().SystemLogTTLDays; got != 3 {
+					t.Errorf("got TTL %d, want 3", got)
+				}
+			})
+		})
+	})
+}

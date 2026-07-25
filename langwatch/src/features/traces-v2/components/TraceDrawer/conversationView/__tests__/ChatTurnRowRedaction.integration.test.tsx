@@ -28,6 +28,17 @@ vi.mock("../expandContext", () => ({
   },
 }));
 
+// The per-turn translate hook dispatches through tRPC; these tests pin
+// redaction rendering, so stub it to the identity passthrough.
+vi.mock("../../../../hooks/useTextTranslation", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
+  }),
+}));
+
 // The turn separator pulls annotation data via tRPC; stub the leaf components.
 vi.mock("../TurnAnnotations", () => ({
   TurnActionRow: () => null,

@@ -77,6 +77,26 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.networkPolicy.gatewayPort }}
+    {{- with .Values.networkPolicy.egressToOtelCollector }}
+    # Manager OTLP export (OTEL_OTLP_ENDPOINT). Without this rule a manager
+    # pointed at an in-cluster collector is silently blackholed by the
+    # default-deny; OTel exporters fail quietly by design, so the only symptom
+    # is telemetry that never arrives.
+    #
+    # AWS EKS eBPF dataplane gotcha, learned in production: egress to a
+    # ClusterIP Service is enforced PRE-DNAT against the Service's ClusterIP,
+    # and the network-policy controller only resolves that ClusterIP into the
+    # allow-list when this rule's podSelector matches the SERVICE's
+    # spec.selector labels (the selector map matched as a label set): matching
+    # only the POD labels resolves the pod IPs but not the ClusterIP, so the
+    # service-DNS path times out while direct pod-IP connects work. Select on
+    # the labels the collector's Service selects on.
+    - to:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.networkPolicy.otelCollectorPort }}
+    {{- end }}
     {{- if .Values.networkPolicy.allowExternalHttps }}
     # External HTTPS (OpenCode update/telemetry, git/gh/npm over :443). This is
     # the pod's ONLY route to the public internet, and the most dangerous rule
@@ -108,12 +128,24 @@ spec:
               {{- range .Values.networkPolicy.privateExcept }}
               - {{ . }}
               {{- end }}
+        {{- if .Values.networkPolicy.allowExternalHttpsIpv6 }}
+        # OPT-IN, and only for genuinely dual-stack clusters. On an IPv4-only
+        # cluster this block is dead weight that BREAKS the AWS EKS eBPF
+        # dataplane: the aws-network-policy-agent's per-pod allow-list is an
+        # IPv4 LPM trie, a v6 `except` key (prefix length > 32) fails the map
+        # write with EINVAL, and the agent aborts the ENTIRE egress refresh on
+        # that first bad key. The policy then silently freezes at its pod-birth
+        # snapshot: every later endpoint change (a control-plane or gateway
+        # deploy, a collector move) leaves the pod pointed at stale IPs.
+        # IPv4-only pods cannot emit IPv6 anyway; omitting the rule DENIES v6
+        # (fail closed), it does not allow it.
         - ipBlock:
             cidr: ::/0
             except:
               {{- range .Values.networkPolicy.privateExceptV6 }}
               - {{ . }}
               {{- end }}
+        {{- end }}
       ports:
         - protocol: TCP
           port: 443

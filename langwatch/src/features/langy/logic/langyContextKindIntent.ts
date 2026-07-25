@@ -42,19 +42,54 @@ const KIND_VOCABULARY: Record<
     aliases: ["scenario", "scenarios", "simulation", "simulations"],
   },
   experiment: { plural: "experiments", aliases: ["experiment", "experiments"] },
+  workflow: {
+    plural: "workflows",
+    aliases: ["workflow", "workflows", "studio"],
+  },
+  agent: { plural: "agents", aliases: ["agent", "agents"] },
+  automation: {
+    plural: "automations",
+    aliases: [
+      "automation",
+      "automations",
+      "trigger",
+      "triggers",
+      "alert",
+      "alerts",
+    ],
+  },
+  annotation: {
+    plural: "annotations",
+    aliases: ["annotation", "annotations", "queue", "queues"],
+  },
+  dashboard: {
+    plural: "dashboards",
+    aliases: ["dashboard", "dashboards", "report", "reports", "analytics"],
+  },
 };
 
 /**
- * Where "browse" goes, as the `/<projectSlug>/<surface>` segment. Experiments
- * share the evaluations surface (the experiments index redirects there).
+ * Where "browse" goes, as the `/<projectSlug>/<surface>` segment.
+ *
+ * The destination is the page that REGISTERS targets of the kind, which is not
+ * always the page named after it. `/evaluations` is titled "Experiments" and its
+ * rows declare themselves experiments; the pages whose cards declare themselves
+ * evaluations are `/evaluators` and `/online-evaluations`. Sending "Browse
+ * evaluations" to `/evaluations` therefore landed on a page where the promised
+ * "anything that lights up can be added as context" lit nothing at all.
  */
 export const SURFACE_PATH_FOR_KIND: Record<LangyRevealableKind, string> = {
   trace: "traces",
   dataset: "datasets",
   prompt: "prompts",
-  evaluation: "evaluations",
+  evaluation: "evaluators",
   scenario: "simulations",
   experiment: "evaluations",
+  workflow: "workflows",
+  agent: "agents",
+  automation: "automations",
+  annotation: "annotations",
+  dashboard: "analytics",
 };
 
 /** Don't offer "browse traces" off a single `t` — too eager to mean anything. */

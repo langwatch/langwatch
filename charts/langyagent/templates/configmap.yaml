@@ -32,3 +32,10 @@ data:
   LANGY_EGRESS_REQUIRE_TLS: {{ .Values.egress.requireTls | quote }}
   LANGY_EGRESS_ENFORCE_FLOOR: {{ .Values.egress.enforceFloor | quote }}
   LANGY_EGRESS_SNI_CROSSCHECK: {{ .Values.egress.sniCrossCheck | quote }}
+  {{- with .Values.mirror.traceEndpoint }}
+  # Mirror lane (ADR-061): the secondary exporter for the turn's gen_ai trace
+  # data into the operator-designated mirror project. The key is NOT here —
+  # it is a project API key, injected from the mirror Secret in the
+  # Deployment env.
+  LANGY_MIRROR_TRACE_ENDPOINT: {{ . | quote }}
+  {{- end }}

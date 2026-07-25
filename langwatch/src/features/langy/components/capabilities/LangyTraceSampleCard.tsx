@@ -30,7 +30,7 @@
  * chrome, `CapabilityRow` for the rows. It deliberately introduces no styling of
  * its own, so whatever the card shell becomes, this follows.
  */
-import { asJsonDocument, type CliResultDigest } from "@langwatch/cli-cards";
+import { asJsonDocument, type CliResultDigest } from "@langwatch/langy";
 import { Button, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
@@ -52,6 +52,7 @@ import {
 } from "./LangyCapabilityCard";
 import { LangyObservationState } from "../LangyObservationState";
 import { LangyContextTarget } from "../LangyContextTarget";
+import { LangySpaAnchor } from "../LangySpaAnchor";
 import { traceContextChip } from "../../logic/langyContextChips";
 
 /**
@@ -180,10 +181,10 @@ function ExplorerAction({ href }: { href: string | null }) {
       width="full"
       textDecoration="none"
     >
-      <a href={href}>
+      <LangySpaAnchor href={href}>
         View in Trace Explorer
         <ArrowUpRight size={12} />
-      </a>
+      </LangySpaAnchor>
     </Button>
   );
 }

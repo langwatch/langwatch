@@ -25,6 +25,13 @@ type chatRequest struct {
 	UserID         string `json:"userId" validate:"required"`
 	Prompt         string `json:"prompt" validate:"required"`
 	System         string `json:"system,omitempty"`
+	// HistorySeed is the conversation-so-far block the worker folds in ahead of
+	// the prompt on its session's FIRST delivered message only (fresh session ⇒
+	// seeded; warm session ⇒ ignored, its transcript already carries it). Rides
+	// every dispatch so re-drives that land on a fresh worker still continue the
+	// conversation. Absent for a brand-new conversation or an older control
+	// plane.
+	HistorySeed string `json:"historySeed,omitempty"`
 	// Credentials has no tag of its own — the validator descends into it and
 	// checks its own `validate:"required"` fields (see domain.Credentials).
 	Credentials   domain.Credentials `json:"credentials"`
@@ -131,6 +138,7 @@ func chatHandler(application *app.App, maxBodyBytes int64, intent string) http.H
 			ConversationID: req.ConversationID,
 			Prompt:         req.Prompt,
 			System:         req.System,
+			HistorySeed:    req.HistorySeed,
 			Credentials:    creds,
 			ResumeToken:    req.ResumeToken,
 			TurnID:         req.TurnID,

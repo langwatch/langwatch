@@ -8,9 +8,6 @@ import {
   Flag,
   TrendingDown,
 } from "react-feather";
-import { Link } from "~/components/ui/link";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 
 export type AutomationKind = "alert" | "automation";
 
@@ -149,62 +146,23 @@ function UseCaseCard({
  * action. Graph and filters stay with the user. Sections with rows don't
  * render this — the header's add button is the create entry point there.
  *
- * Alert use-cases open a drawer that needs a custom graph to point at, so
- * with zero graphs the cards would dead-end. In that case the strip swaps to
- * guidance that sends the user to build a graph first.
  */
 export function UseCaseStrip({
   kind,
   onOpen,
+  showLabel = true,
 }: {
   kind: AutomationKind;
   onOpen: (prefill: UseCasePrefill) => void;
+  showLabel?: boolean;
 }) {
-  const { project } = useOrganizationTeamProject();
-  const graphsQuery = api.graphs.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: kind === "alert" && !!project?.id },
-  );
-  const noGraphsForAlert =
-    kind === "alert" &&
-    graphsQuery.isSuccess &&
-    (graphsQuery.data ?? []).length === 0;
-
-  if (noGraphsForAlert) {
-    return (
-      <VStack
-        align="start"
-        gap={2}
-        padding={4}
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="lg"
-        bg="bg.panel"
-      >
-        <Text textStyle="sm" fontWeight="semibold">
-          Create an analytics graph first
-        </Text>
-        <Text textStyle="sm" color="fg.muted">
-          Alerts watch a metric on one of your analytics graphs. Build a graph,
-          then come back here to set a threshold on it.
-        </Text>
-        <Link
-          href={`/${project?.slug}/analytics/custom`}
-          color="orange.solid"
-          fontWeight="medium"
-          textStyle="sm"
-        >
-          Create an analytics graph
-        </Link>
-      </VStack>
-    );
-  }
-
   return (
     <VStack align="stretch" gap={2}>
-      <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
-        Popular uses
-      </Text>
+      {showLabel && (
+        <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
+          Popular uses
+        </Text>
+      )}
       <SimpleGrid columns={{ base: 1, md: 3 }} gap={3}>
         {USE_CASES[kind].map((useCase) => (
           <UseCaseCard key={useCase.title} useCase={useCase} onOpen={onOpen} />

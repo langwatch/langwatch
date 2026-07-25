@@ -47,6 +47,7 @@ import {
   isCustomRole,
 } from "../enterprise";
 import {
+  batchScopePermissions,
   checkOrganizationPermission,
   checkTeamPermission,
   hasOrganizationPermission,
@@ -152,6 +153,10 @@ export const organizationRouter = createTRPCRouter({
       // must not hand the decrypted secret to lite/viewer members just
       // because the UI happens not to render it.
       const manageableOrgIds = new Set<string>();
+      // Decides the base-key redaction below. One batched resolution per org,
+      // not one check per project — a scoped check is ~4 queries, so a
+      // per-project fan-out would scale with the org's project count.
+      const updatableProjectsByOrg = new Map<string, Map<string, boolean>>();
       for (const organization of organizations) {
         const canManage = await hasOrganizationPermission(
           ctx,
@@ -159,6 +164,27 @@ export const organizationRouter = createTRPCRouter({
           "organization:manage",
         );
         if (canManage) manageableOrgIds.add(organization.id);
+
+        const projectTeamId: Record<string, string> = {};
+        for (const team of organization.teams) {
+          for (const project of team.projects) {
+            projectTeamId[project.id] = team.id;
+          }
+        }
+        const projectIds = Object.keys(projectTeamId);
+        if (projectIds.length === 0) continue;
+
+        const { projects: updatableProjects } = await batchScopePermissions(
+          ctx,
+          {
+            organizationId: organization.id,
+            teamIds: [],
+            projectIds,
+            projectTeamId,
+            permission: "project:update",
+          },
+        );
+        updatableProjectsByOrg.set(organization.id, updatableProjects);
       }
 
       for (const organization of organizations) {
@@ -176,7 +202,14 @@ export const organizationRouter = createTRPCRouter({
           if (project.s3Endpoint) {
             project.s3Endpoint = decrypt(project.s3Endpoint);
           }
-          if (isDemo) {
+          // The base key is a project-level write credential. Same rule as the
+          // S3 secret above: send it only to those who can change the project,
+          // rather than relying on the UI not to render it. Demo projects
+          // expose it to no one.
+          const canUpdateProject =
+            updatableProjectsByOrg.get(organization.id)?.get(project.id) ??
+            false;
+          if (isDemo || !canUpdateProject) {
             project.apiKey = "";
           }
         }
@@ -313,6 +346,7 @@ export const organizationRouter = createTRPCRouter({
           s3SecretAccessKey: z.string().optional(),
           s3Bucket: z.string().optional(),
           presenceEnabled: z.boolean().optional(),
+          traceSharingEnabled: z.boolean().optional(),
           supportContact: z.string().max(500).nullable().optional(),
           primaryIntent: z
             .enum(["AGENT_GOVERNANCE", "LLM_OPS"])
@@ -337,7 +371,21 @@ export const organizationRouter = createTRPCRouter({
         ),
     )
     .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Detect a trace-sharing disable transition before the write so the
+      // kill-switch cascade mirrors the project-level behavior: disabling
+      // revokes every existing trace link across the org (not just blocks new
+      // ones), so re-enabling later never resurrects old links. See ADR-057.
+      const wasSharingEnabled =
+        input.traceSharingEnabled === false
+          ? (
+              await ctx.prisma.organization.findUnique({
+                where: { id: input.organizationId },
+                select: { traceSharingEnabled: true },
+              })
+            )?.traceSharingEnabled === true
+          : false;
+
       await getApp().organizations.update({
         organizationId: input.organizationId,
         name: input.name,
@@ -346,9 +394,22 @@ export const organizationRouter = createTRPCRouter({
         s3SecretAccessKey: input.s3SecretAccessKey,
         s3Bucket: input.s3Bucket,
         presenceEnabled: input.presenceEnabled,
+        traceSharingEnabled: input.traceSharingEnabled,
         supportContact: input.supportContact,
         primaryIntent: input.primaryIntent,
       });
+
+      if (input.traceSharingEnabled === false && wasSharingEnabled) {
+        const projects = await ctx.prisma.project.findMany({
+          where: { team: { organizationId: input.organizationId } },
+          select: { id: true },
+        });
+        await Promise.all(
+          projects.map((project) =>
+            getApp().share.revokeAllTraceShares(project.id),
+          ),
+        );
+      }
 
       return { success: true };
     }),

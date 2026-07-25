@@ -68,6 +68,17 @@ export function createOriginGateReactor(
 
       if (!needsOriginResolution(event, foldState)) return;
 
+      // Defensive: a trace aggregate with an empty ID can't be resolved, and
+      // scheduling one produces an OriginResolvedEvent with an empty
+      // aggregateId that blows up the automations pipeline later.
+      if (!traceId) {
+        logger.warn(
+          { tenantId, eventId: event.id, eventType: event.type },
+          "Skipping deferred origin resolution: empty traceId on trace event",
+        );
+        return;
+      }
+
       // No origin — schedule deferred resolution (5-min delay)
       logger.debug(
         { tenantId, traceId },

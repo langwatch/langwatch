@@ -8,6 +8,9 @@
  */
 
 import {
+  context as otelContext,
+  isSpanContextValid,
+  propagation,
   trace as otelTrace,
   type Span,
   SpanKind,
@@ -30,6 +33,7 @@ interface CreateNextContextOptions {
   res: any;
 }
 
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import type { OrganizationUserRole } from "@prisma/client";
@@ -37,7 +41,6 @@ import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
 import superjson from "superjson";
 import { ZodError } from "zod";
-import { HandledError } from "~/server/app-layer/handled-error";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -145,8 +148,19 @@ export function errorFormatterForTesting({
       }
     : null;
 
-  const domainError =
-    error.cause instanceof HandledError ? error.cause.serialize() : null;
+  // Input validation arrives as a ZodError cause. Promote it to the shared
+  // ValidationError so it travels the one handled-error channel like every
+  // other failure: `fromZodError` flattens the issues into
+  // `meta.fieldErrors` / `meta.formErrors`, which is where the contents of the
+  // old sidecar `data.zodError` field now live. Mirrors what the Hono handler
+  // already does (packages/api/src/errors.ts::validationErrorFromZod).
+  const handled = HandledError.isHandled(error.cause)
+    ? error.cause
+    : error.cause instanceof ZodError
+      ? ValidationError.fromZodError(error.cause)
+      : null;
+
+  const domainError = handled?.serialize() ?? null;
 
   // Surface ModelNotConfiguredError on the wire so the frontend
   // interceptor in `utils/trpcError.ts::extractMissingModelInfo` can
@@ -188,21 +202,30 @@ export function errorFormatterForTesting({
       ? error.cause.toResponseBody()
       : null;
 
-  // A 5xx is an implementation failure, not user-facing copy. tRPC defaults
-  // the response message to the thrown Error's message, which can contain
-  // Prisma models, SQL, hostnames, or other platform internals. HandledError is
-  // the only exception: its message is explicitly authored as safe domain
-  // copy. The original error remains on the TRPCError for loggerMiddleware,
+  // Free-text error messages never cross the tRPC boundary. `data.error` (code,
+  // meta, tips, docsUrl — see SerializedHandledError, which deliberately has no
+  // message field) is the entire client contract for handled errors, and
+  // presentation is decided client-side by the code-keyed explainers. A
+  // HandledError's message is server copy — it can name env vars or internal
+  // services — so the wire carries only its stable code. Unhandled 5xx messages
+  // can contain Prisma models, SQL, or hostnames and collapse to a generic
+  // string. The original error remains on the TRPCError for loggerMiddleware,
   // exception capture, and OTel span recording.
+  //
+  // `message` and `code` stay at the top level because they are JSON-RPC
+  // envelope fields the tRPC client itself runtime-checks (`isTRPCErrorResponse`
+  // requires a string message and a numeric code, and discards `data` entirely
+  // when either is missing) — not fields we chose.
   const isInternalServerError =
     error.code === "INTERNAL_SERVER_ERROR" ||
     shape?.data?.code === "INTERNAL_SERVER_ERROR";
-  const message =
-    isInternalServerError && !(error.cause instanceof HandledError)
+  const message = handled
+    ? handled.code
+    : isInternalServerError
       ? HandledError.toUserMessage(error.cause)
       : shape.message;
   const shapeData = { ...shape.data };
-  if (isInternalServerError && !(error.cause instanceof HandledError)) {
+  if (isInternalServerError || handled) {
     // tRPC includes stacks in development error shapes. Local callers should
     // exercise the same safe wire contract as production callers.
     delete shapeData.stack;
@@ -213,13 +236,12 @@ export function errorFormatterForTesting({
     message,
     data: {
       ...shapeData,
-      zodError: error.cause instanceof ZodError ? error.cause.flatten() : null,
       cause:
         missingModelCause ??
         providerDisabledCause ??
         aiCallFailedCause ??
         limitInfo,
-      domainError,
+      error: domainError,
     },
   };
 }
@@ -460,7 +482,52 @@ function recordSpanError(span: Span, error: unknown): void {
   span.setStatus({ code: SpanStatusCode.ERROR, message: e.message });
 }
 
-export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
+/**
+ * The trace context the caller sent with this call, so a tRPC span continues
+ * the trace the browser started rather than rooting a fresh one. Without this
+ * the UI and the server work it triggers are two unrelated traces, which is the
+ * common case because most of the product talks tRPC rather than REST.
+ *
+ * A local span already on the context wins. When tRPC is served through the
+ * HTTP router, its `tracerMiddleware` has already extracted the same
+ * `traceparent` and opened the `POST /api` server span that is executing this
+ * call — re-extracting would parent the procedure to the *remote* browser span
+ * instead, leaving the HTTP span a childless sibling and losing the fact that
+ * one contains the other. Extraction is therefore only for callers that arrive
+ * with no local span at all.
+ *
+ * Only the request-per-call transports are consulted. The WebSocket and SSE
+ * links hold one long-lived connection, so `ctx.req` there is the *handshake*
+ * request — extracting from it would parent every later call on that socket to
+ * whatever trace happened to open it. Browsers cannot set headers on a
+ * WebSocket handshake, so there is normally nothing to extract, but the rule is
+ * stated rather than relied upon.
+ *
+ * See ADR-058.
+ */
+export function callerTraceContext({
+  req,
+  type,
+}: {
+  // Only the headers are read, and callers range from the Node request to the
+  // WS handshake to nothing at all (SSG helpers), so this asks for the one
+  // thing it uses rather than for a request type it would have to lie about.
+  req: { headers?: Record<string, string | string[] | undefined> } | undefined;
+  type: string;
+}) {
+  const active = otelContext.active();
+  if (type === "subscription") return active;
+
+  const localSpan = otelTrace.getSpan(active)?.spanContext();
+  if (localSpan && isSpanContextValid(localSpan)) return active;
+
+  const headers = req?.headers;
+  if (!headers) return active;
+
+  return propagation.extract(active, headers);
+}
+
+export const tracerMiddleware = t.middleware(async ({ ctx, path, type, next }) => {
   const tracer = otelTrace.getTracer("langwatch:trpc");
   const spanName = `trpc.${path}`;
 
@@ -469,32 +536,40 @@ export const tracerMiddleware = t.middleware(async ({ path, type, next }) => {
   // drown out the trace surface — but failures still need a span so
   // real errors stay visible. Capture the start time before `next()`
   // so the error span's duration matches the actual call.
+  const parentContext = callerTraceContext({ req: ctx.req, type });
+
   if (isSilencedCall(path, type)) {
     const startTime = Date.now();
     const result = await next();
     if (result.ok) return result;
 
-    const span = tracer.startSpan(spanName, {
-      kind: SpanKind.SERVER,
-      startTime,
-      attributes: spanAttributes(path, type),
-    });
+    const span = tracer.startSpan(
+      spanName,
+      {
+        kind: SpanKind.SERVER,
+        startTime,
+        attributes: spanAttributes(path, type),
+      },
+      parentContext,
+    );
     recordSpanError(span, result.error);
     span.end();
     return result;
   }
 
-  return tracer.startActiveSpan(
-    spanName,
-    { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
-    async (span) => {
-      // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
-      // returned as { ok: false, error } result objects — NOT thrown.
-      const result = await next();
-      if (!result.ok) recordSpanError(span, result.error);
-      span.end();
-      return result;
-    },
+  return otelContext.with(parentContext, () =>
+    tracer.startActiveSpan(
+      spanName,
+      { kind: SpanKind.SERVER, attributes: spanAttributes(path, type) },
+      async (span) => {
+        // IMPORTANT: In tRPC v10, next() never throws. Downstream errors are
+        // returned as { ok: false, error } result objects — NOT thrown.
+        const result = await next();
+        if (!result.ok) recordSpanError(span, result.error);
+        span.end();
+        return result;
+      },
+    ),
   );
 });
 
@@ -518,7 +593,7 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
  */
 const handledErrorMiddleware = t.middleware(async ({ next }) => {
   const result = await next();
-  if (!result.ok && result.error.cause instanceof HandledError) {
+  if (!result.ok && HandledError.isHandled(result.error.cause)) {
     const domainError = result.error.cause;
     throw new TRPCError({
       code: handledErrorToTRPCCode(domainError),
@@ -604,20 +679,34 @@ export function handleTrpcCallLogging({
         : 500;
     logData.statusCode = resolvedStatus;
 
-    // Include handled error code in log data for structured filtering
-    if (
-      result.error instanceof TRPCError &&
-      result.error.cause instanceof HandledError
-    ) {
-      logData.handledErrorCode = result.error.cause.code;
+    const cause =
+      result.error instanceof TRPCError ? result.error.cause : undefined;
+    // isHandled also matches an instance from a second copy of the package,
+    // which bare `instanceof` misses — see its brand check.
+    const handledCause = HandledError.isHandled(cause) ? cause : undefined;
+
+    // Include handled error code + fault in log data for structured
+    // filtering (and spike alerting on handledErrorCode).
+    if (handledCause) {
+      logData.handledErrorCode = handledCause.code;
+      logData.handledErrorFault = handledCause.fault;
     }
 
-    // Only capture 5xx errors (actual bugs)
-    if (resolvedStatus >= 500) {
+    // Only unhandled 5xx errors are captured as exceptions: handled errors
+    // are expected failure modes with typed causes, not bugs.
+    if (resolvedStatus >= 500 && !handledCause) {
       capture(toError(result.error));
     }
 
-    const logLevel = getLogLevelFromStatusCode(resolvedStatus);
+    // Handled errors log by fault attribution, not status: customer-fault
+    // errors are expected (warn — watched for spikes), while platform and
+    // provider failures are incidents worth an error line. Unhandled errors
+    // stay status-based.
+    const logLevel = handledCause
+      ? handledCause.fault === "customer"
+        ? "warn"
+        : "error"
+      : getLogLevelFromStatusCode(resolvedStatus);
     log[logLevel](logData, "trpc call");
   } else {
     log.info(logData, "trpc call");
@@ -651,8 +740,9 @@ function isSilencedCall(path: string, type: string): boolean {
 export const loggerMiddleware = t.middleware(
   async ({ path, type, input, ctx, next }) => {
     // Import context utilities dynamically to avoid circular deps
-    const { createContextFromTRPC, runWithContext } =
-      await import("../context/asyncContext");
+    const { createContextFromTRPC, runWithContext } = await import(
+      "../context/asyncContext"
+    );
 
     // Create context from tRPC context and input
     const requestContext = createContextFromTRPC(ctx, input as any);
@@ -766,3 +856,20 @@ export const protectedProcedure = permissionProcedureBuilder(
  *
  */
 export const publicProcedure = permissionProcedureBuilder(t.procedure);
+
+const authMiddlewares = (
+  enforceUserIsAuthed as unknown as { _middlewares: unknown[] }
+)._middlewares;
+
+/**
+ * Whether a built procedure skips `enforceUserIsAuthed` — i.e. was built from
+ * `publicProcedure` and is callable without a session. Backs the
+ * public-surface allowlist test, the tripwire that makes adding a new
+ * unauthenticated endpoint a deliberate, reviewed act.
+ */
+export function isPublicProcedure(procedure: unknown): boolean {
+  const middlewares =
+    (procedure as { _def?: { middlewares?: unknown[] } })._def?.middlewares ??
+    [];
+  return !middlewares.some((middleware) => authMiddlewares.includes(middleware));
+}

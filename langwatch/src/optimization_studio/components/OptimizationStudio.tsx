@@ -45,6 +45,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { GlobalTraceV2DrawerMount } from "../../features/traces-v2/components/GlobalTraceV2DrawerMount";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { assertCrispChatHidden } from "../../utils/crispBubblePolicy";
 import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
@@ -173,18 +174,11 @@ export default function OptimizationStudio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openResultsPanelRequest]);
 
+  // The Crisp bubble policy keeps the support bubble hidden app-wide unless
+  // deliberately opened; re-assert on entering the studio so it can never
+  // cover the canvas controls even if Crisp booted mid-navigation.
   useEffect(() => {
-    if (typeof window === "undefined" || !("$crisp" in window)) {
-      return;
-    }
-
-    // @ts-ignore
-    window.$crisp.push(["do", "chat:hide"]);
-
-    return () => {
-      // @ts-ignore
-      window.$crisp.push(["do", "chat:show"]);
-    };
+    assertCrispChatHidden();
   }, []);
 
   useAskBeforeLeaving();

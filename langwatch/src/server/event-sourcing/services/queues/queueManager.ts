@@ -15,10 +15,12 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import { resolveDeduplicationStrategy } from "../../queues";
+import type { JobDelivery } from "../../queues/queue.types";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import {
   type CommandHandlerOptions,
   processCommand,
+  processCommandBatch,
 } from "../commands/commandDispatcher";
 import { ConfigurationError, ValidationError } from "../errorHandling";
 
@@ -29,7 +31,7 @@ const logger = createLogger("langwatch:event-sourcing:queue-manager");
  * Used by the global queue's process/groupKey/score callbacks to dispatch to the right handler.
  */
 export interface JobRegistryEntry {
-  process: (payload: any) => Promise<void>;
+  process: (payload: any, delivery?: JobDelivery) => Promise<void>;
   groupKeyFn: (payload: any) => string;
   scoreFn: (payload: any) => number;
   delay?: number;
@@ -41,12 +43,17 @@ export interface JobRegistryEntry {
    * into one call (the dispatched job plus drained siblings, in occurredAt
    * order). The first payload is always the dispatched job.
    */
-  processBatch?: (payloads: any[]) => Promise<void>;
+  processBatch?: (payloads: any[], delivery?: JobDelivery) => Promise<void>;
   /**
    * Max number of same-group jobs to coalesce into one `processBatch` call
    * (including the dispatched job). Defaults to 1 (no coalescing).
    */
   coalesceMaxBatch?: number;
+  /**
+   * Optional byte cap for a coalesced batch (ADR-066 pillar 2). Resolved by the
+   * global queue per job; undefined falls back to the GroupQueue default.
+   */
+  coalesceMaxBytes?: number;
 }
 
 interface QueuedEventConsumerDefinition<E extends Event> {
@@ -61,6 +68,7 @@ interface QueuedEventConsumerDefinition<E extends Event> {
     disabled?: boolean;
     killSwitch?: KillSwitchOptions;
     groupKeyFn?: (event: E) => string;
+    coalesceMaxBatch?: number;
   };
 }
 
@@ -238,7 +246,7 @@ export class QueueManager<EventType extends Event = Event> {
         );
       },
       // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
-      close: async () => {},
+      close: async () => undefined,
       waitUntilReady: () => globalQueue.waitUntilReady(),
     };
 
@@ -252,10 +260,16 @@ export class QueueManager<EventType extends Event = Event> {
       event: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
+    onEventBatch?: (
+      handlerName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
   ): void {
     this.initializeEventConsumerQueues({
       definitions: mapProjections,
       onEvent,
+      onEventBatch,
       jobType: "handler",
       jobPath: "map",
       incrementCount: () => this.handlerCount++,
@@ -282,6 +296,7 @@ export class QueueManager<EventType extends Event = Event> {
   private initializeEventConsumerQueues({
     definitions,
     onEvent,
+    onEventBatch,
     jobType,
     jobPath,
     incrementCount,
@@ -290,6 +305,11 @@ export class QueueManager<EventType extends Event = Event> {
     onEvent: (
       consumerName: string,
       event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    onEventBatch?: (
+      consumerName: string,
+      events: EventType[],
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>;
     jobType: "handler" | "subscriber";
@@ -321,6 +341,17 @@ export class QueueManager<EventType extends Event = Event> {
             tenantId: event.tenantId,
           });
         },
+        processBatch:
+          onEventBatch &&
+          handlerDef.options.coalesceMaxBatch &&
+          handlerDef.options.coalesceMaxBatch > 1
+            ? async (events: any[]) => {
+                await onEventBatch(handlerName, events, {
+                  tenantId: events[0]?.tenantId,
+                });
+              }
+            : undefined,
+        coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
         delay: handlerDef.options.delay,
         deduplication: resolveDeduplicationStrategy(
           handlerDef.options.deduplication,
@@ -391,9 +422,10 @@ export class QueueManager<EventType extends Event = Event> {
         scoreFn:
           projectionDef.scoreFn ??
           ((event: any) => event.occurredAt ?? event.createdAt),
-        process: async (event: any) => {
+        process: async (event: any, delivery?: JobDelivery) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
+            deliveryAttempt: delivery?.attempt,
           });
         },
         // Same-group fold events are coalesced into one load/apply/store cycle.
@@ -401,9 +433,10 @@ export class QueueManager<EventType extends Event = Event> {
         // so the tenant is taken from the first event.
         processBatch:
           onEventBatch && coalesceMaxBatch && coalesceMaxBatch > 1
-            ? async (events: any[]) => {
+            ? async (events: any[], delivery?: JobDelivery) => {
                 await onEventBatch(projectionName, events, {
                   tenantId: events[0]?.tenantId,
+                  deliveryAttempt: delivery?.attempt,
                 });
               }
             : undefined,
@@ -554,27 +587,58 @@ export class QueueManager<EventType extends Event = Event> {
           return `${this.aggregateType}:${String(key)}`;
         },
       });
+      const coalesceMaxBatch = cmdEntry.options.coalesceMaxBatch;
+
+      // ADR-066 pillar 2 visibility: a serialized producer that does NOT
+      // coalesce can still flood the event log one tiny insert per item under
+      // high fan-in. Record the gap at registration so it can be found and
+      // closed, instead of surfacing only as ClickHouse small-parts pressure.
+      if (
+        cmdEntry.options.serializeByAggregate &&
+        !(coalesceMaxBatch && coalesceMaxBatch > 1)
+      ) {
+        this.logger.info(
+          { pipeline: this.pipelineName, command: cmdName },
+          "serialized command producer registered without append coalescing",
+        );
+      }
+
+      // Shared across the single and batched processors — same command, same
+      // store, same kill switch; only the payload arity differs.
+      const commandProcessParams = {
+        commandType: cmdEntry.commandType,
+        commandSchema: cmdEntry.schema,
+        handler: cmdEntry.handler,
+        getAggregateId: cmdEntry.getAggregateId,
+        storeEventsFn: storeEvents,
+        aggregateType: this.aggregateType,
+        commandName: cmdEntry.commandName,
+        pipelineName: this.pipelineName,
+        featureFlagService: this.featureFlagService,
+        killSwitchOptions: cmdEntry.killSwitchOptions,
+        logger,
+      };
+
       const jobEntry: JobRegistryEntry = {
         groupKeyFn: commandGroupKeyFn,
         scoreFn: cmdEntry.options.serializeByAggregate
           ? () => Date.now()
           : (payload: any) => payload.occurredAt as number,
         process: async (payload: any) => {
-          await processCommand({
-            payload,
-            commandType: cmdEntry.commandType,
-            commandSchema: cmdEntry.schema,
-            handler: cmdEntry.handler,
-            getAggregateId: cmdEntry.getAggregateId,
-            storeEventsFn: storeEvents,
-            aggregateType: this.aggregateType,
-            commandName: cmdEntry.commandName,
-            pipelineName: this.pipelineName,
-            featureFlagService: this.featureFlagService,
-            killSwitchOptions: cmdEntry.killSwitchOptions,
-            logger,
-          });
+          await processCommand({ ...commandProcessParams, payload });
         },
+        // ADR-066 pillar 2: when the command opts into coalescing, fold a hot
+        // aggregate's queued same-command jobs into one multi-row insert. The
+        // GroupQueue only drains same-`__jobName` siblings, so every payload
+        // here is this command type. Left undefined otherwise (per-job path).
+        processBatch:
+          coalesceMaxBatch && coalesceMaxBatch > 1
+            ? async (payloads: any[]) => {
+                await processCommandBatch({ ...commandProcessParams, payloads });
+              }
+            : undefined,
+        coalesceMaxBatch,
+        coalesceMaxBytes: cmdEntry.options.coalesceMaxBytes,
         delay: cmdEntry.options.delay,
         deduplication: rawDedup,
         spanAttributes: cmdEntry.spanAttributes,

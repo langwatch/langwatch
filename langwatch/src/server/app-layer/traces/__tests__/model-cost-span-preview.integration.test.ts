@@ -21,7 +21,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { ValidationError } from "../../handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import {
   deriveUnmappedCostSuggestion,
   previewCostRuleMatchingSpans,

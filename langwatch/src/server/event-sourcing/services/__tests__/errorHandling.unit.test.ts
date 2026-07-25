@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ClickHouseUnavailableError,
+  QueryMemoryExceededError,
+} from "~/server/app-layer/traces/errors";
+import {
   ErrorCategory,
   SecurityError,
   ValidationError,
@@ -450,6 +454,27 @@ describe("classifyClickHouseError", () => {
     it("returns CRITICAL for null/undefined", () => {
       expect(classifyClickHouseError(null)).toBe(ErrorCategory.CRITICAL);
       expect(classifyClickHouseError(undefined)).toBe(ErrorCategory.CRITICAL);
+    });
+  });
+
+  describe("when the resilient client's translation wrapped the raw error", () => {
+    it("returns RECOVERABLE for a handled query_memory_exceeded wrapping code 241", () => {
+      const raw = Object.assign(new Error("memory"), { code: "241" });
+      const translated = new QueryMemoryExceededError({ reasons: [raw] });
+      expect(classifyClickHouseError(translated)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for a handled clickhouse_unavailable wrapping ECONNREFUSED", () => {
+      const raw = Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" });
+      const translated = new ClickHouseUnavailableError({ reasons: [raw] });
+      expect(classifyClickHouseError(translated)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns CRITICAL for a handled error wrapping a non-transient cause", () => {
+      const translated = new QueryMemoryExceededError({
+        reasons: [new Error("Syntax error in SQL")],
+      });
+      expect(classifyClickHouseError(translated)).toBe(ErrorCategory.CRITICAL);
     });
   });
 });

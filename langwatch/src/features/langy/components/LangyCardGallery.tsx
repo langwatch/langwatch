@@ -32,6 +32,7 @@ import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../logic/langyErrorExplainer";
+import { LangyDerivedCardsTestingGround } from "./derived-cards/LangyDerivedCardsTestingGround";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import { LangyCapabilityRenderer } from "./capabilities/LangyCapabilityRenderer";
 import { LangyError } from "./LangyError";
@@ -39,6 +40,7 @@ import { LangyFeedback } from "./LangyFeedback";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyGitHubPrCard } from "./github/LangyGitHubPrCard";
 import { LangyGitHubProgressCard } from "./github/LangyGitHubProgressCard";
+import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyToolActivity } from "./LangyToolActivity";
 import { ProposalCard, type LangyProposal } from "./MessageContent";
@@ -106,6 +108,10 @@ function toolMessage(
       input: part.input,
       output: part.output,
     })),
+    // Fixture boundary: a runtime-assembled tool part can't satisfy the SDK's
+    // per-state discriminated union (each `state` literal demands different
+    // required fields). The gallery's whole point is feeding the REAL cards
+    // real-shaped data, and the cards narrow these parts structurally.
   } as unknown as UIMessage;
 }
 
@@ -270,6 +276,13 @@ export function LangyCardGallery() {
             },
           ])}
         />
+      </Section>
+
+      {/* ADR-060: the model-emitted block channel — every derived kind, the
+          failed disclosure, and every choices state, all interactive. The
+          streaming playground feeds the REAL preview reducer chunk by chunk. */}
+      <Section title="Model-emitted blocks — derived cards and choices (ADR-060)">
+        <LangyDerivedCardsTestingGround />
       </Section>
 
       <Section title="Capabilities — reads">
@@ -552,7 +565,29 @@ export function LangyCardGallery() {
       </Section>
 
       <Section title="Feedback">
-        <LangyFeedback conversationId="gallery" messageId="gallery-feedback" />
+        {/* "preview": a fixture must never pin over a live conversation's
+            card or fire real shown-marks at the backend cadence. */}
+        <LangyFeedback
+          conversationId="gallery"
+          messageId="gallery-feedback"
+          origin="preview"
+        />
+      </Section>
+
+      {/* A refusal the reader can DO something about — not a broken step, so
+          not a red card. Fixture only; the real one reads its numbers off the
+          failure's own meta, and the CTA only appears for whoever can change
+          the plan. */}
+      <Section title="Plan limits">
+        <LangyPlanLimitCard
+          presentation={{
+            title: "Creating scenario failed",
+            message: "Your plan includes 3 scenarios, and all 3 are in use.",
+            code: "resource_limit_exceeded",
+            limit: { label: "scenarios", type: "scenarios", current: 3, max: 3 },
+            terminal: true,
+          }}
+        />
       </Section>
 
       {/* Generated from the error registry, so a new kind appears here for free

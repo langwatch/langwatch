@@ -3,9 +3,9 @@ import { LuUser } from "react-icons/lu";
 import { RenderedMarkdown } from "../markdownView";
 import type { DisplayRoleVisuals } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
+import { asMarkdownBody } from "./parsing";
 import { getRolePalette } from "./RoleChip";
 import { TurnCollapseChevron } from "./TurnCollapseChevron";
-import { asMarkdownBody } from "./parsing";
 import type { ChatMessage, ContentBlock } from "./types";
 
 /**

@@ -57,7 +57,10 @@ import {
   type TemplateContext,
 } from "@langwatch/automations/templating/templateContext";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import {
+  errorDisplayMessage,
+  isHandledByGlobalHandler,
+} from "~/utils/trpcError";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
 import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
@@ -778,18 +781,18 @@ export function AutomationDrawer({
           const domain = readHandledError(err);
           const { title, description } = domain
             ? explainHandledError(domain)
-            : { title: "Test fire failed", description: err.message };
+            : { title: "Test fire failed", description: errorDisplayMessage(err) };
           pushAttempt({
             at: Date.now(),
             channel,
             status: "failure",
             errorTitle: title,
-            errorDetail: description || err.message,
+            errorDetail: description || errorDisplayMessage(err),
           });
           toaster.create({
             title,
             type: "error",
-            description: description || err.message,
+            description: description || errorDisplayMessage(err),
             meta: { closable: true },
           });
         },
@@ -863,11 +866,14 @@ export function AutomationDrawer({
           const domain = readHandledError(err);
           const { title, description } = domain
             ? explainHandledError(domain)
-            : { title: "Could not save automation", description: err.message };
+            : {
+                title: "Could not save automation",
+                description: errorDisplayMessage(err),
+              };
           toaster.create({
             title,
             type: "error",
-            description: description || err.message,
+            description: description || errorDisplayMessage(err),
             meta: { closable: true },
           });
         },

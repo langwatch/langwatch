@@ -1,4 +1,5 @@
 import { getTraceById as apiGetTraceById } from "../langwatch-api.js";
+import { formatEvaluationLines } from "../utils/format-evaluations.js";
 
 /**
  * Handles the get_trace MCP tool invocation.
@@ -35,18 +36,7 @@ export async function handleGetTrace(params: {
   }
 
   if (result.evaluations && result.evaluations.length > 0) {
-    lines.push("\n## Evaluations");
-    for (const evaluation of result.evaluations) {
-      const status =
-        evaluation.passed === true
-          ? "PASSED"
-          : evaluation.passed === false
-            ? "FAILED"
-            : "N/A";
-      lines.push(
-        `- **${evaluation.name || evaluation.evaluator_id}**: ${status}${evaluation.score != null ? ` (score: ${evaluation.score})` : ""}${evaluation.label ? ` [${evaluation.label}]` : ""}`
-      );
-    }
+    lines.push("\n## Evaluations", ...formatEvaluationLines(result.evaluations));
   }
 
   if (result.formatted_trace) {

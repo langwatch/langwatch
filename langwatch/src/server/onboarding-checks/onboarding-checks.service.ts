@@ -6,7 +6,7 @@ export type OnboardingCheckStatus = {
   workflows: number;
   customGraphs: number;
   datasets: number;
-  evaluations: number;
+  onlineEvaluations: number;
   triggers: number;
   simulations: number;
   modelProviders: number;
@@ -45,7 +45,7 @@ export class OnboardingChecksService {
           orderBy: { createdAt: "desc" },
           take: 1,
         },
-        experiments: {
+        checks: {
           select: { id: true },
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -90,7 +90,7 @@ export class OnboardingChecksService {
         })
       : null;
 
-    const { workflows, customGraphs, datasets, experiments, triggers, team } =
+    const { workflows, customGraphs, datasets, checks, triggers, team } =
       project ?? {};
 
     // Check for simulations (scenario sets in ClickHouse)
@@ -103,7 +103,7 @@ export class OnboardingChecksService {
       workflows: workflows?.length ?? 0,
       customGraphs: customGraphs?.length ?? 0,
       datasets: datasets?.length ?? 0,
-      evaluations: experiments?.length ?? 0,
+      onlineEvaluations: checks?.length ?? 0,
       triggers: triggers?.length ?? 0,
       simulations,
       modelProviders: modelProviders ? 1 : 0,

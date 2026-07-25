@@ -14,6 +14,12 @@ import type { Permission } from "~/server/api/rbac";
  *                        Use for the public REST surface (gateway-platform,
  *                        governance) so the registry records the real
  *                        permission instead of a blanket "any authenticated".
+ *   - projectPermission — for org apps addressing one project: the permission
+ *                        is resolved at the scope of the project named in the
+ *                        route, not the organization. An org-wide grant still
+ *                        passes (org bindings are ancestors of project scope);
+ *                        a team- or project-scoped grant reaches only the
+ *                        projects it was actually given.
  *   - anyAuthenticated — any valid credential for the app's scope; no specific
  *                        permission. Use sparingly and only when the handler
  *                        itself does no privileged read/write.
@@ -27,6 +33,12 @@ import type { Permission } from "~/server/api/rbac";
 export type AccessPolicy =
   | { readonly kind: "permission"; readonly permission: Permission }
   | { readonly kind: "apiKeyPermission"; readonly permission: Permission }
+  | {
+      readonly kind: "projectPermission";
+      readonly permission: Permission;
+      /** Route param naming the project. Defaults to `id`. */
+      readonly param: string;
+    }
   | { readonly kind: "anyAuthenticated" }
   | { readonly kind: "public"; readonly reason: string }
   | { readonly kind: "internal"; readonly reason: string }
@@ -51,6 +63,23 @@ export function requires(permission: Permission): AccessPolicy {
  */
 export function apiKeyPermission(permission: Permission): AccessPolicy {
   return { kind: "apiKeyPermission", permission };
+}
+
+/**
+ * Require an RBAC permission at the scope of the project the route addresses,
+ * for org apps that operate on one project at a time. `requires(...)` would
+ * resolve at organization scope there, so a single org-wide grant would reach
+ * every project in the org.
+ */
+export function requiresOnProject(
+  permission: Permission,
+  options: { param?: string } = {},
+): AccessPolicy {
+  return {
+    kind: "projectPermission",
+    permission,
+    param: options.param ?? "id",
+  };
 }
 
 /**
@@ -110,6 +139,8 @@ export function describeAccessPolicy(policy: AccessPolicy): string {
       return `requires ${policy.permission}`;
     case "apiKeyPermission":
       return `requires ${policy.permission} (API-key ceiling; legacy project keys bypass)`;
+    case "projectPermission":
+      return `requires ${policy.permission} on the project in :${policy.param}`;
     case "anyAuthenticated":
       return "any authenticated credential";
     case "public":

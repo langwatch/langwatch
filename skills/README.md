@@ -41,8 +41,9 @@ skills/<name>/SKILL.mdx  +  skills/_shared/*.mdx
         │
         ├─ 2. DOCS COPY-PASTE PROMPTS
         │     _compiler/compile.ts → _compiled/<skill>.{platform,docs}.txt (gitignored)
-        │     → docs/scripts/sync-prompts.sh → docs/snippets/prompts-data.jsx (committed)
-        │     docs-ci fails if prompts-data.jsx is stale.
+        │     → docs/scripts/sync-prompts.sh → accordion markup generated into
+        │     docs/skills/directory.mdx + pms-and-domain-experts.mdx (committed)
+        │     docs-ci fails if those pages are stale.
         │
         └─ 3. LANGY, THE IN-PRODUCT AGENT
               _compiler/native.ts → _compiled/native/<slug>/SKILL.md (committed;

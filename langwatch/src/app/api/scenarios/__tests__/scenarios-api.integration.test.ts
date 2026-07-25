@@ -303,7 +303,7 @@ describe("Scenarios API", () => {
             name: "",
           });
 
-          expect(res.status).toBe(400);
+          expect(res.status).toBe(422);
           const body = await res.json();
           expect(body).toHaveProperty("error");
         });

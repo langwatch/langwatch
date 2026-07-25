@@ -26,6 +26,15 @@ We understand, here are the basics:
 
 Please note, all contributions should start with an issue first.
 
+## System Requirements
+
+- **RAM**: At least **8 GB** of RAM is recommended to run the full development environment
+- **Docker**: Only needed for the compose-based `make quickstart` presets (e.g. `all-local`, `full-local`) and for `agentic-e2e-tests`. UI/frontend work can skip Docker entirely with `make quickstart frontend-only`
+- **Performance tips**:
+  - Close unnecessary applications to free up memory when running the full dev environment
+  - If builds or hot-reload feel slow and you're on a compose-based preset, ensure Docker has enough memory allocated (Docker Desktop → Settings → Resources)
+  - Run `make quickstart` for an interactive picker that starts only the services your task needs; see `make quickstart-help` for the full non-interactive preset reference
+
 ## How Can I Contribute?
 
 ### Reporting Bugs and Suggesting Enhancements

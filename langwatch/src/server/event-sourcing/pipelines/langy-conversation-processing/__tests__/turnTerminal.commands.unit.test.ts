@@ -68,4 +68,59 @@ describe("turn terminal commands", () => {
       });
     });
   });
+
+  /**
+   * A user stop is the third way into that same slot. It is neither a
+   * completion nor a failure, but it carries an answer, so it rides
+   * `agent_responded` with `outcome: "stopped"` (ADR-058) — which means it
+   * competes with the natural finish for the ONE terminal a turn is allowed,
+   * rather than burying it or being buried by it.
+   *
+   * @see specs/langy/langy-stop-and-resume.feature
+   */
+  describe("given a user stop and the turn's natural completion race each other", () => {
+    const terminalKeyFor = async (outcome: "completed" | "stopped") => {
+      const [event] = await new RecordAgentResponseCommand().handle(
+        envelope({
+          messageId: outcome === "stopped" ? "partial" : "final",
+          role: "assistant",
+          parts: [{ type: "text", text: "half an answer" }],
+          outcome,
+        }) as never,
+      );
+      return event!.idempotencyKey;
+    };
+
+    /** @scenario Stop racing a natural finish resolves to exactly one terminal */
+    /** @scenario If the answer already arrived, Stop is a harmless no-op */
+    it("puts the stop in the slot the answer holds, so whichever lands first is the only terminal", async () => {
+      const stopped = await terminalKeyFor("stopped");
+      const completed = await terminalKeyFor("completed");
+
+      expect(stopped).toBeDefined();
+      expect(stopped).toBe(completed);
+    });
+
+    it("still scopes that slot to the turn, so a stop cannot terminate another one", async () => {
+      const [thisTurn] = await new RecordAgentResponseCommand().handle(
+        envelope({
+          messageId: "partial",
+          role: "assistant",
+          parts: [],
+          outcome: "stopped",
+        }) as never,
+      );
+      const [otherTurn] = await new RecordAgentResponseCommand().handle(
+        envelope({
+          turnId: "turn-2",
+          messageId: "partial",
+          role: "assistant",
+          parts: [],
+          outcome: "stopped",
+        }) as never,
+      );
+
+      expect(thisTurn!.idempotencyKey).not.toBe(otherTurn!.idempotencyKey);
+    });
+  });
 });

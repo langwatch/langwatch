@@ -2,6 +2,7 @@ package egress
 
 import (
 	"context"
+	"net"
 	"sync"
 
 	"go.uber.org/zap"
@@ -66,6 +67,9 @@ func (g *EnforcingGuard) PrepareWorker(_ context.Context, w WorkerContext) (Work
 		requireTLS:    g.cfg.RequireTLS,
 		sniCrossCheck: g.cfg.SNICrossCheck,
 		log:           g.log,
+		resolve: func(ctx context.Context, host string) ([]net.IP, error) {
+			return net.DefaultResolver.LookupIP(ctx, "ip", host)
+		},
 	})
 	if err != nil {
 		return WorkerEgress{}, err

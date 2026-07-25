@@ -8,8 +8,16 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { UIMessage } from "ai";
+
+// The capability renderer (reached via the collapsed-receipt scenario) reads
+// the project off this hook, which is tRPC-backed, mock the boundary, as the
+// other panel tests do, instead of standing up a client.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({ project: { slug: "demo" } }),
+}));
+
 import { LangyPlanCard } from "../components/LangyPlanCard";
 import { LangyToolActivity } from "../components/LangyToolActivity";
 import type { LangyPlan } from "../logic/langyPlan";

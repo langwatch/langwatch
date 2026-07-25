@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { enforceLicenseLimit } from "../../license-enforcement";
@@ -38,6 +39,20 @@ export const graphsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await enforceLicenseLimit(ctx, input.projectId, "customGraphs");
       const graph = JSON.parse(input.graph);
+
+      if (
+        input.dashboardId &&
+        !(await dashboardBelongsToProject(
+          ctx.prisma,
+          input.dashboardId,
+          input.projectId,
+        ))
+      ) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Dashboard not found",
+        });
+      }
 
       // If no gridRow provided, find the next available row
       let gridRow = input.gridRow;

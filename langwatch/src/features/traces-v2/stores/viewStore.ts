@@ -108,7 +108,7 @@ interface ViewState {
   columnOrder: string[];
   draftState: Map<string, DraftLensState>;
 
-  selectLens: (id: string) => void;
+  selectLens: (id: string, opts?: { persist?: boolean }) => void;
   setSort: (sort: SortConfig) => void;
   setGrouping: (mode: GroupingMode) => void;
   toggleColumn: (columnId: string) => void;
@@ -154,6 +154,42 @@ export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
 
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
 const DRAFTS_KEY = "langwatch:traces-v2:drafts:v1";
+// Last-used lens id. Deliberately NOT project-scoped: built-in lens ids
+// (all-traces / simplified / conversations / …) are identical across every
+// project, so a single global key restores the user's preferred view
+// cross-project. A custom lens id only exists in its own project, so on a
+// different project it simply won't be found and the store falls back to
+// the default — the desired behaviour. The lens is otherwise URL-fragment
+// driven (`useURLSync`); this key is the fallback the fragment reader
+// consults when a bare URL carries no lens, so returning to a lensless URL
+// restores the last-used view instead of snapping back to All.
+export const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
+
+/**
+ * The last-used lens id from the global cross-project key, or `null` when it
+ * is unset, on the server, or when storage is unavailable.
+ */
+export function getPersistedActiveLensId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(ACTIVE_LENS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Records the last-used lens id in the global cross-project key. A no-op on the
+ * server or when storage is full/disabled, so callers never need to guard.
+ */
+function persistActiveLensId(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ACTIVE_LENS_KEY, id);
+  } catch {
+    // storage may be full / disabled
+  }
+}
 
 const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
 
@@ -560,9 +596,14 @@ const initialDismissedBuiltIns = loadDismissedBuiltInIds();
 const initialLenses: LensConfig[] = builtInLenses.filter(
   (l) => !initialDismissedBuiltIns.has(l.id),
 );
+const persistedActiveLensId = getPersistedActiveLensId();
 const initialActiveLensId =
-  initialLenses.find((l) => l.id === "all-traces")?.id ??
-  initialLenses[0]?.id ??
+  // Restore the persisted lens when it's already known (a built-in, present
+  // at init). Custom lenses hydrate later and are restored in setUserLenses.
+  (persistedActiveLensId &&
+    initialLenses.find((l) => l.id === persistedActiveLensId)?.id) ||
+  initialLenses.find((l) => l.id === "all-traces")?.id ||
+  initialLenses[0]?.id ||
   "all-traces";
 const initialDrafts = loadDrafts();
 const initialActiveLens = initialLenses.find(
@@ -582,10 +623,16 @@ export const useViewStore = create<ViewState>((set, get) => ({
     defaultColumnOrder,
   draftState: initialDrafts,
 
-  selectLens: (id) => {
+  selectLens: (id, opts) => {
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === id);
       if (!lens) return s;
+      // Remember the choice as the last-used lens (cross-navigation, and
+      // cross-project for built-ins). `useURLSync` passes persist:false when
+      // it's only *applying* a lens (e.g. falling back to the default because
+      // a bare URL carries none), so that path never clobbers the stored
+      // preference.
+      if (opts?.persist !== false) persistActiveLensId(id);
       const draft = s.draftState.get(id);
       // Apply the lens's filter (or its draft override) to filterStore via
       // the silent setter — `applyQueryText` would loop back through
@@ -849,6 +896,35 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const builtIns = s.allLenses.filter((l) => l.isBuiltIn);
       const userLenses = lenses.map((l) => ({ ...l, isBuiltIn: false }));
       const allLenses = [...builtIns, ...userLenses];
+
+      // The persisted last-used lens may be a CUSTOM lens that only becomes
+      // available once its project's lenses hydrate (possibly across several
+      // partial payloads). Restore it whenever we're still on the default
+      // lens — no one-shot latch, so a late/partial first payload can't
+      // permanently block the restore. The `activeLensId === "all-traces"`
+      // guard is self-limiting: once restored (or once the user picks
+      // anything), the active lens is no longer the default, so subsequent
+      // hydrations skip and an explicit choice is never clobbered.
+      const persisted = getPersistedActiveLensId();
+      if (
+        s.activeLensId === "all-traces" &&
+        persisted &&
+        persisted !== s.activeLensId
+      ) {
+        const target = allLenses.find((l) => l.id === persisted);
+        if (target) {
+          const draft = s.draftState.get(persisted);
+          applyFilterTextFromLens(draft?.filter ?? target.filterText);
+          return {
+            allLenses,
+            activeLensId: persisted,
+            sort: draft?.sort ?? target.sort,
+            grouping: draft?.grouping ?? target.grouping,
+            columnOrder: draft?.columns ?? target.columns,
+          };
+        }
+      }
+
       // Mirror to localStorage so a refresh has instant data before
       // the tRPC query resolves — keeps the lens strip from flashing
       // empty between mount and hydration.

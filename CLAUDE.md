@@ -129,7 +129,7 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-backend"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
@@ -169,6 +169,11 @@ specs/               # BDD feature specs
 | Shared types in `types.ts` | Colocate unless truly shared |
 | Duplicating Zod + TS types | When you need both validation AND types, use Zod only with `infer`. For internal constants (no external input), `as const` is sufficient |
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
+| Running `npx vitest` / `npm exec vitest` directly | Always go through the package scripts: `pnpm test:unit run <path>`, `pnpm test:integration run <path>`. Only they carry the repo's RAM guardrails (`pool: "vmThreads"`, `maxWorkers: "50%"`, `vmMemoryLimit: "512MB"`; integration adds `pool: "forks"` + `fileParallelism: false`) |
+| Hand-rolling a throwaway `vitest.*.config.ts` (in `/tmp` or a worktree) | Never. A bare config inherits none of the guardrails above, so vitest defaults to the `forks` pool at `availableParallelism - 1` workers (10 on an 11-core laptop) at ~200-500MB each — several GB per run, multiplied by every parallel agent worktree. Use an existing config |
+| Writing a jsdom config because the repo "has no jsdom environment" | It is per-file on purpose — neither config declares a global `environment`; 515 test files set `// @vitest-environment jsdom` in a docblock. Add the docblock to your test file |
+| Reaching for `--maxWorkers=1` to be gentle on RAM | It serializes the run so it stays resident far longer, overlapping every other agent's run. Scope the run down instead — pass a narrower path |
+| Leaving a killed vitest run behind | Interrupting vitest orphans its forked workers (they reparent to `ppid 1` and keep holding RAM). After an interrupted run, sweep with `pkill -f "vitest/dist/workers"` |
 | Writing tests in the incorrect order | Outside-In TDD: integration tests first, then unit tests |
 | Defining BDD specs on the end of the TODO list | BDD specs should come before any other tasks to guide them, not the other way around |
 | `gh pr edit --body` | Use `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="..."` (avoids Projects classic deprecation warning) |
@@ -187,7 +192,7 @@ specs/               # BDD feature specs
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
 | Setting up a Monitor / sleep that *can* take more than 5 minutes | Anthropic's prompt cache TTL is 5min, so any wait that crosses it forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). Cap each poll cycle at **4.5 min (270s)** — re-check, then re-arm. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
-| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements |
+| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`typescript-sdk/src/cli/**` and `typescript-sdk/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
 
 ## TypeScript
 
@@ -197,6 +202,7 @@ specs/               # BDD feature specs
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
 | Using -- on pnpm tasks, pnpm adds the -- automatically | Using e.g. `pnpm test:unit path/to/file` directly |
 | Using positional parameters for functions with multiple args | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)` |
+| A workspace package tsconfig without `incremental` + `tsBuildInfoFile` | Every package tsconfig sets `"incremental": true` and its own `"tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/<pkg>.tsbuildinfo"`. Without it each typecheck re-checks cold; without a per-package path the packages clobber each other's cache |
 
 ## Database
 

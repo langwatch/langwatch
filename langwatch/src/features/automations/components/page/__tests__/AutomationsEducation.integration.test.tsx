@@ -6,25 +6,6 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { UseCaseStrip } from "../AutomationsEducation";
 
-// UseCaseStrip resolves the project (for the graph-empty guidance on the
-// alert kind) and queries graphs; stub both so the strip renders its cards.
-const mockGraphsQuery = vi.fn(() => ({
-  data: [{ id: "graph-1", name: "Errors" }],
-  isSuccess: true,
-}));
-
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj_1", slug: "acme" },
-  }),
-}));
-
-vi.mock("~/utils/api", () => ({
-  api: {
-    graphs: { getAll: { useQuery: () => mockGraphsQuery() } },
-  },
-}));
-
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

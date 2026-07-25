@@ -5,7 +5,7 @@ import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
 import { createLangyConversationUpdateBroadcastSubscriber } from "../langy-conversation-update-broadcast.subscriber";
@@ -84,6 +84,10 @@ describe("Langy conversation update broadcast subscriber", () => {
     expect(JSON.parse(rawPayload as string)).toEqual({
       event: "langy_conversation_updated",
       conversationId: "conv_1",
+      // The projection's position (ADR-059): the one non-identity field the
+      // signal may carry — inert, lets the client decide whether to fetch the
+      // event tail. Still no conversation CONTENT on the tenant-wide channel.
+      cursor: { acceptedAt: ACCEPTED_AT, eventId: "evt_b" },
       ownerUserId: "user_1",
       isShared: false,
     });

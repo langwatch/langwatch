@@ -14,6 +14,8 @@ import {
 } from "@tanstack/react-table";
 import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import { useMemo, useState } from "react";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { scenarioContextChip } from "~/features/langy/logic/langyContextChips";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Checkbox } from "../ui/checkbox";
 import { Menu } from "../ui/menu";
@@ -187,8 +189,17 @@ export function ScenarioTable({
       </Table.Header>
       <Table.Body>
         {table.getRowModel().rows.map((row) => (
-          <Table.Row
+          // Armed, the scenario can be handed to Langy; the row's own click
+          // (open the scenario) is untouched.
+          <LangyContextTarget
             key={row.id}
+            target={scenarioContextChip({
+              scenarioId: row.original.id,
+              name: row.original.name,
+              noun: "scenario",
+            })}
+          >
+          <Table.Row
             cursor="pointer"
             _hover={{ bg: "bg.emphasized" }}
             onClick={() => onRowClick(row.original.id)}
@@ -199,6 +210,7 @@ export function ScenarioTable({
               </Table.Cell>
             ))}
           </Table.Row>
+          </LangyContextTarget>
         ))}
       </Table.Body>
     </Table.Root>

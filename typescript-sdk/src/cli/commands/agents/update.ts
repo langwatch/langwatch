@@ -3,11 +3,17 @@ import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { commandValidationError } from "../../utils/errorOutput";
+import type { CommandResult } from "../../utils/output";
 
+/**
+ * Returns the updated agent rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
+ */
 export const updateAgentCommand = async (
   id: string,
-  options: { name?: string; type?: string; config?: string; format?: string },
-): Promise<void> => {
+  options: { name?: string; type?: string; config?: string },
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   const service = new AgentsApiService();
@@ -27,15 +33,23 @@ export const updateAgentCommand = async (
       `Updated agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`,
     );
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(agent, null, 2));
-    }
+    return {
+      data: agent,
+      table: () => {
+        // The spinner's success line is the human output.
+      },
+    };
   } catch (error) {
-    if (error instanceof SyntaxError) {
-      spinner.fail(chalk.red("--config must be valid JSON"));
-    } else {
-      failSpinner({ spinner, error, action: "update agent", format: options?.format });
-    }
+    // Route BOTH failure kinds through failSpinner: a direct spinner.fail()
+    // prints nothing in --json/--jq/agent mode (spinners are silent there).
+    failSpinner({
+      spinner,
+      error:
+        error instanceof SyntaxError
+          ? commandValidationError("--config must be valid JSON")
+          : error,
+      action: "update agent",
+    });
     process.exit(1);
   }
 };

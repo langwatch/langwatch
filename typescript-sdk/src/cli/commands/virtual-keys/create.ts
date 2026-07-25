@@ -4,6 +4,7 @@ import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtua
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope, parseScopeArg, virtualKeyDetailUrl } from "./_shared";
+import type { CommandResult } from "../../utils/output";
 
 export interface CreateVirtualKeyOptions {
   name: string;
@@ -12,10 +13,21 @@ export interface CreateVirtualKeyOptions {
   scope?: string[];
   routingPolicy?: string;
   principalUser?: string;
-  format?: string;
 }
 
-export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions): Promise<void> => {
+/**
+ * Returns the created key rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
+ *
+ * `data` deliberately includes `secret`. This is the ONE moment the secret
+ * exists — the server stores only its hash and never returns it again — so the
+ * human output prints it in full, as did the previous `--format json` branch.
+ * A `virtual-key create -o json` that withheld it would produce a key nobody
+ * could ever use.
+ */
+export const createVirtualKeyCommand = async (
+  options: CreateVirtualKeyOptions,
+): Promise<CommandResult | void> => {
   checkApiKey();
 
   if (!options.name) {
@@ -56,36 +68,36 @@ export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions):
 
     spinner.succeed(`Created virtual key "${chalk.cyan(virtual_key.name)}"`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify({ virtual_key, secret }, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(chalk.bold.yellow("⚠  Save the secret below NOW. It will not be shown again."));
-    console.log();
-    console.log(`  ${chalk.green(secret)}`);
-    console.log();
-    console.log(chalk.gray("Use it as the API key in OpenAI-compatible clients:"));
-    console.log(chalk.cyan("  export OPENAI_API_KEY=\"" + secret + "\""));
-    console.log(chalk.cyan("  export OPENAI_BASE_URL=\"https://gateway.langwatch.ai/v1\""));
-    console.log();
-    console.log(chalk.gray("Virtual key id: ") + virtual_key.id);
-    console.log(chalk.gray("Prefix:         ") + `${virtual_key.prefix}...${virtual_key.last_four}`);
-    console.log(chalk.gray("Scopes:         ") + virtual_key.scopes.map(formatScope).join(", "));
-    if (virtual_key.routing_policy_id) {
-      console.log(chalk.gray("Routing policy: ") + virtual_key.routing_policy_id);
-    }
-    if (virtual_key.principal_user_id) {
-      console.log(chalk.gray("Principal:      ") + virtual_key.principal_user_id);
-    }
-    const detailUrl = virtualKeyDetailUrl(virtual_key.id);
-    if (detailUrl) {
-      console.log(chalk.gray("View in UI:     ") + chalk.cyan(detailUrl));
-    }
-    console.log();
+    return {
+      data: { virtual_key, secret },
+      table: () => {
+        console.log();
+        console.log(chalk.bold.yellow("⚠  Save the secret below NOW. It will not be shown again."));
+        console.log();
+        console.log(`  ${chalk.green(secret)}`);
+        console.log();
+        console.log(chalk.gray("Use it as the API key in OpenAI-compatible clients:"));
+        console.log(chalk.cyan("  export OPENAI_API_KEY=\"" + secret + "\""));
+        console.log(chalk.cyan("  export OPENAI_BASE_URL=\"https://gateway.langwatch.ai/v1\""));
+        console.log();
+        console.log(chalk.gray("Virtual key id: ") + virtual_key.id);
+        console.log(chalk.gray("Prefix:         ") + `${virtual_key.prefix}...${virtual_key.last_four}`);
+        console.log(chalk.gray("Scopes:         ") + virtual_key.scopes.map(formatScope).join(", "));
+        if (virtual_key.routing_policy_id) {
+          console.log(chalk.gray("Routing policy: ") + virtual_key.routing_policy_id);
+        }
+        if (virtual_key.principal_user_id) {
+          console.log(chalk.gray("Principal:      ") + virtual_key.principal_user_id);
+        }
+        const detailUrl = virtualKeyDetailUrl(virtual_key.id);
+        if (detailUrl) {
+          console.log(chalk.gray("View in UI:     ") + chalk.cyan(detailUrl));
+        }
+        console.log();
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "create virtual key", format: options?.format });
+    failSpinner({ spinner, error, action: "create virtual key" });
     process.exit(1);
   }
 };

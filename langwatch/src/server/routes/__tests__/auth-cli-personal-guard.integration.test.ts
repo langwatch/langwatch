@@ -4,9 +4,10 @@
  * Integration coverage for the CLI login personal-project guards on
  * `POST /api/auth/cli/approve` (real Redis + real Prisma):
  *
- *   1. device-session (AI-tools) login is refused when governance is not
- *      enabled for the org, since it would otherwise provision a personal
- *      workspace + VK and capture the user's evaluations (customer report).
+ *   1. device-session (AI-tools) login works by default (the governance flag
+ *      ships on, ADR-038 Decision 7) and is refused for an org whose flag is
+ *      switched off, since it would otherwise provision a personal workspace
+ *      + VK and capture the user's evaluations (customer report).
  *   2. project-login (project_api_key) refuses a personal project id and only
  *      hands back a shared project's key.
  *
@@ -16,7 +17,15 @@
  *
  * Spec: specs/ai-gateway/governance/cli-login-personal-guard.feature
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // vi.mock is hoisted above every top-level const, so the values the session
 // mock needs must come from vi.hoisted (hoisted alongside it). Math.random,
@@ -44,8 +53,8 @@ vi.mock("~/server/api/rbac", async (importActual) => {
   return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
 });
 
-import { prisma } from "~/server/db";
 import { hasProjectPermission } from "~/server/api/rbac";
+import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
@@ -84,45 +93,80 @@ async function approve(body: Record<string, unknown>) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ organization_id: ORG_ID, ...body }),
   });
-  return { status: res.status, json: (await res.json()) as Record<string, unknown> };
+  return {
+    status: res.status,
+    json: (await res.json()) as Record<string, unknown>,
+  };
 }
 
 describe("CLI login personal-project guards", () => {
   beforeAll(async () => {
     await startTestContainers();
     await prisma.organization.create({
-      data: { id: ORG_ID, name: `Guard Org ${suffix}`, slug: `guard-${suffix}` },
+      data: {
+        id: ORG_ID,
+        name: `Guard Org ${suffix}`,
+        slug: `guard-${suffix}`,
+      },
     });
     await prisma.user.create({
-      data: { id: USER_ID, email: `guard-${suffix}@example.com`, name: `Guard ${suffix}` },
+      data: {
+        id: USER_ID,
+        email: `guard-${suffix}@example.com`,
+        name: `Guard ${suffix}`,
+      },
     });
     await prisma.organizationUser.create({
       data: { userId: USER_ID, organizationId: ORG_ID, role: "ADMIN" },
     });
     // Shared (team) project + a personal-workspace project for the same user.
     await prisma.team.create({
-      data: { id: TEAM_ID, name: `Team ${suffix}`, slug: `team-${suffix}`, organizationId: ORG_ID },
+      data: {
+        id: TEAM_ID,
+        name: `Team ${suffix}`,
+        slug: `team-${suffix}`,
+        organizationId: ORG_ID,
+      },
     });
-    await prisma.teamUser.create({ data: { userId: USER_ID, teamId: TEAM_ID, role: "ADMIN" } });
+    await prisma.teamUser.create({
+      data: { userId: USER_ID, teamId: TEAM_ID, role: "ADMIN" },
+    });
     await prisma.project.create({
       data: {
-        id: SHARED_PROJECT_ID, name: `Shared ${suffix}`, slug: `shared-${suffix}`,
-        apiKey: SHARED_API_KEY, teamId: TEAM_ID, language: "typescript", framework: "openai",
+        id: SHARED_PROJECT_ID,
+        name: `Shared ${suffix}`,
+        slug: `shared-${suffix}`,
+        apiKey: SHARED_API_KEY,
+        teamId: TEAM_ID,
+        language: "typescript",
+        framework: "openai",
         isPersonal: false,
       },
     });
     await prisma.team.create({
       data: {
-        id: PTEAM_ID, name: `Personal ${suffix}`, slug: `pteam-${suffix}`,
-        organizationId: ORG_ID, isPersonal: true, ownerUserId: USER_ID,
+        id: PTEAM_ID,
+        name: `Personal ${suffix}`,
+        slug: `pteam-${suffix}`,
+        organizationId: ORG_ID,
+        isPersonal: true,
+        ownerUserId: USER_ID,
       },
     });
-    await prisma.teamUser.create({ data: { userId: USER_ID, teamId: PTEAM_ID, role: "ADMIN" } });
+    await prisma.teamUser.create({
+      data: { userId: USER_ID, teamId: PTEAM_ID, role: "ADMIN" },
+    });
     await prisma.project.create({
       data: {
-        id: PERSONAL_PROJECT_ID, name: `My Workspace ${suffix}`, slug: `personal-${suffix}`,
-        apiKey: PERSONAL_API_KEY, teamId: PTEAM_ID, language: "typescript", framework: "openai",
-        isPersonal: true, ownerUserId: USER_ID,
+        id: PERSONAL_PROJECT_ID,
+        name: `My Workspace ${suffix}`,
+        slug: `personal-${suffix}`,
+        apiKey: PERSONAL_API_KEY,
+        teamId: PTEAM_ID,
+        language: "typescript",
+        framework: "openai",
+        isPersonal: true,
+        ownerUserId: USER_ID,
       },
     });
     // A shared project on a team the user is NOT a direct member of. The user
@@ -131,56 +175,98 @@ describe("CLI login personal-project guards", () => {
     // but there is deliberately no TeamUser row for them on this team.
     await prisma.team.create({
       data: {
-        id: OTHER_TEAM_ID, name: `Other ${suffix}`, slug: `oteam-${suffix}`,
+        id: OTHER_TEAM_ID,
+        name: `Other ${suffix}`,
+        slug: `oteam-${suffix}`,
         organizationId: ORG_ID,
       },
     });
     await prisma.project.create({
       data: {
-        id: OTHER_TEAM_PROJECT_ID, name: `Other ${suffix}`, slug: `other-${suffix}`,
-        apiKey: OTHER_TEAM_API_KEY, teamId: OTHER_TEAM_ID, language: "typescript",
-        framework: "openai", isPersonal: false,
+        id: OTHER_TEAM_PROJECT_ID,
+        name: `Other ${suffix}`,
+        slug: `other-${suffix}`,
+        apiKey: OTHER_TEAM_API_KEY,
+        teamId: OTHER_TEAM_ID,
+        language: "typescript",
+        framework: "openai",
+        isPersonal: false,
       },
     });
   });
 
-  // Reset the governance baseline (off) before every test: the dev .env
-  // force-enables the flag, so clearing it BEFORE each case is what guarantees
-  // isolation, and a failed assertion can never leak the forced flag forward.
-  // The one governance-on case opts in explicitly in its own body.
+  // Clear flag overrides before every test: the dev .env may force-enable the
+  // flag and a prior case forces it off, so clearing BOTH before each case is
+  // what guarantees isolation: a failed assertion can never leak an override
+  // forward. Cases that need a non-default state opt in explicitly in their
+  // own body.
   beforeEach(() => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
+    delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
   });
 
   afterAll(async () => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-    await prisma.virtualKey.deleteMany({ where: { principalUserId: USER_ID } }).catch(() => {});
-    await prisma.project.deleteMany({ where: { teamId: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } } }).catch(() => {});
-    await prisma.teamUser.deleteMany({ where: { userId: USER_ID } }).catch(() => {});
-    await prisma.team.deleteMany({ where: { id: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } } }).catch(() => {});
-    await prisma.organizationUser.deleteMany({ where: { userId: USER_ID } }).catch(() => {});
+    delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
+    await prisma.virtualKey
+      .deleteMany({ where: { principalUserId: USER_ID } })
+      .catch(() => {});
+    await prisma.project
+      .deleteMany({
+        where: { teamId: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } },
+      })
+      .catch(() => {});
+    await prisma.teamUser
+      .deleteMany({ where: { userId: USER_ID } })
+      .catch(() => {});
+    await prisma.team
+      .deleteMany({ where: { id: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } } })
+      .catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({ where: { userId: USER_ID } })
+      .catch(() => {});
     await prisma.user.deleteMany({ where: { id: USER_ID } }).catch(() => {});
-    await prisma.organization.deleteMany({ where: { id: ORG_ID } }).catch(() => {});
+    await prisma.organization
+      .deleteMany({ where: { id: ORG_ID } })
+      .catch(() => {});
     await stopTestContainers().catch(() => {});
   });
 
-  describe("given an organization without governance enabled", () => {
+  describe("given an organization with governance switched off", () => {
     describe("when a device-session approval is requested", () => {
       /** @scenario device-session approval is refused when governance is disabled */
       it("refuses it with governance_required and mints no personal VK", async () => {
+        process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED = "0";
         const userCode = await mintDeviceCode("device_session");
 
         const { status, json } = await approve({ user_code: userCode });
 
         expect(status).toBe(403);
         expect(json.error).toBe("governance_required");
-        const vks = await prisma.virtualKey.findMany({ where: { principalUserId: USER_ID } });
+        const vks = await prisma.virtualKey.findMany({
+          where: { principalUserId: USER_ID },
+        });
         expect(vks).toHaveLength(0);
       });
     });
   });
 
-  describe("given an organization with governance enabled", () => {
+  describe("given a default installation with no flag overrides", () => {
+    describe("when a device-session approval is requested", () => {
+      /** @scenario device-session approval succeeds on a default installation */
+      it("does not refuse it through the governance gate", async () => {
+        const userCode = await mintDeviceCode("device_session");
+
+        const { status } = await approve({ user_code: userCode });
+
+        // Either a VK is issued (200) or the no-provider graceful fallback (200);
+        // the gate must NOT block it.
+        expect(status).not.toBe(403);
+      });
+    });
+  });
+
+  describe("given an organization with governance force-enabled", () => {
     describe("when a device-session approval is requested", () => {
       /** @scenario device-session approval succeeds when governance is enabled */
       it("does not refuse the device-session approval", async () => {

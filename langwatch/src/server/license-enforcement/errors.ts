@@ -1,4 +1,4 @@
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { LIMIT_TYPE_LABELS } from "./constants";
 import type { LimitType } from "./types";
 

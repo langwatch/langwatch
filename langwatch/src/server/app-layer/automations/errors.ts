@@ -1,9 +1,9 @@
-import { HandledError } from "~/server/app-layer/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 
 /**
  * Domain errors raised by the automation authoring path (ADR-036). Each is a
  * concrete `HandledError` subclass so the existing tRPC `errorFormatter`
- * serialises it onto the wire as `error.data.domainError` with the `code`
+ * serialises it onto the wire as `error.data.error` with the `code`
  * discriminator plus structured `meta`. The client matches on `code` and
  * renders field-targeted, actionable errors (highlight the offending field,
  * list the offending recipient, etc.) rather than a generic toast.
