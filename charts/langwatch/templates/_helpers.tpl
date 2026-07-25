@@ -466,6 +466,21 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if and (ne $appSecretName "langwatch-app-secrets") (eq ($langySecrets.existingSecretName | default "") "langwatch-app-secrets") }}
     {{- $errors = append $errors (printf "langyagent.secrets.existingSecretName is still the default %q but the app Secret is named %q. The app, the workers, and the agent pod would all mount a Secret this install does not have. Set langyagent.secrets.existingSecretName to %q, or to whichever Secret holds %s." "langwatch-app-secrets" $appSecretName $appSecretName $langyKey) }}
   {{- end }}
+  {{/* A configured key that collides with one of the app Secret's own keys would
+       emit the same Secret.data entry twice, and the second write wins — Langy's
+       random value would silently become the session secret or the gateway
+       token. Refuse rather than quietly conflating two credentials whose blast
+       radii are meant to be separate. Only when both live in the same Secret;
+       an operator-owned Secret elsewhere may name its key whatever it likes. */}}
+  {{- if eq $langySecretName (include "langwatch.appSecretName" .) }}
+    {{- $reserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
+    {{- if (.Values.gateway).chartManaged }}
+      {{- $reserved = concat $reserved (list "LW_GATEWAY_INTERNAL_SECRET" "LW_GATEWAY_JWT_SECRET") }}
+    {{- end }}
+    {{- if has $langyKey $reserved }}
+      {{- $errors = append $errors (printf "langyagent.secrets.internalSecretKey is %q, which is already a key of the app Secret %q. Langy would overwrite that credential with its own value. Pick a distinct key name (the default is LANGY_INTERNAL_SECRET), or point langyagent.secrets.existingSecretName at a separate Secret." $langyKey $langySecretName) }}
+    {{- end }}
+  {{- end }}
   {{- $chartWritesIt := and .Values.autogen.enabled (empty .Values.secrets.existingSecret) (eq $langySecretName (include "langwatch.appSecretName" .)) }}
   {{- if not $chartWritesIt }}
     {{- $found := lookup "v1" "Secret" .Release.Namespace $langySecretName }}
