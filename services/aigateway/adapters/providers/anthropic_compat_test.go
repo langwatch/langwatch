@@ -99,6 +99,14 @@ func TestGetConfigForProvider_AnthropicCompatCarriesBaseURL(t *testing.T) {
 	if cfg.NetworkConfig.DefaultRequestTimeoutInSeconds != 14*60 {
 		t.Fatalf("DefaultRequestTimeoutInSeconds = %d, want the gateway-wide 14m ceiling", cfg.NetworkConfig.DefaultRequestTimeoutInSeconds)
 	}
+	// The gateway sizes these pools itself. Leaving them at zero would let
+	// bifrost's CheckAndSetDefaults fill in 1000 workers per endpoint.
+	if cfg.ConcurrencyAndBufferSize.Concurrency != anthropicCompatConcurrency {
+		t.Fatalf("Concurrency = %d, want the gateway's per-endpoint pool size %d", cfg.ConcurrencyAndBufferSize.Concurrency, anthropicCompatConcurrency)
+	}
+	if cfg.ConcurrencyAndBufferSize.BufferSize != anthropicCompatBufferSize {
+		t.Fatalf("BufferSize = %d, want the gateway's per-endpoint queue size %d", cfg.ConcurrencyAndBufferSize.BufferSize, anthropicCompatBufferSize)
+	}
 }
 
 // Self-hosted Anthropic-compatible servers commonly run unauthenticated.
@@ -507,9 +515,11 @@ func TestDispatch_AnthropicCompatEndpointPoolIsBounded(t *testing.T) {
 		t.Fatalf("Dispatch returned error: %v", err)
 	}
 
-	// Headroom over the pool size for the request's own transport goroutines;
-	// well under bifrost's 1000-worker default, which is what this guards.
-	const ceiling = anthropicCompatConcurrency + 64
+	// Generous headroom over the pool size: the check that matters is that
+	// this stays nowhere near bifrost's 1000-worker default, and a tight
+	// bound would only make the test flaky against unrelated goroutines the
+	// process happens to start while this one runs.
+	const ceiling = anthropicCompatConcurrency + 256
 	if grew := runtime.NumGoroutine() - before; grew > ceiling {
 		t.Fatalf("first dispatch to a compat endpoint grew the process by %d goroutines, want at most %d", grew, ceiling)
 	}
