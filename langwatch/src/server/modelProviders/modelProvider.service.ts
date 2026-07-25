@@ -50,7 +50,16 @@ export type MaterializedModelProvider = MaybeStoredModelProvider & {
  */
 export type UpdateModelProviderInput = {
   id?: string;
-  projectId: string;
+  /**
+   * Tenant anchor. A provider belongs to an organization and reaches the
+   * scopes attached to it, so either handle identifies the tenant: a
+   * project resolves to its organization, an organization is already one.
+   * At least one is required, and callers with no project (an
+   * organization on the agent-governance track has none until it needs
+   * one) pass `organizationId` plus an explicit `scopes` set.
+   */
+  projectId?: string;
+  organizationId?: string;
   name?: string;
   provider: string;
   enabled: boolean;
@@ -62,7 +71,8 @@ export type UpdateModelProviderInput = {
   /**
    * Full scope set for this credential. When omitted on create, defaults
    * to `[{ scopeType: "PROJECT", scopeId: projectId }]` for backward
-   * compatibility; when omitted on update, the existing scope set is
+   * compatibility, so it is required when there is no `projectId` to
+   * default from; when omitted on update, the existing scope set is
    * preserved. Replace-all semantics: passing `[]` is rejected at the
    * router boundary.
    */
@@ -88,7 +98,9 @@ export type UpdateModelProviderInput = {
 
 export type DeleteModelProviderInput = {
   id?: string;
-  projectId: string;
+  /** Same tenant anchor as `UpdateModelProviderInput`: one of the two. */
+  projectId?: string;
+  organizationId?: string;
   provider: string;
 };
 
@@ -414,6 +426,7 @@ export class ModelProviderService {
     const {
       id,
       projectId,
+      organizationId,
       provider,
       enabled,
       customKeys,
@@ -428,6 +441,14 @@ export class ModelProviderService {
       fallbackPriorityGlobal,
       providerConfig,
     } = input;
+
+    if (!projectId && !organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "A model provider write needs either a project or an organization to anchor it.",
+      });
+    }
 
     const advanced = {
       rateLimitRpm,
@@ -452,7 +473,11 @@ export class ModelProviderService {
     // intentionally do NOT auto-match by (provider, projectId) here,
     // since that would clobber an existing row at a different scope when
     // a user adds a second instance of the same provider type.
-    const existingProvider = await this.findExistingProvider(id, projectId);
+    const existingProvider = await this.findExistingProvider({
+      id,
+      projectId,
+      organizationId,
+    });
 
     // When the caller supplied an `id` but no row resolves, the target
     // row was concurrently deleted or is not visible from this project.
@@ -502,6 +527,25 @@ export class ModelProviderService {
       await assertCanManageAllScopes(ctx, scopes);
     }
 
+    // The scope set a brand-new row lands on. `scopes` is the caller's
+    // choice; a caller that supplies none is on the legacy single-scope
+    // path and gets the project it wrote through. With no project there
+    // is nothing to default from, so the set has to be explicit.
+    const createScopes: ScopeInput[] | undefined = existingProvider
+      ? undefined
+      : (scopes ??
+        (projectId
+          ? [{ scopeType: "PROJECT" as const, scopeId: projectId }]
+          : undefined));
+
+    if (!existingProvider && !createScopes) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "A new model provider needs at least one scope when no project is given.",
+      });
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       let result;
 
@@ -509,7 +553,6 @@ export class ModelProviderService {
         result = await this.updateExisting(
           existingProvider,
           {
-            projectId,
             provider,
             enabled,
             name,
@@ -526,11 +569,10 @@ export class ModelProviderService {
       } else {
         result = await this.createNew(
           {
-            projectId,
             provider,
             enabled,
             name: name ?? this.deriveDefaultName(provider),
-            scopes,
+            scopes: createScopes!,
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
@@ -552,10 +594,7 @@ export class ModelProviderService {
         // "not configured" on every role despite having a provider
         // enabled. See
         // specs/model-providers/model-resolver-and-registry.feature.
-        const targetScopes: ScopeInput[] = scopes ?? [
-          { scopeType: "PROJECT", scopeId: projectId },
-        ];
-        for (const scope of targetScopes) {
+        for (const scope of createScopes!) {
           await seedOnboardingDefaultsForProvider({
             prisma: tx as unknown as PrismaClient,
             provider,
@@ -585,7 +624,7 @@ export class ModelProviderService {
    * from the UI is unaffected.
    */
   async upsertByProviderKey(
-    input: UpdateModelProviderInput,
+    input: UpdateModelProviderInput & { projectId: string },
     ctx?: AuthzContext,
   ) {
     const existing = await this.repository.findByProvider(
@@ -646,21 +685,43 @@ export class ModelProviderService {
   ) {
     const { id, projectId, provider } = input;
 
+    if (!projectId && !input.organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "A model provider delete needs either a project or an organization to anchor it.",
+      });
+    }
+    // Matching by provider string is the legacy project-shaped contract —
+    // it asks for "this provider type in this project", which needs one.
+    if (!id && !projectId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Deleting a model provider by provider name needs a project.",
+      });
+    }
+
+    const anchor = await this.resolveOrganizationAnchor({
+      projectId,
+      organizationId: input.organizationId,
+    });
+
     if (ctx) {
-      const organizationId = await this.resolveProjectOrganizationId(projectId);
       // Org-anchored lookup when we can resolve the tenant; otherwise fall
       // back to the legacy project-scope lookup so a missing project can't
       // widen the blast radius.
       const existing =
-        id && organizationId
-          ? await this.repository.findByIdForOrganization(id, organizationId)
-          : id
+        id && anchor
+          ? await this.repository.findByIdForOrganization(id, anchor)
+          : id && projectId
             ? await this.repository.findById(id, projectId)
-            : await this.repository.findByProvider(provider, projectId);
+            : projectId
+              ? await this.repository.findByProvider(provider, projectId)
+              : null;
       if (!existing) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Model provider not found for this project",
+          message: "Model provider not found",
         });
       }
       await assertCanManageAllScopes(
@@ -673,10 +734,9 @@ export class ModelProviderService {
     }
 
     if (id) {
-      return await this.repository.delete(id, projectId);
-    } else {
-      return await this.repository.deleteByProvider(provider, projectId);
+      return await this.repository.delete(id);
     }
+    return await this.repository.deleteByProvider(provider, projectId!);
   }
 
   /**
@@ -1142,10 +1202,15 @@ export class ModelProviderService {
    * REST upsert-by-provider-key entrypoint uses
    * `upsertByProviderKey` below, not this code path.
    */
-  private async findExistingProvider(
-    id: string | undefined,
-    projectId: string,
-  ) {
+  private async findExistingProvider({
+    id,
+    projectId,
+    organizationId,
+  }: {
+    id: string | undefined;
+    projectId?: string;
+    organizationId?: string;
+  }) {
     if (!id) return null;
     // Org-anchored lookup so an edit from a project view resolves providers
     // granted at the org or team scope (which the settings list surfaces by
@@ -1155,10 +1220,36 @@ export class ModelProviderService {
     // submitted scope set still gates the write. Falls back to the
     // project-scope lookup when the tenant can't be resolved, so a missing
     // project can't widen the blast radius.
-    const organizationId = await this.resolveProjectOrganizationId(projectId);
-    return organizationId
-      ? await this.repository.findByIdForOrganization(id, organizationId)
-      : await this.repository.findById(id, projectId);
+    const anchor = await this.resolveOrganizationAnchor({
+      projectId,
+      organizationId,
+    });
+    if (anchor) {
+      return await this.repository.findByIdForOrganization(id, anchor);
+    }
+    return projectId ? await this.repository.findById(id, projectId) : null;
+  }
+
+  /**
+   * The organization a write is anchored to. A caller-supplied
+   * `organizationId` is only ever an anchor, never a grant: the router's
+   * organization-membership middleware has already established the caller
+   * belongs to it, and every lookup bounded by it stays inside that one
+   * tenant. A project resolves to its own organization and wins, since it
+   * is the narrower handle.
+   */
+  private async resolveOrganizationAnchor({
+    projectId,
+    organizationId,
+  }: {
+    projectId?: string;
+    organizationId?: string;
+  }): Promise<string | null> {
+    if (projectId) {
+      const fromProject = await this.resolveProjectOrganizationId(projectId);
+      if (fromProject) return fromProject;
+    }
+    return organizationId ?? null;
   }
 
   private async updateExisting(
@@ -1168,7 +1259,6 @@ export class ModelProviderService {
       extraHeaders: unknown;
     },
     data: {
-      projectId: string;
       provider: string;
       enabled: boolean;
       name?: string;
@@ -1193,7 +1283,6 @@ export class ModelProviderService {
 
     return await this.repository.update(
       existingProvider.id,
-      data.projectId,
       {
         enabled: data.enabled,
         customModels: data.customModels,
@@ -1217,14 +1306,13 @@ export class ModelProviderService {
 
   private async createNew(
     data: {
-      projectId: string;
       name: string;
       provider: string;
       enabled: boolean;
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
-      scopes?: ScopeInput[];
+      scopes: ScopeInput[];
       advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
@@ -1233,7 +1321,6 @@ export class ModelProviderService {
   ) {
     return await this.repository.create(
       {
-        projectId: data.projectId,
         name: data.name,
         provider: data.provider,
         enabled: data.enabled,

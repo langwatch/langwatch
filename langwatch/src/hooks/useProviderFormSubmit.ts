@@ -24,7 +24,15 @@ export type FormSnapshot = {
   provider: MaybeStoredModelProvider;
   /** Human-readable label the user typed (or the humanized default). */
   name: string;
+  /**
+   * Tenant anchor for the write. A provider belongs to an organization
+   * and reaches the scopes attached to it, so the organization is always
+   * the answer and the project is the narrower handle when there is one.
+   * An organization on the agent-governance track has none, and the write
+   * path takes either.
+   */
   projectId: string | undefined;
+  organizationId: string | undefined;
   isUsingEnvVars: boolean | undefined;
   customKeys: Record<string, string>;
   initialKeys: Record<string, unknown>;
@@ -111,7 +119,8 @@ export function useProviderFormSubmit({
       try {
         await updateMutation.mutateAsync({
           id: snapshot.provider.id,
-          projectId: snapshot.projectId ?? "",
+          projectId: snapshot.projectId,
+          organizationId: snapshot.organizationId,
           provider: snapshot.provider.provider,
           enabled: newEnabled,
           customKeys: snapshot.provider.customKeys as any,
@@ -144,6 +153,7 @@ export function useProviderFormSubmit({
     const {
       provider,
       projectId,
+      organizationId,
       isUsingEnvVars,
       customKeys,
       initialKeys,
@@ -309,7 +319,8 @@ export function useProviderFormSubmit({
       }
       await updateMutation.mutateAsync({
         id: provider.id,
-        projectId: projectId ?? "",
+        projectId,
+        organizationId,
         provider: provider.provider,
         name: trimmedName === "" ? undefined : trimmedName,
         enabled: true,

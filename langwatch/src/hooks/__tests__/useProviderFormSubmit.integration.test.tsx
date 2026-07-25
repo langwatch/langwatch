@@ -112,6 +112,7 @@ function buildSnapshot(overrides: Partial<FormSnapshot> = {}): FormSnapshot {
     provider: buildAzureProvider(),
     name: "Azure OpenAI",
     projectId: "proj-1",
+    organizationId: "org_test",
     isUsingEnvVars: true,
     customKeys: { AZURE_OPENAI_API_KEY: "****" },
     initialKeys: { AZURE_OPENAI_API_KEY: "****" },

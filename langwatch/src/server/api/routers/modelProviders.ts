@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   SCOPE_TIERS,
@@ -31,6 +32,7 @@ import {
   checkOrganizationPermission,
   checkProjectPermission,
   hasProjectPermission,
+  type Permission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -53,6 +55,30 @@ export {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "./modelProviders.utils";
+
+/**
+ * Shared input shape for the provider write paths: name the tenant with
+ * either handle, and refuse a request that names neither. A create with
+ * no project also has to say where the credential lands, since there is
+ * no project to default the scope set from.
+ */
+const tenantAnchorSchema = {
+  projectId: z.string().optional(),
+  organizationId: z.string().optional(),
+};
+
+function requireTenantAnchor(
+  input: { projectId?: string; organizationId?: string },
+  ctx: z.RefinementCtx,
+) {
+  if (!input.projectId && !input.organizationId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Either projectId or organizationId is required.",
+      path: ["projectId"],
+    });
+  }
+}
 
 export const modelProviderRouter = createTRPCRouter({
   // tRPC responses land in the browser, so every query here must go
@@ -122,7 +148,7 @@ export const modelProviderRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().optional(),
-        projectId: z.string(),
+        ...tenantAnchorSchema,
         provider: z.string(),
         // Human-readable label shown in the settings list and the model
         // selector group headers. Defaults to the humanized provider name
@@ -161,15 +187,16 @@ export const modelProviderRouter = createTRPCRouter({
         rateLimitRpd: z.number().int().min(0).nullable().optional(),
         fallbackPriorityGlobal: z.number().int().nullable().optional(),
         providerConfig: z.object({}).passthrough().nullable().optional(),
-      }),
+      }).superRefine(requireTenantAnchor),
     )
-    .use(checkProjectPermission("project:update"))
+    .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
       const result = await service.updateModelProvider(
         {
           id: input.id,
           projectId: input.projectId,
+          organizationId: input.organizationId,
           provider: input.provider,
           name: input.name,
           enabled: input.enabled,
@@ -201,13 +228,15 @@ export const modelProviderRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(
-      z.object({
-        id: z.string().optional(),
-        projectId: z.string(),
-        provider: z.string(),
-      }),
+      z
+        .object({
+          id: z.string().optional(),
+          ...tenantAnchorSchema,
+          provider: z.string(),
+        })
+        .superRefine(requireTenantAnchor),
     )
-    .use(checkProjectPermission("project:delete"))
+    .use(checkProjectOrOrganizationPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
       return await service.deleteModelProvider(input, {
@@ -222,13 +251,15 @@ export const modelProviderRouter = createTRPCRouter({
    */
   validateApiKey: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        provider: z.string(),
-        customKeys: z.record(z.string()),
-      }),
+      z
+        .object({
+          ...tenantAnchorSchema,
+          provider: z.string(),
+          customKeys: z.record(z.string()),
+        })
+        .superRefine(requireTenantAnchor),
     )
-    .use(checkProjectPermission("project:update"))
+    .use(checkProjectOrOrganizationPermission("project:update"))
     .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
@@ -675,6 +706,50 @@ export const modelProviderRouter = createTRPCRouter({
       });
     }),
 });
+
+/**
+ * Tenant gate for a provider write that may arrive with either handle. A
+ * provider belongs to an organization and reaches the scopes attached to
+ * it, so a project is one valid way to name the tenant and the
+ * organization is the other — an organization on the agent-governance
+ * track has no project until it needs one, and organization scope is the
+ * default for a new credential.
+ *
+ * With a project, this is the unchanged project permission check. Without
+ * one, it falls back to organization membership, which establishes the
+ * caller belongs to the tenant they named and nothing more. What the
+ * caller may actually write is decided per scope by
+ * `assertCanManageAllScopes` in the service, which is where organization
+ * scope demands `organization:manage`, team demands `team:manage`, and
+ * project demands `project:manage`. Same division of labour as
+ * `scopeAwarePermissionMiddleware` below.
+ */
+function checkProjectOrOrganizationPermission(projectPermission: Permission) {
+  const projectCheck = checkProjectPermission(projectPermission);
+  const organizationCheck = checkOrganizationPermission("organization:view");
+  return async (params: {
+    ctx: any;
+    input: { projectId?: string; organizationId?: string };
+    next: () => any;
+  }) => {
+    if (params.input.projectId) {
+      return projectCheck({
+        ...params,
+        input: { ...params.input, projectId: params.input.projectId },
+      });
+    }
+    if (!params.input.organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Either a project or an organization is required.",
+      });
+    }
+    return organizationCheck({
+      ...params,
+      input: { ...params.input, organizationId: params.input.organizationId },
+    });
+  };
+}
 
 /**
  * Permission middleware for the role/feature default writers. Each scope

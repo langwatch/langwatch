@@ -53,11 +53,11 @@ describe("ModelProviderRepository Integration", () => {
       // CREDENTIALS_SECRET is set in beforeAll but the env validation fails at module load time before tests run.
       it.skip("encrypts on save and decrypts on read preserving original values", async () => {
         const created = await repository.create({
-          projectId,
           name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: { OPENAI_API_KEY: "sk-test-key-123" },
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         });
         createdProviderIds.push(created.id);
 
@@ -120,10 +120,10 @@ describe("ModelProviderRepository Integration", () => {
     describe("when saved and read back", () => {
       it("preserves null customKeys", async () => {
         const created = await repository.create({
-          projectId,
           name: "Gemini",
           provider: "google",
           enabled: true,
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         });
         createdProviderIds.push(created.id);
 
@@ -184,11 +184,11 @@ describe("ModelProviderRepository Integration", () => {
 
         // 3. Save one through repository (will be encrypted)
         const encryptedRow = await repository.create({
-          projectId,
           name: "Anthropic",
           provider: "anthropic",
           enabled: true,
           customKeys: { ANTHROPIC_API_KEY: "sk-ant-already" },
+          scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
         });
         migrationIds.push(encryptedRow.id);
         createdProviderIds.push(encryptedRow.id);

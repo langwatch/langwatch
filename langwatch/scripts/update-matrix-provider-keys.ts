@@ -83,7 +83,7 @@ async function main() {
       continue;
     }
 
-    await repo.update(existing.id, project.id, {
+    await repo.update(existing.id, {
       enabled: true,
       customKeys: filtered,
     });

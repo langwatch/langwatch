@@ -221,6 +221,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     backendModelProviderKey,
     state.customKeys,
     projectId,
+    organization?.id,
   );
 
   useEffect(() => {

@@ -11,14 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  BrainCircuit,
-  Edit,
-  FolderPlus,
-  MoreVertical,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useAllModelProvidersList } from "~/hooks/useAllModelProvidersList";
@@ -45,35 +38,24 @@ export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
-  const canCreateProject = hasPermission("project:create");
-  // A provider is always stored inside a project, so every write on this
-  // page needs one. An organization can legitimately have none yet (see
-  // specs/model-providers/first-project-required.feature), and the list
-  // itself is organization-wide, so the page renders either way and each
-  // blocked action carries the reason it is blocked.
+  // A provider belongs to the organization and reaches the scopes attached
+  // to it, so the write path takes either handle and a project is only the
+  // narrower one. An organization on the agent-governance track has none
+  // until it needs one, and organization scope is the default for a new
+  // credential, so every action here works with or without a project. See
+  // specs/model-providers/providers-without-a-project.feature.
   const projectId = project?.id;
-  // Shared team the first project belongs to. Personal workspaces are
-  // never a home for it, so they are skipped.
-  const firstProjectTeamId =
-    organization?.teams?.find((aTeam) => !aTeam.isPersonal)?.id ??
-    (team?.isPersonal ? undefined : team?.id);
+  const organizationId = organization?.id;
 
   // One reason string per blocked action, `undefined` when the action
   // works. Whatever is rendered inert carries its reason in a tooltip, so
   // no control on this page can be clicked into silence.
   const addProviderDisabledReason = !hasModelProvidersManagePermission
     ? "You need model provider manage permissions to add new providers."
-    : !projectId
-      ? "Create a project first to add a model provider."
-      : undefined;
+    : undefined;
   const rowActionsDisabledReason = !hasModelProvidersManagePermission
     ? "You need model provider manage permissions to edit or delete providers."
-    : !projectId
-      ? "Create a project first to edit or delete providers."
-      : undefined;
-  const createProjectDisabledReason = canCreateProject
-    ? undefined
-    : "You need project create permissions to add a project.";
+    : undefined;
   // Flat, uncollapsed list — see useAllModelProvidersList for why this
   // table can't use the collapsed Record from useModelProvidersSettings.
   const {
@@ -85,13 +67,14 @@ export default function ModelsPage() {
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
   const deleteMutation = api.modelProvider.delete.useMutation();
-  // Carries the project the row was opened from, so the confirm button
-  // always has the project the deletion runs against.
+  // Carries the tenant the row was opened from, so the confirm button
+  // always has the tenant the deletion runs against.
   const [providerToDelete, setProviderToDelete] = useState<{
     id?: string;
     provider: string;
     name: string;
-    projectId: string;
+    projectId: string | undefined;
+    organizationId: string | undefined;
   } | null>(null);
 
   // Build the `available` payload the filter dropdown needs (org / teams /
@@ -223,7 +206,7 @@ export default function ModelsPage() {
             onPick={(providerKey) => {
               openDrawer("editModelProvider", {
                 projectId,
-                organizationId: organization?.id,
+                organizationId,
                 providerKey,
                 modelProviderId: "new",
               });
@@ -237,19 +220,6 @@ export default function ModelsPage() {
 
         {isLoading ? (
           <ProvidersTableSkeleton />
-        ) : enabledProviders.length === 0 && !projectId ? (
-          /* Nothing can be added yet, so the empty state names the one
-             thing that unblocks the page and offers it right here
-             instead of pointing at another settings screen. */
-          <CreateFirstProjectEmptyState
-            disabledReason={createProjectDisabledReason}
-            onCreateProject={() => {
-              openDrawer("createProject", {
-                organizationId: organization?.id,
-                defaultTeamId: firstProjectTeamId,
-              });
-            }}
-          />
         ) : enabledProviders.length === 0 ? (
           <EmptyState.Root width="full">
             <EmptyState.Content>
@@ -392,10 +362,7 @@ export default function ModelsPage() {
                                   </Menu.Trigger>
                                 </TriggerAnchor>
                               </Tooltip>
-                              {/* Both actions write to a project, so they
-                                  only exist once there is one. The trigger
-                                  above stays visible with the reason on it. */}
-                              {projectId && (
+                              {!rowActionsDisabledReason && (
                                 <Menu.Content>
                                   <Menu.Item
                                     value="edit"
@@ -403,7 +370,7 @@ export default function ModelsPage() {
                                       event.stopPropagation();
                                       openDrawer("editModelProvider", {
                                         projectId,
-                                        organizationId: organization?.id,
+                                        organizationId,
                                         modelProviderId: provider.id,
                                         providerKey: provider.provider,
                                       });
@@ -436,6 +403,7 @@ export default function ModelsPage() {
                                           providerSpec?.name ??
                                           provider.provider,
                                         projectId,
+                                        organizationId,
                                       });
                                     }}
                                   >
@@ -525,6 +493,7 @@ export default function ModelsPage() {
                   await deleteMutation.mutateAsync({
                     id: providerToDelete.id,
                     projectId: providerToDelete.projectId,
+                    organizationId: providerToDelete.organizationId,
                     provider: providerToDelete.provider,
                   });
                   setProviderToDelete(null);
@@ -610,53 +579,6 @@ function AddModelProviderMenu({
         ))}
       </Menu.Content>
     </Menu.Root>
-  );
-}
-
-/**
- * Empty state for an organization that has no project yet: a provider is
- * always stored inside one, so the page offers that first step here
- * rather than sending the customer off to find it.
- */
-function CreateFirstProjectEmptyState({
-  disabledReason,
-  onCreateProject,
-}: {
-  disabledReason: string | undefined;
-  onCreateProject: () => void;
-}) {
-  return (
-    <EmptyState.Root width="full">
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <FolderPlus size={24} />
-        </EmptyState.Indicator>
-        <VStack textAlign="center" gap={3}>
-          <VStack textAlign="center" gap={1}>
-            <EmptyState.Title>Create a project first</EmptyState.Title>
-            <EmptyState.Description>
-              Model providers are set up inside a project.
-            </EmptyState.Description>
-          </VStack>
-          <Tooltip content={disabledReason ?? ""} disabled={!disabledReason}>
-            <TriggerAnchor>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!!disabledReason}
-                data-testid="empty-state-create-first-project"
-                onClick={onCreateProject}
-              >
-                <HStack gap={1}>
-                  <Plus size={14} />
-                  <Text>Create project</Text>
-                </HStack>
-              </Button>
-            </TriggerAnchor>
-          </Tooltip>
-        </VStack>
-      </EmptyState.Content>
-    </EmptyState.Root>
   );
 }
 

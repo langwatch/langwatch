@@ -496,11 +496,11 @@ describe("ModelProviderRepository", () => {
         );
 
         await repository.create({
-          projectId: "proj_test",
           name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: keys,
+          scopes: [{ scopeType: "PROJECT", scopeId: "proj_test" }],
         });
 
         const createCall = (prisma.modelProvider.create as any).mock.calls[0][0];
@@ -519,11 +519,11 @@ describe("ModelProviderRepository", () => {
         );
 
         await repository.create({
-          projectId: "proj_test",
           name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: null,
+          scopes: [{ scopeType: "PROJECT", scopeId: "proj_test" }],
         });
 
         const createCall = (prisma.modelProvider.create as any).mock.calls[0][0];
@@ -536,7 +536,6 @@ describe("ModelProviderRepository", () => {
       it("rejects the create instead of persisting cross-org scope rows", async () => {
         await expect(
           repository.create({
-            projectId: "proj_test",
             name: "OpenAI",
             provider: "openai",
             enabled: true,
@@ -556,10 +555,10 @@ describe("ModelProviderRepository", () => {
 
         await expect(
           repository.create({
-            projectId: "proj_orphan",
             name: "OpenAI",
             provider: "openai",
             enabled: true,
+            scopes: [{ scopeType: "PROJECT", scopeId: "proj_orphan" }],
           }),
         ).rejects.toThrow(/organization/);
         expect(prisma.modelProvider.create as any).not.toHaveBeenCalled();
@@ -575,7 +574,7 @@ describe("ModelProviderRepository", () => {
           createModelProvider({ customKeys: "encrypted" }),
         );
 
-        await repository.update("mp_test123", "proj_test", {
+        await repository.update("mp_test123", {
           customKeys: keys,
         });
 
@@ -593,7 +592,7 @@ describe("ModelProviderRepository", () => {
           createModelProvider(),
         );
 
-        await repository.update("mp_test123", "proj_test", {
+        await repository.update("mp_test123", {
           enabled: false,
         });
 
@@ -609,7 +608,7 @@ describe("ModelProviderRepository", () => {
         });
 
         await expect(
-          repository.update("mp_test123", "proj_test", {
+          repository.update("mp_test123", {
             scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_other" }],
           }),
         ).rejects.toThrow(/organization/);
@@ -627,7 +626,7 @@ describe("ModelProviderRepository", () => {
           createModelProvider(),
         );
 
-        await repository.update("mp_test123", "proj_test", {
+        await repository.update("mp_test123", {
           scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_existing" }],
         });
 

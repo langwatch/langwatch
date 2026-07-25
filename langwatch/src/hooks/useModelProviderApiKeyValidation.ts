@@ -8,21 +8,26 @@ import { api } from "../utils/api";
  *
  * @param provider - The provider key (e.g., "openai", "gemini")
  * @param customKeys - The form state containing API keys and configuration
- * @param projectId - The project ID for permission checking
+ * @param projectId - Project handle for the tenant, when there is one
+ * @param organizationId - Organization handle for the tenant
  * @returns Object containing validation state and functions
  */
 export function useModelProviderApiKeyValidation(
   provider: string,
   customKeys: Record<string, string>,
   projectId: string | undefined,
+  organizationId: string | undefined,
 ) {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
   const utils = api.useContext();
 
   const validate = useCallback(async (): Promise<boolean> => {
-    if (!projectId) {
-      setValidationError("Project ID is required for validation");
+    // The probe reads nothing from storage — it sends the typed keys
+    // straight at the provider — so it needs a tenant to authorize
+    // against and nothing more. Either handle names one.
+    if (!projectId && !organizationId) {
+      setValidationError("No organization to validate against");
       return false;
     }
 
@@ -32,6 +37,7 @@ export function useModelProviderApiKeyValidation(
     try {
       const result = await utils.modelProvider.validateApiKey.fetch({
         projectId,
+        organizationId,
         provider,
         customKeys,
       });
@@ -52,7 +58,13 @@ export function useModelProviderApiKeyValidation(
     } finally {
       setIsValidating(false);
     }
-  }, [projectId, provider, customKeys, utils.modelProvider.validateApiKey]);
+  }, [
+    projectId,
+    organizationId,
+    provider,
+    customKeys,
+    utils.modelProvider.validateApiKey,
+  ]);
 
   /**
    * Validates stored or env var API key against a custom URL or default URL.
