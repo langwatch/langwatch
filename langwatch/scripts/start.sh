@@ -32,6 +32,11 @@ if [[ "$NODE_ENV" = "development" ]]; then
   # 403 INVALID_ORIGIN on /api/auth/sign-in/social and the Auth0 redirect dies
   # before it starts. Skipped in production (NEXTAUTH_URL there is the real
   # public URL, not localhost).
+  #
+  # These exports reach the non-Node lanes. The Node entry points load `.env`
+  # with `override: true` after this runs, which would put the committed 5560
+  # back, so the app realigns again on the other side of that load in
+  # `alignDevAuthUrlsToPort` (src/env-create.mjs). Keep the two in step.
   if [ -n "$PORT" ]; then
     export BASE_HOST="http://localhost:${PORT}"
     export NEXTAUTH_URL="http://localhost:${PORT}"

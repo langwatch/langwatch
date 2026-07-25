@@ -180,7 +180,10 @@ export const signIn = async (
     callbackUrl?: string;
     redirect?: boolean;
   },
-): Promise<{ error?: string; status?: number; ok?: boolean } | undefined> => {
+): Promise<
+  | { error?: string; code?: string; status?: number; ok?: boolean }
+  | undefined
+> => {
   // Same-origin guard on the post-login redirect target.
   const callbackURL = options?.callbackUrl
     ? safeRedirectTarget(options.callbackUrl)
@@ -194,8 +197,11 @@ export const signIn = async (
       callbackURL,
     });
     if (result.error) {
+      // `code` is what the screens map to wording; `error` stays the message
+      // for callers that only ever read it.
       return {
         error: result.error.message ?? "CredentialsSignin",
+        code: result.error.code,
         status: result.error.status,
         ok: false,
       };
@@ -228,6 +234,7 @@ export const signIn = async (
   if (result.error) {
     return {
       error: result.error.message ?? "OAuthSignin",
+      code: result.error.code,
       status: result.error.status,
       ok: false,
     };

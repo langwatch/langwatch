@@ -322,6 +322,16 @@
           "jsonpath": "$.appVersion"
         },
         {
+          "type": "yaml",
+          "path": "charts/langyagent/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "charts/langyagent/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
           "type": "json",
           "path": "langwatch/package.json",
           "jsonpath": "$.version"
