@@ -125,5 +125,11 @@ func usageAttributes(usage domain.Usage) []attribute.KeyValue {
 	if usage.CostMicroUSD > 0 {
 		attrs = append(attrs, attribute.Float64(AttrCostUSD, float64(usage.CostMicroUSD)/1_000_000))
 	}
+	if usage.InputChars > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputChars, usage.InputChars))
+	}
+	if usage.AudioSeconds > 0 {
+		attrs = append(attrs, attribute.Float64(AttrGenAIUsageAudioSeconds, usage.AudioSeconds))
+	}
 	return attrs
 }

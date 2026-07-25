@@ -110,6 +110,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 		v1.Post("/messages", messagesHandler(deps))
 		v1.Post("/responses", responsesHandler(deps))
 		v1.Post("/embeddings", embeddingsHandler(deps))
+		v1.Post("/audio/speech", speechHandler(deps))
+		v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
 		v1.Get("/models", modelsHandler(deps))
 	})
 
@@ -323,6 +325,111 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 	}
 }
 
+// speechHandler terminates POST /v1/audio/speech (OpenAI-wire TTS). The
+// request body is small JSON; the response body is binary audio whose
+// Content-Type the dispatcher attached, so writeJSONResponse forwards it
+// without a JSON envelope. Never streams.
+func speechHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		if !ok {
+			return
+		}
+		defer release()
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleSpeech(r.Context(), bundle, body, app.PeekModel(peek))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// maxTranscriptionBodyBytes caps a /v1/audio/transcriptions upload. OpenAI's
+// own endpoint accepts at most 25 MB of audio; one extra MB covers multipart
+// framing and the small text fields. Requests over the cap get 413 before any
+// provider is contacted.
+const maxTranscriptionBodyBytes = 26 << 20
+
+// transcriptionFormFields are the OpenAI-wire optional text fields forwarded
+// to the provider. Anything else in the form is dropped rather than sent
+// blind.
+var transcriptionFormFields = []string{"language", "prompt", "response_format", "temperature"}
+
+// transcriptionsHandler terminates POST /v1/audio/transcriptions (OpenAI-wire
+// multipart STT). Unlike every other v1 route the body is multipart/form-data,
+// so the handler parses the form here, the only layer with the *http.Request,
+// and hands the app a normalized upload. Never streams.
+func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, maxTranscriptionBodyBytes)
+		// Memory threshold: files up to 10 MB stay in memory, larger ones
+		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+					"message": "audio upload exceeds the 25 MB transcription limit",
+				}))
+				return
+			}
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "malformed multipart/form-data body: " + err.Error(),
+			}))
+			return
+		}
+
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": `missing required multipart field: "file"`,
+			}))
+			return
+		}
+		defer func() { _ = file.Close() }()
+
+		data, err := io.ReadAll(file)
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "failed reading uploaded file: " + err.Error(),
+			}))
+			return
+		}
+
+		params := make(map[string]string, len(transcriptionFormFields))
+		for _, f := range transcriptionFormFields {
+			if v := r.FormValue(f); v != "" {
+				params[f] = v
+			}
+		}
+		upload := &domain.TranscriptionUpload{File: data, Filename: header.Filename, Params: params}
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleTranscription(r.Context(), bundle, upload, r.FormValue("model"))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
 // geminiPassthroughHandler terminates any POST /v1beta/... request.
 // Specifically targets the Gemini-native shape used by gemini-cli
 // (`GOOGLE_GEMINI_BASE_URL=http://…/gateway`) and the @google/genai
@@ -456,12 +563,43 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
+		// OpenAI list shape: model-picker clients (OpenWebUI, LibreChat,
+		// SDKs) expect every field of the Model object and an always-
+		// present data array (null breaks some parsers). `created` and
+		// `owned_by` are required by the OpenAI SDK types, so omitting
+		// them leaves strict clients with a null where they expect an
+		// int / string.
+		data := make([]map[string]any, 0, len(models))
+		for _, m := range models {
+			data = append(data, map[string]any{
+				"id":     m.ID,
+				"object": "model",
+				// A gateway model list has no creation date to report:
+				// aliases are config, and upstream catalogs rarely carry
+				// one. 0 keeps the field present and typed rather than
+				// inventing a timestamp that would churn on every call.
+				"created":  0,
+				"owned_by": modelOwnedBy(m),
+			})
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = sonic.ConfigDefault.NewEncoder(w).Encode(map[string]any{
 			"object": "list",
-			"data":   models,
+			"data":   data,
 		})
 	}
+}
+
+// modelOwnedBy names the owner of a listed model. Models that carry no
+// provider (an allowlist entry on a multi-provider credential chain, for
+// instance) are attributed to the gateway rather than to an empty string:
+// `owned_by` is a required string in the OpenAI Model object, and a
+// blank one renders as an unlabelled row in model pickers.
+func modelOwnedBy(m domain.Model) string {
+	if m.ProviderID == "" {
+		return "langwatch"
+	}
+	return string(m.ProviderID)
 }
 
 func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (*domain.Bundle, bool) {
@@ -948,6 +1086,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)

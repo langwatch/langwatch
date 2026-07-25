@@ -1,6 +1,10 @@
 package controlplane
 
-import "github.com/langwatch/langwatch/services/aigateway/domain"
+import (
+	"strings"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
+)
 
 // configWire matches the JSON shape returned by GET /api/internal/gateway/config/:vk_id.
 type configWire struct {
@@ -158,7 +162,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	if len(w.ModelAliases) > 0 {
 		cfg.ModelAliases = make(map[string]domain.ModelAlias, len(w.ModelAliases))
 		for alias, model := range w.ModelAliases {
-			cfg.ModelAliases[alias] = domain.ModelAlias{Model: model}
+			cfg.ModelAliases[alias] = buildModelAlias(model)
 		}
 	}
 
@@ -242,6 +246,21 @@ func buildGuardrails(
 // default and the only opt-out is the operator choosing FAIL_OPEN.
 func failsClosed(g guardrailWire) bool {
 	return g.FailureMode != "fail_open"
+}
+
+// buildModelAlias splits an alias target into the provider that serves it
+// and the model name the provider knows. The control-plane writes aliases
+// in "provider/model" form ("openai/gpt-5-mini"), which is a routing
+// instruction, not a model ID: keeping the prefix on Model would send the
+// provider a model name it has never heard of. A bare target carries no
+// provider and resolves against the credential chain like any other
+// unqualified model.
+func buildModelAlias(target string) domain.ModelAlias {
+	provider, model, found := strings.Cut(target, "/")
+	if !found || provider == "" || model == "" {
+		return domain.ModelAlias{Model: target}
+	}
+	return domain.ModelAlias{ProviderID: normalizeProviderType(provider), Model: model}
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {

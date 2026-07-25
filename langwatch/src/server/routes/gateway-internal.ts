@@ -446,7 +446,16 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   const vkId = c.req.param("vk_id");
   const vk = await prisma.virtualKey.findUnique({
     where: { id: vkId },
-    include: { scopes: true },
+    include: {
+      scopes: true,
+      // The routing policy is where model_aliases and policy_rules live.
+      // Without it the materialiser reads an absent relation and emits an
+      // empty alias map plus empty deny/allow lists, so the gateway never
+      // resolves an alias and never enforces a model deny rule.
+      routingPolicy: {
+        select: { id: true, modelAliases: true, policyRules: true },
+      },
+    },
   });
   if (!vk) {
     return c.json(
