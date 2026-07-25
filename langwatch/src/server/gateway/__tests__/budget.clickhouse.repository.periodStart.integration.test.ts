@@ -146,6 +146,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
   }, 120_000);
 
   describe("when the spend is read back on each window", () => {
+    /** @scenario "Spend recorded against a budget is visible on that budget" */
     it.each(ALL_WINDOWS)("reports non-zero spend on a %s budget", (window) => {
       const budget = budgets.find((b) => b.window === window)!;
       const spent = spendByBudgetId.get(budget.id);
@@ -154,6 +155,7 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
       expect(Number.parseFloat(spent!)).toBeGreaterThan(0);
     });
 
+    /** @scenario "Spend recorded against a budget is visible on that budget" */
     it.each(ALL_WINDOWS)(
       "reports a %s budget as past its limit once spend exceeds it",
       (window) => {

@@ -228,6 +228,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
   });
 
   describe("when spend has passed 80% of the limit but not the limit", () => {
+    /** @scenario "A blocking budget warns before it blocks" */
     it("still lets the request through, and warns", async () => {
       // Three more requests: 4 x $0.001 against a $0.005 ceiling = 80%.
       await recordOneRequest();
@@ -245,6 +246,7 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
   });
 
   describe("when spend has passed the limit", () => {
+    /** @scenario "A blocking budget blocks once its recorded spend passes the limit" */
     it("refuses the request and names the budget that was exceeded", async () => {
       // Two more takes it to $0.006 against the $0.005 ceiling.
       await recordOneRequest();
@@ -259,21 +261,46 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
   });
 
   describe("when a budget points at a project no key sends traffic to", () => {
-    it("reports the budget as unreachable while the one taking traffic is not", async () => {
+    /** @scenario "A budget warns when no key can ever spend against it" */
+    it("reports it as unreachable, and where the keys do send traffic", async () => {
       const { scopeReach } = await service.listWithHealth(ORG_ID);
 
-      expect(scopeReach.get(IDLE_BUDGET_ID)?.reachable).toBe(false);
+      const idle = scopeReach.get(IDLE_BUDGET_ID);
+
+      expect(idle?.reachable).toBe(false);
+      // Naming where traffic does land is what makes the warning
+      // actionable: without it the reader knows the budget is inert but
+      // not what to re-scope it to.
+      expect(idle?.reachableProjectIds).toContain(PROJECT_ID);
+      expect(idle?.reachableProjectIds).not.toContain(IDLE_PROJECT_ID);
+    });
+  });
+
+  describe("when a budget points at the project a key does send traffic to", () => {
+    /** @scenario "A budget that some key can spend against carries no warning" */
+    it("reports it as reachable", async () => {
+      const { scopeReach } = await service.listWithHealth(ORG_ID);
+
       expect(scopeReach.get(BUDGET_ID)?.reachable).toBe(true);
     });
   });
 
   describe("when spend totals cannot be read", () => {
+    /** @scenario "A budget whose spend cannot be totalled says so instead of showing zero" */
     it("reports spend as unavailable rather than as zero", async () => {
       const withoutLedger = GatewayBudgetService.create(prisma, undefined);
 
-      const { spendAvailable } = await withoutLedger.listWithHealth(ORG_ID);
+      const { budgets, spendAvailable } =
+        await withoutLedger.listWithHealth(ORG_ID);
 
       expect(spendAvailable).toBe(false);
+      // The budget is still listed, and the only spend figure left on it is
+      // the Postgres column, which reads 0 even though $0.006 was really
+      // spent above. Rendering that as "$0.00 spent, 0% of limit" is the
+      // lie the flag exists to prevent.
+      const budget = budgets.find((b) => b.id === BUDGET_ID);
+      expect(budget).toBeDefined();
+      expect(Number(budget!.spentUsd)).toBe(0);
     });
   });
 });

@@ -210,15 +210,20 @@ describe("given the Model Providers settings page", () => {
   });
 
   describe("when the organization has no project yet", () => {
-    it("states that a project comes first", () => {
+    /** @scenario "Landing on Model Providers without a project" */
+    it("states that a project comes first, and offers to create one", () => {
       renderPage();
 
       expect(screen.getByText("Create a project first")).toBeTruthy();
       expect(
         screen.getByText("Model providers are set up inside a project."),
       ).toBeTruthy();
+      expect(
+        screen.getByTestId("empty-state-create-first-project"),
+      ).toBeTruthy();
     });
 
+    /** @scenario "Creating the first project from the Model Providers page" */
     it("creates the first project in the shared team", () => {
       renderPage();
 
@@ -230,6 +235,7 @@ describe("given the Model Providers settings page", () => {
       });
     });
 
+    /** @scenario "Adding a model provider is unavailable, with the reason on it" */
     it("blocks adding a model provider and says why", () => {
       renderPage();
 
@@ -241,14 +247,18 @@ describe("given the Model Providers settings page", () => {
       ).toBeTruthy();
     });
 
+    /** @scenario "No provider list opens onto choices that do nothing" */
     it("opens no provider list to pick from", () => {
       renderPage();
+
+      fireEvent.click(screen.getByTestId("header-add-model-provider"));
 
       expect(screen.queryByText("OpenAI")).toBeNull();
       expect(screen.queryByText("Anthropic")).toBeNull();
       expect(document.querySelector("[data-menu-item]")).toBeNull();
     });
 
+    /** @scenario "No provider list opens onto choices that do nothing" */
     it("never opens the provider setup", () => {
       renderPage();
 
@@ -262,12 +272,14 @@ describe("given the Model Providers settings page", () => {
         mockState.providers = [openaiRow];
       });
 
+      /** @scenario "Providers already visible to the organization cannot be edited or deleted" */
       it("lists the provider", () => {
         renderPage();
 
         expect(screen.getByText("OpenAI")).toBeTruthy();
       });
 
+      /** @scenario "Providers already visible to the organization cannot be edited or deleted" */
       it("blocks editing and deleting it, and says why", () => {
         renderPage();
 
@@ -288,12 +300,14 @@ describe("given the Model Providers settings page", () => {
       };
     });
 
+    /** @scenario "A member who cannot create projects" */
     it("still states that a project comes first", () => {
       renderPage();
 
       expect(screen.getByText("Create a project first")).toBeTruthy();
     });
 
+    /** @scenario "A member who cannot create projects" */
     it("blocks creating a project and says why", () => {
       renderPage();
 
@@ -324,6 +338,7 @@ describe("given the Model Providers settings page", () => {
       expect(screen.queryByText("Create a project first")).toBeNull();
     });
 
+    /** @scenario "Adding a provider works once the project exists" */
     it("opens the setup for the provider picked", () => {
       renderPage();
 
