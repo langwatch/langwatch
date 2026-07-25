@@ -10,8 +10,11 @@ import (
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
+// @scenario "PCM means 24kHz on every provider, matching OpenAI semantics"
 func TestSpeechResponseFormatFor(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -31,4 +34,50 @@ func TestSpeechResponseFormatFor(t *testing.T) {
 			assert.Equal(t, tc.want, speechResponseFormatFor(tc.provider, tc.wire))
 		})
 	}
+}
+
+// @scenario "A TTS call lands as a trace with character usage"
+func TestExtractSpeechUsage_CharacterMeasure(t *testing.T) {
+	assert.Equal(t, domain.Usage{}, extractSpeechUsage(nil))
+	assert.Equal(t, domain.Usage{}, extractSpeechUsage(&bfschemas.BifrostSpeechResponse{}))
+
+	u := extractSpeechUsage(&bfschemas.BifrostSpeechResponse{
+		Usage: &bfschemas.SpeechUsage{
+			InputTokens:  12,
+			OutputTokens: 34,
+			TotalTokens:  46,
+			InputChars:   57,
+		},
+	})
+	assert.Equal(t, 57, u.InputChars)
+	assert.Equal(t, 12, u.PromptTokens)
+	assert.Equal(t, 34, u.CompletionTokens)
+	assert.Equal(t, 46, u.TotalTokens)
+}
+
+// @scenario "A transcription call lands as a trace with duration usage"
+func TestExtractTranscriptionUsage_DurationMeasure(t *testing.T) {
+	assert.Equal(t, domain.Usage{}, extractTranscriptionUsage(nil))
+
+	dur := 2.51
+	u := extractTranscriptionUsage(&bfschemas.BifrostTranscriptionResponse{Duration: &dur})
+	assert.Equal(t, 2.51, u.AudioSeconds)
+
+	secs := 3
+	u = extractTranscriptionUsage(&bfschemas.BifrostTranscriptionResponse{
+		Usage: &bfschemas.TranscriptionUsage{Type: "duration", Seconds: &secs},
+	})
+	assert.Equal(t, 3.0, u.AudioSeconds)
+
+	in, out, tot := 11, 0, 11
+	u = extractTranscriptionUsage(&bfschemas.BifrostTranscriptionResponse{
+		Usage: &bfschemas.TranscriptionUsage{
+			Type:         "tokens",
+			InputTokens:  &in,
+			OutputTokens: &out,
+			TotalTokens:  &tot,
+		},
+	})
+	assert.Equal(t, 11, u.PromptTokens)
+	assert.Equal(t, 11, u.TotalTokens)
 }

@@ -193,6 +193,7 @@ func TestAudio_OpenAI_SpeechMP3(t *testing.T) {
 
 // --- ElevenLabs cells ---
 
+// @scenario "ElevenLabs TTS through the same OpenAI wire shape"
 func TestAudio_ElevenLabs_SpeechToOpenAITranscription(t *testing.T) {
 	elVK := requireEnv(t, "TEST_VK_ELEVENLABS")
 	voice := os.Getenv("ELEVENLABS_VOICE_ID")
@@ -217,6 +218,7 @@ func TestAudio_ElevenLabs_SpeechToOpenAITranscription(t *testing.T) {
 	assertHeardTheFox(t, transcript)
 }
 
+// @scenario "ElevenLabs transcription through the same multipart shape"
 func TestAudio_ElevenLabs_Transcription(t *testing.T) {
 	elVK := requireEnv(t, "TEST_VK_ELEVENLABS")
 	oaVK := requireEnv(t, "TEST_VK_OPENAI")

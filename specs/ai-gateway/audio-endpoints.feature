@@ -144,7 +144,10 @@ Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and E
   # Group: Dogfood (proven with the Scenario voice harness)
   # ============================================================
 
-  @e2e
+  # Exercised live on PR #6168 (OpenAI-model and ElevenLabs-model runs, both
+  # success: True); automation is tracked in issue #6180 and lands when the
+  # Scenario repo's voice CI points at the deployed gateway.
+  @e2e @unimplemented
   Scenario: Scenario's voice tests run end to end through the gateway
     Given OPENAI_BASE_URL pointing at the gateway and a virtual key as OPENAI_API_KEY
     When a Scenario voice test synthesizes user turns (TTS) and the judge transcribes segments (STT)
