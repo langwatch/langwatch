@@ -10,6 +10,16 @@
 {{- $env := "production" -}}
 {{- with .Values.global }}{{- with .env }}{{- $env = . }}{{- end }}{{- end }}
 {{- with .Values.environment }}{{- $env = . }}{{- end }}
+{{- /* The mirror lane needs both halves or neither: the manager refuses to boot
+       with one set (services/langyagent/config.go). An endpoint with no key is
+       the half we cannot fill in for the operator — only they can say which
+       project to mirror into — so refuse at render time rather than shipping a
+       pod that crashloops on its own config. The opposite pairing needs no
+       guard: a key with no endpoint resolves to this install's control plane
+       below. */ -}}
+{{- if and .Values.chartManaged .Values.mirror.traceEndpoint (not .Values.mirror.existingSecretName) }}
+{{- fail "langyagent.mirror.traceEndpoint is set but langyagent.mirror.existingSecretName is empty — the agent refuses to start with only half the mirror configured. Create a Secret holding the mirror project's API key and name it in langyagent.mirror.existingSecretName, or clear traceEndpoint to leave the mirror off." }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

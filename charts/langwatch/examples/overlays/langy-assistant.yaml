@@ -34,8 +34,9 @@ langyagent:
   # you want its turns traced into, put it in a Secret, and name it here. The
   # endpoint resolves to this install.
   #
+  #   read -rsp "Mirror project API key: " KEY
   #   kubectl -n <namespace> create secret generic langwatch-langyagent-mirror \
-  #     --from-literal=LANGY_MIRROR_TRACE_KEY=<that project's API key>
+  #     --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
   #
   # mirror:
   #   existingSecretName: langwatch-langyagent-mirror

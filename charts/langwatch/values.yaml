@@ -1689,8 +1689,9 @@ langyagent:
   # which project: create an API key in that project, put it in a Secret, and
   # name the Secret here. The endpoint resolves to this install automatically.
   #
+  #   read -rsp "Mirror project API key: " KEY
   #   kubectl -n <namespace> create secret generic langwatch-langyagent-mirror \
-  #     --from-literal=LANGY_MIRROR_TRACE_KEY=<the project's API key>
+  #     --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
   #
   ## @param langyagent.mirror.existingSecretName [string, default: ""] Secret holding the mirror project's API key. Empty leaves the mirror off.
   ## @param langyagent.mirror.traceEndpoint [string, default: ""] LangWatch base URL to mirror into. Empty means this install's own app Service; set it to mirror into a different deployment.

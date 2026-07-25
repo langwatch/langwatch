@@ -77,8 +77,9 @@ secrets:
 # tools. Optional: leave the block empty (the default) and the lane stays
 # dormant. The key is an ordinary project API key for the designated mirror
 # project; rotate it like any project key.
+#   read -rsp "Mirror project API key: " KEY
 #   kubectl create secret generic langwatch-langyagent-mirror \
-#     --from-literal=LANGY_MIRROR_TRACE_KEY=<mirror project API key>
+#     --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
 mirror:
   # Base URL of the LangWatch deployment holding the mirror project —
   # /api/otel/v1/traces is appended by the manager. Leave empty and set

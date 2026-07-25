@@ -33,7 +33,7 @@ helm upgrade langwatch langwatch/langwatch -n langwatch -f values.yaml
 
 That deploys the agent, wires the app and the workers to it, and makes the
 assistant available to everyone in your install. Give it a model to talk to by
-configuring a [model provider](/self-hosting/overview) for the project, then
+configuring a [model provider](/platform/model-providers) for the project, then
 open the assistant from any page.
 
 <Note>
@@ -90,9 +90,14 @@ can see the model calls it made, the tools it ran, and what each one cost.
 Create an API key in the project you want to mirror into, then:
 
 ```bash
+read -rsp "Mirror project API key: " KEY
 kubectl -n langwatch create secret generic langwatch-langyagent-mirror \
-  --from-literal=LANGY_MIRROR_TRACE_KEY=<that project's API key>
+  --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"
+unset KEY
 ```
+
+Reading the key rather than passing it as an argument keeps it out of your
+shell history and out of the process list on the machine you run this from.
 
 ```yaml
 langyagent:
