@@ -13,7 +13,12 @@ describe("buildEnv", () => {
       expect(env).toContain("CLICKHOUSE_URL=http://localhost:6562/langwatch");
       expect(env).toContain("LANGWATCH_NLP_SERVICE=http://localhost:5561");
       expect(env).toContain("LANGEVALS_ENDPOINT=http://localhost:5562");
-      expect(env).toContain("LW_GATEWAY_BASE_URL=http://localhost:5560");
+      // The gateway's own port, not the app's: this value is what the app
+      // hands Langy's workers and CLI users as an OpenAI-compatible base URL.
+      // The gateway process reads the same name to mean the opposite direction
+      // and gets its value from services/aigateway.ts, not from here.
+      expect(env).toContain("LW_GATEWAY_BASE_URL=http://localhost:5563");
+      expect(env).toContain("OPENCODE_AGENT_URL=http://localhost:5564");
     });
 
     it("populates every secret with a fresh random value", () => {

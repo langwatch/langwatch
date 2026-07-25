@@ -10,6 +10,7 @@ import { Custom } from "../../components/icons/Custom";
 import { DeepSeek } from "../../components/icons/DeepSeek";
 import { Gemini } from "../../components/icons/Gemini";
 import { GoogleCloud } from "../../components/icons/GoogleCloud";
+import { ElevenLabs } from "../../components/icons/ElevenLabs";
 import { Groq } from "../../components/icons/Groq";
 import { OpenAI } from "../../components/icons/OpenAI";
 import { Voyage } from "../../components/icons/Voyage";
@@ -24,6 +25,7 @@ export const modelProviderIcons: Record<
   openai_codex: <Codex />,
   azure: <Azure />,
   anthropic: <Anthropic />,
+  elevenlabs: <ElevenLabs />,
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,

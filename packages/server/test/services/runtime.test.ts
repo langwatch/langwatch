@@ -33,6 +33,7 @@ const nlpStub = makeStub("nlpgo");
 const langevalsStub = makeStub("langevals");
 const gatewayStub = makeStub("aigateway");
 const langwatchStub = makeStub("langwatch");
+const langyStub = makeStub("langyagent");
 
 const migrateFn = vi.fn(async () => {
   callLog.push("migrate");
@@ -46,6 +47,9 @@ const nodeDepsFn = vi.fn(async () => {
 const ensureAppDirFn = vi.fn(async () => {
   callLog.push("app-dir");
 });
+const langyCliFn = vi.fn(async () => {
+  callLog.push("langy-cli");
+});
 
 vi.mock("../../src/services/postgres.ts", () => ({ startPostgres: postgresStub.fn }));
 vi.mock("../../src/services/redis.ts", () => ({ startRedis: redisStub.fn }));
@@ -54,11 +58,19 @@ vi.mock("../../src/services/nlpgo.ts", () => ({ startNlpgo: nlpStub.fn }));
 vi.mock("../../src/services/langevals.ts", () => ({ startLangevals: langevalsStub.fn }));
 vi.mock("../../src/services/aigateway.ts", () => ({ startAigateway: gatewayStub.fn }));
 vi.mock("../../src/services/langwatch.ts", () => ({ startLangwatch: langwatchStub.fn }));
+let langyBinarySupported = true;
+vi.mock("../../src/services/langyagent.ts", () => ({
+  startLangyagent: langyStub.fn,
+  monobinarySupportsLangyagent: vi.fn(async () => langyBinarySupported),
+}));
+vi.mock("../../src/services/langy-cli.ts", () => ({ ensureLangyCli: langyCliFn }));
 vi.mock("../../src/services/langwatch-workers.ts", () => ({
   startLangwatchWorkers: () => ({
     name: "workers",
     pid: 0,
-    stop: async () => {},
+    stop: async () => {
+      callLog.push("stop:workers");
+    },
   }),
 }));
 vi.mock("../../src/services/migrate.ts", () => ({ runMigrations: migrateFn }));
@@ -71,7 +83,8 @@ vi.mock("../../src/services/app-dir.ts", () => ({
   ensureAppDir: ensureAppDirFn,
   appRoot: () => "/tmp/.langwatch-test/app",
 }));
-vi.mock("../../src/services/env-file.ts", () => ({ readEnvFile: () => ({}) }));
+let envFileContent: Record<string, string> = {};
+vi.mock("../../src/services/env-file.ts", () => ({ readEnvFile: () => envFileContent }));
 
 // Import AFTER vi.mock so the runtime resolves the stubs.
 const { runtime } = await import("../../src/services/runtime.ts");
@@ -84,6 +97,7 @@ function fakeCtx(): RuntimeContext {
       nlp: 5561,
       langevals: 5562,
       aigateway: 5563,
+      langyagent: 5564,
       postgres: 6560,
       redis: 6561,
       clickhouseHttp: 6562,
@@ -103,7 +117,7 @@ function fakeCtx(): RuntimeContext {
       envFile: "/tmp/.langwatch-test/.env",
       installManifest: "/tmp/.langwatch-test/install-manifest.json",
     },
-    predeps: {},
+    predeps: { aigateway: { version: "test", resolvedPath: "/fake/bin/aigateway", preInstalled: false } },
     envFile: "/tmp/.langwatch-test/.env",
     version: "test",
     userEnv: {},
@@ -112,6 +126,7 @@ function fakeCtx(): RuntimeContext {
 
 describe("services/runtime", () => {
   beforeEach(() => {
+    langyBinarySupported = true;
     callLog.length = 0;
     [
       postgresStub.fn,
@@ -152,10 +167,10 @@ describe("services/runtime", () => {
   });
 
   describe("when startAll is called", () => {
-    it("starts infra (pg+redis+clickhouse) → migrates → starts app tier (nlp+langevals+gateway+langwatch+workers)", async () => {
+    it("starts infra (pg+redis+clickhouse) → migrates → starts app tier (nlp+langevals+gateway+langwatch+langyagent+workers)", async () => {
       const ctx = fakeCtx();
       const handles = await runtime.startAll(ctx);
-      expect(handles).toHaveLength(8);
+      expect(handles).toHaveLength(9);
       const positions: Record<string, number> = {};
       callLog.forEach((entry, idx) => {
         if (!(entry in positions)) positions[entry] = idx;
@@ -175,6 +190,11 @@ describe("services/runtime", () => {
       expect(positions["start:langwatch"]).toBeGreaterThan(positions["migrate"]!);
     });
 
+    it("starts the assistant alongside the rest of the app tier", async () => {
+      await runtime.startAll(fakeCtx());
+      expect(callLog).toContain("start:langyagent");
+    });
+
     it("returns ServiceHandle objects with name + pid + stop()", async () => {
       const handles = await runtime.startAll(fakeCtx());
       for (const h of handles) {
@@ -185,17 +205,99 @@ describe("services/runtime", () => {
     });
   });
 
+  describe("when the assistant is turned off", () => {
+    it("does not start it, and does not fetch what only it needs", async () => {
+      process.env.LANGWATCH_ENABLE_LANGY = "false";
+      try {
+        await runtime.installServices(fakeCtx());
+        const handles = await runtime.startAll(fakeCtx());
+        expect(callLog).not.toContain("start:langyagent");
+        expect(callLog).not.toContain("langy-cli");
+        // Everything else is untouched.
+        expect(handles).toHaveLength(8);
+        expect(callLog).toContain("start:langwatch");
+        expect(callLog).toContain("venvs");
+      } finally {
+        delete process.env.LANGWATCH_ENABLE_LANGY;
+      }
+    });
+
+    it("strips the assistant out of the app's env so nothing points at a service that is not there", async () => {
+      process.env.LANGWATCH_ENABLE_LANGY = "false";
+      // Simulate a .env scaffolded while the assistant was on: the file keeps
+      // its lines (they are the user's knobs), the processes must not see them.
+      envFileContent = {
+        OPENCODE_AGENT_URL: "http://localhost:5564",
+        FEATURE_FLAG_FORCE_ENABLE: "release_langy_enabled,other_flag",
+      };
+      try {
+        await runtime.startAll(fakeCtx());
+        const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<string, string>;
+        expect(childEnv.OPENCODE_AGENT_URL).toBeUndefined();
+        expect(childEnv.FEATURE_FLAG_FORCE_ENABLE).toBe("other_flag");
+        expect(childEnv.LANGWATCH_ENABLE_LANGY).toBe("false");
+      } finally {
+        envFileContent = {};
+        delete process.env.LANGWATCH_ENABLE_LANGY;
+      }
+    });
+
+  });
+
+  describe("when the release binary predates the assistant", () => {
+    it("comes up without it, and says so", async () => {
+      langyBinarySupported = false;
+      const events: unknown[] = [];
+      const ctx = fakeCtx();
+      const bus = runtime.events(ctx) as { emit(e: unknown): void };
+      const origEmit = bus.emit.bind(bus);
+      bus.emit = (e: unknown) => {
+        events.push(e);
+        origEmit(e);
+      };
+      const handles = await runtime.startAll(ctx);
+      // The whole install still boots; only the assistant is absent.
+      expect(callLog).not.toContain("start:langyagent");
+      expect(callLog).toContain("start:langwatch");
+      expect(handles).toHaveLength(8);
+      // The app is told the assistant is off, not left pointing at a corpse.
+      const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<string, string>;
+      expect(childEnv.LANGWATCH_ENABLE_LANGY).toBe("false");
+      expect(childEnv.OPENCODE_AGENT_URL).toBeUndefined();
+      // And the person running the install is told why.
+      const warning = events.find(
+        (e) =>
+          (e as { type?: string; line?: string }).type === "log" &&
+          ((e as { line?: string }).line ?? "").includes("langy assistant disabled"),
+      );
+      expect(warning).toBeDefined();
+    });
+
+  });
+
+  describe("when nothing is toggled", () => {
+    it("tells the app exactly which evaluators this install skipped", async () => {
+      await runtime.startAll(fakeCtx());
+      const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<string, string>;
+      // Explicit values, so an install whose .env predates a toggle still
+      // gets the truth rather than the app's assume-available default.
+      expect(childEnv.LANGWATCH_ENABLE_PRESIDIO).toBe("false");
+      expect(childEnv.LANGWATCH_ENABLE_LINGUA).toBe("false");
+      expect(childEnv.LANGWATCH_ENABLE_LEGACY_EVALUATORS).toBe("false");
+    });
+  });
+
   describe("when stopAll is called", () => {
     it("stops handles in reverse start order", async () => {
       const handles = await runtime.startAll(fakeCtx());
       callLog.length = 0; // reset to count only stops
       await runtime.stopAll(handles);
       const stopOrder = callLog.filter((entry) => entry.startsWith("stop:"));
-      expect(stopOrder).toHaveLength(7);
+      expect(stopOrder).toHaveLength(9);
       // First stopped should be langwatch (last started); last stopped should be one of the infra.
       const firstStopped = stopOrder[0]!.replace("stop:", "");
       const lastStopped = stopOrder[stopOrder.length - 1]!.replace("stop:", "");
-      expect(["langwatch", "aigateway", "langevals", "nlpgo"]).toContain(firstStopped);
+      expect(firstStopped).toBe("workers");
       expect(["postgres", "redis", "clickhouse"]).toContain(lastStopped);
     });
 
@@ -223,7 +325,7 @@ describe("services/runtime", () => {
       const collector = (async () => {
         for await (const ev of events) {
           collected.push(ev);
-          if (collected.filter((e) => e.type === "healthy").length >= 7) break;
+          if (collected.filter((e) => e.type === "healthy").length >= 8) break;
         }
       })();
       await runtime.startAll(ctx);
@@ -238,7 +340,7 @@ describe("services/runtime", () => {
             () =>
               reject(
                 new Error(
-                  `runtime.events collector did not see 7 healthy events within 5s — got ${
+                  `runtime.events collector did not see 8 healthy events within 5s — got ${
                     collected.filter((e) => e.type === "healthy").length
                   }`,
                 ),
@@ -255,6 +357,7 @@ describe("services/runtime", () => {
           "postgres",
           "redis",
           "clickhouse",
+          "langyagent",
           "nlpgo",
           "langevals",
           "aigateway",

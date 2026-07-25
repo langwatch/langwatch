@@ -174,7 +174,10 @@ secured
 // POST /api/demo/hotel_bot
 // =============================================
 const hotelBotOpenai = new OpenAI({
-  apiKey: env.OPENAI_API_KEY ?? "bogus",
+  // `||` and not `??`: a present-but-empty OPENAI_API_KEY (a scaffolded .env
+  // with the key left blank) must also fall back, or the SDK throws at
+  // module load and takes the whole server down with it.
+  apiKey: env.OPENAI_API_KEY || "bogus",
 });
 
 const guestQueries = [

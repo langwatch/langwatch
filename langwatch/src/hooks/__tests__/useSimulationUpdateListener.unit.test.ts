@@ -6,14 +6,16 @@ import { renderHook, act } from "@testing-library/react";
 
 // Capture the onData callback from useSSESubscription
 let capturedOnData: ((data: { event: string }) => void) | undefined;
+let capturedInput: Record<string, unknown> | undefined;
 
 vi.mock("../useSSESubscription", () => ({
   useSSESubscription: (
     _subscription: unknown,
-    _input: unknown,
+    input: Record<string, unknown>,
     options: { onData?: (data: { event: string }) => void },
   ) => {
     capturedOnData = options.onData;
+    capturedInput = input;
     return {
       connectionState: "connected",
       isConnected: true,
@@ -73,6 +75,7 @@ describe("useSimulationUpdateListener()", () => {
     refetchSpy = vi.fn<() => void>();
     mockIsVisible = true;
     capturedOnData = undefined;
+    capturedInput = undefined;
   });
 
   afterEach(() => {
@@ -405,6 +408,125 @@ describe("useSimulationUpdateListener()", () => {
 
         expect(onNewBatchRun).toHaveBeenCalledTimes(502);
       });
+    });
+  });
+  describe("browser tab handoff", () => {
+    const navigatePayload = (tabKey: string) => ({
+      event: "scenario_tab_navigate",
+      tabKey,
+      url: "https://app.langwatch.ai/acme/simulations/checkout/batch-9",
+    });
+
+    /** @scenario "A simulations tab opened by the SDK registers itself" */
+    it("offers this tab to the SDK when it carries a machine key", () => {
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          tabKey: "machine-abc",
+          tabId: "tab-1",
+        }),
+      );
+
+      expect(capturedInput).toEqual({
+        projectId: "proj_1",
+        tabKey: "machine-abc",
+        tabId: "tab-1",
+      });
+    });
+
+    /** @scenario "A simulations tab without a scenario tab key never registers" */
+    it("stays anonymous without a machine key", () => {
+      renderHook(() => useSimulationUpdateListener({ projectId: "proj_1" }));
+
+      expect(capturedInput).toEqual({ projectId: "proj_1" });
+    });
+
+    /** @scenario "The registered tab navigates to the handed-off run" */
+    it("follows a run handed to this machine", () => {
+      const onTabNavigate = vi.fn();
+
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          tabKey: "machine-abc",
+          tabId: "tab-1",
+          onTabNavigate,
+        }),
+      );
+
+      act(() => {
+        capturedOnData?.({
+          event: JSON.stringify(navigatePayload("machine-abc")),
+        });
+      });
+
+      expect(onTabNavigate).toHaveBeenCalledWith(
+        navigatePayload("machine-abc"),
+      );
+    });
+
+    /** @scenario "A navigate payload for another machine is ignored" */
+    it("ignores a run handed to a different machine", () => {
+      const onTabNavigate = vi.fn();
+
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          tabKey: "machine-abc",
+          tabId: "tab-1",
+          onTabNavigate,
+        }),
+      );
+
+      act(() => {
+        capturedOnData?.({
+          event: JSON.stringify(navigatePayload("machine-xyz")),
+        });
+      });
+
+      expect(onTabNavigate).not.toHaveBeenCalled();
+    });
+
+    it("ignores handoffs entirely on a tab with no machine key", () => {
+      const onTabNavigate = vi.fn();
+
+      renderHook(() =>
+        useSimulationUpdateListener({ projectId: "proj_1", onTabNavigate }),
+      );
+
+      act(() => {
+        capturedOnData?.({
+          event: JSON.stringify(navigatePayload("machine-abc")),
+        });
+      });
+
+      expect(onTabNavigate).not.toHaveBeenCalled();
+    });
+
+    it("does not mistake a handoff for run data", () => {
+      const onNewBatchRun = vi.fn();
+      const refetch = vi.fn();
+
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch,
+          onNewBatchRun,
+          debounceMs: 0,
+          tabKey: "machine-abc",
+          tabId: "tab-1",
+          onTabNavigate: vi.fn(),
+        }),
+      );
+
+      act(() => {
+        capturedOnData?.({
+          event: JSON.stringify(navigatePayload("machine-abc")),
+        });
+      });
+
+      expect(onNewBatchRun).not.toHaveBeenCalled();
+      expect(refetch).not.toHaveBeenCalled();
     });
   });
 });

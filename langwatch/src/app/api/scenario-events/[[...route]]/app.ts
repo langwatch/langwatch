@@ -2,10 +2,15 @@ import { createLogger } from "@langwatch/observability";
 import { bodyLimit } from "hono/body-limit";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import {
+  SCENARIO_TAB_NAVIGATE_EVENT,
+  type ScenarioTabNavigatePayload,
+} from "~/server/scenarios/browser-tab/scenario-tab-events";
+import { scenarioTabRegistry } from "~/server/scenarios/browser-tab/scenario-tab-registry";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 import { ScenarioEventType } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioEvent } from "~/server/scenarios/scenario-event.types";
@@ -141,6 +146,99 @@ secured.access(requires("scenarios:create")).post(
     const url = `${base}${path}`;
 
     return c.json({ success: true, url }, 201);
+  },
+);
+
+// POST /api/scenario-events/browser-tab - Offer a batch run to a simulations
+// tab that is already open on the caller's machine.
+//
+// The SDK sends the scenario tab key it stamped on the tab it opened earlier.
+// When a tab holding that key still has a live SSE subscription, the run is
+// broadcast to it and the SDK skips opening a browser; otherwise the SDK falls
+// back to opening one. Reporting a run is `scenarios:create` work, and so is
+// steering where that run is displayed.
+secured.access(requires("scenarios:create")).post(
+  "/browser-tab",
+  describeRoute({
+    description:
+      "Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Handoff evaluated",
+        content: {
+          "application/json": {
+            schema: resolver(responseSchemas.browserTabHandoff),
+          },
+        },
+      },
+    },
+  }),
+  zValidator(
+    "json",
+    z.object({
+      tabKey: z.string().min(1).max(200),
+      batchRunId: z.string().min(1).max(200),
+      scenarioSetId: z.string().min(1).max(200).optional(),
+    }),
+  ),
+  async (c) => {
+    const { project } = c.var;
+    const { tabKey, batchRunId, scenarioSetId } = c.req.valid("json");
+
+    const base = process.env.BASE_HOST;
+
+    if (!base) {
+      logger.error(
+        "BASE_HOST is not set, but required for the scenario browser-tab handoff",
+      );
+
+      return c.json({ error: "BASE_HOST is not configured" }, 500);
+    }
+
+    // Built server-side from ids rather than accepted as a URL: a handoff can
+    // only ever point a browser at this instance's own simulations page. The
+    // ids are caller-supplied and only length-bounded, so they are encoded — a
+    // `#` or `?` in one would otherwise truncate the rest of the path.
+    const url = `${base}/${project.slug}/simulations/${encodeURIComponent(
+      scenarioSetId || DEFAULT_SET_ID,
+    )}/${encodeURIComponent(batchRunId)}`;
+
+    const hasLiveTab = await scenarioTabRegistry.hasLiveTab({
+      projectId: project.id,
+      tabKey,
+    });
+
+    if (!hasLiveTab) {
+      return c.json({ delivered: false, url }, 200);
+    }
+
+    const payload: ScenarioTabNavigatePayload = {
+      event: SCENARIO_TAB_NAVIGATE_EVENT,
+      tabKey,
+      url,
+    };
+
+    // Parked before the broadcast so a tab reconnecting right now cannot slip
+    // between the two and miss a run we already reported as delivered.
+    await scenarioTabRegistry.setPendingNavigate({
+      projectId: project.id,
+      tabKey,
+      url,
+    });
+
+    await getApp().broadcast.broadcastToTenant(
+      project.id,
+      JSON.stringify(payload),
+      "simulation_updated",
+    );
+
+    logger.info(
+      { projectId: project.id, batchRunId },
+      "Handed scenario batch to an open simulations tab",
+    );
+
+    return c.json({ delivered: true, url }, 200);
   },
 );
 

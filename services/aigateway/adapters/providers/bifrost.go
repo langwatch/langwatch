@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -38,6 +39,13 @@ type BifrostRouter struct {
 	// port exhaustion under embedding throughput.
 	voyageClient   *http.Client
 	endpointPolicy customerEndpointPolicy
+	// discoveryOnce lazily builds the /v1/models discovery client and
+	// cache. Lazy rather than constructor-built so a zero-value router
+	// (used by tests and by any caller that only needs discovery) works
+	// without a live Bifrost instance.
+	discoveryOnce   sync.Once
+	discoveryHTTP   *http.Client
+	discoveryModels *modelsDiscoveryCache
 	// codexClient streams against OpenAI's codex backend (no overall
 	// timeout — turns run for minutes; cancellation rides the context).
 	codexClient *http.Client
@@ -177,6 +185,14 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	if req.Type == domain.RequestTypeEmbeddings {
 		return r.dispatchEmbeddings(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypeSpeech {
+		return r.dispatchSpeech(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypeTranscription {
+		return r.dispatchTranscription(ctx, req, provider, model, cred)
 	}
 
 	if req.Type == domain.RequestTypePassthrough {
@@ -779,11 +795,6 @@ func rawResponseFromBifrostError(berr *bfschemas.BifrostError) ([]byte, int, boo
 		status = *berr.StatusCode
 	}
 	return body, status, true
-}
-
-// ListModels returns an empty list — model discovery is VK-config-driven.
-func (r *BifrostRouter) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-	return nil, nil
 }
 
 // --- Bifrost Account (multi-tenant credential provider) ---

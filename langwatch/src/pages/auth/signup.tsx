@@ -21,6 +21,9 @@ import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { api } from "../../utils/api";
+import { authFailureMessage } from "./authFailureMessage";
+
+const SIGN_UP_FALLBACK = "Sign up did not go through. Please try again.";
 
 export default function SignUp() {
   const { data: session } = useSession();
@@ -77,8 +80,12 @@ function SignUpForm() {
 
   const register = api.user.register.useMutation();
   const [signInLoading, setSignInLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const onSubmit = async (values: z.infer<typeof schema>) => {
+    setSubmitError(null);
+
+    let message: string | null = null;
     try {
       await register.mutateAsync(values);
 
@@ -88,19 +95,29 @@ function SignUpForm() {
         password: values.password,
         callbackUrl: callbackUrl,
       });
+
+      if (response?.error ?? (response?.status && response.status >= 400)) {
+        message = authFailureMessage({
+          code: response.code,
+          message: response.error,
+          status: response.status,
+          fallback: SIGN_UP_FALLBACK,
+        });
+      }
+    } catch (error) {
+      message = authFailureMessage({
+        message: error instanceof Error ? error.message : void 0,
+        fallback: SIGN_UP_FALLBACK,
+      });
+    } finally {
       setSignInLoading(false);
+    }
 
-      if (response?.error) {
-        throw new Error("Sign up failed");
-      }
-
-      if (response?.status && response.status >= 400) {
-        throw new Error("Network response was not ok");
-      }
-    } catch {
+    if (message) {
+      setSubmitError(message);
       toaster.create({
-        title: "Error",
-        description: "Failed to sign up",
+        title: "Could not create your account",
+        description: message,
         type: "error",
         meta: {
           closable: true,
@@ -154,7 +171,7 @@ function SignUpForm() {
               >
                 <Input type="password" {...form.register("confirmPassword")} />
               </HorizontalFormControl>
-              {register.error && (
+              {(submitError ?? register.error?.message) && (
                 <Alert.Root
                   borderStartWidth="4px"
                   borderStartColor="colorPalette.solid"
@@ -162,7 +179,7 @@ function SignUpForm() {
                 >
                   <Alert.Content>
                     <Alert.Description>
-                      {register.error.message}
+                      {submitError ?? register.error?.message}
                     </Alert.Description>
                   </Alert.Content>
                 </Alert.Root>

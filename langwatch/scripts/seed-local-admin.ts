@@ -172,8 +172,14 @@ async function main() {
   });
   console.log("Seeded org + team memberships and RoleBinding rows");
 
+  // The app's own address, not a fixed port: a second checkout runs on
+  // whatever slot was free, and a banner sending people to 5560 lands them on
+  // another checkout (or nothing at all).
+  const appUrl =
+    process.env.BASE_HOST ?? `http://localhost:${process.env.PORT ?? 5560}`;
+
   console.log("\n=== LOGIN CREDENTIALS ===");
-  console.log(`  URL:          http://localhost:5560/auth/signin`);
+  console.log(`  URL:          ${appUrl}/auth/signin`);
   console.log(`  Email:        ${email}`);
   console.log(`  Password:     ${password}`);
   console.log(`  Org slug:     ${org.slug}`);

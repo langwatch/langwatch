@@ -11,6 +11,7 @@ describe("port allocation", () => {
         nlp: 5561,
         langevals: 5562,
         aigateway: 5563,
+        langyagent: 5564,
         postgres: 6560,
         redis: 6561,
         clickhouseHttp: 6562,
@@ -37,12 +38,13 @@ describe("port allocation", () => {
         "nlpgo",
         "langevals",
         "ai gateway",
+        "langy agent",
         "postgres",
         "redis",
         "clickhouse http",
         "clickhouse native",
       ]);
-      expect(new Set(checks.map((c) => c.port)).size).toBe(8);
+      expect(new Set(checks.map((c) => c.port)).size).toBe(9);
     });
   });
 });

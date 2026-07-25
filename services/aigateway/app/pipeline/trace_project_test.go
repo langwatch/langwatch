@@ -36,7 +36,7 @@ func TestTraceBeginsSyncAndStreamSpansUnderConfigProject(t *testing.T) {
 		_, err := interceptor.Sync(next)(context.Background(), &Call{
 			Bundle:  bundle,
 			Request: request,
-			Meta:    &Meta{},
+			Meta:    &MetaAccumulator{},
 		})
 
 		require.NoError(t, err)
@@ -59,7 +59,7 @@ func TestTraceBeginsSyncAndStreamSpansUnderConfigProject(t *testing.T) {
 		_, err := interceptor.Stream(next)(context.Background(), &Call{
 			Bundle:  bundle,
 			Request: request,
-			Meta:    &Meta{},
+			Meta:    &MetaAccumulator{},
 		})
 
 		require.NoError(t, err)

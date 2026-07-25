@@ -218,6 +218,10 @@ export default defineConfig(async (): Promise<UserConfig> => {
         // server appends on every request, so watching one turns each page
         // load into a full-reload loop.
         "**/server*.log",
+        // Working files agents keep under .claude/tmp, per the repo
+        // convention. A dev-server log teed there reloads the page on every
+        // request, same trap as above under a different name.
+        "**/.claude/**",
       ],
       // Docker-on-macOS bind mounts don't surface inotify events reliably,
       // so Vite's default fs.watch sits silent on edits made from the host.

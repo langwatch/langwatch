@@ -87,10 +87,14 @@ browser-tests/
 # README.md is the exception — it documents the .claude/ layout itself.
 .claude/*.md
 !.claude/README.md
-# PR description documents are the canonical reviewer artifact for the
-# branch they describe — graduated from local notes to tracked content
-# per @rchaves directive 2026-04-27.
-!.claude/PR-*.md
+# No un-ignore for PR-*.md here. Git matches ignore patterns
+# case-insensitively when core.ignorecase is on, which is the default on
+# macOS, so that glob also un-ignored scratch files named pr-*.md and
+# committed them: .claude/pr-body-current.md and .claude/pr-body-new.md
+# reached main that way. It protected nothing, since no .claude/PR-*.md is
+# tracked and the rules further down re-ignore the canonical names anyway.
+# To track a specific PR document, add a negation for its exact name below
+# those rules, or `git add -f` it.
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
@@ -146,3 +150,4 @@ server.log
 .langwatch-slug
 /bin/haven
 langwatch/dev.log
+.claude/tmp/

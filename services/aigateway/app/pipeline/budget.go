@@ -10,7 +10,7 @@ import (
 )
 
 // BudgetPrecheckFunc checks whether the request is within budget.
-type BudgetPrecheckFunc func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error)
+type BudgetPrecheckFunc func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 
 // budgetExceededMessage is the admin-actionable copy shown when an org hits
 // its gateway spending limit, so the 402 carries actionable guidance instead
@@ -23,12 +23,12 @@ const budgetExceededMessage = "Your organization's AI gateway spending limit has
 // plane folds OTel span usage attributes into the ClickHouse budget ledger.
 func Budget(precheck BudgetPrecheckFunc, logger *zap.Logger) Interceptor {
 	pre := func(ctx context.Context, call *Call) error {
-		verdict, err := precheck(ctx, call.Bundle)
+		decision, err := precheck(ctx, call.Bundle)
 		if err != nil {
 			logger.Warn("budget_precheck_error", zap.Error(err))
 			return nil
 		}
-		switch verdict {
+		switch decision.Verdict {
 		case domain.BudgetAllow:
 			// No action needed.
 		case domain.BudgetBlock:
@@ -42,7 +42,11 @@ func Budget(precheck BudgetPrecheckFunc, logger *zap.Logger) Interceptor {
 				"fault":    "customer",
 			})
 		case domain.BudgetWarn:
-			call.Meta.BudgetWarnings = append(call.Meta.BudgetWarnings, "near_limit")
+			call.Meta.Update(func(m *Meta) {
+				for _, warning := range decision.Warnings {
+					m.BudgetWarnings = append(m.BudgetWarnings, warning.String())
+				}
+			})
 		}
 		return nil
 	}

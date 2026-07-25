@@ -151,6 +151,12 @@ secured.access(
     session,
     permissionChecked: false,
     publiclyShared: false,
+    // Subscriptions await an event that may never come; without this they stay
+    // suspended after the browser is gone, holding their emitter listener and
+    // skipping their own cleanup. Closing the stream cannot interrupt a
+    // pending `await` from the outside, so the signal has to reach the
+    // procedure itself.
+    signal: raw.signal,
   });
 
   // Create caller and resolve the procedure
