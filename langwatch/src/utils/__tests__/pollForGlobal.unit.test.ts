@@ -81,6 +81,28 @@ describe("pollForGlobal", () => {
       expect(onFound).not.toHaveBeenCalled();
     });
 
+    describe("when the getter starts throwing mid-poll", () => {
+      it("stops polling instead of letting the error escape the timer", () => {
+        const onFound = vi.fn();
+        let live = true;
+        const getValue = vi.fn((): string | undefined => {
+          if (!live) throw new ReferenceError("window is not defined");
+          return undefined;
+        });
+
+        pollForGlobal(getValue, onFound, { intervalMs: 50 });
+
+        // The environment the getter reads from goes away underneath a poll
+        // that is already running.
+        live = false;
+
+        expect(() => vi.advanceTimersByTime(500)).not.toThrow();
+        // The synchronous first read, then one tick that threw and ended it.
+        expect(getValue).toHaveBeenCalledTimes(2);
+        expect(onFound).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when cancelled before the value appears", () => {
       it("never calls onFound even if the value later becomes available", () => {
         const onFound = vi.fn();
