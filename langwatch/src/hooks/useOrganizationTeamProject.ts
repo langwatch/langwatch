@@ -297,7 +297,7 @@ export const useOrganizationTeamProject = (
           (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
         ),
       ) ??
-      selectAmbientTeam(organization?.teams ?? [])) // Find team with demo project, or any team with projects
+      selectAmbientTeam(organization?.teams ?? [])) // The team holding the demo project, else the ambient one
     : resolvedSlugMatch
       ? resolvedSlugMatch.team
       : organization
