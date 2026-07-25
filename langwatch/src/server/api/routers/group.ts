@@ -167,7 +167,9 @@ export const groupRouter = createTRPCRouter({
                 },
               },
             },
-            include: { user: { select: { id: true, name: true, email: true } } },
+            include: {
+              user: { select: { id: true, name: true, email: true, image: true } },
+            },
           },
         },
       });
@@ -197,6 +199,7 @@ export const groupRouter = createTRPCRouter({
           userId: m.userId,
           name: m.user.name,
           email: m.user.email,
+          image: m.user.image,
         })),
       };
     }),

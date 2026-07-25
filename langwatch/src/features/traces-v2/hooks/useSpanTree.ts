@@ -3,6 +3,10 @@ import { useEffect, useRef } from "react";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import { LIVE_REFETCH_MS } from "../constants/freshness";
+import {
+  asSharedQueryResult,
+  useSharedTrace,
+} from "../context/SharedTraceContext";
 import { useSseStatusStore } from "../stores/sseStatusStore";
 import {
   mergeSpanTreeDelta,
@@ -13,6 +17,7 @@ import {
 import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 export function useSpanTree() {
+  const shared = useSharedTrace();
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   // SSE health decides the delta poll's CADENCE, not whether it runs at all.
   // While SSE is up, `useTraceFreshness` invalidates the delta on each
@@ -35,8 +40,10 @@ export function useSpanTree() {
     // Disable the real fetch when the traceId is a preview-mode
     // synthetic — `useOpenTraceDrawer` has already seeded the cache
     // with hand-crafted span data; firing a real request would just
-    // return empty and clobber the seed.
-    enabled: isReady,
+    // return empty and clobber the seed. A shared trace carries its
+    // spans in the share payload, so there is nothing to walk and no
+    // authenticated endpoint to walk it with.
+    enabled: isReady && !shared,
     staleTime: 300_000,
     cacheTime: 1_800_000,
     keepPreviousData: true,
@@ -67,7 +74,11 @@ export function useSpanTree() {
       // exists to avoid. Until the walk lands, the main query is the source of
       // truth (and its retries have no high-water mark to poll from anyway).
       enabled:
-        isReady && isLive && tree !== undefined && !treeQuery.isFetching,
+        isReady &&
+        isLive &&
+        !shared &&
+        tree !== undefined &&
+        !treeQuery.isFetching,
       // Only when SSE can't push. With SSE up, `useTraceFreshness` invalidates
       // this query per `span.stored` batch, which refetches it on the spot.
       refetchInterval: sseConnected ? false : LIVE_REFETCH_MS,
@@ -94,7 +105,7 @@ export function useSpanTree() {
   useEffect(() => {
     const reconnected = sseConnected && !wasSseConnected.current;
     wasSseConnected.current = sseConnected;
-    if (!reconnected || !isReady || !isLive) return;
+    if (!reconnected || !isReady || !isLive || shared) return;
     void utils.tracesV2.spanTreeDelta.invalidate({
       projectId: queryArgs.projectId,
       traceId: queryArgs.traceId,
@@ -103,10 +114,14 @@ export function useSpanTree() {
     sseConnected,
     isReady,
     isLive,
+    shared,
     utils,
     queryArgs.projectId,
     queryArgs.traceId,
   ]);
 
+  if (shared) {
+    return asSharedQueryResult(shared.spanTree) as unknown as typeof treeQuery;
+  }
   return treeQuery;
 }

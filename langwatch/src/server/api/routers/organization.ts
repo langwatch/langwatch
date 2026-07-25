@@ -346,6 +346,7 @@ export const organizationRouter = createTRPCRouter({
           s3SecretAccessKey: z.string().optional(),
           s3Bucket: z.string().optional(),
           presenceEnabled: z.boolean().optional(),
+          traceSharingEnabled: z.boolean().optional(),
           supportContact: z.string().max(500).nullable().optional(),
           primaryIntent: z
             .enum(["AGENT_GOVERNANCE", "LLM_OPS"])
@@ -370,7 +371,21 @@ export const organizationRouter = createTRPCRouter({
         ),
     )
     .use(checkOrganizationPermission("organization:manage"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // Detect a trace-sharing disable transition before the write so the
+      // kill-switch cascade mirrors the project-level behavior: disabling
+      // revokes every existing trace link across the org (not just blocks new
+      // ones), so re-enabling later never resurrects old links. See ADR-057.
+      const wasSharingEnabled =
+        input.traceSharingEnabled === false
+          ? (
+              await ctx.prisma.organization.findUnique({
+                where: { id: input.organizationId },
+                select: { traceSharingEnabled: true },
+              })
+            )?.traceSharingEnabled === true
+          : false;
+
       await getApp().organizations.update({
         organizationId: input.organizationId,
         name: input.name,
@@ -379,9 +394,22 @@ export const organizationRouter = createTRPCRouter({
         s3SecretAccessKey: input.s3SecretAccessKey,
         s3Bucket: input.s3Bucket,
         presenceEnabled: input.presenceEnabled,
+        traceSharingEnabled: input.traceSharingEnabled,
         supportContact: input.supportContact,
         primaryIntent: input.primaryIntent,
       });
+
+      if (input.traceSharingEnabled === false && wasSharingEnabled) {
+        const projects = await ctx.prisma.project.findMany({
+          where: { team: { organizationId: input.organizationId } },
+          select: { id: true },
+        });
+        await Promise.all(
+          projects.map((project) =>
+            getApp().share.revokeAllTraceShares(project.id),
+          ),
+        );
+      }
 
       return { success: true };
     }),

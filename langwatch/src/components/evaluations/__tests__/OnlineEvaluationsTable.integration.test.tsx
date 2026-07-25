@@ -164,7 +164,8 @@ describe("<OnlineEvaluationsTable />", () => {
     expect(onEdit).toHaveBeenCalledWith("monitor-down");
   });
 
-  it("does not render an empty action menu when the viewer has no row actions", () => {
+  /** @scenario A viewer without analytics access does not wait forever */
+  it("shows a stable permission state without an empty action menu", () => {
     render(
       <OnlineEvaluationsTable
         {...defaultProps}
@@ -174,7 +175,7 @@ describe("<OnlineEvaluationsTable />", () => {
       { wrapper: Wrapper },
     );
 
-    expect(screen.getAllByText("Analytics unavailable")).toHaveLength(3);
+    expect(screen.getAllByText("Analytics access required")).toHaveLength(3);
     expect(
       screen.queryByRole("button", { name: "Actions for Answer quality" }),
     ).not.toBeInTheDocument();

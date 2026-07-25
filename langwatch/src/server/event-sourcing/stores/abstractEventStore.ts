@@ -146,29 +146,79 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
     aggregateType: AggregateType,
     anchorOccurredAtMs?: number,
   ): Promise<readonly EventType[]> {
-    EventUtils.validateTenantId(context, `${this.constructor.name}.getEvents`);
+    // For time-local aggregate types, lower-bound the event_log scan to a
+    // window around the triggering work's time so ClickHouse prunes old weekly
+    // partitions instead of cold-scanning every partition on S3. Returns
+    // undefined (unbounded scan) for long-lived aggregate types or when no
+    // usable anchor time is available, so behaviour is unchanged there.
+    return await this.readEvents({
+      operation: "getEvents",
+      aggregateId,
+      context,
+      aggregateType,
+      occurredAtFromMs: rehydrationLowerBoundMs(
+        aggregateType,
+        anchorOccurredAtMs,
+      ),
+    });
+  }
+
+  /**
+   * Retrieves events with an EXPLICIT occurred-at lower bound, applied
+   * verbatim for ANY aggregate type — unlike `getEvents`, whose anchor is
+   * gated to time-local aggregate types because its callers supply a
+   * heuristic time.
+   *
+   * For reads that hold a provable bound of their own: a cursor tail
+   * catch-up wants only events ACCEPTED after its cursor, so occurred-at can
+   * be floored a safety window below that point and still prune every older
+   * weekly partition. The caller owns the margin — the bound MUST sit far
+   * enough below the wanted range that no delayed or replayed event's
+   * occurred-at can fall under it (rows with an unknown occurred time are
+   * always kept by the repositories, so the bound can never drop those).
+   */
+  async getEventsOccurredSince(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    occurredAtFromMs: number,
+  ): Promise<readonly EventType[]> {
+    return await this.readEvents({
+      operation: "getEventsOccurredSince",
+      aggregateId,
+      context,
+      aggregateType,
+      occurredAtFromMs,
+    });
+  }
+
+  private async readEvents({
+    operation,
+    aggregateId,
+    context,
+    aggregateType,
+    occurredAtFromMs,
+  }: {
+    operation: "getEvents" | "getEventsOccurredSince";
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    occurredAtFromMs: number | undefined;
+  }): Promise<readonly EventType[]> {
+    const label = `${this.constructor.name}.${operation}`;
+    EventUtils.validateTenantId(context, label);
 
     if (this.hasMissingAggregateId(aggregateId)) {
       this.logWarning(
-        `${this.constructor.name}.getEvents`,
+        label,
         { tenantId: context.tenantId, aggregateType },
         "Skipped event_log read for an empty aggregateId (would scan the whole empty-id key range); returning no events",
       );
       return [];
     }
 
-    // For time-local aggregate types, lower-bound the event_log scan to a
-    // window around the triggering work's time so ClickHouse prunes old weekly
-    // partitions instead of cold-scanning every partition on S3. Returns
-    // undefined (unbounded scan) for long-lived aggregate types or when no
-    // usable anchor time is available, so behaviour is unchanged there.
-    const occurredAtFromMs = rehydrationLowerBoundMs(
-      aggregateType,
-      anchorOccurredAtMs,
-    );
-
     return await this.instrument(
-      `${this.constructor.name}.getEvents`,
+      label,
       {
         "aggregate.id": String(aggregateId),
         "tenant.id": context.tenantId,
@@ -191,7 +241,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
           return deduplicateEvents(processed);
         } catch (error) {
           this.logError(
-            `${this.constructor.name}.getEvents`,
+            label,
             {
               aggregateId: String(aggregateId),
               tenantId: context.tenantId,

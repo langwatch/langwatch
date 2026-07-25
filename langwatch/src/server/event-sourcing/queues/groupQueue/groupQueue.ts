@@ -56,6 +56,7 @@ import {
 import {
   gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
+  gqForeignSiblingsRestagedTotal,
   gqGroupsPoisonParkedTotal,
   gqJobDelayMilliseconds,
   gqJobDurationMilliseconds,
@@ -117,6 +118,19 @@ const GROUP_QUEUE_CONFIG = {
 
 /** Default TTL for deduplication in milliseconds */
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
+
+/**
+ * Default byte budget for a coalesced batch when a queue enables coalescing but
+ * supplies no `coalesceMaxBytes` resolver (ADR-066 pillar 2).
+ *
+ * 4 MiB keeps a coalesced multi-row append inside the ClickHouse async-insert
+ * flush budget, so producer-side coalescing collapses many tiny appends into one
+ * insert without ever assembling an insert large enough to stall the flush. It
+ * is generous enough that the fold/map batches that predate ADR-066 stay bounded
+ * by their count limit (`coalesceMaxBatch`) in practice, so their behaviour is
+ * unchanged — the byte bound only ever binds first for a genuinely large burst.
+ */
+export const DEFAULT_COALESCE_MAX_BYTES = 4 * 1024 * 1024;
 
 /**
  * Decides whether a failed job attempt should be retried.
@@ -241,6 +255,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     delivery?: JobDelivery,
   ) => Promise<void>;
   private readonly coalesceMaxBatch?: (payload: Payload) => number | undefined;
+  private readonly coalesceMaxBytes?: (payload: Payload) => number | undefined;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly processingQueue: fastq.queueAsPromised<DispatchResult, void>;
   private readonly delay?: number;
@@ -266,6 +281,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private shutdownRequested = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
+  /**
+   * Groups whose claim strike is currently outstanding (recorded at claim,
+   * cleared in the processing finally). {@link close} sweeps these so a
+   * planned shutdown never leaves a strike behind as a fake worker death.
+   */
+  private readonly inFlightStrikeGroups = new Set<string>();
 
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
@@ -283,6 +304,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       process,
       processBatch,
       coalesceMaxBatch,
+      coalesceMaxBytes,
       options: defOptions,
       delay,
       spanAttributes,
@@ -330,6 +352,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.process = process;
     this.processBatch = processBatch;
     this.coalesceMaxBatch = coalesceMaxBatch;
+    this.coalesceMaxBytes = coalesceMaxBytes;
     this.auditAdapter = auditAdapter;
     this.globalConcurrency =
       defOptions?.globalConcurrency ??
@@ -730,12 +753,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * the liveness probe kills the process, the strike stays behind, and after
    * enough consecutive deaths the next claim parks the group instead of
    * re-running the killer (specs/event-sourcing/poison-group-park-guard.feature).
+   *
+   * A claim made after a graceful shutdown was requested records NO strike:
+   * the process is about to exit on purpose, and dying with that job in
+   * flight must not read as the job killing the worker. Pre-shutdown strikes
+   * are swept in {@link close} while the event loop is provably alive. A group
+   * already at the threshold is therefore parked at most one claim early: a
+   * claim that begins after the shutdown records no strike and parks on the next
+   * boot's claim instead, while a claim already awaiting its strike record when
+   * the shutdown flips can still cross the threshold and park during the drain —
+   * but only on its real prior-death strikes, never on a shutdown-born one.
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
 
     const strikeThreshold = readClaimStrikeThreshold();
-    if (strikeThreshold > 0) {
+    const recordStrikes = strikeThreshold > 0 && !this.shutdownRequested;
+    if (recordStrikes) {
       let strikes = 0;
       try {
         strikes = await this.scripts.recordClaimStrike(groupId);
@@ -754,12 +788,30 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         });
         return;
       }
+      this.inFlightStrikeGroups.add(groupId);
+
+      // close() may have flipped shutdownRequested and taken its sweep snapshot
+      // during the recordClaimStrike await above — before this group was in the
+      // set, so the sweep would miss it and an abandoned drain would leave the
+      // strike behind: exactly the false worker-death this guard must not book.
+      // Re-check on the synchronous heels of the add (no await between them, so
+      // close() cannot interleave here) and clear our own strike if the shutdown
+      // began mid-claim. The add and this check are jointly exhaustive: either
+      // close()'s snapshot already saw the group and swept it, or it did not and
+      // we clear it here.
+      if (this.shutdownRequested) {
+        this.inFlightStrikeGroups.delete(groupId);
+        await this.scripts.clearClaimStrikes(groupId).catch(() => {
+          // Protective accounting only; the strike key's TTL bounds a failed clear.
+        });
+      }
     }
 
     try {
       await this.processClaimedJob(dispatched);
     } finally {
-      if (strikeThreshold > 0) {
+      if (recordStrikes) {
+        this.inFlightStrikeGroups.delete(groupId);
         this.scripts.clearClaimStrikes(groupId).catch(() => {
           // The TTL on the strike key bounds the damage of a failed clear.
         });
@@ -848,11 +900,21 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     let batchPayloads: Payload[] | null = null;
     let drainedSiblings: DrainedJob[] = [];
     if (maxBatch > 1 && this.processBatch) {
+      // Byte bound (ADR-066 pillar 2): the drain also stops before a job that
+      // would push the batch past maxBytes, counting the dispatched job's own
+      // stored size as the starting point. Whichever of the count/byte bound
+      // binds first wins; an oversized dispatched job (initialBytes already at
+      // or over the budget) drains no siblings and processes on its own.
+      const maxBytes =
+        this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
+      const initialBytes = Buffer.byteLength(jobDataJson);
       try {
         drainedSiblings = await this.scripts.drainGroupReady({
           groupId,
           nowMs: Date.now(),
           maxJobs: maxBatch - 1,
+          maxBytes,
+          initialBytes,
         });
       } catch (err) {
         this.logger.warn(
@@ -864,6 +926,42 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           "Failed to drain group siblings for coalescing — processing single job",
         );
         drainedSiblings = [];
+      }
+      // Mixed-command groups (ADR-066 pillar 2): with `serializeByAggregate` the
+      // group key namespace is shared across command types, so a drained sibling
+      // can belong to a DIFFERENT job than the dispatched one. Fold/map groups
+      // are single-`__jobName` by construction, so for them this is a no-op. Only
+      // coalesce siblings whose `__jobName` matches the dispatched job's; restage
+      // the rest untouched (via the same path a failed batch uses) so they run as
+      // their own dispatches — a payload is never handed to another job's handler.
+      //
+      // Read the dispatched job's name the SAME way as each sibling
+      // (`readJobRoutingMeta`, null when absent), so a queue that sets no
+      // `__jobName` at all (every job null) still matches and coalesces — rather
+      // than the `jobName` local, which defaults absent to "unknown" and would
+      // mismatch a sibling's null.
+      if (drainedSiblings.length > 0) {
+        const dispatchedJobName = readJobRoutingMeta(jobDataJson).jobName;
+        const matchingSiblings: DrainedJob[] = [];
+        const foreignSiblings: DrainedJob[] = [];
+        for (const sibling of drainedSiblings) {
+          const siblingJobName = readJobRoutingMeta(
+            sibling.jobDataJson,
+          ).jobName;
+          if (siblingJobName === dispatchedJobName) {
+            matchingSiblings.push(sibling);
+          } else {
+            foreignSiblings.push(sibling);
+          }
+        }
+        if (foreignSiblings.length > 0) {
+          gqForeignSiblingsRestagedTotal.inc(
+            { queue_name: this.queueName },
+            foreignSiblings.length,
+          );
+          await this.restageDrainedSiblings(groupId, foreignSiblings);
+        }
+        drainedSiblings = matchingSiblings;
       }
       if (drainedSiblings.length > 0) {
         try {
@@ -2019,6 +2117,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       .catch(() => {
         // best-effort wake; a failed signal only delays dispatcher exit
       });
+
+    // A planned shutdown is not a worker death (poison-group-park-guard
+    // spec: "graceful shutdown mid-job does not count as a poison strike").
+    // Sweep the in-flight claim strikes NOW, before the drain below, while
+    // the event loop is provably alive — a worker whose loop a poison job
+    // seized can never reach this sweep, so real crash-loops keep their
+    // count. Jobs that complete during the drain re-clear harmlessly; jobs
+    // the drain budget (or the platform's SIGKILL) abandons leave no strike
+    // behind and re-dispatch cleanly on the next boot.
+    const inFlight = [...this.inFlightStrikeGroups];
+    if (inFlight.length > 0) {
+      await Promise.allSettled(
+        inFlight.map((groupId) => this.scripts.clearClaimStrikes(groupId)),
+      );
+      this.logger.info(
+        { queueName: this.queueName, groups: inFlight.length },
+        "Cleared in-flight claim strikes for graceful shutdown",
+      );
+    }
+
     this.logger.debug(
       { queueName: this.queueName },
       "Closing group queue processor",

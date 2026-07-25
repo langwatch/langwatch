@@ -5,7 +5,7 @@
  * — and a nonzero exit either way.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readCliErrorDocument } from "@langwatch/cli-cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
 
 // A developer's local .env must not decide whether these tests see a key; the
 // scoped loader's `parse` results are stubbed per test below.

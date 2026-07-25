@@ -60,6 +60,8 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+
 **Projects and API keys: target a real project, not a personal one.**
 
 LangWatch has two kinds of project:
@@ -108,6 +110,14 @@ Then create the monitor with a descriptive name, a valid evaluator type or saved
 - Use `thread` for multi-message outcomes and configure an appropriate idle timeout in the platform when needed.
 - Start with a conservative sample rate for expensive evaluators on high-volume traffic.
 - Use `ON_MESSAGE` for asynchronous online evaluation.
+
+Take the evaluator type from the catalog, never from memory:
+
+```bash
+langwatch evaluator types --format json
+```
+
+If a create still fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once. That failure is yours to fix — do not ask the user to pick a type slug.
 
 Do not guess evaluator parameters. Read the evaluator docs and the installed CLI help. If an LLM evaluator is used, verify that the target project has a model provider configured.
 

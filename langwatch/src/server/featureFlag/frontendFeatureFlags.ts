@@ -65,12 +65,25 @@ export const FRONTEND_FEATURE_FLAGS = [
   // having Langy is necessary but not sufficient, so the panel can ship to a
   // project long before its home page changes shape. Outranked by
   // `release_ui_home_signal_focused_enabled`. See useHomeComposition.
-  "release_ui_home_langy_lantern_enabled",
   // The signal-focused home composition (briefing sheet leads). Decides
   // the homepage's layout ONLY — Langy access separately gates the
   // sheet's hand-to-Langy affordances. See useShowSignalFocusedHome.
   "release_ui_home_signal_focused_enabled",
+  // Langy's minimised state as an edge peek of the panel itself (spec:
+  // specs/langy/langy-peek-dock.feature). Flag off = the classic corner
+  // launcher orb. Swaps only the CLOSED-state affordance; opening, the
+  // panel and Cmd/Ctrl+I are identical either way.
+  "release_ui_langy_peek_dock_enabled",
   "release_webhook_automations",
+  // Pins the Ops section into the main sidebar for a user who already has ops
+  // access, so it shows on every route instead of only under /ops. Deliberately
+  // NOT a PostHog flag — it resolves false server-side (unknown flag) and is
+  // meant to be forced On locally from the hidden Feature Flags (Dev) drawer,
+  // persisting in that browser via the local override. It never widens who can
+  // see ops: the sidebar still gates on ops access, so a non-ops user forcing
+  // it On sees nothing. Env `SHOW_OPS_IN_MAIN_SIDEBAR` remains the fleet-wide
+  // allowlist; this is the per-browser convenience that needs no server change.
+  "ops_ui_ops_menu_pinned",
 ] as const;
 
 /**

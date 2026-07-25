@@ -1,10 +1,12 @@
 import { Box, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
+import { LuArrowRight } from "react-icons/lu";
 import { ComposerMorphGhost } from "~/features/langy/components/ComposerMorphGhost";
 import { Composer } from "~/features/langy/components/Composer";
+import { LangyMark } from "~/features/langy/components/LangyMark";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useComposerMorph } from "~/features/langy/hooks/useComposerMorph";
-import { selectHomeSuggestions } from "~/features/langy/logic/langyHomeSuggestions";
+import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggestions";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useHomeDevState } from "./dev/homeDevState";
 import { OnboardAgentPill } from "./OnboardAgentPill";
@@ -53,13 +55,14 @@ export function LangyHomeLantern() {
   const leadWithOnboarding = reachKnown && isNewProject;
   const suggestions = !reachKnown
     ? []
-    : selectHomeSuggestions(
-        devState === "empty"
-          ? { hasTraces: false, hasEvaluations: false, hasExperiments: false }
-          : devState === "populated"
-            ? { hasTraces: true, hasEvaluations: true, hasExperiments: true }
-            : reach,
-      );
+    : selectLangySuggestions({
+        reach:
+          devState === "empty"
+            ? { hasTraces: false, hasEvaluations: false, hasExperiments: false }
+            : devState === "populated"
+              ? { hasTraces: true, hasEvaluations: true, hasExperiments: true }
+              : reach,
+      });
 
   const modelOverride = useLangyStore((s) => s.modelOverride);
   const setModelOverride = useLangyStore((s) => s.setModelOverride);
@@ -108,32 +111,49 @@ export function LangyHomeLantern() {
         <Box
           minHeight="46px"
           display="flex"
+          position="relative"
           // The hero keeps its space while its bar is away, so nothing under
           // the block jumps when a conversation starts.
           visibility={flight ? "hidden" : "visible"}
         >
           {!canAsk ? (
             <ReadOnlyNotice />
-          ) : conversationOpen ? (
-            <ContinueLine stalled={stalled} onContinue={continueInLangy} />
           ) : (
-            <Box flex={1} minWidth={0}>
-              <Composer
-                variant="hero"
-                cardRef={heroCardRef}
-                model={modelOverride}
-                modelOptions={[]}
-                onModelChange={setModelOverride}
-                onSend={ask}
-                onStop={() => undefined}
-                disabled={false}
-                placeholder={
-                  isNewProject
-                    ? "Ask Langy how to get started"
-                    : "Ask Langy or describe what you want"
-                }
-              />
-            </Box>
+            <>
+              {/* The composer is hidden in place, never unmounted: the slot
+                  always holds the composer's own height, so swapping to the
+                  continue line cannot move anything below (the input is
+                  taller than the 46px floor). visibility also removes it
+                  from pointer + a11y trees while hidden. */}
+              <Box
+                flex={1}
+                minWidth={0}
+                visibility={conversationOpen ? "hidden" : "visible"}
+              >
+                <Composer
+                  variant="hero"
+                  cardRef={heroCardRef}
+                  model={modelOverride}
+                  modelOptions={[]}
+                  onModelChange={setModelOverride}
+                  onSend={ask}
+                  onStop={() => undefined}
+                  disabled={false}
+                  placeholder={
+                    isNewProject
+                      ? "Ask Langy how to get started"
+                      : "Ask Langy or describe what you want"
+                  }
+                />
+              </Box>
+              {conversationOpen ? (
+                // Absolute, filling the composer's reserved footprint: the
+                // slot keeps its height (nothing below jumps) AND the space
+                // reads as an intentional resume card rather than a short line
+                // stranded in emptiness.
+                <ContinueLine stalled={stalled} onContinue={continueInLangy} />
+              ) : null}
+            </>
           )}
         </Box>
 
@@ -157,12 +177,17 @@ export function LangyHomeLantern() {
           {leadWithOnboarding ? (
             <OnboardAgentPill prominent onAskLangy={canAsk ? ask : undefined} />
           ) : null}
-          {canAsk && !conversationOpen ? (
+          {canAsk ? (
             suggestions.map((suggestion) => (
               <chakra.button
                 key={suggestion.label}
                 type="button"
                 onClick={() => ask(suggestion.prompt)}
+                // Hidden in place, never unmounted: the row keeps its exact
+                // height (wrapped lines included) when a conversation opens,
+                // so the lantern doesn't breathe every time the panel does.
+                // visibility also drops them from pointer + a11y trees.
+                visibility={conversationOpen ? "hidden" : "visible"}
                 display="inline-flex"
                 alignItems="center"
                 gap={1.5}
@@ -216,6 +241,13 @@ export function LangyHomeLantern() {
  *
  * It offers a way back rather than a second place to talk: clicking it focuses
  * the conversation that already exists, and never starts a new one.
+ *
+ * It takes the composer's HEIGHT but not its width. The composer is full-bleed
+ * because it is an input and an input wants the room; a resume control that
+ * inherited that stretched one short sentence across the whole block and read
+ * as an empty container with some text stranded at one end. It hugs its own
+ * content instead, and what sits beside it is the block's moving canvas —
+ * which is the thing the lantern is for.
  */
 function ContinueLine({
   stalled,
@@ -228,13 +260,20 @@ function ContinueLine({
     <chakra.button
       type="button"
       onClick={onContinue}
-      flex={1}
+      // Pinned to the reserved box's full height (its parent is
+      // position:relative) but only its left edge — no `right`, so the width
+      // comes from the content.
+      position="absolute"
+      left={0}
+      top={0}
+      bottom={0}
+      maxWidth="full"
       display="flex"
       alignItems="center"
-      gap={2}
+      gap={2.5}
       textAlign="left"
-      height="46px"
-      paddingX={4}
+      paddingLeft={3.5}
+      paddingRight={4}
       borderRadius="18px"
       borderWidth="1px"
       borderStyle="solid"
@@ -243,12 +282,31 @@ function ContinueLine({
       backdropFilter="blur(8px)"
       cursor="pointer"
       color="fg.muted"
-      fontFamily="mono"
-      fontSize="11.5px"
-      transition="color 130ms ease, border-color 130ms ease"
-      _hover={{ color: "fg", borderColor: "border.emphasized" }}
+      transition="color 130ms ease, border-color 130ms ease, background 130ms ease"
+      _hover={{
+        color: "fg",
+        borderColor: "orange.emphasized",
+        background: "bg.panel/85",
+      }}
     >
-      {stalled ? "Langy is still working" : "Continue in Langy"}
+      <LangyMark size={16} />
+      <VStack align="start" gap={0.5} minWidth={0}>
+        <Text fontFamily="mono" fontSize="13px" color="fg" lineHeight="1.3">
+          {stalled ? "Langy is still working" : "Continue your conversation"}
+        </Text>
+        <Text
+          fontSize="xs"
+          color="fg.subtle"
+          lineHeight="1.3"
+          whiteSpace="nowrap"
+          overflow="hidden"
+          textOverflow="ellipsis"
+          maxWidth="full"
+        >
+          {stalled ? "Its answer is on the way" : "Pick up where you left off"}
+        </Text>
+      </VStack>
+      <LuArrowRight size={14} aria-hidden />
     </chakra.button>
   );
 }

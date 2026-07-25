@@ -75,7 +75,7 @@ describe("Dockerfile runtime stage", () => {
       // Guards the guard: if this list ever empties, the assertions below
       // would vacuously pass and stop protecting anything.
       expect(requiredDirs).toContain("handled-error");
-      expect(requiredDirs).toContain("cli-cards");
+      expect(requiredDirs).toContain("langy");
     });
 
     it.each(requiredDirs)("copies packages/%s into the runtime image", (dir) => {

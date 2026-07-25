@@ -327,6 +327,10 @@ function buildMocks(): BriefingMock[] {
             since: "since yesterday",
             loop: scen.bars ? "median goal to PR · 14 min" : undefined,
             headline: scen.headline,
+            // The brand-new state shows the typed QuietHeadline invitation, not
+            // the plain headline, so the dev preview matches a real empty
+            // project (which sets quiet from having no traces/scenarios/recents).
+            quiet: scenKey === "empty",
             receiptsLabel: receipts ? "Needs a look" : undefined,
             receipts,
             pills: scen.pills,

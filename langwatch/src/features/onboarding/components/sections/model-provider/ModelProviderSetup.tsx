@@ -11,6 +11,8 @@ import { createLogger } from "@langwatch/observability";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import type { ScopeAssignment } from "~/server/scopes/scope.types";
+import { CodexSignIn } from "../../../../../components/settings/CodexSignIn";
 import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
 import { Switch } from "../../../../../components/ui/switch";
 import { useModelProviderApiKeyValidation } from "../../../../../hooks/useModelProviderApiKeyValidation";
@@ -36,7 +38,10 @@ import {
   getModelProvider,
   modelProviderRegistry,
 } from "../../../regions/model-providers/registry";
-import type { ModelProviderKey } from "../../../regions/model-providers/types";
+import type {
+  ModelProviderKey,
+  ModelProviderSurface,
+} from "../../../regions/model-providers/types";
 import { DocsLinks } from "../observability/DocsLinks";
 import { ModelProviderCredentialFields } from "./ModelProviderCredentialFields";
 import { ModelProviderExtraHeaders } from "./ModelProviderExtraHeaders";
@@ -57,7 +62,7 @@ const PROVIDERS_WITH_WELL_KNOWN_MODELS = new Set([
 
 interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
-  variant: "evaluations" | "prompts" | "langy";
+  variant: ModelProviderSurface;
   /**
    * When provided, called after a successful save instead of the default
    * redirect. Lets the screen be embedded in a surface that stays put (e.g.
@@ -66,13 +71,11 @@ interface ModelProviderSetupProps {
   onComplete?: () => void;
 }
 
-const variantToDocsMapping: Record<
-  "evaluations" | "prompts" | "langy",
-  string
-> = {
+const variantToDocsMapping: Record<ModelProviderSurface, string> = {
   evaluations: "/llm-evaluation/overview",
   prompts: "/prompt-management/overview",
   langy: "/introduction",
+  onboarding: "/introduction",
 };
 
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
@@ -371,6 +374,33 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     return (
       <VStack align="stretch" gap={3}>
         <Spinner />
+      </VStack>
+    );
+  }
+
+  // OAuth-device providers (Codex) have no key fields: the sign-in flow IS
+  // the whole setup, and its completion writes the provider row (and, from
+  // these embedded surfaces, the coding-assistant defaults) server-side at
+  // the widest scope the caller can manage — the same silent decision the
+  // key-based path makes through useModelProviderForm.
+  if (meta.authFlow === "oauth-device") {
+    const codexScope: ScopeAssignment =
+      hasPermission("organization:manage") && organization?.id
+        ? { scopeType: "ORGANIZATION", scopeId: organization.id }
+        : hasPermission("team:manage") && team?.id
+          ? { scopeType: "TEAM", scopeId: team.id }
+          : { scopeType: "PROJECT", scopeId: projectId ?? "" };
+    return (
+      <VStack align="stretch" gap={2}>
+        <Text fontSize="md" fontWeight="semibold">
+          Connect {meta.label}
+        </Text>
+        <CodexSignIn
+          projectId={projectId ?? ""}
+          scopes={[codexScope]}
+          setAsCodingDefaults
+          onConnected={() => onComplete?.()}
+        />
       </VStack>
     );
   }

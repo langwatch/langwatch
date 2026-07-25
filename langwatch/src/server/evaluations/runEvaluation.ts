@@ -84,8 +84,8 @@ const buildThreadData = async (
     );
   }
 
-  // Thread content feeds the evaluator, so resolve full offloaded IO (#4991)
-  // instead of the 64 KB preview.
+  // #4991: evaluators score against content, so the thread read must resolve
+  // the FULL offloaded IO (ADR-022), not the ≤64KB preview.
   const traceService = TraceService.create(
     undefined,
     buildTraceBlobResolutionDeps(),
@@ -225,8 +225,6 @@ const buildDataForEvaluation = async (
     data = mappedData;
 
     if (mappings && hasThreadMappings(mappings)) {
-      // Thread content feeds the evaluator, so resolve full offloaded IO
-      // (#4991) instead of the 64 KB preview.
       const traceService = TraceService.create(
         undefined,
         buildTraceBlobResolutionDeps(),
@@ -275,8 +273,8 @@ export const runEvaluationForTrace = async ({
   protections: Protections;
   workflowId?: string | null;
 }): Promise<EvaluationResultWithThreadId> => {
-  // The trace's IO is the evaluator's primary input, so resolve full offloaded
-  // IO (#4991) instead of the 64 KB preview.
+  // #4991: the trace being evaluated is read content-first — resolve the
+  // FULL offloaded IO (ADR-022) so the evaluator never scores a preview.
   const traceService = TraceService.create(
     undefined,
     buildTraceBlobResolutionDeps(),

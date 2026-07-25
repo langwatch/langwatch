@@ -1,9 +1,18 @@
+import {
+  applyLangyTurnEvents,
+  initialLangyTurnProjection,
+  seedLangyTurnProjection,
+  type LangyConversationTurnWireEvent,
+  type LangyEventCursor,
+  type LangyTurnProjectionState,
+} from "@langwatch/langy";
 import { create } from "zustand";
 import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { useLangyStore } from "./langyStore";
 
 /**
- * The developer drawer's record of what actually came down the wire.
+ * The developer drawer's record of what actually crossed the wire — in BOTH
+ * directions, on every channel.
  *
  * Langy's UI is several layers of interpretation stacked on one stream: the
  * transport maps entries to AI-SDK chunks, the chunks become message parts, the
@@ -12,13 +21,26 @@ import { useLangyStore } from "./langyStore";
  * one — "what did the server actually send?" — and until now the honest answer
  * required a breakpoint.
  *
- * So this is the raw tape: every `LangyStreamEntry`, in arrival order, with the
- * turn it belonged to and when it landed. No interpretation, no filtering.
+ * So this is the raw tape, one ring of records across four LANES:
+ *
+ *   stream    INBOUND. Every `LangyStreamEntry` off the live turn stream, in
+ *             arrival order — tokens, tool frames, signals, terminals.
+ *   outbound  OUTBOUND. What this client asked the server to do — the sent
+ *             message, the stop request — so "did we even send it?" and "in
+ *             what order relative to the stream?" are on the same tape.
+ *   durable   INBOUND. The EVENT LOG itself (ADR-059): the recorded events the
+ *             tail fetch returns and the snapshot seeds, i.e. the durable truth
+ *             the local fold is built from. This lane is REPLAYABLE — see
+ *             {@link replayTurnProjection}.
+ *   signal    INBOUND. The freshness signals, with their cursors — the "you
+ *             may be behind" pokes that trigger the tail fetches.
+ *
+ * No interpretation, no filtering.
  *
  * ── COSTS NOTHING WHEN OFF ─────────────────────────────────────────────────
- * `record()` returns immediately unless recording is armed, and arming is done
- * by the drawer itself (developer mode). A user who never opens it pays one
- * boolean check per wire entry — on a stream that is already doing a React
+ * Every `record*()` returns immediately unless recording is armed, and arming
+ * is done by the drawer itself (developer mode). A user who never opens it pays
+ * one boolean check per wire entry — on a stream that is already doing a React
  * render per token.
  *
  * ── BOUNDED ────────────────────────────────────────────────────────────────
@@ -32,14 +54,59 @@ import { useLangyStore } from "./langyStore";
 /** Entries kept on the tape. Past this the oldest fall off the front. */
 export const DEV_LOG_CAPACITY = 1_000;
 
-export interface LangyDevLogRecord {
+interface TapeBase {
   /** Monotonic, so the view has a stable key that survives the ring dropping. */
   seq: number;
   atMs: number;
-  /** The turn this entry belonged to, or null before one was adopted. */
-  turnId: string | null;
-  entry: LangyStreamEntry;
+  /**
+   * The conversation this entry belongs to, stamped AT RECORD TIME.
+   *
+   * Some lanes carry their own attribution (a freshness signal, a durable
+   * event, an outbound command's detail); everything else — chiefly stream
+   * deltas — is tagged with the store's active conversation, because the
+   * stream IS the active conversation's turn. Null only when nothing carried
+   * an id and no conversation was active yet (the first moments of a brand-new
+   * conversation, before the server adopts an id).
+   *
+   * The RECORDING stays global — switching conversations must never lose the
+   * tape — but the drawer's views and the chat panel's time travel are scoped
+   * to the open conversation via {@link tapeForConversation}.
+   */
+  conversationId: string | null;
 }
+
+export type LangyDevLogRecord =
+  | (TapeBase & {
+      lane: "stream";
+      /** The turn this entry belonged to, or null before one was adopted. */
+      turnId: string | null;
+      entry: LangyStreamEntry;
+    })
+  | (TapeBase & {
+      lane: "outbound";
+      kind: "send" | "stop";
+      /** One scannable line for the list row. */
+      label: string;
+      detail: unknown;
+    })
+  | (TapeBase & {
+      lane: "durable";
+      source: "tail";
+      event: LangyConversationTurnWireEvent;
+    })
+  | (TapeBase & {
+      lane: "durable";
+      source: "snapshot";
+      cursor: LangyEventCursor | null;
+      currentTurnId: string | null;
+    })
+  | (TapeBase & {
+      lane: "signal";
+      conversationId: string;
+      cursor: LangyEventCursor | null;
+    });
+
+export type LangyDevLogLane = LangyDevLogRecord["lane"];
 
 interface LangyDevLogState {
   /** Nothing is recorded until the drawer arms this. */
@@ -48,25 +115,46 @@ interface LangyDevLogState {
   /** How many entries the ring has discarded, so the view can admit the gap. */
   dropped: number;
   nextSeq: number;
+  /**
+   * The scrubber's position — the tape seq every view (INCLUDING the chat
+   * panel, which time-travels with it) is capped at. Null is LIVE. Lives here
+   * rather than in the drawer so the panel can read it without prop plumbing.
+   */
+  scrubSeq: number | null;
+  setScrub: (seq: number | null) => void;
   setRecording: (recording: boolean) => void;
+  /** INBOUND stream lane — every live turn-stream entry. */
   record: (entry: LangyStreamEntry, turnId: string | null) => void;
+  /** OUTBOUND lane — what this client asked the server to do. */
+  recordOutbound: (
+    kind: "send" | "stop",
+    label: string,
+    detail: unknown,
+  ) => void;
+  /** DURABLE lane — one recorded event off the tail fetch (the event log). */
+  recordDurableEvent: (event: LangyConversationTurnWireEvent) => void;
+  /** DURABLE lane — a snapshot seed (cursor + in-flight turn), the fold's start. */
+  recordSnapshot: (snapshot: {
+    conversationId: string;
+    cursor: LangyEventCursor | null;
+    currentTurnId: string | null;
+  }) => void;
+  /** SIGNAL lane — a freshness signal and the cursor it carried. */
+  recordSignal: (signal: {
+    conversationId: string;
+    cursor: LangyEventCursor | null;
+  }) => void;
   clear: () => void;
 }
 
-export const useLangyDevLog = create<LangyDevLogState>((set, get) => ({
-  recording: false,
-  records: [],
-  dropped: 0,
-  nextSeq: 1,
-  setRecording: (recording) => set({ recording }),
-  record: (entry, turnId) => {
+export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
+  const append = (
+    make: (seq: number) => LangyDevLogRecord,
+  ): void => {
     if (!get().recording) return;
     set((state) => {
       const seq = state.nextSeq;
-      const appended = [
-        ...state.records,
-        { seq, atMs: Date.now(), turnId, entry },
-      ];
+      const appended = [...state.records, make(seq)];
       const overflow = Math.max(0, appended.length - DEV_LOG_CAPACITY);
       return {
         records: overflow > 0 ? appended.slice(overflow) : appended,
@@ -74,9 +162,151 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => ({
         nextSeq: seq + 1,
       };
     });
-  },
-  clear: () => set({ records: [], dropped: 0 }),
-}));
+  };
+  /**
+   * The conversation an entry belongs to, resolved AT RECORD TIME: the entry's
+   * own attribution when it has one, otherwise the store's active
+   * conversation. The fallback is what tags stream deltas — the stream IS the
+   * active conversation's turn — and it reads getState() rather than
+   * subscribing, so a normal (unarmed) session still pays only the recording
+   * boolean.
+   */
+  const attributed = (explicit?: string | null): string | null =>
+    explicit ?? useLangyStore.getState().activeConversationId;
+  return {
+    recording: false,
+    records: [],
+    dropped: 0,
+    nextSeq: 1,
+    scrubSeq: null,
+    setScrub: (scrubSeq) => set({ scrubSeq }),
+    // Disarming also snaps back to live: a closed drawer must never leave the
+    // panel frozen in the past.
+    setRecording: (recording) =>
+      set(recording ? { recording } : { recording, scrubSeq: null }),
+    record: (entry, turnId) =>
+      append((seq) => ({
+        seq,
+        atMs: Date.now(),
+        conversationId: attributed(),
+        lane: "stream",
+        turnId,
+        entry,
+      })),
+    recordOutbound: (kind, label, detail) =>
+      append((seq) => ({
+        seq,
+        atMs: Date.now(),
+        // The send/stop callers put the conversation in the detail payload;
+        // read it from there so the tag survives even when the store has not
+        // adopted the conversation yet (a stop raced against a fresh send).
+        conversationId: attributed(
+          typeof (detail as { conversationId?: unknown } | null)
+            ?.conversationId === "string"
+            ? ((detail as { conversationId: string }).conversationId)
+            : undefined,
+        ),
+        lane: "outbound",
+        kind,
+        label,
+        detail,
+      })),
+    recordDurableEvent: (event) =>
+      append((seq) => ({
+        seq,
+        atMs: Date.now(),
+        // Every wire event names its conversation — the fold's identity.
+        conversationId: attributed(event.data.conversationId),
+        lane: "durable",
+        source: "tail",
+        event,
+      })),
+    recordSnapshot: ({ conversationId, cursor, currentTurnId }) =>
+      append((seq) => ({
+        seq,
+        atMs: Date.now(),
+        conversationId,
+        lane: "durable",
+        source: "snapshot",
+        cursor,
+        currentTurnId,
+      })),
+    recordSignal: ({ conversationId, cursor }) =>
+      append((seq) => ({
+        seq,
+        atMs: Date.now(),
+        conversationId,
+        lane: "signal",
+        cursor,
+      })),
+    clear: () => set({ records: [], dropped: 0 }),
+  };
+});
+
+/**
+ * The tape, scoped to one conversation — what the drawer's views and the chat
+ * panel's time travel render.
+ *
+ * Unattributed records (conversationId null) stay VISIBLE: they can only be
+ * recorded in the first moments of a brand-new conversation, before the server
+ * adopts an id, and dropping them would blank the tape at exactly the moment a
+ * fresh conversation is being debugged. They cannot be proven foreign; a
+ * record that names ANOTHER conversation can, and is hidden.
+ */
+export function tapeForConversation(
+  records: LangyDevLogRecord[],
+  conversationId: string | null,
+): LangyDevLogRecord[] {
+  return records.filter(
+    (record) =>
+      record.conversationId === null ||
+      record.conversationId === conversationId,
+  );
+}
+
+/** The tape at (or before) one moment — the scrubber's view of history. */
+export function tapeUpTo(
+  records: LangyDevLogRecord[],
+  uptoSeq: number | null,
+): LangyDevLogRecord[] {
+  if (uptoSeq === null) return records;
+  return records.filter((record) => record.seq <= uptoSeq);
+}
+
+/**
+ * REPLAY the durable lane through the SAME reducers the live store uses
+ * (ADR-059): seed from the recorded snapshot, fold the recorded tail. Because
+ * the fold is pure and cursor-gated, replaying any prefix of the tape is safe
+ * and deterministic — this is what the scrubber shows as "the fold at that
+ * moment", recomputed from scratch on every call, never cached state.
+ */
+export function replayTurnProjection(
+  records: LangyDevLogRecord[],
+): LangyTurnProjectionState {
+  let projection = initialLangyTurnProjection;
+  for (const record of records) {
+    if (record.lane !== "durable") continue;
+    if (record.source === "snapshot") {
+      projection = seedLangyTurnProjection(projection, {
+        cursor: record.cursor,
+        currentTurnId: record.currentTurnId,
+      });
+    } else {
+      projection = applyLangyTurnEvents(projection, [record.event]);
+    }
+  }
+  return projection;
+}
+
+/** The stream-lane subset — what the three wire views partition. */
+export function streamRecords(
+  records: LangyDevLogRecord[],
+): Array<Extract<LangyDevLogRecord, { lane: "stream" }>> {
+  return records.filter(
+    (record): record is Extract<LangyDevLogRecord, { lane: "stream" }> =>
+      record.lane === "stream",
+  );
+}
 
 /**
  * The tape is scoped too, and more sharply than most of the panel: it holds the
@@ -103,7 +333,7 @@ useLangyStore.subscribe((state, previous) => {
  */
 export function tokenStreamText(records: LangyDevLogRecord[]): string {
   let text = "";
-  for (const record of records) {
+  for (const record of streamRecords(records)) {
     if (record.entry.type === "delta") text += record.entry.text;
   }
   return text;
@@ -114,7 +344,7 @@ export function entryKindCounts(
   records: LangyDevLogRecord[],
 ): { kind: string; count: number }[] {
   const counts = new Map<string, number>();
-  for (const record of records) {
+  for (const record of streamRecords(records)) {
     counts.set(record.entry.type, (counts.get(record.entry.type) ?? 0) + 1);
   }
   return [...counts.entries()]
@@ -146,7 +376,7 @@ export interface DevToolCall {
  */
 export function toolCallsFrom(records: LangyDevLogRecord[]): DevToolCall[] {
   const byId = new Map<string, DevToolCall>();
-  for (const record of records) {
+  for (const record of streamRecords(records)) {
     const entry = record.entry;
     if (entry.type !== "tool") continue;
     const existing = byId.get(entry.id);
@@ -179,4 +409,44 @@ export function toolCallsFrom(records: LangyDevLogRecord[]): DevToolCall[] {
     });
   }
   return [...byId.values()];
+}
+
+/** One scannable line per record, for the unified Log view. */
+export function recordSummary(record: LangyDevLogRecord): string {
+  switch (record.lane) {
+    case "stream": {
+      const entry = record.entry;
+      if (entry.type === "delta") {
+        return entry.text.length > 60
+          ? `${entry.text.slice(0, 60)}…`
+          : entry.text;
+      }
+      if (entry.type === "tool") return `${entry.phase ?? ""} ${entry.name}`;
+      if (entry.type === "status") return entry.status || "(cleared)";
+      if (entry.type === "error") return entry.error;
+      return "";
+    }
+    case "outbound":
+      return record.label;
+    case "durable":
+      return record.source === "snapshot"
+        ? `snapshot seed · cursor=${record.cursor ? `${record.cursor.acceptedAt}/${record.cursor.eventId.slice(0, 8)}` : "null"} · turn=${record.currentTurnId ?? "—"}`
+        : `${record.event.type.replace("lw.langy_conversation.", "")} · ${record.event.id.slice(0, 8)}`;
+    case "signal":
+      return `conv=${record.conversationId.slice(-8)} · cursor=${record.cursor ? `${record.cursor.acceptedAt}/${record.cursor.eventId.slice(0, 8)}` : "none"}`;
+  }
+}
+
+/** The Log row's kind column — lane-specific, one word. */
+export function recordKind(record: LangyDevLogRecord): string {
+  switch (record.lane) {
+    case "stream":
+      return record.entry.type;
+    case "outbound":
+      return record.kind;
+    case "durable":
+      return record.source === "snapshot" ? "snapshot" : "event";
+    case "signal":
+      return "signal";
+  }
 }

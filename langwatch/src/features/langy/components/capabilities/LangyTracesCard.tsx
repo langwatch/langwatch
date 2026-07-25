@@ -27,7 +27,7 @@ import {
 } from "./capabilityRegistry";
 // `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
 // panel agree on what a result document IS in exactly one place.
-import { asJsonDocument } from "@langwatch/cli-cards";
+import { asJsonDocument } from "@langwatch/langy";
 import { collectionOf, textValue, totalOf } from "./cliResultDocument";
 import { CapabilityRow, LangyCapabilityCard } from "./LangyCapabilityCard";
 

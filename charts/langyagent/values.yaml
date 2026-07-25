@@ -64,6 +64,24 @@ secrets:
   existingSecretName: langwatch-langyagent-auth
   internalSecretKey: LANGY_INTERNAL_SECRET
 
+# Mirror lane (ADR-061) — a secondary exporter for the turn's gen_ai trace
+# data: the manager ALSO posts a copy of each Langy turn's traces into a
+# LangWatch project the OPERATOR designates (an internal ops project), so
+# whoever runs this install can watch Langy work with LangWatch's own trace
+# tools. Optional: leave the block empty (the default) and the lane stays
+# dormant. The key is an ordinary project API key for the designated mirror
+# project; rotate it like any project key.
+#   kubectl create secret generic langwatch-langyagent-mirror \
+#     --from-literal=LANGY_MIRROR_TRACE_KEY=<mirror project API key>
+mirror:
+  # Base URL of the LangWatch deployment holding the mirror project —
+  # /api/otel/v1/traces is appended by the manager.
+  traceEndpoint: ""
+  # Secret holding the mirror project's API key. Helm never materialises it;
+  # the operator creates it out-of-band, like the auth secret above.
+  existingSecretName: ""
+  traceKeyKey: LANGY_MIRROR_TRACE_KEY
+
 # /health (manager HTTP) backs both probes.
 probes:
   readiness:
@@ -192,6 +210,26 @@ networkPolicy:
   egressToControlPlane: []
   gatewayPort: 5563
   egressToGateway: []
+  # Manager OTLP telemetry egress (OTEL_OTLP_ENDPOINT). Empty by default: no
+  # rule is rendered, and a manager pointed at an in-cluster collector is
+  # silently blackholed by the default-deny; OTel exporters fail quietly by
+  # design, so set this whenever telemetry targets a cluster-internal
+  # collector. On the AWS EKS eBPF dataplane the podSelector here must match
+  # the collector SERVICE's spec.selector labels, not merely the pods' — see
+  # the rule comment in networkpolicy.yaml (pre-DNAT ClusterIP enforcement).
+  #
+  # Example:
+  #   egressToOtelCollector:
+  #     - namespaceSelector:
+  #         matchLabels:
+  #           kubernetes.io/metadata.name: observability
+  #       podSelector:
+  #         matchLabels:
+  #           app.kubernetes.io/name: otel-collector
+  egressToOtelCollector: []
+  # The collector's POD port for the rule above (NetworkPolicy egress ports
+  # match the destination pod port). 4318 is OTLP/HTTP's default.
+  otelCollectorPort: 4318
   # External HTTPS egress for OpenCode workers — needed for `git clone`,
   # `gh` API calls, npm/pip installs the LLM-driven tools shell out to, and
   # opencode's own update/telemetry. Default false: this pod runs LLM-
@@ -239,6 +277,17 @@ networkPolicy:
                           # CIDR places PODS (and sometimes NODES + the apiserver
                           # ENI) here; NOT covered by RFC1918, so it MUST be
                           # excluded or a worker reaches neighbours on :443.
+  # IPv6 side of the external-HTTPS rule (`::/0` with the excepts below):
+  # OPT-IN, and only for genuinely dual-stack clusters. On an IPv4-only EKS
+  # cluster the v6 block is not just dead weight, it BREAKS enforcement: the
+  # aws-network-policy-agent's per-pod allow-list is an IPv4 LPM trie, a v6
+  # `except` key fails the eBPF map write with EINVAL, and the agent aborts
+  # the ENTIRE egress refresh on that first bad key, so the policy silently
+  # freezes at its pod-birth snapshot and every later endpoint change (a
+  # control-plane or gateway deploy, a collector move) leaves the pod pointed
+  # at stale IPs. IPv4-only pods cannot emit IPv6 anyway; omitting the rule
+  # DENIES v6 (fail closed), it does not allow it.
+  allowExternalHttpsIpv6: false
   privateExceptV6:
     - fd00::/8            # unique-local (incl. IPv6 metadata fd00:ec2::254)
     - fe80::/10           # link-local

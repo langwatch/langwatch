@@ -6,7 +6,7 @@ import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/pro
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_TITLE_SOURCE,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
 import {

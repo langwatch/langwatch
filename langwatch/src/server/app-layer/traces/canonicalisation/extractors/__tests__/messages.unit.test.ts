@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   extractLastUserMessageText,
   extractMessageContentText,
+  extractSystemInstructionFromMessages,
+  stripSystemMessages,
 } from "../_messages";
 
 describe("extractMessageContentText", () => {
@@ -59,6 +61,57 @@ describe("extractLastUserMessageText", () => {
     it("extracts text from the last user message", () => {
       const messages = [{ role: "user", content: { "0": { text: "🐤" } } }];
       expect(extractLastUserMessageText(messages)).toBe("🐤");
+    });
+  });
+
+  describe("when the conversation starts with a developer-role message (OpenAI Responses dialect)", () => {
+    it("extracts the last user text, never the developer prompt", () => {
+      const messages = [
+        { role: "developer", content: "You are OpenCode, a helpful agent." },
+        { role: "user", content: [{ type: "input_text", text: "hi" }] },
+      ];
+      expect(extractLastUserMessageText(messages)).toBe("hi");
+    });
+  });
+});
+
+describe("extractSystemInstructionFromMessages", () => {
+  describe("when the first message is system-role", () => {
+    it("extracts its content", () => {
+      expect(
+        extractSystemInstructionFromMessages([
+          { role: "system", content: "be brief" },
+          { role: "user", content: "hi" },
+        ]),
+      ).toBe("be brief");
+    });
+  });
+
+  describe("when the first message uses the developer role", () => {
+    it("treats it as the system instruction", () => {
+      expect(
+        extractSystemInstructionFromMessages([
+          { role: "developer", content: "You are OpenCode." },
+          { role: "user", content: "hi" },
+        ]),
+      ).toBe("You are OpenCode.");
+    });
+  });
+});
+
+describe("stripSystemMessages", () => {
+  describe("when messages carry system and developer roles", () => {
+    it("strips both spellings and keeps the conversation", () => {
+      const stripped = stripSystemMessages([
+        { role: "system", content: "be brief" },
+        { role: "developer", content: "You are OpenCode." },
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "hello!" },
+      ]);
+      expect(stripped).toEqual([
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "hello!" },
+      ]);
     });
   });
 });

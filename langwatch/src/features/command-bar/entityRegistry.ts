@@ -59,7 +59,7 @@ export const entityRegistry: EntityConfig[] = [
     icon: Percent,
     label: "Evaluator",
     pathBuilder: (id, p) =>
-      `/${p}/evaluators?drawer.open=evaluatorViewer&drawer.evaluatorId=${id}`,
+      `/${p}/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${id}`,
   },
   {
     prefix: "experiment_",

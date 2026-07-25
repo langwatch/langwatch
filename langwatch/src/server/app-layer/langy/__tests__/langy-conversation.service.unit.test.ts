@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
 import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
@@ -78,6 +79,128 @@ const row = (o: Partial<Row> = {}): Row => ({
 });
 
 describe("LangyConversationService", () => {
+  describe("given a conversation whose create was just dispatched (projection lagging)", () => {
+    // The dispatch window: the create command is accepted (a pending handoff
+    // exists, written synchronously) before the projection row lands. A read
+    // in that window must wait it out, not report "not found" — the panel
+    // used to render the lie moments before the turn was accepted.
+    it("getById waits out the projection lag and returns the row", async () => {
+      vi.useFakeTimers();
+      try {
+        const findVisibleById = vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null)
+          .mockResolvedValue(row());
+        const repo = makeRepo({
+          findVisibleById,
+          findPendingHandoff: vi
+            .fn()
+            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+        });
+        const svc = new LangyConversationService(repo, makeCommands());
+        const pending = svc.getById({
+          id: "c1",
+          projectId: "p1",
+          userId: "alice",
+        });
+        await vi.advanceTimersByTimeAsync(1_500);
+        const detail = await pending;
+        expect(detail.id).toBe("c1");
+        expect(findVisibleById.mock.calls.length).toBeGreaterThanOrEqual(3);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("an unknown id still gives up quickly, without waiting out the window", async () => {
+      vi.useFakeTimers();
+      try {
+        const findVisibleById = vi.fn().mockResolvedValue(null);
+        const repo = makeRepo({
+          findVisibleById,
+          findPendingHandoff: vi.fn().mockResolvedValue(null),
+        });
+        const svc = new LangyConversationService(repo, makeCommands());
+        const pending = svc.getById({
+          id: "c-unknown",
+          projectId: "p1",
+          userId: "alice",
+        });
+        const outcome = expect(pending).rejects.toThrow(
+          LangyConversationNotFoundError,
+        );
+        await vi.advanceTimersByTimeAsync(10_000);
+        await outcome;
+        // A short grace, not the whole window: an id nobody is creating must
+        // not pay the cost of one that is.
+        expect(findVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // The other half of the same race, and the one that kept reaching people:
+    // the handoff row is written by the very dispatch being waited on, so a
+    // read that arrived before IT landed found no evidence, took the fast
+    // path, and reported "not found" without ever retrying.
+    it("waits when the handoff itself has not landed yet either", async () => {
+      vi.useFakeTimers();
+      try {
+        const findVisibleById = vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null)
+          .mockResolvedValue(row());
+        const repo = makeRepo({
+          findVisibleById,
+          // Nothing to see on the first probe — the create is younger than
+          // this read by a few milliseconds.
+          findPendingHandoff: vi
+            .fn()
+            .mockResolvedValueOnce(null)
+            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+        });
+        const svc = new LangyConversationService(repo, makeCommands());
+        const pending = svc.getById({
+          id: "c1",
+          projectId: "p1",
+          userId: "alice",
+        });
+        await vi.advanceTimersByTimeAsync(5_000);
+        const detail = await pending;
+        expect(detail.id).toBe("c1");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("gives up honestly when the projection never lands inside the window", async () => {
+      vi.useFakeTimers();
+      try {
+        const repo = makeRepo({
+          findVisibleById: vi.fn().mockResolvedValue(null),
+          findPendingHandoff: vi
+            .fn()
+            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+        });
+        const svc = new LangyConversationService(repo, makeCommands());
+        const pending = svc.getById({
+          id: "c1",
+          projectId: "p1",
+          userId: "alice",
+        });
+        const outcome = expect(pending).rejects.toThrow(
+          LangyConversationNotFoundError,
+        );
+        await vi.advanceTimersByTimeAsync(20_000);
+        await outcome;
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("given a conversation owned by another user in the same project", () => {
     describe("when getById is called by a non-owner without share", () => {
       it("throws not-found — reported as not-found so it can't probe existence", async () => {
@@ -515,6 +638,49 @@ describe("LangyConversationService", () => {
       });
     });
 
+    describe("when the completed turn's reply carries a langy-card fence", () => {
+      it("records the stamped typed part in place of the fence (ADR-060)", async () => {
+        const recordAgentResponse = vi.fn<
+          LangyConversationCommands["recordAgentResponse"]
+        >(async () => {});
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands({ recordAgentResponse }),
+        );
+
+        await svc.ingestAgentTurnResult({
+          projectId: "p1",
+          conversationId: "c1",
+          turnId: "turn-9",
+          status: "completed",
+          text: [
+            "Plotted:",
+            "```langy-card",
+            '{"kind": "stats", "blockId": "b7", "items": [{"label": "runs", "value": 3}]}',
+            "```",
+          ].join("\n"),
+        });
+
+        const arg = recordAgentResponse.mock.calls[0]![0];
+        // The durable event carries the DECISION, not the fence: downstream
+        // (fold, browser, time travel) reads the part and never re-parses text.
+        expect(arg.parts).toEqual([
+          { type: "text", text: "Plotted:", role: "assistant" },
+          {
+            type: "langy-card",
+            blockId: "b7",
+            kind: "stats",
+            provenance: "derived",
+            card: {
+              kind: "stats",
+              blockId: "b7",
+              items: [{ label: "runs", value: 3 }],
+            },
+          },
+        ]);
+      });
+    });
+
     describe("when the agent posts a failed turn", () => {
       it("dispatches failAgentResponse with a serialized domain error, never raw prose", async () => {
         const failAgentResponse = vi.fn<
@@ -540,6 +706,243 @@ describe("LangyConversationService", () => {
         // not the raw code — LastError is rendered on history load.
         const parsed = JSON.parse(arg.error) as { kind?: string };
         expect(parsed.kind).toBe("langy_agent_session_lost");
+      });
+    });
+  });
+
+  describe("getEventsAfter — the tail the browser folds (ADR-059)", () => {
+    // Fixtures only need to satisfy the reader port structurally.
+    const makeEvents = (events: unknown[]) => ({
+      getEventsOccurredSince: vi.fn(async () => events as never),
+    });
+
+    const visibleRepo = () =>
+      makeRepo({
+        findVisibleById: vi.fn().mockResolvedValue(row()),
+      });
+
+    const plainTurnEvent = (o: {
+      id: string;
+      createdAt: number;
+      type?: string;
+      data?: Record<string, unknown>;
+    }) => ({
+      id: o.id,
+      aggregateId: "c1",
+      aggregateType: "langy_conversation",
+      tenantId: "p1",
+      createdAt: o.createdAt,
+      occurredAt: o.createdAt - 10,
+      type: o.type ?? "lw.langy_conversation.tool_call_initiated",
+      version: "2026-07-10",
+      data: o.data ?? {
+        conversationId: "c1",
+        turnId: "t1",
+        toolCallId: `tc-${o.id}`,
+        toolName: "bash",
+      },
+    });
+
+    describe("when the conversation is not visible to the caller", () => {
+      it("throws not-found and never touches the event log", async () => {
+        const events = makeEvents([]);
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands(),
+          undefined,
+          events,
+        );
+        await expect(
+          svc.getEventsAfter({
+            projectId: "p1",
+            conversationId: "c1",
+            userId: "alice",
+            after: { acceptedAt: 0, eventId: "" },
+          }),
+        ).rejects.toThrow(LangyConversationNotFoundError);
+        expect(events.getEventsOccurredSince).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when no event reader is configured", () => {
+      it("answers with an honest empty tail at the caller's own cursor", async () => {
+        const svc = new LangyConversationService(visibleRepo(), makeCommands());
+        const after = { acceptedAt: 5, eventId: "e5" };
+        expect(
+          await svc.getEventsAfter({
+            projectId: "p1",
+            conversationId: "c1",
+            userId: "alice",
+            after,
+          }),
+        ).toEqual({ events: [], cursor: after, truncated: false });
+      });
+    });
+
+    describe("given a stream with events before and after the cursor", () => {
+      it("returns only the strict tail, advances the cursor to its last event", async () => {
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents([
+            plainTurnEvent({ id: "e1", createdAt: 100 }),
+            plainTurnEvent({ id: "e2", createdAt: 200 }),
+            plainTurnEvent({ id: "e3", createdAt: 300 }),
+          ]),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 200, eventId: "e2" },
+        });
+        expect(result.events.map((e) => e.id)).toEqual(["e3"]);
+        expect(result.cursor).toEqual({ acceptedAt: 300, eventId: "e3" });
+        expect(result.truncated).toBe(false);
+      });
+
+      it("floors the storage read a rehydration window below the cursor, never negative", async () => {
+        // The bound is on OCCURRED time while the cursor is on ACCEPT time,
+        // so it must sit a full safety window below the cursor — pruning old
+        // partitions without ever excluding a delayed event's occurred-at.
+        const events = makeEvents([]);
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          events,
+        );
+        const acceptedAt = REHYDRATION_WINDOW_MS + 5_000;
+        await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt, eventId: "e1" },
+        });
+        expect(events.getEventsOccurredSince).toHaveBeenCalledWith(
+          "c1",
+          expect.anything(),
+          "langy_conversation",
+          5_000,
+        );
+
+        await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 10, eventId: "e1" },
+        });
+        expect(events.getEventsOccurredSince).toHaveBeenLastCalledWith(
+          "c1",
+          expect.anything(),
+          "langy_conversation",
+          0,
+        );
+      });
+
+      it("tie-breaks same-millisecond events by event id, byte-wise", async () => {
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents([
+            plainTurnEvent({ id: "2AAa", createdAt: 100 }),
+            plainTurnEvent({ id: "2AAb", createdAt: 100 }),
+          ]),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 100, eventId: "2AAa" },
+        });
+        expect(result.events.map((e) => e.id)).toEqual(["2AAb"]);
+      });
+    });
+
+    describe("given spine events mixed into the stream", () => {
+      it("serves ONLY the turn vocabulary — a runToken can never ride the tail", async () => {
+        // The security pin: conversation_started carries the server-only
+        // runToken. It must be excluded by TYPE, not by field-stripping.
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents([
+            plainTurnEvent({
+              id: "e1",
+              createdAt: 100,
+              type: "lw.langy_conversation.conversation_started",
+              data: {
+                conversationId: "c1",
+                userId: "bob",
+                runToken: "SECRET",
+              },
+            }),
+            plainTurnEvent({ id: "e2", createdAt: 200 }),
+          ]),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 0, eventId: "" },
+        });
+        expect(result.events.map((e) => e.id)).toEqual(["e2"]);
+        expect(JSON.stringify(result)).not.toContain("SECRET");
+      });
+
+      it("serves the wire envelope only — no tenant or aggregate fields", async () => {
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents([plainTurnEvent({ id: "e1", createdAt: 100 })]),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 0, eventId: "" },
+        });
+        expect(Object.keys(result.events[0]!).sort()).toEqual([
+          "createdAt",
+          "data",
+          "id",
+          "occurredAt",
+          "type",
+        ]);
+      });
+    });
+
+    describe("given a tail beyond the response ceiling", () => {
+      it("cuts at the ceiling, flags truncation, and cursors at the cut", async () => {
+        const events = Array.from({ length: 1_050 }, (_, i) =>
+          plainTurnEvent({
+            id: `e${String(i).padStart(5, "0")}`,
+            createdAt: 1_000 + i,
+          }),
+        );
+        const svc = new LangyConversationService(
+          visibleRepo(),
+          makeCommands(),
+          undefined,
+          makeEvents(events),
+        );
+        const result = await svc.getEventsAfter({
+          projectId: "p1",
+          conversationId: "c1",
+          userId: "alice",
+          after: { acceptedAt: 0, eventId: "" },
+        });
+        expect(result.truncated).toBe(true);
+        expect(result.events).toHaveLength(1_000);
+        const last = result.events.at(-1)!;
+        expect(result.cursor).toEqual({
+          acceptedAt: last.createdAt,
+          eventId: last.id,
+        });
       });
     });
   });

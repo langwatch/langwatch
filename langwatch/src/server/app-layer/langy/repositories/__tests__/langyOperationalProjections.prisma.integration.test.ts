@@ -10,8 +10,6 @@ import { MapProjectionExecutor } from "~/server/event-sourcing/projections/mapPr
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
 import {
-  LANGY_CONVERSATION_EVENT_TYPES,
-  LANGY_CONVERSATION_EVENT_VERSIONS,
   LangyAgentRespondedEventSchema,
   LangyAgentTurnAcceptedEventSchema,
   LangyMessageRecordedEventSchema,
@@ -22,8 +20,12 @@ import {
   LangyPlanUpdatedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
-  makeConversationTurnKey,
 } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_CONVERSATION_EVENT_VERSIONS,
+  makeConversationTurnKey,
+} from "@langwatch/langy";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 import { PrismaLangyConversationTurnProjectionRepository } from "../langy-conversation-turn-projection.prisma.repository";
 import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";

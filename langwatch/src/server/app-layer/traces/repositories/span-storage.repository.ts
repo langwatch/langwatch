@@ -71,6 +71,14 @@ export interface SpanSummaryRow {
   durationMs: number;
   statusCode: number | null;
   spanType: string | null;
+  /** Tool display name (`gen_ai.tool.name` ?? `tool_name`), tool spans only. */
+  toolName: string | null;
+  /** Claude model-call join key (`request_id`), llm_request spans only. */
+  requestId: string | null;
+  /** Claude prompt-pairing scope (`query_source`). */
+  querySource: string | null;
+  /** Tool-call join key (`tool_use_id` ?? `gen_ai.tool.call.id`). */
+  toolUseId: string | null;
   model: string | null;
   /**
    * USD cost: `gen_ai.usage.cost` when the SDK reported one, otherwise

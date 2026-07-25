@@ -108,7 +108,7 @@ jobs:
           --health-retries 5
 
       clickhouse:
-        image: clickhouse/clickhouse-server:latest
+        image: clickhouse/clickhouse-server:25.10.2.65
         ports:
           - 8123:8123
         env:

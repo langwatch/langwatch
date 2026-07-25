@@ -37,7 +37,7 @@ import {
   toCliToolResult,
   type CliResultDigest,
   type CliToolResult,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy";
 import {
   parseLangwatchCommand,
   type LangwatchCommand,

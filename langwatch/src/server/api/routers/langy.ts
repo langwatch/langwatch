@@ -23,7 +23,7 @@ import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/lang
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 
 import type { Session } from "~/server/auth";
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
 import { connection } from "~/server/redis";
@@ -391,6 +391,34 @@ export const langyRouter = createTRPCRouter({
    * Single-conversation spine (status + counts), for the open conversation.
    * Returns null when the conversation is not visible to the user.
    */
+  /**
+   * The conversation's durable TURN events strictly after a cursor — the tail
+   * the browser folds locally with the shared @langwatch/langy reducer
+   * (ADR-059). Fired when a freshness signal's cursor is ahead of the local
+   * fold's; authorized owner-or-shared exactly like the other reads (a
+   * non-visible conversation reports not-found via the service's
+   * HandledError). The response's `cursor` is the new local position;
+   * `truncated` means fetch again from it.
+   */
+  conversationEventsAfter: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        after: z.object({
+          acceptedAt: z.number().int().nonnegative(),
+          eventId: z.string(),
+        }),
+      }),
+    )
+    .query(async ({ input, ctx }) => {
+      return await getApp().langy.conversations.getEventsAfter({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+        after: input.after,
+      });
+    }),
+
   detail: langyReadProcedure
     .input(z.object({ conversationId: z.string() }))
     .query(
@@ -475,6 +503,14 @@ export const langyRouter = createTRPCRouter({
          * flight: the answer being rated must exist first.
          */
         shouldAskFeedback: boolean;
+        /**
+         * The projection's event cursor at this snapshot (ADR-059): the client
+         * seeds its local fold here and catches up by fetching
+         * `conversationEventsAfter` — never by replaying full history.
+         */
+        eventCursor: { acceptedAt: number; eventId: string } | null;
+        /** The turn in flight, or null — what a refresh reattaches to. */
+        currentTurnId: string | null;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -520,6 +556,8 @@ export const langyRouter = createTRPCRouter({
           // must never become a Stop target.
           inFlightTurnId: isTurnInFlight ? conversation.currentTurnId : null,
           shouldAskFeedback,
+          eventCursor: conversation.eventCursor,
+          currentTurnId: isTurnInFlight ? conversation.currentTurnId : null,
         };
       },
     ),

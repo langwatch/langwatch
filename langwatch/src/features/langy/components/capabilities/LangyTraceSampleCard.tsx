@@ -30,7 +30,7 @@
  * chrome, `CapabilityRow` for the rows. It deliberately introduces no styling of
  * its own, so whatever the card shell becomes, this follows.
  */
-import { asJsonDocument, type CliResultDigest } from "@langwatch/cli-cards";
+import { asJsonDocument, type CliResultDigest } from "@langwatch/langy";
 import { Button, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";

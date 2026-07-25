@@ -1,11 +1,15 @@
+import { useMemo } from "react";
 import { LuSearch } from "react-icons/lu";
 import { useUIStore } from "../../stores/uiStore";
+import { useAskLangyFromSearch } from "../SearchBar/useAskLangyFromSearch";
 import {
   KeyboardShortcutsHelp,
   type ShortcutGroup,
 } from "../TraceDrawer/KeyboardShortcutsHelp";
 
-const PAGE_GROUPS: ShortcutGroup[] = [
+// ⌘I fires the search bar's ask affordance, which belongs to Langy when
+// Langy is available — so the dialog names whoever will actually answer.
+const pageGroups = (askShortcutLabel: string): ShortcutGroup[] => [
   {
     title: "Navigation",
     items: [
@@ -24,7 +28,7 @@ const PAGE_GROUPS: ShortcutGroup[] = [
     items: [
       {
         keys: ["⌘ / Ctrl", "I"],
-        label: "Ask AI to build a query",
+        label: askShortcutLabel,
         detail: "Describe what you want in plain English",
       },
       {
@@ -77,12 +81,20 @@ const PAGE_GROUPS: ShortcutGroup[] = [
 export const PageKeyboardShortcuts: React.FC = () => {
   const open = useUIStore((s) => s.shortcutsHelpOpen);
   const setOpen = useUIStore((s) => s.setShortcutsHelpOpen);
+  const { langyRoutesAsk } = useAskLangyFromSearch();
+  const groups = useMemo(
+    () =>
+      pageGroups(
+        langyRoutesAsk ? "Ask Langy about these traces" : "Ask AI to build a query",
+      ),
+    [langyRoutesAsk],
+  );
 
   return (
     <KeyboardShortcutsHelp
       open={open}
       onClose={() => setOpen(false)}
-      groups={PAGE_GROUPS}
+      groups={groups}
     />
   );
 };

@@ -8,8 +8,8 @@
  * scrollback.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { UIMessage } from "ai";
 import { act, render, screen } from "@testing-library/react";
+import type { UIMessage } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LangyThinkingLine } from "../components/LangyThinkingLine";
 
@@ -37,6 +37,26 @@ describe("LangyThinkingLine", () => {
       renderLine({ hasLiveReasoning: false });
       expect(screen.getByRole("status")).toBeDefined();
       expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("renders the text fully opaque, with no end-of-line fade mask", () => {
+      // The line used to wear a mask-image gradient that dissolved its last
+      // 1.5em to transparent — on a short "Thinking…" that faded the tail of
+      // the text itself. Overflow is clamped with an ellipsis instead; no
+      // rendered style may mask the text away.
+      renderLine({ hasLiveReasoning: false });
+      const styles = Array.from(document.querySelectorAll("style"))
+        .map((tag) => tag.textContent ?? "")
+        .join("\n");
+      expect(styles).not.toContain("mask-image");
+    });
+
+    it("leads with the shared status-orb slot so the line never jumps", () => {
+      // The startup sequence alternates this line with StreamingStatusLine's
+      // orb-led rows; both share STATUS_LINE_ROW, so the leading indicator
+      // slot exists here too and the text keeps one left offset throughout.
+      renderLine({ hasLiveReasoning: false });
+      expect(document.querySelector("[data-status-orb]")).not.toBeNull();
     });
   });
 

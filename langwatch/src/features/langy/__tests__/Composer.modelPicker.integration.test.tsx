@@ -17,6 +17,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useLangyStore } from "../stores/langyStore";
+
 vi.mock("~/components/ModelSelector", () => ({
   ModelSelector: ({ model }: { model: string }) => (
     <div data-testid="model-selector">{model}</div>
@@ -41,7 +43,6 @@ vi.mock("~/features/traces-v2/components/ai/useTypewriterPlaceholder", () => ({
 }));
 
 import { Composer } from "../components/Composer";
-import { useLangyStore } from "../stores/langyStore";
 
 function renderComposer(
   overrides: Partial<{ model: string; modelOptions: string[] }> = {},
@@ -83,7 +84,12 @@ describe("given the integrated Langy composer", () => {
 
   describe("when Langy is working", () => {
     it("swaps the send control for a stop control", () => {
-      useLangyStore.setState({ turnPhase: "active" });
+      // The composer reads the durable turn-phase machine, not a busy prop —
+      // drive it the way the panel does when the server accepts a turn.
+      useLangyStore
+        .getState()
+        .beginTurn({ conversationId: "conv-1", turnId: "turn-1" });
+
       renderComposer();
 
       expect(screen.getByLabelText("Stop")).toBeTruthy();

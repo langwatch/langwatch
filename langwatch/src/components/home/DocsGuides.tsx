@@ -15,7 +15,6 @@ import {
   HOME_SECTION_PADDING,
   HomeSectionHeader,
 } from "./HomeSectionHeader";
-import { OnboardAgentPill } from "./OnboardAgentPill";
 
 /**
  * Docs & guides, said out loud: a card of four first-class guide links (not
@@ -81,15 +80,7 @@ const GUIDES: Guide[] = [
   },
 ];
 
-export function DocsGuides({
-  showOnboardPill = true,
-}: {
-  /**
-   * The Langy home moves the onboarding pill up into its lit block, so it
-   * turns this one off rather than showing the same route twice on one page.
-   */
-  showOnboardPill?: boolean;
-} = {}) {
+export function DocsGuides() {
   return (
     <HomeCard
       cursor="default"
@@ -101,9 +92,7 @@ export function DocsGuides({
         {/* "The Odyssey" was an internal name for this card, and a reader
             meeting it on their first day learns nothing from it. The title now
             says what the section is (copywriting.md: no internal codenames). */}
-        <HomeSectionHeader title="Docs and guides">
-          {showOnboardPill ? <OnboardAgentPill /> : null}
-        </HomeSectionHeader>
+        <HomeSectionHeader title="Docs and guides" />
         <Grid templateColumns={{ base: "1fr", sm: "1fr 1fr" }} gap={1}>
           {GUIDES.map((guide) => (
             <GuideTile key={guide.title} guide={guide} />

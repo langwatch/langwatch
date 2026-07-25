@@ -56,6 +56,7 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
   const mockStore = {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvents: vi.fn().mockResolvedValue([]),
+    getEventsOccurredSince: vi.fn().mockResolvedValue([]),
     getEventsUpTo: vi
       .fn()
       .mockImplementation(

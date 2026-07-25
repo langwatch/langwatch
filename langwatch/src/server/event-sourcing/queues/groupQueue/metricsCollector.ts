@@ -14,6 +14,14 @@ import {
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
 
 /**
+ * Ready-score written by UNBLOCK_LUA (app-layer/ops/repositories/
+ * queue.redis.repository.ts) to force a just-unblocked group to dispatch
+ * promptly. It is a sentinel (epoch 1ms), not a real eligibility time, so the
+ * oldest-pending-age gauge excludes it — see the computation in collect().
+ */
+const READY_UNBLOCK_SENTINEL_SCORE = 1;
+
+/**
  * Periodically collects metrics from the group queue processing and staging layers.
  */
 export class GroupQueueMetricsCollector {
@@ -96,32 +104,52 @@ export class GroupQueueMetricsCollector {
         this.params.activeJobCountFn(),
       );
 
-      // Oldest pending age: readyKey scores are dispatch-eligibility times but
-      // are re-scored to a FUTURE activeUntil while a group processes, so the
-      // per-group jobs zsets carry the trustworthy dispatchAfterMs timestamps.
-      // Sample up to 10 groups to avoid scanning all groups every collection.
-      const sampleGroups = await this.params.redisConnection.zrange(
-        readyKey,
-        0,
-        9,
-      );
-      let minDispatchAfterMs = Infinity;
-      for (const groupId of sampleGroups) {
-        const groupJobsKey = `${keyPrefix}group:${groupId}:jobs`;
-        const oldest = await this.params.redisConnection.zrange(
-          groupJobsKey,
-          0,
-          0,
+      // Oldest eligible-waiting age. A group's readyKey score is its
+      // dispatch-eligibility time, and every not-yet-dispatchable state is
+      // future-scored:
+      //   - genuinely eligible & waiting     → score <= now   (counted)
+      //   - in-flight (re-scored to activeUntil), backoff-pending retry,
+      //     and not-yet-due delayed stage    → score > now    (excluded)
+      // So the oldest eligible-waiting group is simply the smallest score in
+      // (sentinel, now]. STAGE writes the score with ZADD LT (keep-if-smaller)
+      // and COMPLETE rewrites it to the next remaining job, so the readyKey
+      // score already tracks the group's oldest still-pending job.
+      //
+      // This replaces the previous "min dispatchAfterMs over the first 10 ready
+      // groups" scan, which had two independent defects:
+      //   1. Sampling bias — zrange(readyKey, 0, 9) returns the 10 MOST
+      //      dispatch-eligible groups, not the oldest, so a real backlog sitting
+      //      past index 10 was never inspected and the gauge under-reported.
+      //   2. Wrong clock origin — it read the per-group jobs zset, whose scores
+      //      are PRESERVED across a block/park, so a just-unblocked group
+      //      reported its entire blocked duration as backlog age (0 -> hours in
+      //      one tick).
+      //
+      // Exclude the unblock sentinel: UNBLOCK_LUA (app-layer/ops/repositories/
+      // queue.redis.repository.ts) re-adds a group to ready with the constant
+      // score 1 (epoch 1ms) to force prompt dispatch — not a real eligibility
+      // time, so a just-unblocked group must not read as ~56 years. The
+      // exclusive `(1` lower bound drops it; any real timestamp is far larger.
+      //
+      // Known residual: unpark restores a group's preserved (pre-park) ready
+      // score, so a long-parked group briefly over-reports on unpark until it is
+      // dispatched (one scan cycle). Closing that needs an unpark re-score
+      // decision (queue-fairness change), tracked separately.
+      const nowMs = Date.now();
+      const oldestEligible =
+        await this.params.redisConnection.zrangebyscore(
+          readyKey,
+          `(${READY_UNBLOCK_SENTINEL_SCORE}`,
+          nowMs,
           "WITHSCORES",
+          "LIMIT",
+          0,
+          1,
         );
-        if (oldest.length >= 2) {
-          const score = Number(oldest[1]);
-          if (score > 0 && score < minDispatchAfterMs) {
-            minDispatchAfterMs = score;
-          }
-        }
-      }
-      const age = minDispatchAfterMs === Infinity ? 0 : Math.max(0, Date.now() - minDispatchAfterMs);
+      const age =
+        oldestEligible.length >= 2
+          ? Math.max(0, nowMs - Number(oldestEligible[1]))
+          : 0;
       gqOldestPendingAgeMilliseconds.set(
         { queue_name: this.params.queueName },
         age,

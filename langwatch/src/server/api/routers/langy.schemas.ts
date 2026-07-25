@@ -108,6 +108,19 @@ export const langyConversationUpdateSignalSchema = z.object({
    * to apply in place.
    */
   titleChanged: z.boolean().optional(),
+  /**
+   * The conversation projection's position when this signal was published
+   * (ADR-059): compare with the local fold's cursor and fetch the event tail
+   * (`conversationEventsAfter`) only when behind. A cursor is inert — the
+   * signal still carries no conversation content. Optional so signals from
+   * older server builds keep parsing.
+   */
+  cursor: z
+    .object({
+      acceptedAt: z.number().int().nonnegative(),
+      eventId: z.string(),
+    })
+    .optional(),
 });
 export type LangyConversationUpdateSignal = z.infer<
   typeof langyConversationUpdateSignalSchema

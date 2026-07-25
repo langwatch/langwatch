@@ -90,6 +90,38 @@ function createDurableStore() {
   return { store, committed: () => committed };
 }
 
+/**
+ * A durable store that persists the applied-event-id watermark next to the
+ * committed state, exactly as `codingAgentSession.store.ts` wires it: `store`
+ * writes both the state and `context.appliedEventIds`, and `getWithApplied`
+ * hands the executor the state plus that watermark. This is the tier the cache
+ * falls through to on a miss, so a retry that reaches a cold cache can still
+ * recognise a batch it already committed — the difference that keeps the count
+ * at 1 across cache loss where a watermark-less durable store double-counts.
+ */
+function createDurableStoreWithWatermark() {
+  let committed: CounterState | null = null;
+  let appliedEventIds: string[] = [];
+  const store: FoldProjectionStore<CounterState> = {
+    async store(state, context) {
+      committed = state;
+      appliedEventIds = [...(context.appliedEventIds ?? [])];
+    },
+    async get() {
+      return committed;
+    },
+    async getWithApplied() {
+      return { state: committed, appliedEventIds: [...appliedEventIds] };
+    },
+  };
+  return { store, committed: () => committed };
+}
+
+type DurableStoreFactory = () => {
+  store: FoldProjectionStore<CounterState>;
+  committed: () => CounterState | null;
+};
+
 function toEvent(
   job: FoldJob,
   aggregateId: string = AGGREGATE,
@@ -151,6 +183,7 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     coalesce,
     aggregateId = AGGREGATE,
     tenantId = TENANT,
+    durableFactory = createDurableStore,
   }: {
     keyPrefix: string;
     failFirstBatch?: boolean;
@@ -159,8 +192,9 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
     coalesce?: number;
     aggregateId?: string;
     tenantId?: ReturnType<typeof createTenantId>;
+    durableFactory?: DurableStoreFactory;
   }) {
-    const durable = createDurableStore();
+    const durable = durableFactory();
     const cached = new RedisCachedFoldStore<CounterState>(durable.store, redis, {
       keyPrefix,
     });
@@ -524,13 +558,15 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
   });
 
   describe("given the cache entry is lost before a redelivery", () => {
-    describe("when the job is retried", () => {
+    describe("when the durable store keeps no applied-event watermark", () => {
       it("double-counts — the known limit of a cache-held applied-set", async () => {
-        // Not a bug report, a boundary. The applied-set lives in the cache
-        // entry, so eviction or Redis loss takes the dedup with it. This
-        // degrades to the pre-existing behaviour rather than to something
-        // worse, and it is the reason the plan does not claim this closes the
-        // cold path. Pinned so the limit is visible rather than folklore.
+        // Not a bug report, a boundary scoped to a durable store WITHOUT an
+        // applied-event watermark (the default `createDurableStore` here). For
+        // such a store the applied-set lives only in the cache entry, so
+        // eviction or Redis loss takes the dedup with it. This degrades to the
+        // pre-existing behaviour rather than to something worse. The sibling
+        // scenario below shows a watermark-backed store closing this gap; this
+        // one pins the limit so it stays visible rather than folklore.
         const { queue, durable, applied } = createFoldQueue({
           keyPrefix: "it_cache_lost",
           failFirstBatch: true,
@@ -562,6 +598,59 @@ describe.skipIf(!hasTestcontainers)("fold redelivery idempotency", () => {
             timeout: 20_000,
             interval: 100,
           });
+        } finally {
+          clearInterval(evict);
+        }
+      }, 40_000);
+    });
+
+    describe("when the durable store persists an applied-event watermark", () => {
+      it("counts the event once even though the cache is lost", async () => {
+        // Same cache-eviction-across-the-retry-window flow as the sibling
+        // above, but the durable store persists the applied-event-id watermark
+        // next to its state (as codingAgentSession.store.ts does). On the retry
+        // the cache is cold, so the executor falls through to the durable store,
+        // reads the watermark back via getWithApplied, recognises the
+        // redelivered event, and skips it — closing the cold-cache double-count.
+        const { queue, durable, applied } = createFoldQueue({
+          keyPrefix: "it_cache_lost_watermark",
+          failFirstBatch: true,
+          durableFactory: createDurableStoreWithWatermark,
+        });
+        await queue.waitUntilReady();
+
+        await queue.send({
+          eventId: "event-1",
+          groupId: AGGREGATE,
+          occurredAt: Date.now(),
+        });
+
+        await vi.waitFor(() => expect(applied.length).toBeGreaterThanOrEqual(1), {
+          timeout: 15_000,
+          interval: 50,
+        });
+
+        // Keep the entry evicted for the whole retry window, exactly as the
+        // watermark-less scenario does, so the retry is forced through the
+        // durable read rather than served a warm cache.
+        const evict = setInterval(() => {
+          void redis
+            .keys("fold:it_cache_lost_watermark:*")
+            .then((keys) => (keys.length > 0 ? redis.del(...keys) : 0))
+            // A transient redis hiccup mid-eviction must not surface as an
+            // unhandled rejection and flake the run; the next tick retries.
+            .catch(() => {});
+        }, 20);
+
+        try {
+          // Wait for the redelivery to actually run (a second batch dispatch),
+          // then assert the durable count never moved past 1 — the watermark
+          // recognised the redelivered event across the cache loss.
+          await vi.waitFor(
+            () => expect(applied.length).toBeGreaterThanOrEqual(2),
+            { timeout: 20_000, interval: 100 },
+          );
+          expect(durable.committed()?.count).toBe(1);
         } finally {
           clearInterval(evict);
         }

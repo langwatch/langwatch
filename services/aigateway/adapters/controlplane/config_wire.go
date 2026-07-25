@@ -28,6 +28,11 @@ type configWire struct {
 	// the control plane). Stamped on customer spans as langwatch.labels and
 	// matched by cache-rule vk_tags matchers.
 	VKTags []string `json:"vk_tags"`
+	// LangyMirrorTier is the ADR-061 mirror fidelity the control-plane
+	// materialiser resolved for this VK's organization ("content" | "structural"
+	// | "skip"). Present and non-skip only for Langy virtual keys, so ordinary
+	// customer traffic is never mirrored. Empty/absent ⇒ no mirror.
+	LangyMirrorTier string `json:"langy_mirror_tier"`
 }
 
 type providerSlotWire struct {
@@ -137,6 +142,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 		Credentials:      creds,
 		TraceProjectID:   w.ProjectID,
 		ProjectOTLPToken: w.ProjectOTLPToken,
+		MirrorTier:       w.LangyMirrorTier,
 		VKDisplayPrefix:  w.DisplayPrefix,
 		VKTags:           w.VKTags,
 		AllowedModels:    w.ModelsAllowed,
@@ -340,6 +346,15 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"region":           getString("region"),
 			"auth_credentials": getString("auth_credentials"),
 		}
+	case domain.ProviderOpenAICodex:
+		// OAuth session, not an API key: the access token rides APIKey (it
+		// is the bearer), the ChatGPT account id becomes a request header,
+		// and the provider row id is the refresh callback's address.
+		cred.APIKey = getString("access_token")
+		cred.Extra = map[string]string{
+			"account_id":      getString("account_id"),
+			"provider_row_id": getString("provider_row_id"),
+		}
 	default:
 		cred.APIKey = getString("api_key")
 	}
@@ -368,6 +383,8 @@ func normalizeProviderType(t string) domain.ProviderID {
 		return domain.ProviderAnthropic
 	case "openai":
 		return domain.ProviderOpenAI
+	case "openai_codex":
+		return domain.ProviderOpenAICodex
 	default:
 		return domain.ProviderID(t)
 	}

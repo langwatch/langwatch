@@ -231,14 +231,15 @@ describe("given a page with something Langy can be given", () => {
   };
 
   describe("when the user has never handed Langy anything", () => {
-    it("teaches the gesture once, naming both routes in", () => {
+    it("teaches the # gesture once", () => {
       useLangyStore.setState({ contextHintDismissed: false });
       useLangyContextTargetStore.getState().register(target);
       renderComposer();
 
       const hint = screen.getByTestId("langy-context-gesture-hint");
-      expect(hint).toHaveTextContent("#");
-      expect(hint.textContent).toMatch(/drag/i);
+      expect(hint).toHaveTextContent(
+        "Type # to add anything on this page to Langy context",
+      );
     });
 
     it("says nothing on a page with nothing to point at", () => {

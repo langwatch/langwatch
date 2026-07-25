@@ -1,4 +1,4 @@
-import { LANGY_CONVERSATION_STATUS } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import type { LangyStreamEntry } from "./langyTokenBuffer";
 
 /**

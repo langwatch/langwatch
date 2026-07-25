@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Badge,
   Box,
   Button,
@@ -16,6 +15,7 @@ import { api } from "~/utils/api";
 import { Select } from "../../components/ui/select";
 import { getColorForString } from "../../utils/rotatingColors";
 import { RandomColorAvatar } from "../RandomColorAvatar";
+import { UserAvatar } from "../UserAvatar";
 
 export const AddParticipants = ({
   annotators,
@@ -64,11 +64,14 @@ export const AddParticipants = ({
   const userOptions = users.data?.members.map((member) => ({
     label: member.user.name ?? "",
     value: `user-${member.user.id}`,
+    image: member.user.image ?? null,
   }));
 
   const queueOptions = annotationQueues.data?.map((queue) => ({
     label: queue.name ?? "",
     value: `queue-${queue.id}`,
+    // Queues have no avatar image; keep the option shape uniform for `options`.
+    image: null,
   }));
 
   const options = [...(userOptions ?? []), ...(queueOptions ?? [])];
@@ -77,6 +80,7 @@ export const AddParticipants = ({
     items: options.map((option) => ({
       label: option.label,
       value: option.value,
+      image: option.image,
     })),
   });
   const participantsLeft = participantsCollection.items.filter(
@@ -118,15 +122,15 @@ export const AddParticipants = ({
                         background="bg.muted"
                       >
                         {item.value.startsWith("user-") ? (
-                          <Avatar.Root
+                          <UserAvatar
                             size="2xs"
                             color="white"
                             background={
                               getColorForString("colors", item.label).color
                             }
-                          >
-                            <Avatar.Fallback name={item.label} />
-                          </Avatar.Root>
+                            name={item.label}
+                            image={item.image}
+                          />
                         ) : (
                           <Box padding={1}>
                             <Users size={18} />
@@ -167,7 +171,11 @@ export const AddParticipants = ({
                   <VStack align="start">
                     <HStack>
                       {item.value.startsWith("user-") ? (
-                        <RandomColorAvatar size="2xs" name={item.label} />
+                        <RandomColorAvatar
+                          size="2xs"
+                          name={item.label}
+                          image={item.image}
+                        />
                       ) : (
                         <Box padding={1}>
                           <Users size={18} />

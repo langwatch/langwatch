@@ -101,6 +101,7 @@ describe("startNewConversation", () => {
         "activeTurnId",
         "turnPhase",
         "settledTurnId",
+        "turnProjection",
       ] as const) {
         expect(fresh[key], key).toEqual(baseline[key]);
       }

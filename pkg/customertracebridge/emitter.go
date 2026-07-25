@@ -32,6 +32,22 @@ const (
 	// attrDrop marks a span the gateway started but does not want exported
 	// (zero-cost, no-output probe calls). dropFilterExporter omits these.
 	attrDrop = attribute.Key("langwatch.reserved.drop")
+	// attrMirrorTier / attrMirrorSourceOrg are internal signaling set by
+	// EndSpan and consumed by mirrorExporter (ADR-061). They are stripped from
+	// BOTH the customer copy and the mirror copy before export — a reserved
+	// marker must never reach either project.
+	attrMirrorTier      = attribute.Key("langwatch.reserved.mirror_tier")
+	attrMirrorSourceOrg = attribute.Key("langwatch.reserved.mirror_source_org")
+	// attrOrgID names the SOURCE organization on the mirror copy — the same
+	// ADR-053 Track A key convention the gateway's own tracer uses.
+	attrOrgID = attribute.Key("langwatch.organization_id")
+)
+
+// Mirror tier values (ADR-061), mirroring services/langyagent/domain.MirrorTier.
+const (
+	mirrorTierContent    = "content"
+	mirrorTierStructural = "structural"
+	mirrorTierSkip       = "skip"
 )
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
@@ -120,6 +136,28 @@ type EmitterOptions struct {
 	// this package must not decide. The zero value allows nothing and stamps
 	// nothing (fail closed).
 	Policy Policy
+	// Mirror, when set, turns on the ADR-061 mirror leg: a gen_ai span whose
+	// EndSpan carried a non-skip mirror tier is DUPLICATED into the mirror
+	// project (content gated by the tier), alongside the customer's own copy.
+	// The zero value leaves the leg off — the emitter behaves exactly as before.
+	Mirror MirrorConfig
+}
+
+// MirrorConfig points the emitter's mirror leg at the mirror project (ADR-061).
+// All three must be set for the leg to arm; any empty field disarms it.
+type MirrorConfig struct {
+	// Endpoint is the base URL of the LangWatch deployment holding the mirror
+	// project ("/v1/traces" is appended by the router).
+	Endpoint string
+	// Key is the mirror project's static API key, sent as a Bearer token.
+	Key string
+	// ProjectID is the mirror project's id — the value the mirror copy carries
+	// as langwatch.project_id so the router delivers it there.
+	ProjectID string
+}
+
+func (m MirrorConfig) armed() bool {
+	return m.Endpoint != "" && m.Key != "" && m.ProjectID != ""
 }
 
 // NewEmitter creates a customer trace bridge backed by a private TracerProvider.
@@ -128,9 +166,26 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		opts.Registry = NewRegistry()
 	}
 
-	router := dropFilterExporter{
-		inner: resourceScrubExporter{inner: newRouterExporter(ctx, opts.Registry), policy: opts.Policy},
+	// The export chain, outermost first: drop probe spans, THEN (ADR-061)
+	// duplicate mirror-marked spans into the mirror project, THEN scrub the
+	// resource, THEN route by project id. Mirror sits inside drop (a dropped
+	// span is never mirrored) and outside scrub (both copies get the same
+	// resource treatment and reach the router together).
+	var inner sdktrace.SpanExporter = resourceScrubExporter{
+		inner: newRouterExporter(ctx, opts.Registry), policy: opts.Policy,
 	}
+	if opts.Mirror.armed() {
+		// Register the mirror project once so the router can deliver the mirror
+		// copy. A later per-request SetFromBundle for the mirror project's own
+		// traffic may re-point it at the project's own OTLP token — the same
+		// destination, an equally valid credential — so the collision is benign.
+		if err := opts.Registry.Set(opts.Mirror.ProjectID, opts.Mirror.Endpoint,
+			map[string]string{"Authorization": "Bearer " + opts.Mirror.Key}); err != nil {
+			return nil, fmt.Errorf("register mirror project: %w", err)
+		}
+		inner = mirrorExporter{inner: inner, mirrorProjectID: opts.Mirror.ProjectID}
+	}
+	router := dropFilterExporter{inner: inner}
 
 	batchTimeout := opts.BatchTimeout
 	if batchTimeout == 0 {
@@ -215,7 +270,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 
 	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
-		semconv.GenAIRequestModelKey.String(params.Model),
+		semconv.GenAIRequestModelKey.String(canonicalModelID(params.ProviderID, params.Model)),
 		semconv.GenAIUsageInputTokensKey.Int(freshInput),
 		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
 		attrTotalUsage.Int(params.Usage.TotalTokens),
@@ -268,6 +323,16 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		span.SetAttributes(attrOutputMessages.String(output))
 	}
 
+	// ADR-061 mirror markers: internal signaling for mirrorExporter, stripped
+	// from every exported copy. Only stamped for a non-skip tier (Langy VKs),
+	// so ordinary customer traffic never grows a mirror copy.
+	if tier := params.MirrorTier; tier == mirrorTierContent || tier == mirrorTierStructural {
+		span.SetAttributes(attrMirrorTier.String(tier))
+		if params.MirrorSourceOrgID != "" {
+			span.SetAttributes(attrMirrorSourceOrg.String(params.MirrorSourceOrgID))
+		}
+	}
+
 	if isError {
 		span.SetStatus(codes.Error, params.UpstreamErrorType)
 	}
@@ -283,7 +348,40 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
+	// A Langy turn's model call belongs INSIDE the turn's trace. When the call
+	// arrived WITHOUT the turn's traceparent (a relay gap, or a call outside
+	// any turn), this span rooted a standalone trace that duplicates the turn
+	// in the customer's trace explorer; the worker's own spans already show
+	// the call, so the copy adds nothing but a second row with the same cost.
+	// Drop it, errors included: the turn span carries the failure. A Langy
+	// call is recognized by its mirror tier, which the control plane resolves
+	// to non-skip ONLY for Langy virtual keys, so ordinary gateway traffic
+	// (playground, customer API keys) never carries one, so its standalone
+	// root, the only trace such traffic has, is untouched. attrDrop sits
+	// outermost in the export chain, so the unjoinable span's mirror copy is
+	// suppressed with it.
+	if tier := params.MirrorTier; (tier == mirrorTierContent || tier == mirrorTierStructural) &&
+		TraceParent(ctx) == "" {
+		span.SetAttributes(attrDrop.Bool(true))
+	}
+
 	span.End()
+}
+
+// canonicalModelID reports the model under the platform's provider-prefixed
+// spelling ("anthropic/claude-haiku-4-5"): the id the selectors, the cost
+// registry, the playground and the NLP executions all carry. Model resolution
+// strips the prefix for provider routing, and stamping the stripped name made
+// the gateway the one surface reporting bare wire-names: a Langy turn's
+// Models filter listed the SAME model twice, once bare (this span), once
+// prefixed (the worker's own span). A model whose provider is unknown
+// (implicit resolution never fills it) or that already carries a path
+// segment is reported as requested.
+func canonicalModelID(provider domain.ProviderID, model string) string {
+	if provider == "" || model == "" || strings.Contains(model, "/") {
+		return model
+	}
+	return string(provider) + "/" + model
 }
 
 // Shutdown flushes pending spans to customer endpoints.

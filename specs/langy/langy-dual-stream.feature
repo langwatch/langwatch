@@ -85,6 +85,17 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then it writes a reasoning frame carrying the thinking text
     And a reasoning delta is not treated as an answer token
 
+  @unit
+  # Some models narrate their thinking in the same live stream as the answer,
+  # in whatever order the pieces arrive. That narration belongs on the live
+  # reasoning display while Langy works, never in the reply that is kept.
+  Scenario: Thinking narrated alongside the answer stays out of the reply
+    Given Langy thinks out loud while it writes a reply
+    When I watch the turn live
+    Then the thinking appears as live reasoning while Langy works
+    And the reply I keep reads as the answer alone, in the order Langy wrote it
+    And none of the thinking ends up in it
+
   @integration
   Scenario: Reasoning streams to the browser and vanishes when the turn settles
     Given a turn is running for a conversation I own

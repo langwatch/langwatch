@@ -3,7 +3,6 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   checkOrganizationPermission,
-  checkPermissionOrPubliclyShared,
   checkProjectPermission,
   checkTeamPermission,
   EXTERNAL_MEMBER_PERMISSIONS,
@@ -40,9 +39,6 @@ const mockPrisma = {
   },
   customRole: {
     findUnique: vi.fn(),
-  },
-  publicShare: {
-    findFirst: vi.fn(),
   },
   groupMembership: {
     findMany: vi.fn(),
@@ -793,199 +789,6 @@ describe("RBAC Integration Tests", () => {
       });
     });
 
-    describe("checkPermissionOrPubliclyShared", () => {
-      it("should allow access when user has permission", async () => {
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-123",
-            organizationId: "org-1",
-            organization: {
-              members: [{ role: OrganizationUserRole.MEMBER }],
-            },
-          },
-        });
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: TeamUserRole.ADMIN, customRoleId: null },
-        ]);
-
-        const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("workflows:view" as Permission),
-          { resourceType: "TRACE", resourceParam: "traceId" },
-        );
-
-        const result = await middleware({
-          ctx: mockCtx,
-          input: { projectId: "project-123", traceId: "trace-123" },
-          next: mockNext,
-        });
-
-        expect(result).toBe("success");
-        expect(mockCtx.permissionChecked).toBe(true);
-        expect(mockCtx.publiclyShared).toBe(false);
-      });
-
-      it("should allow access when resource is publicly shared", async () => {
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-123",
-            members: [],
-            organization: { members: [] },
-          },
-        });
-
-        mockPrisma.publicShare.findFirst.mockResolvedValue({
-          id: "share-123",
-          resourceType: "TRACE",
-          resourceId: "trace-123",
-        });
-
-        const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("workflows:view" as Permission),
-          { resourceType: "TRACE", resourceParam: "traceId" },
-        );
-
-        const result = await middleware({
-          ctx: mockCtx,
-          input: { projectId: "project-123", traceId: "trace-123" },
-          next: mockNext,
-        });
-
-        expect(result).toBe("success");
-        expect(mockCtx.permissionChecked).toBe(true);
-        expect(mockCtx.publiclyShared).toBe(true);
-      });
-
-      describe("when scoping the public-share fallback to the project", () => {
-        // A share row that only exists in project-a. The findFirst mock honors
-        // the where clause's projectId so the query scoping is actually
-        // exercised (a `mockResolvedValue` would pass regardless of the fix).
-        function seedShareForProject(projectId: string) {
-          mockPrisma.project.findUnique.mockResolvedValue({
-            team: {
-              id: "team-123",
-              members: [],
-              organization: { members: [] },
-            },
-          });
-          mockPrisma.publicShare.findFirst.mockImplementation(
-            async ({ where }: { where: any }) =>
-              where.projectId === projectId &&
-              where.resourceType === "TRACE" &&
-              where.resourceId === "trace-123"
-                ? {
-                    id: "share-123",
-                    projectId,
-                    resourceType: "TRACE",
-                    resourceId: "trace-123",
-                  }
-                : null,
-          );
-        }
-
-        it("scopes the public-share lookup by the calling project", async () => {
-          seedShareForProject("project-a");
-
-          const middleware = checkPermissionOrPubliclyShared(
-            checkProjectPermission("workflows:view" as Permission),
-            { resourceType: "TRACE", resourceParam: "traceId" },
-          );
-
-          await middleware({
-            ctx: mockCtx,
-            input: { projectId: "project-a", traceId: "trace-123" },
-            next: mockNext,
-          });
-
-          expect(mockPrisma.publicShare.findFirst).toHaveBeenCalledWith(
-            expect.objectContaining({
-              where: expect.objectContaining({ projectId: "project-a" }),
-            }),
-          );
-        });
-
-        it("authorizes a same-project share (regression-safe)", async () => {
-          seedShareForProject("project-a");
-
-          const middleware = checkPermissionOrPubliclyShared(
-            checkProjectPermission("workflows:view" as Permission),
-            { resourceType: "TRACE", resourceParam: "traceId" },
-          );
-
-          const result = await middleware({
-            ctx: mockCtx,
-            input: { projectId: "project-a", traceId: "trace-123" },
-            next: mockNext,
-          });
-
-          expect(result).toBe("success");
-          expect(mockCtx.publiclyShared).toBe(true);
-        });
-
-        it("denies a cross-project read of a share that belongs to another project", async () => {
-          // Share lives in project-a; caller reads the same trace id under project-b.
-          seedShareForProject("project-a");
-
-          const middleware = checkPermissionOrPubliclyShared(
-            checkProjectPermission("workflows:view" as Permission),
-            { resourceType: "TRACE", resourceParam: "traceId" },
-          );
-
-          await expect(
-            middleware({
-              ctx: mockCtx,
-              input: { projectId: "project-b", traceId: "trace-123" },
-              next: mockNext,
-            }),
-          ).rejects.toThrow(TRPCError);
-        });
-
-        it("denies a stale share row from another project for a re-created same-id trace", async () => {
-          // A lingering share for trace-123 in project-a must not authorize a
-          // newly created trace-123 living under project-b.
-          seedShareForProject("project-a");
-
-          const middleware = checkPermissionOrPubliclyShared(
-            checkProjectPermission("workflows:view" as Permission),
-            { resourceType: "TRACE", resourceParam: "traceId" },
-          );
-
-          await expect(
-            middleware({
-              ctx: mockCtx,
-              input: { projectId: "project-b", traceId: "trace-123" },
-              next: mockNext,
-            }),
-          ).rejects.toThrow(
-            "You do not have permission and this resource is not publicly shared",
-          );
-        });
-      });
-
-      it("should throw UNAUTHORIZED when no permission and not shared", async () => {
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-123",
-            members: [],
-            organization: { members: [] },
-          },
-        });
-
-        mockPrisma.publicShare.findFirst.mockResolvedValue(null);
-
-        const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("workflows:view" as Permission),
-          { resourceType: "TRACE", resourceParam: "traceId" },
-        );
-
-        await expect(
-          middleware({
-            ctx: mockCtx,
-            input: { projectId: "project-123", traceId: "trace-123" },
-            next: mockNext,
-          }),
-        ).rejects.toThrow(TRPCError);
-      });
-    });
   });
 
   // ==========================================================================
@@ -1607,45 +1410,6 @@ describe("RBAC Integration Tests", () => {
       });
     });
 
-    describe("when public share fallback middleware runs for a permitted user", () => {
-      it("passes org role via checkProjectPermission", async () => {
-        const ctx = {
-          prisma: mockPrisma,
-          session: mockSession,
-          permissionChecked: false,
-          publiclyShared: false,
-          organizationRole: undefined as OrganizationUserRole | null | undefined,
-        };
-
-        mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-1",
-            organizationId: "org-1",
-            organization: {
-              members: [{ role: OrganizationUserRole.MEMBER }],
-            },
-          },
-        });
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: TeamUserRole.MEMBER, customRoleId: null },
-        ]);
-
-        const mockNext = vi.fn().mockResolvedValue("success");
-        const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("analytics:view" as Permission),
-          { resourceType: "TRACE", resourceParam: "traceId" },
-        );
-
-        await middleware({
-          ctx,
-          input: { projectId: "project-1", traceId: "trace-1" },
-          next: mockNext,
-        });
-
-        expect(ctx.organizationRole).toBe(OrganizationUserRole.MEMBER);
-        expect(ctx.permissionChecked).toBe(true);
-      });
-    });
   });
 
   // ==========================================================================

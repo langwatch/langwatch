@@ -8,7 +8,7 @@
  * fallback for a command this UI has never heard of. The widget vocabulary is
  * the catalog's (`stats` / `rows` / `facts` / `diff` / `text` / `chart`), and
  * each widget reads the already-parsed card payload from the shared
- * `@langwatch/cli-cards` contract — parsed against the card the result was
+ * `@langwatch/langy` contract — parsed against the card the result was
  * DECIDED to be, not one re-derived from the command's name here.
  *
  * Honesty rule (same as the trace cards): output that cannot be read renders
@@ -17,7 +17,7 @@
  * a real answer and says so in real words.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
-import { parseCardResult, type CliResultDigest } from "@langwatch/cli-cards";
+import { parseCardResult, type CliResultDigest } from "@langwatch/langy";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import {
   useCapabilityData,

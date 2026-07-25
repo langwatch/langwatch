@@ -3,6 +3,7 @@ import {
   redactTraceContent,
 } from "~/server/app-layer/traces/visibility-window.service";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
+import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type {
   Event,
   Span,
@@ -271,6 +272,37 @@ export function applyEventProtections(
     ...event,
     event_details: redactObject(event.event_details, redactions),
   };
+}
+
+/**
+ * Applies redaction protections to the v2 derived trace events (the events
+ * timeline / exceptions pane). Event attributes are captured content —
+ * exception messages quote application state — so they are blanked entirely
+ * for a viewer who cannot read content or when the event predates the plan's
+ * visibility cutoff; otherwise the restricted-attribute rules apply. Used by
+ * both the in-app `tracesV2.traceEvents` read and the shared-trace payload,
+ * so the two surfaces can never drift apart.
+ */
+export function applyDerivedTraceEventProtections(
+  events: DerivedTraceEvent[],
+  protections: Protections,
+): DerivedTraceEvent[] {
+  const contentVisible = protections.canSeeCapturedInput === true;
+  const cutoffMs = protections.visibilityCutoffMs;
+  const blank = (attrs: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.keys(attrs).map((key) => [key, "[REDACTED]"]));
+  return events.map((event) => {
+    const beyondCutoff = cutoffMs != null && event.timestamp < cutoffMs;
+    if (!contentVisible || beyondCutoff) {
+      return { ...event, attributes: blank(event.attributes) };
+    }
+    return {
+      ...event,
+      attributes:
+        redactHiddenAttributes(event.attributes, protections.hiddenAttributes) ??
+        event.attributes,
+    };
+  });
 }
 
 /**

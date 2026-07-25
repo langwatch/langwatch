@@ -67,17 +67,17 @@ WORKDIR /app
 # Copy built artifacts from builder.
 # mcp-server must be copied alongside langwatch because pnpm workspace
 # symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
-# cli-cards and handled-error are other root workspace packages linked the same
+# langy and handled-error are other root workspace packages linked the same
 # way. Both are loaded by migration tasks as well as the running server —
 # handled-error is imported for side effects by the server and worker entry
 # points, so omitting it fails the boot outright.
 COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
-COPY --from=builder /app/packages/cli-cards/package.json ./packages/cli-cards/package.json
-COPY --from=builder /app/packages/cli-cards/src ./packages/cli-cards/src
+COPY --from=builder /app/packages/langy/package.json ./packages/langy/package.json
+COPY --from=builder /app/packages/langy/src ./packages/langy/src
 COPY --from=builder /app/packages/handled-error/package.json ./packages/handled-error/package.json
 COPY --from=builder /app/packages/handled-error/src ./packages/handled-error/src
-# cli-cards and handled-error deliberately declare zod / @opentelemetry/api as
+# langy and handled-error deliberately declare zod / @opentelemetry/api as
 # peers. Because the workspace packages live outside /app/langwatch, expose the
 # app's production copies at the nearest shared node_modules boundary after dev
 # dependencies have been pruned.

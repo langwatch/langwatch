@@ -512,7 +512,7 @@ function ProjectSection({
                     opacity={0.5}
                     fontSize="sm"
                   >
-                    <RandomColorAvatar name={m.name} size="xs" />
+                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.customRoleName ?? m.role}
@@ -544,7 +544,7 @@ function ProjectSection({
                 </Text>
                 {projectLevel.map((m, i) => (
                   <HStack key={i} py={1} fontSize="sm">
-                    <RandomColorAvatar name={m.name} size="xs" />
+                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
                     <Box flex={1}>
                       <Text display="inline">{m.name}</Text>
                       {m.source === "override" && m.teamRole && (
@@ -813,7 +813,7 @@ function TeamCard({
                     _dark={{ borderColor: "gray.700" }}
                     opacity={m.viaGroupId ? 0.7 : 1}
                   >
-                    <RandomColorAvatar name={m.name} size="xs" />
+                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
                     <Text fontSize="sm" flex={1}>
                       {m.name}
                     </Text>
@@ -894,7 +894,7 @@ function TeamCard({
                     borderColor="gray.100"
                     _dark={{ borderColor: "gray.700" }}
                   >
-                    <RandomColorAvatar name={m.name} size="xs" />
+                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.role}

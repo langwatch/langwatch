@@ -4,6 +4,7 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import { IO_PREVIEW_BYTES, structuredIoPreview } from "../lean-for-projection";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
 const service = new TraceIOExtractionService();
@@ -799,6 +800,73 @@ describe("TraceIOExtractionService", () => {
         // Raw is preserved (no normalization edge-case touches it because
         // there's no `type:"text"` envelope to unwrap).
         expect(result!.raw).toEqual({ question: "What is 2+2?" });
+      });
+    });
+  });
+
+  // A Langy turn as it really lands: an empty-IO `langy.turn` root plus a
+  // doStream-style LLM child whose chat payload STARTS with a huge
+  // developer-role message and ends with the user's short text — over the
+  // ingest preview budget, so the child's attribute is the LEANED preview.
+  // The trace headline must still be the user's text and the reply, never the
+  // raw JSON of the (truncated) developer prompt.
+  describe("given a langy.turn root with empty IO and a doStream child carrying a developer-first chat payload", () => {
+    const fullInput = JSON.stringify([
+      {
+        role: "developer",
+        content: "You are OpenCode. " + "x".repeat(80 * 1024),
+      },
+      { role: "assistant", content: "Earlier reply for context." },
+      { role: "user", content: [{ type: "input_text", text: "hi" }] },
+    ]);
+    // Exactly what ingest stores inline after leanForProjection (ADR-022).
+    const leanedInput = structuredIoPreview(fullInput, IO_PREVIEW_BYTES)!;
+
+    const makeTurnSpans = () => [
+      createTestSpan({
+        spanId: "turn-root",
+        name: "langy.turn",
+        spanAttributes: {},
+      }),
+      createTestSpan({
+        spanId: "do-stream",
+        parentSpanId: "turn-root",
+        name: "ai.streamText.doStream",
+        startTimeUnixMs: 1100,
+        endTimeUnixMs: 1900,
+        spanAttributes: {
+          "gen_ai.input.messages": leanedInput,
+          "gen_ai.output.messages": JSON.stringify([
+            { role: "assistant", content: "Langy, the LangWatch agent. Hi!" },
+          ]),
+        },
+      }),
+    ];
+
+    describe("when extracting the trace input", () => {
+      it("extracts the latest user message text, not the raw JSON", () => {
+        const input = service.extractFirstInput(makeTurnSpans());
+
+        expect(input).not.toBeNull();
+        expect(input!.text).toBe("hi");
+      });
+
+      it("keeps parsed messages (developer role intact) as the raw value for the message views", () => {
+        const input = service.extractFirstInput(makeTurnSpans());
+
+        const messages = input!.raw as Array<{ role: string }>;
+        expect(Array.isArray(messages)).toBe(true);
+        expect(messages[0]!.role).toBe("developer");
+        expect(messages[messages.length - 1]!.role).toBe("user");
+      });
+    });
+
+    describe("when extracting the trace output", () => {
+      it("extracts the assistant reply text", () => {
+        const output = service.extractLastOutput(makeTurnSpans());
+
+        expect(output).not.toBeNull();
+        expect(output!.text).toBe("Langy, the LangWatch agent. Hi!");
       });
     });
   });

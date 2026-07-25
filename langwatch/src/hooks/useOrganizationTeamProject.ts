@@ -1,7 +1,7 @@
 import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole, type Project } from "@prisma/client";
 import {
   EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
@@ -80,18 +80,63 @@ export const useOrganizationTeamProject = (
   const publicEnv = usePublicEnv();
 
   const isPublicRoute = publicRoutes.includes(router.route);
-  const shareId = typeof router.query.id === "string" ? router.query.id : "";
-  const publicShare = api.share.getShared.useQuery(
-    { id: shareId },
-    { enabled: !!shareId && !!isPublicRoute },
-  );
-  const publicShareProject = api.project.publicGetById.useQuery(
+  const shareToken = typeof router.query.id === "string" ? router.query.id : "";
+  // The public share page resolves everything (incl. its project chrome) through
+  // the single `sharedTrace.get` read. Same query key as the page, so React
+  // Query dedupes to one request and one consumed view. See ADR-057.
+  const sharedTrace = api.sharedTrace.get.useQuery(
+    { token: shareToken },
     {
-      id: publicShare.data?.projectId ?? "",
-      shareId: publicShare.data?.id ?? "",
+      enabled: !!shareToken && !!isPublicRoute,
+      staleTime: Infinity,
+      retry: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
     },
-    { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id },
   );
+  const publicShareProjectData: Project | undefined = sharedTrace.data
+    ? {
+        // The share payload deliberately exposes only the chrome fields; take
+        // exactly those off the DTO.
+        id: sharedTrace.data.project.id,
+        name: sharedTrace.data.project.name,
+        slug: sharedTrace.data.project.slug,
+        language: sharedTrace.data.project.language,
+        framework: sharedTrace.data.project.framework,
+        // Everything else is stubbed with inert, non-sensitive defaults so the
+        // object satisfies the full `Project` the app chrome is typed against.
+        // Nothing session-gated runs on public routes, so these are never read
+        // for real decisions; sensitive fields (apiKey, teamId, S3 credentials)
+        // stay empty/null rather than fake. The explicit `Project` annotation
+        // (no `as` cast) makes the compiler flag any new required column, so a
+        // future field can never silently ship unset here. See ADR-057.
+        apiKey: "",
+        teamId: "",
+        kind: "application",
+        firstMessage: true,
+        integrated: false,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+        userLinkTemplate: null,
+        traceSharingEnabled: false,
+        presenceEnabled: false,
+        s3Endpoint: null,
+        s3AccessKeyId: null,
+        s3SecretAccessKey: null,
+        s3Bucket: null,
+        archivedAt: null,
+        isPersonal: false,
+        ownerUserId: null,
+        personalFeatures: {},
+        // `null` = no egress allowlist configured, which the Langy credential
+        // service reads as "no custom egress" rather than "allow anything" —
+        // the fail-closed side of ADR-053. A share viewer never runs Langy, so
+        // this is inert either way; null keeps it inert AND safe.
+        langyEgressAllowlist: null,
+        departmentId: null,
+      }
+    : undefined;
 
   const isDemo = Boolean(
     publicEnv.data?.DEMO_PROJECT_SLUG &&
@@ -372,7 +417,7 @@ export const useOrganizationTeamProject = (
   if (organizations.isLoading && !organizations.isFetched) {
     return {
       isLoading: true,
-      project: publicShareProject.data,
+      project: publicShareProjectData,
       hasPermission: () => false,
       hasOrgPermission: () => false,
       hasAnyPermission: () => false,
@@ -479,7 +524,7 @@ export const useOrganizationTeamProject = (
     organizations: organizations.data,
     organization,
     team,
-    project: publicShareProject.data ?? finalProject,
+    project: publicShareProjectData ?? finalProject,
     projectId: finalProject?.id,
     hasPermission,
     hasOrgPermission,

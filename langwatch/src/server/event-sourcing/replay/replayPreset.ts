@@ -38,7 +38,6 @@ export interface ReplayRuntime {
  */
 const MAP_TARGET_TABLE: Record<string, string> = {
   spanStorage: "stored_spans",
-  logRecordStorage: "stored_log_records",
   canonicalLogStorage: "log_records",
   metricDataPointStorage: "metric_data_points",
   metricSeriesCatalog: "metric_series",

@@ -1,9 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import {
-  CLAUDE_CODE_KIND_ATTR,
-  CLAUDE_CODE_LOG_RETENTION_DAYS,
-} from "~/server/app-layer/traces/claude-code-log-to-span";
-import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
+  type StoredLogRecordRow,
+  TRACE_LOG_READ_CAP,
+} from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
@@ -25,26 +24,6 @@ function validate(record: CanonicalLogRecord, operation: string) {
   if (!/^[a-f0-9]{64}$/.test(record.recordId)) {
     throw new SecurityError(operation, "invalid RecordId", record.tenantId);
   }
-}
-
-/**
- * Raw claude_code logs the span fold consumes become pure duplication once
- * claudeCodeSpanSync folds them into stored_spans, so they are evicted far
- * sooner than the platform default (the spans inherit the real retention).
- *
- * Stamped, not min'd against the caller's value, so an indefinite (0) project
- * retention cannot make a fold-intermediate log live forever. This mirrors the
- * legacy log-record-storage repository; canonical logs replace that table, so
- * dropping the cap here would silently retain every folded Claude Code log at
- * full trace retention from the cutover onwards.
- */
-function retentionDaysFor(
-  record: CanonicalLogRecord,
-  retentionDays: number,
-): number {
-  return record.attributeKeys.includes(CLAUDE_CODE_KIND_ATTR)
-    ? CLAUDE_CODE_LOG_RETENTION_DAYS
-    : retentionDays;
 }
 
 function groupByTenant(
@@ -110,7 +89,11 @@ function toLogRecordRow({
     OccurredAt: new Date(record.occurredAt),
     AcceptedAt: new Date(record.acceptedAt),
     DedupVersion: dedupVersion(record.acceptedAt),
-    _retention_days: retentionDaysFor(record, retentionDays),
+    // Claude's kind-marked rows once expired after a day, because a reactor
+    // copied them into spans. That converter is gone: these rows ARE the
+    // Terminal transcript's content now, so they live at trace retention
+    // like every other log.
+    _retention_days: retentionDays,
     _size_bytes: record.canonicalSizeBytes,
   };
 }
@@ -198,11 +181,11 @@ export class CanonicalLogRecordClickHouseRepository
     };
   }
 
-  async getMarkedClaudeCodeLogsByTrace({
+  async getLogsByTraceId({
     tenantId,
     traceId,
     occurredAtMs,
-    limit,
+    limit = TRACE_LOG_READ_CAP,
   }: {
     tenantId: string;
     traceId: string;
@@ -211,17 +194,17 @@ export class CanonicalLogRecordClickHouseRepository
   }): Promise<StoredLogRecordRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
-      "CanonicalLogRecordClickHouseRepository.getMarkedClaudeCodeLogsByTrace",
+      "CanonicalLogRecordClickHouseRepository.getLogsByTraceId",
     );
     const client = await this.resolveClient(tenantId);
     const { from, to } = this.window(occurredAtMs);
-    const hasLimit = typeof limit === "number" && limit > 0;
     const result = await client.query({
       query: `
         SELECT
           CorrelationTraceId AS TraceId,
           CorrelationSpanId AS SpanId,
           toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs,
+          BodyText,
           AttributesFlatJson,
           ResourceAttributesFlatJson,
           ScopeName,
@@ -234,33 +217,33 @@ export class CanonicalLogRecordClickHouseRepository
           -- (epoch millis), never matching a DateTime64 bound.
           AND log_records.TimeUnixMs >= {from:DateTime64(3)}
           AND log_records.TimeUnixMs <= {to:DateTime64(3)}
-          AND ProviderKind = 'claude_code'
-          AND ProviderEventKind != ''
-        ORDER BY TimeUnixNano ASC, ProviderEventSequence ASC, RecordId ASC
-        ${hasLimit ? "LIMIT {limit:UInt64}" : ""}
+        ORDER BY TimeUnixNano ASC, RecordId ASC
+        LIMIT {limit:UInt64}
       `,
-      query_params: {
-        tenantId,
-        traceId,
-        from,
-        to,
-        ...(hasLimit ? { limit } : {}),
-      },
+      query_params: { tenantId, traceId, from, to, limit },
       format: "JSONEachRow",
     });
     const rows = await result.json<{
       TraceId: string;
       SpanId: string;
       TimeUnixMs: number | string;
+      BodyText: string | null;
       AttributesFlatJson: string;
       ResourceAttributesFlatJson: string;
       ScopeName: string;
       ScopeVersion: string;
     }>();
+    if (rows.length >= limit) {
+      logger.warn(
+        { tenantId, traceId, limit },
+        "Canonical trace log read hit its row cap; oldest rows returned, the rest omitted",
+      );
+    }
     return rows.map((row) => ({
       traceId: row.TraceId,
       spanId: row.SpanId,
       timeUnixMs: Number(row.TimeUnixMs),
+      body: row.BodyText ?? "",
       attributes: JSON.parse(row.AttributesFlatJson) as Record<string, string>,
       resourceAttributes: JSON.parse(row.ResourceAttributesFlatJson) as Record<
         string,
@@ -269,38 +252,5 @@ export class CanonicalLogRecordClickHouseRepository
       scopeName: row.ScopeName,
       scopeVersion: row.ScopeVersion || null,
     }));
-  }
-
-  async countMarkedClaudeCodeLogsByTrace({
-    tenantId,
-    traceId,
-    occurredAtMs,
-  }: {
-    tenantId: string;
-    traceId: string;
-    occurredAtMs?: number;
-  }): Promise<number> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "CanonicalLogRecordClickHouseRepository.countMarkedClaudeCodeLogsByTrace",
-    );
-    const client = await this.resolveClient(tenantId);
-    const { from, to } = this.window(occurredAtMs);
-    const result = await client.query({
-      query: `
-        SELECT uniqExact(RecordId) AS c
-        FROM log_records
-        WHERE TenantId = {tenantId:String}
-          AND CorrelationTraceId = {traceId:String}
-          AND TimeUnixMs >= {from:DateTime64(3)}
-          AND TimeUnixMs <= {to:DateTime64(3)}
-          AND ProviderKind = 'claude_code'
-          AND ProviderEventKind != ''
-      `,
-      query_params: { tenantId, traceId, from, to },
-      format: "JSONEachRow",
-    });
-    const rows = await result.json<Array<{ c: number | string }>[number]>();
-    return Number(rows[0]?.c ?? 0);
   }
 }

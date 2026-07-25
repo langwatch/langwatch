@@ -1158,13 +1158,110 @@ Rule: Performance
 # AI QUERY COMPOSER
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: AI query composer (Ask AI)
-  Natural-language → query translation runs in a separate FloatingAiBar mode,
-  not inline in the structured search bar.
+Rule: The search bar's ask affordance belongs to Langy when Langy is available
+  The Ask AI query composer predates Langy. For a user who has Langy (it is
+  rolled out to them and they may start a conversation), the search bar's ask
+  button is the Langy entry point instead: a Langy-styled ask surface floats
+  over the search bar — at the top of the trace explorer, next to the traces
+  the question is about — and Enter hands the question and the active search
+  to the Langy panel. When the panel is already open there is no second
+  composer: the panel takes the question. Users without Langy keep the inline
+  Ask AI composer below, unchanged — the affordance is never a dead button.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
+    And Langy is available to the user, with permission to start a conversation
+
+  Scenario: The ask button reads Ask Langy
+    When the Observe page loads
+    Then the search bar's ask button reads "Ask Langy"
+    And the placeholder text reads "Search filters, free text, or Ask Langy…"
+    And the inline submit hint reads "Press ⌘ + Enter to Ask Langy"
+
+  Scenario: Clicking Ask Langy floats the ask surface over the search bar
+    Given the Langy panel is closed
+    When the user clicks "Ask Langy" (or presses ⌘I / Ctrl+I)
+    Then a Langy-styled ask surface floats where the search bar was
+    And the user can type their question there, next to their traces
+    And the inline AI composer does not open
+
+  Scenario: The floating surface shows what will go with the question
+    Given the search bar contains the applied query "status:error"
+    When the user opens the Langy ask surface
+    Then it says the active search goes with the question
+
+  Scenario: Enter hands the question and the search to the panel
+    Given the Langy ask surface is open with "why are these failing?" typed
+    And the search bar contains the applied query "status:error"
+    When the user presses Enter
+    Then the ask surface dissolves
+    And the Langy panel opens and asks "why are these failing?"
+    And the active search rides along as attached context
+
+  Scenario: Escape closes the ask surface without sending anything
+    Given the Langy ask surface is open
+    When the user presses Escape
+    Then the surface closes and the search bar returns
+    And nothing was sent or attached
+
+  Scenario: An open Langy panel is used instead of a second composer
+    Given the Langy panel is already open
+    And the search bar contains the applied query "status:error"
+    When the user clicks "Ask Langy"
+    Then no floating surface appears
+    And the active search attaches to the open panel's conversation context
+
+  Scenario: The panel opening elsewhere retires the floating surface
+    Given the Langy ask surface is open
+    When the Langy panel opens some other way
+    Then the ask surface closes — two composers are never on screen
+
+  Scenario: ⌘+Enter hands the typed question straight to Langy
+    Given the user typed "why are checkout traces failing" in the search bar
+    When the user presses ⌘+Enter / Ctrl+Enter
+    Then the Langy panel opens and asks "why are checkout traces failing"
+
+  Scenario: A question that is just the applied filter is not attached twice
+    Given the search bar contains the applied query "status:error"
+    When the user presses ⌘+Enter / Ctrl+Enter on that same text
+    Then Langy is asked "status:error"
+    And no separate search attachment duplicates it
+
+  Scenario: No model provider setup is demanded on the way to Langy
+    Given the project has no enabled model provider
+    When the user clicks "Ask Langy"
+    Then the Langy ask surface opens
+    # Langy walks the user through model setup itself when it needs one.
+
+  Scenario: Sample data keeps the handoff gated
+    Given the trace list is showing sample data
+    Then the ask button is dimmed
+    And its tooltip explains it works on real traces, not the sample data
+
+  Scenario: A broken ask surface gives the search bar straight back
+    Given the Langy ask surface fails to render
+    Then the surface folds away and the search bar returns
+    And searching keeps working
+
+  Scenario: The keyboard shortcuts dialog names Langy
+    When the user opens the keyboard shortcuts dialog with "?"
+    Then the "Search" section lists "Ask Langy about these traces" for ⌘/Ctrl I
+
+  Scenario: Without Langy the inline Ask AI composer remains
+    Given Langy is not available to the user
+    Then the search bar's ask button reads "Ask AI"
+    And clicking it opens the inline AI composer
+
+Rule: AI query composer (Ask AI)
+  Natural-language → query translation runs in a separate FloatingAiBar mode,
+  not inline in the structured search bar. This is the ask affordance for
+  users WITHOUT Langy (see the rule above).
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+    And Langy is not available to the user
 
   Scenario: Free-text in the structured bar stays free-text
     When the user types "show me all errors" in the structured search bar

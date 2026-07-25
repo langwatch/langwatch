@@ -65,6 +65,14 @@ type BundleConfig struct {
 	// ProjectOTLPToken is the auth token for AI trace export into TraceProjectID.
 	ProjectOTLPToken string
 
+	// MirrorTier is the ADR-061 mirror fidelity resolved for this VK's
+	// organization ("content" | "structural" | "skip" | ""). Non-skip only for
+	// Langy virtual keys — the control-plane materialiser leaves it empty for
+	// ordinary customer VKs, so their gen_ai spans are never mirrored. When
+	// non-skip, the customer trace bridge emits a SECOND gen_ai span into the
+	// mirror project at the tier's fidelity (see pkg/customertracebridge).
+	MirrorTier string
+
 	// VKDisplayPrefix is the VK's public display prefix (e.g. "vk-lw-…").
 	// Carried so rule matchers can target VKs by prefix without leaking the
 	// secret. Sourced from the control-plane config payload.

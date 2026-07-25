@@ -5,11 +5,17 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import Script from "~/utils/compat/next-script";
+import { useCrispBubblePolicy } from "~/utils/crispBubblePolicy";
 import { pollForGlobal } from "~/utils/pollForGlobal";
 
 export function ExtraFooterComponents() {
   const session = useRequiredSession({ required: false });
   const publicEnv = usePublicEnv();
+
+  // Crisp only ever loads on SaaS. The policy owns the bubble's visibility
+  // (hidden unless deliberately opened) for the whole app lifetime, so it
+  // mounts here next to the loader rather than inside any single page.
+  useCrispBubblePolicy({ enabled: Boolean(publicEnv.data?.IS_SAAS) });
 
   if (!publicEnv.data?.IS_SAAS) {
     return null;
@@ -172,8 +178,12 @@ export function SignedInExtraFooterComponents() {
 })('18f008fe-1a55-4b22-70d9-964d6e98b130');`}
           </Script>
           {isInStudio ? null : (
+            /* Loader only: hide/show behavior lives in the Crisp bubble
+               policy (~/utils/crispBubblePolicy), which seeds the queue
+               before this runs. `window.$crisp || []` preserves that queue
+               so the policy's commands and event bindings drain at boot. */
             <Script id="crisp">
-              {`window.$crisp=[];window.$crisp.push(["do", "chat:hide"]);window.$crisp.push(["on", "chat:closed", () => { window.$crisp.push(["do", "chat:hide"]); }]);window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
+              {`window.$crisp=window.$crisp||[];window.CRISP_WEBSITE_ID="cca9eacd-c4d6-4258-a7fc-9606be6fd012";(function(){d=document;s=d.createElement("script");s.src="https://client.crisp.chat/l.js";s.async=1;d.getElementsByTagName("head")[0].appendChild(s);})();`}
             </Script>
           )}
         </>

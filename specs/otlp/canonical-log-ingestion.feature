@@ -85,7 +85,24 @@ Feature: Canonical OTLP log ingestion
 
   Rule: Upgrades do not lose logs in flight
 
+    # Scoped to canonical-era instances: every deployed release now writes to the
+    # canonical store, so an instance mid-upgrade and the instance that takes over
+    # from it are both canonical. Retiring `recordLog` acceptance is safe because
+    # canonical rolled out fully releases ago — no pre-canonical instance that
+    # would emit the legacy command still exists, so nothing in flight is lost.
     Scenario: Logs sent by an instance mid-upgrade are still stored
-      Given an instance running the previous release sends a log record
+      Given an instance running the previous (canonical) release sends a log record
       When a newly deployed instance processes it
-      Then the record is stored and remains readable
+      Then the record is stored in the canonical store and remains readable
+
+  Rule: New logs are written only to the canonical store
+
+    # The legacy store predates canonical log storage and stayed writable only
+    # to drain logs still in flight from pre-cutover instances during a rolling
+    # deploy. That write path is retired: ingestion records to the canonical
+    # store alone, while the legacy store's earlier history stays readable.
+    Scenario: Ingested log telemetry reaches only the canonical store
+      When the project sends a log record
+      Then it is recorded in the canonical log store
+      And the retired store gains no new record
+      And logs already held in the retired store stay readable

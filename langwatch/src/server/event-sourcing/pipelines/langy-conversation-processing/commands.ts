@@ -11,7 +11,7 @@ import {
   LANGY_CONVERSATION_COMMAND_TYPES,
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
-} from "./schemas/constants";
+} from "@langwatch/langy";
 import {
   langyAgentResponseFailedEventDataSchema,
   langyAgentRespondedEventDataSchema,
@@ -29,8 +29,8 @@ import {
   langyToolCallFailedEventDataSchema,
   langyToolCallInitiatedEventDataSchema,
   langyToolCallSucceededEventDataSchema,
-  type LangyConversationProcessingEvent,
-} from "./schemas/events";
+} from "@langwatch/langy";
+import { type LangyConversationProcessingEvent } from "./schemas/events";
 
 /**
  * Langy conversation commands. Most are pure 1:1 command → event mappings via

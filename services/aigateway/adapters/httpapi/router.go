@@ -748,6 +748,47 @@ var (
 	sseDone        = []byte("data: [DONE]\n\n")
 )
 
+// streamErrorFrame builds the data payload for a terminal `event: error`.
+// SDK clients (OpenAI Responses, Vercel AI SDK) schema-validate every data
+// payload, so the frame must be the documented error-event OBJECT, a bare
+// string under an "error" key matches nothing and crashes the client with a
+// parse error instead of surfacing the failure.
+//
+// Provider-origin errors that carried their own event body (UpstreamError
+// with Body, e.g. OpenAI's mid-stream {"type":"error","error":{...}}) are
+// forwarded verbatim: the gateway is a conduit, not an error rewriter
+// (specs/ai-gateway/error-transparency.feature). Everything else gets the
+// standard {"type":"error","error":{"type":"provider_error","message":...}}
+// object.
+func streamErrorFrame(err error) []byte {
+	var ue *domain.UpstreamError
+	if errors.As(err, &ue) && len(ue.Body) > 0 && sonic.Valid(ue.Body) {
+		return ue.Body
+	}
+	msg := err.Error()
+	if ue != nil && ue.Message != "" {
+		msg = ue.Message
+	}
+	frame, marshalErr := sonic.Marshal(sseErrorPayload{
+		Type:  "error",
+		Error: sseErrorDetail{Type: "provider_error", Message: msg},
+	})
+	if marshalErr != nil {
+		return []byte(`{"type":"error","error":{"type":"provider_error","message":"stream failed"}}`)
+	}
+	return frame
+}
+
+type sseErrorPayload struct {
+	Type  string         `json:"type"`
+	Error sseErrorDetail `json:"error"`
+}
+
+type sseErrorDetail struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
 func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIterator) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -780,9 +821,8 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 	}
 
 	if err := iter.Err(); err != nil {
-		errJSON, _ := sonic.Marshal(map[string]string{"error": err.Error()})
 		_, _ = w.Write(sseErrorPrefix)
-		_, _ = w.Write(errJSON)
+		_, _ = w.Write(streamErrorFrame(err))
 		_, _ = w.Write(sseDoubleNL)
 		if flusher != nil {
 			flusher.Flush()

@@ -3,8 +3,6 @@ import { nanoid } from "nanoid";
 import { useEffect, useMemo } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import { useRegisterLangyHandlers } from "~/features/langy/LangyContext";
-import type { ProposalHandlers } from "~/features/langy/components/MessageContent";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
@@ -18,10 +16,13 @@ import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3St
 import { useExecuteEvaluation } from "~/experiments-v3/hooks/useExecuteEvaluation";
 import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
+import type { ProposalHandlers } from "~/features/langy/components/MessageContent";
+import { useRegisterLangyHandlers } from "~/features/langy/LangyContext";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { assertCrispChatHidden } from "~/utils/crispBubblePolicy";
 
 /**
  * Experiments Workbench Page
@@ -291,19 +292,11 @@ export default function ExperimentsWorkbenchPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Prevent Crisp chat from showing when loading the workbench to not stay on top of the drawer buttons
+  // The Crisp bubble policy keeps the support bubble hidden app-wide unless
+  // deliberately opened; re-assert on entering the workbench so it can never
+  // sit on top of the drawer buttons even if Crisp booted mid-navigation.
   useEffect(() => {
-    if (typeof window === "undefined" || !("$crisp" in window)) {
-      return;
-    }
-
-    // @ts-ignore
-    window.$crisp.push(["do", "chat:hide"]);
-
-    return () => {
-      // @ts-ignore
-      window.$crisp.push(["do", "chat:show"]);
-    };
+    assertCrispChatHidden();
   }, []);
 
   // Show 404 if experiment doesn't exist

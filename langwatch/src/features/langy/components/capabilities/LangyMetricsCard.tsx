@@ -5,7 +5,7 @@
  * queried metric lands as a headline figure that springs up from zero, matching
  * the reference's metrics statcard. Reads only — the deep link opens Analytics.
  */
-import { asJsonDocument } from "@langwatch/cli-cards";
+import { asJsonDocument } from "@langwatch/langy";
 import { Text, VStack } from "@chakra-ui/react";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import { formatMoneyShort } from "../Money";

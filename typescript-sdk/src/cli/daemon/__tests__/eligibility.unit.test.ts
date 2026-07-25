@@ -99,6 +99,7 @@ describe("evaluateEligibility", () => {
       ["opencode"],
       ["daemon"],
       ["init-shell"],
+      ["report"],
     ])("refuses %s", (command) => {
       expect(evaluateEligibility(piped({ args: [command] }))).toEqual({
         eligible: false,

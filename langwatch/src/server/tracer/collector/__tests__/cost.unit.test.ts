@@ -460,6 +460,32 @@ describe("matchModelCostWithFallbacks", () => {
     });
   });
 
+  describe("when the model belongs to the codex account provider (@regression)", () => {
+    const realCosts = getStaticModelCosts();
+
+    /** @scenario A codex-prefixed model id prices from the underlying OpenAI entry */
+    it("matches openai_codex/gpt-5.6-terra to openai/gpt-5.6-terra", () => {
+      expect(
+        matchModelCostWithFallbacks("openai_codex/gpt-5.6-terra", realCosts)
+          ?.model,
+      ).toBe("openai/gpt-5.6-terra");
+    });
+
+    /** @scenario The bare model id behind the codex provider prices from the OpenAI entry */
+    it("matches the bare gpt-5.6-terra the gateway reports to openai/gpt-5.6-terra", () => {
+      const matched = matchModelCostWithFallbacks("gpt-5.6-terra", realCosts);
+      expect(matched?.model).toBe("openai/gpt-5.6-terra");
+      expect(matched?.inputCostPerToken ?? 0).toBeGreaterThan(0);
+      expect(matched?.outputCostPerToken ?? 0).toBeGreaterThan(0);
+    });
+
+    it("keeps every codex catalog entry out of the cost registry", () => {
+      expect(
+        realCosts.filter((entry) => entry.model.startsWith("openai_codex/")),
+      ).toEqual([]);
+    });
+  });
+
   describe("when a custom regex expects original casing", () => {
     const caseSensitiveCosts: MaybeStoredLLMModelCost[] = [
       {

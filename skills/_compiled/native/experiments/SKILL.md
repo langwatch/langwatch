@@ -67,6 +67,8 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+
 **Projects and API keys: target a real project, not a personal one.**
 
 LangWatch has two kinds of project:
@@ -118,7 +120,7 @@ experiment = langwatch.experiment.init("agent-regression")
 for index, row in experiment.loop(dataset.iterrows()):
     response = my_agent(row["input"])
     experiment.evaluate(
-        "ragas/answer_relevancy",
+        "ragas/response_relevancy",
         index=index,
         data={"input": row["input"], "output": response},
         settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
@@ -142,7 +144,7 @@ const experiment = await langwatch.experiments.init("agent-regression");
 
 await experiment.run(dataset, async ({ item, index }) => {
   const response = await myAgent(item.input);
-  await experiment.evaluate("ragas/answer_relevancy", {
+  await experiment.evaluate("ragas/response_relevancy", {
     index,
     data: { input: item.input, output: response },
     settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
@@ -150,7 +152,7 @@ await experiment.run(dataset, async ({ item, index }) => {
 });
 ```
 
-Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
+Read `langwatch docs evaluations/evaluators/list` before choosing an evaluator, and take the type slug from `langwatch evaluator types --format json` — never from memory. If an evaluation fails with a `validation_error` naming the slug and an `expected` list, correct it from that list and retry once. Reuse project evaluators when appropriate. A scoring function is part of the experiment, not the experiment itself.
 
 ## Run and Verify
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEnv } from "@t3-oss/env-core";
 
-import { assertGatewaySecretsAllOrNone, createEnvConfig, gatewaySecretsSchema } from "../env-create.mjs";
+import { assertGatewaySecretsAllOrNone, createEnvConfig, gatewaySecretsSchema, rumSampleRatioSchema } from "../env-create.mjs";
 
 // Regression for iter-110: gateway secrets set partially (e.g. only
 // LW_VIRTUAL_KEY_PEPPER, missing the two HMAC/JWT secrets) let the server
@@ -171,6 +171,39 @@ describe("gatewaySecretsSchema", () => {
       // logged issues. If a future Zod/t3-env release starts echoing the
       // received value, this assertion will fail — that's the trip-wire.
       expect(logged).not.toMatch(/REPLACE_ME/);
+    });
+  });
+});
+
+// Binds the spec scenario "A nonsensical share records rather than silently
+// collecting nothing" (specs/observability/browser-rum-trace-correlation.feature)
+// to the path a deployment actually takes. `SessionRatioSampler` clamps a
+// nonsense ratio too, but nothing out of range could ever reach it: the env
+// schema rejected the value first and `createEnv` turned that into a boot
+// failure, so a typo in an optional telemetry dial took the whole app down.
+// This exercises the real exported schema, so dropping the `.catch` fails here.
+describe("rumSampleRatioSchema", () => {
+  describe("given a share that cannot be read as a ratio", () => {
+    it.each([
+      ["a word", "banana"],
+      ["a ratio above one", "2"],
+      ["a negative ratio", "-1"],
+      ["blank, which is how an unset .env line reads", ""],
+    ])("records everything rather than refusing to boot on %s", (_case, value) => {
+      const parsed = rumSampleRatioSchema.safeParse(value);
+
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data).toBe(1);
+    });
+  });
+
+  describe("given a share that reads as a ratio", () => {
+    it.each([
+      ["a fraction", "0.25", 0.25],
+      ["zero, which is a deliberate choice rather than nonsense", "0", 0],
+      ["one", "1", 1],
+    ])("honours %s", (_case, value, expected) => {
+      expect(rumSampleRatioSchema.parse(value)).toBe(expected);
     });
   });
 });

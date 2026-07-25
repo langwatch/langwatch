@@ -40,6 +40,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
 }));
 
+// The minimised affordance is flag-gated (LangySidecar reads
+// release_ui_langy_peek_dock_enabled). This suite is about the inline model
+// setup, not the closed state, so pin the flag off (the classic launcher) —
+// the same render path this suite had before the flag landed.
+vi.mock("~/hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 // The panel reads `currentDrawer` to decide whether it is riding beside a
 // drawer as the floating companion. Defaults to no drawer (the dock/floating
 // cases); the companion-header test flips it. The rest of the hook's surface is
@@ -188,13 +196,13 @@ vi.mock("~/utils/api", () => ({
       onConversationUpdate: {
         useSubscription: () => undefined,
       },
+      stopTurn: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       deleteConversation: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
       renameConversation: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
-      },
-      stopTurn: {
         useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
       },
       list: {
@@ -230,6 +238,22 @@ vi.mock("~/utils/api", () => ({
     virtualKeys: {
       list: {
         useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+    // The empty state's asks are picked from the project's reach (see
+    // useProjectReach); a fully-reached project keeps the classic four rows,
+    // which is what the "normal empty state" assertions below look for.
+    integrationsChecks: {
+      getCheckStatus: {
+        useQuery: () => ({
+          data: {
+            firstMessage: true,
+            onlineEvaluations: 1,
+            simulations: 1,
+            datasets: 1,
+          },
+          isLoading: false,
+        }),
       },
     },
     ops: {
@@ -307,7 +331,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
         // It replaces — not supplements — the normal empty state.
         expect(
           screen.queryByText(
-            "Ask in plain language, or start with one of these.",
+            "Just type away, or start with one of these.",
           ),
         ).not.toBeInTheDocument();
       });
@@ -357,7 +381,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
         });
         expect(
           await screen.findByText(
-            "Ask in plain language, or start with one of these.",
+            "Just type away, or start with one of these.",
           ),
         ).toBeInTheDocument();
       });
@@ -379,7 +403,7 @@ describe("Feature: Langy prompts for a model when the project has none configure
         // The panel shows its normal empty state.
         expect(
           await screen.findByText(
-            "Ask in plain language, or start with one of these.",
+            "Just type away, or start with one of these.",
           ),
         ).toBeInTheDocument();
 

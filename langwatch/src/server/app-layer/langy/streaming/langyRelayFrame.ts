@@ -15,7 +15,7 @@
 // against zod/v4, and a v4 schema embedded in a v3 `z.object()` blows up at parse
 // time (`keyValidator._parse is not a function`) rather than at construction.
 import * as z from "zod/v4";
-import { cliToolResultSchema } from "@langwatch/cli-cards";
+import { cliToolResultSchema } from "@langwatch/langy";
 
 import {
   handledErrorFromHerr,

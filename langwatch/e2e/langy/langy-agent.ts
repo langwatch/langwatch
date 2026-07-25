@@ -54,7 +54,11 @@ function getSessionCookie(): Promise<string> {
         );
       }
       const setCookie = res.headers.get("set-cookie") ?? "";
-      const match = /__Secure-better-auth\.session_token=[^;]+/.exec(setCookie);
+      // better-auth only applies the __Secure- prefix on HTTPS origins, so a
+      // plain-http local stack sets the bare cookie name. Accept both.
+      const match = /(?:__Secure-)?better-auth\.session_token=[^;]+/.exec(
+        setCookie,
+      );
       if (!match) {
         throw new Error(
           "Langy test sign-in: no better-auth session cookie in response",

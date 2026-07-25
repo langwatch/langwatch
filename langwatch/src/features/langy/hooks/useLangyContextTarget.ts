@@ -8,7 +8,6 @@ import {
   releaseContextTarget,
   useLangyContextTargetStore,
 } from "../stores/langyContextTargetStore";
-import { useLangyStore } from "../stores/langyStore";
 
 /**
  * Declare "I am a thing Langy can take as context".
@@ -21,7 +20,7 @@ import { useLangyStore } from "../stores/langyStore";
  *
  * HOW IT BEHAVES, and every clause here is a correction of an earlier cut:
  *
- *   Nothing happens until the page is ARMED — `#`, or a held Shift; see
+ *   Nothing happens until the page is ARMED — `#`; see
  *   `useLangyContextArming`. That gate is the correction. The first version
  *   swallowed clicks in the capture phase whenever the panel was open, and that
  *   made every row on the page un-openable the moment you asked Langy a
@@ -126,8 +125,14 @@ export function useLangyContextTarget(
   const chipRef = target?.ref;
   const enabled = target?.enabled ?? true;
 
-  const isOpen = useLangyStore((state) => state.isOpen);
-  const isActive = isOpen && enabled && !!id && !!kind && !!label;
+  // NOT gated on the panel being open. The arming gesture works whether Langy
+  // is open, peeking or shut (see LangyContextTargetLayer), and half of that
+  // fix is worthless without this half: with the panel closed the page armed,
+  // said "click anything highlighted", and then registered no targets at all —
+  // so the mode announced itself over a page where nothing could light up and
+  // nothing could be clicked. You reach for something on the page BEFORE you
+  // go and talk about it, which is exactly when the panel is not open.
+  const isActive = enabled && !!id && !!kind && !!label;
 
   const register = useLangyContextTargetStore((state) => state.register);
   const unregister = useLangyContextTargetStore((state) => state.unregister);

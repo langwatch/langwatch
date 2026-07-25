@@ -474,6 +474,25 @@ export const incrementEsFoldRefoldTotal = (
   outcome: "performed" | "declined" | "unavailable",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_fold_read_window_fallback_total");
+const esFoldReadWindowFallbackTotal = new Counter({
+  name: "es_fold_read_window_fallback_total",
+  help: "Unwindowed retries after a fold's windowed store read missed, by whether the retry found the state",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * `recovered` — the row existed OUTSIDE the declared window; without the retry
+ * the fold would have started from init() and overwritten it. A non-trivial
+ * rate means the fold's `readWindow.widthMs` no longer matches how far the
+ * event's business time drifts from the table's partition column.
+ * `absent` — the aggregate is genuinely new; the retry confirmed the miss.
+ */
+export const incrementEsFoldReadWindowFallbackTotal = (
+  projectionName: string,
+  outcome: "recovered" | "absent",
+) => esFoldReadWindowFallbackTotal.labels(projectionName, outcome).inc();
+
 register.removeSingleMetric("es_reactor_collapsed_total");
 const esReactorCollapsedTotal = new Counter({
   name: "es_reactor_collapsed_total",
@@ -1029,6 +1048,20 @@ const langyRateLimitTotal = new Counter({
 });
 export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
   langyRateLimitTotal.labels(outcome);
+
+// Model-emitted ```langy-card blocks at the relay stamp (ADR-060 §8). The
+// failure outcomes are the drift alarm for prompt regressions in block
+// emission — a rising unsalvageable/invalid rate means the agent's emission
+// quality slipped, exactly like ADR-059's probe-miss counter for cards.
+register.removeSingleMetric("langwatch_langy_blocks_total");
+const langyBlocksTotal = new Counter({
+  name: "langwatch_langy_blocks_total",
+  help: "Model-emitted langy-card blocks stamped by the relay, by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyBlocksCounter = (
+  outcome: "stamped" | "unsalvageable" | "invalid",
+) => langyBlocksTotal.labels(outcome);
 
 // ============================================================================
 // Fold redelivery

@@ -23,22 +23,18 @@ Feature: The Langy home
     Given I am signed in on a project's home page
 
   Scenario: The Langy home renders when the signal-focused home is off
-    Given I have Langy with its home enabled for me
+    Given I have Langy
     But the signal-focused home is not enabled for me
     When the home page renders
     Then the lit block leads the page with a composer I can type into
     And recent work and the setup checklist still follow underneath
 
-  Scenario: The Langy home needs its own rollout, not just Langy
-    Given I have Langy
-    But the Langy home is not enabled for me
-    When the home page renders
-    Then the classic home renders
-    And the lit block is not shown
-
-  Scenario: Without Langy the rollout alone changes nothing
-    Given the Langy home is enabled for me
-    But I do not have Langy
+  # Having Langy IS having the Langy home — there is no second rollout to
+  # forget. A project with the panel and a classic lobby was a state nobody
+  # could explain from the page, so it is no longer a state.
+  Scenario: Without Langy the classic home renders
+    Given I do not have Langy
+    And the signal-focused home is not enabled for me
     When the home page renders
     Then the classic home renders
     And the lit block is not shown
@@ -96,6 +92,22 @@ Feature: The Langy home
     And the example asks become ways to get set up
     And the setup checklist takes the figures' place directly beneath the block
     And no figures or recent work are shown
+
+  # The home is where a new project lands first, so the way in lives under the
+  # field even though every empty feature page carries its own setup control.
+  Scenario: A new project leads with sending the first trace
+    Given the Langy home renders
+    And the project has never received a trace
+    Then a prominent send-your-first-trace control sits above the example asks
+    And it offers Langy's walkthrough, a prompt for my coding agent, and the docs
+    And the walkthrough route is withheld when I cannot start conversations
+
+  Scenario: A populated project keeps the quiet onboarding route
+    Given the Langy home renders
+    And the project has received traces
+    Then a quiet onboard-your-agent control sits beneath the example asks
+    And no send-your-first-trace lead appears
+    And nothing is offered while what the project holds is not known yet
 
   Scenario: A project with data leads its figures with the compact strip
     Given the Langy home renders

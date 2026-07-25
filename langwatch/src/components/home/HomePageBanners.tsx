@@ -16,19 +16,13 @@ import { motion, useAnimationFrame, useMotionValue } from "motion/react";
 import posthog from "posthog-js";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { IconType } from "react-icons";
-import {
-  LuArrowLeft,
-  LuArrowRight,
-  LuMic,
-  LuSparkles,
-  LuX,
-  LuZap,
-} from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 import { SERIF } from "~/features/asaplangy";
 import { getIsMac } from "~/features/command-bar/utils/platform";
+import { LangyMark } from "~/features/langy/components/LangyMark";
+import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useRouter } from "~/utils/compat/next-router";
 import { useColorModeValue } from "../ui/color-mode";
 import { Tooltip } from "../ui/tooltip";
@@ -42,6 +36,51 @@ import { Tooltip } from "../ui/tooltip";
  */
 const LANTERN_COLORS = ["#f56b1a", "#ffb380", "#6e57d2"];
 const LANTERN_COLORS_DARK = ["#a8480d", "#f56b1a", "#5b41c2"];
+
+/**
+ * The Langy mark as the homebar announcement's identity — its own instance,
+ * deliberately NOT the panel's.
+ *
+ * Same grey as every other slide's glyph: in the ticker each announcement's
+ * icon is quiet identification, not branding, and one coloured mark in the
+ * row would outrank the words beside it. The mark's shape says Langy; the
+ * paint stays the row's. Own paint-server id for the same reason the
+ * launcher has one — duplicate SVG gradient ids resolve to whichever comes
+ * first in the DOM.
+ *
+ * Same footprint as every other slide's glyph — 14px, bare. The mark's
+ * wireframe reads softer this small, but a bigger tile made the banner row
+ * change height whenever this slide was the active one, and a row that
+ * breathes per-slide costs more than a crisper mark buys.
+ */
+const LANGY_HOMEBAR_MARK_GRADIENT_ID = "langy-homebar-mark-grad";
+
+function LangyHomebarMark() {
+  return (
+    <Box display="inline-flex" alignItems="center">
+      <svg
+        width="0"
+        height="0"
+        aria-hidden
+        style={{ position: "absolute", pointerEvents: "none" }}
+      >
+        <defs>
+          <linearGradient
+            id={LANGY_HOMEBAR_MARK_GRADIENT_ID}
+            x1="0%"
+            y1="100%"
+            x2="100%"
+            y2="0%"
+          >
+            <stop offset="0%" stopColor="var(--chakra-colors-fg-muted)" />
+            <stop offset="100%" stopColor="var(--chakra-colors-fg-muted)" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <LangyMark size={14} gradientId={LANGY_HOMEBAR_MARK_GRADIENT_ID} />
+    </Box>
+  );
+}
 
 /**
  * The Langy announcement, carried only by the Langy home.
@@ -65,7 +104,10 @@ const LANGY_SLIDE: Slide = {
     offsetY: 0.16,
     rotation: 42,
   },
-  Icon: LuSparkles,
+  // Langy's own face, not a stock sparkle: the mark on its own violet tile,
+  // so the Langy announcement is recognisably HIM against the orange chrome
+  // every other slide shares. See LangyHomebarMark.
+  iconNode: <LangyHomebarMark />,
   heading: "Langy can ship the fix, not just find it",
   badge: "New",
   subtitle: (
@@ -83,8 +125,6 @@ const LANGY_SLIDE: Slide = {
     ),
 };
 
-const SNOOZE_DAYS = 7;
-const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 /** Dwell per slide before it advances. */
 const DWELL_MS = 9000;
 /** One duration governs the whole slide change: the gradient morphs its palette
@@ -240,35 +280,6 @@ function useSlides(
   );
 }
 
-// ---- Snooze (per-slide, per-project) ------------------------------------
-
-const storageKey = (slide: Slide, projectId: string) =>
-  `${slide.storagePrefix}${projectId}`;
-
-function isSlideSnoozed(slide: Slide, projectId: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const raw = localStorage.getItem(storageKey(slide, projectId));
-    if (!raw) return false;
-    const expiresAt = Number(raw);
-    return Number.isFinite(expiresAt) && expiresAt > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-function snoozeSlide(slide: Slide, projectId: string) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(
-      storageKey(slide, projectId),
-      String(Date.now() + SNOOZE_MS),
-    );
-  } catch {
-    // Best-effort dismissal.
-  }
-}
-
 // ---- Colour / shape interpolation ---------------------------------------
 
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
@@ -375,25 +386,16 @@ export function HomePageBanners({
   const askLangy = useLangyStore((s) => s.askLangy);
 
   const [hasMounted, setHasMounted] = useState(false);
-  const [snoozed, setSnoozed] = useState<Record<string, boolean>>({});
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!projectId) return;
-    const next: Record<string, boolean> = {};
-    for (const slide of slides)
-      next[slide.id] = isSlideSnoozed(slide, projectId);
-    setSnoozed(next);
-  }, [projectId, slides]);
-
-  const eligible = useMemo(
-    () => slides.filter((slide) => !snoozed[slide.id]),
-    [snoozed, slides],
-  );
+  // Every slide, always. An announcement stands until it is taken out of the
+  // rotation in code — there is no per-reader dismissal to filter by, so
+  // there is nothing to work out here.
+  const eligible = slides;
   const active = eligible.length > 0 ? index % eligible.length : 0;
   const slide = eligible[active];
 
@@ -501,8 +503,12 @@ export function HomePageBanners({
 
     // Ease the advance speed toward its target (0 while hovered / reduced /
     // single-slide, 1 otherwise) so hovering slows to a stop, not a cut.
+    // The lantern's ticker is the exception: its segment fill IS the
+    // countdown, and a bar that freezes under the pointer (or right after
+    // picking a slide, while the pointer is still on the control) reads as
+    // stuck rather than polite. There the rotation simply keeps running.
     const wantMoving =
-      !hoveredRef.current &&
+      (variant === "lantern" || !hoveredRef.current) &&
       !reduceMotionRef.current &&
       eligibleLenRef.current > 1;
     const targetSpeed = wantMoving ? 1 : 0;
@@ -548,12 +554,6 @@ export function HomePageBanners({
   if (!hasMounted || !projectId) return null;
   if (variant !== "lantern" && (eligible.length === 0 || !slide)) return null;
 
-  const dismiss = (slideToHide: Slide) => {
-    if (projectId) snoozeSlide(slideToHide, projectId);
-    setSnoozed((s) => ({ ...s, [slideToHide.id]: true }));
-    setIndex(0);
-  };
-
   const handleCta = (slideToOpen: Slide) => {
     posthog.capture(slideToOpen.posthogEvent, {
       surface: "home_banner",
@@ -591,34 +591,51 @@ export function HomePageBanners({
       <Box
         position="relative"
         width="full"
-        borderRadius="14px"
-        borderWidth="1px"
-        borderColor="border.muted"
-        background="bg.surface"
-        overflow="hidden"
-        isolation="isolate"
         onMouseEnter={() => (hoveredRef.current = true)}
         onMouseLeave={() => (hoveredRef.current = false)}
       >
-        {/* The ground. The SAME shared canvas the announcement card uses, at
-            the same whisper, tuned toward the Langy palette when no
-            announcement is lighting it. Everything else in this block layers
-            over it: the shader is the floor, never a decoration on top. */}
+        {/* The ground: light, not a panel.
+
+            This used to be a bordered card with the shader held at 13% behind a
+            flat gradient of the same colours. Two gradients multiplied down to
+            a whisper do not read as a moving mesh, they read as a tint — the
+            animation was there the whole time and could not be seen. So the
+            card is gone, the flat gradient is now only the fallback for a
+            machine that cannot run the shader, and what is left runs bright
+            enough to actually be light: a bloom behind the field that dissolves
+            into the page long before it reaches any text.
+
+            It bleeds past its own box on purpose. The hero is not an object on
+            the home, it is where the home is lit from. */}
         <Box
           aria-hidden
           position="absolute"
-          inset={0}
+          insetInline={{ base: "-8%", md: "-14%" }}
+          insetBlock={{ base: "-30%", md: "-45%" }}
           pointerEvents="none"
-          opacity={{ base: 0.13, _dark: 0.2 }}
+          opacity={{ base: 0.3, _dark: 0.45 }}
+          // Softer on light. On a pale ground the mesh's bands keep their
+          // edges and read as banding rather than as light; blurring takes the
+          // edges off without touching the colours. Dark needs none of it —
+          // the same blur there only muddies a field that already reads as
+          // depth.
+          filter={{ base: "blur(15px)", _dark: "blur(5px)" }}
+          css={{
+            maskImage:
+              "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+            WebkitMaskImage:
+              "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+          }}
         >
-          <Box
-            position="absolute"
-            inset={0}
-            style={{
-              background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
-            }}
-          />
-          {!lowPerf ? (
+          {lowPerf ? (
+            <Box
+              position="absolute"
+              inset={0}
+              style={{
+                background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
+              }}
+            />
+          ) : (
             <Box position="absolute" inset={0}>
               <MeshGradient
                 colors={lanternColors}
@@ -634,90 +651,221 @@ export function HomePageBanners({
                 style={{ width: "100%", height: "100%" }}
               />
             </Box>
-          ) : null}
+          )}
         </Box>
-        {/* The signal grid, the same one the panel wears, faded out toward the
-            bottom so it never competes with the composer sitting on it. */}
+
+        {/* Light mode only: a white bloom over the ground's middle. On a
+            pale page the mesh's colours behind the greeting and the field
+            read as smudge rather than light, so this keeps that zone clean.
+            An ellipse rather than a band on purpose: the colour still leaks
+            past its left and right edges, so the ground reads as light the
+            content stands in front of rather than a curtain dropped over
+            it. Dark keeps the full field: the same colours read as depth
+            there. Covers the ground's own bleed box so it tracks exactly.
+            Anything of the page's own chrome the bleed reaches (the demo
+            row above the hero) stacks itself above this — the order is
+            colour, then bloom, then every element. */}
         <Box
           aria-hidden
           position="absolute"
-          inset={0}
+          insetInline={{ base: "-8%", md: "-14%" }}
+          insetBlock={{ base: "-30%", md: "-45%" }}
           pointerEvents="none"
-          className="langy-signal-grid langy-signal-grid--banner"
+          display={{ base: "block", _dark: "none" }}
+          background="radial-gradient(62% 64% at 50% 28%, var(--chakra-colors-bg) 0%, var(--chakra-colors-bg) 52%, transparent 78%)"
         />
 
         <VStack
           position="relative"
           zIndex={1}
-          align="stretch"
-          gap={3}
+          align="center"
+          /* Wider than the hero's own rhythm on purpose: the ticker is an
+             aside, not the next line of the block above it, and the pause
+             before it is what says so. */
+          gap={9}
           paddingX={{ base: 4, md: 5 }}
-          paddingY={4}
+          paddingY={{ base: 8, md: 12 }}
         >
-          {slide ? (
-            <HStack gap={2.5} align="center" minHeight="20px">
-              <Box flexShrink={0} color="orange.fg" display="grid">
-                {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
-              </Box>
-              <Text
-                fontSize="12.5px"
-                color="fg.muted"
-                truncate
-                display={{ base: "none", sm: "block" }}
-              >
-                {slide.heading}
-              </Text>
-              <chakra.button
-                type="button"
-                onClick={() => handleCta(slide)}
-                fontFamily="mono"
-                fontSize="11px"
-                color="orange.fg"
-                background="transparent"
-                borderWidth={0}
-                cursor="pointer"
-                whiteSpace="nowrap"
-                flexShrink={0}
-                _hover={{ textDecoration: "underline" }}
-              >
-                {slide.ctaLabel}
-              </chakra.button>
-              <Spacer />
-              {multi ? (
-                <HStack gap={1} flexShrink={0}>
-                  {eligible.map((_, i) => (
-                    <Box
-                      key={i}
-                      as="button"
-                      aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
-                      aria-current={i === active ? "true" : undefined}
-                      onClick={() => selectSlide(i)}
-                      width={i === active ? "16px" : "6px"}
-                      height="6px"
-                      borderRadius="full"
-                      background={
-                        i === active ? "fg.muted" : "border.emphasized"
-                      }
-                      transition="width 200ms ease, background 200ms ease"
-                    />
-                  ))}
-                </HStack>
-              ) : null}
-              <Tooltip content={`Hide for ${SNOOZE_DAYS} days`} openDelay={400}>
-                <IconButton
-                  aria-label="Hide this announcement"
-                  size="2xs"
-                  variant="ghost"
-                  color="fg.subtle"
-                  flexShrink={0}
-                  onClick={() => dismiss(slide)}
-                >
-                  <LuX size={13} />
-                </IconButton>
-              </Tooltip>
-            </HStack>
-          ) : null}
           {children}
+
+          <VStack gap={1}>
+            {/* What is new, as a ticker rather than a bar.
+                It sits BELOW the field now. An announcement is the least
+                important thing on a page whose job is to take a question, and it
+                was previously the first line in the block with the only coloured
+                link in it — so the eye landed on this and not on the field. */}
+            {/* ONE measure, held for every slide.
+                Sized to its own content the block was honest per slide and
+                awful across them: each rotation re-measured the headline, so
+                the rule and the whole ticker jumped wider and narrower every
+                nine seconds — the announcement moving is the one thing more
+                distracting than the announcement. A constant is the only width
+                that cannot pop, so the headline truncates into it instead
+                (min and max are the same thing here on purpose). Narrower than
+                the field, because a rule the full width of the hero reads as a
+                divider closing the block rather than punctuation under a
+                line. */}
+            {slide ? (
+              <VStack gap="7px" width="min(520px, 100%)" align="stretch">
+                {/* The line. One target: the arrow is the affordance, so the
+                    announcement stops carrying a second small button beside a
+                    label that already says the same thing. The verb survives as
+                    the accessible name. */}
+                <chakra.button
+                  type="button"
+                  onClick={() => handleCta(slide)}
+                  aria-label={slide.ctaLabel}
+                  display="flex"
+                  alignItems="center"
+                  gap={2.5}
+                  width="full"
+                  minHeight="20px"
+                  background="transparent"
+                  borderWidth={0}
+                  padding={0}
+                  cursor="pointer"
+                  textAlign="left"
+                  css={{
+                    "&:hover .langy-ticker-arrow": {
+                      transform: "translateX(3px)",
+                      color: "var(--chakra-colors-orange-fg)",
+                    },
+                  }}
+                >
+                  <Box flexShrink={0} color="fg.muted" display="grid">
+                    {slide.iconNode ??
+                      (slide.Icon ? <slide.Icon size={14} /> : null)}
+                  </Box>
+                  {slide.badge ? (
+                    <chakra.span
+                      flexShrink={0}
+                      fontSize="11px"
+                      fontWeight="600"
+                      /* A step deeper than orange.fg on light: over the white
+                         bloom the default reads brownish; dark keeps it. */
+                      color={{ base: "orange.700", _dark: "orange.fg" }}
+                    >
+                      {slide.badge}
+                    </chakra.span>
+                  ) : null}
+                  <Text
+                    fontSize="12.5px"
+                    color="fg.muted"
+                    truncate
+                    /* A flex child's min-width is `auto`, so without this it
+                       refuses to shrink below its own text and pushes the row
+                       wide instead of ellipsing. */
+                    minWidth={0}
+                    flex="1"
+                  >
+                    {slide.heading}
+                  </Text>
+                  <chakra.span
+                    className="langy-ticker-arrow"
+                    aria-hidden
+                    flexShrink={0}
+                    color="fg.subtle"
+                    fontSize="12px"
+                    lineHeight="1"
+                    transition="transform 130ms ease, color 130ms ease"
+                  >
+                    &#8594;
+                  </chakra.span>
+                </chakra.button>
+
+                {/* The pagination is a span waterfall — the shape this product
+                    draws all day. Each announcement gets an equal segment
+                    because each gets an equal dwell; the ones already shown
+                    read complete, the live one fills across its own dwell (the
+                    same `progress` value the auto-advance runs on, so it eases
+                    to a stop under the pointer exactly like the rotation does),
+                    and the ones ahead are still empty track. Position and
+                    countdown are one object instead of dots plus a timer. */}
+                {/* The hit area is 16px tall; the mark inside it is 2px. Bled
+                    back out with a negative margin so buying a real click
+                    target costs the layout nothing — the rule sits exactly
+                    where it did, with more pointer either side of it. A 2px
+                    target is decoration you are invited to miss. */}
+                {multi ? (
+                  <HStack
+                    gap="5px"
+                    width="full"
+                    height="16px"
+                    marginTop="-7px"
+                    marginBottom="-7px"
+                  >
+                    {eligible.map((_, i) => (
+                      <Box
+                        key={i}
+                        as="button"
+                        aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
+                        aria-current={i === active ? "true" : undefined}
+                        onClick={() => selectSlide(i)}
+                        flex="1"
+                        height="full"
+                        display="flex"
+                        alignItems="center"
+                        background="transparent"
+                        cursor="pointer"
+                        // The mark answers the pointer anywhere in the tall
+                        // box, so the target reads as the size it truly is.
+                        css={{
+                          "&:hover .langy-ticker-segment": {
+                            background: "var(--chakra-colors-fg-muted)",
+                          },
+                        }}
+                      >
+                        <Box
+                          className="langy-ticker-segment"
+                          width="full"
+                          height="2px"
+                          borderRadius="full"
+                          overflow="hidden"
+                          // Three bright chunks with gaps read as a progress
+                          // control — steps to get through — which is the wrong
+                          // promise for pagination. A hairline at low alpha
+                          // recedes to being punctuation: seen when you look at
+                          // it, never competing with the sentence above. Only
+                          // the ACTIVE segment darkens — position, not history;
+                          // shading the already-shown ones read as a checklist.
+                          background={
+                            i === active ? "fg.muted/40" : "fg.muted/15"
+                          }
+                          transition="background 200ms ease"
+                          /* The fill's accent, resolved per colour mode here
+                             because the motion.div below takes a raw style
+                             object that cannot carry Chakra conditionals. */
+                          css={{
+                            "--ticker-accent":
+                              "var(--chakra-colors-orange-700)",
+                            _dark: {
+                              "--ticker-accent":
+                                "var(--chakra-colors-orange-fg)",
+                            },
+                          }}
+                        >
+                          {i === active ? (
+                            <motion.div
+                              style={{
+                                height: "100%",
+                                // The same orange as NEW. The accent appearing
+                                // exactly twice — the word, and the segment it
+                                // belongs to — is what ties the two rows into
+                                // one object rather than a line and a widget.
+                                background: "var(--ticker-accent)",
+                                scaleX: progress,
+                                transformOrigin: "left",
+                              }}
+                            />
+                          ) : null}
+                        </Box>
+                      </Box>
+                    ))}
+                  </HStack>
+                ) : null}
+              </VStack>
+            ) : null}
+          </VStack>
         </VStack>
       </Box>
     );
@@ -944,27 +1092,6 @@ export function HomePageBanners({
             ))}
           </HStack>
         ) : null}
-
-        <Tooltip
-          content={`Hide for ${SNOOZE_DAYS} days`}
-          positioning={{ placement: "top" }}
-        >
-          <IconButton
-            size="sm"
-            variant="ghost"
-            color="white/80"
-            position="absolute"
-            top={2}
-            right={2}
-            zIndex={2}
-            _hover={{ bg: "white/20", color: "white" }}
-            _active={{ bg: "white/30" }}
-            onClick={() => dismiss(slide)}
-            aria-label="Dismiss"
-          >
-            <LuX />
-          </IconButton>
-        </Tooltip>
       </Box>
     );
   }
@@ -1210,28 +1337,6 @@ export function HomePageBanners({
               );
             })}
           </Box>
-
-          {/* Dismiss — quiet inline chrome, like every other card control.
-              Pinned to the TOP of the row (the row centres its items, which
-              otherwise floats the X to the vertical middle) so it reads as a
-              normal top-right card close. */}
-          <Tooltip
-            content={`Hide for ${SNOOZE_DAYS} days`}
-            positioning={{ placement: "top" }}
-          >
-            <IconButton
-              size="xs"
-              variant="ghost"
-              color="fg.subtle"
-              flexShrink={0}
-              alignSelf="flex-start"
-              _hover={{ bg: "bg.muted", color: "fg" }}
-              onClick={() => dismiss(slide)}
-              aria-label="Dismiss"
-            >
-              <LuX />
-            </IconButton>
-          </Tooltip>
         </HStack>
 
         {/* Countdown ring — sweeps to full over the dwell, and eases to a stop

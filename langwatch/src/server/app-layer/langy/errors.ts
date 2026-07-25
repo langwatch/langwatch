@@ -57,11 +57,16 @@ export class LangyConversationNotFoundError extends NotFoundError {
     conversationId: string,
     options: { reasons?: readonly Error[] } = {},
   ) {
-    super("langy_conversation_not_found", "Langy conversation", conversationId, {
-      meta: { conversationId },
-      ...remediation("langy_conversation_not_found"),
-      ...options,
-    });
+    super(
+      "langy_conversation_not_found",
+      "Langy conversation",
+      conversationId,
+      {
+        meta: { conversationId },
+        ...remediation("langy_conversation_not_found"),
+        ...options,
+      },
+    );
     this.name = "LangyConversationNotFoundError";
   }
 }
@@ -105,7 +110,13 @@ export class LangyModelNotConfiguredError extends HandledError {
   }
 }
 
-/** A `modelOverride` not on the project's Langy VK allowlist (HTTP 400). */
+/**
+ * A model Langy may not run for this project (HTTP 400): it is not on the
+ * project's Langy allowlist. The allowlist is the ONLY runnable-set gate —
+ * the engine itself is provider-blind, dispatching whatever model it is
+ * given with its full provider-prefixed id and letting the AI gateway's
+ * prefix routing pick the provider.
+ */
 export class LangyModelNotAllowedError extends HandledError {
   declare readonly code: "langy_model_not_allowed";
   constructor(public readonly model: string) {

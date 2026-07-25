@@ -8,7 +8,7 @@ import type { LangyContextTarget as LangyContextTargetDescriptor } from "../stor
  * one-wrapper version of `useLangyContextTarget`.
  *
  * Wrap the element that IS the thing. Nothing changes until the user arms the
- * page (`#`, or a held Shift); armed, it picks up a quiet outline and a click
+ * page (`#`); armed, it picks up a quiet outline and a click
  * or a drag onto the panel takes the resource into Langy's context. Disarmed —
  * which is almost always — the child is handed straight back, untouched: no
  * clone, no merged props, no wrapper node, and the element's own click does

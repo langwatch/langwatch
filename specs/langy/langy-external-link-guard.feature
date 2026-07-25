@@ -1,6 +1,6 @@
 Feature: Langy shows where a link goes before it leaves LangWatch
   As a LangWatch user reading an answer from Langy
-  I want any link that takes me off LangWatch to show me its real destination first
+  I want any link the model wrote that takes me off LangWatch to show me its real destination first
   So that a link whose words say one thing and whose address goes somewhere else cannot walk me into a fake sign-in page
 
   # ---------------------------------------------------------------------------
@@ -19,9 +19,11 @@ Feature: Langy shows where a link goes before it leaves LangWatch
   # (https://langwatch.ai@evil.example), lookalike hosts, and suffix confusion
   # (langwatch.ai.evil.com) all read as what they are.
   #
-  # One interception point: the Langy panel root. Every link the panel renders —
-  # answers, cards, error remediation, whatever is added next — passes through
-  # it, so no component has to remember to opt in.
+  # One interception point: the Langy panel root. Every model-written link the
+  # panel renders (answers, cards, error remediation, whatever is added next)
+  # passes through it, so no component has to remember to opt in. LangWatch's
+  # own buttons and links are the product's copy, not model output, and open
+  # directly (see "Only links written by the model are checked" below).
   #
   # Related: langy-capability-cards.feature (cards that carry links),
   # langy-egress-enforcement.feature (the same threat, on the worker's side).
@@ -167,6 +169,26 @@ Feature: Langy shows where a link goes before it leaves LangWatch
     @integration
     Scenario: A link marked to open in a new tab is checked too
       Given Langy's answer links to "https://example.com" and opens in a new tab
+      When I click it
+      Then I am shown where the link goes before anything opens
+
+  Rule: Only links written by the model are checked
+
+    # The guard exists because answers are model output: their links are shaped
+    # by whatever data the agent read. LangWatch's own buttons and links open
+    # directly; a warning on them would make the product read as distrusting
+    # its own buttons. Only links written by the model are checked, and an
+    # answer can never pass its links off as LangWatch's own.
+
+    @integration
+    Scenario: A button of LangWatch's own that leaves the app opens straight away
+      Given the panel shows a LangWatch-authored button that opens an off-site page
+      When I click it
+      Then the page opens with no dialog in between
+
+    @integration
+    Scenario: An answer linking to the same address is still checked
+      Given Langy's answer links to the same off-site address
       When I click it
       Then I am shown where the link goes before anything opens
 

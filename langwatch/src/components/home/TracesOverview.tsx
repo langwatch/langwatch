@@ -3,6 +3,7 @@ import {
   chakra,
   Grid,
   HStack,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -138,6 +139,19 @@ const MIN_POINTS_FOR_A_TREND = 4;
 /** What "wide enough to compare" resolves to when the reader takes the offer. */
 const WIDER_WINDOW = { key: "30d", label: "Last 30 days" } as const;
 
+/**
+ * How tall the curve under the figures is drawn, in pixels.
+ *
+ * Not the chart default. That default is sized for a dashboard, where the
+ * chart IS the page and a reader is measuring values off it. Here the curve
+ * answers one question the figures cannot — which way it is going — and at the
+ * dashboard height a handful of daily readings become a thin line adrift in
+ * white space, with the sections below it pushed off the fold. Sized to the
+ * figures it belongs to instead: tall enough to show shape, short enough that
+ * the row of numbers stays the thing being read.
+ */
+const TREND_HEIGHT = 160;
+
 export function TracesOverview({
   variant = "full",
 }: {
@@ -241,58 +255,72 @@ export function TracesOverview({
         input={tracesOverviewGraph}
         emptyState={<NewProjectQuickView projectSlug={project.slug} />}
       />
-      {/* The chart is never deleted, only moved. In `strip` it waits behind a
-          named control that says what it will show and over what window, so
-          the click is worth taking rather than a mystery chevron; in `trend`
-          it is simply already there. */}
-      {variant === "strip" && trendIsMeaningful ? (
-        <chakra.button
-          type="button"
-          onClick={() => setChartOpen((open) => !open)}
-          aria-expanded={chartOpen}
-          display="inline-flex"
-          alignSelf="flex-start"
-          alignItems="center"
-          gap={1}
-          marginTop={1}
-          fontSize="xs"
-          color="fg.muted"
-          background="transparent"
-          borderWidth={0}
-          cursor="pointer"
-          _hover={{ color: "fg" }}
-        >
-          {chartOpen ? <LuChevronDown size={12} /> : <LuChevronRight size={12} />}
-          {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
-        </chakra.button>
-      ) : null}
-      {compact && !trendIsMeaningful ? (
-        // Not enough readings to draw a shape. Rather than a chart that
-        // invents one, or a dead sentence about it, say what the figures ARE
-        // comparing themselves against and offer the window that would show a
-        // real trend. The offer is the better thing, not the explanation.
-        <HStack marginTop={1} gap={2} flexWrap="wrap">
+      {/* One footer, always carrying both halves of what the figures mean.
+          It used to be an either/or: a reader on a window wide enough for a
+          trend was offered the chart but never told what the deltas were
+          measured against, and a reader on a window too short was told, but
+          left with a single sentence under a wide row of numbers. Both halves
+          are true in both cases, so both are shown: what the comparison is, on
+          the left, and the one thing worth doing about this window, on the
+          right. The band is the same shape either way, which is what stops it
+          reading as a leftover. */}
+      {compact ? (
+        <HStack gap={3} flexWrap="wrap" width="full" align="center">
           <Text fontSize="xs" color="fg.subtle">
-            {`Each figure is compared with ${periodPhrase} before it.`}
+            Each figure is compared with the period before it.
           </Text>
-          <chakra.button
-            type="button"
-            onClick={() => setRelativePeriod(WIDER_WINDOW.key)}
-            fontSize="xs"
-            color="fg.muted"
-            background="transparent"
-            borderWidth={0}
-            cursor="pointer"
-            textDecoration="underline"
-            textUnderlineOffset="3px"
-            _hover={{ color: "orange.fg" }}
-          >
-            See {WIDER_WINDOW.label.toLowerCase()}
-          </chakra.button>
+          <Spacer />
+          {/* The chart is never deleted, only moved. In `strip` it waits behind
+              a named control that says what it will show and over what window,
+              so the click is worth taking rather than a mystery chevron; in
+              `trend` it is simply already there, and needs no control. */}
+          {trendIsMeaningful ? (
+            variant === "strip" ? (
+              <chakra.button
+                type="button"
+                onClick={() => setChartOpen((open) => !open)}
+                aria-expanded={chartOpen}
+                display="inline-flex"
+                alignItems="center"
+                gap={1}
+                fontSize="xs"
+                color="fg.muted"
+                background="transparent"
+                borderWidth={0}
+                cursor="pointer"
+                _hover={{ color: "fg" }}
+              >
+                {chartOpen ? (
+                  <LuChevronDown size={12} />
+                ) : (
+                  <LuChevronRight size={12} />
+                )}
+                {chartOpen ? "Hide the trend" : `Show the trend over ${periodPhrase}`}
+              </chakra.button>
+            ) : null
+          ) : (
+            // Not enough readings to draw a shape. Rather than a chart that
+            // invents one, offer the window that would show a real trend. The
+            // offer is the better thing, not an explanation of the absence.
+            <chakra.button
+              type="button"
+              onClick={() => setRelativePeriod(WIDER_WINDOW.key)}
+              fontSize="xs"
+              color="fg.muted"
+              background="transparent"
+              borderWidth={0}
+              cursor="pointer"
+              textDecoration="underline"
+              textUnderlineOffset="3px"
+              _hover={{ color: "orange.fg" }}
+            >
+              See {WIDER_WINDOW.label.toLowerCase()}
+            </chakra.button>
+          )}
         </HStack>
       ) : null}
       {showTrend ? (
-        <Box width="full" marginTop={1}>
+        <Box width="full">
           {/* Bucketed by day, not aggregated whole: the summary above is the
               one number, this is how it got there. `timeScale: 1` is also what
               makes the window's length equal the number of readings the curve
@@ -303,6 +331,7 @@ export function TracesOverview({
               graphType: "line",
               timeScale: 1,
               includePrevious: false,
+              height: TREND_HEIGHT,
             }}
             titleProps={{ fontSize: "xs", color: "fg.muted" }}
           />

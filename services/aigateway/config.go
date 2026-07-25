@@ -22,6 +22,7 @@ type Config struct {
 	ControlPlane                  ControlPlaneConfig        `env:"LW_GATEWAY"`
 	AuthCache                     AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
 	CustomerTraceBridge           CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
+	LangyMirror                   LangyMirrorConfig         `env:"LANGY_MIRROR"`
 	OTel                          config.OTel               `env:"OTEL"`
 	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
 	// non-streaming response writes a keep-alive byte while dispatch is
@@ -72,6 +73,19 @@ type CustomerTraceBridgeConfig struct {
 	// BaseURL is where the customer trace bridge exports spans.
 	// Defaults to ControlPlane.BaseURL if not set.
 	BaseURL string `env:"BASE_URL"`
+}
+
+// LangyMirrorConfig points the gateway's ADR-061 mirror leg at LangWatch's own
+// mirror project. Product configuration shared verbatim with the Go manager
+// (LANGY_MIRROR_TRACE_ENDPOINT / LANGY_MIRROR_TRACE_KEY), plus the mirror
+// project's id so the bridge can route the mirror copy there. Never OTEL_* —
+// that namespace is the gateway's own telemetry only. All three unset (the
+// self-hosted default) leaves the gateway's mirror leg dormant; the customer
+// path is unaffected either way.
+type LangyMirrorConfig struct {
+	TraceEndpoint string `env:"TRACE_ENDPOINT"`
+	TraceKey      string `env:"TRACE_KEY"`
+	ProjectID     string `env:"PROJECT_ID"`
 }
 
 func defaultConfig() Config {

@@ -90,6 +90,12 @@ type sseEvent struct {
 		// token fast-path reads the same single sseEvent decode as session routing.
 		Field string `json:"field"`
 		Delta string `json:"delta"`
+		// PartID names the message part a delta belongs to. Load-bearing for
+		// reasoning routing: codex reasoning-summary parts stream their text
+		// with field=="text" (same channel as answer tokens), so the part's
+		// TYPE — learned from message.part.updated — is the only thing that
+		// tells thinking apart from the answer.
+		PartID string `json:"partID"`
 		// Part is where opencode puts the message part on `message.part.updated` —
 		// the carrier for the tool-call lifecycle (see ssePart).
 		Part ssePart `json:"part"`
@@ -490,6 +496,33 @@ func reasoningDeltaFromEvent(ev *sseEvent) (string, bool) {
 		return ev.Properties.Delta, true
 	}
 	return "", false
+}
+
+// reasoningPartType is opencode's part.type for the model's thinking. Its
+// deltas may arrive on field=="text" (the codex path streams reasoning-summary
+// text on the same field as answer tokens), so the part type — not the delta
+// field — is the authority on what a delta IS.
+const reasoningPartType = "reasoning"
+
+// deltaPartID is the message-part id a delta event belongs to: the current
+// shape carries it as properties.partID; the legacy type=="text" shape names
+// its part on part.id. Empty when the event names no part.
+func deltaPartID(ev *sseEvent) string {
+	if ev.Properties.PartID != "" {
+		return ev.Properties.PartID
+	}
+	return ev.Part.ID
+}
+
+// recordPartType notes a part's declared type from a message.part.updated (or
+// unwrapped part) event, so later deltas route by what the part IS.
+func recordPartType(partTypes map[string]string, ev *sseEvent) {
+	if id := ev.Properties.Part.ID; id != "" && ev.Properties.Part.Type != "" {
+		partTypes[id] = ev.Properties.Part.Type
+	}
+	if id := ev.Part.ID; id != "" && ev.Part.Type != "" {
+		partTypes[id] = ev.Part.Type
+	}
 }
 
 // The tool lifecycle is emitted as frames.ToolStart / frames.ToolEnd (the frames
@@ -1105,11 +1138,82 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 	dataPrefix := []byte("data:")
 	var ev sseEvent
 	tools := newToolCallTracker() // per-turn de-dupe of the tool start/end frames
+	// Part id -> declared part type, learned from message.part.updated. Routing
+	// authority for deltas: a reasoning part's deltas stream on field=="text"
+	// on the codex path, and only this map keeps that thinking out of the
+	// durable answer text.
+	partTypes := make(map[string]string)
 	// Segment tracking for the paragraph restore below: text deltas carry no
 	// message-part boundary, so "a tool settled since the last token" is how we
 	// know the next token starts a NEW segment of the answer.
 	emittedText := false
 	toolSinceText := false
+	// The two routes a delta can take. Answer text rides frames.Delta into the
+	// live edge AND the durable final; reasoning rides frames.Reasoning,
+	// ephemeral, never the final. Both report false when the relay push broke.
+	emitAnswerDelta := func(delta string) bool {
+		// Text resuming AFTER a tool call is a new message segment, but the
+		// deltas carry no boundary: everything downstream (the live text
+		// stream and the durable final alike) concatenates them into one
+		// string, gluing the pre-tool preamble straight onto the post-tool
+		// answer ("...for those traces.No traces failing..."). Restore the
+		// paragraph the model actually produced.
+		if emittedText && toolSinceText {
+			delta = "\n\n" + delta
+		}
+		emittedText = true
+		toolSinceText = false
+		f, mErr := frames.Delta(delta)
+		if mErr != nil {
+			return true
+		}
+		return emitFrame(f)
+	}
+	emitReasoningDelta := func(delta string) bool {
+		f, mErr := frames.Reasoning(delta)
+		if mErr != nil {
+			return true
+		}
+		return emitFrame(f)
+	}
+	// Deltas for parts whose type is not yet declared, in arrival order. The
+	// stream carries NO ordering guarantee between a part's first
+	// message.part.delta and the message.part.updated that declares its type,
+	// and field=="text" alone cannot tell answer text from codex
+	// reasoning-summary text, so an undeclared part's deltas wait here and
+	// replay through the real routing the moment the declaration lands.
+	// Buffered deltas are replayed exactly once (drained entries are removed)
+	// and per-part arrival order is preserved.
+	var pendingOrder []string
+	pendingDeltas := map[string][]string{}
+	routeDelta := func(id, delta string) bool {
+		if partTypes[id] == reasoningPartType {
+			return emitReasoningDelta(delta)
+		}
+		return emitAnswerDelta(delta)
+	}
+	// drainPending replays buffered deltas whose part type is now known. With
+	// force set (the stream is settling) it replays everything: a part still
+	// undeclared at settle routes as answer text, because with no declaration
+	// there is no evidence it was thinking and answer text must never be
+	// silently dropped from the final. Reports false when the relay push broke.
+	drainPending := func(force bool) bool {
+		kept := pendingOrder[:0]
+		for _, id := range pendingOrder {
+			if !force && partTypes[id] == "" {
+				kept = append(kept, id)
+				continue
+			}
+			for _, delta := range pendingDeltas[id] {
+				if !routeDelta(id, delta) {
+					return false
+				}
+			}
+			delete(pendingDeltas, id)
+		}
+		pendingOrder = kept
+		return true
+	}
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
 		if !bytes.HasPrefix(line, dataPrefix) {
@@ -1132,22 +1236,35 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 				continue
 			}
 		}
+		// Part-type bookkeeping first, then replay: deltas that arrived before
+		// their part's declaration now route by what the part IS.
+		recordPartType(partTypes, &ev)
+		if !drainPending(false) {
+			return nil // relay push broke.
+		}
 		// Token fast-path: emit the delta frame so time-to-first-token is not gated
 		// behind the tool frames below.
 		if delta, ok := textDeltaFromEvent(&ev); ok {
-			// Text resuming AFTER a tool call is a new message segment, but the
-			// deltas carry no boundary — everything downstream (the live text
-			// stream and the durable final alike) concatenates them into one
-			// string, and the pre-tool preamble glued straight onto the post-tool
-			// answer ("…for those traces.No traces failing…"). Restore the
-			// paragraph the model actually produced.
-			if emittedText && toolSinceText {
-				delta = "\n\n" + delta
-			}
-			emittedText = true
-			toolSinceText = false
-			if f, mErr := frames.Delta(delta); mErr == nil {
-				if !emitFrame(f) {
+			id := deltaPartID(&ev)
+			switch {
+			case partTypes[id] == reasoningPartType:
+				// A reasoning part streaming on field=="text" (codex
+				// reasoning-summary titles) is THINKING, not the answer:
+				// route it as an ephemeral reasoning frame so it never
+				// reaches the durable final text.
+				if !emitReasoningDelta(delta) {
+					return nil // relay push broke.
+				}
+			case id != "" && partTypes[id] == "":
+				// The part this delta belongs to is not declared yet: hold it
+				// until message.part.updated names what the part IS, so early
+				// reasoning can never leak into the durable answer.
+				if _, buffered := pendingDeltas[id]; !buffered {
+					pendingOrder = append(pendingOrder, id)
+				}
+				pendingDeltas[id] = append(pendingDeltas[id], delta)
+			default:
+				if !emitAnswerDelta(delta) {
 					return nil // relay push broke.
 				}
 			}
@@ -1156,10 +1273,8 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 		// token, ephemerally (never durable). Shown while it streams, discarded on
 		// settle.
 		if reasoning, ok := reasoningDeltaFromEvent(&ev); ok {
-			if f, mErr := frames.Reasoning(reasoning); mErr == nil {
-				if !emitFrame(f) {
-					return nil // relay push broke.
-				}
+			if !emitReasoningDelta(reasoning) {
+				return nil // relay push broke.
 			}
 		}
 		// Tool lifecycle: start/end frames as the call opens and settles.
@@ -1178,6 +1293,10 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 		//   - error: return the agent's message so the app emits a frames.Error;
 		//   - anything else: normal completion (nil ⇒ app emits frames.Final).
 		if _, terminal := terminalEventTypes[ev.Type]; terminal {
+			// Flush buffered deltas ahead of the terminal so they precede the
+			// terminal frame and reach the durable fold; best-effort, the
+			// terminal outcome below stands regardless.
+			_ = drainPending(true)
 			switch ev.Type {
 			case "handoff":
 				var m map[string]any
@@ -1199,6 +1318,9 @@ func StreamSession(ctx context.Context, baseURL, bearerToken, sessionID string, 
 			}
 		}
 	}
+	// The stream ended without a terminal event (the worker cut it): flush any
+	// still-buffered deltas so their text is not silently dropped.
+	_ = drainPending(true)
 	if err := scanner.Err(); err != nil {
 		if ctx.Err() != nil {
 			return nil

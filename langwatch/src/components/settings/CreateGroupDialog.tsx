@@ -161,6 +161,7 @@ export function CreateGroupDialog({
                       <HStack key={userId} py={1} fontSize="sm">
                         <RandomColorAvatar
                           name={member?.user.name ?? member?.user.email ?? "?"}
+                          image={member?.user.image}
                           size="xs"
                         />
                         <Text flex={1}>

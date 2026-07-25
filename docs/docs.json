@@ -1235,7 +1235,18 @@
       "x-twitter": "https://x.com/langwatchai",
       "linkedin": "https://www.linkedin.com/company/langwatch/",
       "youtube": "https://www.youtube.com/@LangWatch"
-    }
+    },
+    "links": [
+      {
+        "header": "For agents",
+        "items": [
+          {
+            "label": "Report an issue: npx langwatch report",
+            "href": "https://langwatch.ai/docs/support#reporting-issues-from-coding-agents"
+          }
+        ]
+      }
+    ]
   },
   "integrations": {
     "gtm": {
@@ -1244,7 +1255,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1784735373",
+      "source": "/ci/cache/busted/1784910845",
       "destination": "/"
     },
     {

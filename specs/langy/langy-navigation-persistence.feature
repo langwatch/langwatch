@@ -71,6 +71,33 @@ Feature: Langy persists across in-project navigation
     When I reach that project from a different organization
     Then no conversation is restored and I start fresh
 
+  # ---------------------------------------------------------------------------
+  # Coming back to a conversation that has to load
+  # ---------------------------------------------------------------------------
+
+  # Restoring is not the same as starting fresh, and the panel already knows
+  # which it is doing before the messages arrive: it remembered the
+  # conversation. Painting the empty state's invitation over a conversation the
+  # reader has already had — and then swapping it out — reads as Langy having
+  # forgotten them, and the card resizing underneath makes it worse.
+
+  @unit
+  Scenario: A conversation that is still loading never shows the empty invitation
+    Given I had a conversation open and I reload the window
+    When the panel restores before its messages have arrived
+    Then the panel shows a placeholder in the shape of a conversation
+    And it never offers "How can I help?" or the starter suggestions
+    And the invitation is what a genuinely new chat gets instead
+
+  @unit
+  Scenario: A restored conversation opens at the size its content will need
+    Given I had a conversation of several messages open
+    When I reload and the panel restores before its messages have arrived
+    Then the card opens at the size that conversation needs
+    And it does not rest at the empty size and grow once the messages land
+    # The recents list already carries each conversation's message count, so
+    # this is a known quantity, not a guess.
+
   @integration @unimplemented
   Scenario: A half-typed message survives navigation
     # Tracked: needs a draft store wired into LangyContext + a regression test

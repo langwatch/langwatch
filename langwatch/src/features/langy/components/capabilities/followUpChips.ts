@@ -5,33 +5,33 @@
  * unit-testable on its own:
  *   - `cliFollowUps.ts` answers WHICH offers a result earns (from the feature
  *     map's produces/consumes relation).
- *   - `logic/traceQueryIntent.ts` answers WHERE a TRACE offer lands (it
- *     recompiles the search's own input into a pre-filtered destination URL).
+ *   - `logic/traceExplorerLink.ts` answers WHERE a carried offer lands. It is
+ *     the SAME reader the card's own "View in Trace Explorer" button uses
+ *     (`readTraceSearchQuery`), so the chips and the card can never disagree
+ *     about what the agent actually searched. The live transport hands us
+ *     opencode's shell payload (`{ command: "langwatch trace search …" }` —
+ *     the envelope retypes the NAME only), and that reader is the one that
+ *     knows how to open it.
  *
  * ── TWO GRADES OF DESTINATION ──────────────────────────────────────────────
  *
- * This used to bail entirely unless the call's input parsed as a trace query:
+ * An offer resolves at one of two grades, and its COPY tells you which:
  *
- *     const intent = parseTraceQueryIntent(call.input);
- *     if (!intent) return [];
- *
- * `followUpsForResult` is perfectly generic — it works off the feature map, not
- * off traces — so that one line was the whole reason a question about spend, or
- * analytics, or anything that is not a trace search, earned no guidance at all.
- * Every offer the map derived was computed and then thrown away.
- *
- * So an offer now resolves at one of two grades, and its COPY tells you which:
- *
- *   CARRIED    a builder recompiled the result's own query into the destination,
+ *   CARRIED    a builder recompiled the search's own text into the destination,
  *              so the data goes with you. Keeps the offer's own verb —
- *              "Graph these" means these.
- *   PLAIN      no builder for this result kind, but the consuming feature has a
- *              surface. Reads "Open in Analytics" — an invitation to go and
- *              look, never a promise that the filter travelled.
+ *              "Alert me on this" means THIS search.
+ *   PLAIN      the destination cannot hold what this search expressed, but the
+ *              consuming feature has a surface. Reads "Open in Analytics" — an
+ *              invitation to go and look, never a promise that the query
+ *              travelled.
  *
- * That distinction is the whole honesty of the feature. A chip saying "Graph
- * these" that lands on an unfiltered index is worse than no chip, which is why
- * the label is chosen by the destination it actually got, not by the offer.
+ * That distinction is the whole honesty of the feature, and it is why the
+ * analytics offer is ALWAYS plain today: the graph builder filters on FIELDS
+ * only (its API call has no free-text input), and the CLI's `trace search` has
+ * no field flags — so there is nothing a graph could faithfully carry. A chip
+ * saying "Graph these" that lands on an unfiltered builder is worse than no
+ * chip. The one destination that CAN hold the search today is the automation
+ * drawer, whose subject is a liqe query (`buildAutomationHref`).
  *
  * Carried chips sort first, and the list is capped — the point is a next step,
  * not a menu.
@@ -39,11 +39,10 @@
  * @see specs/langy/langy-followup-suggestions.feature
  */
 import {
-  buildAlertHref,
-  buildGraphHref,
-  parseTraceQueryIntent,
-  type TraceQueryIntent,
-} from "../../logic/traceQueryIntent";
+  buildAutomationHref,
+  readTraceSearchQuery,
+  type TraceSearchQuery,
+} from "../../logic/traceExplorerLink";
 import {
   buildSurfaceHref,
   SURFACE_BY_FEATURE,
@@ -62,7 +61,7 @@ export const MAX_FOLLOW_UP_CHIPS = 3;
 export interface FollowUpChip {
   /** Stable per (result kind, target feature) — safe as a React key. */
   id: string;
-  /** The chip's copy — "Graph these" when carried, "Open in X" when not. */
+  /** The chip's copy — "Alert me on this" when carried, "Open in X" when not. */
   label: string;
   /** The destination the chip navigates to. */
   href: string;
@@ -83,20 +82,32 @@ export interface SettledCall {
 
 /**
  * Route a target feature to the builder that compiles the search into its
- * surface. Only offers present here can be carried out; every other offer is
- * dropped. Both builders re-use the legacy filter shape the search already ran
- * with, so graphing and alerting need no new backend.
+ * surface. Only offers present here can be carried; every other offer resolves
+ * at the plain grade. One entry today: the automation drawer already accepts a
+ * liqe subject through its existing `initialFilterQuery` seed, so alerting
+ * needs no new backend. Analytics is deliberately absent — see the module
+ * header for why a carried graph would be a lie.
  */
 const DESTINATION_BY_FEATURE: Record<
   string,
   (args: {
     projectSlug: string | null;
-    intent: TraceQueryIntent;
+    search: TraceSearchQuery;
   }) => string | null
 > = {
-  "observability.analytics": buildGraphHref,
-  triggers: buildAlertHref,
+  triggers: buildAutomationHref,
 };
+
+/**
+ * Result kinds whose offers never resolve at the PLAIN grade. A plain chip is
+ * "go and look" — honest only when the destination shows the thing that earned
+ * the offer. An evaluator's consumers (Experiments, Online Evaluations) open
+ * on pages that neither show the evaluator nor pick it up, so "Open in
+ * Experiments" under a just-created evaluator was navigation noise pretending
+ * to be a next step. A CARRIED offer (a builder that takes the evaluator
+ * along) would still be welcome — none exists today.
+ */
+const PLAIN_INELIGIBLE_KINDS = new Set(["evaluators"]);
 
 /**
  * The follow-up chips a settled call earns: the offers `cliFollowUps` derives,
@@ -118,15 +129,16 @@ export function deriveFollowUpChips({
   });
   if (suggestions.length === 0) return [];
 
-  // Only trace searches can be recompiled into a filtered destination today.
-  // A null intent is no longer fatal — it just means every offer resolves at
-  // the plain grade instead of the carried one.
-  const intent = parseTraceQueryIntent(call.input);
+  // The search as the agent actually ran it — read off the CLI command string
+  // (or the older structured shape) by the same reader the card's Explorer
+  // button uses. An input that is not a trace search reads as an empty search,
+  // and every builder answers null on one, so those offers resolve plain.
+  const search = readTraceSearchQuery(call.input);
 
   const chips: FollowUpChip[] = [];
   for (const suggestion of suggestions) {
     const build = DESTINATION_BY_FEATURE[suggestion.featureId];
-    const carriedHref = intent && build ? build({ projectSlug, intent }) : null;
+    const carriedHref = build ? build({ projectSlug, search }) : null;
     if (carriedHref) {
       chips.push({
         id: suggestion.id,
@@ -137,8 +149,10 @@ export function deriveFollowUpChips({
       continue;
     }
 
-    // No filter to carry. Offer the surface itself, worded so it cannot be
-    // mistaken for one that brought the result along.
+    // Nothing to carry. Offer the surface itself, worded so it cannot be
+    // mistaken for one that brought the result along — unless the destination
+    // could not even SHOW the result's kind, in which case no chip at all.
+    if (PLAIN_INELIGIBLE_KINDS.has(suggestion.kind)) continue;
     const surface = SURFACE_BY_FEATURE[suggestion.featureId];
     if (!surface) continue;
     const href = buildSurfaceHref({ surface, projectSlug });

@@ -5,14 +5,15 @@
  * to leave. These are the ways it could go wrong:
  *   - `#` is a character. Typing it into the composer or a search box must type
  *     it, not light up the page.
- *   - Shift is pressed constantly. Every capital letter must not flash the page.
- *   - Two gestures, one mode: a Shift keyup must not cancel a `#` latch.
- *   - A tab switch mid-hold must not leave the page armed forever.
+ *   - Escape must only be swallowed when it actually disarmed something.
  */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LangyContextTargetLayer } from "../components/LangyContextTargetLayer";
 import { useLangyContextArming } from "../hooks/useLangyContextArming";
 import { useLangyContextTargetStore } from "../stores/langyContextTargetStore";
+import { useLangyStore } from "../stores/langyStore";
 
 function Host() {
   useLangyContextArming();
@@ -27,12 +28,6 @@ function press(key: string, target: EventTarget = document.body) {
     target.dispatchEvent(
       new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
     );
-  });
-}
-
-function release(key: string) {
-  act(() => {
-    window.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
   });
 }
 
@@ -77,55 +72,12 @@ describe("useLangyContextArming", () => {
         input.remove();
       });
     });
-
-    describe("when the user holds Shift", () => {
-      it("arms only once the hold is deliberate", () => {
-        render(<Host />);
-
-        press("Shift");
-        expect(armSource()).toBeNull();
-
-        act(() => vi.advanceTimersByTime(400));
-
-        expect(armSource()).toBe("hold");
-      });
-
-      it("disarms the moment it is released", () => {
-        render(<Host />);
-        press("Shift");
-        act(() => vi.advanceTimersByTime(400));
-
-        release("Shift");
-
-        expect(armSource()).toBeNull();
-      });
-    });
-
-    describe("when the user types a capital letter", () => {
-      it("never flashes the page — Shift and a letter is not a hold", () => {
-        render(<Host />);
-
-        press("Shift");
-        press("A");
-        act(() => vi.advanceTimersByTime(400));
-
-        expect(armSource()).toBeNull();
-      });
-    });
   });
 
   describe("given the mode was latched with #", () => {
     beforeEach(() => {
       render(<Host />);
       press("#");
-    });
-
-    describe("when the user releases a Shift they happened to be holding", () => {
-      it("keeps the latch — the keyup belongs to a different gesture", () => {
-        release("Shift");
-
-        expect(armSource()).toBe("key");
-      });
     });
 
     describe("when the user presses # again", () => {
@@ -145,21 +97,6 @@ describe("useLangyContextArming", () => {
     });
   });
 
-  describe("given the window loses focus mid-hold", () => {
-    it("disarms, because the keyup will never arrive", () => {
-      render(<Host />);
-      press("Shift");
-      act(() => vi.advanceTimersByTime(400));
-      expect(armSource()).toBe("hold");
-
-      act(() => {
-        window.dispatchEvent(new Event("blur"));
-      });
-
-      expect(armSource()).toBeNull();
-    });
-  });
-
   describe("given the page is disarmed", () => {
     describe("when the user presses Escape", () => {
       it("lets it through, so it still closes whatever it was meant for", () => {
@@ -175,6 +112,51 @@ describe("useLangyContextArming", () => {
         });
 
         expect(event.defaultPrevented).toBe(false);
+      });
+    });
+  });
+});
+
+/**
+ * The gesture has to work from where the user actually is.
+ *
+ * The arming listener lived inside a subtree the layer only rendered while the
+ * Langy panel was OPEN, so pressing `#` anywhere else did nothing whatsoever —
+ * no highlight, no hint, no error. The peek made that the common case rather
+ * than the edge one: a minimised panel reads as closed, which is how Langy sits
+ * most of the time.
+ *
+ * Mounted through the REAL layer, not the hook: mounting the hook directly is
+ * exactly what let the bug through, because the hook was never the broken part.
+ */
+/** The layer paints real chrome once armed, so it needs the design system. */
+function renderLayer() {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <LangyContextTargetLayer />
+    </ChakraProvider>,
+  );
+}
+
+describe("LangyContextTargetLayer", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useLangyContextTargetStore.getState().reset();
+    useLangyStore.setState({ isOpen: false });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    useLangyStore.setState({ isOpen: false });
+  });
+
+  describe("given the Langy panel is closed", () => {
+    describe("when the user presses #", () => {
+      it("still latches the mode on", () => {
+        renderLayer();
+
+        press("#");
+
+        expect(armSource()).toBe("key");
       });
     });
   });

@@ -135,6 +135,17 @@ export class TraceOriginService {
         // then flipped the trace summary's origin from playground /
         // application to evaluation as the eval spans arrived.
         mergedAttributes["langwatch.origin"] = existingOrigin;
+      } else if (existingOrigin === "langy" && explicitOrigin === "gateway") {
+        // A Langy turn's trace carries BOTH platform origins: the manager's
+        // relay stamps "langy" on the turn span + relayed worker spans, and
+        // the AI gateway stamps "gateway" on the gen_ai spans it retells into
+        // the SAME trace. Under "explicit always wins", whichever span folded
+        // last decided the summary — the same turn flipped between "langy"
+        // and "gateway" run to run. Langy outranks the gateway: once a trace
+        // has resolved to "langy", a gateway span never displaces it (while a
+        // langy span arriving after gateway spans still upgrades it, via the
+        // explicit-wins branch below).
+        mergedAttributes["langwatch.origin"] = existingOrigin;
       } else {
         // Explicit langwatch.origin on any other span wins — it's a
         // deliberate, high-confidence signal (SDK or platform). This

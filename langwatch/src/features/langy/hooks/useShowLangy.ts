@@ -34,13 +34,36 @@ import { LANGY_RELEASE_FLAG } from "~/utils/langyReleaseFlag";
  * (picks the Langy activation banner over the promo teaser) — one gate,
  * so the banner can never invite a user into a panel that won't render.
  */
-export function useShowLangy(): boolean {
-  const { data: session } = useRequiredSession();
-  const { team, project, organization, organizationRole, hasPermission } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+export interface LangyVisibility {
+  /** Does this user have Langy? */
+  show: boolean;
+  /**
+   * We do not KNOW yet — the session, the project, or the rollout flag is
+   * still in flight.
+   *
+   * "No" and "not yet" are different answers, and every gate here collapses
+   * them into `false` for callers that only need to hide a control (hiding it
+   * for one extra frame costs nothing). A caller choosing between whole PAGE
+   * COMPOSITIONS cannot afford that: answering "no" while the flag is in the
+   * air renders the wrong home and then swaps it out underneath the reader.
+   */
+  isResolving: boolean;
+}
+
+/** The gate, with its own uncertainty exposed. See {@link LangyVisibility}. */
+export function useLangyVisibility(): LangyVisibility {
+  const { data: session, status: sessionStatus } = useRequiredSession();
+  const {
+    team,
+    project,
+    organization,
+    organizationRole,
+    hasPermission,
+    isLoading: contextLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const publicEnv = usePublicEnv();
 
   const user = session?.user;
@@ -62,11 +85,30 @@ export function useShowLangy(): boolean {
   // to an organization only matches when organizationId is in the evaluation
   // context, so omitting it would hide the panel for an org that has actually
   // been rolled out.
-  const { enabled: releaseLangy } = useFeatureFlag(LANGY_RELEASE_FLAG, {
-    projectId: project?.id,
-    organizationId: organization?.id,
-    enabled: mayReadLangy,
-  });
+  const { enabled: releaseLangy, isLoading: flagLoading } = useFeatureFlag(
+    LANGY_RELEASE_FLAG,
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: mayReadLangy,
+    },
+  );
 
-  return mayReadLangy && releaseLangy;
+  // Deliberately never waits on something that may never arrive: a reader with
+  // no project at all is DECIDED (they cannot have Langy), not pending. Only
+  // the three things that are genuinely in flight count.
+  const isResolving =
+    sessionStatus === "loading" ||
+    contextLoading ||
+    (mayReadLangy && flagLoading);
+
+  return { show: mayReadLangy && releaseLangy, isResolving };
+}
+
+/**
+ * The gate as a plain boolean, for the many callers that only hide a control.
+ * Reports `false` while the answer is still loading — see {@link LangyVisibility}.
+ */
+export function useShowLangy(): boolean {
+  return useLangyVisibility().show;
 }

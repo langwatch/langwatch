@@ -55,6 +55,8 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
+
 **Projects and API keys: target a real project, not a personal one.**
 
 LangWatch has two kinds of project:
@@ -93,14 +95,18 @@ langwatch analytics query --metric p95-latency --group-by metadata.model --forma
 
 Widen with `--start-date` (ISO) to 30 days when trends look suspicious: a gradual drift only shows on longer windows. Run `langwatch analytics query --help` for every preset and flag.
 
+An empty metric is a coverage note, never the end of the road. An empty `eval-pass-rate` means there were no evaluator runs in the selected window; it says nothing about the traffic itself, which `trace-count`, `total-cost`, and the latency metrics still describe. For an open "what has my agent been up to?", answer from whichever sources HAVE data, production traces first, then simulation runs: share a few concrete observations (volume, the kinds of requests coming in, errors, cost or latency movements, one or two example traces), then end with one short line inviting the user to name what to dig into more deeply ("Say which of these to dig into and I'll go deeper."). Never end the conversation on "no evaluation data" alone when the project has traces.
+
 ## Step 3: Export the Evidence and Mine It
 
 Aggregates say WHAT changed; only the traces say WHY. Export a large sample and analyze it locally:
 
 ```bash
-langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
-langwatch trace export --format jsonl --limit 1000 --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
+langwatch trace export --format jsonl --limit 1000 --origin application -o traces.jsonl
+langwatch trace export --format jsonl --limit 1000 --origin application --start-date <30d-ago> --end-date <14d-ago> -o traces-before.jsonl
 ```
+
+`--origin application` scopes the sample to real production traffic (it includes traces with no recorded origin). Evaluation, simulation, playground, gateway, and langy traces would pollute the picture of what the agent does for users; include those origins (comma-separated) only when they are the subject of the question.
 
 Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 
@@ -112,7 +118,7 @@ Write small local scripts (python3 or jq) over the JSONL to compute, at minimum:
 6. **Outliers**: the single weirdest traces by duration, cost, span count, and output size. Read them individually.
 
 ```bash
-langwatch trace search -q "<keyword from a pattern>" --limit 10 --format json   # Chase a specific pattern
+langwatch trace search -q "<keyword from a pattern>" --origin application --limit 10 --format json   # Chase a specific pattern
 langwatch trace get <traceId>                                                   # Read a representative trace in full
 langwatch trace get <traceId> -f json                                           # Every span, token count, and timing
 ```
@@ -143,6 +149,8 @@ Diagnosis without treatment is just bad news. If the `agent-improve` skill is in
 - Do NOT rely on aggregates alone; always read at least a handful of full traces per finding, the surprise is always in the details
 - Do NOT analyze only the happy window; without a before/after comparison you cannot see behavior change
 - Do NOT dump raw JSON at the user; the deliverable is the diagnosis and the report, written in plain language with numbers
+- Do NOT stop at an empty evaluation metric; when evaluations have no data, the answer comes from the traces (and simulation runs), with a closing invitation to dig deeper
+- Do NOT mix origins blindly; questions about production behavior are answered from `--origin application` traffic
 - If the CLI returns an error, report the user-facing consequence (what couldn't be determined and why in plain terms), not the raw error text — an activity card already shows the underlying failure
 ````
 
@@ -247,6 +255,8 @@ langwatch scenario-docs                           # Scenario docs index
 Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
 
 If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team. No login needed, secrets and personal data are redacted locally, and it directly shapes what gets fixed. `npx langwatch report --help` explains the options.
 
 **Projects and API keys: target a real project, not a personal one.**
 
@@ -1100,7 +1110,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
         </span>
         <div className="lw-prompt-source">
 
-````text
+`````text
 Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -1119,7 +1129,27 @@ Classify the user's intent:
 | Batch test a dataset, compare prompts or models, benchmark, create a CI quality gate | `experiments`        |
 | Score live traces or threads, monitor production quality, create a guardrail         | `online-evaluations` |
 
-If the request remains ambiguous after inspecting context, briefly explain the distinction and route to `experiments` as the safer pre-deployment default.
+If the request remains ambiguous after inspecting context — a bare "make me an eval" that names neither a dataset nor live traffic — do not create anything yet. This choice picks what gets tested, so it is the user's to make, not a default's. Ask it as a question card and stop; the answer arrives as the next message.
+
+Where `langy-card` blocks render, ask it as a `choices` block — the only sanctioned question format — last in the reply:
+
+````markdown
+```langy-card
+{
+  "kind": "choices",
+  "blockId": "eval-kind",
+  "question": "What should this evaluate?",
+  "options": [
+    { "id": "experiment", "label": "A dataset, before deployment" },
+    { "id": "online", "label": "Live production traffic" }
+  ]
+}
+```
+````
+
+Neither option names an existing entity, so neither carries a `ref`. Without that channel, ask the same question as one short line of prose.
+
+A rejected field value is not this kind of choice. If a create later fails with a `validation_error` whose reason names the field and an `expected` list, correct that exact field from the list and retry once — never turn a fixable slug into a question for the user.
 
 Then hand off:
 
@@ -1138,7 +1168,7 @@ Then hand off:
    ```
 
 Do not recreate the companion skill's instructions from memory. Load the focused skill so its current workflow, safety checks, and verification steps are used.
-````
+`````
 
         </div>
       </div>

@@ -86,7 +86,7 @@ export type TraceListItemDto = z.infer<typeof traceListItemSchema>;
  * Trace header: everything the drawer header + summary tab needs.
  * Returned by `tracesV2.header`.
  */
-const traceHeaderSchema = z.object({
+export const traceHeaderSchema = z.object({
   traceId: z.string(),
   timestamp: z.number(),
   name: z.string(),
@@ -160,7 +160,7 @@ export type TraceHeader = z.infer<typeof traceHeaderSchema>;
  * Span tree node: lightweight per-span data for waterfall / flame / span-list.
  * Returned by `tracesV2.spanTree`.
  */
-const spanTreeNodeSchema = z.object({
+export const spanTreeNodeSchema = z.object({
   spanId: z.string(),
   parentSpanId: z.string().nullable(),
   name: z.string(),
@@ -170,6 +170,12 @@ const spanTreeNodeSchema = z.object({
   durationMs: z.number(),
   status: z.enum(["ok", "error", "unset"]),
   model: z.string().nullable(),
+  /**
+   * Tool display name (`gen_ai.tool.name` ?? claude's `tool_name`) for tool
+   * spans — lets the waterfall label WHICH tool ran without a spanDetail
+   * call. Null for non-tool spans.
+   */
+  toolName: z.string().nullish(),
   /**
    * USD cost — `gen_ai.usage.cost` when the SDK reported one, otherwise
    * computed server-side from token counts × model pricing (same cascade

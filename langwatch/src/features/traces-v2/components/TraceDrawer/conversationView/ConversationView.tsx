@@ -340,6 +340,13 @@ const ConversationSkeleton: React.FC<{ conversationId: string }> = ({
   );
 };
 
+const CONVERSATION_MODES: Mode[] = [
+  "thread",
+  "bubbles",
+  "markdown",
+  "annotations",
+];
+
 const ConversationHeader: React.FC<{
   conversationId: string;
   turnCount: number;
@@ -399,7 +406,7 @@ const ConversationHeader: React.FC<{
       <SegmentedToggle
         value={mode}
         onChange={(v) => onModeChange(v as Mode)}
-        options={["thread", "bubbles", "markdown", "annotations"]}
+        options={CONVERSATION_MODES}
       />
     </HStack>
   );

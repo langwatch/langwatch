@@ -58,7 +58,7 @@ jobs:
               - 'go.sum'
               - 'Dockerfile.langyagent'
               - 'typescript-sdk/**'
-              - 'packages/cli-cards/**'
+              - 'packages/langy/**'
               - 'skills/**'
               - 'feature-map.json'
               - 'langwatch/src/server/tracer/types.ts'

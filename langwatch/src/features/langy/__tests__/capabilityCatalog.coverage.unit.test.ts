@@ -8,7 +8,7 @@
  *
  * @see specs/langy/langy-capability-cards.feature
  */
-import { DIGEST_STRATEGIES } from "@langwatch/cli-cards";
+import { DIGEST_STRATEGIES } from "@langwatch/langy";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";
@@ -22,10 +22,7 @@ import {
 } from "../components/capabilities/capabilityRegistry";
 
 const CLI_PROGRAM_PATH = fileURLToPath(
-  new URL(
-    "../../../../../typescript-sdk/src/cli/program.ts",
-    import.meta.url,
-  ),
+  new URL("../../../../../typescript-sdk/src/cli/program.ts", import.meta.url),
 );
 
 /**
@@ -63,6 +60,9 @@ const EXCLUDED_COMMANDS = new Set([
   "cursor",
   "gemini",
   "opencode",
+  // Sends a support report to the LangWatch team; the confirmation is a
+  // message and an opaque id, not a platform resource a card could open.
+  "report",
   // The CLI's own background process management — pure local plumbing.
   "daemon",
   // The catalog itself — self-referential: a card for the command that lists
@@ -83,7 +83,8 @@ const EXCLUDED_COMMANDS = new Set([
  */
 function cliTopLevelCommands(): Set<string> {
   const source = readFileSync(CLI_PROGRAM_PATH, "utf-8");
-  const pattern = /(?:const\s+\w+\s*=\s*)?\bprogram\s*(?:[\r\n]+\s*)?\.command\(\s*"([^"\s]+)/g;
+  const pattern =
+    /(?:const\s+\w+\s*=\s*)?\bprogram\s*(?:[\r\n]+\s*)?\.command\(\s*"([^"\s]+)/g;
   const commands = new Set<string>();
   for (const match of source.matchAll(pattern)) {
     commands.add(match[1]!);
@@ -157,7 +158,9 @@ describe("the capability catalog, given the CLI's real command tree", () => {
       const strategies = new Set<string>(DIGEST_STRATEGIES);
       const undeclared = Object.entries(CAPABILITY_CATALOG).filter(
         ([, entry]) =>
-          !strategies.has((entry as { digestStrategy?: string }).digestStrategy ?? ""),
+          !strategies.has(
+            (entry as { digestStrategy?: string }).digestStrategy ?? "",
+          ),
       );
       expect(
         undeclared.map(([resource]) => resource),

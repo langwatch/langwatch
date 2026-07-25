@@ -5,10 +5,16 @@
 **Status:** Accepted (amended 2026-07-22 — see "Amendment: one decision point,
 enforced" for what shipped and what turned out to be wrong)
 
-**Builds on:** the `@langwatch/cli-cards` contract (one card per result *shape*,
-shared by the CLI and the Langy panel so the two can never disagree about what a
-command produced), and the capability catalog / registry that binds a view to
-each CLI resource.
+**Builds on:** the `@langwatch/langy/cards` contract (one card per result
+*shape*, shared by the CLI and the Langy panel so the two can never disagree
+about what a command produced), and the capability catalog / registry that binds
+a view to each CLI resource.
+
+> **2026-07-22.** This contract used to be its own package, `@langwatch/cli-cards`.
+> It now lives at `packages/langy/src/cards` and is imported as
+> `@langwatch/langy/cards`, so that the measured cards described here and the
+> derived cards of ADR-060 share ONE kind list instead of two vocabularies that
+> mirrored each other. Paths below are given in their current form.
 
 **Spec:** `specs/langy/langy-capability-cards.feature` (to be extended alongside
 this decision).
@@ -19,7 +25,7 @@ Langy renders a CLI result as a rich card — traces, metrics, a dataset, an eva
 run — and the card is chosen from the command's **name**:
 
 ```ts
-// packages/cli-cards/src/tool-result.ts
+// packages/langy/src/cards/tool-result.ts
 export function toCliToolResult({ resource, verb, payload }) {
   const card = cardKindFor({ resource, verb });   // name only
   const parsed = schemaByCard[card].safeParse(payload);
@@ -250,8 +256,8 @@ stated safety property, and it should be treated as the latter.
 
 ## Consequences
 
-- **The CLI's own rendering changes too.** `cli-cards` is shared, deliberately,
-  so that the panel and the terminal cannot disagree. A promotion that gives the
+- **The CLI's own rendering changes too.** The card contract is shared,
+  deliberately, so that the panel and the terminal cannot disagree. A promotion that gives the
   panel a spend card gives `langwatch trace search` one as well. This is intended.
 - **The coverage test grows a second obligation.** It currently guards
   catalogue ⟷ CLI-resource parity; it will also need to hold each new card kind
@@ -310,7 +316,7 @@ Two corrections to the text above:
   claiming a `present` emission path has been corrected rather than left
   aspirational.
 - **The consequence "the CLI's own rendering changes too" has not landed.**
-  `cli-cards` is shared, but nothing in the CLI renders from the stamped card
+  The card contract is shared, but nothing in the CLI renders from the stamped card
   today; the terminal still prints its own table. The claim is a design intent,
   not a current fact.
 

@@ -20,7 +20,7 @@ import { z } from "zod";
 import {
   cliToolResultSchema,
   type CliToolResult,
-} from "@langwatch/cli-cards";
+} from "@langwatch/langy";
 
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";

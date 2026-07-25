@@ -23,9 +23,21 @@ interface UseTraceListRefreshResult {
    * True while any of (list, discover, newCount) is fetching. Tied to
    * the React-Query cache directly so the spinner / tint stay on until
    * the data actually lands, instead of clearing after a fixed
-   * timeout.
+   * timeout. Used by `RefreshProgressBar` to know when an EXPLICIT
+   * refresh has settled — not a UI-facing spinner signal on its own,
+   * since `discover`/`newCount` also refetch on routine background SSE
+   * activity (see `shouldSpin` below for that).
    */
   isRefreshing: boolean;
+  /**
+   * The refresh BUTTON's spin state: an explicit refresh in flight, or a
+   * genuinely new trace being merged into `list` — never a background
+   * `discover`/`newCount` refetch triggered by a routine span update to a
+   * trace already on screen. A busy coding-agent trace fires those on
+   * nearly every span; spinning the button for each one reads as "something
+   * is wrong" when nothing new actually happened.
+   */
+  shouldSpin: boolean;
 }
 
 /**
@@ -65,7 +77,25 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
     },
   });
 
+  // Narrower than `fetchingCount` above: only a `list` fetch counts — not
+  // `discover`/`newCount`, which refetch on routine background SSE activity
+  // (a span landing on a trace already on screen), not just when a new trace
+  // actually shows up.
+  const listFetchingCount = useIsFetching({
+    predicate: (q) => {
+      const key = q.queryKey;
+      if (!Array.isArray(key) || key.length === 0) return false;
+      try {
+        const head = JSON.stringify(key[0]);
+        return head.includes('"tracesV2"') && head.includes('"list"');
+      } catch {
+        return false;
+      }
+    },
+  });
+
   const requestRefresh = useRefreshUIStore((s) => s.requestRefresh);
+  const refreshRequested = useRefreshUIStore((s) => s.refreshRequested);
   const refresh = useCallback(() => {
     const now = Date.now();
     if (now - lastClickRef.current < REFRESH_DEBOUNCE_MS) return;
@@ -84,5 +114,9 @@ export function useTraceListRefresh(): UseTraceListRefreshResult {
     void trpcUtils.tracesV2.newCount.invalidate();
   }, [trpcUtils, requestRefresh]);
 
-  return { refresh, isRefreshing: fetchingCount > 0 };
+  return {
+    refresh,
+    isRefreshing: fetchingCount > 0,
+    shouldSpin: refreshRequested || listFetchingCount > 0,
+  };
 }

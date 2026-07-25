@@ -108,27 +108,21 @@ describe("<HomePageBanners />", () => {
     ).toBeNull();
   });
 
-  it("shows the last remaining banner with no dots when only one is eligible", () => {
-    localStorage.setItem(AUTOMATIONS_KEY, String(Date.now() + 60_000));
+  it("carries every announcement, with dots to move between them", () => {
+    // Every slide in the rotation shows, always — an announcement stands until
+    // it is taken out in code, so there is no state that can reduce the set.
     renderWithProviders(<HomePageBanners />);
     expect(
-      screen.getByRole("heading", {
-        name: "Voice agent simulations are here",
-      }),
+      screen.getByRole("heading", { name: "React the moment it matters" }),
     ).toBeDefined();
     expect(
-      screen.queryByRole("heading", { name: "React the moment it matters" }),
-    ).toBeNull();
-    // One eligible banner → no carousel dots.
-    expect(
-      screen.queryByRole("button", { name: /Show announcement/ }),
-    ).toBeNull();
+      screen.getAllByRole("button", { name: /Show announcement/ }).length,
+    ).toBeGreaterThan(1);
   });
 
   it("renders nothing before the project id resolves", () => {
-    // Before the project resolves the per-project snooze map can't be read,
-    // so every slide would look eligible — a snoozed user would see a flash
-    // and the automations CTA would push /undefined/automations.
+    // The CTA needs the project slug to route, so rendering before it lands
+    // would push /undefined/automations.
     useOrganizationTeamProjectMock.mockReturnValue({
       project: undefined,
     } as ReturnType<typeof useOrganizationTeamProject>);
@@ -143,18 +137,15 @@ describe("<HomePageBanners />", () => {
     ).toBeNull();
   });
 
-  it("renders nothing when every banner is snoozed", () => {
+  it("shows an announcement a reader had previously hidden", () => {
+    // There is no dismissal any more, so a stale key from when there was one
+    // must not keep an announcement off the page forever.
     localStorage.setItem(AUTOMATIONS_KEY, String(Date.now() + 60_000));
     localStorage.setItem(VOICE_KEY, String(Date.now() + 60_000));
     renderWithProviders(<HomePageBanners />);
     expect(
-      screen.queryByRole("heading", { name: "React the moment it matters" }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("heading", {
-        name: "Voice agent simulations are here",
-      }),
-    ).toBeNull();
+      screen.getByRole("heading", { name: "React the moment it matters" }),
+    ).toBeDefined();
   });
 
   describe("when a banner's link is followed", () => {
@@ -171,23 +162,19 @@ describe("<HomePageBanners />", () => {
 
       fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
 
-      // Still on screen, and nothing was written to the per-project snooze:
-      // following a link is interest, not "seen it, thanks". Only the X
-      // dismisses.
+      // Still on screen: following a link is interest, not "seen it, thanks".
       expect(
         screen.getByRole("heading", { name: "React the moment it matters" }),
       ).toBeDefined();
       expect(localStorage.getItem(AUTOMATIONS_KEY)).toBeNull();
     });
 
-    it("still snoozes when the reader actually dismisses it", () => {
+    it("offers no way to hide an announcement at all", () => {
       renderWithProviders(<HomePageBanners />);
 
-      fireEvent.click(
-        screen.getAllByRole("button", { name: /Hide|Dismiss/ })[0]!,
-      );
-
-      expect(localStorage.getItem(AUTOMATIONS_KEY)).not.toBeNull();
+      expect(
+        screen.queryAllByRole("button", { name: /Hide|Dismiss/ }),
+      ).toHaveLength(0);
     });
   });
 

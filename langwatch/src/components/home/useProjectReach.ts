@@ -1,6 +1,6 @@
+import type { ProjectReach } from "~/features/langy/logic/langyHomeSuggestions";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { ProjectReach } from "~/features/langy/logic/langyHomeSuggestions";
 
 export interface ProjectReachResult extends ProjectReach {
   /** True until we know, so nothing offers asks it may have to withdraw. */
@@ -30,14 +30,19 @@ export function useProjectReach(): ProjectReachResult {
     { enabled: !!project?.id },
   );
 
-  const hasTraces = data?.firstMessage ?? false;
+  // The project row in hand already answers "has a trace ever arrived" —
+  // the collector flips `firstMessage` on the first one. The checks query
+  // re-reads the same column but its answer can lag (cache) or never come
+  // (it is permission-gated); the row is authoritative for never leading a
+  // traced project with "send your first trace".
+  const hasTraces =
+    (project?.firstMessage ?? false) || (data?.firstMessage ?? false);
 
   return {
     isLoading: isLoading || !data,
     isNewProject: !isLoading && !!data && !hasTraces,
     hasTraces,
     hasEvaluations: (data?.onlineEvaluations ?? 0) > 0,
-    hasExperiments:
-      (data?.simulations ?? 0) > 0 || (data?.datasets ?? 0) > 0,
+    hasExperiments: (data?.simulations ?? 0) > 0 || (data?.datasets ?? 0) > 0,
   };
 }
