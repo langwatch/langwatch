@@ -258,7 +258,11 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     await sessions.upsert(
       sessionRow({
         sessionId: drifted,
-        startedAtMs: baseMs - 30 * 24 * 60 * 60 * 1000,
+        // Far outside the read window, but WELL inside the 30-day retention:
+        // a drift equal to retentionDays parks this row exactly on the table's
+        // `StartedAt + toIntervalDay(_retention_days)` TTL boundary, where any
+        // background merge DELETEs it mid-test and the reads fall back to v1.
+        startedAtMs: baseMs - 15 * 24 * 60 * 60 * 1000,
         costUsd: 2,
       }),
       30,
