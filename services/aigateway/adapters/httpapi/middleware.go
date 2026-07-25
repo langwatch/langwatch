@@ -114,6 +114,19 @@ func CustomerTraceMiddleware() func(http.Handler) http.Handler {
 	}
 }
 
+// DispatchMetaMiddleware seeds the request context with the accumulator the
+// dispatch pipeline writes response metadata into. The non-streaming path
+// commits the response header block as soon as its first keep-alive byte goes
+// out, which happens while dispatch is still running, so it has to be able to
+// read the metadata accumulated so far rather than waiting for the result.
+func DispatchMetaMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(app.NewDispatchMetaContext(r.Context())))
+		})
+	}
+}
+
 // BundleFromContext returns the resolved bundle from the request context.
 func BundleFromContext(ctx context.Context) *domain.Bundle {
 	if v, ok := ctx.Value(bundleCtxKey{}).(*domain.Bundle); ok {

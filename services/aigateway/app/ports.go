@@ -23,7 +23,7 @@ type ProviderRouter interface {
 // by the trace-fold reactor on the control plane (folds OTel span usage
 // into the ClickHouse budget ledger), not on the gateway hot path.
 type BudgetChecker interface {
-	Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error)
+	Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 }
 
 // GuardrailEvaluator runs guardrail policies against request/response content.

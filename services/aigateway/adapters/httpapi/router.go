@@ -103,6 +103,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	r.Route("/v1", func(v1 chi.Router) {
 		v1.Use(AuthMiddleware(deps.App.Auth()))
+		v1.Use(DispatchMetaMiddleware())
 		v1.Use(CustomerTraceMiddleware())
 		v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
 		v1.Post("/chat/completions", chatHandler(deps))
@@ -121,6 +122,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// cachedContents/*) is accepted by the same handler.
 	r.Route("/v1beta", func(v1beta chi.Router) {
 		v1beta.Use(AuthMiddleware(deps.App.Auth()))
+		v1beta.Use(DispatchMetaMiddleware())
 		v1beta.Use(CustomerTraceMiddleware())
 		v1beta.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
 		v1beta.HandleFunc("/*", geminiPassthroughHandler(deps))
@@ -707,6 +709,16 @@ func withHeartbeat[T any](ctx context.Context, w http.ResponseWriter, interval t
 				// regardless of whether a heartbeat ever fired, making it
 				// useless as a signal.
 				hw.Header().Set("X-LangWatch-Heartbeat-Active", "true")
+				// Last chance to send response metadata: the write below
+				// commits the header block, so anything the handler adds
+				// after dispatch returns is silently dropped. Everything the
+				// interceptor chain decides before the provider call —
+				// budget warnings, cache mode, request id — is already
+				// accumulated, and a long enough call to heartbeat is
+				// exactly when a customer needs to see it.
+				if meta := app.DispatchMetaFrom(ctx); meta != nil {
+					setMetaHeaders(hw, meta.Snapshot())
+				}
 			}
 			_, _ = hw.Write(heartbeatByte)
 			hw.Flush()
@@ -735,22 +747,26 @@ func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
 	_, _ = w.Write(resp.Body)
 }
 
+// setMetaHeaders writes the response metadata headers. Called up to twice per
+// non-streaming request — once from the keep-alive before it commits the
+// header block, once after dispatch returns — so it Sets rather than Adds and
+// the second call refreshes the values instead of appending duplicates.
 func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 	h := w.Header()
 	if meta.GatewayRequestID != "" {
-		h.Add("X-LangWatch-Gateway-Request-Id", meta.GatewayRequestID)
+		h.Set("X-LangWatch-Gateway-Request-Id", meta.GatewayRequestID)
 	}
 	if meta.FallbackCount > 0 {
-		h.Add("X-LangWatch-Fallback-Count", strconv.Itoa(meta.FallbackCount))
+		h.Set("X-LangWatch-Fallback-Count", strconv.Itoa(meta.FallbackCount))
 	}
 	if len(meta.BudgetWarnings) > 0 {
-		h.Add("X-LangWatch-Budget-Warning", strings.Join(meta.BudgetWarnings, ","))
+		h.Set("X-LangWatch-Budget-Warning", strings.Join(meta.BudgetWarnings, ","))
 	}
 	if meta.CacheMode != "" {
-		h.Add("X-LangWatch-Cache-Mode", meta.CacheMode)
+		h.Set("X-LangWatch-Cache-Mode", meta.CacheMode)
 	}
 	if meta.CustomerTraceparent != "" {
-		h.Add("Traceparent", meta.CustomerTraceparent)
+		h.Set("Traceparent", meta.CustomerTraceparent)
 	}
 }
 

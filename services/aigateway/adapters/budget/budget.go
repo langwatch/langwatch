@@ -41,33 +41,45 @@ func NewChecker(opts CheckerOptions) *Checker {
 	return &Checker{logger: opts.Logger, metrics: opts.Metrics}
 }
 
+// SoftWarnPercent is how much of a budget must be consumed before the gateway
+// attaches a warning to the response. It mirrors the control plane's soft-warn
+// threshold (langwatch/src/server/gateway/budget.service.ts) so the response
+// header, the dashboard banner and the CLI all fire at the same point instead
+// of the header staying silent through the whole band the dashboard already
+// calls a warning.
+const SoftWarnPercent = 80
+
 // Precheck evaluates cached budget snapshots. Never calls control plane on hot path.
 // Permissive by default: stale data allows the request through, debit reconciles later.
-func (c *Checker) Precheck(_ context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error) {
-	if len(bundle.Config.Budget.Scopes) == 0 {
-		return domain.BudgetAllow, nil
-	}
+//
+// A scope that is out of budget blocks only when its on_breach is "block";
+// every other scope at or past SoftWarnPercent contributes a warning, whatever
+// its on_breach. A "warn" scope past its limit is still just a warning, and a
+// "block" scope on approach warns before it starts rejecting.
+func (c *Checker) Precheck(_ context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error) {
+	decision := domain.BudgetDecision{Verdict: domain.BudgetAllow}
 
 	for _, scope := range bundle.Config.Budget.Scopes {
 		if scope.LimitMicroUSD <= 0 {
 			continue
 		}
-		remaining := scope.LimitMicroUSD - scope.SpentMicroUSD
-		switch scope.OnBreach {
-		case "block":
-			if remaining <= 0 {
-				if c.metrics != nil {
-					c.metrics.RecordBudgetBlock(scope.Scope)
-				}
-				return domain.BudgetBlock, nil
+		exhausted := scope.SpentMicroUSD >= scope.LimitMicroUSD
+		if exhausted && scope.OnBreach == "block" {
+			if c.metrics != nil {
+				c.metrics.RecordBudgetBlock(scope.Scope)
 			}
-		case "warn":
-			pctUsed := (scope.SpentMicroUSD * 100) / scope.LimitMicroUSD
-			if remaining <= 0 || pctUsed >= 90 {
-				return domain.BudgetWarn, nil
-			}
+			return domain.BudgetDecision{Verdict: domain.BudgetBlock}, nil
 		}
+		pctUsed := int((scope.SpentMicroUSD * 100) / scope.LimitMicroUSD)
+		if pctUsed < SoftWarnPercent {
+			continue
+		}
+		decision.Verdict = domain.BudgetWarn
+		decision.Warnings = append(decision.Warnings, domain.BudgetWarning{
+			Scope:   scope.Scope,
+			PctUsed: pctUsed,
+		})
 	}
 
-	return domain.BudgetAllow, nil
+	return decision, nil
 }

@@ -11,9 +11,25 @@ import (
 )
 
 type DispatchMeta = pipeline.Meta
+type DispatchMetaAccumulator = pipeline.MetaAccumulator
 type CompletionResult = pipeline.SyncResult
 type StreamResult = pipeline.StreamResult
 type EmbeddingResult = pipeline.SyncResult
+
+// NewDispatchMetaContext seeds ctx with the accumulator this request's
+// dispatch writes response metadata into. Transports that may have to commit
+// the response header block before dispatch returns need it: without it they
+// can only read the metadata once the dispatch is over, by which point the
+// headers are already on the wire.
+func NewDispatchMetaContext(ctx context.Context) context.Context {
+	return pipeline.NewMetaContext(ctx)
+}
+
+// DispatchMetaFrom returns the accumulator seeded by NewDispatchMetaContext,
+// or nil when the context was never seeded.
+func DispatchMetaFrom(ctx context.Context) *DispatchMetaAccumulator {
+	return pipeline.MetaFromContext(ctx)
+}
 
 func (a *App) HandleChat(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string) (*CompletionResult, error) {
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeChat, Model: model, BodyReader: body})

@@ -19,6 +19,17 @@ Feature: AI Gateway — Budgets
   budget in breach blocks the request when its on_breach is "block", or lets it
   through with a warning header when its on_breach is "warn".
 
+  A budget that is close to its limit but not yet in breach warns without
+  blocking anything. The threshold is 80% of the limit, the same point at which
+  the dashboard banner and the CLI warning appear, so a customer never sees one
+  surface warn while another stays quiet. The warning rides on the response as
+  "X-LangWatch-Budget-Warning: <scope>:<pct>", one entry per budget over the
+  threshold, comma-separated when several apply. It is present on both
+  streaming and non-streaming responses, and on responses long enough that the
+  gateway has already started sending keep-alive bytes. Budgets that are only
+  approaching a hard cap warn too: the request still succeeds, and the header is
+  the only notice before the 402 starts.
+
   Spend is derived from traces. The gateway emits one OTel span per request
   carrying gen_ai.usage.* + langwatch.virtual_key_id + langwatch.gateway_request_id.
   The trace-processing pipeline enriches the span with cost (pricing catalog ×
@@ -78,8 +89,47 @@ Feature: AI Gateway — Budgets
     And 95.00 USD of spend has been attributed this month
     When a gateway request is processed
     Then the upstream provider is called
-    And the response includes header "X-LangWatch-Budget-Warning: project:95%"
+    And the response includes header "X-LangWatch-Budget-Warning: project:95"
     And the response body is the provider's response unchanged
+
+  @integration
+  Scenario: Streaming responses carry the warning header too
+    Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "warn"
+    And 95.00 USD of spend has been attributed this month
+    When a gateway request is processed with streaming enabled
+    Then the response includes header "X-LangWatch-Budget-Warning: project:95"
+    And the stream is the provider's stream unchanged
+
+  @integration
+  Scenario: A hard cap warns on approach before it starts rejecting
+    Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "block"
+    And 85.86 USD of spend has been attributed this month
+    When a gateway request is processed
+    Then the upstream provider is called
+    And the response includes header "X-LangWatch-Budget-Warning: project:85"
+
+  @integration
+  Scenario: No warning header well under the limit
+    Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "block"
+    And 40.00 USD of spend has been attributed this month
+    When a gateway request is processed
+    Then the response carries no budget warning header
+
+  @integration
+  Scenario: A long-running completion still reports the warning
+    Given project "gateway-demo" has a monthly budget with limit $100 and on_breach "warn"
+    And 95.00 USD of spend has been attributed this month
+    When a gateway request takes long enough for the gateway to send keep-alive bytes
+    Then the response includes header "X-LangWatch-Budget-Warning: project:95"
+    And the gateway request id header is present as well
+
+  @integration
+  Scenario: Every applicable budget over the threshold is named
+    Given the organization is at 84% of its monthly limit with on_breach "block"
+    And the project is at 20% of its daily limit with on_breach "block"
+    And virtual key "prod-key" is at 99% of its daily limit with on_breach "warn"
+    When a gateway request is processed
+    Then the response includes header "X-LangWatch-Budget-Warning: organization:84,virtual_key:99"
 
   @integration
   Scenario: Most restrictive budget wins when multiple apply

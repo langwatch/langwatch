@@ -1,5 +1,7 @@
 package domain
 
+import "strconv"
+
 // BudgetVerdict is the outcome of a budget precheck.
 type BudgetVerdict int
 
@@ -8,6 +10,30 @@ const (
 	BudgetWarn
 	BudgetBlock
 )
+
+// BudgetWarning names one budget scope that is close enough to its limit for
+// the caller to be told about it while the request still goes through.
+type BudgetWarning struct {
+	// Scope is the budget's scope kind: org, team, project, virtual_key, principal.
+	Scope string
+	// PctUsed is the share of the limit already spent, truncated to a whole
+	// percent.
+	PctUsed int
+}
+
+// String renders the warning in the wire shape the X-LangWatch-Budget-Warning
+// header carries: "<scope>:<pct>", e.g. "project:95".
+func (w BudgetWarning) String() string {
+	return w.Scope + ":" + strconv.Itoa(w.PctUsed)
+}
+
+// BudgetDecision is the outcome of a budget precheck: whether the request may
+// proceed, plus the scopes worth warning the caller about. Warnings are only
+// meaningful when the verdict is BudgetWarn.
+type BudgetDecision struct {
+	Verdict  BudgetVerdict
+	Warnings []BudgetWarning
+}
 
 // GuardrailAction is the guardrail decision.
 type GuardrailAction int

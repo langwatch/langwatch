@@ -26,6 +26,7 @@ import {
   isExperimentsActivePath,
   isOnlineEvaluationsActivePath,
 } from "./sidebar/navigationActiveState";
+import { projectScopedDestination } from "./sidebar/projectScopedNav";
 import { SidebarSection } from "./sidebar/SidebarSection";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
@@ -174,12 +175,11 @@ export const MainMenu = React.memo(function MainMenu({
                   {
                     icon: featureIcons.scenarios.icon,
                     label: projectRoutes.scenarios.title,
-                    href: project
-                      ? projectRoutes.scenarios.path.replace(
-                          "[project]",
-                          project.slug,
-                        )
-                      : "/auth/signin",
+                    ...projectScopedDestination({
+                      path: projectRoutes.scenarios.path,
+                      label: projectRoutes.scenarios.title,
+                      project,
+                    }),
                     isActive: router.pathname.includes(
                       "/simulations/scenarios",
                     ),
@@ -187,12 +187,11 @@ export const MainMenu = React.memo(function MainMenu({
                   {
                     icon: featureIcons.simulation_runs.icon,
                     label: projectRoutes.simulation_runs.title,
-                    href: project
-                      ? projectRoutes.simulation_runs.path.replace(
-                          "[project]",
-                          project.slug,
-                        )
-                      : "/auth/signin",
+                    ...projectScopedDestination({
+                      path: projectRoutes.simulation_runs.path,
+                      label: projectRoutes.simulation_runs.title,
+                      project,
+                    }),
                     isActive:
                       router.pathname.includes("/simulations") &&
                       !router.pathname.includes("/simulations/scenarios"),
@@ -469,15 +468,14 @@ const PageMenuLink = ({
       : "?view=list"
     : "";
 
+  const destination = projectScopedDestination({ path, label, project });
+
   return (
     <SideMenuLink
       icon={icon}
       label={label}
-      href={
-        project
-          ? path.replace("[project]", project.slug) + viewModeQuery
-          : "/auth/signin"
-      }
+      href={destination.href && destination.href + viewModeQuery}
+      unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}
       showLabel={showLabel}
