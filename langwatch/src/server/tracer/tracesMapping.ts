@@ -12,9 +12,16 @@ import {
 import { getRAGChunks, getRAGInfo } from "./utils";
 
 // Define a Trace type that includes annotations for use within this file
-// This assumes the Annotation type comes from Prisma
+// This assumes the Annotation type comes from Prisma.
+//
+// `user` asks for only the field this file reads (`author` uses `user.name`).
+// Requiring the whole Prisma `User` forced every caller to fetch every user
+// column — email, lastLoginAt and the rest — just to satisfy the type, which
+// is how those columns ended up being shipped to the browser.
 type TraceWithAnnotations = BaseTrace & {
-  annotations?: (Annotation & { user?: User | null })[];
+  annotations?: (Annotation & {
+    user?: { name?: string | null } | null;
+  })[];
 };
 
 /**
