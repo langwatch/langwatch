@@ -1,3 +1,4 @@
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -61,10 +62,39 @@ export const onboardingRouter = createTRPCRouter({
           });
         }
 
+        // Governance-intent signups get their personal workspace here rather
+        // than waiting for the first CLI login. That is where their usage
+        // lands, so provisioning it now is what makes /me show something the
+        // moment onboarding finishes instead of an empty shell whose contents
+        // depend on a command the user has not run yet.
+        //
+        // Non-fatal by design, matching organization.acceptInvite: a failure
+        // here must not cost the user the organization they just created, and
+        // `user.personalContext` backfills lazily on the next session.
+        if (input.primaryIntent === "AGENT_GOVERNANCE") {
+          try {
+            const personalWorkspaceService = new PersonalWorkspaceService(
+              ctx.prisma,
+            );
+            await personalWorkspaceService.ensure({
+              userId: ctx.session.user.id,
+              organizationId: orgResult.organization.id,
+              displayName: ctx.session.user.name,
+              displayEmail: ctx.session.user.email,
+            });
+          } catch (error) {
+            captureException(toError(error), {
+              extra: {
+                origin: "onboarding.initializeOrganization",
+                organizationId: orgResult.organization.id,
+              },
+            });
+          }
+        }
+
         // Create project under the organization. Governance-intent signups
-        // skip it (ADR-038 v6): their users live on /me (personal workspaces
-        // are provisioned lazily at CLI login) and a project is only created
-        // when the org later flips to LLMOps in settings.
+        // skip it (ADR-038 v6): their users live on /me and a project is only
+        // created when the org later flips to LLMOps in settings.
         let projectSlug: string | null = null;
         if (input.primaryIntent !== "AGENT_GOVERNANCE") {
           const projectName = input.projectName ?? orgResult.team.name;

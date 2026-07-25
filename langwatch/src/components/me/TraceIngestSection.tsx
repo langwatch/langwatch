@@ -199,9 +199,8 @@ export function TraceIngestSection() {
           Trace Ingest
         </Heading>
         <Text color="fg.muted" fontSize="sm">
-          Connect your tools to flow traces into your personal workspace.
-          Templates pre-shape upstream spans into the LangWatch canonical
-          gen_ai.* form so cost, tokens, and model populate automatically.
+          Connect your tools so their traces land in your personal workspace,
+          with cost, tokens, and model filled in for you.
         </Text>
       </VStack>
 
