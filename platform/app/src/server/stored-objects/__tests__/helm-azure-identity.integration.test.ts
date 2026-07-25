@@ -14,6 +14,7 @@
  * Skips when helm is unavailable so CI without the binary is unaffected.
  */
 import { execFileSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -29,7 +30,36 @@ function hasHelm(): boolean {
   }
 }
 
-const describeHelm = hasHelm() ? describe : describe.skip;
+/**
+ * `helm template` refuses to render until every dependency in Chart.yaml is
+ * present under charts/. Three of ours are local file:// subcharts and one
+ * (prometheus) is remote; the built .tgz files are gitignored, so a developer
+ * checkout usually has them and a fresh CI runner does not — which made this
+ * suite fail on "missing in charts/ directory" long before reaching any
+ * assertion.
+ *
+ * Build them once if they're absent. If that can't be done (no network for the
+ * remote chart), skip the suite rather than reporting a chart bug that isn't
+ * one — the same honesty as the helm-not-installed guard above.
+ */
+function chartDepsReady(): boolean {
+  const builtDir = path.join(CHART_DIR, "charts");
+  if (fs.existsSync(builtDir) && fs.readdirSync(builtDir).some((f) => f.endsWith(".tgz"))) {
+    return true;
+  }
+  try {
+    execFileSync("helm", ["dependency", "build", CHART_DIR], {
+      stdio: "pipe",
+      timeout: 180_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const canRenderChart = hasHelm() && chartDepsReady();
+const describeHelm = canRenderChart ? describe : describe.skip;
 
 /** Renders the chart, returning stdout. Throws on a failed render. */
 function render(setArgs: string[]): string {
