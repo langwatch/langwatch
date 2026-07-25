@@ -69,6 +69,7 @@ function uriFor(bytes: Buffer): string {
 beforeAll(() => {
   if (!hasRealAzure) return;
   driver = new AzureBlobDriver({
+    mode: "sharedKey",
     accountName: ACCOUNT_NAME!,
     accountKey: ACCOUNT_KEY!,
     // Undefined for public Azure — the driver then derives the host-style

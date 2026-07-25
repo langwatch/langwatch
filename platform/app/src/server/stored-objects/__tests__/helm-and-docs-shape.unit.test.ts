@@ -293,6 +293,33 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
       // The explicit-toggle rationale must be documented, not just the vars.
       expect(example).toMatch(/EXPLICIT toggle|explicit toggle/);
     });
+
+    /** @scenario "Self-hosting docs describe the enterprise authentication path" */
+    it("documents every auth mode, the required role assignment, and the AKS-only limit", () => {
+      const doc = readRepoFile(
+        "docs/self-hosting/configuration/environment-variables.mdx",
+      );
+
+      expect(doc).toContain("AZURE_BLOB_AUTH_MODE");
+      for (const mode of [
+        "sharedKey",
+        "workloadIdentity",
+        "managedIdentity",
+        "azureCli",
+      ]) {
+        expect(doc).toContain(mode);
+      }
+
+      // The role that actually grants data access, and the trap of granting
+      // the control-plane role instead.
+      expect(doc).toContain("Storage Blob Data Contributor");
+      expect(doc).toMatch(/Contributor.*does \*not\* grant data access/);
+
+      // Shared-key config is unnecessary in token modes, and federated
+      // Kubernetes identity is AKS-only.
+      expect(doc).toMatch(/no fallback|There is no fallback/i);
+      expect(doc).toMatch(/AKS only|AKS\*\* only/i);
+    });
   });
 
   describe("when the self-hosting environment-variables doc is loaded", () => {

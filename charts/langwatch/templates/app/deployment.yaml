@@ -70,7 +70,13 @@ spec:
         prometheus.io/port: "{{ .Values.app.service.port }}"
         {{- end }}
     spec:
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       # The app does not call the Kubernetes API, so don't mount the SA token.
+      # Cloud workload identity is unaffected by this flag: the platform
+      # webhook injects its own projected token volume, which the chart
+      # deliberately does not hand-roll.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # The app runs the same shutdown budget as the workers, because it can be
       # the process hosting the worker stack (the `all` process role) and its

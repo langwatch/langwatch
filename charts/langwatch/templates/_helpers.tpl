@@ -275,12 +275,30 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountName is not configured" }}
     {{- end }}
 
-    {{- if .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
-      {{- if empty .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.key }}
-        {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
+    {{- $azureAuthMode := .Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey" }}
+    {{- if not (has $azureAuthMode (list "sharedKey" "workloadIdentity" "managedIdentity" "azureCli")) }}
+      {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.authMode is %q — must be one of sharedKey, workloadIdentity, managedIdentity, azureCli" $azureAuthMode) }}
+    {{- end }}
+    {{/* The account key is required by, and only by, sharedKey auth. Under an
+         identity mode it must be absent — a key that would be silently ignored
+         is worse than no key, because the operator believes it is in use. */}}
+    {{- if eq $azureAuthMode "sharedKey" }}
+      {{- if .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
+        {{- if empty .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.key }}
+          {{- $errors = append $errors "app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name is set but key is empty" }}
+        {{- end }}
+      {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
+        {{- $errors = append $errors "app.dataplane.provider is azureBlob with authMode sharedKey but providers.azureBlob.accountKey is not configured" }}
       {{- end }}
-    {{- else if empty .Values.app.dataplane.providers.azureBlob.accountKey.value }}
-      {{- $errors = append $errors "app.dataplane.provider is azureBlob but providers.azureBlob.accountKey is not configured" }}
+    {{- else }}
+      {{- if or .Values.app.dataplane.providers.azureBlob.accountKey.value .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
+        {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.authMode is %q but providers.azureBlob.accountKey is also configured — remove the key, it would be ignored" $azureAuthMode) }}
+      {{- end }}
+      {{- if eq $azureAuthMode "workloadIdentity" }}
+        {{- if not (include "langwatch.serviceAccountName" .) }}
+          {{- $errors = append $errors "azureBlob authMode workloadIdentity requires global.serviceAccount (create=true or name) so the Entra identity has a ServiceAccount to bind to" }}
+        {{- end }}
+      {{- end }}
     {{- end }}
 
     {{- if .Values.app.dataplane.providers.azureBlob.container.secretKeyRef.name }}
@@ -810,7 +828,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_NAME" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountName) }}
+- name: AZURE_BLOB_AUTH_MODE
+  value: {{ .Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey" | quote }}
+{{- if eq (.Values.app.dataplane.providers.azureBlob.authMode | default "sharedKey") "sharedKey" }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ACCOUNT_KEY" "fieldValues" .Values.app.dataplane.providers.azureBlob.accountKey) }}
+{{- end }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_CONTAINER" "fieldValues" .Values.app.dataplane.providers.azureBlob.container) }}
 {{- if or .Values.app.dataplane.providers.azureBlob.endpoint.value .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.azureBlob.endpoint) }}
@@ -1290,3 +1312,16 @@ here, once, by name, so both consuming templates agree.
 {{- end -}}
 {{- $granted -}}
 {{- end -}}
+
+{{/*
+ServiceAccount name for the first-party workloads (app, workers, cronjobs).
+Explicit name wins; otherwise the release name when we create one; otherwise
+empty, which callers treat as "omit serviceAccountName and use `default`".
+*/}}
+{{- define "langwatch.serviceAccountName" -}}
+{{- if .Values.global.serviceAccount.name -}}
+{{- .Values.global.serviceAccount.name -}}
+{{- else if .Values.global.serviceAccount.create -}}
+{{- .Release.Name -}}
+{{- end -}}
+{{- end }}

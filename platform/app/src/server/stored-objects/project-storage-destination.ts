@@ -37,6 +37,7 @@
  */
 import { env } from "~/env.mjs";
 import { getS3ConfigForProject } from "~/server/dataplane-s3";
+import { resolveAzureCredentials } from "./azure-credentials";
 
 export type ProjectStorageDestination =
   | { kind: "s3"; bucket: string }
@@ -52,53 +53,26 @@ export type ProjectStorageDestination =
 const DEFAULT_LOCAL_FS_ROOT = "/var/lib/langwatch/objects";
 
 /**
- * Thrown when `STORED_OBJECTS_BACKEND=azure` is set but one or more of the
- * three required Azure config vars is missing. Fails loud, naming exactly
- * which var(s) are missing — no silent fallback to S3 or the local
- * filesystem, which would risk writing a tenant's bytes to the wrong place
- * (or the ephemeral container layer) without the operator noticing.
- */
-export class AzureBackendMisconfiguredError extends Error {
-  readonly missingVariables: string[];
-
-  constructor(missingVariables: string[]) {
-    super(
-      `STORED_OBJECTS_BACKEND=azure requires ${missingVariables.join(", ")} to be set. ` +
-        "Refusing to silently fall back to S3 or the local filesystem.",
-    );
-    this.name = "AzureBackendMisconfiguredError";
-    this.missingVariables = missingVariables;
-  }
-}
-
-/**
  * Resolves the azure destination from env, or throws
- * `AzureBackendMisconfiguredError` naming every missing required var.
- * Called only once `env.STORED_OBJECTS_BACKEND === "azure"` has already
- * been checked by the caller.
+ * `AzureBackendMisconfiguredError` (from `azure-credentials.ts` — the one
+ * place that decides whether Azure config is complete, for every auth
+ * mode) naming every missing/contradictory var. Called only once
+ * `env.STORED_OBJECTS_BACKEND === "azure"` has already been checked by the
+ * caller.
  */
 function resolveAzureDestination(): ProjectStorageDestination {
-  // Trim before the emptiness check, matching the global-S3 branch below: a
-  // whitespace-only value (trivially produced by a YAML block scalar or a
-  // padded Kubernetes secret) would otherwise pass as "set" and mint URIs
-  // with a blank account or container.
-  const accountName = env.AZURE_BLOB_ACCOUNT_NAME?.trim();
-  const accountKey = env.AZURE_BLOB_ACCOUNT_KEY?.trim();
-  const container = env.AZURE_BLOB_CONTAINER?.trim();
-
-  const missingVariables: string[] = [];
-  if (!accountName) missingVariables.push("AZURE_BLOB_ACCOUNT_NAME");
-  if (!accountKey) missingVariables.push("AZURE_BLOB_ACCOUNT_KEY");
-  if (!container) missingVariables.push("AZURE_BLOB_CONTAINER");
-
-  if (missingVariables.length > 0) {
-    throw new AzureBackendMisconfiguredError(missingVariables);
-  }
+  const credentials = resolveAzureCredentials();
+  // resolveAzureCredentials() already validated AZURE_BLOB_CONTAINER is
+  // present (it's part of "is Azure usable at all", even though the
+  // container isn't part of AzureCredentials itself — a credential
+  // describes how to authenticate to the account, not which container a
+  // caller addresses within it).
+  const container = env.AZURE_BLOB_CONTAINER!.trim();
 
   return {
     kind: "azure",
-    accountName: accountName!,
-    container: container!,
+    accountName: credentials.accountName,
+    container,
   };
 }
 

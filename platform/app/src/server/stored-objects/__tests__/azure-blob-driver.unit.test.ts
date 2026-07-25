@@ -11,6 +11,19 @@
 import crypto from "node:crypto";
 import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Token-mode tests isolate the driver from real @azure/identity network
+// calls — token acquisition itself is covered by
+// azure-token-provider.unit.test.ts. Here we only assert the driver calls
+// the provider correctly and reacts to its result / to 401 / 403 responses.
+const getAzureBlobTokenMock = vi.fn();
+const invalidateAzureBlobTokenMock = vi.fn();
+vi.mock("../azure-token-provider", () => ({
+  getAzureBlobToken: (...args: unknown[]) => getAzureBlobTokenMock(...args),
+  invalidateAzureBlobToken: (...args: unknown[]) =>
+    invalidateAzureBlobTokenMock(...args),
+}));
+
 import { AzureBlobDriver } from "../azure-blob-driver";
 import { ObjectNotFoundError } from "../errors";
 
@@ -31,6 +44,8 @@ beforeEach(() => {
   originalFetch = globalThis.fetch;
   fetchSpy = vi.fn();
   globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch;
+  getAzureBlobTokenMock.mockReset();
+  invalidateAzureBlobTokenMock.mockReset();
 });
 
 afterEach(() => {
@@ -40,8 +55,18 @@ afterEach(() => {
 
 function newDriver() {
   return new AzureBlobDriver({
+    mode: "sharedKey",
     accountName: ACCOUNT_NAME,
     accountKey: ACCOUNT_KEY,
+  });
+}
+
+function newTokenModeDriver(
+  mode: "workloadIdentity" | "managedIdentity" | "azureCli" = "workloadIdentity",
+) {
+  return new AzureBlobDriver({
+    mode,
+    accountName: ACCOUNT_NAME,
   });
 }
 
@@ -355,6 +380,7 @@ describe("AzureBlobDriver", () => {
       vi.setSystemTime(new Date(KAT_TIMESTAMP));
 
       const driver = new AzureBlobDriver({
+        mode: "sharedKey",
         accountName: KAT_ACCOUNT_NAME,
         accountKey: KAT_ACCOUNT_KEY,
       });
@@ -406,6 +432,7 @@ describe("AzureBlobDriver", () => {
   describe("when an alternate endpoint is configured (e.g. Azurite emulator)", () => {
     it("uses the configured endpoint instead of the public-cloud hostname", async () => {
       const driver = new AzureBlobDriver({
+        mode: "sharedKey",
         accountName: ACCOUNT_NAME,
         accountKey: ACCOUNT_KEY,
         endpointBaseUrl: "http://127.0.0.1:10000/devstoreaccount1",
@@ -444,6 +471,7 @@ describe("AzureBlobDriver", () => {
       vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
 
       const driver = new AzureBlobDriver({
+        mode: "sharedKey",
         accountName: PATH_STYLE_ACCOUNT,
         accountKey: ACCOUNT_KEY,
         endpointBaseUrl: PATH_STYLE_ENDPOINT,
@@ -493,6 +521,7 @@ describe("AzureBlobDriver", () => {
       vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
 
       const driver = new AzureBlobDriver({
+        mode: "sharedKey",
         accountName: PATH_STYLE_ACCOUNT,
         accountKey: ACCOUNT_KEY,
         endpointBaseUrl: PATH_STYLE_ENDPOINT,
@@ -532,6 +561,197 @@ describe("AzureBlobDriver", () => {
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).not.toBe(
         `SharedKey ${PATH_STYLE_ACCOUNT}:${wrongSignature}`,
+      );
+    });
+  });
+
+  describe("given a token-based auth mode with a valid access token", () => {
+    beforeEach(() => {
+      getAzureBlobTokenMock.mockResolvedValue("bearer-token-value");
+    });
+
+    /** @scenario "Every Azure Blob operation carries a bearer token in a token-based mode" */
+    it.each([
+      ["get" as const, () => driverGet(), 200],
+      ["put" as const, () => driverPut(), 201],
+      ["delete" as const, () => driverDelete(), 202],
+      ["exists" as const, () => driverExists(), 200],
+      ["head" as const, () => driverHead(), 200],
+      ["ensureContainer" as const, () => driverEnsureContainer(), 201],
+    ])("%s carries a Bearer Authorization header, no SharedKey signature, and a supported storage API version", async (_op, run, status) => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(status === 200 ? "body" : "", {
+          status,
+          headers: status === 200 ? { "content-length": "4" } : undefined,
+        }),
+      );
+
+      await run();
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const [, init] = fetchSpy.mock.calls[0]!;
+      const headers = init.headers as Record<string, string>;
+      expect(headers.Authorization).toBe("Bearer bearer-token-value");
+      expect(headers.Authorization).not.toMatch(/^SharedKey/);
+      expect(headers["x-ms-version"]).toBe("2021-12-02");
+    });
+
+    function driverGet() {
+      return newTokenModeDriver().get(URI);
+    }
+    function driverPut() {
+      return newTokenModeDriver().put(URI, Buffer.from("x"), "application/octet-stream");
+    }
+    function driverDelete() {
+      return newTokenModeDriver().delete(URI);
+    }
+    function driverExists() {
+      return newTokenModeDriver().exists(URI);
+    }
+    function driverHead() {
+      return newTokenModeDriver().head(URI);
+    }
+    function driverEnsureContainer() {
+      return newTokenModeDriver().ensureContainer(CONTAINER);
+    }
+  });
+
+  describe("given a token-based auth mode signing the same operation against different endpoint addressing styles", () => {
+    /** @scenario "Bearer authorization is identical regardless of endpoint addressing style" */
+    it("produces the same Authorization header for a host-style and a path-style endpoint, neither carrying a SharedKey signature", async () => {
+      getAzureBlobTokenMock.mockResolvedValue("same-bearer-token");
+
+      const hostStyleDriver = new AzureBlobDriver({
+        mode: "workloadIdentity",
+        accountName: ACCOUNT_NAME,
+      });
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+      await hostStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
+      const hostHeaders = fetchSpy.mock.calls[0]![1].headers as Record<string, string>;
+
+      const pathStyleDriver = new AzureBlobDriver({
+        mode: "workloadIdentity",
+        accountName: ACCOUNT_NAME,
+        endpointBaseUrl: "http://127.0.0.1:10000/devstoreaccount1",
+      });
+      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+      await pathStyleDriver.put(URI, Buffer.from("x"), "application/octet-stream");
+      const pathHeaders = fetchSpy.mock.calls[1]![1].headers as Record<string, string>;
+
+      expect(hostHeaders.Authorization).toBe("Bearer same-bearer-token");
+      expect(pathHeaders.Authorization).toBe("Bearer same-bearer-token");
+      expect(hostHeaders.Authorization).not.toMatch(/^SharedKey/);
+      expect(pathHeaders.Authorization).not.toMatch(/^SharedKey/);
+    });
+  });
+
+  describe("given a storage request is rejected as unauthenticated (401) despite a cached token", () => {
+    /** @scenario "An expired-token rejection is retried exactly once with a fresh token" */
+    it("invalidates the cached token and retries the request exactly once", async () => {
+      getAzureBlobTokenMock
+        .mockResolvedValueOnce("expired-token")
+        .mockResolvedValueOnce("fresh-token");
+      fetchSpy
+        .mockResolvedValueOnce(new Response("", { status: 401 }))
+        .mockResolvedValueOnce(new Response("", { status: 200 }));
+
+      const exists = await newTokenModeDriver().exists(URI);
+
+      expect(exists).toBe(true);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(invalidateAzureBlobTokenMock).toHaveBeenCalledOnce();
+      const [, retryInit] = fetchSpy.mock.calls[1]!;
+      expect((retryInit.headers as Record<string, string>).Authorization).toBe(
+        "Bearer fresh-token",
+      );
+    });
+
+    it("propagates a second consecutive 401 rather than retrying again", async () => {
+      getAzureBlobTokenMock.mockResolvedValue("still-rejected-token");
+      fetchSpy
+        .mockResolvedValueOnce(new Response("nope", { status: 401 }))
+        .mockResolvedValueOnce(new Response("nope again", { status: 401 }));
+
+      await expect(newTokenModeDriver().get(URI)).rejects.toThrow(/401/);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(invalidateAzureBlobTokenMock).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a storage request is rejected because the identity lacks data permissions (403)", () => {
+    /** @scenario "A permission rejection is not retried and names the missing role assignment" */
+    it("does not acquire a new token or retry, and names the required role assignment and scope", async () => {
+      getAzureBlobTokenMock.mockResolvedValue("token-without-permission");
+      fetchSpy.mockResolvedValueOnce(new Response("Forbidden", { status: 403 }));
+
+      let message = "";
+      try {
+        await newTokenModeDriver().get(URI);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+
+      expect(message).toMatch(/Storage Blob Data Contributor/);
+      expect(message).toMatch(new RegExp(CONTAINER));
+      // Exactly one fetch — no retry attempted for a 403.
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(invalidateAzureBlobTokenMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("secret hygiene — any Azure Blob operation failing in any auth mode", () => {
+    /** @scenario "Authorization material never reaches logs, errors, or traces" */
+    it("never includes the bearer token value in a thrown error message", async () => {
+      getAzureBlobTokenMock.mockResolvedValue("super-secret-bearer-token");
+      fetchSpy.mockResolvedValueOnce(
+        new Response("denied", { status: 500, statusText: "Internal Server Error" }),
+      );
+
+      let message = "";
+      try {
+        await newTokenModeDriver().get(URI);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message.length).toBeGreaterThan(0);
+      expect(message).not.toMatch(/super-secret-bearer-token/);
+    });
+
+    /** @scenario "Authorization material never reaches logs, errors, or traces" */
+    it("never includes the SharedKey account key or signature value in a thrown error message", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response("denied", { status: 500, statusText: "Internal Server Error" }),
+      );
+
+      let message = "";
+      try {
+        await newDriver().get(URI);
+      } catch (error) {
+        message = (error as Error).message;
+      }
+      expect(message).not.toContain(ACCOUNT_KEY);
+      expect(message).not.toMatch(/SharedKey/);
+    });
+
+    /** @scenario "Authorization material never reaches logs, errors, or traces" */
+    it("redacts storage URIs embedded in a failing response body via redactStorageUrisInText", async () => {
+      fetchSpy.mockResolvedValueOnce(
+        new Response(`blocked by policy for azure-blob://${ACCOUNT_NAME}/${CONTAINER}/${BLOB_PATH}`, {
+          status: 500,
+          statusText: "Internal Server Error",
+        }),
+      );
+
+      let message = "";
+      try {
+        await newDriver().put(URI, Buffer.from("x"), "application/octet-stream");
+      } catch (error) {
+        message = (error as Error).message;
+      }
+
+      expect(message).toMatch(/\*\*\*/);
+      expect(message).not.toMatch(
+        new RegExp(`azure-blob://${ACCOUNT_NAME}/${CONTAINER}`),
       );
     });
   });

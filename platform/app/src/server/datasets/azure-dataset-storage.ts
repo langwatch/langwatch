@@ -18,11 +18,11 @@
  */
 import type { Readable } from "node:stream";
 import { nanoid } from "nanoid";
-import { env } from "~/env.mjs";
+import { streamToBuffer, StreamTooLargeError } from "~/utils/streamToBuffer";
 import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
+import { resolveAzureCredentials } from "~/server/stored-objects/azure-credentials";
 import { ObjectNotFoundError } from "~/server/stored-objects/errors";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { StreamTooLargeError, streamToBuffer } from "~/utils/streamToBuffer";
 import {
   assertKeyWithinProject,
   assertNoTraversal,
@@ -87,16 +87,13 @@ export class AzureDatasetStorage implements DatasetStorage {
       );
     }
     // Invariant: a kind === "azure" destination is only ever returned after
-    // resolveProjectStorageDestination validated ACCOUNT_NAME / ACCOUNT_KEY /
-    // CONTAINER (AzureBackendMisconfiguredError names any missing var).
-    // Re-validating here would be a second source of truth that drifts.
-    const driver = new AzureBlobDriver({
-      accountName: destination.accountName,
-      // Trimmed to match resolveAzureDestination: a padded Kubernetes secret
-      // would otherwise base64-decode to the wrong key and fail every request.
-      accountKey: env.AZURE_BLOB_ACCOUNT_KEY!.trim(),
-      endpointBaseUrl: env.AZURE_BLOB_ENDPOINT,
-    });
+    // resolveProjectStorageDestination (via resolveAzureCredentials, the
+    // single source of truth for every auth mode) validated the required
+    // vars for whichever mode is active — AzureBackendMisconfiguredError
+    // names any missing/contradictory one. Re-resolving here rather than
+    // reading AZURE_BLOB_ACCOUNT_KEY directly is what keeps this working in
+    // a token-based mode, where there is no account key to read.
+    const driver = new AzureBlobDriver(resolveAzureCredentials());
     return {
       driver,
       accountName: destination.accountName,

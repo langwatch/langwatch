@@ -52,6 +52,9 @@ spec:
         spec:
           # The cron pod only curls the app over HTTP; it never calls the
           # Kubernetes API, so don't mount the SA token.
+          {{- with (include "langwatch.serviceAccountName" $root) }}
+          serviceAccountName: {{ . }}
+          {{- end }}
           automountServiceAccountToken: {{ $root.Values.global.automountServiceAccountToken }}
           # Pod security context
           securityContext:

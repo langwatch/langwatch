@@ -53751,12 +53751,40 @@ Precedence, evaluated in this order: a per-project BYOC S3 bucket (if configured
 |----------|-------------|---------|
 | `STORED_OBJECTS_BACKEND` | Explicit write-destination toggle: `azure`, or `s3` (the default when unset). `s3` selects nothing by itself — S3 is still chosen by `S3_BUCKET_NAME`, so the value only exists to say "not azure" | — |
 | `AZURE_BLOB_ACCOUNT_NAME` | Azure Storage account name | — |
-| `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key (SharedKey auth) | — |
+| `AZURE_BLOB_ACCOUNT_KEY` | Azure Storage account key. Required by — and only by — `AZURE_BLOB_AUTH_MODE=sharedKey` | — |
+| `AZURE_BLOB_AUTH_MODE` | How to authenticate: `sharedKey`, `workloadIdentity`, `managedIdentity`, or `azureCli` | `sharedKey` |
+| `AZURE_BLOB_AUTHORITY_HOST` | Entra authority host. Required for sovereign clouds | Public cloud |
+| `AZURE_BLOB_TOKEN_AUDIENCE` | Token audience override. Sovereign clouds only | `https://storage.azure.com` |
 | `AZURE_BLOB_CONTAINER` | Azure Blob container name | — |
 | `AZURE_BLOB_ENDPOINT` | Blob endpoint base URL. Optional on the Azure public cloud; required for sovereign clouds (`*.usgovcloudapi.net`, `*.chinacloudapi.cn`), private endpoints, and the Azurite emulator | `https://{accountName}.blob.core.windows.net` |
 
 <Warning>
-When `STORED_OBJECTS_BACKEND=azure` is set, all three of `AZURE_BLOB_ACCOUNT_NAME`, `AZURE_BLOB_ACCOUNT_KEY`, and `AZURE_BLOB_CONTAINER` are required together. An incomplete config fails loud when the destination is resolved, naming the missing variable — it never silently falls back to S3 or the local filesystem. During an S3→Azure migration, keep `S3_BUCKET_NAME` set: legacy S3 surfaces (persisted `s3://` objects, the trace spool, staged payloads) continue to read from and write to the S3 bucket, while new stored-objects and dataset writes target Azure. On an azure-only install (no `S3_BUCKET_NAME`), those legacy S3 surfaces are unavailable and fail with a clear error instead of writing to a bucket nobody reads. In the Helm chart, set `app.dataplane.legacyS3ReadBucket` to the pre-migration bucket (keeping the `awsS3` credential fields populated) to get exactly this state; leave it empty on a greenfield Azure install. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Authentication is SharedKey only; workload identity and per-project Azure BYOC are tracked separately (issues #6087, #6088).
+When `STORED_OBJECTS_BACKEND=azure` is set, all three of `AZURE_BLOB_ACCOUNT_NAME`, `AZURE_BLOB_ACCOUNT_KEY`, and `AZURE_BLOB_CONTAINER` are required together. An incomplete config fails loud when the destination is resolved, naming the missing variable — it never silently falls back to S3 or the local filesystem. During an S3→Azure migration, keep `S3_BUCKET_NAME` set: legacy S3 surfaces (persisted `s3://` objects, the trace spool, staged payloads) continue to read from and write to the S3 bucket, while new stored-objects and dataset writes target Azure. On an azure-only install (no `S3_BUCKET_NAME`), those legacy S3 surfaces are unavailable and fail with a clear error instead of writing to a bucket nobody reads. In the Helm chart, set `app.dataplane.legacyS3ReadBucket` to the pre-migration bucket (keeping the `awsS3` credential fields populated) to get exactly this state; leave it empty on a greenfield Azure install. Set `AZURE_BLOB_ENDPOINT` (chart: `app.dataplane.providers.azureBlob.endpoint`) for sovereign clouds or private endpoints; it defaults to `https://{accountName}.blob.core.windows.net`. Per-project Azure BYOC is tracked separately (issue #6088).
+
+### Authenticating without an account key
+
+`AZURE_BLOB_AUTH_MODE` selects how the app proves who it is. It defaults to `sharedKey`, so existing installs are unaffected.
+
+Many organisations set `allowSharedKeyAccess=false` on the storage account, frequently enforced through Azure Policy. On such an account the shared-key mode does not degrade — **every request is refused**. Use one of the identity modes instead:
+
+| Mode | Where it fits | Requires |
+| --- | --- | --- |
+| `sharedKey` | Anywhere account keys are permitted | `AZURE_BLOB_ACCOUNT_KEY` |
+| `workloadIdentity` | AKS. The enterprise path | A ServiceAccount annotated with the identity's client id, and the pod label `azure.workload.identity/use: "true"`. Both are chart values — see below |
+| `managedIdentity` | Azure VM, VMSS, App Service | The identity assigned to the machine |
+| `azureCli` | A developer laptop | Being signed in with `az login` |
+
+Whichever identity you use, grant it **Storage Blob Data Contributor** on the storage account or the specific container. The control-plane **Contributor** role does *not* grant data access — this is the single most common setup mistake, and it surfaces as a permission error rather than a sign-in error.
+
+Three rules worth knowing before you configure it:
+
+- **There is no fallback.** If an identity mode is selected and the identity is missing or unauthorised, storage fails loudly and stays down until it is fixed. It never quietly reverts to an account key, because that would reverse your security decision at the moment you are least likely to notice.
+- **An account key alongside an identity mode is rejected.** A key that would be silently ignored is worse than no key, since you would believe it was in use.
+- **Bearer tokens require HTTPS.** A plaintext `AZURE_BLOB_ENDPOINT` is refused before any token is sent.
+
+In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have nothing to bind to. Federated Kubernetes identity is supported on **AKS only** — the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
+
+The same identity must be available to any out-of-band job that writes bytes, such as the dataset backfill task; run it with the same ServiceAccount as the app and workers.
 </Warning>
 
 ## Email
@@ -53883,7 +53911,9 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.dataplane.enabled` | `USE_S3_STORAGE` (provider: `awsS3`) or `STORED_OBJECTS_BACKEND=azure` (provider: `azureBlob`) |
 | `app.dataplane.bucket` | `S3_BUCKET_NAME` |
 | `app.dataplane.providers.azureBlob.accountName.value` | `AZURE_BLOB_ACCOUNT_NAME` |
-| `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` |
+| `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` (sharedKey mode only) |
+| `app.dataplane.providers.azureBlob.authMode` | `AZURE_BLOB_AUTH_MODE` |
+| `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
 | `app.dataplane.legacyS3ReadBucket` | `S3_BUCKET_NAME` — set during an S3→Azure migration so pre-migration objects stay readable; leave empty on a greenfield Azure install |

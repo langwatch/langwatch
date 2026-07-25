@@ -69,6 +69,9 @@ spec:
         {{- end }}
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       # SIGTERM starts a real drain here, unlike a stateless web pod: the
       # GroupQueue stops dispatching and waits for in-flight jobs to finish
