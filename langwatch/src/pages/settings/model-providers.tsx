@@ -55,7 +55,8 @@ export default function ModelsPage() {
   // Shared team the first project belongs to. Personal workspaces are
   // never a home for it, so they are skipped.
   const firstProjectTeamId =
-    organization?.teams?.find((aTeam) => !aTeam.isPersonal)?.id ?? team?.id;
+    organization?.teams?.find((aTeam) => !aTeam.isPersonal)?.id ??
+    (team?.isPersonal ? undefined : team?.id);
 
   // One reason string per blocked action, `undefined` when the action
   // works. Whatever is rendered inert carries its reason in a tooltip, so

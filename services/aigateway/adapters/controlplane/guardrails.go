@@ -69,8 +69,14 @@ type guardrailCheckRequest struct {
 
 // guardrailCheckContent carries the payload under the key the direction
 // implies, per contract 4.6.
+//
+// Tools and MCPs travel with the request direction. The control plane scores
+// them, so a data plane that dropped them would let a policy written to catch
+// a dangerous tool definition pass on the prose alone.
 type guardrailCheckContent struct {
 	Messages json.RawMessage `json:"messages,omitempty"`
+	Tools    json.RawMessage `json:"tools,omitempty"`
+	MCPs     json.RawMessage `json:"mcps,omitempty"`
 	Output   string          `json:"output,omitempty"`
 	Chunk    string          `json:"chunk,omitempty"`
 }
@@ -96,10 +102,19 @@ func contentFor(direction string, payload []byte) (guardrailCheckContent, error)
 	case "request":
 		var body struct {
 			Messages json.RawMessage `json:"messages"`
+			Tools    json.RawMessage `json:"tools"`
+			MCPs     json.RawMessage `json:"mcps"`
 		}
 		if err := json.Unmarshal(payload, &body); err == nil && len(body.Messages) > 0 {
-			return guardrailCheckContent{Messages: body.Messages}, nil
+			return guardrailCheckContent{
+				Messages: body.Messages,
+				Tools:    body.Tools,
+				MCPs:     body.MCPs,
+			}, nil
 		}
+		// The body is not the shape we know. Send it whole rather than
+		// nothing, so the guardrail still sees the request it is meant to
+		// judge.
 		return guardrailCheckContent{Messages: json.RawMessage(payload)}, nil
 	case "response":
 		return guardrailCheckContent{Output: assistantText(payload)}, nil

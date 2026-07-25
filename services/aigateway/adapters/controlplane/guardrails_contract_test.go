@@ -108,6 +108,35 @@ func TestContentForPacksEachDirectionUnderItsOwnKey(t *testing.T) {
 		}
 	})
 
+	// A guardrail written to catch a dangerous tool definition has to be able
+	// to see one. The control plane scores content.tools and content.mcps, so
+	// a data plane that forwarded only the prose would let such a policy pass
+	// on an empty string.
+	t.Run("request carries tools and mcps alongside the messages", func(t *testing.T) {
+		got := mustPack(t, "request", []byte(`{
+			"model":"gpt-5-mini",
+			"messages":[{"role":"user","content":"hi"}],
+			"tools":[{"type":"function","function":{"name":"rm_rf"}}],
+			"mcps":[{"server":"acme-internal"}]
+		}`))
+		if !strings.Contains(string(got.Messages), `"role":"user"`) {
+			t.Fatalf("messages = %s", got.Messages)
+		}
+		if !strings.Contains(string(got.Tools), "rm_rf") {
+			t.Fatalf("tools were dropped: %s", got.Tools)
+		}
+		if !strings.Contains(string(got.MCPs), "acme-internal") {
+			t.Fatalf("mcps were dropped: %s", got.MCPs)
+		}
+	})
+
+	t.Run("request omits tools and mcps when the caller sent none", func(t *testing.T) {
+		got := mustPack(t, "request", []byte(`{"messages":[{"role":"user","content":"hi"}]}`))
+		if len(got.Tools) != 0 || len(got.MCPs) != 0 {
+			t.Fatalf("empty tools/mcps must stay absent from the wire: %+v", got)
+		}
+	})
+
 	t.Run("response extracts the assistant text", func(t *testing.T) {
 		got := mustPack(t, "response", []byte(`{"choices":[{"message":{"content":"the answer"}}]}`))
 		if got.Output != "the answer" {
