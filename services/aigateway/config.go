@@ -21,6 +21,7 @@ type Config struct {
 	Log                           clog.Config               `env:"LOG"`
 	ControlPlane                  ControlPlaneConfig        `env:"LW_GATEWAY"`
 	AuthCache                     AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
+	Circuit                       CircuitConfig             `env:"LW_GATEWAY_CIRCUIT"`
 	CustomerTraceBridge           CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
 	LangyMirror                   LangyMirrorConfig         `env:"LANGY_MIRROR"`
 	OTel                          config.OTel               `env:"OTEL"`
@@ -68,6 +69,21 @@ type AuthCacheConfig struct {
 	ConfigTTL time.Duration `env:"CONFIG_TTL"`
 }
 
+// CircuitConfig tunes the per-credential circuit breaker that preempts
+// dispatch to a provider which has been failing, so a known-down
+// credential costs one probe per cooldown instead of a dead round-trip on
+// every request. Plain seconds rather than Go duration strings, because
+// config.Hydrate parses time.Duration fields as raw nanosecond integers.
+type CircuitConfig struct {
+	// WindowS is the failure-counting window. 0 uses the breaker default.
+	WindowS int64 `env:"WINDOW_S"`
+	// Threshold is how many failures inside the window open the circuit.
+	Threshold int `env:"THRESHOLD"`
+	// CooldownS is how long the circuit stays open before a single probe
+	// is let through.
+	CooldownS int64 `env:"COOLDOWN_S"`
+}
+
 // CustomerTraceBridgeConfig holds customer trace bridge settings.
 type CustomerTraceBridgeConfig struct {
 	// BaseURL is where the customer trace bridge exports spans.
@@ -97,6 +113,11 @@ func defaultConfig() Config {
 			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
 		},
 		NonStreamingHeartbeatIntervalSeconds: int64(config.DefaultNonStreamingHeartbeatInterval / time.Second),
+		Circuit: CircuitConfig{
+			WindowS:   30,
+			Threshold: 10,
+			CooldownS: 60,
+		},
 		ControlPlane: ControlPlaneConfig{
 			BaseURL: "http://localhost:5560",
 		},

@@ -30,6 +30,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		App:                   application,
 		Logger:                deps.Logger,
 		Health:                deps.Health,
+		Metrics:               deps.Metrics,
 		Version:               info.Version,
 		TraceRegistry:         deps.TraceRegistry,
 		DefaultExportEndpoint: cfg.CustomerTraceBridge.BaseURL + "/api/otel",

@@ -154,15 +154,17 @@ admin:
   existingAuthSecretName: ""
   authSecretKey: token
 
-# Rate limit live-check tier (contract §4.4). VK-level rate limits
-# (rpm/rpd) are always enforced locally; these knobs gate the live
-# /budget/check reconciliation call that only fires when a cached
-# scope is within `liveThresholdPct` of its hard limit.
+# Budget enforcement. VK-level rate limits (rpm/rpd) and the budget
+# precheck are both enforced locally against the cached bundle snapshot;
+# there is no control-plane call on the hot path. The gateway does not
+# send debits: cost rides the OTel span and the control plane's
+# trace-fold reactor writes the ClickHouse ledger, which flows back into
+# the snapshot on the next /changes refresh. Watch
+# `gateway_budget_blocks_total{scope}` to confirm a hard cap is firing.
 budget:
-  outboxFlushInterval: 2s
-  outboxMaxRetries: 10
-  liveThresholdPct: "0.9"  # 90%
-  liveTimeout: 200ms
+  # Fraction of the hard limit at which a `warn`-mode scope starts
+  # reporting a warn verdict.
+  warnThresholdPct: "0.9"  # 90%
 
 guardrails:
   preTimeout: 800ms
