@@ -38,6 +38,36 @@ export const guardrailAttachmentSchema = z.object({
 });
 export type GuardrailAttachment = z.infer<typeof guardrailAttachmentSchema>;
 
+/**
+ * VK tags ride every single gateway request: the data plane stamps them on
+ * each customer span as `langwatch.labels`, the trace pipeline unions that
+ * into the trace's `metadata.labels`, and the Trace Explorer's Label facet
+ * aggregates every distinct value with `arrayJoin`. Tags are therefore a
+ * cardinality surface, not free-form storage, and the tag list arrives from
+ * an unvalidated REST body just as easily as from the drawer.
+ *
+ * The bounds are applied as a parse-time normalisation rather than a
+ * rejection so that reading a virtual key never throws: `parseVirtualKeyConfig`
+ * runs on the config-fetch path the gateway depends on, and a row that
+ * predates the bound must still resolve to a servable bundle.
+ */
+export const VK_TAGS_MAX_COUNT = 32;
+export const VK_TAG_MAX_LENGTH = 128;
+
+export function normalizeVkTags(tags: readonly string[]): string[] {
+  const normalized = new Set<string>();
+  for (const raw of tags) {
+    if (typeof raw !== "string") continue;
+    // Slice by code point so truncation can never split a surrogate pair
+    // into lone halves, which serialise as invalid UTF-8 downstream.
+    const tag = [...raw.trim()].slice(0, VK_TAG_MAX_LENGTH).join("").trim();
+    if (tag === "") continue;
+    normalized.add(tag);
+    if (normalized.size === VK_TAGS_MAX_COUNT) break;
+  }
+  return [...normalized];
+}
+
 export const virtualKeyConfigSchema = z.object({
   modelsAllowed: z.array(z.string()).nullable().default(null),
   cache: z
@@ -70,7 +100,7 @@ export const virtualKeyConfigSchema = z.object({
   metadata: z
     .object({
       label: z.string().optional(),
-      tags: z.array(z.string()).default([]),
+      tags: z.array(z.string()).default([]).transform(normalizeVkTags),
     })
     .default({ tags: [] }),
 });

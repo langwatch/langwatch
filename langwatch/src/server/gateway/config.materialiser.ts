@@ -151,6 +151,10 @@ export type GatewayConfigPayload = {
    */
   langy_mirror_tier: LangyMirrorTier;
   metadata: Record<string, unknown>;
+  // The VK's operator-assigned tags, lifted from config.metadata.tags.
+  // The gateway stamps them on customer spans as langwatch.labels (Trace
+  // Explorer "Label" filter) and matches cache-rule vk_tags against them.
+  vk_tags: string[];
 };
 
 export class GatewayConfigMaterialiser {
@@ -223,6 +227,7 @@ export class GatewayConfigMaterialiser {
       })),
       cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
+      vk_tags: config.metadata?.tags ?? [],
     };
   }
 
