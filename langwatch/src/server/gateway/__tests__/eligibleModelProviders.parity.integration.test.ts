@@ -53,12 +53,21 @@ const MP_MULTISCOPE_ID = `mp-elig-multiscope-${suffix}`;
  * Mirrors what `VirtualKeyCreateDrawer` hands the preview: the org-wide
  * provider list straight off the tRPC query, plus the org/team/project
  * graph the picker already has in memory.
+ *
+ * The plain annotation below is doing work. Assigning the service's return
+ * value straight into `OrgModelProvider[]` is what makes the compiler check
+ * that the two sides still agree on the shape, which is the whole point of
+ * this file: `isRoutable` reads `enabled` and `disabledAt`, and a drawer
+ * reading fields the service stopped sending is exactly the bug here. An
+ * `as unknown as` cast would satisfy the compiler while the two halves
+ * diverged, so this test would keep passing through the regression it exists
+ * to catch. If a future change makes this line fail to compile, fix the
+ * types rather than casting past them.
  */
 async function resolveAsTheDrawerWould() {
   const service = ModelProviderService.create(prisma);
-  const providers = (await service.listOrgModelProvidersForFrontend(
-    ORG_ID,
-  )) as unknown as OrgModelProvider[];
+  const providers: OrgModelProvider[] =
+    await service.listOrgModelProvidersForFrontend(ORG_ID);
   const hierarchy = buildScopeHierarchy(
     [
       { id: PROJECT_ID, teamId: TEAM_ID },
