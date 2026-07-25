@@ -77,7 +77,9 @@ async function createGuardrail({
     data: {
       id,
       projectId,
-      name: id,
+      // Deliberately not the id. policies_triggered must carry the stable id,
+      // and a fixture whose name equals its id cannot tell the two apart.
+      name: `Display name for ${id}`,
       evaluatorId,
       direction,
       failureMode,
