@@ -28360,12 +28360,43 @@ Where a sandboxed runtime comes from:
 
 | Cluster | What to do |
 |---------|------------|
-| GKE | Nothing: GKE Sandbox provides the `gvisor` RuntimeClass. Autopilot schedules the pod directly; on Standard, enable Sandbox on a node pool. |
+| GKE | Nothing on Autopilot: GKE Sandbox provides the `gvisor` RuntimeClass and schedules the pod directly. On Standard, enable Sandbox on a node pool. |
 | AKS | Use a Kata VM isolation pool and point `langyagent.runtimeClassName` at its RuntimeClass. Any sandboxed class works. |
-| EKS | No managed option. Install gVisor on the node group (custom AMI or DaemonSet), or accept running unsandboxed below. |
+| EKS | No managed option. Install gVisor on a node group ([below](#eks)), or accept running unsandboxed. |
 
-If your cluster cannot offer one, say so explicitly and the pod runs on the
-node's normal runtime:
+### EKS
+
+AWS offers no managed gVisor, so the RuntimeClass takes one platform step. The
+setup LangWatch runs its own hosted Langy on:
+
+1. **A dedicated, tainted node group** for the agent pod. Installing `runsc`
+   reconfigures and restarts containerd on the node, so isolating Langy onto
+   its own nodes keeps that restart, and gVisor's syscall-interception
+   overhead, away from the rest of the cluster. One `m8g.xlarge` handles
+   roughly 5 to 15 concurrent sessions. Label and taint it (for example
+   `workload=langy-gvisor`), and set the matching `nodeSelector` and
+   `tolerations` on `langyagent`.
+2. **A `gvisor-installer` DaemonSet**, nodeSelector-scoped to that node group
+   only, that downloads a pinned `runsc` and `containerd-shim-runsc-v1`
+   release (verify the published SHA-512 digests), registers the runtime in
+   the containerd config, and restarts containerd. Pin the release; do not
+   track `latest` for the binary that sandboxes a root, LLM-driven workload.
+3. **The RuntimeClass**:
+
+   ```yaml
+   apiVersion: node.k8s.io/v1
+   kind: RuntimeClass
+   metadata:
+     name: gvisor
+   handler: runsc
+   ```
+
+The first boot on a cold node takes a few minutes (node up, then the async
+runsc install, then the pod's sandbox creation retries until it lands); the
+pod reaches Ready on its own.
+
+If your cluster cannot offer a sandboxed runtime, say so explicitly and the
+pod runs on the node's normal runtime:
 
 ```yaml
 langyagent:
@@ -29116,6 +29147,8 @@ helm install langwatch ./langwatch \
 ```
 
 See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+
+Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks).
 </Tip>
 
 <Note>
