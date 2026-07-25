@@ -29,6 +29,7 @@
     "cookbooks/*.mdx",
     "use-cases/*.mdx",
     "user-events/*.mdx",
+    "langy/*.mdx",
     "self-hosting/*.mdx",
     "hybrid-setup/*.mdx",
     "api-reference/**/*.mdx",

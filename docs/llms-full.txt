@@ -25135,6 +25135,1131 @@ curl -X POST "https://app.langwatch.ai/api/track_event" \\
 
 ---
 
+# FILE: ./langy/chat.mdx
+
+---
+title: Ask Langy
+description: Ask Langy in plain language about your production traces and evals; it reads the data with the langwatch CLI, writes a Scenario test, and can open a pull request.
+sidebarTitle: Ask Langy
+keywords:
+  - ai agent debugging
+  - did my agent get worse
+  - ask ai about traces
+---
+
+Type the question into the Langy panel in plain language; there is no query syntax to learn. The sections below group example questions by what you are trying to find out, from a regression, to a cost spike, to a fix you want turned into a pull request.
+
+<Info>**Also check:** [Scenario tests and evals](/langy/scenario-tests-and-evals) (what Langy produces), [Pull requests](/langy/pull-requests) (how it changes code), [Insights across your traces](/langy/insights) (what it finds when you ask what changed).</Info>
+
+<Frame caption="The Langy panel, ready for a question, with suggested prompts and a 'Choose what Langy can see' context row on the composer.">
+  ![The Langy chat panel ready for a question](/images/langy/overview/chat-panel-empty.png)
+</Frame>
+
+## What you can ask
+
+Group your questions by intent. Each maps to the `langwatch` CLI commands Langy runs behind it.
+
+### Investigate a regression
+
+- "Did my agent get worse this week?"
+- "Find failing traces from the last 24 hours."
+- "Why is p50 latency 12s on the checkout agent?"
+
+Langy runs `langwatch trace search` and `langwatch analytics query` over the relevant origin, compares the window you named, and comes back with the traces and the metric that moved.
+
+### Investigate cost
+
+- "Where is my cost going?"
+- "What changed in my token spend after the last deploy?"
+- "Can I move this feature to a cheaper model without losing quality?"
+
+For a cheaper-model migration, Langy pulls the traces for that feature, then writes an [evaluation or a Scenario test](/langy/scenario-tests-and-evals) that measures the current behavior so the swap is proven, not guessed.
+
+### Set up testing and evals
+
+- "Set up an evaluator for answer correctness on the support agent."
+- "Write a Scenario test that probes this agent like an annoyed user."
+- "Compare two runs and tell me which prompt is better."
+
+Langy writes the test or evaluator with `langwatch scenario create`, `langwatch evaluator create`, or `langwatch experiment run`, and can run it for you. See [Scenario tests and evals](/langy/scenario-tests-and-evals).
+
+### Investigate an issue and open a PR
+
+- "Investigate this failing trace and open a PR with a fix."
+- "This agent ignores the system prompt under pressure; write a failing test and fix it."
+
+Langy reads the trace, writes a failing Scenario test that captures the problem, drafts a fix, and opens a [bot-authored pull request](/langy/pull-requests). A human reviews and merges; Langy never merges.
+
+## What happens when you ask
+
+<Steps>
+  <Step title="Langy reads your data">
+    It shells the `langwatch` CLI (`trace search`, `trace get`, `analytics query`, and more) to read the traces and evals for the question you asked. Traces are scoped by origin, so it excludes its own turns by default.
+  </Step>
+  <Step title="It may write a test or evaluation">
+    When a question needs a check, Langy writes a Scenario simulation test or an evaluation that captures the behavior. See [Scenario tests and evals](/langy/scenario-tests-and-evals).
+  </Step>
+  <Step title="It may open a pull request">
+    For a code change, Langy opens a bot-authored PR on the repo you installed the GitHub App on, and runs the Scenario tests it wrote in your CI. See [Pull requests](/langy/pull-requests).
+  </Step>
+</Steps>
+
+Each tool call streams into the turn as an activity card, so you see the CLI command it ran and its typed result, not a black box.
+
+<Frame caption="The Langy panel mid-turn, running real tool work. Each CLI call appears as an activity in the conversation.">
+  ![Langy running tool work](/images/langy/chat/chat-toolwork.png)
+</Frame>
+
+When Langy runs a Scenario simulation, the result appears as a run card in the chat with its outcome, duration, and cost.
+
+<Frame caption="A live simulation-run card inside chat: outcome SUCCESS with duration and cost, and a link to open the run in Simulations.">
+  ![Simulation run card in chat](/images/langy/chat/simulation-run-card.png)
+</Frame>
+
+## Ask about what you are looking at
+
+The panel stays docked while you move through the app, so you can open a trace and ask Langy about that trace. Paste the trace ID or add it through the context chip, and Langy reads the same spans you see in the waterfall.
+
+<Frame caption="A trace's span waterfall with Langy alongside, walking through what happened in that trace and why an evaluator errored.">
+  ![A trace drawer with its span waterfall and a Langy conversation about that trace](/images/langy/panel/drawer-companion.png)
+</Frame>
+
+## Choose what Langy can see
+
+Context is explicit. The `# Context` chip on the composer lets you choose what Langy can see, and the chips shown are exactly the context the model receives, nothing hidden.
+
+## Stop a turn
+
+You can stop a turn at any point. Stopping ends the turn for real: Langy stops the work in progress and keeps the partial output it already produced. Start a new turn to continue from there.
+
+---
+
+# FILE: ./langy/codex.mdx
+
+---
+title: Run Langy on Your Own OpenAI Plan (Codex)
+description: Sign in with your OpenAI account so Langy runs on your ChatGPT subscription through the LangWatch AI Gateway instead of per-token API billing.
+sidebarTitle: Codex
+keywords: codex, run codex on your own openai plan, openai subscription harness, langy codex
+---
+
+Codex signs in with OpenAI's device-code OAuth, the same flow the Codex CLI itself uses to authenticate. It is the one provider you connect by signing in rather than pasting an API key.
+
+<Frame caption="When Langy asks for a model, Codex leads the provider grid with a Recommended badge. Every other provider takes an API key; Codex takes a sign-in.">
+  ![The Langy panel's model setup, with Codex recommended at the top of the provider grid](/images/langy/codex/onboarding-recommended.png)
+</Frame>
+
+## Sign in with your OpenAI account
+
+<Steps>
+  <Step title="Open settings and add a provider">
+    In model-provider settings, choose **Add provider**, then pick **Codex (OpenAI account)** from the list.
+
+    <Frame caption="The Add Model Provider list. Codex (OpenAI account) is at the bottom.">
+      ![The Add Model Provider list with Codex at the bottom](/images/langy/codex/settings-add-provider.png)
+    </Frame>
+  </Step>
+  <Step title="Choose Codex and connect">
+    Codex replaces the usual API-key field with an OpenAI account sign-in. Pick the scope, then connect. Once connected, the drawer shows the account and confirms that usage counts against your OpenAI subscription, not API credits.
+
+    <Frame caption="The Codex provider drawer, connected to an OpenAI account. Usage counts against your OpenAI subscription, not API credits.">
+      ![The Codex provider drawer connected to an OpenAI account](/images/langy/codex/signin-drawer.png)
+    </Frame>
+  </Step>
+  <Step title="Approve the device code">
+    Open `auth.openai.com/codex/device`, enter the code shown, and approve. The approval lands on OpenAI's own Codex sign-in screen because Langy uses the same OAuth client the Codex CLI uses. Once approved, the connection completes on its own.
+
+    <Frame caption="The device-code step. Enter the code on OpenAI's device page while Langy waits for the approval.">
+      ![The Langy panel showing a device code and waiting for approval on OpenAI's device page](/images/langy/codex/device-code.png)
+    </Frame>
+  </Step>
+</Steps>
+
+After you connect, a dialog offers to set Codex as your coding default. Accepting applies Codex to the Langy and Fast roles. Your playground, evaluations, and workflows keep their current model.
+
+Once connected, the `gpt-5.6` models in the Langy model menu run through Codex and carry the Codex icon, distinct from the plain OpenAI mark.
+
+<Frame caption="The Langy model menu after connecting. The gpt-5.6 models carry the Codex icon; gpt-5.6-terra is the default.">
+  ![The Langy model menu with gpt-5.6 models carrying the Codex icon](/images/langy/models/model-menu-codex-icon.png)
+</Frame>
+
+## What Codex is scoped to
+
+Codex runs only through the LangWatch AI Gateway, on the gateway's Responses endpoint, riding the same per-project virtual key the rest of Langy uses. Tracing, rate limits, budgets, and model policy still apply, exactly as they do for any other model. See [Models and bring your own key](/langy/models).
+
+Codex is available only for Langy and the Fast tier, not for the playground, evaluations, or workflows. This scope follows OpenAI's terms, which the product states verbatim as licensing Codex for "coding-assistant harnesses and light AI assists, not general inference."
+
+<Note>
+Codex uses your OpenAI subscription via OAuth device sign-in. Every other provider, including Anthropic, is configured with an API key. See [Models and bring your own key](/langy/models).
+</Note>
+
+## Why teams run Langy on their own plan
+
+Langy reads production trace data and does heavy token work over many turns. Running it on your own OpenAI subscription keeps that token flow, and the account it bills, under your control:
+
+- **Cost.** A flat subscription instead of per-token API billing for Langy's usage.
+- **Data control.** The token flow stays on your own account. For what leaves your environment and where it goes, see [Data flow and privacy](/langy/security/data-flow-and-privacy).
+
+## Troubleshooting
+
+- **Session expired.** If the OAuth session dies, Langy shows a re-auth card. Sign in again through the same settings drawer.
+- **Plan limit reached.** If your plan hits its usage cap, Langy shows a switch-model card. Pick another model in the composer for the turn. See [Models and bring your own key](/langy/models).
+
+<Info>
+**Also check:** [Models and bring your own key](/langy/models), [Token usage and cost](/langy/token-usage-and-cost).
+</Info>
+
+## Reference
+
+- [Models and bring your own key](/langy/models)
+- [Token usage and cost](/langy/token-usage-and-cost)
+- [Data flow and privacy](/langy/security/data-flow-and-privacy)
+
+---
+
+# FILE: ./langy/getting-started.mdx
+
+---
+title: Getting started with Langy
+description: "Langy setup: enabling the agent, picking a model or signing in with Codex, and reviewing the first pull request it opens."
+sidebarTitle: Getting started
+keywords:
+  - langy getting started
+  - enable langy
+  - ai engineer setup
+---
+
+<Info>
+  **Also check:** [How Langy works](/langy/how-langy-works), [Models and Codex](/langy/models), [Pull requests](/langy/pull-requests)
+</Info>
+
+<Steps>
+  <Step title="Open the Langy panel">
+    - **On LangWatch Cloud:** Langy is available. Open the panel to get started.
+    - **On a self-hosted install:** the Helm chart deploys the Langy agent by default. If an admin disabled it, see [self-hosting](/self-hosting/langy/overview).
+  </Step>
+  <Step title="Pick a model or sign in with Codex">
+    Open the model picker in the composer. You bring your own model access, one of two ways:
+
+    - **Add a provider API key** for OpenAI, Anthropic, or another supported provider, then pick a model such as `gpt-5.6-terra` or `claude-opus-4-8`. See [Models](/langy/models).
+    - **Sign in with your OpenAI account** to run Langy on your ChatGPT subscription through Codex, using a device-code sign-in instead of pasting a key. See [Codex](/langy/codex).
+
+    Every model call, including Codex, goes through the LangWatch AI Gateway, so tracing, budgets, and policy apply the same way regardless of which you pick.
+
+    <Frame caption="The Langy panel on the LangWatch home in its model-setup state. Codex leads the provider grid with a Recommended badge.">
+      ![The LangWatch home with the Langy panel asking for a model, Codex recommended](/images/langy/fresh/langy-panel-model-setup.png)
+    </Frame>
+  </Step>
+  <Step title="Ask it something in the panel">
+    Type a question in plain language into the Langy panel. Langy reads the traces and evals your question points at, then works toward an answer or a change. As it runs, its tool calls stream into the conversation as activity cards, so you can see which traces it searched and which tests it ran.
+
+    <Frame caption="Langy mid-turn, streaming its tool work into the conversation as it reads traces and runs tests.">
+      ![The Langy chat panel mid-turn, doing tool work](/images/langy/chat/chat-toolwork.png)
+    </Frame>
+
+    For the kinds of questions Langy answers, see [Ask Langy](/langy/chat).
+  </Step>
+  <Step title="Review the pull request it opens">
+    When Langy changes code, it opens a pull request on the repo you installed the GitHub App on. The PR is authored by the LangWatch bot and credits you with a `Co-authored-by` trailer and a "Requested by @your-login via LangWatch" note. The Scenario tests Langy wrote run in your CI on that PR, so you can read the diff and see the checks before merging.
+
+    You review and merge. Langy never merges its own PR. See [Pull requests](/langy/pull-requests) for the full flow.
+  </Step>
+</Steps>
+
+<Note>
+  Langy can open pull requests only on repositories where the GitHub App is installed. If it reaches for `git` or `gh` on a repo the app is not installed on, it stops the turn and shows an install card in the chat.
+</Note>
+
+---
+
+# FILE: ./langy/how-langy-works.mdx
+
+---
+title: How Langy works
+description: "Each Langy conversation is one opencode worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
+sidebarTitle: How Langy works
+keywords:
+  - how langy works
+  - ai agent architecture
+  - opencode harness
+---
+
+Langy runs on [opencode](https://github.com/anomalyco/opencode) as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one opencode process per conversation and reaps it when the conversation goes idle.
+
+The worker does the actual reading, testing, and code editing. Every tool call it makes streams back into the chat as a typed activity, and every turn is a traced run in your project.
+
+<Info>
+  **Also check:** [Security and the sandbox](/langy/security/sandbox), [Self-hosting overview](/self-hosting/langy/overview)
+</Info>
+
+## The architecture
+
+```mermaid
+graph LR
+  browser["Browser<br/>(event-sourced chat UI)"]
+  control["LangWatch control plane<br/>(turn processor, event log)"]
+  manager["langyagent pod<br/>(Go manager)"]
+  worker["opencode worker<br/>(one per conversation, gVisor-sandboxed)"]
+  cli["langwatch CLI<br/>&rarr; LangWatch API"]
+  gateway["LangWatch AI Gateway<br/>(model calls)"]
+  github["GitHub App<br/>(bot-authored PRs)"]
+
+  browser <--> control
+  control <-->|"LANGY_INTERNAL_SECRET bearer<br/>ClusterIP only"| manager
+  manager --> worker
+  worker --> cli
+  worker --> gateway
+  worker --> github
+  worker -.->|"each turn is a traced run"| control
+```
+
+| Piece | What it does |
+|---|---|
+| Browser | The chat panel. Event-sourced: a refresh resumes the conversation, an in-flight turn keeps streaming. |
+| Control plane | The turn processor in the LangWatch app. Admits each turn, dispatches it to the agent, logs every tool call as a typed event. |
+| `langyagent` | The agent service. Spawns one opencode worker per conversation. Single replica; scale vertically. |
+| opencode worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
+
+The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/self-hosting/langy/overview).
+
+The worker has exactly three ways out:
+
+- **The `langwatch` CLI** for your LangWatch data: `trace search`, `analytics query`, `scenario create`, `experiment run`. No MCP server, no internal API.
+- **The LangWatch AI Gateway** for every model call, never a provider directly, so each call is traced, rate-limited, and policy-checked on your own keys or Codex. See [Models](/langy/models) and [Codex](/langy/codex).
+- **The GitHub App** for code changes, only as pull requests. See [Pull requests](/langy/pull-requests).
+
+## The session loop
+
+<Steps>
+  <Step title="You ask">
+    You send a turn in plain language. The control plane admits it and dispatches it to the manager, which spawns (or reuses a warm) worker for that conversation with the turn's credentials bound at spawn.
+  </Step>
+  <Step title="Langy reads the traces and evals">
+    The worker runs `langwatch` CLI commands to pull the traces, analytics, and evals your question points at. Each command streams back into the conversation as an activity card, so you see what it searched.
+  </Step>
+  <Step title="It writes a failing Scenario test or evaluation">
+    When the answer is a code change, Langy writes a Scenario multi-turn simulation or an evaluation that captures the problem, so the fix has something to prove against.
+  </Step>
+  <Step title="It drafts a fix and opens a pull request">
+    Langy clones the installed repo inside the worker, drafts the change, and opens a bot-authored pull request. The clone lives only in the worker's home and is wiped when the worker is reaped.
+  </Step>
+  <Step title="Your CI runs the tests it wrote">
+    The Scenario tests Langy wrote run in your CI on that PR. The PR card returns with the result, so the receipts are the diff plus the check status.
+  </Step>
+  <Step title="A human reviews and merges">
+    You read the PR and merge it. Langy never merges its own PR.
+  </Step>
+</Steps>
+
+<Note>
+  Every turn Langy takes re-enters LangWatch as its own traced, costed run in your project. You debug Langy with the same traces and evals you use to debug your own agents.
+</Note>
+
+For how the sandbox isolates each worker and exactly what it can and cannot reach on the network, see [Security and the sandbox](/langy/security/sandbox). For running this stack yourself, see the [self-hosting overview](/self-hosting/langy/overview).
+
+---
+
+# FILE: ./langy/insights.mdx
+
+---
+title: Insights across your traces
+description: Ask Langy what changed and it analyzes patterns across thousands of your traces, compares this week to previous weeks, and can set up alerts and automations for what matters.
+sidebarTitle: Insights
+keywords:
+  - ai agent monitoring
+  - ai anomaly detection
+  - did my agent get worse
+---
+
+This is the same kind of question as anything else you ask Langy, aimed at a wider read: instead of one trace, it looks across your project's history at once.
+
+<Info>**Also check:** [Ask Langy](/langy/chat) (the panel you ask from), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what an investigation can produce).</Info>
+
+## Ask what changed
+
+Point Langy at a window and it reads across your traces to find what moved, instead of making you page through them:
+
+- "Did my agent get worse this week?"
+- "What changed in my errors since the last deploy?"
+- "Where is my cost going, and how does it compare to last week?"
+- "Why is p50 latency 12s on the checkout agent?"
+
+Langy runs the `langwatch` CLI (`trace search`, `analytics query`, and more) over the origin you named, compares this week to previous weeks, and comes back with the cost, latency, or quality change that stands out and the traces behind it. From there you can ask it to [write a test](/langy/scenario-tests-and-evals) or [open a PR](/langy/pull-requests) on the same finding.
+
+## Ask it to watch for you
+
+When something is worth watching past a single question, ask Langy to set up an alert or an automation and it creates the monitor or trigger for you:
+
+- "Alert me if p95 latency on the checkout agent goes above 8s."
+- "Create a trigger that flags any trace where the answer-correctness eval fails."
+- "Watch my daily token spend and tell me if it jumps."
+
+Langy sets these up with `langwatch monitor create` and `langwatch trigger create`, so the alert or automation lives in your project like any other, not inside the chat. You change or remove it the same way you would one you made yourself.
+
+<Note>These are things you ask Langy to do, on the window and metric you name. Langy analyzes your traces and sets up monitors when you ask; it does not watch and act on its own.</Note>
+
+---
+
+# FILE: ./langy/models.mdx
+
+---
+title: Langy Models and Bring Your Own Key
+description: Choose the model Langy runs on and connect your own provider API keys through the LangWatch AI Gateway.
+sidebarTitle: Models
+keywords: langy model, bring your own llm key, ai gateway
+---
+
+Open the model menu in the Langy panel's composer to see what is running and switch it. The menu shows a short shortlist first and hides the rest of your project's enabled models behind **More models**.
+
+<Frame caption="The Langy model menu. A short shortlist at the top (the gpt-5.6 family and claude-opus-4-8), then More models expands the full grouped catalog from your project's enabled providers.">
+  ![Langy model picker](/images/langy/models/model-picker.png)
+</Frame>
+
+## The model menu
+
+The menu has two parts:
+
+- **Shortlist.** A small derived list, not a fixed roster. It leads with Langy's current default, then your current selection, then one representative each from the quick, balanced, and reasoning groups. Named families you will see include `gpt-5.6-terra` (default), `gpt-5.6-luna` (fast), `gpt-5.6-sol`, and `claude-opus-4-8`.
+- **More models.** Expands the full catalog over every provider you have enabled on the project, grouped by capability. Toggle it back with **Fewer models**. Type a search query to collapse the split and search the whole catalog at once.
+
+The groups are:
+
+| Group | What it holds |
+|---|---|
+| Quick | Small, fast models for cheap turns. |
+| Balanced | General-purpose models. |
+| Reasoning | Models with extended reasoning, including Codex `gpt-5.6` over the Responses API. |
+
+<Note>
+The exact number of models under **More models** depends on which providers you have enabled and which models each exposes. There is no fixed count.
+</Note>
+
+## Langy's model role
+
+LangWatch resolves models by role. Langy has its own role, separate from the others, so changing Langy's model does not change what your playground, evaluations, or workflows use.
+
+| Role | Used by |
+|---|---|
+| Default | The general default across the platform. |
+| Fast | Cheaper, quicker assists. |
+| Langy | The model Langy chats and works with. |
+| Embeddings | Vector embeddings. |
+
+Setting a model in the Langy composer sets the Langy role for the project.
+
+## Bring your own key
+
+Langy uses your own provider accounts. Add a provider API key once in the model-provider settings, and Langy (and the rest of the platform) can use that provider's models.
+
+Supported providers include OpenAI, Anthropic, Gemini, Azure, Bedrock, Vertex, and more (around 14 in total). Every provider except Codex is configured with an **API key**. Codex is configured by signing in with your OpenAI account instead. See [Run Langy on your own OpenAI plan](/langy/codex).
+
+Provider keys are stored **encrypted at rest**. They are decrypted only when a call needs them, and they are never returned over the API.
+
+## How Langy's model calls are routed
+
+Langy never calls a provider directly. Every Langy LLM call rides a per-project **virtual key** through the LangWatch AI Gateway. That means the same controls apply to Langy that apply to any other traffic on your project:
+
+- **Tracing.** Every call is traced, with tokens and cost, in your own LangWatch project.
+- **Rate limits.** Your gateway rate limits and budgets apply.
+- **Model policy.** The gateway enforces which models are allowed, server-side, as a second check on top of the picker.
+
+<Info>
+**Also check:** [Token usage and cost](/langy/token-usage-and-cost), [Data flow and privacy](/langy/security/data-flow-and-privacy).
+</Info>
+
+## Reference
+
+- [Run Langy on your own OpenAI plan (Codex)](/langy/codex)
+- [Token usage and cost](/langy/token-usage-and-cost)
+- [How Langy works](/langy/how-langy-works)
+
+---
+
+# FILE: ./langy/overview.mdx
+
+---
+title: Langy Overview
+description: Langy is the automated AI engineer inside LangWatch that reads your traces and evals, writes Scenario tests, and opens PRs for the CI to run the evals and validate improvements.
+sidebarTitle: Overview
+keywords:
+  - automated ai engineer
+  - ai engineer agent
+  - langy
+  - ai agent that opens PRs
+---
+
+<Frame caption="The Langy panel open on the LangWatch home. Ask it a question and it starts reading your traces.">
+  ![The Langy home with the chat panel open and suggested prompts](/images/langy/overview/chat-panel-empty.png)
+</Frame>
+
+Langy is a full coding-agent harness running in a sandbox, with access to everything you grant it in your LangWatch account, so it fully understands your agents, evals, and prompts. Being a coding agent, it connects to your GitHub, runs code, experiments with improvements, and contributes them back as pull requests.
+
+With a CI pipeline that reaches your other systems, Langy runs its evals against your real agent pipeline, however complex it is.
+
+Langy uses your own model accounts and API keys. Every turn it takes is itself a traced, costed run in your LangWatch project, so you watch Langy work with the same tools you use to watch your own agents.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Getting started" icon="play" href="/langy/getting-started">
+    Enable Langy, pick a model or sign in with Codex, and review the first pull request.
+  </Card>
+  <Card title="How Langy works" icon="diagram-project" href="/langy/how-langy-works">
+    The mechanism: a gVisor-sandboxed opencode worker whose only interface to LangWatch is the `langwatch` CLI.
+  </Card>
+  <Card title="Ask Langy" icon="comments" href="/langy/chat">
+    The chat panel and the kinds of questions Langy answers, from regressions to cost spikes.
+  </Card>
+  <Card title="Models and Codex" icon="microchip" href="/langy/models">
+    The model picker, bring your own API key, and signing in with your OpenAI account for Codex.
+  </Card>
+  <Card title="Security and the sandbox" icon="shield-halved" href="/langy/security/sandbox">
+    What the sandbox can and cannot reach, and where the boundaries sit.
+  </Card>
+  <Card title="Self-hosting Langy" icon="server" href="/self-hosting/langy/overview">
+    Ships enabled in the Helm chart, sandboxed with gVisor by default.
+  </Card>
+</CardGroup>
+
+---
+
+# FILE: ./langy/pull-requests.mdx
+
+---
+title: Pull requests
+description: "How Langy changes your code: bot-authored pull requests through a GitHub App, credited to you, reviewed by a human before merge, with the Scenario tests it wrote running in your CI."
+sidebarTitle: Pull requests
+keywords:
+  - ai agent pull request
+  - automated PRs
+  - ai code review
+---
+
+Langy changes code in exactly one way: it opens a pull request. It pushes only to the branch it creates for that PR, never to your default or existing branches, and it never merges its own PR.
+
+<Info>**Also check:** [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
+
+## How a Langy PR is made
+
+<Steps>
+  <Step title="Langy drafts the change">
+    After it [reads your traces and writes a failing test](/langy/chat), Langy drafts a fix on a branch.
+  </Step>
+  <Step title="It opens a bot-authored PR">
+    The GitHub App opens the pull request on the installed repo. The commits are authored by the bot; you are credited with a `Co-authored-by` trailer and a "Requested by @&lt;your-login&gt; via LangWatch" note on the PR.
+  </Step>
+  <Step title="Your CI runs the tests it wrote">
+    The Scenario simulation tests Langy wrote run in your CI on the PR, so the PR carries its own proof.
+  </Step>
+  <Step title="A human reviews and merges">
+    You review the PR like any other. Langy never merges; a person does.
+  </Step>
+</Steps>
+
+<Note>Langy contributes to your codebase exclusively through pull requests. Nothing touches your code without a human approving the merge.</Note>
+
+{/* TODO screenshot: a Langy-authored GitHub PR page showing the Co-authored-by / "Requested by @login" trailer and the in-chat card that produced it */}
+
+## The install is the access boundary
+
+Langy can only open PRs on repositories the GitHub App is installed on. The install is the boundary: there is no per-user OAuth and no stored personal token.
+
+If the app is not installed on a repo, Langy stops the turn the moment it reaches for `git` or `gh`. It shows an Install card in chat, then re-runs the turn once you install it.
+
+For the exact GitHub App permissions (Contents read/write, Pull requests read/write, Metadata read) and the token model, see [GitHub access](/langy/security/github-access).
+
+## Limits
+
+<Warning>Langy opens at most **20 pull requests per day**. This limit is fixed.</Warning>
+
+To register the GitHub App on a self-hosted install, see [GitHub App setup](/self-hosting/langy/github-app).
+
+---
+
+# FILE: ./langy/reference/limits.mdx
+
+---
+title: Langy Limits
+description: Reference table of Langy's operational limits, which are fixed in code, and which you configure through environment variables when self-hosting.
+sidebarTitle: Limits
+keywords: langy limits, langy rate limit, langy max workers, langy pull requests per day
+---
+
+The table lists each limit's current value; the **Kind** column marks which ones you can change. The sections below explain what happens when you hit each limit and, where possible, how to raise it.
+
+## Limits
+
+| Limit | Value | Kind | Set by |
+|---|---|---|---|
+| GitHub pull requests per day | 20 | Hardcoded | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var) |
+| Max concurrent workers | 20 (default) | Configurable | `LANGY_MAX_WORKERS` |
+| Idle worker reap | 10 minutes (600000 ms default) | Configurable | `LANGY_WORKER_IDLE_MS` |
+| Per-session LangWatch API key lifetime | Short-lived, auto-expiring | Fixed by design | Minted per chat, owned by the requesting user |
+| GitHub installation token lifetime | 1 hour | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
+
+## What each limit means
+
+### GitHub pull requests per day
+
+Langy opens at most 20 pull requests per project per day. The count is a code constant (`LANGY_GITHUB_PRS_PER_DAY = 20`), so it is the same on every install and you cannot raise it with an environment variable. When the cap is hit, Langy stops the turn before it opens another PR. See [Pull requests](/langy/pull-requests).
+
+### Max concurrent workers
+
+Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how many workers run at once; the default is 20. Past the cap the agent returns 503 rather than spawning another worker. Raise it by giving the agent pod more resources and increasing the value. See [Self-hosting overview](/self-hosting/langy/overview).
+
+### Idle worker reap
+
+A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so nothing sensitive stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
+
+### Per-session LangWatch API key
+
+Each chat mints its own LangWatch API key, owned by the requesting user, project-scoped, clamped to the intersection of the Langy permission set and that user's own permissions, and short-lived. It auto-expires; a worker exit revokes it early. A Langy tool call can never exceed what that user could do by hand. See [Data flow and privacy](/langy/security/data-flow-and-privacy).
+
+### GitHub installation token
+
+Langy mints a fresh 1-hour GitHub App installation token per turn, hands it to the worker as an environment variable only, and never stores it at rest. The token carries only `contents:write` and `pull_requests:write`, scoped to the installation's repositories. See [GitHub access](/langy/security/github-access).
+
+<Note>
+Only the max-workers cap and the idle-reap timeout are configurable. The 20-PRs-per-day cap is hardcoded, and the two token lifetimes are fixed (one by design, one by GitHub). For the full environment-variable reference, see [Environment variables](/self-hosting/langy/environment-variables).
+</Note>
+
+<Info>
+**Also check:** [Environment variables](/self-hosting/langy/environment-variables), [Pull requests](/langy/pull-requests), [Sandbox](/langy/security/sandbox).
+</Info>
+
+## Reference
+
+- [Environment variables](/self-hosting/langy/environment-variables)
+- [Supported models](/langy/reference/supported-models)
+- [Troubleshooting](/langy/reference/troubleshooting)
+
+---
+
+# FILE: ./langy/reference/supported-models.mdx
+
+---
+title: Langy Supported Models and Providers
+description: Reference table of the model providers Langy can use, how each is configured, and the model roles that pick which model runs where.
+sidebarTitle: Supported models
+keywords: langy supported models, langy providers, langy model roles, bring your own key
+---
+
+Langy runs on the model providers your project has enabled. Every provider except Codex is configured with an API key you paste in model-provider settings; Codex is configured by signing in with your OpenAI account over OAuth. Langy sends all model traffic through the LangWatch AI Gateway, so tracing, rate limits, budgets, and model policy apply to every call.
+
+## Providers
+
+| Provider | How you configure it | Notes |
+|---|---|---|
+| OpenAI | API key | `gpt-5.6` family and others. |
+| Anthropic | API key | `claude-opus-4-8` family and others. |
+| Codex | Sign in with your OpenAI account (OAuth device code) | The only provider you connect by signing in, not by pasting a key. Restricted to the Langy and Fast roles. See [Codex](/langy/codex). |
+| Gemini | API key | |
+| Azure OpenAI | API key | |
+| Amazon Bedrock | API key or credentials | |
+| Google Vertex | API key or credentials | |
+| DeepSeek | API key | |
+| xAI | API key | |
+| Cerebras | API key | |
+| Groq | API key | |
+| Voyage | API key | Embeddings. |
+| Custom (LiteLLM) | API key or endpoint | Any provider reachable through LiteLLM. |
+
+You add these in model-provider settings, the same drawer the rest of LangWatch uses. Keys are stored encrypted at rest. See [Models and bring your own key](/langy/models).
+
+## Model roles
+
+A role decides which configured model runs for a given kind of work. Langy uses four roles.
+
+| Role | What it drives |
+|---|---|
+| Default | The general-purpose model for standard work. |
+| Fast | Lighter, quicker assists. |
+| Langy | Langy's own chat and coding model. |
+| Embeddings | Vector embeddings. |
+
+## The model picker
+
+In the Langy composer the picker shows a short shortlist by default, then a **More models** disclosure with the rest of the models your enabled providers expose.
+
+- The shortlist is **derived, not fixed**. It starts with the Langy default, then your current selection, then one representative each of the quick, balanced, and reasoning capability groups. It is not a hardcoded list of names.
+- The **More models** count is **data-driven per project**. It is however many other models your enabled providers make available, so it differs between projects.
+
+Named model families you will see when the matching provider is enabled include `gpt-5.6-terra` (the default), `gpt-5.6-sol`, `gpt-5.6-luna` (fast), and `claude-opus-4-8`.
+
+<Note>
+Codex models appear in the picker only for the Langy and Fast roles. OpenAI's terms scope the Codex subscription path to coding-assistant harnesses and light AI assists, so Codex is offered for Langy and Fast but not for the playground, evaluations, or workflows. See [Codex](/langy/codex).
+</Note>
+
+## Bring your own key
+
+Every provider except Codex is bring-your-own-key: you paste your own API key and Langy runs on your account. There is no LangWatch-provided default key for Langy models. For who pays and how to see the spend, see [Token usage and cost](/langy/token-usage-and-cost).
+
+<Info>
+**Also check:** [Models and bring your own key](/langy/models), [Codex](/langy/codex), [Token usage and cost](/langy/token-usage-and-cost).
+</Info>
+
+## Reference
+
+- [Models and bring your own key](/langy/models)
+- [Codex](/langy/codex)
+- [Limits](/langy/reference/limits)
+
+---
+
+# FILE: ./langy/reference/troubleshooting.mdx
+
+---
+title: Langy Troubleshooting
+description: Common Langy problems and the exact check for each, from Langy not appearing in your org to a PR it cannot open, no configured model, and a stopped turn.
+sidebarTitle: Troubleshooting
+keywords: langy troubleshooting, langy not working, langy not available, langy cannot open pr
+---
+
+Each problem below lists the check that resolves it. Start with the one that matches the symptom.
+
+<AccordionGroup>
+  <Accordion title="Langy is not available in my org">
+    - **Cloud:** Langy is available. Open the panel to get started.
+    - **Self-hosted:** the agent pod deploys by default. Confirm it was not disabled (`langyagent.chartManaged=false`) and the pod is running. A running pod is not the whole story: with `enableForAllUsers: false` the install keeps the rollout flag authoritative, so Langy stays dark until you target the projects or organizations you want. See [Self-hosting overview](/self-hosting/langy/overview) and [Setup](/self-hosting/langy/setup#staged-rollout).
+  </Accordion>
+
+  <Accordion title="Langy can't open a PR">
+    Two common causes.
+
+    - **The GitHub App is not installed.** Langy opens pull requests only on repositories where its GitHub App is installed. When it reaches for `git` or `gh` and no install exists, it stops the turn and shows an Install card in chat. Use that card to install the app, then re-run the turn. See [GitHub access](/langy/security/github-access).
+    - **Outbound HTTPS is off (self-hosted).** A hardened install with `networkPolicy.allowExternalHttps` set to `false` blocks `github.com`, `api.github.com`, and `codeload.github.com`. Allow those FQDNs (or turn `allowExternalHttps` on) so the worker can push and open the PR. See [Networking and egress](/self-hosting/langy/networking-and-egress).
+    - Also check you are under the daily PR cap. Langy opens at most 20 pull requests per project per day. See [Limits](/langy/reference/limits).
+  </Accordion>
+
+  <Accordion title="Langy has no model">
+    Langy runs on the providers your project has enabled, and there is no default key. Configure a provider (paste an API key) or sign in with your OpenAI account for Codex. Until a model is available for the Langy role, Langy cannot run a turn. See [Supported models](/langy/reference/supported-models) and [Codex](/langy/codex).
+  </Accordion>
+
+  <Accordion title="A turn was stopped">
+    You can stop a running turn for real, and you can continue or resume afterward. A stop is an intentional outcome, not a failure: Langy keeps the partial answer streamed so far, and nothing you did is wrong. Continue the conversation, or ask again. A refresh mid-turn rejoins the running turn rather than losing it.
+  </Accordion>
+
+  <Accordion title="Langy's worker stopped mid-reply">
+    If a worker process dies mid-reply, Langy surfaces a "worker stopped" card. Your message is safe. Send it again; a fresh worker spawns for the next turn.
+  </Accordion>
+</AccordionGroup>
+
+## Audit-log events to check
+
+When Langy touches GitHub, it writes audit-log events. Use these to confirm what happened and when.
+
+| Event | Meaning |
+|---|---|
+| `langy.github.install` | The Langy GitHub App was installed and bound to your org. |
+| `langy.github.disconnect` | The Langy GitHub App was disconnected. |
+
+<Info>
+**Also check:** [GitHub access](/langy/security/github-access), [Limits](/langy/reference/limits), [Supported models](/langy/reference/supported-models).
+</Info>
+
+## Reference
+
+- [Self-hosting overview](/self-hosting/langy/overview)
+- [GitHub access](/langy/security/github-access)
+- [Supported models](/langy/reference/supported-models)
+- [Limits](/langy/reference/limits)
+
+---
+
+# FILE: ./langy/scenario-tests-and-evals.mdx
+
+---
+title: Scenario tests and evaluations
+description: "What Langy produces when it tests your agent: Scenario multi-turn simulation tests and evaluations, written and run through the langwatch CLI."
+sidebarTitle: Tests and evals
+keywords:
+  - ai agent simulation testing
+  - scenario tests
+  - agent evaluations
+---
+
+Both are real artifacts, not drafts: Langy writes and runs them through the `langwatch` CLI, so what comes back lives in your project like any test or evaluator you wrote by hand. Which one it picks depends on what the question needs to prove; see the table below.
+
+<Info>**Also check:** [Ask Langy](/langy/chat) (how you request a test), [Pull requests](/langy/pull-requests) (the tests it wrote run in your CI), [Agent Simulations](/agent-simulations/introduction) and [Evaluations](/evaluations/overview) (the product surfaces these land in).</Info>
+
+## Scenario simulation tests
+
+A Scenario test is a multi-turn simulation. A simulated user drives your agent across a full conversation, probing it the way a real user would, and a judge scores the transcript against the criteria you set.
+
+This is how Langy catches behavior that a single-turn check misses: an agent that holds the line for one message but drifts by turn 15.
+
+Langy writes and runs these with:
+
+```bash
+langwatch scenario create
+langwatch scenario run
+```
+
+The runs land in the Simulations surface, where you can filter, group, and open any run.
+
+<Frame caption="The Simulations overview filtered to red-team runs. Each row is a scenario run with its outcome.">
+  ![Simulations overview filtered to red-team runs](/images/langy/testing/redteam-overview.png)
+</Frame>
+
+Open a run to see the judge's verdict and its reasoning against your criteria.
+
+<Frame caption="A scenario run detail: the judge verdict with the reasoning it used to reach it.">
+  ![Scenario verdict and judge reasoning](/images/langy/testing/scenario-verdict.png)
+</Frame>
+
+When a run fails, the detail includes the bug log so you can see exactly where the agent broke.
+
+<Frame caption="A failed-run detail with the bug log showing where the agent's behavior diverged from the criteria.">
+  ![Failed run detail with bug log](/images/langy/testing/failed-run-buglog.png)
+</Frame>
+
+Read more in the Agent Simulations docs: [Introduction](/agent-simulations/introduction), [Getting started](/agent-simulations/getting-started), [Red teaming](/agent-simulations/red-teaming), and [Voice agents](/agent-simulations/voice-agents).
+
+## Evaluations
+
+An evaluation scores a run against a criterion: answer correctness, a custom rule, an LLM judge, a pairwise comparison. Langy writes evaluators and runs experiments and monitors with the CLI:
+
+```bash
+langwatch evaluator create
+langwatch experiment run
+langwatch monitor create
+```
+
+Use each for a different job:
+
+- `langwatch experiment run` scores an offline or batch run, for comparing two models or two prompts. See [Experiments](/evaluations/experiments/overview) and [running evals in CI/CD](/evaluations/experiments/ci-cd).
+- `langwatch monitor create` sets up an online evaluation that scores live production traffic. See [Online evaluation](/evaluations/online-evaluation/overview).
+- `langwatch evaluator create` defines the evaluator both of the above use. See [Evaluators](/evaluations/evaluators/overview).
+
+## Which one Langy picks
+
+Langy picks based on what your question needs to prove:
+
+| You want to check | Langy writes |
+|---|---|
+| The agent handles a full conversation correctly | A Scenario simulation test |
+| One run scores well on a criterion | An evaluation |
+| Live traffic stays within a criterion | An online monitor |
+| Two models or prompts, head to head | An experiment |
+
+You can also name the one you want in the [chat](/langy/chat): "write a Scenario test that..." or "set up an evaluator for...".
+
+---
+
+# FILE: ./langy/security/data-flow-and-privacy.mdx
+
+---
+title: Langy Data Flow and Privacy
+description: "Exactly what data leaves a Langy conversation and where it goes: every turn is traced into your own LangWatch project, external traffic is limited to the egress path, and an optional operator mirror lane is off unless you configure it."
+sidebarTitle: Data flow and privacy
+keywords:
+  - ai agent data privacy
+  - llm data flow
+  - secret redaction
+  - self-hosted ai control
+---
+
+A Langy conversation sends data to at most three destinations. Two of them are yours, and the third is off unless you turn it on:
+
+1. **Your own LangWatch project (always).** Every Langy turn is itself traced and costed into the LangWatch project you are working in.
+2. **External hosts (only through the egress path).** LLM traffic goes to the LangWatch AI Gateway. Traffic to `git` / `gh` / `npm` reaches the internet only if `allowExternalHttps` is enabled and the destination passes the L7 egress adapter. Private ranges, CGNAT, and the cloud metadata endpoint are always blocked.
+3. **An operator mirror lane (optional, off by default).** An operator can configure a second copy of each turn's trace to be shipped to a LangWatch project they designate (ADR-061). This lane is dormant unless `LANGY_MIRROR_TRACE_ENDPOINT` and `LANGY_MIRROR_TRACE_KEY` are both set.
+
+```mermaid
+flowchart TD
+    U[You, in the LangWatch UI] --> CP[LangWatch control plane]
+    CP -->|LANGY_INTERNAL_SECRET bearer, ClusterIP| AG[Langy agent pod]
+    AG --> W[One gVisor-sandboxed worker per conversation]
+
+    W -->|langwatch CLI, per-session caller-scoped key| API[LangWatch API]
+    W -->|LLM traffic via per-project virtual key| GW[LangWatch AI Gateway]
+    W -->|git / gh / npm, only if allowExternalHttps and passes L7 adapter| EXT[github.com / api.github.com / codeload.github.com]
+
+    W -.->|every turn, traced and costed| TR[(Your LangWatch project)]
+    GW --> TR
+
+    W -.->|optional mirror lane, dormant unless configured| MR[(Operator project, ADR-061)]
+
+    W x--x|blocked at L3/L4| MD[Private ranges / CGNAT / cloud metadata]
+
+    classDef blocked fill:#fdecea,stroke:#e17100;
+    class MD blocked;
+```
+
+## Destination 1: your own LangWatch project (always)
+
+Every Langy turn is an agent run, and it is traced like any other agent run in your project.
+
+The worker streams its spans through the trace relay, authenticated with the per-session key and a fail-closed resource-attribute allow-list. A platform-owned `langy.turn` root span is recorded, and the LangWatch AI Gateway records the `gen_ai` spans, including the full prompt and completion, for the LLM calls.
+
+You watch Langy work with the same tools you use to watch your own agents, and the cost of a Langy turn shows up as cost in your project.
+
+## Destination 2: external hosts (only through the egress path)
+
+Langy does not open arbitrary outbound connections. Two kinds of external traffic exist, and both are constrained:
+
+- **LLM traffic** goes to the LangWatch AI Gateway, never directly to a model provider. The worker's LLM base URL points at the gateway, so tracing, rate limits, budgets, and model policy all apply. See [How Langy's model calls are routed](/langy/models).
+- **`git` / `gh` / `npm` traffic** reaches the internet only when `allowExternalHttps` is on and the destination passes the L7 egress adapter. The operator floor is `github.com`, `api.github.com`, and `codeload.github.com`; a project can add to the allow-list.
+
+Regardless of the allow-list, these are blocked at L3/L4:
+
+- **RFC 1918 private ranges.** A worker cannot reach into your private network (SSRF protection).
+- **CGNAT (`100.64.0.0/10`).** Blocks the node-local addresses some managed Kubernetes networking uses.
+- **The cloud metadata endpoint.** Blocks IMDS credential theft.
+
+For the full picture of what the sandbox can and cannot reach, and the honest note that the stock L7 adapter is cooperative rather than mandatory, see [How Langy is isolated](/langy/security/sandbox).
+
+## Secret and PII redaction keeps secrets out of what Langy reads
+
+Langy reads your traces through the `langwatch` CLI. What it reads is what already passed through LangWatch trace-ingestion redaction, so secrets do not enter Langy's context in the first place. This is the platform's redaction, not a Langy-specific feature:
+
+- **`DEFAULT_PII_REDACTION_LEVEL = "ESSENTIAL"`.** The default project posture redacts essential PII. Levels are `STRICT`, `ESSENTIAL`, and `DISABLED`.
+- **Secrets redaction is a separate default-on toggle.** Detected secrets are redacted before the span is stored, so a leaked API key in a trace is not sitting in the data Langy later reads.
+
+Because redaction happens at ingestion, tightening it (for example moving to `STRICT`) tightens what Langy can see too.
+
+## The per-session, caller-scoped LangWatch key
+
+Langy never uses a shared admin-equivalent service key to read your data. Each chat mints a **per-session LangWatch API key owned by the requesting user** (ADR-047), and that key is:
+
+- **Clamped** to the intersection of the Langy permission set and what the requesting user actually holds.
+- **Project-scoped** to the project the conversation is in.
+- **Short-lived**, auto-expiring after the session, and revoked when the worker exits.
+
+The rule this enforces: a Langy tool call can never exceed what that user could do by hand. If the key leaked, the blast radius is one user's own permissions, for a few hours.
+
+## Destination 3: the operator mirror lane (optional, off by default)
+
+An operator running the install can have the agent ship a second copy of each turn's trace to a LangWatch project they designate, so whoever runs the deployment can watch Langy work. It is a separate, bounded, drop-on-full lane (ADR-061), and it is **dormant unless configured** with `LANGY_MIRROR_TRACE_ENDPOINT` and `LANGY_MIRROR_TRACE_KEY`.
+
+The lane is allow-list based (never a denylist), with three tiers set per organization:
+
+| Tier | What it copies |
+|---|---|
+| `content` | Adds an explicit content allow-list: `gen_ai.input.messages`, `gen_ai.output.messages`, and named tool-payload keys. |
+| `structural` | Timings, tokens, status, and enums only. No prompts, completions, or tool output. |
+| `skip` | Nothing. |
+
+<Note>
+On a self-hosted install the mirror lane is **off** unless `langyagent.mirror.existingSecretName` names a Secret with the mirror project's API key, and you choose the tier. On LangWatch SaaS the default is the `content` tier, with specific organizations restricted. If you are self-hosting and do not want any operator copy of Langy's traces, leave the mirror Secret unset.
+</Note>
+
+<Info>
+**Also check:** [How Langy is isolated](/langy/security/sandbox), [What Langy can do in your GitHub](/langy/security/github-access), [Models and bring your own key](/langy/models).
+</Info>
+
+## Reference
+
+- [How Langy is isolated](/langy/security/sandbox)
+- [What Langy can do in your GitHub](/langy/security/github-access)
+- [Self-hosting: environment variables](/self-hosting/langy/environment-variables)
+- [Token usage and cost](/langy/token-usage-and-cost)
+
+---
+
+# FILE: ./langy/security/github-access.mdx
+
+---
+title: What Langy Can Do in Your GitHub
+description: Langy touches your code only through a GitHub App that opens bot-authored pull requests; the app private key is the only stored credential, tokens are minted per turn with two write scopes, and the install is the access boundary.
+sidebarTitle: GitHub access
+keywords:
+  - langy github permissions
+  - ai agent github app
+  - bot authored pull requests
+---
+
+Langy contributes to your code in exactly one way: **bot-authored pull requests through a GitHub App**. Langy pushes only to the branch it creates for that PR, never to your default or existing branches, and never merges its own PR. A human reviews and merges.
+
+## The credential model
+
+- **No per-user OAuth.** Installing the app does not ask a user to authorize it against their GitHub account. The bot-authored flow uses no user OAuth at all.
+- **The app private key is the only stored credential.** It lives only in the control plane (as `GITHUB_LANGY_PRIVATE_KEY`) and never reaches a worker. When it is unset, the GitHub feature is silently off.
+- **Installation tokens are minted per turn.** Each turn mints a fresh 1-hour installation token, cached in Redis just under its lifetime and never persisted. The worker receives it as the `GH_TOKEN` environment variable only; nothing is written to disk.
+- **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories, or to a single repository when the turn targets one.
+
+Inside the worker, `git config credential.helper '!gh auth git-credential'` wires `git` to read the token from the environment, so there is no `.gitconfig` or `.git-credentials` on disk.
+
+Commits are authored by `langwatch[bot]`, and the requesting user is credited with a `Co-authored-by` trailer plus a `Requested by @<login> via LangWatch` note in the PR body.
+
+## The install is the access boundary
+
+Langy can open pull requests only on the repositories the app is installed on. Installing the app on a repository is what grants access; there is no separate grant.
+
+A single LangWatch organization can install the app on several GitHub accounts, and each installation is listed separately.
+
+If the app is not installed when Langy reaches for `git` or `gh`, the platform stops the turn, shows an install card in chat, and re-runs the turn once the app is installed.
+
+## App permissions
+
+These are the only repository permissions the app requests:
+
+| Permission | Access |
+|---|---|
+| Contents | Read and write |
+| Pull requests | Read and write |
+| Metadata | Read |
+
+The app subscribes to no events beyond the installation lifecycle that GitHub sends automatically (`installation`, `installation_repositories`).
+
+<Note>
+`Contents: Read and write` is what lets Langy clone a repository, create a branch, and push commits to that branch. It does not let Langy merge; merging a pull request is a separate action that a human takes in GitHub after review.
+</Note>
+
+## Disconnecting
+
+Disconnect from **Settings, Integrations, GitHub, Disconnect**, which opens GitHub's uninstall page (an app cannot be uninstalled through the API). Once GitHub confirms, the `installation.deleted` webhook removes the local record.
+
+<Warning>
+Removing the installation cuts off **new** turns immediately. A worker that is already running with a token keeps that token until the idle reaper kills it (up to 10 minutes idle) or the token self-expires (up to 1 hour). There is no way for a live worker to mint a new token once the install is gone.
+</Warning>
+
+Install and disconnect actions are recorded in the audit log as `langy.github.install` and `langy.github.disconnect`.
+
+<Info>
+**Also check:** [How Langy is isolated](/langy/security/sandbox), [Data flow and privacy](/langy/security/data-flow-and-privacy), [Register the Langy GitHub App](/self-hosting/langy/github-app).
+</Info>
+
+## Reference
+
+- [Register the Langy GitHub App](/self-hosting/langy/github-app) for the setup steps (registering the app, plumbing the secrets, and installing it).
+- [How Langy is isolated](/langy/security/sandbox)
+- [Data flow and privacy](/langy/security/data-flow-and-privacy)
+
+---
+
+# FILE: ./langy/security/sandbox.mdx
+
+---
+title: How Langy is Isolated
+description: Langy runs each conversation as an isolated worker under a gVisor sandbox, with per-worker file and control-port walls and an L7 egress adapter; this page states exactly what each layer blocks and where the boundary is only cooperative today.
+sidebarTitle: Sandbox and isolation
+keywords:
+  - ai agent sandbox
+  - gvisor
+  - agent isolation
+  - ai agent security
+---
+
+Each conversation runs as a separate `opencode` worker process inside a single agent pod. gVisor is a user-space kernel that sits between the worker and the host kernel, so a worker that runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`) has a much smaller pod-to-host escape surface than a normal container.
+
+On LangWatch Cloud the pod always runs under gVisor. Self-hosted, the chart pins the pod to a `gvisor` RuntimeClass by default; on a cluster without one the pod waits rather than silently dropping to the node's runtime. Any sandboxed RuntimeClass works (a Kata class on AKS, for example).
+
+Running unsandboxed takes an explicit pair, `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`; the chart's render-time `fail` guard refuses the first value alone. You then lose the pod-to-host boundary and keep only the in-pod walls below.
+
+## Isolation layers
+
+Langy is isolated at several layers, from the pod boundary down to the walls between two conversations sharing one pod. Weakest to strongest:
+
+| Boundary | Mechanism | Enforced by |
+|---|---|---|
+| Pod to host | gVisor (`runsc`) user-space kernel; required RuntimeClass with a render-time chart guard | Kubernetes + chart |
+| Worker to worker (files) | Each conversation gets a distinct Unix UID and a `0700` home; homes are chowned before any secret is written; `/proc/<pid>/environ` is `0400` owned by the worker UID, so a sibling UID gets `EACCES` | Linux file permissions (DAC) |
+| Worker to worker (control port) | Each worker gets a distinct random `OPENCODE_SERVER_PASSWORD`; a per-worker auth proxy terminates the external token and swaps in HTTP Basic upstream; a fail-closed guard refuses to start a worker whose control server does not return `401` to an unauthenticated request | Go auth proxy + opencode |
+| Worker to external (L7) | Per-worker egress adapter: require-TLS, per-destination throttle, the project's allow-list, an operator FQDN floor, and a TLS SNI cross-check against the CONNECT authority | Go adapter (cooperative, see below) |
+| Worker to external (L3/L4) | Deny-by-default `NetworkPolicy`; outbound `:443` to anywhere is off by default; RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint are carved out and blocked | Container network interface (CNI) |
+| Worker to external (optional, hard) | Cilium `toFQDNs` on the floor, or a per-worker network namespace (ADR-033 Fix B) | Cilium / netns (planned, see below) |
+| Control plane to agent | `LANGY_INTERNAL_SECRET` bearer token, constant-time compared; the agent Service is ClusterIP only and never exposed outside the cluster | Go |
+
+The manager process runs as root in the container, which is load-bearing: assigning a distinct UID per worker needs `CAP_SETUID`, `CAP_SETGID`, and `CAP_CHOWN`.
+
+To keep the blast radius small, the container drops all capabilities and adds back only five: `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, and `SETGID`. It also sets `allowPrivilegeEscalation: false` and `readOnlyRootFilesystem: true`.
+
+It omits `fsGroup`, since sharing it would reopen the cross-worker file boundary, and sets `automountServiceAccountToken: false` because the manager makes no Kubernetes API calls.
+
+## Why egress is enforced at L7, not with iptables
+
+gVisor's kernel implements **no netfilter**. `iptables` and `nftables` fail in every mode under gVisor, so the usual way to control a container's outbound traffic (an `iptables` OWNER-match DROP or a REDIRECT to a local proxy) is not available here.
+
+That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-043) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
+
+The earlier `iptables`-based rule and its `NET_ADMIN` capability were removed because they are dead under gVisor.
+
+<Warning>
+**Isolation limits (state these to a regulated buyer).**
+
+Today the per-worker Unix accounts are a **sibling-process boundary, not a full per-tenant boundary**. Multiple workers still share one gVisor sandbox and one network namespace (ADR-053, Proposed). The file and control-port walls above stop one worker from reading another worker's secrets or driving another worker's control server, but they do not give each conversation its own kernel or its own network stack.
+
+The stock L7 egress adapter is **cooperative**, not mandatory. It enforces the allow-list only for traffic that goes through the proxy. A prompt-injected worker that ignores `HTTPS_PROXY` and dials an external IP directly on `:443` is **monitored, not blocked**, in the stock pod.
+
+The mandatory-enforcement end states (a Cilium `toFQDNs` policy, or a per-worker network namespace that needs `CAP_SYS_ADMIN`) are **designed, not shipped**. Do not read this page as a claim of hard tenant isolation by default.
+</Warning>
+
+The defence-in-depth mitigations that **are** shipped today:
+
+- **CGNAT egress deny.** The `100.64.0.0/10` range is blocked at L3/L4, so a worker cannot reach the node-local link addresses that some managed Kubernetes networking uses.
+- **Dropped default service-account token.** `automountServiceAccountToken: false`; a worker that reached the Kubernetes API would have no token to present.
+- **Public-subnet node placement (opt-in).** You can schedule the agent pod on a node group that has no route to your private data tier, so a full escape lands somewhere with no path to your databases.
+
+<Note>
+For a self-hosted install, egress is **denied by default**: `networkPolicy.allowExternalHttps` is `false`, so Langy cannot reach the internet at all until you enable it. Turning it on for GitHub is covered in [Networking and egress](/self-hosting/langy/networking-and-egress) and [the GitHub App setup](/self-hosting/langy/github-app).
+</Note>
+
+## What the sandbox can and cannot reach
+
+- **Can reach (when configured):** the LangWatch API (through the per-session `langwatch` CLI credentials), the LangWatch AI Gateway for LLM traffic, and `github.com` / `api.github.com` / `codeload.github.com` when external HTTPS is enabled.
+- **Cannot reach:** RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint (blocked at L3/L4 to prevent SSRF and IMDS credential theft), and any other external host unless the project allow-lists it and it passes the L7 adapter.
+- **Does not keep at rest:** nothing durable lives worker-side. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
+
+<Info>
+**Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking and egress](/self-hosting/langy/networking-and-egress).
+</Info>
+
+## Reference
+
+- [Data flow and privacy](/langy/security/data-flow-and-privacy)
+- [What Langy can do in your GitHub](/langy/security/github-access)
+- [Self-hosting Langy](/self-hosting/langy/overview)
+
+---
+
+# FILE: ./langy/token-usage-and-cost.mdx
+
+---
+title: Langy Token Usage and Cost
+description: Langy's model calls bill to your own accounts through the LangWatch AI Gateway, per token for API keys or against your subscription for Codex, and every turn is a traced, costed run in your own LangWatch project.
+sidebarTitle: Token usage and cost
+keywords: langy token cost, ai agent cost tracking, llm spend
+---
+
+Whichever provider you configured, or your Codex subscription if you connected one, is what actually gets charged. LangWatch never touches your bill, and the charge shows up alongside everything else in your project, broken out by turn, not as a separate invoice to track down.
+
+## Who pays for tokens
+
+Langy has no model account of its own. It runs on:
+
+- **Your provider API keys**, for any provider you configure with a key. See [Models and bring your own key](/langy/models).
+- **Your Codex subscription**, if you sign in with your OpenAI account. See [Run Langy on your own OpenAI plan](/langy/codex).
+
+Every Langy LLM call routes through the LangWatch AI Gateway on a per-project virtual key. Your gateway budgets and rate limits apply to Langy the same way they apply to the rest of your traffic, so Langy's spend is capped and enforced by the limits you already set.
+
+## How you see the spend
+
+Every Langy turn is traced into your own LangWatch project, with tokens and cost, like any other agent run. A turn produces:
+
+- A `langy.turn` root span for the turn itself.
+- The model calls under it, with full token counts and cost from the gateway.
+
+Because each session is a run in your project, you can open it in the same trace views you use for your own agents and read exactly what a session spent. Langy is observed with the same tools you use to observe everything else.
+
+{/* TODO screenshot: a Langy turn shown as a traced, costed run in Trace Explorer. Not yet staged in docs/images/langy/. */}
+
+<Note>
+Langy excludes its own turns from your production-traffic views by default. Its traces carry the `langy` origin, so they do not mix into samples of your application traffic unless you ask for them.
+</Note>
+
+<Info>
+**Also check:** [Models and bring your own key](/langy/models), [Run Langy on your own OpenAI plan](/langy/codex).
+</Info>
+
+## Reference
+
+- [Models and bring your own key](/langy/models)
+- [Run Langy on your own OpenAI plan (Codex)](/langy/codex)
+- [Data flow and privacy](/langy/security/data-flow-and-privacy)
+
+---
+
 # FILE: ./self-hosting/compliance.mdx
 
 ---
@@ -27932,7 +29057,7 @@ keywords:
   - langy_internal_secret
 ---
 
-The agent-side variables (`LANGY_*`, `OPENCODE_*`) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret; the control-plane variables (`GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
+The agent-side variables (`LANGY_*`, and `OPENCODE_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`OPENCODE_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
 
 <Info>
 **Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub App](/self-hosting/langy/github-app), [Networking and egress](/self-hosting/langy/networking-and-egress).

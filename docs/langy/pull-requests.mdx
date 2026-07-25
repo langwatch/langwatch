@@ -8,7 +8,7 @@ keywords:
   - ai code review
 ---
 
-Langy changes code in exactly one way: it opens a pull request. It never commits directly, never pushes to a branch you have not reviewed, and never merges its own PR.
+Langy changes code in exactly one way: it opens a pull request. It pushes only to the branch it creates for that PR, never to your default or existing branches, and it never merges its own PR.
 
 <Info>**Also check:** [GitHub access](/langy/security/github-access) (the scopes and the boundary), [GitHub App setup](/self-hosting/langy/github-app) (registering the app when self-hosting), [Scenario tests and evals](/langy/scenario-tests-and-evals) (what runs in CI on the PR).</Info>
 

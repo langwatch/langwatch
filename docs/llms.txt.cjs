@@ -127,6 +127,7 @@ ${AGENT_REPORT_NOTE}
   const integrationsAnchor = anchors.find(a => a.anchor === 'Integrations');
   const selfHostingAnchor = anchors.find(a => a.anchor === 'Self Hosting');
   const apiRefAnchor = anchors.find(a => a.anchor === 'API Reference');
+  const langyAnchor = anchors.find(a => a.anchor === 'Langy');
 
   // Process Documentation anchor groups, but insert Integrations after Observability
   if (docAnchor) {
@@ -156,8 +157,8 @@ ${AGENT_REPORT_NOTE}
     });
   }
 
-  // Add remaining anchors (Self Hosting, API Reference)
-  const remainingAnchors = [selfHostingAnchor, apiRefAnchor].filter(Boolean);
+  // Add remaining anchors (Langy, Self Hosting, API Reference)
+  const remainingAnchors = [langyAnchor, selfHostingAnchor, apiRefAnchor].filter(Boolean);
 
   if (remainingAnchors.length > 0) {
     content += '\n\n';
