@@ -8,6 +8,37 @@ import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
 /**
+ * Whether the downloaded mono-binary knows the `langyagent` subcommand.
+ * Binaries released before the assistant existed answer any unknown command
+ * with a usage line listing the services they do have, so the presence of
+ * the name in that output is the honest capability check. Without this
+ * probe, an older binary dies at boot with "unknown service" and takes the
+ * whole install down with it; with it, the install comes up assistant-less
+ * and says why.
+ *
+ * Never throws and never hangs: the assistant is optional, so a probe that
+ * cannot answer (broken binary, hung exec) reads as "not supported" and the
+ * install proceeds without the assistant rather than dying over it.
+ */
+export async function monobinarySupportsLangyagent(binary: string): Promise<boolean> {
+  try {
+    const { stdout, stderr } = await execa(binary, [], {
+      reject: false,
+      timeout: 5_000,
+    });
+    return `${stdout}\n${stderr}`.includes("langyagent");
+  } catch {
+    return false;
+  }
+}
+
+// The manager only accepts running workers without per-worker isolation in a
+// local-like environment (services/langyagent/config.go enforces this on its
+// side too). Mirroring the check here means a .env edited to a production-like
+// ENVIRONMENT never even asks for the unsafe mode.
+const UNSAFE_ISOLATION_ENVIRONMENTS = new Set(["local", "development", "dev", "test"]);
+
+/**
  * The Langy assistant's manager, the process that owns one opencode worker
  * per conversation. Same `cmd/service` mono-binary as the gateway and the NLP
  * engine, dispatched as `langyagent`, so the assistant adds no download of its
@@ -26,26 +57,12 @@ import { supervise, type SupervisedHandle } from "./spawn.ts";
  * unsandboxed instead, and say so rather than implying a boundary that is not
  * there.
  */
-/**
- * Whether the downloaded mono-binary knows the `langyagent` subcommand.
- * Binaries released before the assistant existed answer any unknown command
- * with a usage line listing the services they do have, so the presence of
- * the name in that output is the honest capability check. Without this
- * probe, an older binary dies at boot with "unknown service" and takes the
- * whole install down with it; with it, the install comes up assistant-less
- * and says why.
- */
-export async function monobinarySupportsLangyagent(binary: string): Promise<boolean> {
-  const { stdout, stderr } = await execa(binary, [], { reject: false });
-  return `${stdout}\n${stderr}`.includes("langyagent");
-}
-
 export async function startLangyagent(
   ctx: RuntimeContext,
   bus: EventBus,
   envFromFile: Record<string, string>,
 ): Promise<SupervisedHandle> {
-  bus.emit({ type: "starting", service: "langyagent" as never });
+  bus.emit({ type: "starting", service: "langyagent" });
   const start = Date.now();
 
   const binary = ctx.predeps.aigateway?.resolvedPath;
@@ -58,6 +75,9 @@ export async function startLangyagent(
   const workspaceRoot = join(langyRoot, "workspace");
   mkdirSync(sessionsRoot, { recursive: true });
   mkdirSync(workspaceRoot, { recursive: true });
+
+  const environment = (envFromFile.ENVIRONMENT ?? "local").trim().toLowerCase();
+  const isLocalLike = UNSAFE_ISOLATION_ENVIRONMENTS.has(environment);
 
   const sp = servicePaths(ctx.paths);
   const handle = supervise({
@@ -72,10 +92,10 @@ export async function startLangyagent(
         PORT: String(ctx.ports.langyagent),
         SESSIONS_ROOT: sessionsRoot,
         LANGY_WORKSPACE_ROOT: workspaceRoot,
-        // Workers spawn as the user who ran the installer. The manager refuses
-        // this unless ENVIRONMENT is local-like, which the scaffolded .env sets,
-        // so a production deployment cannot reach this path by accident.
-        LANGY_UNSAFE_DEV_DISABLE_ISOLATION: "true",
+        // Workers spawn as the user who ran the installer. Only asked for in
+        // a local-like ENVIRONMENT (the scaffolded .env's default); the
+        // manager refuses it anywhere else, and we do not ask.
+        ...(isLocalLike ? { LANGY_UNSAFE_DEV_DISABLE_ISOLATION: "true" } : {}),
         // Each worker is an opencode process holding a real conversation; two
         // at a time is as much as a laptop should be asked to hold, and idle
         // ones are reaped quickly so a finished conversation stops costing
@@ -101,6 +121,6 @@ export async function startLangyagent(
     await handle.stop();
     throw new Error(`langyagent did not become healthy: ${ready.reason}`);
   }
-  bus.emit({ type: "healthy", service: "langyagent" as never, durationMs: Date.now() - start });
+  bus.emit({ type: "healthy", service: "langyagent", durationMs: Date.now() - start });
   return handle;
 }

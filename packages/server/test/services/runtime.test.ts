@@ -240,7 +240,10 @@ describe("services/runtime", () => {
       }
     });
 
-    it("comes up without the assistant when the release binary predates it, and says so", async () => {
+  });
+
+  describe("when the release binary predates the assistant", () => {
+    it("comes up without it, and says so", async () => {
       langyBinarySupported = false;
       const events: unknown[] = [];
       const ctx = fakeCtx();
@@ -268,6 +271,9 @@ describe("services/runtime", () => {
       expect(warning).toBeDefined();
     });
 
+  });
+
+  describe("when nothing is toggled", () => {
     it("tells the app exactly which evaluators this install skipped", async () => {
       await runtime.startAll(fakeCtx());
       const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<string, string>;
@@ -317,7 +323,7 @@ describe("services/runtime", () => {
       const collector = (async () => {
         for await (const ev of events) {
           collected.push(ev);
-          if (collected.filter((e) => e.type === "healthy").length >= 7) break;
+          if (collected.filter((e) => e.type === "healthy").length >= 8) break;
         }
       })();
       await runtime.startAll(ctx);
@@ -332,7 +338,7 @@ describe("services/runtime", () => {
             () =>
               reject(
                 new Error(
-                  `runtime.events collector did not see 7 healthy events within 5s — got ${
+                  `runtime.events collector did not see 8 healthy events within 5s — got ${
                     collected.filter((e) => e.type === "healthy").length
                   }`,
                 ),
@@ -349,6 +355,7 @@ describe("services/runtime", () => {
           "postgres",
           "redis",
           "clickhouse",
+          "langyagent",
           "nlpgo",
           "langevals",
           "aigateway",

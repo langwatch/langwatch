@@ -46,7 +46,7 @@ export const evaluationsRouter = createTRPCRouter({
           // did not download) drop out of the offer; saved references to
           // them still resolve against the static registry and fail their
           // runs with the clear not-installed message.
-          .filter(([key]) => !evaluatorUnavailability(key)?.hideFromUi)
+          .filter(([key]) => !evaluatorUnavailability({ evaluatorType: key })?.hideFromUi)
           .map(([key, evaluator]) => [
             key,
             {
@@ -56,7 +56,7 @@ export const evaluationsRouter = createTRPCRouter({
                 : evaluator.envVars.filter((envVar) => !process.env[envVar]),
               // Set when this install does not have the evaluator's code at
               // all, which is a different thing from it being unconfigured.
-              unavailable: evaluatorUnavailability(key),
+              unavailable: evaluatorUnavailability({ evaluatorType: key }),
             },
           ]),
       );

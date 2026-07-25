@@ -37,15 +37,23 @@ function extrasFrom(args: string[]): string[] {
 }
 
 describe("evaluator environment", () => {
+  const TOGGLE_KEYS = [
+    "LANGWATCH_ENABLE_PRESIDIO",
+    "LANGWATCH_ENABLE_LINGUA",
+    "LANGWATCH_ENABLE_LEGACY_EVALUATORS",
+  ];
+
   beforeEach(() => {
     execCalls.length = 0;
     home = mkdtempSync(join(tmpdir(), "lw-venvs-"));
-    delete process.env.LANGWATCH_ENABLE_PRESIDIO;
+    // process.env wins over the .env file in resolveVenvSpecs, so an ambient
+    // export on a dev shell or CI runner would silently flip these tests.
+    for (const key of TOGGLE_KEYS) delete process.env[key];
   });
 
   afterEach(() => {
     rmSync(home, { recursive: true, force: true });
-    delete process.env.LANGWATCH_ENABLE_PRESIDIO;
+    for (const key of TOGGLE_KEYS) delete process.env[key];
   });
 
   describe("when none of the heavyweight evaluators were asked for", () => {

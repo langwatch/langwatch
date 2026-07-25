@@ -53,7 +53,7 @@ async function resolveVersion(bin: string): Promise<string | null> {
  * (the manager itself) already ships inside the mono-binary we download for
  * the gateway.
  */
-export function makeOpencodePredep({ enabled }: { enabled: boolean }): Predep {
+export function makeOpencodePredep({ isEnabled }: { isEnabled: boolean }): Predep {
   return {
     id: "opencode",
     label: "langy assistant runtime",
@@ -63,12 +63,22 @@ export function makeOpencodePredep({ enabled }: { enabled: boolean }): Predep {
     required: false,
 
     async detect(paths) {
-      if (!enabled) {
+      if (!isEnabled) {
         return { installed: true, version: "skipped", resolvedPath: "" };
       }
       const bundled = join(paths.bin, "opencode");
       if (existsSync(bundled)) {
         const v = await resolveVersion(bundled);
+        // The pin is the contract: the skills are written against one
+        // opencode grammar, so bumping OPENCODE_VERSION must actually land
+        // on existing installs rather than being satisfied by whatever
+        // binary is already there.
+        if (v && v !== OPENCODE_VERSION) {
+          return {
+            installed: false,
+            reason: `opencode is v${v}, this release pins v${OPENCODE_VERSION} — re-downloading`,
+          };
+        }
         return { installed: true, version: v ?? "unknown", resolvedPath: bundled };
       }
       return { installed: false, reason: "opencode not in ~/.langwatch/bin" };

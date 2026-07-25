@@ -32,10 +32,10 @@ Feature: The assistant works on a laptop install
     Then it answers
     And nothing had to be installed by hand first
 
-  Scenario: The assistant runs its tools
+  Scenario: The assistant answers from the install's own data
     When they ask the assistant something that needs LangWatch's own data
-    Then it runs the LangWatch CLI to find out
-    And the answer reflects what the CLI returned
+    Then the answer reflects what this install actually contains
+    And not just what a language model would guess
 
   Scenario: The assistant is available without being switched on somewhere else
     When they open the product after installing

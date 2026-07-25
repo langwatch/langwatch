@@ -12,35 +12,35 @@ describe("optional install pieces", () => {
   describe("when nothing is set", () => {
     it("installs the assistant and skips every heavyweight evaluator", () => {
       const f = resolveFeatures({});
-      expect(f.langy).toBe(true);
-      expect(f.presidio).toBe(false);
-      expect(f.lingua).toBe(false);
-      expect(f.legacyEvaluators).toBe(false);
+      expect(f.isLangyEnabled).toBe(true);
+      expect(f.isPresidioEnabled).toBe(false);
+      expect(f.isLinguaEnabled).toBe(false);
+      expect(f.isLegacyEvaluatorsEnabled).toBe(false);
     });
   });
 
   describe("when a toggle is set", () => {
     it("honours an explicit opt-in to the PII model", () => {
-      expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: "true" }).presidio).toBe(true);
+      expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: "true" }).isPresidioEnabled).toBe(true);
     });
 
     it("honours an explicit opt-out of the assistant", () => {
-      expect(resolveFeatures({ [LANGY_ENV_KEY]: "false" }).langy).toBe(false);
+      expect(resolveFeatures({ [LANGY_ENV_KEY]: "false" }).isLangyEnabled).toBe(false);
     });
 
     it("honours opting into language detection and legacy evaluators", () => {
-      expect(resolveFeatures({ [LINGUA_ENV_KEY]: "true" }).lingua).toBe(true);
+      expect(resolveFeatures({ [LINGUA_ENV_KEY]: "true" }).isLinguaEnabled).toBe(true);
       expect(
-        resolveFeatures({ [LEGACY_EVALUATORS_ENV_KEY]: "true" }).legacyEvaluators,
+        resolveFeatures({ [LEGACY_EVALUATORS_ENV_KEY]: "true" }).isLegacyEvaluatorsEnabled,
       ).toBe(true);
     });
 
     it("accepts the spellings people actually type", () => {
       for (const yes of ["1", "true", "TRUE", "yes", "on", " true "]) {
-        expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: yes }).presidio).toBe(true);
+        expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: yes }).isPresidioEnabled).toBe(true);
       }
       for (const no of ["0", "false", "FALSE", "no", "off"]) {
-        expect(resolveFeatures({ [LANGY_ENV_KEY]: no }).langy).toBe(false);
+        expect(resolveFeatures({ [LANGY_ENV_KEY]: no }).isLangyEnabled).toBe(false);
       }
     });
   });
@@ -49,12 +49,12 @@ describe("optional install pieces", () => {
     it("keeps the default rather than reading it as off", () => {
       // A typo silently stripping a feature someone asked for is the worse
       // failure: they wait for an install that quietly did not happen.
-      expect(resolveFeatures({ [LANGY_ENV_KEY]: "maybe" }).langy).toBe(true);
-      expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: "sure" }).presidio).toBe(false);
+      expect(resolveFeatures({ [LANGY_ENV_KEY]: "maybe" }).isLangyEnabled).toBe(true);
+      expect(resolveFeatures({ [PRESIDIO_ENV_KEY]: "sure" }).isPresidioEnabled).toBe(false);
     });
 
     it("treats an empty value as unset", () => {
-      expect(resolveFeatures({ [LANGY_ENV_KEY]: "" }).langy).toBe(true);
+      expect(resolveFeatures({ [LANGY_ENV_KEY]: "" }).isLangyEnabled).toBe(true);
     });
   });
 

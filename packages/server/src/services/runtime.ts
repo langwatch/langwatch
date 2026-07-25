@@ -62,7 +62,7 @@ const runtimeImpl: RuntimeApi = {
       syncVenvs(ctx, bus),
       ensureLangwatchDeps(ctx, bus),
       // The assistant's CLI: only an install running it needs the download.
-      ...(features.langy ? [ensureLangyCli(ctx, bus)] : []),
+      ...(features.isLangyEnabled ? [ensureLangyCli(ctx, bus)] : []),
     ]);
   },
 
@@ -97,17 +97,22 @@ const runtimeImpl: RuntimeApi = {
     // resolved feature toggles ride along explicitly (see featureEnv) so the
     // app describes exactly the install this process just built.
     const features = resolveFeatures({ ...envFromFile, ...process.env });
-    // The assistant additionally needs a mono-binary new enough to carry the
-    // langyagent service. The npm package and the release binary move in
-    // lockstep, but a smoke run of an unreleased CLI, or an install mid
-    // release-window, gets the previous release's binary; starting the
-    // assistant against it dies with "unknown service" and would take the
-    // whole install down. Come up without the assistant instead, and say so.
-    let langyRunnable = features.langy;
-    if (langyRunnable) {
+    // The assistant is OPTIONAL: nothing else depends on it, so no failure of
+    // its own may take the install down. It boots (or declines to) BEFORE the
+    // app tier, because the app must be told the truth about it: an agent URL
+    // with no agent behind it turns every send into a hang. Two ways it
+    // declines, each with its own notice:
+    //   - the mono-binary predates the langyagent service (the npm package
+    //     and the release binary move in lockstep, but a smoke run of an
+    //     unreleased CLI, or an install mid release-window, gets the previous
+    //     release's binary, which answers "unknown service");
+    //   - it started but never reached healthy.
+    let isLangyRunnable = features.isLangyEnabled;
+    let langyHandle: SupervisedHandle | null = null;
+    if (isLangyRunnable) {
       const binary = ctx.predeps.aigateway?.resolvedPath;
-      langyRunnable = !!binary && (await monobinarySupportsLangyagent(binary));
-      if (!langyRunnable) {
+      isLangyRunnable = !!binary && (await monobinarySupportsLangyagent(binary));
+      if (!isLangyRunnable) {
         bus.emit({
           type: "log",
           service: "langyagent",
@@ -117,13 +122,30 @@ const runtimeImpl: RuntimeApi = {
         });
       }
     }
-    const effective = { ...features, langy: langyRunnable };
+    if (isLangyRunnable) {
+      try {
+        langyHandle = await startLangyagent(ctx, bus, {
+          ...envFromFile,
+          ...ctx.userEnv,
+        });
+        handles.push(langyHandle);
+      } catch (err) {
+        isLangyRunnable = false;
+        bus.emit({
+          type: "log",
+          service: "langyagent",
+          stream: "stderr",
+          line: `langy assistant disabled: it failed to start (${err instanceof Error ? err.message : String(err)}). Everything else continues without it.`,
+        });
+      }
+    }
+    const effective = { ...features, isLangyEnabled: isLangyRunnable };
     const childEnv: Record<string, string> = {
       ...envFromFile,
       ...ctx.userEnv,
       ...featureEnv(effective),
     };
-    if (!effective.langy) {
+    if (!effective.isLangyEnabled) {
       // With the assistant off, the app must not think it exists: an agent
       // URL with no agent behind it turns every send into a hang, and the
       // forced rollout flag would render the panel. The .env keeps its lines
@@ -141,19 +163,13 @@ const runtimeImpl: RuntimeApi = {
       // nlpgo is the only NLP runtime — the Go service from the aigateway
       // monobinary, dispatched as `nlpgo`. It binds to ctx.ports.nlp; the
       // langwatch app's /studio/* routing always targets /go/*.
-      const [nlp, langevals, gw, lw, langy] = await Promise.all([
+      const [nlp, langevals, gw, lw] = await Promise.all([
         startNlpgo(ctx, bus, childEnv),
         startLangevals(ctx, bus, childEnv),
         startAigateway(ctx, bus, envFromFile),
         startLangwatch(ctx, bus, childEnv),
-        // The assistant is optional; when it is off nothing references it and
-        // the app simply never offers it.
-        effective.langy
-          ? startLangyagent(ctx, bus, childEnv)
-          : Promise.resolve(null),
       ]);
       handles.push(nlp, langevals, gw, lw);
-      if (langy) handles.push(langy);
 
       // Phase 3b: workers. Spawned AFTER the app is healthy so it can
       // share the same boot env (Redis + Prisma already migrated, app

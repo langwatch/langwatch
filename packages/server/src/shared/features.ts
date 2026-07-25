@@ -17,7 +17,7 @@ export type FeatureToggles = {
    * the gateway downloads regardless. Default ON: it is a headline feature of
    * the product, and the download is small next to the rest of the install.
    */
-  langy: boolean;
+  isLangyEnabled: boolean;
   /**
    * The PII detection evaluator. Costs ~670MB, a natural-language model
    * larger than the entire rest of the Python environment, and the single
@@ -27,13 +27,13 @@ export type FeatureToggles = {
    * LangWatch's own redaction of secrets and simple PII in the ingestion
    * pipeline is unaffected by this; it is not implemented with presidio.
    */
-  presidio: boolean;
+  isPresidioEnabled: boolean;
   /**
    * The language detection evaluator. Costs ~95MB of language models.
    * Default OFF for the same reason as the PII detector: a niche evaluator
    * should not tax every install that never runs it.
    */
-  lingua: boolean;
+  isLinguaEnabled: boolean;
   /**
    * The deprecated legacy evaluators (the old Ragas API surface). They exist
    * only so evaluations saved years ago keep running, and while they share
@@ -41,7 +41,7 @@ export type FeatureToggles = {
    * should vanish rather than nag. Default OFF; an install that needs them
    * says so, everyone else never sees them.
    */
-  legacyEvaluators: boolean;
+  isLegacyEvaluatorsEnabled: boolean;
 };
 
 const TRUE = new Set(["1", "true", "yes", "on"]);
@@ -53,12 +53,20 @@ const FALSE = new Set(["0", "false", "no", "off"]);
  * value falls back to the default rather than being treated as false, so a
  * typo cannot silently strip a feature someone asked for.
  */
-function toggle(env: Record<string, string | undefined>, key: string, fallback: boolean): boolean {
+function toggle({
+  env,
+  key,
+  defaultEnabled,
+}: {
+  env: Record<string, string | undefined>;
+  key: string;
+  defaultEnabled: boolean;
+}): boolean {
   const raw = env[key]?.trim().toLowerCase();
-  if (raw === undefined || raw === "") return fallback;
+  if (raw === undefined || raw === "") return defaultEnabled;
   if (TRUE.has(raw)) return true;
   if (FALSE.has(raw)) return false;
-  return fallback;
+  return defaultEnabled;
 }
 
 export const LANGY_ENV_KEY = "LANGWATCH_ENABLE_LANGY";
@@ -70,10 +78,14 @@ export function resolveFeatures(
   env: Record<string, string | undefined> = process.env,
 ): FeatureToggles {
   return {
-    langy: toggle(env, LANGY_ENV_KEY, true),
-    presidio: toggle(env, PRESIDIO_ENV_KEY, false),
-    lingua: toggle(env, LINGUA_ENV_KEY, false),
-    legacyEvaluators: toggle(env, LEGACY_EVALUATORS_ENV_KEY, false),
+    isLangyEnabled: toggle({ env, key: LANGY_ENV_KEY, defaultEnabled: true }),
+    isPresidioEnabled: toggle({ env, key: PRESIDIO_ENV_KEY, defaultEnabled: false }),
+    isLinguaEnabled: toggle({ env, key: LINGUA_ENV_KEY, defaultEnabled: false }),
+    isLegacyEvaluatorsEnabled: toggle({
+      env,
+      key: LEGACY_EVALUATORS_ENV_KEY,
+      defaultEnabled: false,
+    }),
   };
 }
 
@@ -88,9 +100,9 @@ export function resolveFeatures(
  */
 export function featureEnv(features: FeatureToggles): Record<string, string> {
   return {
-    [LANGY_ENV_KEY]: String(features.langy),
-    [PRESIDIO_ENV_KEY]: String(features.presidio),
-    [LINGUA_ENV_KEY]: String(features.lingua),
-    [LEGACY_EVALUATORS_ENV_KEY]: String(features.legacyEvaluators),
+    [LANGY_ENV_KEY]: String(features.isLangyEnabled),
+    [PRESIDIO_ENV_KEY]: String(features.isPresidioEnabled),
+    [LINGUA_ENV_KEY]: String(features.isLinguaEnabled),
+    [LEGACY_EVALUATORS_ENV_KEY]: String(features.isLegacyEvaluatorsEnabled),
   };
 }

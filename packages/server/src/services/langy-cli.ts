@@ -57,8 +57,12 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   // A shell shim rather than a symlink into node_modules/.bin: the workers get
   // a PATH, not a package manager, and the shim keeps the resolved entrypoint
   // readable when someone goes looking for what the assistant just ran.
+  // Paths are single-quoted (with embedded quotes escaped) because they derive
+  // from LANGWATCH_HOME: inside double quotes the shell would expand a $ or a
+  // backtick that the directory name happens to contain.
   mkdirSync(ctx.paths.bin, { recursive: true });
-  writeFileSync(shim, `#!/bin/sh\nexec "${process.execPath}" "${entry}" "$@"\n`, { mode: 0o755 });
+  const sq = (v: string) => `'${v.replaceAll("'", `'\\''`)}'`;
+  writeFileSync(shim, `#!/bin/sh\nexec ${sq(process.execPath)} ${sq(entry)} "$@"\n`, { mode: 0o755 });
   chmodSync(shim, 0o755);
   writeFileSync(marker, LANGY_CLI_VERSION);
 

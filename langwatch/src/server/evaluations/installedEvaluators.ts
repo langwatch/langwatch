@@ -36,10 +36,13 @@ export type EvaluatorUnavailability = {
   hideFromUi?: boolean;
 };
 
-function explicitlyDisabled(
-  env: NodeJS.ProcessEnv,
-  envVar: string,
-): boolean {
+function explicitlyDisabled({
+  env,
+  envVar,
+}: {
+  env: NodeJS.ProcessEnv;
+  envVar: string;
+}): boolean {
   const raw = env[envVar]?.trim().toLowerCase();
   if (raw === undefined || raw === "") return false;
   return ["0", "false", "no", "off"].includes(raw);
@@ -48,13 +51,16 @@ function explicitlyDisabled(
 /**
  * Returns why an evaluator cannot run here, or undefined when it can.
  */
-export function evaluatorUnavailability(
-  evaluatorType: string,
-  env: NodeJS.ProcessEnv = process.env,
-): EvaluatorUnavailability | undefined {
+export function evaluatorUnavailability({
+  evaluatorType,
+  env = process.env,
+}: {
+  evaluatorType: string;
+  env?: NodeJS.ProcessEnv;
+}): EvaluatorUnavailability | undefined {
   if (
     evaluatorType.startsWith("presidio/") &&
-    explicitlyDisabled(env, PRESIDIO_ENABLE_ENV_VAR)
+    explicitlyDisabled({ env, envVar: PRESIDIO_ENABLE_ENV_VAR })
   ) {
     return {
       reason: "PII detection is not installed on this server.",
@@ -63,7 +69,7 @@ export function evaluatorUnavailability(
   }
   if (
     evaluatorType.startsWith("lingua/") &&
-    explicitlyDisabled(env, LINGUA_ENABLE_ENV_VAR)
+    explicitlyDisabled({ env, envVar: LINGUA_ENABLE_ENV_VAR })
   ) {
     return {
       reason: "Language detection is not installed on this server.",
@@ -72,7 +78,7 @@ export function evaluatorUnavailability(
   }
   if (
     evaluatorType.startsWith("legacy/") &&
-    explicitlyDisabled(env, LEGACY_EVALUATORS_ENABLE_ENV_VAR)
+    explicitlyDisabled({ env, envVar: LEGACY_EVALUATORS_ENABLE_ENV_VAR })
   ) {
     return {
       reason: "Legacy evaluators are not installed on this server.",
@@ -88,8 +94,10 @@ export function evaluatorUnavailability(
  * One sentence of what happened, one of what to do, the same pair the
  * evaluator picker shows, so the two never tell different stories.
  */
-export function unavailableEvaluatorMessage(
-  unavailability: EvaluatorUnavailability,
-): string {
+export function unavailableEvaluatorMessage({
+  unavailability,
+}: {
+  unavailability: EvaluatorUnavailability;
+}): string {
   return `${unavailability.reason} ${unavailability.howToEnable}`;
 }

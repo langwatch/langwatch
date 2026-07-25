@@ -91,9 +91,9 @@ function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   });
   const extras = [
     ...LANGEVALS_BASE_EXTRAS,
-    ...(features.lingua ? ["lingua"] : []),
-    ...(features.legacyEvaluators ? ["legacy"] : []),
-    ...(features.presidio ? ["presidio"] : []),
+    ...(features.isLinguaEnabled ? ["lingua"] : []),
+    ...(features.isLegacyEvaluatorsEnabled ? ["legacy"] : []),
+    ...(features.isPresidioEnabled ? ["presidio"] : []),
   ];
   // langevals is the only Python venv we build — nlpgo runs from the
   // aigateway monobinary and needs no uv environment.

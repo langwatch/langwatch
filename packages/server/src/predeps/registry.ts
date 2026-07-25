@@ -25,6 +25,6 @@ export function predepRegistry({ version }: { version: string }): Predep[] {
     clickhousePredep,
     goosePredep,
     makeAigatewayPredep(version),
-    makeOpencodePredep({ enabled: features.langy }),
+    makeOpencodePredep({ isEnabled: features.isLangyEnabled }),
   ];
 }

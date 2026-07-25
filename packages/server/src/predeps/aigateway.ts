@@ -84,10 +84,12 @@ export function makeAigatewayPredep(version: string): Predep {
         // The monobinary carries three services that evolve with every
         // release, so an install that upgrades the CLI must upgrade the
         // binary with it: accepting any old binary here is how a langyagent
-        // subcommand (or a gateway fix) silently never arrives. Dev runs are
-        // exempt (expected version 0.0.0-dev matches nothing real, and dev
-        // binaries report "dev"): they keep whatever they built.
-        if (v && version !== "0.0.0-dev" && v !== version) {
+        // subcommand (or a gateway fix) silently never arrives. Two dev
+        // exemptions: a CLI running from source expects 0.0.0-dev (matches
+        // nothing real, keep whatever is there), and a binary reporting
+        // "dev" was built from a checkout on purpose via
+        // LANGWATCH_AIGATEWAY_DEV_BUILD and stays until its owner rebuilds.
+        if (v && v !== "dev" && version !== "0.0.0-dev" && v !== version) {
           return {
             installed: false,
             reason: `ai-gateway monobinary is v${v}, this release wants v${version} — re-downloading`,
