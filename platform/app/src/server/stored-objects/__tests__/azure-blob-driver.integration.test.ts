@@ -121,6 +121,7 @@ beforeAll(async () => {
   azurite = await startAzurite();
   await ensureAzuriteContainer({ azurite, container: CONTAINER });
   driver = new AzureBlobDriver({
+    mode: "sharedKey",
     accountName: azurite.accountName,
     accountKey: azurite.accountKey,
     endpointBaseUrl: azurite.endpointBaseUrl,

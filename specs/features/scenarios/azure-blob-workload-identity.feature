@@ -39,14 +39,14 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # One credential decision, consumed everywhere
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: A resolvable Azure destination always comes with a usable Azure driver
     Given any supported combination of Azure backend and auth-mode configuration
     When the destination resolver and the storage-driver registration are both consulted
     Then either both report Azure as usable, or neither does
     And no configuration exists where writes resolve to Azure while the driver is unregistered
 
-  @unit @unimplemented
+  @unit
   Scenario: Adding an auth mode forces every Azure credential construction site to be revisited
     Given the Azure credential type distinguishes the supported auth modes
     Then a construction site that handles only shared-key credentials fails to compile
@@ -56,7 +56,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Auth mode selection
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Azure authentication defaults to shared key when no mode is set
     Given STORED_OBJECTS_BACKEND is azure with an account name, key, and container
     And AZURE_BLOB_AUTH_MODE is not set
@@ -64,7 +64,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then it signs requests with the shared account key exactly as before
     And deployments created under issue #4133 observe no change in behaviour
 
-  @unit @unimplemented
+  @unit
   Scenario Outline: Each supported auth mode selects its own credential source
     Given STORED_OBJECTS_BACKEND is azure
     And AZURE_BLOB_AUTH_MODE is <mode>
@@ -80,13 +80,13 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
       | managedIdentity  | the instance metadata identity endpoint      |
       | azureCli         | the developer's signed-in Azure CLI identity |
 
-  @unit @unimplemented
+  @unit
   Scenario: An unrecognized AZURE_BLOB_AUTH_MODE value is rejected, not ignored
     Given AZURE_BLOB_AUTH_MODE is set to a value outside the supported set
     When the environment is validated
     Then validation fails with an error naming the variable and the supported values
 
-  @unit @unimplemented
+  @unit
   Scenario: A shared account key configured alongside a token-based mode is refused
     Given AZURE_BLOB_AUTH_MODE is a token-based mode
     And AZURE_BLOB_ACCOUNT_KEY is also configured
@@ -94,7 +94,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then it fails, stating that the key would be ignored and must be removed
     And the operator is never left guessing which credential is actually in use
 
-  @unit @unimplemented
+  @unit
   Scenario: An auth mode configured while Azure is not the backend is refused
     Given AZURE_BLOB_AUTH_MODE is set to a token-based mode
     But STORED_OBJECTS_BACKEND is not azure
@@ -105,7 +105,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Misconfiguration diagnostics
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Missing federated identity input names the operator-actionable cause
     Given AZURE_BLOB_AUTH_MODE is workloadIdentity
     And the platform-injected federated identity values are absent
@@ -114,7 +114,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     And the error explains that the pod is missing the workload-identity label, the service-account client-id annotation, or the cluster webhook
     And it does not instruct the operator to set the injected variables by hand
 
-  @unit @unimplemented
+  @unit
   Scenario: Missing shared-key configuration still names the missing variable
     Given AZURE_BLOB_AUTH_MODE is sharedKey
     And AZURE_BLOB_ACCOUNT_KEY is not set
@@ -126,7 +126,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Bearer-token request signing
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Every Azure Blob operation carries a bearer token in a token-based mode
     Given the driver is in a token-based auth mode with a valid access token
     When it issues a get, put, delete, exists, head, or container-create request
@@ -134,14 +134,14 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     And no request carries a SharedKey signature
     And each request declares a storage API version that supports Entra authentication
 
-  @unit @unimplemented
+  @unit
   Scenario: Bearer authorization is identical regardless of endpoint addressing style
     Given the driver is in a token-based auth mode
     When it signs the same operation against a host-style and a path-style endpoint
     Then both requests carry the same Authorization header
     And neither carries a SharedKey signature
 
-  @unit @unimplemented
+  @unit
   Scenario: A token-based mode refuses a non-HTTPS blob endpoint
     Given AZURE_BLOB_AUTH_MODE is a token-based mode
     And AZURE_BLOB_ENDPOINT points at a plaintext HTTP address
@@ -153,7 +153,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Sovereign and non-public clouds
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: A sovereign-cloud storage endpoint obtains tokens from the matching authority
     Given a storage endpoint in a sovereign cloud
     And a configured identity authority host and token audience for that cloud
@@ -161,7 +161,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then it is requested from the configured authority, not the public-cloud default
     And it is scoped to the configured storage audience
 
-  @unit @unimplemented
+  @unit
   Scenario: A sovereign-cloud endpoint without a matching authority is refused
     Given a storage endpoint outside the public cloud
     And no identity authority host is configured
@@ -173,41 +173,41 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Token lifecycle
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: An access token is reused across operations rather than re-fetched per call
     Given the driver is in a token-based auth mode
     And a token has already been acquired and is still valid
     When several storage operations run
     Then the identity provider is contacted once, not once per operation
 
-  @unit @unimplemented
+  @unit
   Scenario: Projects sharing an identity share a cached token
     Given two projects resolve to the same Azure identity and audience
     When driver instances are constructed separately for each
     Then both reuse the same cached token
 
-  @unit @unimplemented
+  @unit
   Scenario: Projects resolving to different identities never share a token
     Given two projects resolve to different Azure identities
     When driver instances are constructed for each
     Then each acquires and uses its own token
     And one project's token is never presented to the other's storage account
 
-  @unit @unimplemented
+  @unit
   Scenario: Concurrent cold-start operations trigger a single token exchange
     Given the driver is in a token-based auth mode with an empty token cache
     When many storage operations begin simultaneously
     Then exactly one token exchange is performed
     And every operation proceeds with the resulting token
 
-  @unit @unimplemented
+  @unit
   Scenario: An access token is refreshed before it expires rather than after a failure
     Given the cached token expires within the refresh safety margin
     When the next storage operation runs
     Then a fresh token is acquired before the request is issued
     And the operation succeeds without observing an authorization failure
 
-  @unit @unimplemented
+  @unit
   Scenario: The federated assertion is re-read for every token exchange
     Given the driver is in workloadIdentity mode
     And the platform has rotated the projected service-account token on disk
@@ -222,7 +222,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then it waits for the interval the provider specified
     And it does not retry immediately in a tight loop
 
-  @unit @unimplemented
+  @unit
   Scenario: A failed token exchange surfaces as a configuration error, not a storage error
     Given the identity provider rejects the credential exchange
     When a storage operation runs
@@ -233,14 +233,14 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Authorization failure semantics
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: An expired-token rejection is retried exactly once with a fresh token
     Given a storage request is rejected as unauthenticated despite a cached token
     When the driver reacts
     Then it acquires a fresh token and retries the request once
     And a second consecutive rejection propagates to the caller
 
-  @unit @unimplemented
+  @unit
   Scenario: A permission rejection is not retried and names the missing role assignment
     Given a storage request is rejected because the identity lacks data permissions
     When the driver reacts
@@ -299,7 +299,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Helm surface
   # ---------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: The chart binds every storage-touching workload to one federated service account
     Given the azureBlob provider is selected with workloadIdentity auth
     When the chart renders
@@ -307,14 +307,14 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     And that service account carries the identity client-id annotation
     And each of those pods carries the label that enables the workload-identity webhook
 
-  @integration @unimplemented
+  @integration
   Scenario: The chart leaves token projection to the platform webhook
     Given the azureBlob provider is selected with workloadIdentity auth
     When the chart renders
     Then it does not hand-mount a projected identity token volume
     And the existing service-account token automount default is unchanged
 
-  @integration @unimplemented
+  @integration
   Scenario: The chart does not require an account key under a token-based mode
     Given the azureBlob provider is selected with a token-based auth mode
     And no accountKey value or secret reference is configured
@@ -322,14 +322,14 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then it renders successfully
     And no account-key environment variable is emitted
 
-  @integration @unimplemented
+  @integration
   Scenario: The chart still demands an account key under shared-key auth
     Given the azureBlob provider is selected with sharedKey auth
     And no accountKey value or secret reference is configured
     When the chart renders
     Then rendering fails with an error naming the missing accountKey
 
-  @integration @unimplemented
+  @integration
   Scenario: Installs that do not use Azure render exactly as they did before
     Given a chart configuration that does not select the azureBlob provider
     When the chart renders
@@ -359,7 +359,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   # Documentation
   # ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Self-hosting docs describe the enterprise authentication path
     Given the self-hosting environment-variables docs
     Then they document AZURE_BLOB_AUTH_MODE and every supported value

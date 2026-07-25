@@ -53,6 +53,27 @@ export const rumSampleRatioSchema = z.preprocess(
  */
 export const storedObjectsBackendSchema = z.enum(["s3", "azure"]).optional();
 
+/**
+ * Azure Blob authentication mode (issue #6087). An explicit toggle — never
+ * inferred from which credential vars happen to be present, the same
+ * reasoning that made `storedObjectsBackendSchema` explicit rather than
+ * env-presence-inferred.
+ *
+ * `sharedKey` (default, unchanged from #4133) signs requests with
+ * AZURE_BLOB_ACCOUNT_KEY. The three token modes exchange an OAuth bearer
+ * token via @azure/identity instead of an HMAC signature:
+ *   - `workloadIdentity` — AKS federated service-account token, injected by
+ *     the azure-workload-identity admission webhook.
+ *   - `managedIdentity` — the instance metadata identity endpoint (Azure VM
+ *     / VMSS / App Service self-hosters).
+ *   - `azureCli` — the developer's `az login` session (local dev only).
+ *
+ * Exported so tests exercise the real schema rather than an inline copy.
+ */
+export const azureBlobAuthModeSchema = z
+  .enum(["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"])
+  .optional();
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -368,6 +389,20 @@ export function createEnvConfig() {
       AZURE_BLOB_ACCOUNT_KEY: z.string().optional(),
       AZURE_BLOB_ENDPOINT: z.string().optional(),
       AZURE_BLOB_CONTAINER: z.string().optional(),
+      // See azureBlobAuthModeSchema above. Validated only when
+      // STORED_OBJECTS_BACKEND=azure — resolveAzureCredentials rejects it
+      // otherwise as dead config.
+      AZURE_BLOB_AUTH_MODE: azureBlobAuthModeSchema,
+      // Sovereign-cloud (e.g. Azure Government, Azure China) identity
+      // authority host for token exchange. Required alongside a
+      // token-based AZURE_BLOB_AUTH_MODE whenever AZURE_BLOB_ENDPOINT does
+      // not address the public *.blob.core.windows.net cloud — see
+      // resolveAzureCredentials in azure-credentials.ts.
+      AZURE_BLOB_AUTHORITY_HOST: z.string().optional(),
+      // Sovereign-cloud storage resource audience used to scope the token
+      // request (`{audience}/.default`). Defaults to the public-cloud
+      // "https://storage.azure.com" audience when unset.
+      AZURE_BLOB_TOKEN_AUDIENCE: z.string().optional(),
       DATASET_STORAGE_LOCAL: z.boolean().optional(),
       CREDENTIALS_SECRET: z.string().optional(),
       AZURE_AD_CLIENT_ID: z.string().optional(),
@@ -564,6 +599,9 @@ export function createEnvConfig() {
       AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
       AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
       AZURE_BLOB_CONTAINER: process.env.AZURE_BLOB_CONTAINER,
+      AZURE_BLOB_AUTH_MODE: process.env.AZURE_BLOB_AUTH_MODE,
+      AZURE_BLOB_AUTHORITY_HOST: process.env.AZURE_BLOB_AUTHORITY_HOST,
+      AZURE_BLOB_TOKEN_AUDIENCE: process.env.AZURE_BLOB_TOKEN_AUDIENCE,
       DATASET_STORAGE_LOCAL:
         process.env.DATASET_STORAGE_LOCAL === "1" ||
         process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",

@@ -69,6 +69,9 @@ spec:
         {{- end }}
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 8 }}

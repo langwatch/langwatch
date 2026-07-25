@@ -22,11 +22,9 @@ vi.mock("~/server/dataplane-s3", () => ({
   getS3ConfigForProject: vi.fn(),
 }));
 
+import { AzureBackendMisconfiguredError } from "../azure-credentials";
+import { resolveProjectStorageDestination } from "../project-storage-destination";
 import { getS3ConfigForProject } from "~/server/dataplane-s3";
-import {
-  AzureBackendMisconfiguredError,
-  resolveProjectStorageDestination,
-} from "../project-storage-destination";
 
 const mockGetS3ConfigForProject = vi.mocked(getS3ConfigForProject);
 
@@ -65,27 +63,30 @@ describe("resolveProjectStorageDestination", () => {
     ["AZURE_BLOB_ACCOUNT_NAME"],
     ["AZURE_BLOB_ACCOUNT_KEY"],
     ["AZURE_BLOB_CONTAINER"],
-  ])("given STORED_OBJECTS_BACKEND=azure with %s missing", (missingVariable) => {
-    /** @scenario "Azure backend selection fails loud when the Azure config is incomplete" */
-    it(`raises a configuration error naming ${missingVariable} and does not fall back`, async () => {
-      mockEnv.STORED_OBJECTS_BACKEND = "azure";
-      mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
-      mockEnv.AZURE_BLOB_ACCOUNT_KEY = "key-value";
-      mockEnv.AZURE_BLOB_CONTAINER = "lw-container";
-      mockEnv[missingVariable] = undefined;
-      // The fallback destinations are configured too, to prove the resolver
-      // does NOT quietly fall through to either when azure is misconfigured.
-      mockEnv.S3_BUCKET_NAME = "global-bucket";
-      mockEnv.LANGWATCH_LOCAL_STORAGE_PATH = "/data/objects";
+  ])(
+    "given STORED_OBJECTS_BACKEND=azure with %s missing",
+    (missingVariable) => {
+      /** @scenario "Azure backend selection fails loud when the Azure config is incomplete" */
+      it(`raises a configuration error naming ${missingVariable} and does not fall back`, async () => {
+        mockEnv.STORED_OBJECTS_BACKEND = "azure";
+        mockEnv.AZURE_BLOB_ACCOUNT_NAME = "lwacct";
+        mockEnv.AZURE_BLOB_ACCOUNT_KEY = "key-value";
+        mockEnv.AZURE_BLOB_CONTAINER = "lw-container";
+        mockEnv[missingVariable] = undefined;
+        // The fallback destinations are configured too, to prove the resolver
+        // does NOT quietly fall through to either when azure is misconfigured.
+        mockEnv.S3_BUCKET_NAME = "global-bucket";
+        mockEnv.LANGWATCH_LOCAL_STORAGE_PATH = "/data/objects";
 
-      await expect(
-        resolveProjectStorageDestination("proj_1"),
-      ).rejects.toBeInstanceOf(AzureBackendMisconfiguredError);
-      await expect(resolveProjectStorageDestination("proj_1")).rejects.toThrow(
-        new RegExp(missingVariable),
-      );
-    });
-  });
+        await expect(
+          resolveProjectStorageDestination("proj_1"),
+        ).rejects.toBeInstanceOf(AzureBackendMisconfiguredError);
+        await expect(
+          resolveProjectStorageDestination("proj_1"),
+        ).rejects.toThrow(new RegExp(missingVariable));
+      });
+    },
+  );
 
   describe("given an unrelated STORED_OBJECTS_BACKEND value or none at all", () => {
     /** @scenario "Azure env vars alone never flip the write destination" */
