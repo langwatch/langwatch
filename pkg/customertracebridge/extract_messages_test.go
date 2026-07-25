@@ -197,3 +197,33 @@ func TestWalkSSEData_skipsDoneAndComments(t *testing.T) {
 	})
 	assert.Equal(t, []string{`{"a":1}`, `{"a":2}`}, seen)
 }
+
+func TestExtractInputMessages_SpeechCarriesTTSText(t *testing.T) {
+	body := []byte(`{"model":"elevenlabs/eleven_flash_v2","voice":"nova","input":"Hello there, how can I help?"}`)
+	got := extractInputMessages(body, domain.RequestTypeSpeech)
+	want := `[{"role":"user","content":"Hello there, how can I help?"}]`
+	if got != want {
+		t.Fatalf("speech input = %q, want %q", got, want)
+	}
+}
+
+func TestExtractInputMessages_SpeechWithoutInputIsEmpty(t *testing.T) {
+	if got := extractInputMessages([]byte(`{"model":"x"}`), domain.RequestTypeSpeech); got != "" {
+		t.Fatalf("speech input without text = %q, want empty", got)
+	}
+}
+
+func TestExtractOutputMessages_TranscriptionCarriesTranscript(t *testing.T) {
+	body := []byte(`{"text":"The quick brown fox jumps over the lazy dog.","duration":2.3}`)
+	got := extractOutputMessages(body, domain.RequestTypeTranscription)
+	want := `[{"role":"assistant","content":"The quick brown fox jumps over the lazy dog."}]`
+	if got != want {
+		t.Fatalf("transcription output = %q, want %q", got, want)
+	}
+}
+
+func TestExtractOutputMessages_SpeechBinaryStaysEmpty(t *testing.T) {
+	if got := extractOutputMessages([]byte{0xff, 0xf3, 0x01, 0x02}, domain.RequestTypeSpeech); got != "" {
+		t.Fatalf("speech output = %q, want empty (binary audio)", got)
+	}
+}

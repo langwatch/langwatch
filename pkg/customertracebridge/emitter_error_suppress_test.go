@@ -83,7 +83,11 @@ func TestEmitter_ZeroCostNoOutputSuccess_MarkedForDrop(t *testing.T) {
 	span := recordSpanForParams(t, domain.AITraceParams{
 		ProviderID: domain.ProviderAnthropic,
 		Model:      "claude-opus-4-7",
-		Usage:      domain.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 0},
+		// Probes are /v1/messages calls; the suppression is gated to
+		// chat-shaped request types so audio and embeddings spans (which
+		// structurally never carry completion tokens) stay visible.
+		RequestType: domain.RequestTypeMessages,
+		Usage:       domain.Usage{PromptTokens: 6, CompletionTokens: 0, CostMicroUSD: 0},
 		// no ResponseBody -> extractOutputMessages == ""
 	})
 

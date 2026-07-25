@@ -337,14 +337,22 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		span.SetStatus(codes.Error, params.UpstreamErrorType)
 	}
 
-	// Suppress zero-cost, no-output, successful spans: these are claude-code's
-	// internal probe calls (system-reminder / skills-list pings) that return no
-	// usage and no assistant content, so they'd otherwise clutter the trace list
-	// with empty $0 rows. Keep anything with output OR cost OR an error. The
-	// drop marker is honored by dropFilterExporter at export time. PATH-A ONLY:
-	// Path B (claude-code direct OTLP) does not route through the gateway, so its
-	// probes are not affected here.
-	if !isError && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
+	// Suppress zero-cost, no-output, successful CHAT-SHAPED spans: these are
+	// claude-code's internal probe calls (system-reminder / skills-list pings)
+	// that return no usage and no assistant content, so they'd otherwise
+	// clutter the trace list with empty $0 rows. Keep anything with output OR
+	// cost OR an error. The drop marker is honored by dropFilterExporter at
+	// export time. PATH-A ONLY: Path B (claude-code direct OTLP) does not
+	// route through the gateway, so its probes are not affected here.
+	//
+	// Gated to chat/messages because that is the only shape probes have.
+	// Applying it to every type silently swallowed legitimate successful
+	// calls that structurally never carry completion tokens or extracted
+	// output: TTS spans (binary audio response), duration-priced STT spans
+	// (scribe reports seconds, not tokens), and embeddings.
+	isProbeShape := params.RequestType == domain.RequestTypeChat ||
+		params.RequestType == domain.RequestTypeMessages
+	if !isError && isProbeShape && params.Usage.CompletionTokens == 0 && params.Usage.CostMicroUSD == 0 && output == "" {
 		span.SetAttributes(attrDrop.Bool(true))
 	}
 
@@ -489,6 +497,13 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 		// are normalised to a chat-style messages array so downstream
 		// rendering matches the other surfaces.
 		return responsesInputAsMessages(body)
+	case domain.RequestTypeSpeech:
+		// TTS: the synthesized text is the meaningful input. Rendered as a
+		// single user message so the trace viewer shows it like any chat.
+		if in := gjson.GetBytes(body, "input"); in.Exists() && in.String() != "" {
+			return fmt.Sprintf(`[{"role":"user","content":%q}]`, in.String())
+		}
+		return ""
 	default:
 		r := gjson.GetBytes(body, "messages")
 		if !r.Exists() {
@@ -655,7 +670,17 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 			return out
 		}
 		return geminiOutputFromJSON(body)
+	case domain.RequestTypeTranscription:
+		// STT: the transcript is the meaningful output. The response is the
+		// OpenAI transcription JSON; anything without a text field (or a
+		// non-JSON body) renders as empty rather than as raw bytes.
+		if t := gjson.GetBytes(body, "text"); t.Exists() && t.String() != "" {
+			return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, t.String())
+		}
+		return ""
 	default:
+		// RequestTypeSpeech lands here on purpose: the response body is
+		// binary audio, which has no renderable message form.
 		return ""
 	}
 }
