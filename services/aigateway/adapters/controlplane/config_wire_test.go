@@ -171,3 +171,26 @@ func TestProviderSlotToCredential_BaseURL(t *testing.T) {
 		assert.Empty(t, cred.Extra["base_url"])
 	})
 }
+
+// The control-plane writes aliases in "provider/model" form, which is a
+// routing instruction rather than a model ID. Keeping the prefix on Model
+// sends the provider a model name it has never heard of, and drops the
+// provider the alias was pointing at.
+//
+// Spec: specs/ai-gateway/provider-routing.feature
+func TestToDomain_ModelAliases(t *testing.T) {
+	cfg := (&configWire{
+		ModelAliases: map[string]string{
+			"chat":     "openai/gpt-5-mini",
+			"thinking": "anthropic/claude-haiku-4-5-20251001",
+			"local":    "custom/qwen3-14b",
+			"bare":     "gpt-5-mini",
+		},
+	}).toDomain()
+
+	assert.Equal(t, domain.ModelAlias{ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"}, cfg.ModelAliases["chat"])
+	assert.Equal(t, domain.ModelAlias{ProviderID: domain.ProviderAnthropic, Model: "claude-haiku-4-5-20251001"}, cfg.ModelAliases["thinking"])
+	assert.Equal(t, domain.ModelAlias{ProviderID: domain.ProviderCustom, Model: "qwen3-14b"}, cfg.ModelAliases["local"])
+	assert.Equal(t, domain.ModelAlias{Model: "gpt-5-mini"}, cfg.ModelAliases["bare"],
+		"an unqualified target carries no provider and resolves against the credential chain")
+}
