@@ -83,6 +83,23 @@ function LiveSimulationRunCard({
     ),
   );
 
+  // A run the platform can't answer for renders the fallback, and `isTerminal`
+  // never flips for it (only a terminal STATUS does) — so without this the
+  // dead card would hold its SSE subscription open indefinitely. It has to be
+  // state rather than the query's own `error`, because the listener is
+  // declared ABOVE the query: `refetchInterval` is evaluated synchronously
+  // while `useQuery` runs, so `sseConnected` must already be bound by then
+  // (the drawer, whose polling policy this mirrors, orders them the same way).
+  const [runUnresolvable, setRunUnresolvable] = useState(false);
+
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id && !isTerminal && !runUnresolvable,
+    debounceMs: 300,
+    filter: { scenarioRunId: runId },
+    onStreamingEvent: handleStreamingEvent,
+  });
+
   const { data, error } = api.scenarios.getRunState.useQuery(
     { projectId: project?.id ?? "", scenarioRunId: runId },
     {
@@ -96,21 +113,14 @@ function LiveSimulationRunCard({
     },
   );
 
-  const { isConnected: sseConnected } = useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    // `!error`: a run the platform can't answer for renders the fallback —
-    // isTerminal never flips for it (only a terminal STATUS does), so without
-    // this the dead card would hold its subscription open indefinitely.
-    enabled: !!project?.id && !isTerminal && !error,
-    debounceMs: 300,
-    filter: { scenarioRunId: runId },
-    onStreamingEvent: handleStreamingEvent,
-  });
-
   const status = data?.status;
   useEffect(() => {
     if (statusIsTerminal(status)) setIsTerminal(true);
   }, [status]);
+
+  useEffect(() => {
+    if (error) setRunUnresolvable(true);
+  }, [error]);
 
   // Drop optimistic streamed messages once the server state includes them.
   useEffect(() => {

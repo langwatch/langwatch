@@ -12,7 +12,6 @@ import type { MouseEvent } from "react";
 import { isInternalHref } from "~/components/Markdown";
 import { useRouter } from "~/utils/compat/next-router";
 
-
 /**
  * Click handler for a real `<a>` whose plain left-click should SPA-navigate.
  *

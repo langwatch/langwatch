@@ -145,7 +145,8 @@ function textOf(node: ReactNode): string {
  * This is THE internal-href guard — `useSpaLinkClick` (features/langy) and
  * the panel's navigate handler use this same function; do not fork it.
  */
-// eslint-disable-next-line no-control-regex -- intentionally matching C0 controls
+// Matching C0 controls is the point here, not an oversight — they are exactly
+// the bytes the URL parser strips before resolving.
 const CONTROL_CHARS = /[\u0000-\u001f]/;
 
 // The PERCENT-ENCODED forms of the same rejected bytes: markdown's

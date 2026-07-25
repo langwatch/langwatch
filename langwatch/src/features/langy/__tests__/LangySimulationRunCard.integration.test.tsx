@@ -30,8 +30,29 @@ function lastListenerEnabled(): boolean {
   return mockUpdateListener.mock.calls.at(-1)?.[0]?.enabled ?? false;
 }
 
+/**
+ * The boundary stub has to keep the ONE behaviour of the real client that the
+ * card depends on: TanStack evaluates `refetchInterval` SYNCHRONOUSLY while
+ * `useQuery` runs. A stub that only returns `{ data }` never calls it, so a
+ * poll policy closing over a value declared below the query looks fine here
+ * and throws `ReferenceError: Cannot access '…' before initialization` on the
+ * first real render. Calling it is what makes this test able to see that.
+ */
 vi.mock("~/utils/api", () => ({
-  api: { scenarios: { getRunState: { useQuery: mockUseQuery } } },
+  api: {
+    scenarios: {
+      getRunState: {
+        useQuery: (
+          input: unknown,
+          options?: { refetchInterval?: (data: unknown) => unknown },
+        ) => {
+          const result = mockUseQuery(input, options);
+          options?.refetchInterval?.((result as { data?: unknown })?.data);
+          return result;
+        },
+      },
+    },
+  },
 }));
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
