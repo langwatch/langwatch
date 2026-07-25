@@ -81,9 +81,64 @@ Feature: Model → provider routing via VK config
 
   Rule: Listed models endpoint reflects effective allowlist
 
-    @integration @unimplemented
+    @unit
     Scenario: GET /v1/models returns aliases + allowed models
       When I GET /v1/models
       Then the response includes "chat" and "thinking" (aliases)
       And the response includes "gpt-5-mini"
       And the response does NOT include "gpt-4o" (not in models_allowed)
+
+    @unit
+    Scenario: GET /v1/models discovers models from self-hosted endpoints
+      Given the VK has no models_allowed configured
+      And a provider slot points at a self-hosted server via a base URL
+      When I GET /v1/models
+      Then the gateway asks that server for its model list
+      And the server's models appear in the response
+      And a server that fails to answer is skipped without failing the request
+
+    @unit
+    Scenario: GET /v1/models does not query endpoints when an allowlist is set
+      Given the VK has models_allowed ["qwen3-14b"]
+      And a provider slot points at a self-hosted server via a base URL
+      When I GET /v1/models
+      Then the response lists exactly the allowlist plus any aliases
+      And no upstream server is queried
+
+    @unit
+    Scenario: GET /v1/models expands wildcard allowlist entries
+      Given the VK has models_allowed ["claude-haiku-*"]
+      And the endpoint's catalog holds "claude-haiku-4-5-20251001" and "claude-opus-4-20250514"
+      When I GET /v1/models
+      Then the response includes "claude-haiku-4-5-20251001"
+      And "claude-haiku-*" itself is absent, a client cannot request a pattern
+      And "claude-opus-4-20250514" is absent, the allowlist still applies to discovered models
+
+    @unit
+    Scenario: GET /v1/models filters models denied by policy rules
+      Given the VK policy_rules.models.deny includes "^gpt-4.*$"
+      And the effective model list would include "gpt-4o"
+      When I GET /v1/models
+      Then "gpt-4o" is absent from the response
+
+  Rule: Model discovery cannot be turned into a probe of the gateway's network
+
+    Discovery is the one place the gateway itself fetches a
+    customer-controlled URL, so the endpoint policy that guards dispatch
+    has to hold at every hop, not just on the configured base URL.
+
+    @unit
+    Scenario: GET /v1/models does not follow redirects away from the configured endpoint
+      Given a provider slot points at a self-hosted server via a base URL
+      And that server answers the model-list probe with a redirect
+      When I GET /v1/models
+      Then the redirect target is never contacted
+      And the endpoint is skipped like any other failed probe
+
+    @unit
+    Scenario: GET /v1/models re-checks the resolved address before connecting
+      Given a base URL whose host answers the policy check with a public address
+      And the same host resolves to a private address when the connection is made
+      When I GET /v1/models
+      Then the gateway does not connect
+      And the endpoint contributes no models
