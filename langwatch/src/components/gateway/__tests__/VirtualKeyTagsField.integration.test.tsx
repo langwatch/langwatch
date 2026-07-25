@@ -95,6 +95,7 @@ describe("given the New virtual key drawer is open", () => {
   afterEach(() => cleanup());
 
   describe("when the Tags label's information icon is opened", () => {
+    /** @scenario The Tags field explains itself behind the label's information icon */
     it("says what tags do for the person typing them", async () => {
       renderDrawer();
 
@@ -109,6 +110,7 @@ describe("given the New virtual key drawer is open", () => {
       );
     });
 
+    /** @scenario The Tags field explains itself behind the label's information icon */
     it("warns that the tags become labels everyone in the project can see", async () => {
       renderDrawer();
 
@@ -123,6 +125,7 @@ describe("given the New virtual key drawer is open", () => {
       );
     });
 
+    /** @scenario The Tags field explains itself behind the label's information icon */
     it("explains cache-rule matching without naming the internals", async () => {
       renderDrawer();
 
@@ -137,6 +140,7 @@ describe("given the New virtual key drawer is open", () => {
       );
     });
 
+    /** @scenario The Tags field explains itself behind the label's information icon */
     it("states what saving does to a list that runs past the limits", async () => {
       renderDrawer();
 
@@ -153,6 +157,7 @@ describe("given the New virtual key drawer is open", () => {
       );
     });
 
+    /** @scenario The Tags field explains itself behind the label's information icon */
     it("links out to the cache-rules docs", async () => {
       renderDrawer();
 
@@ -168,6 +173,7 @@ describe("given the New virtual key drawer is open", () => {
   });
 
   describe("when nothing has been typed into Tags", () => {
+    /** @scenario The Tags field explains itself behind the label's information icon */
     it("leaves no explanation sitting under the field", () => {
       renderDrawer();
 
@@ -176,6 +182,7 @@ describe("given the New virtual key drawer is open", () => {
       ).not.toBeInTheDocument();
     });
 
+    /** @scenario The Tags field explains itself behind the label's information icon */
     it("keeps the explanation behind the icon rather than on the page", () => {
       renderDrawer();
 
@@ -186,6 +193,7 @@ describe("given the New virtual key drawer is open", () => {
   });
 
   describe("when more tags are typed than the key keeps", () => {
+    /** @scenario A tag list that will not survive the save says so before saving */
     it("warns that the extra ones will not be saved", async () => {
       renderDrawer();
 
@@ -205,6 +213,7 @@ describe("given the New virtual key drawer is open", () => {
   });
 
   describe("when a tag longer than the limit is typed", () => {
+    /** @scenario A tag list that will not survive the save says so before saving */
     it("warns that it will be shortened", async () => {
       renderDrawer();
 
@@ -220,6 +229,7 @@ describe("given the New virtual key drawer is open", () => {
   });
 
   describe("when an ordinary tag list is typed", () => {
+    /** @scenario A tag list within the limits gets no warning */
     it("shows no warning under the field", async () => {
       renderDrawer();
 
