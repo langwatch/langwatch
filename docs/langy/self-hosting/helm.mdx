@@ -13,7 +13,7 @@ Enabling Langy takes two steps: create the shared `LANGY_INTERNAL_SECRET` secret
 The agent pod is **default off** in the umbrella chart (`langyagent.chartManaged: false` at the umbrella level). The app and the agent both reference a shared `LANGY_INTERNAL_SECRET` Secret that the chart does **not** materialise, so defaulting on would break every existing operator's next upgrade with `CreateContainerConfigError`.
 
 <Info>
-**Pairs with:** [Self-hosting overview](/langy/self-hosting/overview), [Environment variables](/langy/self-hosting/environment-variables), [Register the GitHub App](/langy/self-hosting/github-app).
+**Also check:** [Self-hosting overview](/langy/self-hosting/overview), [Environment variables](/langy/self-hosting/environment-variables), [Register the GitHub App](/langy/self-hosting/github-app).
 </Info>
 
 <Warning>

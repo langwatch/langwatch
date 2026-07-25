@@ -1,6 +1,6 @@
 ---
 title: Langy Overview
-description: Langy is the automated AI engineer inside LangWatch that reads your traces and evals, writes Scenario tests, and opens a bot-authored pull request it proves in your CI.
+description: Langy is the automated AI engineer inside LangWatch that reads your traces and evals, writes Scenario tests, and opens PRs for the CI to run the evals and validate improvements.
 sidebarTitle: Overview
 keywords:
   - automated ai engineer
@@ -9,23 +9,21 @@ keywords:
   - ai agent that opens PRs
 ---
 
-You ask it a question in plain language, wherever your trace and eval data already lives. Langy reads the relevant production traces and evals through the `langwatch` CLI, its only path to your data.
+Langy is a full coding-agent harness running in a sandbox, with access to everything you grant it in your LangWatch account, so it fully understands your agents, evals, and prompts. Being a coding agent, it connects to your GitHub, runs code, experiments with improvements, and contributes them back as pull requests.
 
-When a question needs a check, it writes a Scenario simulation test or evaluation that captures the problem, drafts a fix, and opens a pull request on the repo you install it on. The Scenario tests it wrote run in your CI, so what comes back is either findings or a PR with green checks.
-
-A human reviews and merges. Langy never merges its own PR.
+With a CI pipeline that reaches your other systems, Langy runs its evals against your real agent pipeline, however complex it is.
 
 <Frame caption="The Langy panel open on the LangWatch home. Ask it a question and it starts reading your traces.">
   ![The Langy home with the chat panel open and suggested prompts](/images/langy/overview/chat-panel-empty.png)
 </Frame>
 
-Langy runs each conversation in its own isolated sandbox and uses your own model accounts and API keys. Every turn it takes is itself a traced, costed run in your LangWatch project, so you watch Langy work with the same tools you use to watch your own agents.
+Langy uses your own model accounts and API keys. Every turn it takes is itself a traced, costed run in your LangWatch project, so you watch Langy work with the same tools you use to watch your own agents.
 
 ## Where to go next
 
 <CardGroup cols={2}>
   <Card title="Getting started" icon="play" href="/langy/getting-started">
-    Turn Langy on, pick a model, ask it something, and review its first pull request.
+    Enable Langy, pick a model or sign in with Codex, and review the first pull request.
   </Card>
   <Card title="How Langy works" icon="diagram-project" href="/langy/how-langy-works">
     The mechanism: a gVisor-sandboxed opencode worker whose only interface to LangWatch is the `langwatch` CLI.

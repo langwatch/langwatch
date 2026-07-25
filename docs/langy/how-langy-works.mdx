@@ -1,6 +1,6 @@
 ---
 title: How Langy works
-description: Langy is the opencode coding-agent harness inside LangWatch, running one gVisor-sandboxed worker per conversation whose only interface to LangWatch is the langwatch CLI.
+description: "Each Langy conversation is one opencode worker in a gVisor sandbox: it reads LangWatch through the langwatch CLI, calls models through the LangWatch AI Gateway, and ships code only as pull requests."
 sidebarTitle: How Langy works
 keywords:
   - how langy works
@@ -8,14 +8,12 @@ keywords:
   - opencode harness
 ---
 
-A Go manager pod spawns and supervises one [opencode](https://github.com/anomalyco/opencode) worker per conversation. That worker does the actual reading, testing, and code editing, and it shells out to `langwatch` CLI commands rather than calling an MCP server or an internal data API.
+Langy runs on [opencode](https://github.com/anomalyco/opencode) as a separate service, `langyagent`, next to the LangWatch app. The app dispatches each chat turn to it; `langyagent` keeps one opencode process per conversation and reaps it when the conversation goes idle.
 
-Model calls leave the worker only through the LangWatch AI gateway. Code changes leave only as bot-authored GitHub pull requests.
-
-Every turn a worker takes is itself a traced run in your LangWatch project.
+The worker does the actual reading, testing, and code editing. Every tool call it makes streams back into the chat as a typed activity, and every turn is a traced run in your project.
 
 <Info>
-  **Pairs with:** [Security and the sandbox](/langy/security/sandbox), [Self-hosting overview](/langy/self-hosting/overview)
+  **Also check:** [Security and the sandbox](/langy/security/sandbox), [Self-hosting overview](/langy/self-hosting/overview)
 </Info>
 
 ## The architecture
@@ -27,7 +25,7 @@ graph LR
   manager["langyagent pod<br/>(Go manager)"]
   worker["opencode worker<br/>(one per conversation, gVisor-sandboxed)"]
   cli["langwatch CLI<br/>&rarr; LangWatch API"]
-  gateway["AI gateway<br/>(model calls)"]
+  gateway["LangWatch AI Gateway<br/>(model calls)"]
   github["GitHub App<br/>(bot-authored PRs)"]
 
   browser <--> control
@@ -39,18 +37,20 @@ graph LR
   worker -.->|"each turn is a traced run"| control
 ```
 
-The pieces, from the browser inward:
+| Piece | What it does |
+|---|---|
+| Browser | The chat panel. Event-sourced: a refresh resumes the conversation, an in-flight turn keeps streaming. |
+| Control plane | The turn processor in the LangWatch app. Admits each turn, dispatches it to the agent, logs every tool call as a typed event. |
+| `langyagent` | The agent service. Spawns one opencode worker per conversation. Single replica; scale vertically. |
+| opencode worker | The coding agent itself, inside the gVisor sandbox, holding that conversation's credentials, repo clone, and skills. Reaped after ~10 minutes idle, home wiped. |
 
-- **Browser.** The chat panel. Its state is event-sourced, so a refresh resumes the conversation and a turn already in flight keeps streaming.
-- **Control plane.** The TypeScript turn processor in LangWatch. It admits and dispatches each turn, re-types every shell tool call the worker makes into a typed capability for the event log, and persists conversation state. It reaches the agent pod over cluster DNS on a ClusterIP-only service, authenticated with the `LANGY_INTERNAL_SECRET` bearer token. The agent is never exposed outside the cluster.
-- **langyagent pod.** A single Go manager process that spawns one opencode worker per conversation. It runs one replica by design; scale it vertically, not horizontally.
-- **opencode worker.** The coding agent for a single conversation, running in the gVisor sandbox. It holds that conversation's credentials, its cloned repo, and its skills, and nothing durable survives the worker: an idle worker is reaped after about 10 minutes and its home is wiped.
+The agent service is cluster-internal only, never exposed outside; auth and networking details are on the [self-hosting overview](/langy/self-hosting/overview).
 
 The worker has exactly three ways out:
 
-- **The `langwatch` CLI**, its only interface to your LangWatch data. Commands like `langwatch trace search`, `langwatch analytics query`, `langwatch scenario create`, and `langwatch experiment run` run inside the worker's shell. There is no LangWatch MCP server and no `search_traces` or `get_analytics` tool for the model to call; if a skill mentions one, the model runs the CLI instead. Traces are scoped by `--origin`, and Langy excludes its own `langy`-origin traces by default.
-- **The AI gateway** for every model call. Langy does not call model providers directly. Its LLM traffic points at the LangWatch AI gateway, so every call is traced, rate-limited, and policy-checked like any other, and your bring-your-own-key or Codex credentials are enforced there. See [Models](/langy/models) and [Codex](/langy/codex).
-- **The GitHub App** for code changes, and only as pull requests. See [Pull requests](/langy/pull-requests).
+- **The `langwatch` CLI** for your LangWatch data: `trace search`, `analytics query`, `scenario create`, `experiment run`. No MCP server, no internal API.
+- **The LangWatch AI Gateway** for every model call, never a provider directly, so each call is traced, rate-limited, and policy-checked on your own keys or Codex. See [Models](/langy/models) and [Codex](/langy/codex).
+- **The GitHub App** for code changes, only as pull requests. See [Pull requests](/langy/pull-requests).
 
 ## The session loop
 

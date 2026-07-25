@@ -1,6 +1,6 @@
 ---
 title: Getting started with Langy
-description: Turn Langy on, pick a model or sign in with Codex, ask it something in the panel, and review the pull request it opens.
+description: "Langy setup: enabling the agent, picking a model or signing in with Codex, and reviewing the first pull request it opens."
 sidebarTitle: Getting started
 keywords:
   - langy getting started
@@ -8,10 +8,10 @@ keywords:
   - ai engineer setup
 ---
 
-Langy needs no separate install on your side: it reads your data through the `langwatch` CLI it already ships with, and it changes code only through a GitHub App you install on the repos you choose.
+There is nothing to install: the only setup is a model, and the GitHub App for pull requests.
 
 <Info>
-  **Pairs with:** [How Langy works](/langy/how-langy-works), [Models and Codex](/langy/models), [Pull requests](/langy/pull-requests)
+  **Also check:** [How Langy works](/langy/how-langy-works), [Models and Codex](/langy/models), [Pull requests](/langy/pull-requests)
 </Info>
 
 <Steps>
@@ -25,7 +25,7 @@ Langy needs no separate install on your side: it reads your data through the `la
     - **Add a provider API key** for OpenAI, Anthropic, or another supported provider, then pick a model such as `gpt-5.6-terra` or `claude-opus-4-8`. See [Models](/langy/models).
     - **Sign in with your OpenAI account** to run Langy on your ChatGPT subscription through Codex, using a device-code sign-in instead of pasting a key. See [Codex](/langy/codex).
 
-    Every model call, including Codex, goes through the LangWatch AI gateway, so tracing, budgets, and policy apply the same way regardless of which you pick.
+    Every model call, including Codex, goes through the LangWatch AI Gateway, so tracing, budgets, and policy apply the same way regardless of which you pick.
 
     <Frame caption="The Langy panel on the LangWatch home in its model-setup state. Codex leads the provider grid with a Recommended badge.">
       ![The LangWatch home with the Langy panel asking for a model, Codex recommended](/images/langy/fresh/langy-panel-model-setup.png)

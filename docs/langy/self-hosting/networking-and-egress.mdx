@@ -12,12 +12,12 @@ The Langy agent pod has **no outbound HTTPS by default**: `networkPolicy.allowEx
 
 To let Langy clone and push (open PRs), you enable egress. The pod's traffic then passes through an L7 egress adapter that requires TLS, allow-lists destinations, and enforces a GitHub FQDN floor.
 
-LLM traffic never uses this path; it goes to the in-cluster [AI Gateway](/ai-gateway/self-hosting/helm).
+LLM traffic never uses this path; it goes to the in-cluster [LangWatch AI Gateway](/ai-gateway/self-hosting/helm).
 
 The one boundary to understand before you rely on this in a regulated environment: the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is designed but not shipped. The details are below and in [The sandbox](/langy/security/sandbox).
 
 <Info>
-**Pairs with:** [Self-hosting overview](/langy/self-hosting/overview), [Environment variables](/langy/self-hosting/environment-variables), [The sandbox](/langy/security/sandbox).
+**Also check:** [Self-hosting overview](/langy/self-hosting/overview), [Environment variables](/langy/self-hosting/environment-variables), [The sandbox](/langy/security/sandbox).
 </Info>
 
 ## Why egress is L7, not iptables
@@ -30,7 +30,7 @@ That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy
 
 | Destination | Why | Path |
 |---|---|---|
-| In-cluster AI Gateway | All LLM traffic (traced, budgeted, policed) | Always, in-cluster |
+| In-cluster LangWatch AI Gateway | All LLM traffic (traced, budgeted, policed) | Always, in-cluster |
 | In-cluster LangWatch app | The `langwatch` CLI (per-session key) | Always, in-cluster |
 | `github.com`, `api.github.com`, `codeload.github.com` | Clone and push for pull requests | Only when egress is on |
 | `api.github.com` (from the control plane, not the worker) | Mint 1-hour installation tokens | Control plane |

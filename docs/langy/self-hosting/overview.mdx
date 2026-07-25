@@ -18,7 +18,7 @@ The GitHub App and outbound network egress are both optional and off until you c
 The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [opencode](/langy/how-langy-works) worker per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 
 <Info>
-**Pairs with:** [Enable Langy via Helm](/langy/self-hosting/helm), [Environment variables](/langy/self-hosting/environment-variables), [Networking and egress](/langy/self-hosting/networking-and-egress), [The sandbox](/langy/security/sandbox).
+**Also check:** [Enable Langy via Helm](/langy/self-hosting/helm), [Environment variables](/langy/self-hosting/environment-variables), [Networking and egress](/langy/self-hosting/networking-and-egress), [The sandbox](/langy/security/sandbox).
 </Info>
 
 <Note>
@@ -59,13 +59,13 @@ graph LR
     App -->|"Bearer LANGY_INTERNAL_SECRET<br/>ClusterIP only"| Agent["langyagent pod<br/>(Go manager)"]
     Agent -->|"one per conversation"| Worker["gVisor-sandboxed<br/>opencode worker"]
     Worker -->|"langwatch CLI<br/>(per-session key)"| App
-    Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["AI Gateway"]
+    Worker -->|"LLM traffic<br/>(virtual key)"| Gateway["LangWatch AI Gateway"]
     Gateway -->|"completions"| Providers["LLM Providers<br/>(your accounts / BYOK)"]
     Worker -->|"git / gh<br/>(if egress on)"| GitHub["github.com<br/>api.github.com<br/>codeload.github.com"]
     App -->|"install tokens"| GitHubAPI["api.github.com"]
 ```
 
-The control plane reaches the agent over cluster DNS at `http://<release>-langyagent:80` (`OPENCODE_AGENT_URL`), authenticated with `LANGY_INTERNAL_SECRET`. The Service is ClusterIP only; a render-time guard blocks any other type, so the agent is never exposed outside the cluster. Each worker's only path to LangWatch data is the `langwatch` CLI, and its only path to the internet is the [L7 egress adapter](/langy/self-hosting/networking-and-egress). LLM traffic goes through the [AI Gateway](/ai-gateway/self-hosting/helm), never direct to providers, so every Langy LLM call is traced, budgeted, and policed like any other.
+The control plane reaches the agent over cluster DNS at `http://<release>-langyagent:80` (`OPENCODE_AGENT_URL`), authenticated with `LANGY_INTERNAL_SECRET`. The Service is ClusterIP only; a render-time guard blocks any other type, so the agent is never exposed outside the cluster. Each worker's only path to LangWatch data is the `langwatch` CLI, and its only path to the internet is the [L7 egress adapter](/langy/self-hosting/networking-and-egress). LLM traffic goes through the [LangWatch AI Gateway](/ai-gateway/self-hosting/helm), never direct to providers, so every Langy LLM call is traced, budgeted, and policed like any other.
 
 ## Where to go next
 

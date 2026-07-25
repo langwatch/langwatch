@@ -1,6 +1,6 @@
 ---
 title: Langy Models and Bring Your Own Key
-description: Choose the model Langy runs on and connect your own provider API keys through the LangWatch AI gateway.
+description: Choose the model Langy runs on and connect your own provider API keys through the LangWatch AI Gateway.
 sidebarTitle: Models
 keywords: langy model, bring your own llm key, ai gateway
 ---
@@ -53,14 +53,14 @@ Provider keys are stored **encrypted at rest**. They are decrypted only when a c
 
 ## How Langy's model calls are routed
 
-Langy never calls a provider directly. Every Langy LLM call rides a per-project **virtual key** through the LangWatch AI gateway. That means the same controls apply to Langy that apply to any other traffic on your project:
+Langy never calls a provider directly. Every Langy LLM call rides a per-project **virtual key** through the LangWatch AI Gateway. That means the same controls apply to Langy that apply to any other traffic on your project:
 
 - **Tracing.** Every call is traced, with tokens and cost, in your own LangWatch project.
 - **Rate limits.** Your gateway rate limits and budgets apply.
 - **Model policy.** The gateway enforces which models are allowed, server-side, as a second check on top of the picker.
 
 <Info>
-**Pairs with:** [Token usage and cost](/langy/token-usage-and-cost), [Data flow and privacy](/langy/security/data-flow-and-privacy).
+**Also check:** [Token usage and cost](/langy/token-usage-and-cost), [Data flow and privacy](/langy/security/data-flow-and-privacy).
 </Info>
 
 ## Reference

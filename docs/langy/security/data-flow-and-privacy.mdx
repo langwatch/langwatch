@@ -12,7 +12,7 @@ keywords:
 A Langy conversation sends data to at most three destinations. Two of them are yours, and the third is off unless you turn it on:
 
 1. **Your own LangWatch project (always).** Every Langy turn is itself traced and costed into the LangWatch project you are working in.
-2. **External hosts (only through the egress path).** LLM traffic goes to the LangWatch AI gateway. Traffic to `git` / `gh` / `npm` reaches the internet only if `allowExternalHttps` is enabled and the destination passes the L7 egress adapter. Private ranges, CGNAT, and the cloud metadata endpoint are always blocked.
+2. **External hosts (only through the egress path).** LLM traffic goes to the LangWatch AI Gateway. Traffic to `git` / `gh` / `npm` reaches the internet only if `allowExternalHttps` is enabled and the destination passes the L7 egress adapter. Private ranges, CGNAT, and the cloud metadata endpoint are always blocked.
 3. **An operator mirror lane (optional, off by default).** An operator can configure a second copy of each turn's trace to be shipped to a LangWatch project they designate (ADR-061). This lane is dormant unless `LANGY_MIRROR_TRACE_ENDPOINT` and `LANGY_MIRROR_TRACE_KEY` are both set.
 
 ```mermaid
@@ -22,7 +22,7 @@ flowchart TD
     AG --> W[One gVisor-sandboxed worker per conversation]
 
     W -->|langwatch CLI, per-session caller-scoped key| API[LangWatch API]
-    W -->|LLM traffic via per-project virtual key| GW[LangWatch AI gateway]
+    W -->|LLM traffic via per-project virtual key| GW[LangWatch AI Gateway]
     W -->|git / gh / npm, only if allowExternalHttps and passes L7 adapter| EXT[github.com / api.github.com / codeload.github.com]
 
     W -.->|every turn, traced and costed| TR[(Your LangWatch project)]
@@ -40,7 +40,7 @@ flowchart TD
 
 Every Langy turn is an agent run, and it is traced like any other agent run in your project.
 
-The worker streams its spans through the trace relay, authenticated with the per-session key and a fail-closed resource-attribute allow-list. A platform-owned `langy.turn` root span is recorded, and the AI gateway records the `gen_ai` spans, including the full prompt and completion, for the LLM calls.
+The worker streams its spans through the trace relay, authenticated with the per-session key and a fail-closed resource-attribute allow-list. A platform-owned `langy.turn` root span is recorded, and the LangWatch AI Gateway records the `gen_ai` spans, including the full prompt and completion, for the LLM calls.
 
 You watch Langy work with the same tools you use to watch your own agents, and the cost of a Langy turn shows up as cost in your project.
 
@@ -48,7 +48,7 @@ You watch Langy work with the same tools you use to watch your own agents, and t
 
 Langy does not open arbitrary outbound connections. Two kinds of external traffic exist, and both are constrained:
 
-- **LLM traffic** goes to the LangWatch AI gateway, never directly to a model provider. The worker's LLM base URL points at the gateway, so tracing, rate limits, budgets, and model policy all apply. See [How Langy's model calls are routed](/langy/models).
+- **LLM traffic** goes to the LangWatch AI Gateway, never directly to a model provider. The worker's LLM base URL points at the gateway, so tracing, rate limits, budgets, and model policy all apply. See [How Langy's model calls are routed](/langy/models).
 - **`git` / `gh` / `npm` traffic** reaches the internet only when `allowExternalHttps` is on and the destination passes the L7 egress adapter. The operator floor is `github.com`, `api.github.com`, and `codeload.github.com`; a project can add to the allow-list.
 
 Regardless of the allow-list, these are blocked at L3/L4:
@@ -95,7 +95,7 @@ On a self-hosted install the mirror lane is **off** unless you set both variable
 </Note>
 
 <Info>
-**Pairs with:** [How Langy is isolated](/langy/security/sandbox), [What Langy can do in your GitHub](/langy/security/github-access), [Models and bring your own key](/langy/models).
+**Also check:** [How Langy is isolated](/langy/security/sandbox), [What Langy can do in your GitHub](/langy/security/github-access), [Models and bring your own key](/langy/models).
 </Info>
 
 ## Reference
