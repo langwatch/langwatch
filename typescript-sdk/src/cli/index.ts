@@ -384,6 +384,7 @@ program.addHelpText(
     "  claude          Run `claude` (Claude Code) routed through the gateway",
     "  codex           Run `codex` (OpenAI Codex CLI) routed through the gateway",
     "  copilot         Run `copilot` (GitHub Copilot CLI) with LangWatch telemetry",
+    "  code            Run `code` (VS Code) with LangWatch telemetry for GitHub Copilot Chat",
     "  cursor          Run `cursor` routed through the gateway",
     "  gemini          Run `gemini` (Gemini CLI) routed through the gateway",
     "  opencode        Run `opencode` (multi-provider) routed through the gateway",

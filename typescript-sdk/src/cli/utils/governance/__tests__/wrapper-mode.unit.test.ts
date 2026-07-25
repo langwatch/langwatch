@@ -579,6 +579,8 @@ describe("resolveWrapperMode", () => {
           out.vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT,
         ).toBeUndefined();
         expect(out.notice ?? "").toContain("tokens only");
+        // the notice names the actual tool, not a hardcoded "copilot"
+        expect(out.notice ?? "").toContain("code traces");
       } finally {
         if (prev === undefined)
           delete process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;

@@ -346,7 +346,7 @@ export async function resolveWrapperMode(
     )
   ) {
     delete vars.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT;
-    const optOutNotice = `${lwTag()} content capture is disabled in your environment (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false); copilot traces will carry tokens only.`;
+    const optOutNotice = `${lwTag()} content capture is disabled in your environment (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT is falsey); ${tool} traces will carry tokens only.`;
     notice = notice ? `${notice}\n${optOutNotice}` : optOutNotice;
   }
 
