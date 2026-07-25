@@ -79,7 +79,14 @@ dev's Personal Workspace at https://<your-host>/me .
 {{- if (index .Values "langyagent").chartManaged }}
   • Langy, the in-product assistant:
       kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name=langyagent
-{{- if not (index .Values "langyagent").runtimeClassName }}
+{{- if (index .Values "langyagent").runtimeClassName }}
+    The pod is pinned to the "{{ (index .Values "langyagent").runtimeClassName }}" RuntimeClass. If it stays Pending
+    with a "RuntimeClass not found" event, your cluster does not define one:
+    GKE ships it managed (GKE Sandbox), on AKS point langyagent.runtimeClassName
+    at your Kata VM isolation class, on EKS install gVisor on the node group,
+    or accept running without the pod-to-host sandbox explicitly:
+      langyagent.runtimeClassName=""  langyagent.acceptUnsandboxedRuntime=true
+{{- else }}
     ⚠ Running without a pod-to-host sandbox (no runtimeClassName). Workers
     keep per-UID isolation and the NetworkPolicy. To harden, install a
     gvisor RuntimeClass in the cluster and set:

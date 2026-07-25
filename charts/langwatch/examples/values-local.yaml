@@ -76,3 +76,10 @@ redis:
 
 prometheus: { chartManaged: false }
 cronjobs:   { enabled: false }
+
+# Local clusters (kind, minikube) have no sandboxed runtime; run Langy without
+# one so the assistant works out of the box. Production installs keep the
+# gvisor default.
+langyagent:
+  runtimeClassName: ""
+  acceptUnsandboxedRuntime: true

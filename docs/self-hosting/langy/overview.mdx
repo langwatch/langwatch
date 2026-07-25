@@ -11,7 +11,7 @@ keywords:
 
 Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, and ships **enabled**: a plain `helm install` deploys it, materialises the shared secret, wires the app and workers to it, and opens Langy to everyone in the install.
 
-The default runs on the node's normal runtime so the chart installs on any cluster. For production, harden the pod with a gVisor RuntimeClass: `langyagent.runtimeClassName: "gvisor"`. See [Setup](/self-hosting/langy/setup).
+The default pins the pod to a `gvisor` RuntimeClass. On a cluster without one, only the agent pod waits (Pending) while the rest of the install runs; provide a sandboxed runtime or accept running without one. See [Setup](/self-hosting/langy/setup).
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
@@ -34,7 +34,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 | Access | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
 | Replicas | 1 (render-time guard blocks more until conversation-sticky routing exists) |
 | Update strategy | `Recreate`, no HPA. Scale vertically. |
-| Sandbox | Node default runtime out of the box; harden with `runtimeClassName: gvisor` |
+| Sandbox | `runtimeClassName: gvisor` by default; unsandboxed only via explicit `acceptUnsandboxedRuntime: true` |
 | Sizing | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi |
 | Shared secret | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
 | GitHub App | Optional, for bot-authored pull requests |
@@ -42,7 +42,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 
 ## Hard requirements
 
-- **A sandboxed runtime, for production.** The default install runs the pod on the node's normal runtime and states that in the install notes; workers keep per-UID isolation, per-worker credentials, and the NetworkPolicy. Because the workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), production installs should add the pod-to-host sandbox: install a `gvisor` RuntimeClass (the gVisor operator or a RuntimeClass manifest; GKE Sandbox ships one) and set `langyagent.runtimeClassName: "gvisor"`. Setting `acceptUnsandboxedRuntime: false` makes the chart refuse to render until a sandboxed runtime is configured. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime.** The workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), so the default pins the pod to gVisor. GKE ships the RuntimeClass managed (GKE Sandbox; Autopilot schedules `gvisor` pods directly). On AKS, point `runtimeClassName` at your Kata VM isolation class; any sandboxed RuntimeClass works. EKS has no managed option: install gVisor on the node group, or accept unsandboxed explicitly with `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`. On a cluster without the RuntimeClass, the pod waits with a `RuntimeClass not found` event and the install notes explain the choice. See [The sandbox](/langy/security/sandbox).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
@@ -72,7 +72,7 @@ The control plane reaches the agent over cluster DNS at `http://<release>-langya
 
 <CardGroup cols={2}>
   <Card title="Setup" icon="ship" href="/self-hosting/langy/setup">
-    One chart value deploys the agent; unsandboxed acceptance, egress, mirror, and staged rollout.
+    Deployed by default; the sandboxed runtime per cloud, egress, mirror, and staged rollout.
   </Card>
   <Card title="Register the GitHub App" icon="github" href="/self-hosting/langy/github-app">
     Register the app, set the `GITHUB_LANGY_*` env vars, and install it on the repos Langy may touch.

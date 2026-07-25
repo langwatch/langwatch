@@ -1649,16 +1649,20 @@ gateway:
 ## visit. What Langy still needs from you is a model to talk to: configure a model
 ## provider for the project as you would for any other LangWatch feature.
 ##
-## The default runs on the node's normal runtime so the install works on any
-## cluster. Workers still get per-UID isolation, a per-worker opencode password,
-## and a NetworkPolicy with egress off. HARDENING for production: give the pod a
-## sandboxed runtime so a worker that escapes its container does not face the
-## node kernel directly:
+## The default pins the pod to a gvisor RuntimeClass, the secure posture. The
+## install itself never fails on this: on a cluster without the RuntimeClass,
+## only the langyagent pod stays Pending (with a "RuntimeClass not found"
+## event) while the rest of the install runs, and the install notes explain the
+## choice. Where to get one: GKE ships it managed (GKE Sandbox; Autopilot
+## schedules gvisor pods directly), AKS offers Kata VM isolation (set
+## runtimeClassName to your Kata class; any sandboxed RuntimeClass is fine),
+## EKS has no managed option, so install gVisor on your node group or accept
+## unsandboxed explicitly:
 ##
 ##   langyagent:
-##     runtimeClassName: "gvisor"
+##     runtimeClassName: ""
+##     acceptUnsandboxedRuntime: true
 ##
-## (requires a gvisor RuntimeClass in the cluster; see the subchart values.)
 ## To not run Langy at all: langyagent.chartManaged: false removes the pod and
 ## every reference to it.
 ## NOTE: hyphenated key — reference as (index .Values "langyagent") in templates.
@@ -1666,11 +1670,11 @@ langyagent:
   ## @param langyagent.chartManaged [default: true] Deploy the Langy agent pod as part of this chart, wire the app and workers to it, and open the assistant to this install. Set false to run without the assistant; the pod and every reference to it are removed on the next upgrade.
   chartManaged: true
 
-  ## @param langyagent.runtimeClassName [string, default: ""] RuntimeClass for the agent pod. Empty runs on the node's default runtime so the chart installs anywhere; set "gvisor" (with the RuntimeClass present in the cluster) to add the pod-to-host sandbox. Overrides the subchart default.
-  runtimeClassName: ""
+  ## @param langyagent.runtimeClassName [string, default: "gvisor"] RuntimeClass for the agent pod. Any sandboxed class works (gvisor, a Kata class on AKS). Blank it only together with acceptUnsandboxedRuntime, on clusters that cannot offer one.
+  runtimeClassName: "gvisor"
 
-  ## @param langyagent.acceptUnsandboxedRuntime [default: true] Acknowledges that an empty runtimeClassName runs LLM-driven shell without a pod-to-host sandbox. On by default so the out-of-the-box install renders; set false to make the chart refuse to render unless a sandboxed runtime is configured.
-  acceptUnsandboxedRuntime: true
+  ## @param langyagent.acceptUnsandboxedRuntime [default: false] Accept running LLM-driven shell without a pod-to-host sandbox. Required for a blank runtimeClassName, so an unsandboxed deploy is always a value the operator wrote down.
+  acceptUnsandboxedRuntime: false
 
   ## @param langyagent.enableForAllUsers [default: true] Make Langy available to everyone in this install as soon as the agent is deployed. Set false to keep the rollout flag authoritative and open Langy to chosen projects/orgs from /ops/feature-flags instead — the staged path the hosted product uses.
   enableForAllUsers: true

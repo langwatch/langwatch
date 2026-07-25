@@ -11,9 +11,9 @@ keywords:
 
 Each conversation runs as a separate `opencode` worker process inside a single agent pod. gVisor is a user-space kernel that sits between the worker and the host kernel, so a worker that runs arbitrary shell (Langy workers spawn `git`, `gh`, and `npm`) has a much smaller pod-to-host escape surface than a normal container.
 
-On LangWatch Cloud the pod always runs under gVisor. A self-hosted umbrella-chart install runs on the node's normal runtime by default, so it installs on any cluster, and states in its install notes that the pod-to-host sandbox is absent; you then keep only the in-pod walls below. Harden it with `langyagent.runtimeClassName: "gvisor"` once the cluster defines the RuntimeClass.
+On LangWatch Cloud the pod always runs under gVisor. Self-hosted, the chart pins the pod to a `gvisor` RuntimeClass by default; on a cluster without one the pod waits rather than silently dropping to the node's runtime. Any sandboxed RuntimeClass works (a Kata class on AKS, for example).
 
-The agent's own chart (`charts/langyagent`) keeps a render-time `fail` guard: managed, with no runtime set and the unsandboxed acceptance withdrawn (`acceptUnsandboxedRuntime: false`), it refuses to render rather than dropping the sandbox silently.
+Running unsandboxed takes an explicit pair, `runtimeClassName: ""` plus `acceptUnsandboxedRuntime: true`; the chart's render-time `fail` guard refuses the first value alone. You then lose the pod-to-host boundary and keep only the in-pod walls below.
 
 ## Isolation layers
 

@@ -42,12 +42,11 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     # Same family as the existing replicaCount and service.type render guards.
 
   # Most self-managed clusters cannot offer a sandboxed runtime, and refusing
-  # them outright made the assistant hosted-only in practice. The umbrella chart
-  # therefore ships the acceptance as its default so a plain install runs the
-  # assistant anywhere, and announces the missing sandbox in its install notes
-  # with the hardening step. The guard keeps protecting the standalone subchart,
-  # whose defaults still demand a sandboxed runtime, and any operator who
-  # withdraws the acceptance explicitly.
+  # them outright made the assistant hosted-only in practice. The invariant that
+  # survives is narrower and still worth having: nobody runs this workload
+  # unsandboxed by ACCIDENT. Accepting the reduced isolation is a value the
+  # operator writes down, so it shows up in their own values file and in review,
+  # rather than being the silent consequence of leaving a field blank.
   Scenario: An operator can accept the reduced isolation and render without a sandbox
     Given the chart manages the langy-agent pod
     And no sandboxed runtime is configured for the pod
@@ -63,12 +62,14 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     Then the pod renders successfully
     And the pod is pinned to the sandboxed runtime
 
-  Scenario: The umbrella chart's default install runs the assistant and says how to harden it
+  Scenario: A default install on a cluster without the RuntimeClass degrades to Pending, not to unsandboxed
     Given an operator installs the umbrella chart with default values
+    And the cluster defines no matching RuntimeClass
     When the install completes
-    Then the langy-agent pod is deployed without a sandboxed runtime
-    And the install notes state that the pod-to-host sandbox is absent
-    And the install notes name the value that pins the pod to a sandboxed runtime
+    Then every other workload runs
+    And the langy-agent pod waits rather than running without its sandbox
+    And the install notes explain where a sandboxed runtime comes from on each major cloud
+    And the install notes name the values that accept running without one
 
   Scenario: The guard does not fire when the agent is not chart-managed
     Given the chart does not manage the langy-agent pod

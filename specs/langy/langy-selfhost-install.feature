@@ -28,7 +28,7 @@ Feature: Langy comes up with a self-hosted LangWatch install
   # ===========================================================================
 
   Scenario: A plain install brings up a working assistant
-    Given an operator installs the LangWatch chart on their own cluster
+    Given an operator installs the LangWatch chart on a cluster with a sandboxed runtime
     When the install completes with default values
     Then the Langy agent is running without any Langy-specific values set
     And nothing was created by hand
@@ -94,27 +94,25 @@ Feature: Langy comes up with a self-hosted LangWatch install
   # ===========================================================================
 
   # Langy runs LLM-written shell, so the sandboxed runtime is the posture we
-  # want everywhere. But requiring it silently made "no sandboxed runtime" mean
-  # "no Langy at all", which is most self-managed clusters. So the umbrella
-  # chart ships unsandboxed-and-accepted as its default: a plain install runs
-  # Langy on any cluster, and the install notes say the sandbox is absent and
-  # how to add it. The refusal survives for the operator who withdraws the
-  # acceptance, and for the standalone subchart, whose defaults still demand a
-  # sandboxed runtime.
-  Scenario: A default install runs Langy without a sandbox and says so
-    Given a cluster with no sandboxed runtime available
+  # want everywhere. But hard-failing the whole install over it made the chart
+  # unusable on clusters without one. So the default keeps the sandbox pinned
+  # and degrades to a waiting pod instead: the install always succeeds, Langy
+  # stays dark until the operator either provides a sandboxed runtime or
+  # accepts running without one, out loud, in their values file.
+  Scenario: A default install keeps the sandbox pinned
+    Given a cluster with a sandboxed runtime available
     When the operator installs with default values
-    Then Langy installs and runs
-    And the install notes state the sandbox is absent and name the hardening value
-
-  Scenario: An operator can harden the pod with a sandboxed runtime
-    Given a cluster with a gvisor RuntimeClass available
-    When the operator pins the agent to it
     Then Langy installs and runs under the sandboxed runtime
 
-  Scenario: Withdrawing the acceptance without providing a sandbox is refused
+  Scenario: An operator whose cluster has no sandboxed runtime can still run Langy, deliberately
     Given a cluster with no sandboxed runtime available
-    When the operator withdraws the unsandboxed acceptance without setting a runtime
+    When the operator accepts the reduced isolation explicitly
+    Then Langy installs and runs
+    And the acceptance is recorded in their own values, not buried in a default
+
+  Scenario: Leaving the sandbox out without saying so is still refused
+    Given a cluster with no sandboxed runtime available
+    When the operator blanks the runtime without accepting the reduced isolation
     Then the install refuses to render
     And the refusal explains both what is missing and how to accept it
 

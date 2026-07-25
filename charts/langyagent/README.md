@@ -34,18 +34,21 @@ than half-deploying. To run without the assistant, set
 
 ### The sandboxed runtime
 
-The agent runs LLM-written shell. Under the umbrella chart the default runs on
-the node's normal runtime so the install works on any cluster, and the install
-notes state that the pod-to-host sandbox is absent. Harden it once the cluster
-defines a `gvisor` RuntimeClass:
+The agent runs LLM-written shell, so the default pins the pod to a `gvisor`
+RuntimeClass. On a cluster without one, the pod stays Pending (RuntimeClass
+not found) while everything else runs: GKE ships the class managed (GKE
+Sandbox), on AKS point `runtimeClassName` at your Kata VM isolation class, on
+EKS install gVisor on the node group. To run without a sandbox, say so
+explicitly:
 
 ```yaml
 langyagent:
-  runtimeClassName: "gvisor"
+  runtimeClassName: ""
+  acceptUnsandboxedRuntime: true
 ```
 
-Standalone, this chart's own defaults still demand a sandboxed runtime and
-refuse to render without one unless `acceptUnsandboxedRuntime: true` is set.
+The chart refuses a blank runtime without the acceptance, so an unsandboxed
+deploy is always deliberate.
 
 Unsandboxed, you keep per-worker UID isolation, the per-worker opencode
 password, and the NetworkPolicy; you give up the pod-to-host sandbox. A

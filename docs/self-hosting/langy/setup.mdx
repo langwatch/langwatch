@@ -29,30 +29,38 @@ LangWatch install can use it, and it runs with the permissions of whoever is
 asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
 </Note>
 
-## Hardening with a sandboxed runtime
+## The sandboxed runtime
 
-Langy's workers run shell written by a language model. The default install runs
-the pod on the node's normal runtime so the chart installs on any cluster, and
-the install notes state that the pod-to-host sandbox is absent.
+Langy's workers run shell written by a language model, so the default pins the
+agent pod to a [gVisor](https://gvisor.dev/docs/user_guide/install/)
+RuntimeClass. On a cluster without one, only this pod stays Pending (with a
+`RuntimeClass not found` event) while the rest of the install runs.
 
-What you keep by default: each conversation's worker runs under its own UID with
-its own credentials, workers cannot read each other's, and a NetworkPolicy bounds
-what any of them can reach. What the sandbox adds on top is protection of the
-node itself from a worker that escapes its container. An install whose users are
-all colleagues carries a very different risk here than one exposed to untrusted
-users, and that judgement is yours to make.
+Where a sandboxed runtime comes from:
 
-For production, pin the pod to [gVisor](https://gvisor.dev/docs/user_guide/install/).
-Managed offerings like GKE Sandbox provide the RuntimeClass; on self-managed
-clusters install the gVisor operator or a RuntimeClass manifest first:
+| Cluster | What to do |
+|---------|------------|
+| GKE | Nothing: GKE Sandbox provides the `gvisor` RuntimeClass. Autopilot schedules the pod directly; on Standard, enable Sandbox on a node pool. |
+| AKS | Use a Kata VM isolation pool and point `langyagent.runtimeClassName` at its RuntimeClass. Any sandboxed class works. |
+| EKS | No managed option. Install gVisor on the node group (custom AMI or DaemonSet), or accept running unsandboxed below. |
+
+If your cluster cannot offer one, say so explicitly and the pod runs on the
+node's normal runtime:
 
 ```yaml
 langyagent:
-  runtimeClassName: "gvisor"
+  runtimeClassName: ""
+  acceptUnsandboxedRuntime: true
 ```
 
-To make the chart refuse to render unless a sandboxed runtime is configured,
-also set `acceptUnsandboxedRuntime: false`.
+The chart refuses a blank runtime without the acceptance, so an unsandboxed
+deploy is always a value you wrote down. What you keep either way: each
+conversation's worker runs under its own UID with its own credentials, workers
+cannot read each other's, and a NetworkPolicy bounds what any of them can
+reach. What the sandbox adds on top is protection of the node itself from a
+worker that escapes its container. An install whose users are all colleagues
+carries a very different risk here than one exposed to untrusted users, and
+that judgement is yours to make.
 
 ## Letting Langy reach the internet
 
