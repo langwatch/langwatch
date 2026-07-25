@@ -545,8 +545,8 @@ function validateStatusCode(value: number | null): NormalizedStatusCode | null {
  * Ensures a ClickHouse Map(String, String) value is actually Record<string, string>.
  * Non-string values are dropped with a warning.
  *
- * Exported so every stored_spans read path shares the same row decoding —
- * pair with {@link deserializeAttributes}.
+ * Exported so every stored_spans read path shares the same row decoding.
+ * Pair with {@link deserializeAttributes}.
  */
 export function ensureStringRecord(
   raw: Record<string, unknown>,

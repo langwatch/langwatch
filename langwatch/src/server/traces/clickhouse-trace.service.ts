@@ -1,21 +1,21 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
-import { HandledError } from "@langwatch/handled-error";
-import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import {
-  deserializeAttributes,
-  ensureStringRecord,
-} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
+import {
+  deserializeAttributes,
+  ensureStringRecord,
+} from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
+import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
   type ClickHouseEvaluationRunRow,

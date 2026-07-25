@@ -177,7 +177,7 @@ export async function resolveOffloadedTracesBatch({
   const fetchTasks = new Map<string, FetchTask>();
   const tracePlans: SpanPlan[][] = spansPerTrace.map((spans) =>
     spans.map((span) => {
-      const attrs = span.spanAttributes as NormalizedAttributes;
+      const attrs = span.spanAttributes;
       if (!hasEventRefs(attrs)) {
         return { cleanedAttrs: attrs, refs: [], hadRefs: false };
       }

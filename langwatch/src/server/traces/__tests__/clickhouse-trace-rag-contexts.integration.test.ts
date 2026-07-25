@@ -10,26 +10,35 @@
  * `contexts: []`. See specs/traces/rag-contexts-read-deserialization.feature.
  *
  * Uses testcontainers ClickHouse to exercise real SQL against the production
- * schema — rows are inserted exactly as serializeAttributes writes them.
+ * schema. Rows are inserted exactly as serializeAttributes writes them.
  */
+
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { RAGSpan, Span } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { SpanStorageClickHouseRepository } from "../repositories/span-storage.clickhouse.repository";
-import type { Protections } from "../../elasticsearch/protections";
-import type { RAGSpan, Span } from "~/server/tracer/types";
 
 const tenantId = `test-rag-contexts-${nanoid()}`;
 const now = Date.now();
 
 const ragChunks = [
-  { document_id: "kb-billing.md", chunk_id: null, content: "Billing article body" },
-  { document_id: "kb-coverage.md", chunk_id: "c-2", content: "Coverage article body" },
+  {
+    document_id: "kb-billing.md",
+    chunk_id: null,
+    content: "Billing article body",
+  },
+  {
+    document_id: "kb-coverage.md",
+    chunk_id: "c-2",
+    content: "Coverage article body",
+  },
 ];
 
 function makeTraceSummaryRow(overrides: Record<string, unknown> = {}) {
@@ -74,7 +83,10 @@ function makeTraceSummaryRow(overrides: Record<string, unknown> = {}) {
  * every SpanAttributes value is a string (Map(String, String)), with
  * objects/arrays JSON-stringified by serializeAttributes.
  */
-function makeRagSpanRow(traceId: string, overrides: Record<string, unknown> = {}) {
+function makeRagSpanRow(
+  traceId: string,
+  overrides: Record<string, unknown> = {},
+) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
@@ -95,7 +107,10 @@ function makeRagSpanRow(traceId: string, overrides: Record<string, unknown> = {}
       "langwatch.span.type": "rag",
       "langwatch.rag.contexts": JSON.stringify(ragChunks),
       "langwatch.timestamps": JSON.stringify({ started_at: now }),
-      "langwatch.input": JSON.stringify({ type: "text", value: "user question" }),
+      "langwatch.input": JSON.stringify({
+        type: "text",
+        value: "user question",
+      }),
     },
     StatusCode: 1,
     StatusMessage: null,

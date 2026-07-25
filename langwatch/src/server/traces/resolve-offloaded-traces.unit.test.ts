@@ -15,7 +15,7 @@ vi.mock("langwatch", () => ({
       _name: string,
       _opts: unknown,
       fn: (span: { setAttributes: () => void }) => unknown,
-    ) => fn({ setAttributes: () => {} }),
+    ) => fn({ setAttributes: () => undefined }),
   }),
 }));
 
