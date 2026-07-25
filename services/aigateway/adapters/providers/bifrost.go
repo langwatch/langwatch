@@ -882,7 +882,9 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 		// are sized for a hosted provider fronting the whole gateway; taking
 		// them per endpoint would let customer configuration multiply the
 		// process's goroutine count several times over. A self-hosted server
-		// saturates far below this, and the queue still absorbs bursts.
+		// saturates far below this, and a burst past the queue applies
+		// backpressure rather than failing: bifrost only drops queued
+		// requests under DropExcessRequests, which the gateway leaves off.
 		cfg.ConcurrencyAndBufferSize = bfschemas.ConcurrencyAndBufferSize{
 			Concurrency: anthropicCompatConcurrency,
 			BufferSize:  anthropicCompatBufferSize,
