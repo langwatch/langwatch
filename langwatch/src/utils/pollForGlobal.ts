@@ -21,7 +21,17 @@ export function pollForGlobal<T>(
 
   const deadline = Date.now() + timeoutMs;
   const interval = setInterval(() => {
-    const value = getValue();
+    let value: T | undefined;
+    try {
+      value = getValue();
+    } catch {
+      // A getter that throws is reading something whose environment went away,
+      // so it will throw on every future tick too. Left alone the exception
+      // escapes from the timer to the top level, where no caller can catch it.
+      clearInterval(interval);
+      return;
+    }
+
     if (value) {
       clearInterval(interval);
       onFound(value);
