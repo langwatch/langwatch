@@ -106,6 +106,13 @@ export function ModelCostComparisonCard() {
     promptTokens + completionTokens + cacheReadTokens + cacheWriteTokens > 0;
   const cachedTokens = cacheReadTokens + cacheWriteTokens;
 
+  // Formatted up front so a value that cannot be estimated reads as a dash
+  // with an explanation underneath, rather than a skeleton that promises a
+  // number still on its way.
+  const asIs = (value: string) => value;
+  const cell = (value: number | undefined, format: (value: number) => string) =>
+    !isLoaded ? undefined : value === undefined ? "-" : format(value);
+
   return (
     <VStack align="stretch" gap={4}>
       <HStack justify="space-between" flexWrap="wrap" gap={2}>
@@ -138,24 +145,24 @@ export function ModelCostComparisonCard() {
           <HStack align="start" gap={0}>
             <SummaryMetric
               label="Actual Cost"
-              current={isLoaded ? actualCost : undefined}
-              format={money}
+              current={cell(actualCost, money)}
+              format={asIs}
               increaseIs="neutral"
               tooltip="What this period's traffic cost, across every model in it. Models with no published price, self-hosted ones included, are recorded at $0."
               zeroMeansNoData={false}
             />
             <SummaryMetric
               label="Estimated Cost"
-              current={isLoaded ? referenceCost : undefined}
-              format={money}
+              current={cell(referenceCost, money)}
+              format={asIs}
               increaseIs="neutral"
               tooltip="Every input, output and cached token recorded in this period, priced at the selected model's published rates."
               zeroMeansNoData={false}
             />
             <SummaryMetric
               label="Estimated Savings"
-              current={isLoaded ? savings : undefined}
-              format={signedMoney}
+              current={cell(savings, signedMoney)}
+              format={asIs}
               increaseIs="good"
               tooltip="Estimated cost on the selected model minus the actual cost. Negative means the current setup costs more."
               zeroMeansNoData={false}

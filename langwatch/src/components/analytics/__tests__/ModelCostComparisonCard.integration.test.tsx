@@ -249,7 +249,11 @@ describe("<ModelCostComparisonCard />", () => {
       expect(
         screen.getByText(/no model with a published price/i),
       ).toBeInTheDocument();
-      expect(screen.queryByText("$0.00 ")).not.toBeInTheDocument();
+      // The estimate and the savings read as a dash: absent, not pending and
+      // not zero. The one dollar figure left is the actual cost, which is
+      // genuinely $0.00 for this period.
+      expect(screen.getAllByText("-")).toHaveLength(2);
+      expect(screen.getAllByText("$0.00")).toHaveLength(1);
     });
   });
 
