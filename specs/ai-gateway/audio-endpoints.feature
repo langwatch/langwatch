@@ -1,4 +1,4 @@
-Feature: Gateway audio endpoints — OpenAI-compatible TTS and STT for OpenAI and ElevenLabs
+Feature: Gateway audio endpoints, OpenAI-compatible TTS and STT for OpenAI and ElevenLabs
   As a developer running voice agents (and as Scenario's own voice test harness)
   I want the gateway to serve /v1/audio/speech and /v1/audio/transcriptions on a virtual key
   So that voice traffic gets the same governance, observability, and cost tracking as chat
@@ -15,7 +15,7 @@ Feature: Gateway audio endpoints — OpenAI-compatible TTS and STT for OpenAI an
     And the organization also has an ElevenLabs API key configured
 
   # ============================================================
-  # Group: Text to speech — POST /v1/audio/speech
+  # Group: Text to speech (POST /v1/audio/speech)
   # ============================================================
 
   @integration
@@ -28,7 +28,7 @@ Feature: Gateway audio endpoints — OpenAI-compatible TTS and STT for OpenAI an
       | response_format | mp3                      |
     Then the response is 200 with binary audio bytes in the body
     And the Content-Type is the audio MIME type for the requested format
-    And the body is NOT a JSON envelope — an OpenAI SDK's `client.audio.speech.create(...)` consumes it unchanged
+    And the body is NOT a JSON envelope, so an OpenAI SDK's `client.audio.speech.create(...)` consumes it unchanged
 
   @integration
   Scenario: PCM response format passes through for realtime consumers
@@ -50,7 +50,7 @@ Feature: Gateway audio endpoints — OpenAI-compatible TTS and STT for OpenAI an
     And the explicit "provider/model" form bypasses aliases, as everywhere else
 
   # ============================================================
-  # Group: Speech to text — POST /v1/audio/transcriptions
+  # Group: Speech to text (POST /v1/audio/transcriptions)
   # ============================================================
 
   @integration
@@ -82,7 +82,7 @@ Feature: Gateway audio endpoints — OpenAI-compatible TTS and STT for OpenAI an
     And no provider is contacted
 
   # ============================================================
-  # Group: Governance — the same pipeline as chat
+  # Group: Governance (the same pipeline as chat)
   # ============================================================
 
   @unit
@@ -134,7 +134,7 @@ Feature: Gateway audio endpoints — OpenAI-compatible TTS and STT for OpenAI an
     And the span carries the audio duration (or the provider's token usage when reported) as the measure STT is priced by
 
   # ============================================================
-  # Group: Dogfood — proven with the Scenario voice harness
+  # Group: Dogfood (proven with the Scenario voice harness)
   # ============================================================
 
   @e2e

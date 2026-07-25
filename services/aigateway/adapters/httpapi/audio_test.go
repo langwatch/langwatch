@@ -1,6 +1,6 @@
 package httpapi
 
-// Binds specs/ai-gateway/audio-endpoints.feature — the @unit scenarios for
+// Binds specs/ai-gateway/audio-endpoints.feature: the @unit scenarios for
 // POST /v1/audio/speech and POST /v1/audio/transcriptions: routing, multipart
 // parsing, the size cap, missing-field errors, allowlist enforcement, and
 // binary response writing. The @integration/@e2e scenarios run live via the
@@ -94,7 +94,7 @@ func TestAudioSpeech_ReturnsBinaryAudioWithContentType(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	// Raw bytes, no JSON envelope — an OpenAI SDK consumes this unchanged.
+	// Raw bytes, no JSON envelope; an OpenAI SDK consumes this unchanged.
 	assert.Equal(t, "RIFF-fake-pcm-bytes", rec.Body.String())
 	assert.Equal(t, "audio/pcm", rec.Header().Get("Content-Type"))
 
@@ -132,7 +132,7 @@ func TestAudioSpeech_ModelAllowlistApplies(t *testing.T) {
 	provider := &mockProvider{
 		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
 			// A t.Fatal here would Goexit the heartbeat goroutine and wedge
-			// the handler — record and assert from the test goroutine instead.
+			// the handler; record and assert from the test goroutine instead.
 			dispatched = true
 			return successResponse(), nil
 		},
@@ -263,7 +263,7 @@ func TestAudioTranscriptions_UnknownFormFieldsAreDropped(t *testing.T) {
 }
 
 // Guard: the speech success path must never be wrapped in a JSON envelope by
-// a future refactor — a body that starts with '{' would break every OpenAI
+// a future refactor: a body that starts with '{' would break every OpenAI
 // SDK's `audio.speech.create`, which hands the bytes straight to the caller.
 func TestAudioSpeech_BodyIsNotJSONWrapped(t *testing.T) {
 	router := audioRouter(nil)

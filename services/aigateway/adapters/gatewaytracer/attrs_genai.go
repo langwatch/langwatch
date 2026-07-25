@@ -28,7 +28,7 @@ const (
 	AttrGenAIUsageTotal       = "gen_ai.usage.total_tokens"
 	// Audio usage measures (no upstream semconv exists yet for either):
 	// characters synthesized by a TTS call and seconds of audio transcribed
-	// by an STT call — the units character- and duration-priced audio
+	// by an STT call, the units character- and duration-priced audio
 	// providers bill by.
 	AttrGenAIUsageInputChars   = "gen_ai.usage.input_chars"
 	AttrGenAIUsageAudioSeconds = "gen_ai.usage.audio_seconds"

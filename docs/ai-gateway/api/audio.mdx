@@ -4,7 +4,7 @@ description: OpenAI-compatible text to speech and transcription through the Lang
 sidebarTitle: Audio (TTS + STT)
 ---
 
-OpenAI-compatible audio endpoints. Any client that speaks OpenAI's audio API — the official SDKs, LiveKit and Pipecat voice agents, [Scenario](https://scenario.langwatch.ai)'s voice testing harness — works with zero code change by pointing its `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Voice traffic gets the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits, and per-call observability.
+OpenAI-compatible audio endpoints. Any client that speaks OpenAI's audio API (the official SDKs, LiveKit and Pipecat voice agents, [Scenario](https://scenario.langwatch.ai)'s voice testing harness) works with zero code change by pointing its `OPENAI_BASE_URL` at the gateway and its `OPENAI_API_KEY` at a LangWatch virtual key. Voice traffic gets the same governance as chat: virtual-key auth, model allowlists, budgets, rate limits, and per-call observability.
 
 Two providers ship today:
 
@@ -34,7 +34,7 @@ Body matches OpenAI's [speech schema](https://platform.openai.com/docs/api-refer
 }
 ```
 
-The response body is the **raw audio bytes** with the matching `Content-Type` (`audio/mpeg`, `audio/wav`, `audio/pcm`, …) — no JSON envelope, exactly like OpenAI, so `client.audio.speech.create(...)` consumes it unchanged. `response_format: "pcm"` returns raw PCM16 for realtime consumers.
+The response body is the **raw audio bytes** with the matching `Content-Type` (`audio/mpeg`, `audio/wav`, `audio/pcm`, …) with no JSON envelope, exactly like OpenAI, so `client.audio.speech.create(...)` consumes it unchanged. `response_format: "pcm"` returns raw PCM16 for realtime consumers.
 
 ```python
 from openai import OpenAI
@@ -83,9 +83,9 @@ Every audio call lands as a gateway trace like chat does. Providers that report 
 
 ## Errors
 
-Same error surface as every other endpoint — see [Errors](/ai-gateway/api/errors). Provider rejections (an invalid ElevenLabs voice id, an unsupported format) pass through with the provider's own status code and body. A model outside the virtual key's allowlist returns the standard `model_not_allowed`; a provider with no key configured returns `no_provider_configured`.
+Same error surface as every other endpoint; see [Errors](/ai-gateway/api/errors). Provider rejections (an invalid ElevenLabs voice id, an unsupported format) pass through with the provider's own status code and body. A model outside the virtual key's allowlist returns the standard `model_not_allowed`; a provider with no key configured returns `no_provider_configured`.
 
 ## Not yet supported
 
-- **Streaming TTS/STT** (`stream=true`) — requests are served complete; streaming is a follow-up.
-- **Realtime voice websockets** (OpenAI Realtime, ElevenLabs ConvAI) — connect directly to the provider for realtime sessions; the gateway serves the request/response audio endpoints.
+- **Streaming TTS/STT** (`stream=true`): requests are served complete; streaming is a follow-up.
+- **Realtime voice websockets** (OpenAI Realtime, ElevenLabs ConvAI): connect directly to the provider for realtime sessions; the gateway serves the request/response audio endpoints.

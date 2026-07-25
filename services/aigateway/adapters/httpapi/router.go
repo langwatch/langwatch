@@ -349,8 +349,8 @@ var transcriptionFormFields = []string{"language", "prompt", "response_format", 
 
 // transcriptionsHandler terminates POST /v1/audio/transcriptions (OpenAI-wire
 // multipart STT). Unlike every other v1 route the body is multipart/form-data,
-// so the handler parses the form here — the only layer with the *http.Request
-// — and hands the app a normalized upload. Never streams.
+// so the handler parses the form here, the only layer with the *http.Request,
+// and hands the app a normalized upload. Never streams.
 func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bundle, ok := requireBundle(w, r, deps.Logger)

@@ -1,5 +1,5 @@
 /**
- * Audio dogfood seeder — provisions everything the gateway audio endpoints
+ * Audio dogfood seeder: provisions everything the gateway audio endpoints
  * need for a live local run, in one shot:
  *
  *   1. OpenAI + ElevenLabs ModelProvider rows on the user's org (keys from
@@ -38,12 +38,17 @@ function parseArgs(argv: string[]): Args {
   return { email };
 }
 
-async function ensureProvider(
-  organizationId: string,
-  provider: string,
-  name: string,
-  keys: Record<string, string>,
-): Promise<string> {
+async function ensureProvider({
+  organizationId,
+  provider,
+  name,
+  keys,
+}: {
+  organizationId: string;
+  provider: string;
+  name: string;
+  keys: Record<string, string>;
+}): Promise<string> {
   const existing = await prisma.modelProvider.findFirst({
     where: { organizationId, provider },
     select: { id: true },
@@ -74,7 +79,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   const user = await prisma.user.findFirst({ where: { email: args.email } });
-  if (!user) throw new Error(`no user with email ${args.email} — sign up first`);
+  if (!user) throw new Error(`no user with email ${args.email}, sign up first`);
   // Query through Organization (not OrganizationUser): the tenancy guard
   // requires an org-scoped where clause on membership models, and the
   // org-with-member shape is the sanctioned way to resolve "this user's org".
@@ -88,23 +93,31 @@ async function main() {
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     providerIds.push(
-      await ensureProvider(org.id, "openai", "OpenAI", { OPENAI_API_KEY: openaiKey }),
+      await ensureProvider({
+        organizationId: org.id,
+        provider: "openai",
+        name: "OpenAI",
+        keys: { OPENAI_API_KEY: openaiKey },
+      }),
     );
   } else {
-    process.stderr.write("[seed-audio] OPENAI_API_KEY unset — skipping openai provider\n");
+    process.stderr.write("[seed-audio] OPENAI_API_KEY unset, skipping openai provider\n");
   }
   const elevenKey = process.env.ELEVENLABS_API_KEY;
   if (elevenKey) {
     providerIds.push(
-      await ensureProvider(org.id, "elevenlabs", "ElevenLabs", {
-        ELEVENLABS_API_KEY: elevenKey,
+      await ensureProvider({
+        organizationId: org.id,
+        provider: "elevenlabs",
+        name: "ElevenLabs",
+        keys: { ELEVENLABS_API_KEY: elevenKey },
       }),
     );
   } else {
-    process.stderr.write("[seed-audio] ELEVENLABS_API_KEY unset — skipping elevenlabs provider\n");
+    process.stderr.write("[seed-audio] ELEVENLABS_API_KEY unset, skipping elevenlabs provider\n");
   }
   if (providerIds.length === 0) {
-    throw new Error("no provider keys in env — nothing to route");
+    throw new Error("no provider keys in env, nothing to route");
   }
 
   // Org-default policy with all providers and NO model allowlist: the
@@ -115,9 +128,13 @@ async function main() {
     select: { id: true, modelProviderIds: true },
   });
   if (existingPolicy) {
-    const merged = Array.from(
-      new Set([...existingPolicy.modelProviderIds, ...providerIds]),
-    );
+    // modelProviderIds is a Json column, so Prisma types it as JsonValue.
+    const priorIds = Array.isArray(existingPolicy.modelProviderIds)
+      ? existingPolicy.modelProviderIds.filter(
+          (id): id is string => typeof id === "string",
+        )
+      : [];
+    const merged = Array.from(new Set([...priorIds, ...providerIds]));
     await prisma.routingPolicy.update({
       where: { id: existingPolicy.id },
       data: { modelProviderIds: merged, modelAllowlist: [] },

@@ -2,7 +2,7 @@
 
 package matrix
 
-// Live audio cells — bind the @integration scenarios of
+// Live audio cells: bind the @integration scenarios of
 // specs/ai-gateway/audio-endpoints.feature against a REAL local stack and
 // REAL provider keys (no mocks): gateway on :5563, control plane on :5560, a
 // VK with the provider's credentials bound.
@@ -119,7 +119,7 @@ func transcribe(t *testing.T, vk, model, filename string, file []byte) string {
 		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
-		t.Fatalf("transcription response is not the OpenAI JSON shape: %v — %s", err, truncate(body, 300))
+		t.Fatalf("transcription response is not the OpenAI JSON shape: %v; body: %s", err, truncate(body, 300))
 	}
 	if parsed.Text == "" {
 		t.Fatalf("transcription returned empty text: %s", truncate(body, 300))
@@ -128,13 +128,13 @@ func transcribe(t *testing.T, vk, model, filename string, file []byte) string {
 }
 
 // assertHeardTheFox requires the transcript to carry the distinctive words of
-// spokenLine — the proof real audio crossed both directions.
+// spokenLine, the proof real audio crossed both directions.
 func assertHeardTheFox(t *testing.T, transcript string) {
 	t.Helper()
 	lower := strings.ToLower(transcript)
 	for _, word := range []string{"quick", "brown", "fox", "lazy", "dog"} {
 		if !strings.Contains(lower, word) {
-			t.Fatalf("transcript %q does not contain %q — the audio did not survive the round trip", transcript, word)
+			t.Fatalf("transcript %q does not contain %q; the audio did not survive the round trip", transcript, word)
 		}
 	}
 }
@@ -185,7 +185,7 @@ func TestAudio_OpenAI_SpeechToTranscriptionRoundTrip(t *testing.T) {
 func TestAudio_OpenAI_SpeechMP3(t *testing.T) {
 	vk := requireEnv(t, "TEST_VK_OPENAI")
 	audio := speak(t, vk, "openai/gpt-4o-mini-tts", "nova", "mp3")
-	// MP3 sync bytes or ID3 tag — cheap sanity that the format matched.
+	// MP3 sync bytes or ID3 tag, cheap sanity that the format matched.
 	if !bytes.HasPrefix(audio, []byte("ID3")) && (len(audio) < 2 || audio[0] != 0xFF) {
 		t.Fatalf("mp3 response does not look like MP3 (first bytes: % x)", audio[:8])
 	}

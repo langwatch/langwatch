@@ -337,7 +337,7 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2026-07-25"),
     blurb:
-      "Voice models — text to speech and transcription — served through the AI Gateway's /v1/audio endpoints.",
+      "Voice models for lifelike text to speech and accurate transcription.",
   },
   azure: {
     name: "Azure OpenAI",
