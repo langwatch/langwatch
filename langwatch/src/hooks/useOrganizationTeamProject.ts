@@ -36,6 +36,36 @@ export function isOrgScopedPermission(permission: Permission): boolean {
   );
 }
 
+/**
+ * Ambient team for organization-level work, in order of preference: a shared
+ * team that already holds a project, then any shared team, then whatever is
+ * left.
+ *
+ * Personal workspaces sort last because they are a private context — one
+ * project, owned by one person — while everything the app scopes to the
+ * ambient project belongs to the organization. Model provider credentials are
+ * the sharp edge: the settings page writes them against the ambient project,
+ * so a personal workspace winning here files an organization's keys into one
+ * member's private space. A personal team always holds exactly one project,
+ * so a plain "first team with a project" lookup lets it win whenever it
+ * sorts first.
+ *
+ * An organization whose only team is personal still resolves to it, so a solo
+ * user is never left without a context.
+ *
+ * @internal Exported for testing only
+ */
+export function selectAmbientTeam<
+  T extends { isPersonal?: boolean | null; projects: unknown[] },
+>(teams: T[]): T | undefined {
+  return (
+    teams.find((team) => !team.isPersonal && team.projects.length > 0) ??
+    teams.find((team) => !team.isPersonal) ??
+    teams.find((team) => team.projects.length > 0) ??
+    teams[0]
+  );
+}
+
 /** @internal Exported for testing only */
 export function resolveProjectRedirectSubPath({
   pathname,
@@ -185,13 +215,22 @@ export const useOrganizationTeamProject = (
     typeof router.query.project == "string" ? router.query.project : undefined;
 
   // TODO: test all this
-  const projectSlug =
+  const projectSlugFromUrl =
     projectQueryParam && !reservedProjectSlugs.includes(projectQueryParam)
       ? projectQueryParam
-      : localStorageProjectSlug;
+      : undefined;
+
+  const projectSlug = projectSlugFromUrl ?? localStorageProjectSlug;
 
   const teamSlug =
     typeof router.query.team == "string" ? router.query.team : undefined;
+
+  // The address bar is what separates "the user is in their personal
+  // workspace" from "the app picked it for them". A personal project or team
+  // named in the URL resolves exactly like any other; the persisted selection
+  // does not, because nothing on an organization-scoped page tells the user
+  // which project it is about to write to.
+  const addressedBySlug = !!projectSlugFromUrl || !!teamSlug;
 
   const teamsMatchingSlug = teamSlug
     ? organizations.data?.flatMap((organization) =>
@@ -222,6 +261,16 @@ export const useOrganizationTeamProject = (
       ),
   );
 
+  // The slug that resolved a personal workspace off the persisted selection
+  // rather than off the URL is stickiness, not intent: it survives from the
+  // last visit to /[personal-slug]/* into every organization-scoped page that
+  // carries no project of its own. Drop it there and let the ambient
+  // resolution below pick a shared team, which also re-persists the shared
+  // project so the stale selection heals itself.
+  const slugMatch = projectsTeamsOrganizationsMatchingSlug?.[0];
+  const resolvedSlugMatch =
+    slugMatch?.team.isPersonal && !addressedBySlug ? undefined : slugMatch;
+
   // For demo mode, find the organization that contains the demo project
   // (backend returns all user orgs + demo org, so we need to find the one with demo project)
   const organization = isDemo
@@ -234,8 +283,8 @@ export const useOrganizationTeamProject = (
       ) ?? organizations.data?.[0]) // Fallback to first if not found
     : teamsMatchingSlug?.[0]
       ? teamsMatchingSlug?.[0].organization
-      : projectsTeamsOrganizationsMatchingSlug?.[0]
-        ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
+      : resolvedSlugMatch
+        ? resolvedSlugMatch.organization
         : organizations.data
           ? (organizations.data.find(
               (org) => org.id == localStorageOrganizationId,
@@ -248,14 +297,13 @@ export const useOrganizationTeamProject = (
           (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
         ),
       ) ??
-      organization?.teams.find((t) => t.projects.length > 0) ??
-      organization?.teams[0]) // Find team with demo project, or any team with projects
-    : projectsTeamsOrganizationsMatchingSlug?.[0]
-      ? projectsTeamsOrganizationsMatchingSlug?.[0].team
+      selectAmbientTeam(organization?.teams ?? [])) // Find team with demo project, or any team with projects
+    : resolvedSlugMatch
+      ? resolvedSlugMatch.team
       : organization
-        ? (organization.teams.find((team) => team.id == localStorageTeamId) ??
-          organization.teams.find((team) => team.projects.length > 0) ??
-          organization.teams[0])
+        ? (organization.teams.find(
+            (team) => team.id == localStorageTeamId && !team.isPersonal,
+          ) ?? selectAmbientTeam(organization.teams))
         : undefined;
 
   // For demo mode, find the project with the demo slug
@@ -264,8 +312,7 @@ export const useOrganizationTeamProject = (
         (p) => p.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
       ) ?? team?.projects[0]) // Find demo project by slug, or fallback to first
     : team
-      ? (projectsTeamsOrganizationsMatchingSlug?.[0]?.project ??
-        team.projects[0])
+      ? (resolvedSlugMatch?.project ?? team.projects[0])
       : undefined;
 
   // Override project slug for demo projects so it matches the URL
