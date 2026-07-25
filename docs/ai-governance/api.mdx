@@ -45,7 +45,7 @@ Every governance resource exposes the full CRUD triple, `list`, `get`, `create`,
 | Invites | `/api/governance/invites` | [Members and invites](/ai-governance/members-and-invites) |
 | Role bindings | `/api/governance/role-bindings` | [Roles and permissions](/ai-governance/roles-and-permissions) |
 | AI tool entries | `/api/governance/ai-tool-entries` | [Personas](/ai-governance/personas) |
-| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/sessions`) |
+| Sessions | `/api/governance/sessions` | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
 | Virtual keys | `/api/governance/virtual-keys` | [Control plane](/ai-governance/control-plane) |
 
 `audit-log` is intentionally read-only (no create, update, delete), audit rows are emitted by other state-changing routes and are immutable by design.

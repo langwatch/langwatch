@@ -112,7 +112,7 @@ If the request didn't appear, the [CLI debug commands](/ai-governance/cli-debug)
 - **Want to switch tools?** Every coding assistant has its own setup page: [Claude Code](/ai-gateway/cli/claude-code), [Codex](/ai-gateway/cli/codex), [Gemini CLI](/ai-gateway/cli/gemini-cli), [Cursor](/ai-gateway/cli/cursor), [opencode](/ai-gateway/cli/opencode), [Aider](/ai-gateway/cli/aider).
 - **Want to use a model provider directly from your code?** Click the provider tile on `/me` (OpenAI, Anthropic, Bedrock, Gemini), name a key, and copy the secret once. The form posts to `personalVirtualKeys.issuePersonal` and the result is a virtual key you drop into your app's config, same gateway, same budget, no provider credentials in your dotfiles. See [Model-provider tiles](/ai-governance/personal-portal/end-user#model-provider-tiles).
 - **Want to share a key with your team?** Don't use a personal VK, create a project and a project-scoped VK instead. The portal nudges you toward this with a "building an app for your team? Consider creating a project" hint.
-- **Want to know which devices are signed in?** [/me/sessions](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.
+- **Want to know which devices are signed in?** [/me/devices](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.
 - **Got an error?** [CLI debug → Error catalog](/ai-governance/cli-debug#error-catalog) maps every CLI error to the admin action that fixes it.
 
 ## Alternative path: admin hasn't published a catalog yet

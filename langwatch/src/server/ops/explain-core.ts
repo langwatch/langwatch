@@ -30,8 +30,8 @@ const TABLE_FUNCTION_RE =
 const SYSTEM_SCHEMA_RE = /\bsystem\s*\./i;
 
 /// Per-query ClickHouse-side guardrails. Must stay aligned with the
-/// langwatch_ops profile in
-/// infrastructure/clickhouse-serverless/config/users.xml.template.
+/// langwatch_ops profile, which is provisioned per deployment rather than
+/// from this repo: a readonly=1 profile with no SOURCES grant.
 /// ClickHouseSettings is picky: `readonly` / `max_result_bytes` /
 /// `max_memory_usage` are typed `UInt64 = string`, `max_execution_time`
 /// is `Seconds = number`.

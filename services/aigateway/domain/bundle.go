@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Bundle is the resolved virtual-key configuration used for the request lifecycle.
 type Bundle struct {
@@ -83,6 +86,40 @@ type BundleConfig struct {
 	// yet — but plumbed end-to-end so future tag wiring is a one-line add
 	// in the control-plane materialiser.
 	VKTags []string
+}
+
+// AllowsModel reports whether a model ID satisfies models_allowed. An
+// empty allowlist allows everything. Entries are either a literal model
+// ID or a trailing-"*" prefix pattern.
+func (c BundleConfig) AllowsModel(model string) bool {
+	if len(c.AllowedModels) == 0 {
+		return true
+	}
+	for _, pattern := range c.AllowedModels {
+		if ModelPatternMatches(pattern, model) {
+			return true
+		}
+	}
+	return false
+}
+
+// ModelPatternMatches applies one models_allowed entry to a model ID.
+func ModelPatternMatches(pattern, model string) bool {
+	if pattern == model {
+		return true
+	}
+	if ModelPatternIsWildcard(pattern) {
+		return strings.HasPrefix(model, strings.TrimSuffix(pattern, "*"))
+	}
+	return false
+}
+
+// ModelPatternIsWildcard reports whether a models_allowed entry is a
+// pattern rather than a concrete model ID. Callers that surface the
+// allowlist to users (GET /v1/models) must not present a wildcard as if
+// it were a model a client can request.
+func ModelPatternIsWildcard(pattern string) bool {
+	return strings.HasSuffix(pattern, "*")
 }
 
 // ModelAlias maps a friendly name to a provider + model.

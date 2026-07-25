@@ -2,25 +2,22 @@
  * @vitest-environment node
  *
  * Integration tests for private ClickHouse data isolation through the
- * event-sourcing pipeline. Spins up 2 ClickHouse containers and proves
+ * event-sourcing pipeline. Uses 2 isolated ClickHouse endpoints and proves
  * that EventRepositoryClickHouse and SpanStorageClickHouseRepository
- * route data to the correct instance based on env var configuration.
+ * route data to the correct endpoint based on env var configuration. An
+ * endpoint is a database on the local server natively, and a container in CI;
+ * either way a client built for one cannot read the other's rows.
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import {
-  ClickHouseContainer,
-  type StartedClickHouseContainer,
-} from "@testcontainers/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
 import { prisma } from "~/server/db";
 import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types";
+import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
 import type { ClickHouseClientResolver } from "../clickhouseClient";
 
-let sharedContainer: StartedClickHouseContainer;
-let privateContainer: StartedClickHouseContainer;
 let sharedClient: ClickHouseClient;
 let privateClient: ClickHouseClient;
 
@@ -38,46 +35,10 @@ vi.mock("../client", () => ({
   _getSharedClickHouseClient: () => sharedClient,
 }));
 
-/**
- * XML config for ClickHouse storage policy required by the table schemas.
- */
-const STORAGE_POLICY_CONFIG = `
-<clickhouse>
-    <storage_configuration>
-        <disks>
-            <hot>
-                <path>/var/lib/clickhouse/hot/</path>
-            </hot>
-            <cold>
-                <path>/var/lib/clickhouse/cold/</path>
-            </cold>
-        </disks>
-        <policies>
-            <local_primary>
-                <volumes>
-                    <hot>
-                        <disk>hot</disk>
-                    </hot>
-                    <cold>
-                        <disk>cold</disk>
-                    </cold>
-                </volumes>
-            </local_primary>
-        </policies>
-    </storage_configuration>
-</clickhouse>
-`.trim();
-
-function createStoragePolicyConfigFile(): string {
-  const fs = require("node:fs");
-  const os = require("node:os");
-  const path = require("node:path");
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ch-iso-test-"));
-  const configPath = path.join(tempDir, "storage_policy.xml");
-  fs.writeFileSync(configPath, STORAGE_POLICY_CONFIG);
-  return configPath;
-}
-
+// Both DDLs below stay unqualified: each endpoint's client carries its own
+// database in the connection URL, and that separation is what these tests
+// assert: a repository can only reach the database its resolved client
+// was built for.
 const EVENT_LOG_DDL = `
 CREATE TABLE IF NOT EXISTS event_log
 (
@@ -288,38 +249,13 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
   let sharedProjectId: string;
 
   beforeAll(async () => {
-    const storagePolicyConfigPath = createStoragePolicyConfigFile();
+    const [shared, private_] = await startTestClickHouseEndpoints({
+      suite: "ch-isolation",
+      names: ["shared", "private"],
+    });
 
-    const [shared, private_] = await Promise.all([
-      new ClickHouseContainer("clickhouse/clickhouse-server:25.10.2.65")
-        .withLabels({ "langwatch.test.isolation": "shared" })
-        .withCopyFilesToContainer([
-          {
-            source: storagePolicyConfigPath,
-            target: "/etc/clickhouse-server/config.d/storage.xml",
-          },
-        ])
-        .withReuse()
-        .withStartupTimeout(120_000)
-        .start(),
-      new ClickHouseContainer("clickhouse/clickhouse-server:25.10.2.65")
-        .withLabels({ "langwatch.test.isolation": "private" })
-        .withCopyFilesToContainer([
-          {
-            source: storagePolicyConfigPath,
-            target: "/etc/clickhouse-server/config.d/storage.xml",
-          },
-        ])
-        .withReuse()
-        .withStartupTimeout(120_000)
-        .start(),
-    ]);
-
-    sharedContainer = shared;
-    privateContainer = private_;
-
-    const sharedUrl = sharedContainer.getConnectionUrl();
-    const privateUrl = privateContainer.getConnectionUrl();
+    const sharedUrl = shared!.url;
+    const privateUrl = private_!.url;
 
     // Set the private CH env var so the clickhouseClient module resolves it
     process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;

@@ -340,6 +340,22 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  elevenlabs: {
+    name: "ElevenLabs",
+    // Ships audio only (TTS + STT through the gateway's /v1/audio routes).
+    // Registered like every provider so the key lives in Settings -> Model
+    // Providers; the LLM model catalog carries no elevenlabs chat models, so
+    // it never shows up in chat model selectors.
+    type: "llm",
+    apiKey: "ELEVENLABS_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      ELEVENLABS_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-07-25"),
+    blurb:
+      "Voice models for lifelike text to speech and accurate transcription.",
+  },
   azure: {
     name: "Azure OpenAI",
     type: "llm",
