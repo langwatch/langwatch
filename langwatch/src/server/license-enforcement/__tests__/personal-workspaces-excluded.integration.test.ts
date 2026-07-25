@@ -293,6 +293,7 @@ describe("given an organization with both personal and real workspaces", () => {
   });
 
   describe("when real projects have already filled the free allowance", () => {
+    /** @scenario Real projects still reach the limit alongside personal projects */
     it("still blocks a new project", async () => {
       const service = enforcementFor(
         freePlanWith({ maxProjects: REAL_PROJECTS }),
@@ -327,7 +328,24 @@ describe("given an organization with both personal and real workspaces", () => {
     });
   });
 
+  describe("when real teams have already filled the team allowance", () => {
+    /** @scenario Real teams still reach the limit alongside personal teams */
+    it("still blocks a new team", async () => {
+      const service = enforcementFor(freePlanWith({ maxTeams: REAL_TEAMS }));
+
+      await expect(
+        service.checkLimit(organizationId, "teams"),
+      ).resolves.toMatchObject({
+        allowed: false,
+        current: REAL_TEAMS,
+        max: REAL_TEAMS,
+      });
+    });
+  });
+
   describe("when the customer looks at the usage page", () => {
+    /** @scenario The reported project usage excludes personal projects */
+    /** @scenario The reported team usage excludes personal teams */
     it("reports the same counts that enforcement blocks on", async () => {
       const plan = freePlanWith();
       const usage = await usageStatsFor(plan).getUsageStats(organizationId, {
@@ -349,6 +367,7 @@ describe("given an organization with both personal and real workspaces", () => {
   // Runs last: it adds a real project, which shifts the counts the
   // assertions above pin.
   describe("when a free organization still has real allowance left", () => {
+    /** @scenario A free organization keeps its full project allowance after provisioning a personal workspace */
     it("creates the project even though personal projects exist", async () => {
       mockGetActivePlan.mockResolvedValue(
         freePlanWith({ maxProjects: REAL_PROJECTS + 1 }),

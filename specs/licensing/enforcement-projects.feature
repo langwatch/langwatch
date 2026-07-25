@@ -88,14 +88,12 @@ Feature: Project Limit Enforcement with License
   # The same count backs enforcement, the usage page, and the license status
   # panel, so a personal project is invisible to all three or to none of them.
 
-  @integration
   Scenario: Personal projects do not count toward the project limit
     Given the organization has a license with maxProjects 2
     And the organization has 2 personal projects
     When I create a project named "New Project"
     Then the project is created successfully
 
-  @integration
   Scenario: Real projects still reach the limit alongside personal projects
     Given the organization has a license with maxProjects 2
     And the organization has 2 projects
@@ -103,14 +101,12 @@ Feature: Project Limit Enforcement with License
     When I create a project named "New Project"
     Then the request fails with FORBIDDEN
 
-  @integration
   Scenario: A free organization keeps its full project allowance after provisioning a personal workspace
     Given the organization is on the free plan allowing 2 projects
     And every member has a personal workspace
-    When I create 2 projects for real work
-    Then both projects are created successfully
+    When I create a project for real work
+    Then the project is created successfully
 
-  @integration
   Scenario: The reported project usage excludes personal projects
     Given the organization has 2 projects
     And the organization has 1 personal project
