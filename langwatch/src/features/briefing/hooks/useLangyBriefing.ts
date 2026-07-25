@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SeriesInputType } from "~/server/analytics/registry";
+import { readSummaryMetric } from "~/server/analytics/timeseriesSummary";
 import type { TimeseriesBucket } from "~/server/analytics/types";
 // The single canonical encoder for `getTimeseries` bucket keys (ADR-034
 // app-layer module). Reused — not re-implemented — so this reader can never
@@ -78,45 +79,6 @@ export interface LangyBriefingResult {
 /** Backwards-compatible name for callers/tests of the briefing derivation. */
 export const buildBriefingReceipts = buildAttentionInbox;
 export type ReceiptSignals = AttentionInboxSignals;
-
-/**
- * Reads one series' value back out of a `getTimeseries` `currentPeriod`. The
- * lookup key is derived from the app-layer's canonical `buildSeriesName`
- * encoder (`{index}/{metric}/{aggregation}`, `index` = the series' position in
- * the request) rather than re-spelled here, so it cannot drift from how the
- * value was written. Returns `undefined` when that metric never appears in any
- * bucket, so a missing signal degrades to an omitted cell rather than a
- * fabricated 0. With `timeScale: "full"` there is a single bucket, so the sum
- * is a passthrough of that one value.
- */
-export function readSummaryMetric({
-  buckets,
-  series,
-  metric,
-  aggregation,
-}: {
-  buckets: TimeseriesBucket[] | undefined;
-  series: SeriesInputType[];
-  metric: string;
-  aggregation: string;
-}): number | undefined {
-  if (!buckets) return undefined;
-  const index = series.findIndex(
-    (s) => s.metric === metric && s.aggregation === aggregation,
-  );
-  if (index < 0) return undefined;
-  const key = buildSeriesName(series[index]!, index);
-  let sum = 0;
-  let seen = false;
-  for (const bucket of buckets) {
-    const raw = bucket[key];
-    if (typeof raw === "number") {
-      sum += raw;
-      seen = true;
-    }
-  }
-  return seen ? sum : undefined;
-}
 
 /**
  * Read a grouped metric from the same `getTimeseries` response. Counts are

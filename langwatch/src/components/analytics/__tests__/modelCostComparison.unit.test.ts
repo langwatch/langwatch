@@ -1,16 +1,36 @@
 import { describe, expect, it } from "vitest";
 import type { ModelMetadataForFrontend } from "../../../hooks/useModelProvidersSettings";
-import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
 import {
   estimateReferenceCost,
   referenceModelOptions,
 } from "../modelCostComparison";
 
-// A custom/self-hosted model's real cost is unknown, but
-// `mergeCustomModelMetadata` backfills its pricing with {0,0} so other
-// consumers (e.g. LLMConfigPopover) don't choke on missing fields. This
-// fixture reproduces that shape to prove referenceModelOptions doesn't
-// trust it.
+// Spec: specs/analytics/model-cost-comparison.feature
+
+// Anthropic Claude Sonnet 4.6's real catalog rates, so the arithmetic below is
+// checkable against the published price list rather than invented numbers.
+const SONNET = {
+  inputCostPerToken: 0.000003,
+  outputCostPerToken: 0.000015,
+  inputCacheReadPerToken: 0.0000003,
+  inputCacheWritePerToken: 0.00000375,
+};
+
+const noTokens = {
+  promptTokens: 0,
+  completionTokens: 0,
+  cacheReadTokens: 0,
+  cacheWriteTokens: 0,
+};
+
+const metadataWith = (
+  pricing: ModelMetadataForFrontend["pricing"],
+): ModelMetadataForFrontend =>
+  ({ id: "x", name: "x", provider: "openai", pricing }) as never;
+
+// A custom/self-hosted model's real cost is unknown, but the model metadata
+// backfills its pricing with {0,0} so other consumers don't choke on missing
+// fields. This fixture reproduces that shape.
 const customModelMetadata = (): ModelMetadataForFrontend =>
   ({
     id: "custom/qwen3-14b",
@@ -19,59 +39,88 @@ const customModelMetadata = (): ModelMetadataForFrontend =>
     pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
   }) as never;
 
-const providerWithCustomModel = (
-  modelId: string,
-): Record<string, MaybeStoredModelProvider> =>
-  ({
-    custom: {
-      provider: "custom",
-      enabled: true,
-      customModels: [{ modelId, displayName: modelId }],
-    },
-  }) as never;
-
-// Spec: specs/analytics/model-cost-comparison.feature
-
-const metadataWith = (
-  pricing: ModelMetadataForFrontend["pricing"],
-): ModelMetadataForFrontend =>
-  ({ id: "x", name: "x", provider: "openai", pricing }) as never;
-
 describe("estimateReferenceCost", () => {
-  describe("when the reference model has complete pricing", () => {
-    it("prices the period's tokens at the reference per-token rates", () => {
-      // Scenario: 2M input + 500k output on a model at $3/M in, $15/M out
+  describe("when the period mixes fresh and cached input", () => {
+    it("prices every token bucket at its own rate", () => {
       const cost = estimateReferenceCost({
         promptTokens: 2_000_000,
         completionTokens: 500_000,
-        pricing: { inputCostPerToken: 0.000003, outputCostPerToken: 0.000015 },
+        cacheReadTokens: 1_000_000,
+        cacheWriteTokens: 200_000,
+        pricing: SONNET,
       });
-      expect(cost).toBeCloseTo(2_000_000 * 0.000003 + 500_000 * 0.000015, 10);
-      expect(cost).toBeCloseTo(13.5, 6);
+
+      // 2M x $3/M + 500k x $15/M + 1M x $0.30/M + 200k x $3.75/M
+      expect(cost).toBeCloseTo(6 + 7.5 + 0.3 + 0.75, 10);
+      expect(cost).toBeCloseTo(14.55, 6);
+    });
+
+    it("counts the cached tokens rather than dropping them", () => {
+      const withCache = estimateReferenceCost({
+        promptTokens: 2_000_000,
+        completionTokens: 500_000,
+        cacheReadTokens: 1_000_000,
+        cacheWriteTokens: 200_000,
+        pricing: SONNET,
+      })!;
+      const freshOnly = estimateReferenceCost({
+        promptTokens: 2_000_000,
+        completionTokens: 500_000,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        pricing: SONNET,
+      })!;
+
+      expect(freshOnly).toBeCloseTo(13.5, 6);
+      expect(withCache).toBeGreaterThan(freshOnly);
+    });
+  });
+
+  describe("when the model publishes no cache rates", () => {
+    it("prices cached tokens at the plain input rate, as the recorded cost does", () => {
+      const cost = estimateReferenceCost({
+        promptTokens: 1_000_000,
+        completionTokens: 0,
+        cacheReadTokens: 1_000_000,
+        cacheWriteTokens: 1_000_000,
+        pricing: {
+          inputCostPerToken: 0.000003,
+          outputCostPerToken: 0.000015,
+        },
+      });
+
+      expect(cost).toBeCloseTo(3_000_000 * 0.000003, 10);
     });
   });
 
   describe("when pricing is missing or incomplete", () => {
     it("returns undefined instead of a partial estimate", () => {
       expect(
-        estimateReferenceCost({
-          promptTokens: 1000,
-          completionTokens: 1000,
-          pricing: undefined,
-        }),
+        estimateReferenceCost({ ...noTokens, pricing: undefined }),
+      ).toBeUndefined();
+      expect(
+        estimateReferenceCost({ ...noTokens, pricing: null }),
       ).toBeUndefined();
       expect(
         estimateReferenceCost({
-          promptTokens: 1000,
-          completionTokens: 1000,
-          pricing: null,
-        }),
-      ).toBeUndefined();
-      expect(
-        estimateReferenceCost({
-          promptTokens: 1000,
-          completionTokens: 1000,
+          ...noTokens,
           pricing: { inputCostPerToken: 0.000003 },
+        }),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when both published rates are zero", () => {
+    it("returns undefined rather than a confident $0 estimate", () => {
+      // Self-hosted and custom models carry this placeholder, and so do the
+      // handful of catalog rows whose price is not public.
+      expect(
+        estimateReferenceCost({
+          promptTokens: 2_000_000,
+          completionTokens: 500_000,
+          cacheReadTokens: 0,
+          cacheWriteTokens: 0,
+          pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
         }),
       ).toBeUndefined();
     });
@@ -79,20 +128,14 @@ describe("estimateReferenceCost", () => {
 
   describe("when the period has zero tokens", () => {
     it("estimates zero", () => {
-      expect(
-        estimateReferenceCost({
-          promptTokens: 0,
-          completionTokens: 0,
-          pricing: { inputCostPerToken: 0.000003, outputCostPerToken: 0.000015 },
-        }),
-      ).toBe(0);
+      expect(estimateReferenceCost({ ...noTokens, pricing: SONNET })).toBe(0);
     });
   });
 });
 
 describe("referenceModelOptions", () => {
   describe("when some models lack catalog pricing", () => {
-    it("offers only models with complete pricing, sorted", () => {
+    it("offers only models with a usable published price, sorted", () => {
       const options = referenceModelOptions({
         modelMetadata: {
           "openai/gpt-5-mini": metadataWith({
@@ -100,15 +143,13 @@ describe("referenceModelOptions", () => {
             outputCostPerToken: 0.000002,
           }),
           "custom/qwen3-14b": metadataWith(undefined as never),
-          "anthropic/claude-sonnet-4-6": metadataWith({
-            inputCostPerToken: 0.000003,
-            outputCostPerToken: 0.000015,
-          }),
+          "anthropic/claude-sonnet-4-6": metadataWith(SONNET),
           "custom/half-priced": metadataWith({
             inputCostPerToken: 0.000001,
           } as never),
         },
       });
+
       expect(options).toEqual([
         "anthropic/claude-sonnet-4-6",
         "openai/gpt-5-mini",
@@ -122,37 +163,20 @@ describe("referenceModelOptions", () => {
     });
   });
 
-  describe("when a custom/self-hosted model carries placeholder {0,0} pricing", () => {
-    it("excludes it even though the pricing fields are both numbers", () => {
+  describe("when a model carries an all-zero placeholder price", () => {
+    it("leaves it out, whether it is custom or a catalog row", () => {
       const options = referenceModelOptions({
         modelMetadata: {
-          "anthropic/claude-sonnet-4-6": metadataWith({
-            inputCostPerToken: 0.000003,
-            outputCostPerToken: 0.000015,
-          }),
+          "anthropic/claude-sonnet-4-6": metadataWith(SONNET),
           "custom/qwen3-14b": customModelMetadata(),
+          "gemini/lyria-3-pro-preview": metadataWith({
+            inputCostPerToken: 0,
+            outputCostPerToken: 0,
+          }),
         },
-        providers: providerWithCustomModel("qwen3-14b"),
       });
 
       expect(options).toEqual(["anthropic/claude-sonnet-4-6"]);
-      expect(options).not.toContain("custom/qwen3-14b");
-    });
-
-    it("cannot exclude custom models when providers is not supplied", () => {
-      // Without `providers` there is no way to tell a genuinely-free
-      // catalog model apart from a custom-model placeholder, so the
-      // exclusion can only run for callers that pass `providers` (the real
-      // ModelCostComparisonCard integration always does). This case pins
-      // that fallback: omitting the provider list re-admits the custom
-      // model, so callers must supply `providers` for the guarantee to hold.
-      const options = referenceModelOptions({
-        modelMetadata: {
-          "custom/qwen3-14b": customModelMetadata(),
-        },
-      });
-
-      expect(options).toEqual(["custom/qwen3-14b"]);
     });
   });
 });

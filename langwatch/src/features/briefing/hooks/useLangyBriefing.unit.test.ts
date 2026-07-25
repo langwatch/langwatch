@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { SeriesInputType } from "~/server/analytics/registry";
+import { readSummaryMetric } from "~/server/analytics/timeseriesSummary";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import type { TimeseriesBucket } from "~/server/analytics/types";
 import type { BriefingReceipt } from "../types";
 import {
   buildBriefingReceipts,
   readGroupedSummaryMetric,
-  readSummaryMetric,
   type ReceiptSignals,
 } from "./useLangyBriefing";
 

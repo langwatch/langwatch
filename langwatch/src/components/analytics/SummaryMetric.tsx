@@ -38,12 +38,12 @@ export function SummaryMetric({
     fontWeight?: SystemStyleObject["fontWeight"];
   };
   /**
-   * Whether a `current` of exactly 0 (with no `previous` to compare
-   * against) should render as "No data yet". Defaults to true: most
-   * callers never pass `previous` and a bare zero there has historically
-   * meant "nothing recorded". Callers that can tell the two apart (e.g. a
-   * loaded value that is genuinely zero) pass `false` to show the real
-   * $0.00/0 instead.
+   * Whether a `current` of exactly 0 with no `previous` to compare against
+   * renders as "No data yet". Defaults to true, which is what a caller that
+   * only ever counts rows wants: nothing counted and nothing to compare
+   * against means nothing was recorded. Pass false when zero is a real,
+   * loaded value the reader needs to see, such as a period that genuinely
+   * cost nothing.
    */
   zeroMeansNoData?: boolean;
 }) {
