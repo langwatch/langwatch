@@ -1,0 +1,71 @@
+Feature: A laptop install only pays for what it uses
+  As someone installing LangWatch on my own machine
+  I want the install to skip the parts I am not going to use
+  So that I am running the product in minutes instead of waiting on a download
+    the size of the rest of the install put together
+
+  See _shared/contract.md §1 — the promise is "~3 minutes to the full stack".
+
+  # Context. The evaluator environment installs every evaluator LangWatch can
+  # run, and one of them dominates everything else: the PII detector ships a
+  # natural-language model that is larger than the entire rest of that
+  # environment. Almost nobody installing LangWatch for the first time is there
+  # to evaluate PII, and the people who are can say so.
+  #
+  # This is not about removing the evaluator. It is about when it arrives, and
+  # about the difference between "LangWatch cannot do this" and "this install
+  # has not fetched it yet" — a difference the product has to state out loud,
+  # because a silently missing evaluator looks like a broken one.
+
+  # ===========================================================================
+  # The default install is the lean one
+  # ===========================================================================
+
+  Scenario: The heavyweight PII model is not downloaded by default
+    Given someone runs the installer for the first time
+    When the evaluator environment is prepared
+    Then the PII detector's language model is not downloaded
+    And the install finishes materially faster than it would have with it
+
+  Scenario: Every other evaluator still works
+    Given a default install
+    When they run any evaluator other than the PII detector
+    Then it runs normally
+    # Dropping one evaluator must not disturb the rest of the environment.
+
+  # ===========================================================================
+  # Absent is not the same as broken
+  # ===========================================================================
+
+  Scenario: Choosing the PII detector explains that it is not installed here
+    Given a default install
+    When they go to set up the PII detection evaluator
+    Then the product tells them it is not installed in this install
+    And it tells them exactly how to get it
+    And it does not present the evaluator as though it were ready to run
+
+  Scenario: Running it anyway fails with the same explanation
+    Given a default install
+    And an evaluation that uses the PII detector
+    When it runs
+    Then the failure says the evaluator is not installed in this install
+    And says how to install it
+    # Rather than the generic "internal error" a missing evaluator route
+    # produces, which tells the person nothing they can act on.
+
+  # ===========================================================================
+  # Asking for it gets it
+  # ===========================================================================
+
+  Scenario: Turning it on installs it
+    Given someone has asked for the PII detector
+    When they restart the server
+    Then its language model is downloaded once
+    And the PII detection evaluator works
+    And the product no longer says it is missing
+
+  Scenario: Turning it back off does not break an install that used it
+    Given an install that has the PII detector
+    When they turn it off and restart
+    Then the rest of the install keeps working
+    And the product goes back to saying the evaluator is not installed here

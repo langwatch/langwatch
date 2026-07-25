@@ -17,6 +17,7 @@ import {
   evaluatorsSchema,
 } from "../../evaluations/evaluators";
 import { runEvaluationForTrace } from "../../evaluations/runEvaluation";
+import { evaluatorUnavailability } from "../../evaluations/installedEvaluators";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -47,6 +48,9 @@ export const evaluationsRouter = createTRPCRouter({
             missingEnvVars: isAzureEvaluatorType(key)
               ? azureMissingEnvVars
               : evaluator.envVars.filter((envVar) => !process.env[envVar]),
+            // Set when this install does not have the evaluator's code at
+            // all, which is a different thing from it being unconfigured.
+            unavailable: evaluatorUnavailability(key),
           },
         ]),
       );

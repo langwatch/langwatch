@@ -33,6 +33,7 @@ const nlpStub = makeStub("nlpgo");
 const langevalsStub = makeStub("langevals");
 const gatewayStub = makeStub("aigateway");
 const langwatchStub = makeStub("langwatch");
+const langyStub = makeStub("langyagent");
 
 const migrateFn = vi.fn(async () => {
   callLog.push("migrate");
@@ -46,6 +47,9 @@ const nodeDepsFn = vi.fn(async () => {
 const ensureAppDirFn = vi.fn(async () => {
   callLog.push("app-dir");
 });
+const langyCliFn = vi.fn(async () => {
+  callLog.push("langy-cli");
+});
 
 vi.mock("../../src/services/postgres.ts", () => ({ startPostgres: postgresStub.fn }));
 vi.mock("../../src/services/redis.ts", () => ({ startRedis: redisStub.fn }));
@@ -54,6 +58,8 @@ vi.mock("../../src/services/nlpgo.ts", () => ({ startNlpgo: nlpStub.fn }));
 vi.mock("../../src/services/langevals.ts", () => ({ startLangevals: langevalsStub.fn }));
 vi.mock("../../src/services/aigateway.ts", () => ({ startAigateway: gatewayStub.fn }));
 vi.mock("../../src/services/langwatch.ts", () => ({ startLangwatch: langwatchStub.fn }));
+vi.mock("../../src/services/langyagent.ts", () => ({ startLangyagent: langyStub.fn }));
+vi.mock("../../src/services/langy-cli.ts", () => ({ ensureLangyCli: langyCliFn }));
 vi.mock("../../src/services/langwatch-workers.ts", () => ({
   startLangwatchWorkers: () => ({
     name: "workers",
@@ -84,6 +90,7 @@ function fakeCtx(): RuntimeContext {
       nlp: 5561,
       langevals: 5562,
       aigateway: 5563,
+      langyagent: 5564,
       postgres: 6560,
       redis: 6561,
       clickhouseHttp: 6562,
@@ -152,10 +159,10 @@ describe("services/runtime", () => {
   });
 
   describe("when startAll is called", () => {
-    it("starts infra (pg+redis+clickhouse) → migrates → starts app tier (nlp+langevals+gateway+langwatch+workers)", async () => {
+    it("starts infra (pg+redis+clickhouse) → migrates → starts app tier (nlp+langevals+gateway+langwatch+langyagent+workers)", async () => {
       const ctx = fakeCtx();
       const handles = await runtime.startAll(ctx);
-      expect(handles).toHaveLength(8);
+      expect(handles).toHaveLength(9);
       const positions: Record<string, number> = {};
       callLog.forEach((entry, idx) => {
         if (!(entry in positions)) positions[entry] = idx;
@@ -175,6 +182,11 @@ describe("services/runtime", () => {
       expect(positions["start:langwatch"]).toBeGreaterThan(positions["migrate"]!);
     });
 
+    it("starts the assistant alongside the rest of the app tier", async () => {
+      await runtime.startAll(fakeCtx());
+      expect(callLog).toContain("start:langyagent");
+    });
+
     it("returns ServiceHandle objects with name + pid + stop()", async () => {
       const handles = await runtime.startAll(fakeCtx());
       for (const h of handles) {
@@ -185,17 +197,35 @@ describe("services/runtime", () => {
     });
   });
 
+  describe("when the assistant is turned off", () => {
+    it("does not start it, and does not fetch what only it needs", async () => {
+      process.env.LANGWATCH_ENABLE_LANGY = "false";
+      try {
+        await runtime.installServices(fakeCtx());
+        const handles = await runtime.startAll(fakeCtx());
+        expect(callLog).not.toContain("start:langyagent");
+        expect(callLog).not.toContain("langy-cli");
+        // Everything else is untouched.
+        expect(handles).toHaveLength(8);
+        expect(callLog).toContain("start:langwatch");
+        expect(callLog).toContain("venvs");
+      } finally {
+        delete process.env.LANGWATCH_ENABLE_LANGY;
+      }
+    });
+  });
+
   describe("when stopAll is called", () => {
     it("stops handles in reverse start order", async () => {
       const handles = await runtime.startAll(fakeCtx());
       callLog.length = 0; // reset to count only stops
       await runtime.stopAll(handles);
       const stopOrder = callLog.filter((entry) => entry.startsWith("stop:"));
-      expect(stopOrder).toHaveLength(7);
+      expect(stopOrder).toHaveLength(8);
       // First stopped should be langwatch (last started); last stopped should be one of the infra.
       const firstStopped = stopOrder[0]!.replace("stop:", "");
       const lastStopped = stopOrder[stopOrder.length - 1]!.replace("stop:", "");
-      expect(["langwatch", "aigateway", "langevals", "nlpgo"]).toContain(firstStopped);
+      expect(["langwatch", "aigateway", "langevals", "nlpgo", "langyagent"]).toContain(firstStopped);
       expect(["postgres", "redis", "clickhouse"]).toContain(lastStopped);
     });
 

@@ -6,6 +6,8 @@ import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { servicePaths } from "./paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
+import { readEnvFile } from "./env-file.ts";
+import { resolveFeatures } from "../shared/features.ts";
 
 type VenvSpec = {
   name: "langevals";
@@ -60,8 +62,31 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
   );
 }
 
-function resolveVenvSpecs(_ctx: RuntimeContext): VenvSpec[] {
+// Every extra langevals declares (see langevals/pyproject.toml), minus
+// presidio. `--extra all` is the union of these plus presidio; naming them
+// individually is how we drop one without dropping the rest.
+const LANGEVALS_EXTRAS_WITHOUT_PRESIDIO = [
+  "azure",
+  "langevals",
+  "legacy",
+  "lingua",
+  "openai",
+  "ragas",
+  "topic_clustering",
+];
+
+function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   const root = appRoot();
+  // The PII detector brings a natural-language model that is larger than the
+  // rest of this environment put together (~670MB of a ~1.6GB venv, most of it
+  // one spacy model). Most first installs never evaluate PII, so it is opt-in
+  // and the product tells anyone who reaches for that evaluator how to get it.
+  // Nothing else about redaction depends on this: LangWatch's own secret and
+  // PII redaction in the ingestion pipeline is not implemented with presidio.
+  const presidio = resolveFeatures({
+    ...readEnvFile(ctx.envFile),
+    ...process.env,
+  }).presidio;
   // langevals is the only Python venv we build — nlpgo runs from the
   // aigateway monobinary and needs no uv environment.
   const specs: VenvSpec[] = [
@@ -76,14 +101,13 @@ function resolveVenvSpecs(_ctx: RuntimeContext): VenvSpec[] {
       // langevals-presidio, langevals-legacy. Each is a separate `langevals_*`
       // distribution; server.py auto-registers FastAPI routes for any
       // `langevals_*` package found via importlib.metadata.distributions().
-      // Without --extra all, only langevals + langevals-core get installed
+      // Without any extras, only langevals + langevals-core get installed
       // and `/openapi.json` reports just `/healthcheck` and `/` — every
       // evaluator request 404s, langwatch app's runEvaluation throws
       // `404 {"detail":"Not Found"}`, and the experiments workbench column
-      // shows 'Internal error' for every row. We install all extras so the
-      // evaluator dispatch + the legacy-eval REST route can reach a real
-      // evaluator implementation.
-      extras: ["all"],
+      // shows 'Internal error' for every row. So we always install the full
+      // set, with presidio the one member that has to be asked for.
+      extras: presidio ? ["all"] : LANGEVALS_EXTRAS_WITHOUT_PRESIDIO,
     },
   ];
 

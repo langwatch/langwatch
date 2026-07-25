@@ -16,7 +16,10 @@ import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
+import { startLangyagent } from "./langyagent.ts";
+import { ensureLangyCli } from "./langy-cli.ts";
 import { startNlpgo } from "./nlpgo.ts";
+import { resolveFeatures } from "../shared/features.ts";
 import { runMigrations } from "./migrate.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { startPostgres } from "./postgres.ts";
@@ -54,9 +57,12 @@ const runtimeImpl: RuntimeApi = {
     // uv sync + langwatch node_modules + prepare:files run in parallel.
     // Each helper is idempotent and prints "already cached" + early-returns
     // when its lockfile hash matches the previous run.
+    const features = resolveFeatures({ ...readEnvFile(ctx.envFile), ...process.env });
     await Promise.all([
       syncVenvs(ctx, bus),
       ensureLangwatchDeps(ctx, bus),
+      // The assistant's CLI: only an install running it needs the download.
+      ...(features.langy ? [ensureLangyCli(ctx, bus)] : []),
     ]);
   },
 
@@ -94,13 +100,20 @@ const runtimeImpl: RuntimeApi = {
       // nlpgo is the only NLP runtime — the Go service from the aigateway
       // monobinary, dispatched as `nlpgo`. It binds to ctx.ports.nlp; the
       // langwatch app's /studio/* routing always targets /go/*.
-      const [nlp, langevals, gw, lw] = await Promise.all([
+      const features = resolveFeatures({ ...envFromFile, ...process.env });
+      const [nlp, langevals, gw, lw, langy] = await Promise.all([
         startNlpgo(ctx, bus, childEnv),
         startLangevals(ctx, bus, childEnv),
         startAigateway(ctx, bus, envFromFile),
         startLangwatch(ctx, bus, childEnv),
+        // The assistant is optional; when it is off nothing references it and
+        // the app simply never offers it.
+        features.langy
+          ? startLangyagent(ctx, bus, childEnv)
+          : Promise.resolve(null),
       ]);
       handles.push(nlp, langevals, gw, lw);
+      if (langy) handles.push(langy);
 
       // Phase 3b: workers. Spawned AFTER the app is healthy so it can
       // share the same boot env (Redis + Prisma already migrated, app
