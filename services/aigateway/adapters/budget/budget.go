@@ -15,19 +15,30 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
+// BlockMetrics counts rejections by the scope whose limit was breached.
+// Declared here rather than imported so the checker stays free of a
+// metrics dependency; the gateway's Prometheus recorder satisfies it.
+type BlockMetrics interface {
+	RecordBudgetBlock(scope string)
+}
+
 // Checker implements BudgetChecker with a cached precheck path.
 type Checker struct {
-	logger *zap.Logger
+	logger  *zap.Logger
+	metrics BlockMetrics
 }
 
 // CheckerOptions configures the budget checker.
 type CheckerOptions struct {
 	Logger *zap.Logger
+	// Metrics counts blocked requests by scope. Optional; nil skips
+	// counting.
+	Metrics BlockMetrics
 }
 
 // NewChecker creates a budget checker.
 func NewChecker(opts CheckerOptions) *Checker {
-	return &Checker{logger: opts.Logger}
+	return &Checker{logger: opts.Logger, metrics: opts.Metrics}
 }
 
 // Precheck evaluates cached budget snapshots. Never calls control plane on hot path.
@@ -45,6 +56,9 @@ func (c *Checker) Precheck(_ context.Context, bundle *domain.Bundle) (domain.Bud
 		switch scope.OnBreach {
 		case "block":
 			if remaining <= 0 {
+				if c.metrics != nil {
+					c.metrics.RecordBudgetBlock(scope.Scope)
+				}
 				return domain.BudgetBlock, nil
 			}
 		case "warn":

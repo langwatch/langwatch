@@ -133,7 +133,7 @@ curl -s https://gateway.langwatch.ai/readyz | jq
 Non-`ok` checks pinpoint the layer:
 - `control_plane: error: timeout ...` → control-plane degraded; gateway is refusing traffic correctly.
 - `auth_cache_bootstrap: error: ...` → startup failed; pod will be restarted.
-- `outbox_writer: stale ...` → budget debits aren't flushing; budgets are stale.
+- `bundle_refresh: stale ...` → the bundle snapshot is not refreshing, so budget prechecks run against stale spend.
 
 **Fix:**
 - If control plane is down, wait, investigate control plane.
@@ -500,5 +500,5 @@ Restart the entry point (the validator runs at import time, so no incremental re
 - [Observability](/ai-gateway/observability): what every span attribute means.
 - [Health Checks](/ai-gateway/self-hosting/health-checks): interpreting `/readyz` output.
 - [Cookbook: CI smoke test](/ai-gateway/cookbooks/ci-smoke-test): automate validation.
-- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook): on-call playbook (graceful drain, outbox backlog, pprof diagnostics).
+- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook): on-call playbook (graceful drain, budget spend accumulation, pprof diagnostics).
 - [Cookbook: Grafana dashboard](/ai-gateway/cookbooks/grafana-dashboard): importable JSON to visualise every metric referenced on this page.

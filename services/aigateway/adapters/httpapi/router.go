@@ -24,6 +24,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/app"
@@ -32,9 +33,12 @@ import (
 
 // RouterDeps are the dependencies for the HTTP router.
 type RouterDeps struct {
-	App                   *app.App
-	Logger                *zap.Logger
-	Health                *health.Registry
+	App    *app.App
+	Logger *zap.Logger
+	Health *health.Registry
+	// Metrics serves /metrics and backs the request middleware. Optional;
+	// when nil no metrics are recorded and /metrics is not mounted.
+	Metrics               *gatewaymetrics.Recorder
 	Version               string
 	TraceRegistry         *customertracebridge.Registry
 	DefaultExportEndpoint string
@@ -72,6 +76,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(httpmiddleware.RequestID)
+	// Metrics sit outside Recover so a panic is counted as the 500 the
+	// recovery middleware turns it into, not as whatever status had been
+	// written before the stack unwound. Probes and the scrape endpoint
+	// exclude themselves from the counters.
+	r.Use(gatewaymetrics.Middleware(deps.Metrics))
 	r.Use(httpmiddleware.Recover())
 	r.Use(httpmiddleware.Telemetry())
 	if deps.Version != "" {
@@ -83,6 +92,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Get("/healthz", deps.Health.Liveness)
 		r.Get("/readyz", deps.Health.Readiness)
 		r.Get("/startupz", deps.Health.Startup)
+	}
+
+	// Unauthenticated like the probes: the cluster's scraper has no
+	// virtual key, and the endpoint is kept off the public ingress by the
+	// chart rather than by a credential.
+	if deps.Metrics != nil {
+		r.Handle("/metrics", deps.Metrics.Handler())
 	}
 
 	r.Route("/v1", func(v1 chi.Router) {
