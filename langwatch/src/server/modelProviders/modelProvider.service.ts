@@ -820,6 +820,11 @@ export class ModelProviderService {
       name: mp.name,
       provider: mp.provider,
       enabled: mp.enabled,
+      // Whether the credential has been withdrawn. The gateway already
+      // refuses to route to a withdrawn provider; surfacing it lets the
+      // frontend surfaces that preview routing agree with that decision
+      // instead of advertising reach the key does not have.
+      disabledAt: mp.disabledAt,
       customKeys: includeKeys ? mp.customKeys : null,
       models: defaultProvider?.models ?? null,
       embeddingsModels: defaultProvider?.embeddingsModels ?? null,
