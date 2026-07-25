@@ -3,12 +3,11 @@
  *
  * Covers specs/scenarios/scenario-tab-handoff.feature — the tab-identity half.
  *
- * Renders the hook inside a real react-router, with real session and local
- * storage, so the query-param lift, the URL scrub and the opt-out are the
- * behaviours a browser would actually produce.
+ * Renders the hook inside a real react-router, with real session storage, so
+ * the query-param lift and the URL scrub are the behaviours a browser would
+ * actually produce.
  */
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,17 +23,13 @@ vi.mock(
 import { useScenarioTabFollow } from "../useScenarioTabFollow";
 
 function Probe() {
-  const { tabKey, tabId, isDisabled, stopFollowing, resumeFollowing } =
-    useScenarioTabFollow();
+  const { tabKey, tabId } = useScenarioTabFollow();
 
   return (
     <div>
       <span data-testid="tab-key">{tabKey ?? "none"}</span>
       <span data-testid="tab-id">{tabId ? "assigned" : "none"}</span>
-      <span data-testid="disabled">{String(isDisabled)}</span>
       <span data-testid="search">{window.location.search}</span>
-      <button onClick={stopFollowing}>stop</button>
-      <button onClick={resumeFollowing}>resume</button>
     </div>
   );
 }
@@ -132,57 +127,4 @@ describe("useScenarioTabFollow", () => {
     });
   });
 
-  describe("opting out", () => {
-    /** @scenario "The user can stop the tab from following" */
-    it("stops offering the tab and remembers the choice", async () => {
-      const user = userEvent.setup();
-      renderAt("/acme/simulations/checkout?scenarioTab=machine-abc");
-
-      await waitFor(() =>
-        expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc"),
-      );
-
-      await user.click(screen.getByRole("button", { name: "stop" }));
-
-      expect(screen.getByTestId("tab-key")).toHaveTextContent("none");
-      expect(screen.getByTestId("disabled")).toHaveTextContent("true");
-      expect(
-        window.localStorage.getItem("langwatch:scenario-tab-follow-disabled"),
-      ).toBe("true");
-    });
-
-    it("honours a previous opt-out on a freshly opened tab", async () => {
-      window.localStorage.setItem(
-        "langwatch:scenario-tab-follow-disabled",
-        "true",
-      );
-
-      renderAt("/acme/simulations/checkout?scenarioTab=machine-abc");
-
-      await waitFor(() =>
-        expect(screen.getByTestId("disabled")).toHaveTextContent("true"),
-      );
-      expect(screen.getByTestId("tab-key")).toHaveTextContent("none");
-    });
-
-    it("can be turned back on", async () => {
-      const user = userEvent.setup();
-      window.localStorage.setItem(
-        "langwatch:scenario-tab-follow-disabled",
-        "true",
-      );
-
-      renderAt("/acme/simulations/checkout?scenarioTab=machine-abc");
-      await waitFor(() =>
-        expect(screen.getByTestId("disabled")).toHaveTextContent("true"),
-      );
-
-      await user.click(screen.getByRole("button", { name: "resume" }));
-
-      expect(screen.getByTestId("tab-key")).toHaveTextContent("machine-abc");
-      expect(
-        window.localStorage.getItem("langwatch:scenario-tab-follow-disabled"),
-      ).toBeNull();
-    });
-  });
 });

@@ -40,6 +40,7 @@ import {
 } from "./RunHistoryFilters";
 import { RunHistorySkeleton } from "./RunHistorySkeleton";
 import { RunRow } from "./RunRow";
+import { ScenarioTabConnectedBadge } from "./ScenarioTabConnectedBadge";
 import { GroupRow } from "./GroupRow";
 import { useRunHistoryStore } from "./useRunHistoryStore";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
@@ -48,6 +49,8 @@ type ExternalSetDetailPanelProps = {
   scenarioSetId: string;
   period: Period;
   highlightBatchId?: string | null;
+  /** True when the SDK opened this tab, so new local runs land here. */
+  connectedToLocalRun?: boolean;
 };
 
 /** Group-by options available for external sets (no target). */
@@ -59,6 +62,7 @@ export function ExternalSetDetailPanel({
   scenarioSetId,
   period,
   highlightBatchId,
+  connectedToLocalRun = false,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -232,6 +236,7 @@ export function ExternalSetDetailPanel({
             {scenarioSetId}
           </Text>
         </VStack>
+        <ScenarioTabConnectedBadge visible={connectedToLocalRun} />
       </HStack>
 
       {/* Filter bar — fixed above the scrollable run list */}

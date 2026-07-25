@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SCENARIO_TAB_QUERY_PARAM } from "~/server/scenarios/browser-tab/scenario-tab-events";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -9,9 +9,6 @@ import { useRouter } from "~/utils/compat/next-router";
  */
 const SESSION_KEY = "langwatch:scenario-tab-key";
 const SESSION_TAB_ID_KEY = "langwatch:scenario-tab-id";
-
-/** Opt-out, deliberately browser-wide and durable across reloads. */
-const OPT_OUT_KEY = "langwatch:scenario-tab-follow-disabled";
 
 function readSession(key: string): string | null {
   try {
@@ -29,14 +26,6 @@ function writeSession({ key, value }: { key: string; value: string }): void {
   }
 }
 
-function readOptOut(): boolean {
-  try {
-    return window.localStorage.getItem(OPT_OUT_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
 function randomTabId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -49,10 +38,6 @@ export interface ScenarioTabFollowState {
   tabKey: string | null;
   /** Identifies this tab within the machine key, so siblings don't collide. */
   tabId: string | null;
-  /** True once the user asked this browser to stop following. */
-  isDisabled: boolean;
-  stopFollowing: () => void;
-  resumeFollowing: () => void;
 }
 
 /**
@@ -67,12 +52,6 @@ export function useScenarioTabFollow(): ScenarioTabFollowState {
   const router = useRouter();
   const [tabKey, setTabKey] = useState<string | null>(null);
   const [tabId, setTabId] = useState<string | null>(null);
-  const [isDisabled, setIsDisabled] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setIsDisabled(readOptOut());
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !router.isReady) return;
@@ -104,32 +83,5 @@ export function useScenarioTabFollow(): ScenarioTabFollowState {
     setTabId(resolvedTabId);
   }, [router.isReady, router.query]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stopFollowing = useCallback(() => {
-    try {
-      window.localStorage.setItem(OPT_OUT_KEY, "true");
-    } catch {
-      // Best effort: the in-memory flag below still takes this tab out.
-    }
-    setIsDisabled(true);
-  }, []);
-
-  const resumeFollowing = useCallback(() => {
-    try {
-      window.localStorage.removeItem(OPT_OUT_KEY);
-    } catch {
-      // Best effort.
-    }
-    setIsDisabled(false);
-  }, []);
-
-  return useMemo(
-    () => ({
-      tabKey: isDisabled ? null : tabKey,
-      tabId: isDisabled ? null : tabId,
-      isDisabled,
-      stopFollowing,
-      resumeFollowing,
-    }),
-    [isDisabled, resumeFollowing, stopFollowing, tabId, tabKey],
-  );
+  return useMemo(() => ({ tabKey, tabId }), [tabId, tabKey]);
 }

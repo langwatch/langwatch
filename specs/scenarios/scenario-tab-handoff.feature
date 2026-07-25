@@ -106,7 +106,7 @@ Feature: Hand a scenario run to the simulations tab that is already open
     Given the simulations page is mounted with scenario tab key "abc"
     When a run is handed to key "abc"
     Then the page routes to that batch URL
-    And a toast tells the user the tab followed a new run
+    And the user is not interrupted by any notification
 
   @integration
   Scenario: A navigate payload for another machine is ignored
@@ -115,12 +115,12 @@ Feature: Hand a scenario run to the simulations tab that is already open
     Then the page does not navigate
 
   @integration
-  Scenario: The user can stop the tab from following
-    Given the simulations page followed a run and showed its toast
-    When the user chooses to stop following
-    Then the tab stops taking runs
-    And later runs open their own browser tab again
-    And the choice survives a page reload
+  Scenario: A connected tab quietly shows that it is linked to local runs
+    Given the simulations page is mounted with scenario tab key "abc"
+    When an external set view is open
+    Then a badge in the set header says the tab is connected to a local run
+    And hovering it explains that new runs will land in this tab
+    And a tab opened without a key shows no badge
 
   @integration
   Scenario: The scenario tab key survives a reload but never leaks into shared links

@@ -138,27 +138,12 @@ export default function SimulationsPage() {
       if (lastFollowedRef.current === payload.url) return;
       lastFollowedRef.current = payload.url;
 
+      // Silently: the user started the run themselves, the page moving to it
+      // is the expected outcome, not news. The connected badge in the set
+      // header is the only marker that this tab behaves this way.
       void router.push(target.pathname + target.search);
-
-      toaster.create({
-        title: "Following a new run from your terminal",
-        description:
-          "This tab moves to the newest run instead of opening a new one.",
-        type: "info",
-        action: {
-          label: "Stop following",
-          onClick: () => {
-            scenarioTab.stopFollowing();
-            toaster.create({
-              title: "This tab no longer follows new runs",
-              description: "Runs will open a new tab again.",
-              type: "info",
-            });
-          },
-        },
-      });
     },
-    [router, scenarioTab]
+    [router]
   );
 
   useSimulationUpdateListener({
@@ -425,6 +410,7 @@ export default function SimulationsPage() {
                 period={period}
                 suiteNameMap={suiteNameMap}
                 highlightBatchId={highlightBatchId}
+                connectedToLocalRun={!!scenarioTab.tabKey}
               />
             </Box>
           </Box>
@@ -474,6 +460,7 @@ function MainPanel({
   period,
   suiteNameMap,
   highlightBatchId,
+  connectedToLocalRun,
 }: {
   error: { message: string } | null;
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
@@ -488,6 +475,7 @@ function MainPanel({
   period: Period;
   suiteNameMap: Map<string, string>;
   highlightBatchId: string | null;
+  connectedToLocalRun: boolean;
 }) {
   if (error) {
     return (
@@ -510,7 +498,7 @@ function MainPanel({
   }
 
   if (selectedExternalSetId) {
-    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} period={period} highlightBatchId={highlightBatchId} />;
+    return <ExternalSetDetailPanel scenarioSetId={selectedExternalSetId} period={period} highlightBatchId={highlightBatchId} connectedToLocalRun={connectedToLocalRun} />;
   }
 
   if (selectedSuiteSlug === ALL_RUNS_ID) {
