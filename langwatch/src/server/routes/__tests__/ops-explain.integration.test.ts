@@ -13,8 +13,8 @@
  *
  * ClickHouse comes from startTestClickHouseEndpoints: the native local server
  * when one is configured, a container otherwise. Either way the suite gets its
- * own database, so the EXPLAIN targets here can never be confused with — or
- * create a stub table inside — a developer's real `langwatch` database on a
+ * own database, so the EXPLAIN targets here can never be confused with, or
+ * create a stub table inside, a developer's real `langwatch` database on a
  * shared native server.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

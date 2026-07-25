@@ -12,7 +12,10 @@ import {
   type StartedRedisContainer,
 } from "@testcontainers/redis";
 import { migrateUp } from "~/server/clickhouse/goose";
-import { nativeClickHouseBaseUrl } from "~/test-utils/clickhouseTestEndpoints";
+import {
+  nativeClickHouseBaseUrl,
+  TEST_CLICKHOUSE_IMAGE,
+} from "~/test-utils/clickhouseTestEndpoints";
 import { shardSawFailure } from "~/test-utils/shardFailureReporter";
 
 const TEST_DATABASE = "test_langwatch";
@@ -294,9 +297,7 @@ export async function setup(): Promise<void> {
   // Start ClickHouse container (reusable to speed up subsequent test runs)
   const storagePolicyConfigPath = createStoragePolicyConfigFile();
 
-  clickHouseContainer = await new ClickHouseContainer(
-    "clickhouse/clickhouse-server:25.10.2.65",
-  )
+  clickHouseContainer = await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
     .withLabels(CONTAINER_LABELS)
     .withReuse()
     .withCopyFilesToContainer([

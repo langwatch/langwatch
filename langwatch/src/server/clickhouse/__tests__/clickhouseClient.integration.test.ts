@@ -3,7 +3,10 @@
  *
  * Integration tests for per-organization ClickHouse client routing.
  * Uses two isolated ClickHouse endpoints to verify that data is routed
- * to the correct instance based on env var configuration.
+ * to the correct endpoint based on env var configuration. An endpoint is a
+ * database on the local server natively, and a container in CI; either way a
+ * client built for one cannot read the other's rows, which is the property
+ * these tests turn on.
  *
  * Env var format: CLICKHOUSE_URL__<label>__<orgId>=<connectionUrl>
  */
@@ -24,7 +27,7 @@ const SHARED_ORG_ID = `test-shared-org-${nanoid(6)}`;
 
 // Table names stay unqualified throughout: each endpoint's client carries its
 // own database in the connection URL, and that is precisely the separation
-// under test — a query can only ever reach the database its client was built
+// under test: a query can only ever reach the database its client was built
 // for.
 async function setupTestSchema(client: ClickHouseClient): Promise<void> {
   await client.command({

@@ -169,11 +169,17 @@ COMMANDS
     help          This text.
 
 ENVIRONMENT
-    Everything below except LANGWATCH_SLUG, HAVEN_AGENT and the colour switches
-    also resolves from langwatch/.env (then .env.portless), so a lasting
-    preference — "this machine runs native ClickHouse, never provision one" —
-    lives next to the URL it belongs with and travels into every new worktree.
-    An exported variable still wins, for overriding a single run.
+    Most of the knobs below also resolve from langwatch/.env (then
+    .env.portless), so a lasting preference like "this machine runs native
+    ClickHouse, never provision one" lives next to the URL it belongs with and
+    travels into every new worktree. An exported variable still wins, for
+    overriding a single run.
+
+    These describe ONE run rather than one machine, so they are read from the
+    process environment only: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED,
+    HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR. Every
+    worktree shares one .env, so pinning a slug or a baseline marker there would
+    apply it to all of them, and a seed flag would re-seed on every up.
 
     LANGWATCH_SLUG=<slug>        Pin this worktree's slug (else the sanitised
                                  worktree directory name, cached).
@@ -238,7 +244,8 @@ ENVIRONMENT
                                  per-worker UID sandbox off. Default (neither
                                  flag) keeps the sandbox on, mirroring production.
     LANGY_UNSAFE_HOST_ACCESS=1   Run the langyagent worker as a bare host process
-                                 — no colima, no VM boundary, full host access.
+                                 with no colima and no VM boundary, so it has
+                                 full host access.
                                  The fast-iteration tier, and the one that lets a
                                  stack come up with no container runtime at all.
     HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on

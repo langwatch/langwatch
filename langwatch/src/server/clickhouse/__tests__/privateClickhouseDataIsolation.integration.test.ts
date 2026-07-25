@@ -4,7 +4,9 @@
  * Integration tests for private ClickHouse data isolation through the
  * event-sourcing pipeline. Uses 2 isolated ClickHouse endpoints and proves
  * that EventRepositoryClickHouse and SpanStorageClickHouseRepository
- * route data to the correct instance based on env var configuration.
+ * route data to the correct endpoint based on env var configuration. An
+ * endpoint is a database on the local server natively, and a container in CI;
+ * either way a client built for one cannot read the other's rows.
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
@@ -35,7 +37,7 @@ vi.mock("../client", () => ({
 
 // Both DDLs below stay unqualified: each endpoint's client carries its own
 // database in the connection URL, and that separation is what these tests
-// assert — a repository can only reach the database its resolved client
+// assert: a repository can only reach the database its resolved client
 // was built for.
 const EVENT_LOG_DDL = `
 CREATE TABLE IF NOT EXISTS event_log

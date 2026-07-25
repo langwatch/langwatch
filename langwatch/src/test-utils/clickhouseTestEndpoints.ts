@@ -4,7 +4,7 @@
  *
  * Those suites need two or more endpoints whose data cannot leak into one
  * another, so they can prove that a row written for a private-ClickHouse org
- * lands in that org's instance and nowhere else. Two backends provide that:
+ * lands on that org's endpoint and nowhere else. Two backends provide that:
  *
  *   - Native: one database per endpoint on the always-on local ClickHouse
  *     (LANGWATCH_TEST_CLICKHOUSE_URL), so a laptop runs the suite with no
@@ -25,8 +25,12 @@ import {
   type StartedClickHouseContainer,
 } from "@testcontainers/clickhouse";
 
-/** Kept in step with the image globalSetup.ts starts. */
-const CONTAINER_IMAGE = "clickhouse/clickhouse-server:25.10.2.65";
+/**
+ * The ClickHouse image every container-backed test starts, here and in
+ * globalSetup.ts. One symbol rather than one string per call site, so a version
+ * bump cannot leave half the suite on the old image.
+ */
+export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:25.10.2.65";
 
 export interface TestClickHouseEndpoint {
   /** Connection URL, with this endpoint's own database in the path. */
@@ -67,11 +71,7 @@ export async function startTestClickHouseEndpoints({
     : await startContainerEndpoints({ suite, names });
 }
 
-/**
- * One database per endpoint on the shared native server. `CREATE DATABASE` runs
- * against the server root: the database in the endpoint URL does not exist yet,
- * and connecting to a missing database fails before the statement is sent.
- */
+/** One database per endpoint on the shared native server. */
 async function startNativeEndpoints({
   suite,
   names,
@@ -81,20 +81,16 @@ async function startNativeEndpoints({
   names: string[];
   baseUrl: string;
 }): Promise<TestClickHouseEndpoint[]> {
-  const root = createClient({ url: rootUrl(baseUrl) });
-  try {
-    const endpoints: TestClickHouseEndpoint[] = [];
-    for (const name of names) {
-      const database = databaseName({ suite, name });
-      await root.command({
-        query: `CREATE DATABASE IF NOT EXISTS ${database}`,
-      });
-      endpoints.push({ database, url: endpointUrl(baseUrl, database) });
-    }
-    return endpoints;
-  } finally {
-    await root.close();
+  const endpoints: TestClickHouseEndpoint[] = [];
+  for (const name of names) {
+    endpoints.push(
+      await ensureEndpoint({
+        baseUrl,
+        database: databaseName({ suite, name }),
+      }),
+    );
   }
+  return endpoints;
 }
 
 /**
@@ -114,7 +110,7 @@ async function startContainerEndpoints({
     names.map(
       async (name): Promise<[string, StartedClickHouseContainer]> => [
         name,
-        await new ClickHouseContainer(CONTAINER_IMAGE)
+        await new ClickHouseContainer(TEST_CLICKHOUSE_IMAGE)
           .withLabels({
             "langwatch.test": "true",
             [`langwatch.test.${suite}`]: name,
@@ -128,19 +124,37 @@ async function startContainerEndpoints({
 
   const endpoints: TestClickHouseEndpoint[] = [];
   for (const [name, container] of started) {
-    const database = databaseName({ suite, name });
-    const baseUrl = container.getConnectionUrl();
-    const root = createClient({ url: rootUrl(baseUrl) });
-    try {
-      await root.command({
-        query: `CREATE DATABASE IF NOT EXISTS ${database}`,
-      });
-    } finally {
-      await root.close();
-    }
-    endpoints.push({ database, url: endpointUrl(baseUrl, database) });
+    endpoints.push(
+      await ensureEndpoint({
+        baseUrl: container.getConnectionUrl(),
+        database: databaseName({ suite, name }),
+      }),
+    );
   }
   return endpoints;
+}
+
+/**
+ * Creates the endpoint's database and returns the URL that selects it.
+ *
+ * `CREATE DATABASE` goes to the server root rather than the endpoint URL: the
+ * database does not exist yet, and connecting to a missing one fails before the
+ * statement is ever sent.
+ */
+async function ensureEndpoint({
+  baseUrl,
+  database,
+}: {
+  baseUrl: string;
+  database: string;
+}): Promise<TestClickHouseEndpoint> {
+  const root = createClient({ url: rootUrl(baseUrl) });
+  try {
+    await root.command({ query: `CREATE DATABASE IF NOT EXISTS ${database}` });
+  } finally {
+    await root.close();
+  }
+  return { database, url: endpointUrl(baseUrl, database) };
 }
 
 /**

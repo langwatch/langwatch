@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -240,8 +242,8 @@ func TestClickHouseLimitsEnvWiring(t *testing.T) {
 }
 
 // haven's own knobs (LANGWATCH_HAVEN_CH, LANGY_UNSAFE_HOST_ACCESS, …) resolve
-// from langwatch/.env as well as the shell, so a machine-level preference —
-// "this laptop runs native ClickHouse, never provision one" — is pinned next to
+// from langwatch/.env as well as the shell, so a machine-level preference like
+// "this laptop runs native ClickHouse, never provision one" is pinned next to
 // the CLICKHOUSE_URL it belongs with and travels into every new worktree.
 func TestResolveKnob(t *testing.T) {
 	dotenv := func() map[string]string {
@@ -267,7 +269,7 @@ func TestResolveKnob(t *testing.T) {
 			t.Run("the process environment wins over the dotenv layers", func(t *testing.T) {
 				got, _ := resolveKnob("LANGWATCH_HAVEN_CH", exported, dotenv)
 				if got != "1" {
-					t.Errorf("got %q, want %q — an export must override .env for a one-off run", got, "1")
+					t.Errorf("got %q, want %q; an export must override .env for a one-off run", got, "1")
 				}
 			})
 		})
@@ -311,4 +313,37 @@ func TestResolveKnob(t *testing.T) {
 			})
 		})
 	})
+}
+
+// The ENVIRONMENT help text promises that haven's knobs resolve from
+// langwatch/.env, and names the ones that do not. That promise is only as good
+// as its exclusion list: a knob added on plain os.Getenv without being listed
+// reads, to anyone following the docs, as configurable from .env when it
+// silently is not. Derive the real list from the source so the two cannot part.
+func TestProcessOnlyKnobsAreDocumented(t *testing.T) {
+	source, err := os.ReadFile("root.go")
+	if err != nil {
+		t.Fatalf("read root.go: %v", err)
+	}
+	help, err := os.ReadFile("help.go")
+	if err != nil {
+		t.Fatalf("read help.go: %v", err)
+	}
+
+	found := regexp.MustCompile(`os\.(?:Getenv|LookupEnv)\("([A-Z_]+)"\)`).
+		FindAllStringSubmatch(string(source), -1)
+	if len(found) == 0 {
+		t.Fatal("no os.Getenv knobs found: the pattern stopped matching, not a clean bill of health")
+	}
+
+	for _, match := range found {
+		key := match[1]
+		if !strings.Contains(string(help), key) {
+			t.Errorf(
+				"%s is read straight from the process environment but never named in help.go: "+
+					"either route it through devEnv or add it to the ENVIRONMENT exclusion list",
+				key,
+			)
+		}
+	}
 }

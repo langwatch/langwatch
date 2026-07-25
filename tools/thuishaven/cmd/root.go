@@ -710,14 +710,17 @@ func hasFlag(args []string, flag string) bool {
 // the merged dotenv layers (langwatch/.env, then langwatch/.env.portless).
 //
 // The same precedence Prisma and tsx give the app's settings, and for the same
-// reason — a preference like "never manage ClickHouse, this machine runs a
+// reason: a preference like "never manage ClickHouse, this machine runs a
 // native one" belongs next to the CLICKHOUSE_URL it goes with, travels into
 // every new worktree with the .env the checkout hook copies, and is still
 // overridable by exporting the variable for a single run.
 //
-// Deliberately not used for per-invocation switches (HAVEN_AGENT, NO_COLOR,
-// FORCE_COLOR, LANGWATCH_SLUG): those describe one run, not a machine, and
-// pinning them in a file that every worktree inherits is a trap.
+// Deliberately not used for the switches that describe one run rather than one
+// machine: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED, HAVEN_SEED_TRACES,
+// HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR. Every worktree inherits the
+// same .env, so a slug or a baseline marker pinned there would claim all of
+// them at once, and a seed flag would re-seed on every up. Keep this list and
+// the ENVIRONMENT section of help.go in step.
 func devEnv(key string) string {
 	v, _ := resolveKnob(key, os.LookupEnv, dotenvKnobs)
 	return v
