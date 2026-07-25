@@ -51,13 +51,16 @@ async function insertTestRow(
   });
 }
 
+// project_id leads the predicate even though the row id is already unique per
+// run: the tenant column is what every read of a real table is scoped by, and a
+// fixture is the first thing someone copies when writing the next one.
 async function queryTestRow(
   client: ClickHouseClient,
-  id: string,
+  { id, projectId }: { id: string; projectId: string },
 ): Promise<{ id: string; project_id: string; data: string }[]> {
   const result = await client.query({
-    query: `SELECT * FROM ${TEST_TABLE} WHERE id = {id:String}`,
-    query_params: { id },
+    query: `SELECT * FROM ${TEST_TABLE} WHERE project_id = {projectId:String} AND id = {id:String}`,
+    query_params: { projectId, id },
     format: "JSONEachRow",
   });
   return result.json();
@@ -204,11 +207,14 @@ describe("ClickHouse routing via env vars", () => {
         data: "shared-data",
       });
 
-      const rows = await queryTestRow(sharedClient, rowId);
+      const rows = await queryTestRow(sharedClient, { id: rowId, projectId });
       expect(rows).toHaveLength(1);
       expect(rows[0]!.data).toBe("shared-data");
 
-      const privateRows = await queryTestRow(privateClient, rowId);
+      const privateRows = await queryTestRow(privateClient, {
+        id: rowId,
+        projectId,
+      });
       expect(privateRows).toHaveLength(0);
     });
   });
@@ -243,11 +249,17 @@ describe("ClickHouse routing via env vars", () => {
         data: "private-data",
       });
 
-      const privateRows = await queryTestRow(privateClient, rowId);
+      const privateRows = await queryTestRow(privateClient, {
+        id: rowId,
+        projectId,
+      });
       expect(privateRows).toHaveLength(1);
       expect(privateRows[0]!.data).toBe("private-data");
 
-      const sharedRows = await queryTestRow(sharedClient, rowId);
+      const sharedRows = await queryTestRow(sharedClient, {
+        id: rowId,
+        projectId,
+      });
       expect(sharedRows).toHaveLength(0);
     });
   });
