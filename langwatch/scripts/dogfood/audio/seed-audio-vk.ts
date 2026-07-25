@@ -19,6 +19,11 @@
  *
  * Idempotent: reuses existing provider rows (matched by org + provider) and
  * updates the default policy in place.
+ *
+ * Guardrails, because provider keys and the default policy are org-wide
+ * records: refuses to run against a non-local DATABASE_URL unless
+ * --allow-remote-db is passed, and refuses to wipe a curated default-policy
+ * modelAllowlist unless --clear-allowlist is passed.
  */
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
@@ -27,15 +32,45 @@ import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtu
 
 interface Args {
   email: string;
+  allowRemoteDb: boolean;
+  clearAllowlist: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
   let email = "";
+  let allowRemoteDb = false;
+  let clearAllowlist = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") email = argv[++i] ?? "";
+    if (argv[i] === "--allow-remote-db") allowRemoteDb = true;
+    if (argv[i] === "--clear-allowlist") clearAllowlist = true;
   }
   if (!email) throw new Error("--email is required");
-  return { email };
+  return { email, allowRemoteDb, clearAllowlist };
+}
+
+const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * This seeder mutates org-wide records (provider keys, the default routing
+ * policy), so it only runs against a local database by default. Pointing it
+ * at staging or prod by accident would overwrite shared credentials.
+ */
+function assertLocalDatabase(allowRemoteDb: boolean): void {
+  if (allowRemoteDb) return;
+  const raw = process.env.DATABASE_URL ?? "";
+  let host = "";
+  try {
+    host = new URL(raw).hostname;
+  } catch {
+    throw new Error("DATABASE_URL is unset or unparseable, refusing to seed");
+  }
+  if (!LOCAL_DB_HOSTS.has(host)) {
+    throw new Error(
+      `DATABASE_URL points at ${host}, not a local database. ` +
+        "Re-run with --allow-remote-db if you really mean it.",
+    );
+  }
 }
 
 async function ensureProvider({
@@ -49,11 +84,20 @@ async function ensureProvider({
   name: string;
   keys: Record<string, string>;
 }): Promise<string> {
-  const existing = await prisma.modelProvider.findFirst({
+  // Deterministic pick: oldest row first, and be loud when the org carries
+  // more than one row for the provider, since only one gets the fresh key.
+  const existingRows = await prisma.modelProvider.findMany({
     where: { organizationId, provider },
+    orderBy: { createdAt: "asc" },
     select: { id: true },
   });
+  const existing = existingRows[0];
   if (existing) {
+    if (existingRows.length > 1) {
+      process.stderr.write(
+        `[seed-audio] WARNING: ${existingRows.length} ${provider} provider rows on this org, refreshing the oldest (${existing.id}) and leaving the rest untouched\n`,
+      );
+    }
     await prisma.modelProvider.update({
       where: { id: existing.id },
       data: { enabled: true, customKeys: encrypt(JSON.stringify(keys)) },
@@ -77,6 +121,7 @@ async function ensureProvider({
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  assertLocalDatabase(args.allowRemoteDb);
 
   const user = await prisma.user.findFirst({ where: { email: args.email } });
   if (!user) throw new Error(`no user with email ${args.email}, sign up first`);
@@ -125,9 +170,22 @@ async function main() {
   // seeded for chat models would reject every audio model id.
   const existingPolicy = await prisma.routingPolicy.findFirst({
     where: { organizationId: org.id, isDefault: true },
-    select: { id: true, modelProviderIds: true },
+    select: { id: true, modelProviderIds: true, modelAllowlist: true },
   });
   if (existingPolicy) {
+    // A curated allowlist on the existing default policy is someone's
+    // deliberate restriction; wiping it silently would lift model limits
+    // for every caller in the org. Require the explicit flag.
+    const hasCuratedAllowlist =
+      Array.isArray(existingPolicy.modelAllowlist) &&
+      existingPolicy.modelAllowlist.length > 0;
+    if (hasCuratedAllowlist && !args.clearAllowlist) {
+      throw new Error(
+        `default policy ${existingPolicy.id} has a curated modelAllowlist, ` +
+          "which would reject audio model ids. Re-run with --clear-allowlist " +
+          "to clear it, or add the audio models to the allowlist yourself.",
+      );
+    }
     // modelProviderIds is a Json column, so Prisma types it as JsonValue.
     const priorIds = Array.isArray(existingPolicy.modelProviderIds)
       ? existingPolicy.modelProviderIds.filter(
