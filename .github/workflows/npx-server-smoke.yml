@@ -219,6 +219,35 @@ jobs:
           probe langevals "http://127.0.0.1:$((base + 2))/"        /tmp/health-langevals.json
           probe gateway   "http://127.0.0.1:$((base + 3))/healthz" /tmp/health-gateway.json
 
+      # The assistant has exactly two legitimate outcomes, and the CLI's own
+      # log says which one happened: `langyagent` reached healthy, or it was
+      # deliberately skipped because the downloaded release binary predates
+      # the langyagent service (the smoke tests an unreleased CLI against the
+      # PREVIOUS release's binary, so the skip is the expected path until the
+      # next release publishes fresh binaries). Anything else — crash-looping,
+      # or a "healthy" verdict without a listener actually answering on the
+      # port — fails the smoke. The port re-probe exists because a stray
+      # listener on the assistant's port once let a dead langyagent pass as
+      # healthy on ubuntu runners.
+      - name: Assert the assistant either booted or declared itself skipped
+        run: |
+          set -eo pipefail
+          base=${RESOLVED_BASE}
+          log="$GITHUB_WORKSPACE/_smoke.log"
+          if grep -q "langy assistant disabled" "$log"; then
+            echo "✓ assistant skipped with the release-binary notice (expected until the next release's binaries exist)"
+            exit 0
+          fi
+          if grep -qE "langyagent +healthy in" "$log"; then
+            curl -fsS --connect-timeout 2 --max-time 5 "http://127.0.0.1:$((base + 4))/health" > /tmp/health-langy.json
+            echo "✓ assistant healthy and answering on port $((base + 4))"
+            cat /tmp/health-langy.json; echo
+            exit 0
+          fi
+          echo "✗ cli.log shows neither a healthy langyagent nor the deliberate-skip notice"
+          grep -i "langyagent" "$log" | tail -n 5 || true
+          exit 1
+
       # Belt-and-suspenders for the beta.8 → beta.9 regression: the smoke
       # matrix happily passed for weeks while aigateway was being silently
       # `go build`-ed on the runner. Two assertions to make a future

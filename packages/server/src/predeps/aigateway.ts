@@ -1,5 +1,5 @@
 import { execa } from "execa";
-import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { downloadWithProgress } from "./_download.ts";
@@ -55,14 +55,20 @@ function findRepoRoot(): string | null {
 
 async function buildFromCheckout(repoRoot: string, outDir: string, task: { output?: string }): Promise<void> {
   task.output = "building from local checkout (cmd/service)";
-  // `go build ./cmd/service` produces a multi-service entrypoint; the gateway
-  // is invoked as `service aigateway`. We compile to ~/.langwatch/bin/.service
-  // and shim a wrapper script so callers can run `aigateway --version` etc.
-  const realBin = join(outDir, ".service");
-  await execa("go", ["build", "-o", realBin, "./cmd/service"], { cwd: repoRoot, stdio: "pipe" });
-  const wrapper = join(outDir, "aigateway");
-  writeFileSync(wrapper, `#!/bin/sh\nexec "${realBin}" aigateway "$@"\n`, { mode: 0o755 });
-  chmodSync(wrapper, 0o755);
+  // `go build ./cmd/service` produces the multi-service entrypoint that
+  // dispatches on its first argument — the same artifact the release
+  // publishes, and the same one three services here invoke as
+  // `<binary> aigateway|nlpgo|langyagent`.
+  //
+  // This used to write a wrapper script that hardcoded `aigateway` as that
+  // first argument, which meant every service booted the gateway: the NLP
+  // engine and the Langy agent each started a second gateway, raced for its
+  // port, and died with "address already in use". The mono-binary answers
+  // `--version` on its own, which was the wrapper's only other reason to
+  // exist, so it is written straight out instead.
+  const out = join(outDir, "aigateway");
+  await execa("go", ["build", "-o", out, "./cmd/service"], { cwd: repoRoot, stdio: "pipe" });
+  chmodSync(out, 0o755);
 }
 
 export function makeAigatewayPredep(version: string): Predep {
@@ -75,6 +81,20 @@ export function makeAigatewayPredep(version: string): Predep {
       const bundled = join(paths.bin, "aigateway");
       if (existsSync(bundled)) {
         const v = await resolveVersion(bundled);
+        // The monobinary carries three services that evolve with every
+        // release, so an install that upgrades the CLI must upgrade the
+        // binary with it: accepting any old binary here is how a langyagent
+        // subcommand (or a gateway fix) silently never arrives. Two dev
+        // exemptions: a CLI running from source expects 0.0.0-dev (matches
+        // nothing real, keep whatever is there), and a binary reporting
+        // "dev" was built from a checkout on purpose via
+        // LANGWATCH_AIGATEWAY_DEV_BUILD and stays until its owner rebuilds.
+        if (v && v !== "dev" && version !== "0.0.0-dev" && v !== version) {
+          return {
+            installed: false,
+            reason: `ai-gateway monobinary is v${v}, this release wants v${version} — re-downloading`,
+          };
+        }
         if (v) return { installed: true, version: v, resolvedPath: bundled };
         return { installed: true, version: "unknown", resolvedPath: bundled };
       }
