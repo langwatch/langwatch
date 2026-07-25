@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -416,6 +417,101 @@ func TestDispatch_EvictedAnthropicCompatEndpointRecoversOnNextDispatch(t *testin
 	}
 	if got := hits.Load(); got != 2 {
 		t.Fatalf("upstream hits after re-dispatch = %d, want 2", got)
+	}
+}
+
+// Eviction schedules the provider teardown on its own goroutine, so a
+// dispatch to the same endpoint can land between the eviction and the
+// teardown running. Tearing the provider down then closes the queue that
+// dispatch is about to use and bifrost answers those requests with "provider
+// is shutting down", so a re-registered endpoint must cancel its own pending
+// teardown.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestAnthropicCompatRegistry_ReRegisteredEndpointCancelsPendingTeardown(t *testing.T) {
+	credFor := func(url string) domain.Credential {
+		return domain.Credential{
+			ProviderID: domain.ProviderAnthropic,
+			APIKey:     "sk-ant",
+			Extra:      map[string]string{"base_url": url},
+		}
+	}
+
+	var evicted []bfschemas.ModelProvider
+	reg := newAnthropicCompatRegistry(1)
+	reg.onEvict = func(key bfschemas.ModelProvider) { evicted = append(evicted, key) }
+
+	keyA := reg.register(credFor("http://a:8000"))
+	reg.register(credFor("http://b:8000"))
+	if len(evicted) != 1 || evicted[0] != keyA {
+		t.Fatalf("evicted = %v, want [%q]", evicted, keyA)
+	}
+
+	// A dispatch beats the teardown goroutine to the endpoint.
+	if again := reg.register(credFor("http://a:8000")); again != keyA {
+		t.Fatalf("re-registered endpoint derived %q, want %q", again, keyA)
+	}
+
+	var released []bfschemas.ModelProvider
+	record := func(key bfschemas.ModelProvider) { released = append(released, key) }
+	reg.releaseEvicted(keyA, record)
+	if len(released) != 0 {
+		t.Fatalf("released = %v, want none: the endpoint is live again and its provider is serving the dispatch that re-registered it", released)
+	}
+
+	// An endpoint that stays evicted is still torn down.
+	stale := evicted[len(evicted)-1]
+	if stale == keyA {
+		t.Fatalf("re-registration should have evicted the other endpoint, got %q", stale)
+	}
+	reg.releaseEvicted(stale, record)
+	if len(released) != 1 || released[0] != stale {
+		t.Fatalf("released = %v, want [%q]", released, stale)
+	}
+}
+
+// Unlike the OpenAI-compat path, where every customer endpoint shares the one
+// VLLM provider, each compat endpoint gets its own bifrost worker pool. On
+// bifrost's own defaults that is 1000 goroutines per endpoint, so at the
+// registry's capacity customer configuration alone would add ~32k goroutines
+// to the process. The gateway sizes these pools itself; this is the guard
+// that a config change cannot silently restore the defaults.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestDispatch_AnthropicCompatEndpointPoolIsBounded(t *testing.T) {
+	const upstreamResponse = `{"id":"msg_test","type":"message","role":"assistant","model":"claude-sonnet-5","content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":3,"output_tokens":1}}`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(upstreamResponse))
+	}))
+	defer srv.Close()
+
+	router, err := NewBifrostRouter(context.Background(), BifrostOptions{Logger: zap.NewNop(), InitialPoolSize: 10})
+	if err != nil {
+		t.Fatalf("NewBifrostRouter: %v", err)
+	}
+	defer router.Close()
+
+	before := runtime.NumGoroutine()
+	if _, err := router.Dispatch(context.Background(), &domain.Request{
+		Type:  domain.RequestTypeMessages,
+		Model: "claude-sonnet-5",
+		Body:  []byte(`{"model":"claude-sonnet-5","max_tokens":8,"messages":[{"role":"user","content":"hi"}]}`),
+	}, domain.Credential{
+		ID:         "mp-ant-pool",
+		ProviderID: domain.ProviderAnthropic,
+		APIKey:     "sk-local",
+		Extra:      map[string]string{"base_url": srv.URL},
+	}); err != nil {
+		t.Fatalf("Dispatch returned error: %v", err)
+	}
+
+	// Headroom over the pool size for the request's own transport goroutines;
+	// well under bifrost's 1000-worker default, which is what this guards.
+	const ceiling = anthropicCompatConcurrency + 64
+	if grew := runtime.NumGoroutine() - before; grew > ceiling {
+		t.Fatalf("first dispatch to a compat endpoint grew the process by %d goroutines, want at most %d", grew, ceiling)
 	}
 }
 

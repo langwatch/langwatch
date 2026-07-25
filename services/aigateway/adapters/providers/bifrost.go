@@ -103,12 +103,12 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	// was registered but never dispatched to (no pool exists) — nothing to
 	// release, so only log it.
 	compatEndpoints.onEvict = func(key bfschemas.ModelProvider) {
-		go func() {
-			if rmErr := bf.RemoveProvider(key); rmErr != nil {
+		go compatEndpoints.releaseEvicted(key, func(evictedKey bfschemas.ModelProvider) {
+			if rmErr := bf.RemoveProvider(evictedKey); rmErr != nil {
 				opts.Logger.Debug("anthropic-compat provider teardown skipped",
-					zap.String("provider", string(key)), zap.Error(rmErr))
+					zap.String("provider", string(evictedKey)), zap.Error(rmErr))
 			}
-		}()
+		})
 	}
 	codexURL := opts.CodexBackendURL
 	if codexURL == "" {
@@ -876,6 +876,17 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 			BaseProviderType: bfschemas.Anthropic,
 			IsKeyLess:        endpoint.keyless,
 		}
+		// Every compat endpoint gets its own bifrost worker pool, unlike the
+		// OpenAI-compat path where all customer endpoints share the single
+		// VLLM provider. Bifrost's defaults (1000 workers, 5000-slot queue)
+		// are sized for a hosted provider fronting the whole gateway; taking
+		// them per endpoint would let customer configuration multiply the
+		// process's goroutine count several times over. A self-hosted server
+		// saturates far below this, and the queue still absorbs bursts.
+		cfg.ConcurrencyAndBufferSize = bfschemas.ConcurrencyAndBufferSize{
+			Concurrency: anthropicCompatConcurrency,
+			BufferSize:  anthropicCompatBufferSize,
+		}
 	}
 	// Whole-gateway timeout ceiling. StreamIdleTimeoutInSeconds gets the
 	// same value: its 60s default is a per-chunk gap limit, and reasoning
@@ -1082,14 +1093,23 @@ type anthropicCompatEndpoint struct {
 }
 
 // anthropicCompatMaxEndpoints bounds the endpoint registry. Every distinct
-// endpoint behind a derived provider key costs a full bifrost worker pool
-// (DefaultConcurrency goroutines + a DefaultBufferSize queue), so the bound
-// is what keeps endpoint rotation across tenants from leaking pools for the
-// life of the process. Sized well above the number of self-hosted Anthropic
-// endpoints a single gateway process realistically serves concurrently;
-// an endpoint that rotates out is torn down and transparently re-created
-// on its next dispatch.
+// endpoint behind a derived provider key costs a bifrost worker pool, so the
+// bound is what keeps endpoint rotation across tenants from leaking pools for
+// the life of the process. Sized well above the number of self-hosted
+// Anthropic endpoints a single gateway process realistically serves
+// concurrently; an endpoint that rotates out is torn down and transparently
+// re-created on its next dispatch.
 const anthropicCompatMaxEndpoints = 32
+
+// anthropicCompatConcurrency and anthropicCompatBufferSize size the worker
+// pool bifrost creates per compat endpoint. Together with the endpoint bound
+// they cap what customer configuration can cost the process: 32 endpoints of
+// 128 workers instead of the 32k goroutines bifrost's own per-provider
+// defaults would produce.
+const (
+	anthropicCompatConcurrency = 128
+	anthropicCompatBufferSize  = 1024
+)
 
 // anthropicCompatRegistry maps derived provider keys to their endpoints.
 // Bifrost resolves provider config by provider key alone — GetConfigForProvider
@@ -1158,6 +1178,19 @@ func (reg *anthropicCompatRegistry) register(cred domain.Credential) bfschemas.M
 		}
 	}
 	return key
+}
+
+// releaseEvicted runs release for an evicted key, unless a dispatch put the
+// same endpoint back in the live set between the eviction and this call.
+// Releasing then would close the bifrost queue that dispatch is about to
+// enqueue on, and bifrost answers those requests with "provider is shutting
+// down" instead of routing them; leaving the provider alone costs nothing
+// because the next eviction of that key schedules the teardown again.
+func (reg *anthropicCompatRegistry) releaseEvicted(key bfschemas.ModelProvider, release func(bfschemas.ModelProvider)) {
+	if _, live := reg.lookup(string(key)); live {
+		return
+	}
+	release(key)
 }
 
 // lookup resolves a derived provider key to its endpoint. Nil-safe so an

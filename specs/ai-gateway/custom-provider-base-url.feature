@@ -85,8 +85,14 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     And the upstream request carries no x-api-key header
 
   Scenario: An endpoint that fell out of recent use still works when dispatched to again
-    Given an "anthropic" model provider with a base URL that has not been dispatched to recently
-    And many other Anthropic-compatible endpoints have been dispatched to since
+    Given an "anthropic" model provider with a base URL that has not been used recently
+    And many other Anthropic-compatible endpoints have served traffic since
     When a /v1/messages request is dispatched through it again
     Then the upstream request reaches its configured endpoint
-    And endpoints outside the recently used set hold no gateway resources in the meantime
+    And the response comes back with no added latency the caller can notice
+
+  Scenario: Serving many self-hosted endpoints does not degrade the gateway
+    Given Anthropic-compatible endpoints for many different projects
+    When traffic flows through all of them
+    Then every request reaches the endpoint configured for its project
+    And the gateway keeps serving them without growing its resource use unboundedly
