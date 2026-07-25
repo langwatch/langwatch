@@ -53,12 +53,7 @@ async function loadKeyReach(
 ): Promise<KeyReach[]> {
   const keys = await prisma.virtualKey.findMany({
     where: { organizationId, status: "ACTIVE" },
-    select: {
-      id: true,
-      organizationId: true,
-      principalUserId: true,
-      scopes: { select: { scopeType: true, scopeId: true } },
-    },
+    include: { scopes: true },
   });
 
   const reach: KeyReach[] = [];
