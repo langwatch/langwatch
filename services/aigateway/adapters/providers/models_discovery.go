@@ -166,8 +166,25 @@ func (c *modelsDiscoveryCache) get(ctx context.Context, key string, fetch func()
 	c.entries[key] = entry
 	c.mu.Unlock()
 
+	// An entry nobody ever completes would block every later caller for
+	// this key until their context expires, so a panicking fetch has to
+	// release its waiters and drop the entry on the way out.
+	completed := false
+	defer func() {
+		if completed {
+			return
+		}
+		c.mu.Lock()
+		if c.entries[key] == entry {
+			delete(c.entries, key)
+		}
+		c.mu.Unlock()
+		close(entry.done)
+	}()
+
 	entry.models = fetch()
 	entry.expiresAt = time.Now().Add(modelsDiscoveryTTL)
+	completed = true
 	close(entry.done)
 	return entry.models, nil
 }

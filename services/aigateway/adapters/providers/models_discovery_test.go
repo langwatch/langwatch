@@ -432,6 +432,44 @@ func TestListModels_CollapsesConcurrentDiscovery(t *testing.T) {
 	}
 }
 
+// A cache entry nobody completes would block every later caller for that
+// key until their context expires. A panicking discovery must release its
+// waiters and drop the entry so the next call retries.
+func TestModelsDiscoveryCache_RecoversFromPanickingFetch(t *testing.T) {
+	cache := &modelsDiscoveryCache{}
+
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("panic did not propagate to the caller")
+			}
+		}()
+		_, _ = cache.get(context.Background(), "key", func() []domain.Model {
+			panic("discovery blew up")
+		})
+	}()
+
+	done := make(chan []domain.Model, 1)
+	go func() {
+		models, err := cache.get(context.Background(), "key", func() []domain.Model {
+			return []domain.Model{{ID: "qwen3-14b"}}
+		})
+		if err != nil {
+			t.Errorf("second call returned error: %v", err)
+		}
+		done <- models
+	}()
+
+	select {
+	case models := <-done:
+		if len(models) != 1 || models[0].ID != "qwen3-14b" {
+			t.Fatalf("models = %v, want the retried catalog", models)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("a later call blocked on an entry the panicking fetch never completed")
+	}
+}
+
 // Discovery must honor the same customer-endpoint policy Dispatch applies:
 // a base URL that BlockLocalHTTPCalls would reject at dispatch time must
 // not be contacted by the model probe either (SSRF + key exfiltration).
