@@ -9,8 +9,16 @@
  * BYOC identity lands (#6088), two projects resolving to different
  * identities must never share a token — an unkeyed cache would leak one
  * tenant's bearer token into another tenant's requests. The key is
- * `${authorityHost}|${tenantId}|${clientId}|${audience}` so it is already
- * shaped for that future without a rewrite.
+ * `${authorityHost}|${tenantId}|${clientId}|${audience}`.
+ *
+ * Caveat, deliberately recorded rather than papered over: `tenantId` and
+ * `clientId` are read from process-global env, because today the platform
+ * injects exactly one identity per process. That is correct as shipped —
+ * one identity, one cache entry — but it is NOT yet sufficient for #6088.
+ * Per-project identities cannot vary a process-global variable, so before
+ * that lands, `tenantId`/`clientId` must move onto `AzureCredentials` (the
+ * resolver filling them from env today, per-project later) and `mode` must
+ * join the key. Until then, do not assume this cache separates tenants.
  */
 import {
   AzureCliCredential,

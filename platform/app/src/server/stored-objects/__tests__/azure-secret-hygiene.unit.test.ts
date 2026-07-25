@@ -102,6 +102,57 @@ describe("redactAuthorizationMaterial()", () => {
   });
 });
 
+describe("redactAuthorizationMaterial() against the wire formats the identity endpoint actually speaks", () => {
+  /**
+   * The token endpoint answers in JSON and accepts form-encoding. It never
+   * speaks XML, so a redactor that only matched XML elements let every real
+   * token-endpoint leak straight through.
+   */
+  describe("given a JSON token response", () => {
+    /** @scenario "Authorization material never reaches logs, errors, or traces" */
+    it("removes the access token from the JSON field", () => {
+      const redacted = redactAuthorizationMaterial(
+        `{"token_type":"Bearer","expires_in":3599,"access_token":"${LEAKED_TOKEN}"}`,
+      );
+
+      expect(redacted).not.toContain(LEAKED_TOKEN);
+    });
+  });
+
+  describe("given a form-encoded exchange request echoed back", () => {
+    /** @scenario "Authorization material never reaches logs, errors, or traces" */
+    it("removes the client assertion", () => {
+      const redacted = redactAuthorizationMaterial(
+        `grant_type=client_credentials&client_assertion=${LEAKED_TOKEN}&scope=x`,
+      );
+
+      expect(redacted).not.toContain(LEAKED_TOKEN);
+    });
+  });
+
+  describe("given an XML error element carrying attributes", () => {
+    /** @scenario "Authorization material never reaches logs, errors, or traces" */
+    it("still removes the echoed detail", () => {
+      const redacted = redactAuthorizationMaterial(
+        '<AuthenticationErrorDetail xml:space="preserve">MAC signature over GET</AuthenticationErrorDetail>',
+      );
+
+      expect(redacted).not.toContain("MAC signature over GET");
+    });
+  });
+
+  describe("given ordinary prose that merely mentions a scheme", () => {
+    /** @scenario "Authorization material never reaches logs, errors, or traces" */
+    it("leaves the sentence readable rather than eating the next word", () => {
+      const redacted = redactAuthorizationMaterial(
+        "SharedKey authentication is disabled on this storage account.",
+      );
+
+      expect(redacted).toContain("SharedKey authentication is disabled");
+    });
+  });
+});
+
 describe("redactStorageErrorText()", () => {
   describe("given text carrying both a tenant URI and a credential", () => {
     /** @scenario "Authorization material never reaches logs, errors, or traces" */
