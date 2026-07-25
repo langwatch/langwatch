@@ -54393,8 +54393,18 @@ asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
 
 Langy's workers run shell written by a language model, so the default pins the
 agent pod to a [gVisor](https://gvisor.dev/docs/user_guide/install/)
-RuntimeClass. On a cluster without one, only this pod stays Pending (with a
-`RuntimeClass not found` event) while the rest of the install runs.
+RuntimeClass. On a cluster without one, only the agent is affected while the
+rest of the install runs — but it does not appear as a Pending pod. Kubernetes
+rejects the pod at admission, so no pod is created at all and
+`kubectl get pods -l app.kubernetes.io/name=langyagent` lists nothing. The
+reason sits on the Deployment:
+
+```bash
+kubectl -n langwatch get deploy langwatch-langyagent \
+  -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
+# pods "langwatch-langyagent-..." is forbidden: pod rejected:
+# RuntimeClass "gvisor" not found
+```
 
 Where a sandboxed runtime comes from:
 
@@ -54418,9 +54428,96 @@ setup LangWatch runs its own hosted Langy on:
    `tolerations` on `langyagent`.
 2. **A `gvisor-installer` DaemonSet**, nodeSelector-scoped to that node group
    only, that downloads a pinned `runsc` and `containerd-shim-runsc-v1`
-   release (verify the published SHA-512 digests), registers the runtime in
+   release, verifies the published SHA-512 digests, registers the runtime in
    the containerd config, and restarts containerd. Pin the release; do not
    track `latest` for the binary that sandboxes a root, LLM-driven workload.
+
+   <Accordion title="gvisor-installer DaemonSet">
+
+   Bump `GVISOR_RELEASE` to a release you have reviewed; the digest check
+   below fails the install if the download does not match what upstream
+   published for it. The AL2023 image matches the EKS-optimized AMI, so swap
+   it and the `dnf` line if your node group runs a different distribution.
+
+   ```yaml
+   apiVersion: apps/v1
+   kind: DaemonSet
+   metadata:
+     name: gvisor-installer
+     namespace: kube-system
+   spec:
+     selector:
+       matchLabels:
+         app: gvisor-installer
+     template:
+       metadata:
+         labels:
+           app: gvisor-installer
+       spec:
+         hostPID: true
+         nodeSelector:
+           workload: langy-gvisor
+         tolerations:
+           - key: dedicated
+             operator: Equal
+             value: langy-gvisor
+             effect: NoSchedule
+         containers:
+           - name: installer
+             image: public.ecr.aws/amazonlinux/amazonlinux:2023
+             securityContext:
+               privileged: true
+             command: ["/bin/bash", "-c"]
+             args:
+               - |
+                 set -euxo pipefail
+                 dnf install -y util-linux-core
+
+                 case "$(uname -m)" in
+                   aarch64) GVISOR_ARCH=aarch64 ;;
+                   x86_64)  GVISOR_ARCH=x86_64 ;;
+                   *) echo "unsupported arch"; exit 1 ;;
+                 esac
+
+                 MARKER=/host/var/lib/gvisor-installer.done
+                 if [ -f "$MARKER" ]; then echo "already installed"; sleep infinity; fi
+
+                 GVISOR_RELEASE=20260706
+                 URL="https://storage.googleapis.com/gvisor/releases/release/${GVISOR_RELEASE}/${GVISOR_ARCH}"
+
+                 cd /tmp
+                 for f in runsc containerd-shim-runsc-v1; do
+                   curl -fsSL "${URL}/${f}" -o "$f"
+                   curl -fsSL "${URL}/${f}.sha512" -o "${f}.sha512"
+                   sha512sum -c "${f}.sha512"
+                   install -m 0755 "$f" "/host/usr/local/bin/${f}"
+                 done
+
+                 CONFIG=/host/etc/containerd/config.toml
+                 if ! grep -q 'runtimes.runsc' "$CONFIG" 2>/dev/null; then
+                   cat >> "$CONFIG" <<'EOF'
+
+                 [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.runsc]
+                   runtime_type = "io.containerd.runsc.v1"
+                 EOF
+                 fi
+
+                 nsenter --target 1 --mount --uts --ipc --net --pid -- systemctl restart containerd
+                 sleep 5
+                 nsenter --target 1 --mount --uts --ipc --net --pid -- systemctl is-active containerd
+
+                 touch "$MARKER"
+                 sleep infinity
+             volumeMounts:
+               - name: host
+                 mountPath: /host
+         volumes:
+           - name: host
+             hostPath:
+               path: /
+   ```
+
+   </Accordion>
 3. **The RuntimeClass**:
 
    ```yaml
