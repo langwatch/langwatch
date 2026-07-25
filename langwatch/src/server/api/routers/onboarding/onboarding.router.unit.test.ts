@@ -209,7 +209,7 @@ describe("onboarding.initializeOrganization", () => {
       });
     });
 
-    /** @scenario "Governance signup creates organization and team, but no project" */
+    /** @scenario "Governance signup creates organization and team, but no shared project" */
     it("skips project creation and returns a null projectSlug", async () => {
       const caller = createCaller();
 
