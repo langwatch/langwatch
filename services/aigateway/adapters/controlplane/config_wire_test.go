@@ -205,3 +205,78 @@ func TestConfigWire_AbsentTraceProjectIDIsEmpty(t *testing.T) {
 
 	assert.Empty(t, cfg.TraceProjectID)
 }
+
+// failure_mode used to be decoded off the wire and then dropped when the
+// domain config was built, so RequestFailOpen and ResponseFailOpen were never
+// assigned and read false forever. That is invisible while nothing consults
+// them, and becomes a lie the moment something does: a guardrail an operator
+// set to FAIL_OPEN would block traffic on any evaluator error while the UI
+// still described it as fail-open. See #6157.
+func TestBuildGuardrails_FailureModeReachesTheDataPlane(t *testing.T) {
+	t.Run("a fail-open guardrail opts its direction into failing open", func(t *testing.T) {
+		got := buildGuardrails(
+			[]guardrailWire{{ID: "gr", EvaluatorSlug: "pii", FailureMode: "fail_open"}},
+			[]guardrailAttachmentWire{{Direction: "pre", GuardrailIDs: []string{"gr"}}},
+		)
+		assert.True(t, got.RequestFailOpen, "fail_open on the wire must reach the pipeline")
+	})
+
+	t.Run("a fail-closed guardrail keeps its direction failing closed", func(t *testing.T) {
+		got := buildGuardrails(
+			[]guardrailWire{{ID: "gr", EvaluatorSlug: "pii", FailureMode: "fail_closed"}},
+			[]guardrailAttachmentWire{{Direction: "pre", GuardrailIDs: []string{"gr"}}},
+		)
+		assert.False(t, got.RequestFailOpen)
+	})
+
+	t.Run("an absent failure_mode fails closed", func(t *testing.T) {
+		// FAIL_CLOSED is the Prisma default and the only opt-out is the
+		// operator explicitly choosing FAIL_OPEN, so an older control plane
+		// that omits the field must not be read as permission to proceed.
+		got := buildGuardrails(
+			[]guardrailWire{{ID: "gr", EvaluatorSlug: "pii"}},
+			[]guardrailAttachmentWire{{Direction: "pre", GuardrailIDs: []string{"gr"}}},
+		)
+		assert.False(t, got.RequestFailOpen)
+	})
+
+	t.Run("one fail-closed guardrail makes the whole direction fail closed", func(t *testing.T) {
+		// The flag is per direction because a direction is one call, and an
+		// unreachable control plane returns no per-guardrail verdicts. The
+		// strictest guardrail on the direction therefore decides.
+		got := buildGuardrails(
+			[]guardrailWire{
+				{ID: "open", EvaluatorSlug: "a", FailureMode: "fail_open"},
+				{ID: "closed", EvaluatorSlug: "b", FailureMode: "fail_closed"},
+			},
+			[]guardrailAttachmentWire{{Direction: "pre", GuardrailIDs: []string{"open", "closed"}}},
+		)
+		assert.False(t, got.RequestFailOpen)
+	})
+
+	t.Run("the directions are decided independently", func(t *testing.T) {
+		got := buildGuardrails(
+			[]guardrailWire{
+				{ID: "pre-open", EvaluatorSlug: "a", FailureMode: "fail_open"},
+				{ID: "post-closed", EvaluatorSlug: "b", FailureMode: "fail_closed"},
+			},
+			[]guardrailAttachmentWire{
+				{Direction: "pre", GuardrailIDs: []string{"pre-open"}},
+				{Direction: "post", GuardrailIDs: []string{"post-closed"}},
+			},
+		)
+		assert.True(t, got.RequestFailOpen)
+		assert.False(t, got.ResponseFailOpen)
+	})
+
+	t.Run("a direction with no guardrails is vacuously fail-open", func(t *testing.T) {
+		// Nothing to bypass, so an error on an empty direction must not stop
+		// a request that the other direction's guardrails still govern.
+		got := buildGuardrails(
+			[]guardrailWire{{ID: "post-closed", EvaluatorSlug: "b", FailureMode: "fail_closed"}},
+			[]guardrailAttachmentWire{{Direction: "post", GuardrailIDs: []string{"post-closed"}}},
+		)
+		assert.True(t, got.RequestFailOpen)
+		assert.False(t, got.ResponseFailOpen)
+	})
+}

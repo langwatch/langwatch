@@ -194,6 +194,7 @@ func buildGuardrails(
 		byID[g.ID] = g
 	}
 	cfg := domain.GuardrailsConfig{}
+	var requestFailClosed, responseFailClosed bool
 	for _, att := range attachments {
 		for _, id := range att.GuardrailIDs {
 			g, ok := byID[id]
@@ -211,14 +212,36 @@ func buildGuardrails(
 			switch att.Direction {
 			case "pre", "request":
 				cfg.Pre = append(cfg.Pre, entry)
+				requestFailClosed = requestFailClosed || failsClosed(g)
 			case "post", "response":
 				cfg.Post = append(cfg.Post, entry)
+				responseFailClosed = responseFailClosed || failsClosed(g)
 			case "stream_chunk":
 				cfg.StreamChunk = append(cfg.StreamChunk, entry)
 			}
 		}
 	}
+	// failure_mode is per guardrail, but the data plane's flag is per
+	// direction, because a direction is one call and an unreachable control
+	// plane produces no per-guardrail verdicts to apply a mode to. A direction
+	// therefore fails open only when every guardrail on it opted into that: one
+	// guardrail set to fail closed means the operator asked for the request to
+	// stop when it cannot be evaluated, and a control-plane outage is exactly
+	// that case.
+	//
+	// A direction with no guardrails is vacuously fail-open, which is right:
+	// there is nothing there to bypass.
+	cfg.RequestFailOpen = !requestFailClosed
+	cfg.ResponseFailOpen = !responseFailClosed
 	return cfg
+}
+
+// failsClosed reports whether a guardrail should stop the request when it
+// cannot be evaluated. Anything other than an explicit fail_open is treated as
+// fail closed, matching the control plane, where FAIL_CLOSED is the Prisma
+// default and the only opt-out is the operator choosing FAIL_OPEN.
+func failsClosed(g guardrailWire) bool {
+	return g.FailureMode != "fail_open"
 }
 
 func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
