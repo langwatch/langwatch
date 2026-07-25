@@ -36,7 +36,7 @@ func (d *dispatchLabels) get() (string, string) {
 type dispatchLabelsKey struct{}
 
 // SetDispatchLabels records the provider and model this request resolved
-// to, so the request counter can be labelled with them. Model must already
+// to, so the request counter can be labeled with them. Model must already
 // be sanitized (see SanitizeModel). A no-op when the request did not come
 // through Middleware, which keeps the pipeline usable from unit tests.
 func SetDispatchLabels(ctx context.Context, provider, model string) {

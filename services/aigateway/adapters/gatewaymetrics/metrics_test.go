@@ -276,7 +276,7 @@ func TestGuardrailCounter_StreamChunkFailOpenCountsAsFailOpenNotAllow(t *testing
 		},
 	}, r)
 
-	// No error surfaces: the stream proceeds, which is the required behaviour.
+	// No error surfaces: the stream proceeds, which is the required behavior.
 	verdict, err := g.EvaluateChunk(context.Background(), &domain.Bundle{}, &domain.Request{}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, domain.GuardrailAllow, verdict.Action)

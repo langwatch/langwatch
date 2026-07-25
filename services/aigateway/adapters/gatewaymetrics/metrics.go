@@ -165,7 +165,7 @@ func New() *Recorder {
 
 	r.fallbackEvents = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_fallback_events_total",
-		Help: "Successful failovers, labelled by the credential that failed and the credential that served the request.",
+		Help: "Successful failovers, labeled by the credential that failed and the credential that served the request.",
 	}, []string{"from_credential", "to_credential"})
 
 	r.circuitState = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -190,7 +190,7 @@ func New() *Recorder {
 
 	r.budgetBlocks = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_budget_blocks_total",
-		Help: "Requests rejected by budget precheck, labelled by the scope whose limit was breached.",
+		Help: "Requests rejected by budget precheck, labeled by the scope whose limit was breached.",
 	}, []string{"scope"})
 
 	r.cacheHits = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -200,7 +200,7 @@ func New() *Recorder {
 
 	r.cacheRuleHits = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_cache_rule_hits_total",
-		Help: "Cache-control rule matches, labelled by rule and by the mode applied after precedence resolution (RESPECT, FORCE, DISABLE).",
+		Help: "Cache-control rule matches, labeled by rule and by the mode applied after precedence resolution (RESPECT, FORCE, DISABLE).",
 	}, []string{"rule_id", "mode_applied"})
 
 	r.guardrails = prometheus.NewCounterVec(prometheus.CounterOpts{

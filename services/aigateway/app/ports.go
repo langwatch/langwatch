@@ -65,7 +65,7 @@ type AITraceEmitter interface {
 // can observe: what happened on each dispatch attempt, and what the
 // gateway decided on the way there. Signals that belong to a single
 // adapter (auth cache tiers, rate-limit dimensions, budget scopes) are
-// recorded by that adapter instead of being funnelled through here.
+// recorded by that adapter instead of being funneled through here.
 type MetricsRecorder interface {
 	RecordProviderAttempt(credentialID, outcome, provider, model string, seconds float64)
 	RecordFallback(fromCredential, toCredential string)

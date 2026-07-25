@@ -271,7 +271,7 @@ func controlPlaneDecisions(t *testing.T, service string) []string {
 
 // The stream-chunk direction is the one that fails open by design, so a slow
 // or unreachable policy service never stalls a stream a user is already
-// reading. That behaviour must not change. What must be visible is that the
+// reading. That behavior must not change. What must be visible is that the
 // allow was a bypass and not a verdict: an operator watching enforcement
 // cannot tell an outage from healthy traffic otherwise, which is the same
 // class of silent non-enforcement as the stub this changeset replaced.

@@ -95,7 +95,7 @@ type guardrailCheckResponse struct {
 // contentFor packs the raw payload into the contract's content object.
 //
 // Every direction is named explicitly. A catch-all default would pack an
-// unrecognised direction under "chunk", so a typo or a direction the control
+// unrecognized direction under "chunk", so a typo or a direction the control
 // plane rejects would be evaluated as a stream chunk instead of failing.
 func contentFor(direction string, payload []byte) (guardrailCheckContent, error) {
 	switch direction {
@@ -126,7 +126,7 @@ func contentFor(direction string, payload []byte) (guardrailCheckContent, error)
 
 // assistantText pulls the generated text out of an OpenAI-shaped response so
 // evaluators score the completion rather than the envelope. Falls back to the
-// raw body when the shape is not recognised.
+// raw body when the shape is not recognized.
 func assistantText(payload []byte) string {
 	var body struct {
 		Choices []struct {
@@ -194,7 +194,7 @@ func verdictFor(result guardrailCheckResponse) (domain.GuardrailVerdict, error) 
 	case "allow":
 		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, nil
 	}
-	// An unrecognised verdict means the two sides disagree about the wire
+	// An unrecognized verdict means the two sides disagree about the wire
 	// shape. Surface it as an error so the caller's failure mode decides,
 	// rather than silently allowing the request.
 	return domain.GuardrailVerdict{Action: domain.GuardrailAllow},

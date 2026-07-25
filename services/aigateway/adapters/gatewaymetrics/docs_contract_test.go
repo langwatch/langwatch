@@ -150,7 +150,7 @@ func TestDocumentedLabelsExist(t *testing.T) {
 	root := repoRoot(t)
 	checked := 0
 	for _, path := range docFiles(t, root) {
-		body, err := os.ReadFile(path) //nolint:gosec // G304: walking a fixed in-repo docs tree
+		body, err := os.ReadFile(path)
 		require.NoError(t, err)
 		rel, _ := filepath.Rel(root, path)
 
@@ -183,7 +183,7 @@ func documentedNames(t *testing.T) map[string][]string {
 	found := map[string][]string{}
 
 	for _, path := range docFiles(t, root) {
-		body, err := os.ReadFile(path) //nolint:gosec // G304: walking a fixed in-repo docs tree
+		body, err := os.ReadFile(path)
 		require.NoError(t, err)
 		rel, _ := filepath.Rel(root, path)
 		for _, m := range metricNamePattern.FindAllStringSubmatch(string(body), -1) {

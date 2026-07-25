@@ -10,7 +10,7 @@ import (
 // controlPlaneEndpoints maps the gateway's internal control-plane paths
 // onto short, stable label values. Matching is by prefix because some
 // paths carry an identifier (/config/<vk_id>), which must never reach a
-// label. The set is closed by design: an unrecognised path folds onto the
+// label. The set is closed by design: an unrecognized path folds onto the
 // placeholder rather than becoming a label of its own, so a future
 // endpoint cannot quietly widen the series count before anyone names it
 // here.
