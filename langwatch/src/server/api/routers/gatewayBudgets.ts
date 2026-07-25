@@ -65,16 +65,22 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
-      const rows = await service.list(input.organizationId);
+      const { budgets, spendAvailable, scopeReach } =
+        await service.listWithHealth(input.organizationId);
       const scopeTargets = await resolveScopeTargetsBatch(
         ctx.prisma,
-        rows,
+        budgets,
         input.organizationId,
       );
-      return rows.map((b) => ({
-        ...toDto(b),
-        scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
-      }));
+      return {
+        spendAvailable,
+        budgets: budgets.map((b) => ({
+          ...toDto(b),
+          spendAvailable,
+          unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
+          scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
+        })),
+      };
     }),
 
   listForProject: protectedProcedure
@@ -82,20 +88,26 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .use(checkProjectPermission("gatewayBudgets:view"))
     .query(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
-      const rows = await service.listForProject(input.projectId);
+      const { budgets, spendAvailable, scopeReach } =
+        await service.listForProjectWithHealth(input.projectId);
       const project = await ctx.prisma.project.findUnique({
         where: { id: input.projectId },
         select: { team: { select: { organizationId: true } } },
       });
       const scopeTargets = await resolveScopeTargetsBatch(
         ctx.prisma,
-        rows,
+        budgets,
         project?.team.organizationId ?? null,
       );
-      return rows.map((b) => ({
-        ...toDto(b),
-        scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
-      }));
+      return {
+        spendAvailable,
+        budgets: budgets.map((b) => ({
+          ...toDto(b),
+          spendAvailable,
+          unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
+          scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
+        })),
+      };
     }),
 
   get: protectedProcedure
@@ -110,6 +122,8 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       }
       return {
         ...toDto(detail.budget),
+        spendAvailable: detail.spendAvailable,
+        unreachableByAnyKey: detail.unreachableByAnyKey,
         scopeTarget: detail.scopeTarget,
         recentLedger: detail.recentLedger.map((l) => ({
           id: l.id,

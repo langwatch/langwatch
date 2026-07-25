@@ -142,6 +142,80 @@ Feature: AI Gateway — Budgets
     And no Postgres gatewayBudgetLedger row is read
 
   # ============================================================================
+  # Spend must read back for every window offered
+  # ============================================================================
+  #
+  # Spend is written to the ledger by the trace fold and read back from the
+  # pre-aggregated rollup. The two sides bucket spend into periods, and they
+  # only ever agree if they compute the start of the period the same way. When
+  # they disagree the write lands in a bucket the read never looks at, so a
+  # budget accrues nothing forever, blocks nothing, and warns about nothing,
+  # while the UI reports a confident zero.
+
+  @integration
+  Scenario Outline: Spend recorded against a budget is visible on that budget
+    Given a budget with window "<window>" and limit $0.0001
+    When $0.001 of spend is recorded against it
+    Then the budget reports non-zero spend
+    And it reports itself as over its limit
+
+    Examples:
+      | window |
+      | minute |
+      | hour   |
+      | day    |
+      | week   |
+      | month  |
+      | total  |
+
+  @integration
+  Scenario: A blocking budget blocks once its recorded spend passes the limit
+    Given project "gateway-demo" has a blocking budget of $0.0001 for today
+    When enough gateway traffic is recorded to pass $0.0001
+    Then a further request through "prod-key" is refused for going over budget
+    And the refusal names the budget that was exceeded
+
+  @integration
+  Scenario: A blocking budget warns before it blocks
+    Given project "gateway-demo" has a blocking budget of $0.0001 for today
+    When recorded spend reaches 80% of the limit but has not passed it
+    Then a request through "prod-key" still reaches the provider
+    And the response carries a budget warning
+
+  # ============================================================================
+  # Making a budget that cannot work visible
+  # ============================================================================
+
+  @integration
+  Scenario: A budget whose spend cannot be totalled says so instead of showing zero
+    Given a budget exists
+    But spend totals cannot be read right now
+    When I open the Budgets list
+    Then the budget does not claim "$0.00 spent, 0% of limit"
+    And it tells me its spend is unavailable
+
+  @visual
+  Scenario: The Budgets screen surfaces that spend is not being totalled
+    Given spend totals cannot be read right now
+    When I open the Budgets list
+    Then a notice tells me spend figures are unavailable and budgets are not being enforced
+
+  @integration
+  Scenario: A budget warns when no key can ever spend against it
+    Given project "gateway-demo" has a budget scoped to project "gateway-demo"
+    But every active key in the organization is scoped to team "platform"
+    When I open the Budgets list
+    Then the budget warns that no active key sends traffic it can see
+    And the warning names which scopes the organization's keys actually use
+
+  @integration
+  Scenario: A budget that some key can spend against carries no warning
+    Given project "gateway-demo" has a budget scoped to project "gateway-demo"
+    And an active key is scoped to project "gateway-demo"
+    When I open the Budgets list
+    Then the budget carries no scope warning
+
+  # ============================================================================
   # Window resets
   # ============================================================================
 
