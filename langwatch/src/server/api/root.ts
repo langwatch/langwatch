@@ -16,6 +16,8 @@ import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
+import { bugReportsRouter } from "./routers/bugReports";
+import { codingAgentsRouter } from "./routers/codingAgents";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
@@ -38,8 +40,8 @@ import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
-import { langyEgressRouter } from "./routers/langyEgress";
 import { langyRouter } from "./routers/langy";
+import { langyEgressRouter } from "./routers/langyEgress";
 import { langyGithubRouter } from "./routers/langyGithub";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
@@ -77,7 +79,6 @@ import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
-import { codingAgentsRouter } from "./routers/codingAgents";
 import { translateRouter } from "./routers/translate";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
@@ -116,6 +117,7 @@ const coreRouters = {
   modelProvider: modelProviderRouter,
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
+  bugReports: bugReportsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   share: shareRouter,

@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   Card,
   HStack,
@@ -8,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { UserAvatar } from "~/components/UserAvatar";
 import { Edit, MessageCircle, ThumbsDown, ThumbsUp } from "react-feather";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -93,11 +93,13 @@ export const Annotations = ({
             <Card.Body>
               <VStack align="start" gap={3}>
                 <HStack width="full" align={"top"}>
-                  <Avatar.Root size="sm" background="gray.solid" color="white">
-                    <Avatar.Fallback
-                      name={annotation.user?.name ?? undefined}
-                    />
-                  </Avatar.Root>
+                  <UserAvatar
+                    size="sm"
+                    background="gray.solid"
+                    color="white"
+                    name={annotation.user?.name ?? undefined}
+                    image={annotation.user?.image}
+                  />
                   <VStack align="start" gap={0}>
                     <Text fontWeight="bold" fontSize="sm">
                       {annotation.user?.name ?? (

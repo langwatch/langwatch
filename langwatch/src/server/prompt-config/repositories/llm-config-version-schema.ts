@@ -150,6 +150,54 @@ export function runtimeParametersEqual(a: unknown, b: unknown): boolean {
   );
 }
 
+/**
+ * Renders a single side of a runtime parameter diff. A key entirely absent
+ * from the object ("unset") must read differently from that key being
+ * present with an explicit `undefined` value, even though
+ * `JSON.stringify(undefined)` can't tell them apart on its own.
+ */
+function describeRuntimeParamValue(hasKey: boolean, value: unknown): string {
+  if (!hasKey) return "unset";
+  return value === undefined ? "undefined" : JSON.stringify(value);
+}
+
+/**
+ * Per-key description of runtime parameters that differ between
+ * `localParameters` and `remoteParameters`, in the same direction as
+ * `runtimeParametersEqual`'s arguments. Canonicalizes nested values with
+ * `sortKeysDeep` (same as `runtimeParametersEqual`) so key reordering alone
+ * isn't reported as a change, and treats a key entirely missing from one
+ * side as distinct from that key being explicitly set to `undefined`.
+ */
+export function diffRuntimeParameters({
+  localParameters,
+  remoteParameters,
+}: {
+  localParameters: unknown;
+  remoteParameters: unknown;
+}): string[] {
+  const paramsA = (localParameters ?? {}) as RuntimeParameters;
+  const paramsB = (remoteParameters ?? {}) as RuntimeParameters;
+  const keys = new Set([...Object.keys(paramsA), ...Object.keys(paramsB)]);
+
+  const differences: string[] = [];
+  for (const key of keys) {
+    const hasA = key in paramsA;
+    const hasB = key in paramsB;
+    const equal =
+      hasA === hasB &&
+      JSON.stringify(sortKeysDeep(paramsA[key])) ===
+        JSON.stringify(sortKeysDeep(paramsB[key]));
+
+    if (!equal) {
+      differences.push(
+        `${key}: ${describeRuntimeParamValue(hasA, paramsA[key])} → ${describeRuntimeParamValue(hasB, paramsB[key])}`,
+      );
+    }
+  }
+  return differences;
+}
+
 export function isValidHandle(handle: string): boolean {
   // npm package name pattern: allows lowercase letters, numbers, hyphens, and optionally one slash
   const npmPackagePattern = /^[a-z0-9_-]+(?:\/[a-z0-9_-]+)?$/;

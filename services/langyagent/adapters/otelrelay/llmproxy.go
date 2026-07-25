@@ -83,6 +83,18 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 	if entry == nil {
 		return
 	}
+	// A prior call's 200 stream ended in a hard in-stream error event (see the
+	// SSE sniffer below). Every retry re-opens a fresh 200 stream and dies
+	// identically, so status-based cutting never fires, answer this retry
+	// terminally with the provider's own payload instead of proxying it.
+	if body, ok := entry.takeLLMStreamCut(); ok {
+		clog.Get(r.baseCtx).Info("otelrelay llm in-stream failure retry cut",
+			zap.String("conversation", entry.info.ConversationID))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(body)
+		return
+	}
 	target, err := llmTargetURL(entry.info.GatewayBaseURL, req.PathValue("token"), req.URL)
 	if err != nil {
 		clog.Get(r.baseCtx).Warn("otelrelay llm target resolution failed",
@@ -147,6 +159,16 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		// message. The body is restored untouched for the worker's SDK.
 		ModifyResponse: func(resp *http.Response) error {
 			if resp.StatusCode < 400 {
+				if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+					// A 200 stream can still fail: providers signal hard
+					// limits (OpenAI's insufficient_quota) as an in-stream
+					// error event after the stream opens. Watch the frames as
+					// they pass through untouched; a clean end clears the
+					// capture, an error event captures and latches (see
+					// llmStreamSniffer).
+					resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
+					return nil
+				}
 				// A later successful call clears the capture: a transient failure
 				// the SDK retried past must not be blamed for an unrelated error
 				// the agent reports afterwards.
@@ -179,6 +201,29 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// The envelope deliberately carries no HTTP status; keep it in meta.
 			e.Meta["http_status"] = resp.StatusCode
 			entry.setLLMError(e)
+			// A 429 is retryable by the worker SDK's book, which is right for a
+			// burst and an endless silent spinner for a hard plan limit. Cut the
+			// loop here (see cutRateLimitRetry): the SDK sees a final failure,
+			// the turn fails, and the captured error above still carries the
+			// provider's own cause for the panel's plan-limit card.
+			//
+			// The count is of UNINTERRUPTED 429s: any other answer, a 500
+			// included, resets it (without touching the capture above). A mixed
+			// flap is not a deterministic limit, and only a limit that answers
+			// every backoff identically should be cut.
+			if resp.StatusCode != http.StatusTooManyRequests {
+				entry.resetRateLimitStrikes()
+				return nil
+			}
+			hard := hasHardLimitReason(e)
+			strikes := entry.strikeRateLimit()
+			if hard || strikes >= rateLimitCutAfter {
+				cutRateLimitRetry(resp)
+				clog.Get(r.baseCtx).Info("otelrelay llm rate-limit retry loop cut",
+					zap.String("conversation", entry.info.ConversationID),
+					zap.Bool("hard_limit", hard),
+					zap.Int("consecutive", strikes))
+			}
 			return nil
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
@@ -218,6 +263,54 @@ func llmTargetURL(gatewayBaseURL, token string, reqURL *url.URL) (*url.URL, erro
 // backend's `{"detail": ...}`). The provider's message rides Meta["message"]
 // so the turn's terminal error frame still names the real failure.
 const llmUpstreamErrorCode = herr.Code("llm_upstream_error")
+
+// rateLimitCutAfter is how many CONSECUTIVE 429s a conversation's mediated LLM
+// calls may accumulate before the proxy converts the next one into a
+// non-retryable failure. A genuine burst (tokens-per-minute) clears within a
+// retry or two; only a limit that answers every backoff identically reaches
+// three in a row.
+const rateLimitCutAfter = 3
+
+// hardLimitReasonCodes are the provider discriminants that mark a failure as a
+// PLAN limit, deterministic until the provider's window or billing resets
+// rather than a burst. These cut the retry loop on the FIRST strike: every
+// retry would be answered identically, and the panel already has bespoke copy
+// for them (langyErrorExplainer promotes `usage_limit_reached` to the
+// plan-limit card). Applies to rejected calls (429) and to in-stream error
+// events on 200 streams alike.
+var hardLimitReasonCodes = map[herr.Code]bool{
+	"usage_limit_reached":        true,
+	"codex_plan_limit":           true,
+	"insufficient_quota":         true,
+	"billing_hard_limit_reached": true,
+}
+
+// hasHardLimitReason walks a captured LLM error's code and reason chain for a
+// hard plan-limit discriminant.
+func hasHardLimitReason(e herr.E) bool {
+	if hardLimitReasonCodes[e.Code] {
+		return true
+	}
+	for _, reason := range e.Reasons {
+		if nested, ok := reason.(herr.E); ok && hasHardLimitReason(nested) {
+			return true
+		}
+	}
+	return false
+}
+
+// cutRateLimitRetry rewrites an upstream 429 into a response the worker SDK
+// treats as FINAL. The body — the provider's own error JSON — passes through
+// untouched, so the agent's error event and the captured herr both still name
+// the real cause; only the status stops being an invitation to retry. The
+// retry-steering headers go with it so no SDK second-guesses the status.
+func cutRateLimitRetry(resp *http.Response) {
+	resp.StatusCode = http.StatusBadRequest
+	resp.Status = "400 Bad Request"
+	resp.Header.Del("Retry-After")
+	resp.Header.Del("x-should-retry")
+	resp.Header.Del("retry-after-ms")
+}
 
 // maxUpstreamMessageBytes bounds the provider message carried on a best-effort
 // capture, so a pathological body never bloats the error frame.

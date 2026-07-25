@@ -8,6 +8,10 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ExtractedIO } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import {
+  DEFAULT_PARTITION_WINDOW_MS,
+  queryWindowed,
+} from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { prisma as defaultPrisma } from "~/server/db";
 import {
   type ClickHouseEvaluationRunRow,
@@ -2734,24 +2738,28 @@ export class ClickHouseTraceService {
           // partitions and scans every part (incl. cold S3) to locate the rows.
           // A ±2-day margin around the caller's range is safe headroom; without
           // a hint we keep the original unbounded read.
-          const SUMMARY_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+          //
+          // resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a
+          // point, so map it onto queryWindowed's centre+half-width form: centre
+          // on the range midpoint and grow the half-width to cover half the range
+          // PLUS the ±2-day margin. The emitted fragment's bounds then land on
+          // exactly [from - 2d, to + 2d] — the same predicate the old local
+          // constant produced. Fallback "none": a resolve failure already left
+          // effectiveOccurredAt undefined (hint null -> unbounded read, warn
+          // logged at the resolve site), and a hinted-but-empty summary read is
+          // never widened here — an empty result is authoritative and the caller
+          // below skips the span scan.
           const hasSummaryWindow =
             effectiveOccurredAt !== undefined &&
             effectiveOccurredAt.from > 0 &&
             effectiveOccurredAt.to > 0;
-          const summaryTimeFilterOuter = hasSummaryWindow
-            ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({sumFromMs:Int64}) AND t.OccurredAt <= fromUnixTimestamp64Milli({sumToMs:Int64})"
-            : "";
-          const summaryTimeFilterInner = hasSummaryWindow
-            ? "AND OccurredAt >= fromUnixTimestamp64Milli({sumFromMs:Int64}) AND OccurredAt <= fromUnixTimestamp64Milli({sumToMs:Int64})"
-            : "";
-          const summaryTimeParams = hasSummaryWindow
-            ? {
-                sumFromMs:
-                  effectiveOccurredAt.from - SUMMARY_PARTITION_WINDOW_MS,
-                sumToMs: effectiveOccurredAt.to + SUMMARY_PARTITION_WINDOW_MS,
-              }
-            : {};
+          const summaryHintMs = hasSummaryWindow
+            ? (effectiveOccurredAt.from + effectiveOccurredAt.to) / 2
+            : null;
+          const summaryWindowMs = hasSummaryWindow
+            ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 +
+              DEFAULT_PARTITION_WINDOW_MS
+            : DEFAULT_PARTITION_WINDOW_MS;
 
           // Summaries first (light, one row per trace): they carry OccurredAt,
           // which bounds the heavy stored_spans scan below to the traces' weekly
@@ -2759,8 +2767,21 @@ export class ClickHouseTraceService {
           // StartTime always falls within its trace's lifetime, so a ±2-day window
           // around the summaries' OccurredAt range is safe headroom; when no
           // summary row is found we fall back to an unbounded span scan.
-          const summaryResult = await clickHouseClient.query({
-            query: `
+          const summaryRows = await queryWindowed<TraceSummaryRow[]>({
+            table: "trace_summaries",
+            hintMs: summaryHintMs,
+            windowMs: summaryWindowMs,
+            fallback: "none",
+            isEmpty: (rows) => rows.length === 0,
+            run: async (window) => {
+              const summaryTimeFilterOuter = window
+                ? window.sqlFor("t.OccurredAt")
+                : "";
+              const summaryTimeFilterInner = window
+                ? window.sqlFor("OccurredAt")
+                : "";
+              const summaryResult = await clickHouseClient.query({
+                query: `
         SELECT
           TraceId AS ts_TraceId,
           SpanCount AS ts_SpanCount,
@@ -2803,15 +2824,16 @@ export class ClickHouseTraceService {
           )
         ORDER BY t.TraceId
       `,
-            query_params: {
-              tenantId: projectId,
-              traceIds: batchTraceIds,
-              ...summaryTimeParams,
+                query_params: {
+                  tenantId: projectId,
+                  traceIds: batchTraceIds,
+                  ...(window?.params ?? {}),
+                },
+                format: "JSONEachRow",
+              });
+              return (await summaryResult.json()) as TraceSummaryRow[];
             },
-            format: "JSONEachRow",
           });
-
-          const summaryRows = (await summaryResult.json()) as TraceSummaryRow[];
 
           // No matched summaries: the result map is built solely from summary
           // rows, so the spans would be discarded anyway. Return early to skip the
@@ -2821,28 +2843,68 @@ export class ClickHouseTraceService {
             return new Map();
           }
 
+          // Parse spans
+          type SpanRow = {
+            SpanId: string;
+            TraceId: string;
+            TenantId: string;
+            ParentSpanId: string | null;
+            ParentTraceId: string | null;
+            ParentIsRemote: boolean | null;
+            Sampled: boolean;
+            StartTime: number;
+            EndTime: number;
+            DurationMs: number;
+            SpanName: string;
+            SpanKind: number;
+            ResourceAttributes: Record<string, unknown>;
+            SpanAttributes: Record<string, unknown>;
+            StatusCode: number | null;
+            StatusMessage: string | null;
+            ScopeName: string | null;
+            ScopeVersion: string | null;
+            Events_Timestamp: number[];
+            Events_Name: string[];
+            Events_Attributes: Record<string, unknown>[];
+            Links_TraceId: string[];
+            Links_SpanId: string[];
+            Links_Attributes: Record<string, unknown>[];
+          };
+
           // Bound the stored_spans scan to the weeks the matched traces occurred
-          // in (the cold-scan cost driver).
-          const SPAN_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+          // in (the cold-scan cost driver). Same range->window mapping as the
+          // summary read above: centre on the matched summaries' OccurredAt
+          // midpoint, half-width = half that range + the ±2-day margin, so the
+          // fragment lands on exactly [min - 2d, max + 2d]. Fallback "none": no
+          // matched OccurredAts -> hint null -> unbounded scan (the old
+          // hasWindow=false branch); a hinted-but-empty span read is
+          // authoritative and never widened.
           const occurredAts = summaryRows
             .map((r) => r.ts_OccurredAt)
             .filter((t): t is number => typeof t === "number" && t > 0);
           const hasWindow = occurredAts.length > 0;
-          const spanTimeFilterOuter = hasWindow
-            ? "AND t.StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) AND t.StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})"
-            : "";
-          const spanTimeFilterInner = hasWindow
-            ? "AND StartTime >= fromUnixTimestamp64Milli({spanFromMs:Int64}) AND StartTime <= fromUnixTimestamp64Milli({spanToMs:Int64})"
-            : "";
-          const spanTimeParams = hasWindow
-            ? {
-                spanFromMs: Math.min(...occurredAts) - SPAN_PARTITION_WINDOW_MS,
-                spanToMs: Math.max(...occurredAts) + SPAN_PARTITION_WINDOW_MS,
-              }
-            : {};
+          const spanMinMs = hasWindow ? Math.min(...occurredAts) : 0;
+          const spanMaxMs = hasWindow ? Math.max(...occurredAts) : 0;
+          const spanHintMs = hasWindow ? (spanMinMs + spanMaxMs) / 2 : null;
+          const spanWindowMs = hasWindow
+            ? (spanMaxMs - spanMinMs) / 2 + DEFAULT_PARTITION_WINDOW_MS
+            : DEFAULT_PARTITION_WINDOW_MS;
 
-          const spansResult = await clickHouseClient.query({
-            query: `
+          const spanRows = await queryWindowed<SpanRow[]>({
+            table: "stored_spans",
+            hintMs: spanHintMs,
+            windowMs: spanWindowMs,
+            fallback: "none",
+            isEmpty: (rows) => rows.length === 0,
+            run: async (window) => {
+              const spanTimeFilterOuter = window
+                ? window.sqlFor("t.StartTime")
+                : "";
+              const spanTimeFilterInner = window
+                ? window.sqlFor("StartTime")
+                : "";
+              const spansResult = await clickHouseClient.query({
+                query: `
         SELECT
           SpanId,
           TraceId,
@@ -2883,42 +2945,16 @@ export class ClickHouseTraceService {
         ORDER BY t.TraceId, t.StartTime ASC
         LIMIT ${MAX_SPANS_PER_TRACE} BY t.TraceId
       `,
-            query_params: {
-              tenantId: projectId,
-              traceIds: batchTraceIds,
-              ...spanTimeParams,
+                query_params: {
+                  tenantId: projectId,
+                  traceIds: batchTraceIds,
+                  ...(window?.params ?? {}),
+                },
+                format: "JSONEachRow",
+              });
+              return (await spansResult.json()) as SpanRow[];
             },
-            format: "JSONEachRow",
           });
-
-          // Parse spans
-          type SpanRow = {
-            SpanId: string;
-            TraceId: string;
-            TenantId: string;
-            ParentSpanId: string | null;
-            ParentTraceId: string | null;
-            ParentIsRemote: boolean | null;
-            Sampled: boolean;
-            StartTime: number;
-            EndTime: number;
-            DurationMs: number;
-            SpanName: string;
-            SpanKind: number;
-            ResourceAttributes: Record<string, unknown>;
-            SpanAttributes: Record<string, unknown>;
-            StatusCode: number | null;
-            StatusMessage: string | null;
-            ScopeName: string | null;
-            ScopeVersion: string | null;
-            Events_Timestamp: number[];
-            Events_Name: string[];
-            Events_Attributes: Record<string, unknown>[];
-            Links_TraceId: string[];
-            Links_SpanId: string[];
-            Links_Attributes: Record<string, unknown>[];
-          };
-          const spanRows = (await spansResult.json()) as SpanRow[];
 
           // Group spans by TraceId
           const spansByTrace = new Map<string, NormalizedSpan[]>();

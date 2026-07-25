@@ -13,6 +13,12 @@ ClickHouse holds 11 hot-path tables that grow with tenant traffic (`event_log`,
 mechanism to age data out, so storage costs scaled linearly forever and every
 tenant got the same fate regardless of plan or category.
 
+**Note (log-write retirement):** `stored_log_records` is now read-only and
+draining. The log write chain was retired — canonical `log_records` is the only
+log write path — so no new rows are stamped into `stored_log_records`; its
+existing TTL drains the pre-cutover history. It stays in the list above as a
+table the TTL still governs, not a live write target.
+
 The design space had four hard constraints:
 
 1. **Per-tenant, per-category.** A free org and a paid org share the same

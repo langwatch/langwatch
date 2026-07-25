@@ -109,8 +109,8 @@ secured
       if (process.env.NODE_ENV === "production") {
         logger.error(
           "CLICKHOUSE_OPS_URL is not set in production — refusing to fall back to the default-user client. " +
-            "Provision the langwatch_ops user (see infrastructure/clickhouse-serverless/config/users.xml.template) " +
-            "and set CLICKHOUSE_OPS_URL.",
+            "Provision a langwatch_ops ClickHouse user with a readonly=1 profile " +
+            "and no SOURCES grant, then set CLICKHOUSE_OPS_URL to it.",
         );
         return c.json(
           {
@@ -123,8 +123,8 @@ secured
       if (consumeMissingOpsUrlWarning()) {
         logger.warn(
           "CLICKHOUSE_OPS_URL is not set — /ops/clickhouse/explain is falling back to the default-user client. " +
-            "Provision the langwatch_ops user (see infrastructure/clickhouse-serverless/config/users.xml.template) " +
-            "and set CLICKHOUSE_OPS_URL to remove this fallback.",
+            "Provision a langwatch_ops ClickHouse user with a readonly=1 profile " +
+            "and no SOURCES grant, then set CLICKHOUSE_OPS_URL to it to remove this fallback.",
         );
       }
       usingFallback = true;

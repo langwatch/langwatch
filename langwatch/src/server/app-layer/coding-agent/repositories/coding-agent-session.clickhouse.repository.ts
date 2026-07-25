@@ -134,11 +134,17 @@ interface ClickHouseWriteRecord {
 /** UInt64 columns ride as strings — see the interface docblock. */
 const big = (n: number): string => String(Math.max(0, Math.round(n)));
 
-function toRecord(
-  row: CodingAgentSessionRow,
-  retentionDays?: number,
-  appliedEventIds: readonly string[] = [],
-): ClickHouseWriteRecord {
+function toRecord({
+  row,
+  retentionDays,
+  appliedEventIds = [],
+  versionStampMs,
+}: {
+  row: CodingAgentSessionRow;
+  retentionDays?: number;
+  appliedEventIds?: readonly string[];
+  versionStampMs: number;
+}): ClickHouseWriteRecord {
   const now = new Date();
   return {
     TenantId: row.tenantId,
@@ -147,9 +153,10 @@ function toRecord(
     Version: row.version,
     StartedAt: new Date(row.startedAtMs),
     // Preserve first-seen creation across re-folds; UpdatedAt is the RMT
-    // version and must be the write time so the latest version wins.
+    // version and must be strictly greater than the version it supersedes —
+    // see nextVersionStamp for why write time alone is not enough.
     CreatedAt: row.createdAt > 0 ? new Date(row.createdAt) : now,
-    UpdatedAt: now,
+    UpdatedAt: new Date(versionStampMs),
 
     Agent: row.agent,
     AgentVersion: row.agentVersion,
@@ -257,6 +264,30 @@ export class CodingAgentSessionClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
+  /**
+   * Monotonic floor for the RMT version stamp this writer issues. The
+   * IN-tuple read pattern requires that no two versions of one session tie on
+   * UpdatedAt (dev/docs/best_practices/clickhouse-queries.md: "nextUpdatedAt =
+   * max(now, prevUpdatedAt + 1) … no ties possible"): a tie makes BOTH rows
+   * match max(UpdatedAt), and a windowed read can then resurrect the stale
+   * in-window version while the true latest sits outside the window. The
+   * stamp combines the superseded version's timestamp threaded through the
+   * row (the read-back path) with this writer's own last stamp (covers
+   * writers that did not read back); per-aggregate group serialization covers
+   * the cross-process window.
+   */
+  private lastVersionStampMs = 0;
+
+  private nextVersionStamp(priorUpdatedAtMs: number): number {
+    const stamp = Math.max(
+      Date.now(),
+      priorUpdatedAtMs + 1,
+      this.lastVersionStampMs + 1,
+    );
+    this.lastVersionStampMs = stamp;
+    return stamp;
+  }
+
   async upsert(
     row: CodingAgentSessionRow,
     retentionDays?: number,
@@ -270,7 +301,14 @@ export class CodingAgentSessionClickHouseRepository
     try {
       await client.insert({
         table: TABLE_NAME,
-        values: [toRecord(row, retentionDays, appliedEventIds)],
+        values: [
+          toRecord({
+            row,
+            retentionDays,
+            appliedEventIds,
+            versionStampMs: this.nextVersionStamp(row.updatedAt),
+          }),
+        ],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
@@ -292,19 +330,30 @@ export class CodingAgentSessionClickHouseRepository
    * full sort key, and `StartedAt` can shift when an earlier signal arrives
    * late, so superseded rows can persist until TTL.
    *
-   * `startedAtMs` prunes to a handful of partitions. A session can run for
-   * hours, and a late signal can move StartedAt backwards, so the hint is
-   * widened ±7 days rather than pinned to the exact ms — the window keeps
-   * this a partition-pruned point read instead of a full-table scan.
+   * `window` bounds StartedAt on the OUTER read only, so it stays a
+   * partition-pruned point read instead of a full-table scan. The width is
+   * the CALLER's declaration (the fold's `options.readWindow`, or a direct
+   * caller deriving from CODING_AGENT_SESSION_READ_WINDOW_MS) — this
+   * repository applies the bound verbatim and implements no widening or miss
+   * fallback of its own.
+   *
+   * The inner dedup subquery is deliberately UNWINDOWED: it must resolve the
+   * TRUE latest version. Windowing it too would make a session whose latest
+   * version's StartedAt drifted outside the window (while an older version
+   * sits inside) read back as that stale older version — a non-null result no
+   * fallback can catch, and folding onto it overwrites the real latest row.
+   * Unwindowed, the same case yields an EMPTY outer read, which the caller's
+   * retry recovers. The subquery touches only sort-key columns, so it stays a
+   * cheap keyed seek without partition pruning.
    */
   private async findLatestRecord({
     tenantId,
     sessionId,
-    startedAtMs,
+    window,
   }: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<Record<string, unknown> | null> {
     EventUtils.validateTenantId(
       { tenantId },
@@ -313,7 +362,7 @@ export class CodingAgentSessionClickHouseRepository
     const client = await this.resolveClient(tenantId);
 
     const partitionFilter =
-      startedAtMs !== undefined
+      window !== undefined
         ? "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
         : "";
 
@@ -329,7 +378,6 @@ export class CodingAgentSessionClickHouseRepository
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND SessionId = {sessionId:String}
-              ${partitionFilter}
             GROUP BY TenantId, SessionId
           )
         LIMIT 1
@@ -337,11 +385,8 @@ export class CodingAgentSessionClickHouseRepository
       query_params: {
         tenantId,
         sessionId,
-        ...(startedAtMs !== undefined
-          ? {
-              from: startedAtMs - 7 * 24 * 60 * 60 * 1000,
-              to: startedAtMs + 7 * 24 * 60 * 60 * 1000,
-            }
+        ...(window !== undefined
+          ? { from: window.fromMs, to: window.toMs }
           : {}),
       },
       format: "JSONEachRow",
@@ -355,7 +400,7 @@ export class CodingAgentSessionClickHouseRepository
   async findBySessionId(params: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<CodingAgentSessionRow | null> {
     const record = await this.findLatestRecord(params);
     return record ? fromRecord(record) : null;
@@ -369,7 +414,7 @@ export class CodingAgentSessionClickHouseRepository
   async findBySessionIdWithApplied(params: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null> {
     const record = await this.findLatestRecord(params);
     if (!record) return null;
@@ -474,7 +519,12 @@ export class CodingAgentSessionClickHouseRepository
       await client.insert({
         table: TABLE_NAME,
         values: entries.map(({ row, retentionDays, appliedEventIds }) =>
-          toRecord(row, retentionDays, appliedEventIds),
+          toRecord({
+            row,
+            retentionDays,
+            appliedEventIds,
+            versionStampMs: this.nextVersionStamp(row.updatedAt),
+          }),
         ),
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },

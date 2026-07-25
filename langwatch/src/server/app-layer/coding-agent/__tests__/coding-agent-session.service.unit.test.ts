@@ -170,6 +170,44 @@ describe("CodingAgentSessionService", () => {
     });
   });
 
+  describe("given a session whose row sits outside the caller's hint window", () => {
+    describe("when the session is looked up with that hint", () => {
+      /** @scenario a stale hint degrades to a slower read, not a missing session */
+      it("retries without the window and returns the session", async () => {
+        const row = makeRow({ modelCalls: 5 });
+        const findCalls: Array<{
+          window?: { fromMs: number; toMs: number };
+        }> = [];
+        const sessions: CodingAgentSessionRepository = {
+          upsert: async () => {},
+          // The row is only visible to an unwindowed read — the hint misses.
+          findBySessionId: async (params) => {
+            findCalls.push({ window: params.window });
+            return params.window === undefined ? row : null;
+          },
+          findBySessionIdWithApplied: async () => null,
+          findManyRecent: async () => [],
+        };
+        const service = new CodingAgentSessionService(
+          sessions,
+          { ensure: async () => {}, findByTraceId: async () => null },
+          { ensure: async () => {}, findTotalsBySessionIds: async () => [] },
+        );
+
+        const session = await service.getBySessionId({
+          projectId: PROJECT,
+          sessionId: SESSION,
+          startedAtMs: row.startedAtMs,
+        });
+
+        expect(session?.modelCalls).toBe(5);
+        expect(findCalls).toHaveLength(2);
+        expect(findCalls[0]!.window).toBeDefined();
+        expect(findCalls[1]!.window).toBeUndefined();
+      });
+    });
+  });
+
   describe("when a trace is not a coding agent's", () => {
     /** @scenario traces from other sources are untouched */
     it("returns null without touching the session table", async () => {

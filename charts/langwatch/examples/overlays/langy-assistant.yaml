@@ -1,0 +1,42 @@
+# langy-assistant.yaml — Run the in-product assistant alongside LangWatch.
+#
+# Deploys the Langy agent pod, wires the app and the workers to it, and opens
+# the assistant to everyone in the install. The shared secret is materialised by
+# the chart, so there is nothing to create beforehand.
+#
+# Langy still needs a model to talk to: configure a model provider for the
+# project as you would for any other LangWatch feature.
+#
+# Usage:
+#   helm install lw . \
+#     -f examples/overlays/langy-assistant.yaml \
+#     --set autogen.enabled=true
+
+langyagent:
+  chartManaged: true
+
+  # The agent runs model-written shell, so it asks for a sandboxed runtime and
+  # refuses to install without one. On a cluster that cannot provide gVisor,
+  # blank the runtime and accept the reduced isolation on purpose:
+  #
+  #   runtimeClassName: ""
+  #   acceptUnsandboxedRuntime: true
+  #
+  # See examples/overlays/langy-assistant-unsandboxed.yaml.
+  runtimeClassName: "gvisor"
+
+  networkPolicy:
+    # Langy's tools shell out to git, gh, and package managers. Private ranges
+    # and the cloud metadata endpoint stay blocked either way.
+    allowExternalHttps: true
+
+  # Watch Langy work inside your own LangWatch: create an API key in the project
+  # you want its turns traced into, put it in a Secret, and name it here. The
+  # endpoint resolves to this install.
+  #
+  #   read -rsp "Mirror project API key: " KEY
+  #   kubectl -n <namespace> create secret generic langwatch-langyagent-mirror \
+  #     --from-env-file=/dev/stdin <<< "LANGY_MIRROR_TRACE_KEY=$KEY"; unset KEY
+  #
+  # mirror:
+  #   existingSecretName: langwatch-langyagent-mirror

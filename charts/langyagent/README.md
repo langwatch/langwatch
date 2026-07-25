@@ -14,31 +14,11 @@ The chart ships as a sub-chart of the umbrella `langwatch` chart (aliased
 `docker.io/langwatch/langyagent`, tag tracking the `langwatch` chart's
 `appVersion`.
 
-## Pre-install: create the shared auth Secret
-
-**Read this before `helm install`.** The chart references a Kubernetes
-`Secret` (default name `langwatch-langyagent-auth`) holding the
-service-to-service token. The control plane sends this token as a Bearer
-header; the agent verifies it. If the Secret is missing at install time the
-pod loops with `secret "langwatch-langyagent-auth" not found`.
-
-The **same value** must be present on both the agent pod and the
-`langwatch-app` env (`LANGY_INTERNAL_SECRET`). When you deploy both via the
-umbrella chart, both pods read it from this one Secret:
-
-```bash
-kubectl create secret generic langwatch-langyagent-auth \
-  --namespace langwatch \
-  --from-literal=LANGY_INTERNAL_SECRET="$(openssl rand -hex 32)"
-```
-
-Override the Secret/key names via `secrets.existingSecretName` and
-`secrets.internalSecretKey`.
-
 ## Install
 
-Preferred — via the umbrella `langwatch` chart, which also wires the app's
-`OPENCODE_AGENT_URL` + `LANGY_INTERNAL_SECRET` for you:
+Preferred — via the umbrella `langwatch` chart, which wires the app and the
+workers to the agent, materialises the shared `LANGY_INTERNAL_SECRET` into its
+own app Secret, and opens the assistant to the people in the install:
 
 ```bash
 helm install langwatch ./charts/langwatch -n langwatch \
@@ -46,18 +26,53 @@ helm install langwatch ./charts/langwatch -n langwatch \
   --set langyagent.chartManaged=true
 ```
 
-Standalone (you bring your own control plane and set `OPENCODE_AGENT_URL`
-on it manually):
+There is nothing to create beforehand. If you supply your own app Secret
+instead of letting the chart generate one (`autogen.enabled: false`), add a
+`LANGY_INTERNAL_SECRET` key to it — the install tells you so and stops rather
+than half-deploying.
+
+### On a cluster with no sandboxed runtime
+
+The agent runs LLM-written shell, so it asks for a sandboxed runtime (`gvisor`)
+by default. Most self-managed clusters have none, and the install refuses to
+render rather than silently dropping the sandbox. To run it anyway, say so:
+
+```yaml
+langyagent:
+  chartManaged: true
+  runtimeClassName: ""
+  acceptUnsandboxedRuntime: true
+```
+
+You keep per-worker UID isolation, the per-worker opencode password, and the
+NetworkPolicy; you give up the pod-to-host sandbox. A single-tenant install
+whose users are colleagues carries a much smaller worker-versus-worker risk
+than a multi-tenant one — read the trade that way, not as a formality.
+
+### Standalone
+
+You bring your own control plane, set `OPENCODE_AGENT_URL` on it manually, and
+create the shared Secret yourself so both sides hold the same value:
 
 ```bash
+kubectl create secret generic langwatch-langyagent-auth \
+  --namespace langwatch \
+  --from-literal=LANGY_INTERNAL_SECRET="$(openssl rand -hex 32)"
+
 helm install langyagent ./charts/langyagent -n langwatch -f values.prod.yaml
 ```
+
+Override the Secret/key names via `secrets.existingSecretName` and
+`secrets.internalSecretKey`.
 
 ## Values reference
 
 | Path                          | Purpose                                                                 |
 |-------------------------------|-------------------------------------------------------------------------|
 | `chartManaged`                | Master on/off switch for the agent (umbrella: `langyagent.chartManaged`) |
+| `enableForAllUsers`           | Umbrella-only. Opens Langy to everyone in the install as soon as the agent is deployed. `false` keeps the rollout flag authoritative so you open it per project/org from `/ops/feature-flags` |
+| `runtimeClassName`            | Sandboxed runtime for the pod (default `gvisor`). Blank it only together with `acceptUnsandboxedRuntime` |
+| `acceptUnsandboxedRuntime`    | Accept running with no pod-to-host sandbox, on clusters that cannot offer one. Required for a blank `runtimeClassName`, so an unsandboxed deploy is always deliberate |
 | `environment`                 | Deployment environment reported as `ENVIRONMENT` (empty → inherits `global.env` → `production`). Security-load-bearing: prod pods must report a production environment so the manager refuses `LANGY_UNSAFE_DEV_DISABLE_ISOLATION` |
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                     |
 | `replicaCount`                | **Keep at 1** — see Scaling below                                       |

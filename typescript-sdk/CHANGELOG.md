@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.37.0...typescript-sdk@v1.0.0) (2026-07-24)
+
+
+### Features
+
+* **typescript-sdk:** graduate to 1.0.0 ([f2e7067](https://github.com/langwatch/langwatch/commit/f2e70674c292b9634929e11bfede42b1ea70c86e))
+
+## [0.37.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.36.0...typescript-sdk@v0.37.0) (2026-07-24)
+
+
+### Features
+
+* agent issue reports, npx langwatch report at every access point ([#6101](https://github.com/langwatch/langwatch/issues/6101)) ([e881f8e](https://github.com/langwatch/langwatch/commit/e881f8e5ed5e24094e9c55e3f8d390c9ff2f43e4))
+
+
+### Bug Fixes
+
+* post-merge codex and Langy dogfood batch ([#6073](https://github.com/langwatch/langwatch/issues/6073)) ([a5a1e5a](https://github.com/langwatch/langwatch/commit/a5a1e5ac92854fc5a9619373ea57591f7b702539))
+
 ## [0.36.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.35.0...typescript-sdk@v0.36.0) (2026-07-23)
 
 

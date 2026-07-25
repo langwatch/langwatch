@@ -27,6 +27,10 @@ import * as path from "node:path";
  *   binary with inherited stdio and hand it the terminal for an entire
  *   interactive session. That is the caller's process's job, not an RPC's.
  * - init-shell: trivially cheap and its whole purpose is to be `eval`'d.
+ * - report: a one-shot, network-bound support command, often a customer's
+ *   very first `npx langwatch` contact. Leaving a resident daemon behind as
+ *   a side effect of filing an issue report would be surprising, and the
+ *   cold-start saving is irrelevant next to the upload.
  */
 const DENIED_COMMANDS = new Set([
   "daemon",
@@ -41,6 +45,7 @@ const DENIED_COMMANDS = new Set([
   "gemini",
   "opencode",
   "init-shell",
+  "report",
 ]);
 
 /**

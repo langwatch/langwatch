@@ -30,13 +30,17 @@ export interface CodingAgentSessionRepository {
   ): Promise<void>;
 
   /**
-   * One session, or null. `startedAtMs` is the partition-pruning hint —
-   * without it ClickHouse scans every partition, including cold storage.
+   * One session, or null. `window` bounds StartedAt so ClickHouse prunes
+   * partitions — without it every partition is scanned, including cold
+   * storage. The repository applies the window it is given verbatim; it is a
+   * pruning optimisation only, so a caller that cannot rule out a row outside
+   * its window must retry without one (the fold path gets that retry from the
+   * executor's declared-read-window contract).
    */
   findBySessionId(params: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<CodingAgentSessionRow | null>;
 
   /**
@@ -48,7 +52,7 @@ export interface CodingAgentSessionRepository {
   findBySessionIdWithApplied(params: {
     tenantId: string;
     sessionId: string;
-    startedAtMs?: number;
+    window?: { fromMs: number; toMs: number };
   }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null>;
 
   /**

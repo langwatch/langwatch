@@ -56,6 +56,7 @@ export type AnnotationWithUser = Annotation & {
   user?: {
     name: string | null;
     id: string;
+    image?: string | null;
   };
 };
 
@@ -69,7 +70,7 @@ type GroupedAnnotation = {
 export type UnifiedQueueItem = {
   id: string;
   doneAt: Date | null;
-  createdByUser: { name: string | null; id: string } | null;
+  createdByUser: { name: string | null; id: string; image?: string | null } | null;
   createdAt: Date;
   traceId: string;
   trace?: Trace;
@@ -125,6 +126,7 @@ export const AnnotationsTable = ({
         ? {
             name: item.createdByUser.name,
             id: item.createdByUser.id,
+            image: item.createdByUser.image ?? null,
           }
         : null,
       createdAt: item.createdAt ? new Date(item.createdAt) : new Date(),

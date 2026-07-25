@@ -135,13 +135,30 @@ type workerEntry struct {
 	// cause behind the agent's laundered error event, captured so the turn's
 	// terminal error frame can carry the full typed chain through.
 	llmErr *herr.E
+	// rateLimitStrikes counts CONSECUTIVE rate-limited (429) mediated LLM
+	// calls for this conversation. A successful call resets it, as does a new
+	// turn. At the cut threshold handleLLM stops the worker SDK's retry loop:
+	// a hard plan limit answers every retry identically, and the SDK's
+	// ever-growing backoff otherwise leaves the turn spinning silently.
+	rateLimitStrikes int
+	// llmStreamCut is the provider error payload captured from an in-stream
+	// error event on a 200 LLM stream (OpenAI signals insufficient_quota this
+	// way). Status-based cutting never sees these, every SDK retry re-opens
+	// a fresh 200 stream and dies identically, so when set, handleLLM
+	// answers the NEXT call with a terminal 400 carrying this body instead of
+	// proxying. Cleared by a clean stream, a new turn, or clearLLMError.
+	llmStreamCut []byte
 }
 
 func (e *workerEntry) setTurn(sc trace.SpanContext) {
 	e.mu.Lock()
 	e.turn = sc
-	// A new turn must never inherit the previous turn's failure as its cause.
+	// A new turn must never inherit the previous turn's failure as its cause,
+	// nor its rate-limit strikes: the user asked something new, so let the SDK
+	// retry from a clean slate (a hard limit will re-strike immediately).
 	e.llmErr = nil
+	e.rateLimitStrikes = 0
+	e.llmStreamCut = nil
 	e.mu.Unlock()
 }
 
@@ -160,6 +177,47 @@ func (e *workerEntry) setLLMError(err herr.E) {
 func (e *workerEntry) clearLLMError() {
 	e.mu.Lock()
 	e.llmErr = nil
+	e.rateLimitStrikes = 0
+	e.llmStreamCut = nil
+	e.mu.Unlock()
+}
+
+// latchLLMStreamCut arms the terminal answer for the conversation's next
+// mediated LLM call with the provider's own in-stream error payload.
+func (e *workerEntry) latchLLMStreamCut(body []byte) {
+	e.mu.Lock()
+	e.llmStreamCut = body
+	e.mu.Unlock()
+}
+
+// takeLLMStreamCut consumes the armed cut. One terminal answer per latch: the
+// SDK treats it as final and fails the turn; if a later call in the same
+// conversation dies the same in-stream way, the sniffer re-latches. A
+// consumed latch never poisons an unrelated later call.
+func (e *workerEntry) takeLLMStreamCut() ([]byte, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if len(e.llmStreamCut) == 0 {
+		return nil, false
+	}
+	body := e.llmStreamCut
+	e.llmStreamCut = nil
+	return body, true
+}
+
+func (e *workerEntry) strikeRateLimit() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.rateLimitStrikes++
+	return e.rateLimitStrikes
+}
+
+// resetRateLimitStrikes zeroes the consecutive-429 count without touching the
+// captured llmErr: any non-429 answer breaks the run, but a captured 5xx
+// cause must survive as the turn's most recent real failure.
+func (e *workerEntry) resetRateLimitStrikes() {
+	e.mu.Lock()
+	e.rateLimitStrikes = 0
 	e.mu.Unlock()
 }
 

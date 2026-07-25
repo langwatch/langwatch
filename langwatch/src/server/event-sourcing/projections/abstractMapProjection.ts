@@ -52,23 +52,23 @@ export type MapEventHandlers<
  *
  * **Usage:**
  * ```typescript
- * const logEvents = [logRecordReceivedEventSchema] as const;
+ * const events = [canonicalLogRecordReceivedEventSchema] as const;
  *
- * class LogRecordStorageMapProjection
- *   extends AbstractMapProjection<NormalizedLogRecord, typeof logEvents>
- *   implements MapEventHandlers<typeof logEvents, NormalizedLogRecord>
+ * class CanonicalLogStorageMapProjection
+ *   extends AbstractMapProjection<CanonicalLogRecord, typeof events>
+ *   implements MapEventHandlers<typeof events, CanonicalLogRecord>
  * {
- *   readonly name = "logRecordStorage";
- *   readonly store: AppendStore<NormalizedLogRecord>;
- *   protected readonly events = logEvents;
+ *   readonly name = "canonicalLogStorage";
+ *   readonly store: AppendStore<CanonicalLogRecord>;
+ *   protected readonly events = events;
  *
- *   constructor(deps: { store: AppendStore<NormalizedLogRecord> }) {
+ *   constructor(deps: { store: AppendStore<CanonicalLogRecord> }) {
  *     super();
  *     this.store = deps.store;
  *   }
  *
- *   mapObsTraceLogRecordReceived(event: LogRecordReceivedEvent): NormalizedLogRecord {
- *     return { ... };
+ *   mapLogRecordReceived(event: CanonicalLogRecordReceivedEvent): CanonicalLogRecord {
+ *     return event.data;
  *   }
  * }
  * ```

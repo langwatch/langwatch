@@ -60,6 +60,12 @@ type BifrostOptions struct {
 	CodexRefresher domain.CodexTokenRefresher
 	// CodexBackendURL overrides the codex upstream (tests only).
 	CodexBackendURL string
+	// OpenAIBackendURL overrides OpenAI's upstream (tests only). A credential
+	// base_url reroutes to the vLLM chat-compat provider (see mapProvider);
+	// this override instead keeps the request on bifrost's native OpenAI
+	// provider, so tests can drive the real Responses stream pipeline against
+	// a local server.
+	OpenAIBackendURL string
 }
 
 // NewBifrostRouter creates a provider router backed by bifrost.
@@ -69,7 +75,7 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		pool = 1000
 	}
 	bf, err := bifrost.Init(ctx, bfschemas.BifrostConfig{
-		Account:         &account{},
+		Account:         &account{openAIBaseURL: opts.OpenAIBackendURL},
 		InitialPoolSize: pool,
 		Logger:          &bifrostLogger{logger: opts.Logger},
 	})
@@ -796,7 +802,11 @@ func credentialFromContext(ctx context.Context) domain.Credential {
 }
 
 // account implements bfschemas.Account for multi-tenant credential dispatch.
-type account struct{}
+type account struct {
+	// openAIBaseURL redirects bifrost's native OpenAI provider to a local
+	// server in tests. Empty in production. See BifrostOptions.OpenAIBackendURL.
+	openAIBaseURL string
+}
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
 	return bfschemas.StandardProviders, nil
@@ -829,6 +839,9 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 	// anything.
 	cfg.NetworkConfig.DefaultRequestTimeoutInSeconds = ProviderRequestTimeoutSeconds
 	cfg.NetworkConfig.StreamIdleTimeoutInSeconds = ProviderRequestTimeoutSeconds
+	if provider == bfschemas.OpenAI && a.openAIBaseURL != "" {
+		cfg.NetworkConfig.BaseURL = a.openAIBaseURL
+	}
 	if proxyURL := os.Getenv("LW_GATEWAY_OUTBOUND_PROXY"); proxyURL != "" {
 		// Debug-only: route outbound provider traffic through an HTTP proxy
 		// (e.g. `http://localhost:8888` for mitmproxy). Lets operators
@@ -1098,6 +1111,51 @@ func bfErrorMsg(e *bfschemas.BifrostError) string {
 	return fmt.Sprintf("bifrost error (status %v)", e.StatusCode)
 }
 
+// upstreamStreamError converts a mid-stream BifrostError chunk into a
+// structured domain.UpstreamError the SSE writer can forward faithfully.
+//
+// Providers can fail a 200-established stream with an in-stream error event
+// whose detail nests under an `error` OBJECT (OpenAI Responses:
+// {"type":"error","error":{"type","code","message","param"}}). Bifrost's
+// stream schema maps only the legacy flat `message`/`code`/`param` fields, so
+// for the nested shape it hands over an ErrorField with an EMPTY message
+// but, on raw-forward paths (rawForwardCtx), the verbatim event body rides
+// ExtraFields.RawResponse. Recover the message from there, and keep the raw
+// body so the writer can forward the provider's own event bytes unchanged.
+func upstreamStreamError(e *bfschemas.BifrostError) *domain.UpstreamError {
+	ue := &domain.UpstreamError{Message: bfErrorMsg(e)}
+	if e == nil {
+		ue.Message = "provider stream error"
+		return ue
+	}
+	if code := e.StatusCode; code != nil {
+		ue.StatusCode = *code
+	}
+	raw, ok := extractRawResponseBytes(e.ExtraFields.RawResponse)
+	if !ok {
+		if ue.Message == "" {
+			ue.Message = "provider stream error"
+		}
+		return ue
+	}
+	var event struct {
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if sonic.Unmarshal(raw, &event) == nil && event.Error != nil {
+		// The raw body IS a provider error event, forward it verbatim.
+		ue.Body = raw
+		if ue.Message == "" {
+			ue.Message = event.Error.Message
+		}
+	}
+	if ue.Message == "" {
+		ue.Message = "provider stream error"
+	}
+	return ue
+}
+
 // --- Usage extraction ---
 
 func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
@@ -1188,7 +1246,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			return false
 		}
 		if chunk.BifrostError != nil {
-			it.err = fmt.Errorf("stream error: %s", bfErrorMsg(chunk.BifrostError))
+			it.err = upstreamStreamError(chunk.BifrostError)
 			it.done = true
 			return false
 		}

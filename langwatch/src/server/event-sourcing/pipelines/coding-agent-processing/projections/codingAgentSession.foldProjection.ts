@@ -50,6 +50,16 @@ const codingAgentSessionEvents = [
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-21";
 
 /**
+ * How far a session's StartedAt (the table's partition column) may drift from
+ * the business time a read is anchored on — a folded event's occurredAt, or a
+ * trace-session mapping's timestamp. Sessions run for hours and a late signal
+ * can move StartedAt backwards, so the window is ±7 days rather than pinned to
+ * the exact ms. Declared once here, on the fold; direct callers derive their
+ * window from this too, never from their own arithmetic.
+ */
+export const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
  * The fold's state: the derived session plus the bookkeeping the abstract fold
  * needs. Deliberately flat — the session data is already bounded, so the whole
  * state is O(1) in the length of the session.
@@ -99,8 +109,17 @@ export class CodingAgentSessionFoldProjection
    * replaces per series. A late event folds onto the loaded state in place; no
    * history replay derives anything. (See the 2026-07-23 outage: unbounded
    * refolds starved ClickHouse merges into a platform-wide `TOO_MANY_PARTS`.)
+   *
+   * `readWindow` bounds the read-back to a partition-pruned window around the
+   * folded event's business time. The width covers the drift between an
+   * event's occurredAt and the row's StartedAt (the partition column) — a
+   * session resumed later than that still reads back correctly because the
+   * executor retries a windowed miss without the window.
    */
-  override options: FoldProjectionOptions = { refoldOnOutOfOrder: false };
+  override options: FoldProjectionOptions = {
+    refoldOnOutOfOrder: false,
+    readWindow: { widthMs: CODING_AGENT_SESSION_READ_WINDOW_MS },
+  };
 
   constructor(deps: { store: FoldProjectionStore<CodingAgentSessionState> }) {
     super({

@@ -1,44 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 import { LogRecordStorageClickHouseRepository } from "../log-record-storage.clickhouse.repository";
 
 // Legacy attribute key the ingest path used to stamp on claude_code content
 // logs. The marking is gone; this key is asserted here only to pin that the
 // read path never filters on it.
 const LEGACY_CLAUDE_KIND_ATTR = "langwatch.claude_code.kind";
-
-const makeRecord = (
-  over: Partial<NormalizedLogRecord> = {},
-): NormalizedLogRecord => ({
-  id: "proj-1",
-  tenantId: "project_test",
-  traceId: "a3c6656cf433e97549f654034be02955",
-  spanId: "9376fa726d53e62a",
-  timeUnixMs: 1_700_000_000_000,
-  severityNumber: 9,
-  severityText: "INFO",
-  body: "{}",
-  attributes: {},
-  resourceAttributes: {},
-  scopeName: "com.anthropic.claude_code.events",
-  scopeVersion: null,
-  ...over,
-});
-
-const repoCapturingInsert = () => {
-  const insert = vi.fn().mockResolvedValue(undefined);
-  const resolveClient = (async () => ({
-    insert,
-  })) as unknown as ConstructorParameters<
-    typeof LogRecordStorageClickHouseRepository
-  >[0];
-  const repo = new LogRecordStorageClickHouseRepository(resolveClient);
-  return { repo, insert };
-};
-
-const insertedRow = (insert: ReturnType<typeof vi.fn>) =>
-  insert.mock.calls[0]![0].values[0] as { _retention_days: number };
 
 const repoCapturingQuery = (rows: unknown[] = []) => {
   const query = vi.fn().mockResolvedValue({ json: async () => rows });
@@ -56,56 +22,6 @@ const capturedQuery = (query: ReturnType<typeof vi.fn>) =>
     query: string;
     query_params: Record<string, unknown>;
   };
-
-describe("LogRecordStorageClickHouseRepository.insertLogRecord", () => {
-  describe("when the log record is a Claude Code content log", () => {
-    // Claude Code logs are the content-of-record now (no longer duplicated onto
-    // synthesized spans), so a claude-kind log gets the caller's normal
-    // retention like any other log — no special short floor.
-    it("keeps the platform default retention", async () => {
-      const { repo, insert } = repoCapturingInsert();
-
-      await repo.insertLogRecord(
-        makeRecord({ attributes: { [LEGACY_CLAUDE_KIND_ATTR]: "model" } }),
-      );
-
-      expect(insertedRow(insert)._retention_days).toBe(
-        PLATFORM_DEFAULT_RETENTION_DAYS,
-      );
-    });
-
-    it("honours an explicit retention override", async () => {
-      const { repo, insert } = repoCapturingInsert();
-
-      await repo.insertLogRecord(
-        makeRecord({ attributes: { [LEGACY_CLAUDE_KIND_ATTR]: "tool" } }),
-        308,
-      );
-
-      expect(insertedRow(insert)._retention_days).toBe(308);
-    });
-  });
-
-  describe("when the log record is a plain log", () => {
-    it("keeps the platform default retention", async () => {
-      const { repo, insert } = repoCapturingInsert();
-
-      await repo.insertLogRecord(makeRecord({ attributes: {} }));
-
-      expect(insertedRow(insert)._retention_days).toBe(
-        PLATFORM_DEFAULT_RETENTION_DAYS,
-      );
-    });
-
-    it("honours an explicit retention override", async () => {
-      const { repo, insert } = repoCapturingInsert();
-
-      await repo.insertLogRecord(makeRecord({ attributes: {} }), 308);
-
-      expect(insertedRow(insert)._retention_days).toBe(308);
-    });
-  });
-});
 
 describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
   // stored_log_records is PARTITION BY toYearWeek(TimeUnixMs); the read must
@@ -125,6 +41,26 @@ describe("LogRecordStorageClickHouseRepository.getLogsByTraceId", () => {
       const windowMs = 2 * 24 * 60 * 60 * 1000;
       expect(query_params.fromMs).toBe(occurredAtMs - windowMs);
       expect(query_params.toMs).toBe(occurredAtMs + windowMs);
+    });
+  });
+
+  // The read is single-shot: a hinted window that comes back empty is
+  // authoritative (`fallback: "none"` in the queryWindowed adopter), so it must
+  // NOT fire a second, wider query the way an `"unbounded"`/`{ lookbackMs }`
+  // fallback would. This pins the pre-adopter behaviour through the migration.
+  describe("when the caller provides a time and the hinted window is empty", () => {
+    it("does not re-widen — it issues exactly one query", async () => {
+      const { repo, query } = repoCapturingQuery([]);
+
+      await repo.getLogsByTraceId("project_test", "trace-1", 1_700_000_000_000);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      const { query_params } = capturedQuery(query);
+      const windowMs = 2 * 24 * 60 * 60 * 1000;
+      // The single query stayed on the ±2d hinted window; it never fell back to
+      // the now-anchored lookback frame.
+      expect(query_params.fromMs).toBe(1_700_000_000_000 - windowMs);
+      expect(query_params.toMs).toBe(1_700_000_000_000 + windowMs);
     });
   });
 

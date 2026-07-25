@@ -820,6 +820,7 @@
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
+              "self-hosting/configuration/langy-assistant",
               "self-hosting/configuration/observability",
               "self-hosting/configuration/third-party-integrations"
             ]
@@ -1294,7 +1295,18 @@
       "x-twitter": "https://x.com/langwatchai",
       "linkedin": "https://www.linkedin.com/company/langwatch/",
       "youtube": "https://www.youtube.com/@LangWatch"
-    }
+    },
+    "links": [
+      {
+        "header": "For agents",
+        "items": [
+          {
+            "label": "Report an issue: npx langwatch report",
+            "href": "https://langwatch.ai/docs/support#reporting-issues-from-coding-agents"
+          }
+        ]
+      }
+    ]
   },
   "integrations": {
     "gtm": {
@@ -1303,7 +1315,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1784837696",
+      "source": "/ci/cache/busted/1784968829",
       "destination": "/"
     },
     {

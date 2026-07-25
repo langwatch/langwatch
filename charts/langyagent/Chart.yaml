@@ -5,8 +5,8 @@ description: >-
   isolated OpenCode subprocess per conversation, with per-request credential
   injection. Internal-only service consumed by the LangWatch control plane.
 type: application
-version: 3.3.0
-appVersion: 3.3.0
+version: 3.5.0
+appVersion: 3.5.0
 keywords:
   - langwatch
   - langy

@@ -219,9 +219,7 @@ export function extractAssistantTextFromResponseBody(
   }
   if (parts.length === 0) return null;
   // Defence-in-depth payload-size guard. claude-code 2.x caps each
-  // api_response_body inline at ~60KB upstream, and the log
-  // command-level cap (capOversizedLogRecord, alexis) bounds the
-  // stored body before redaction/fold. This second cap bounds the
+  // api_response_body inline at ~60KB upstream. This cap bounds the
   // ComputedOutput / langwatch.output value specifically, in case
   // a future claude release lifts the 60KB inline cap or a different
   // emitter ships an api_response_body without one.

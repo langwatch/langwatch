@@ -182,7 +182,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     const read = await sessions.findBySessionId({
       tenantId,
       sessionId: `${tag}-rt`,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
 
     expect(read).not.toBeNull();
@@ -244,6 +244,44 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     expect(forSession[0]!.costUsd).toBeCloseTo(2);
   });
 
+  it("returns empty, not a stale version, when the latest StartedAt drifted outside the window", async () => {
+    // v1 starts inside the window; v2 (the true latest) backdates StartedAt
+    // far outside it. A windowed read must NOT dedup to v1 — the inner
+    // max(UpdatedAt) seek is unwindowed, so the drifted latest makes the
+    // outer windowed read empty and the caller's unwindowed retry recovers
+    // the real row instead of folding onto (and overwriting) stale state.
+    const drifted = `${tag}-drift`;
+    await sessions.upsert(
+      sessionRow({ sessionId: drifted, startedAtMs: baseMs, costUsd: 1 }),
+      30,
+    );
+    await sessions.upsert(
+      sessionRow({
+        sessionId: drifted,
+        // Far outside the read window, but WELL inside the 30-day retention:
+        // a drift equal to retentionDays parks this row exactly on the table's
+        // `StartedAt + toIntervalDay(_retention_days)` TTL boundary, where any
+        // background merge DELETEs it mid-test and the reads fall back to v1.
+        startedAtMs: baseMs - 15 * 24 * 60 * 60 * 1000,
+        costUsd: 2,
+      }),
+      30,
+    );
+
+    const windowed = await sessions.findBySessionId({
+      tenantId,
+      sessionId: drifted,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+    const unwindowed = await sessions.findBySessionId({
+      tenantId,
+      sessionId: drifted,
+    });
+
+    expect(windowed).toBeNull();
+    expect(unwindowed?.costUsd).toBeCloseTo(2);
+  });
+
   it("reads back the applied-event-id watermark next to the row (ADR-066)", async () => {
     const row = sessionRow({ sessionId: `${tag}-applied` });
     await sessions.upsert(row, 30, ["ev-1", "ev-2"]);
@@ -251,12 +289,12 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId: `${tag}-applied`,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
     const direct = await sessions.findBySessionId({
       tenantId,
       sessionId: `${tag}-applied`,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
 
     expect(withApplied).not.toBeNull();
@@ -274,7 +312,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId: `${tag}-noapplied`,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
 
     expect(withApplied).not.toBeNull();
@@ -306,7 +344,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId,
-      startedAtMs: baseMs,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
 
     expect(withApplied).not.toBeNull();

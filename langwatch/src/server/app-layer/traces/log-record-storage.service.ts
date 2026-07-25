@@ -8,7 +8,6 @@ import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 import { LogRecordStorageClickHouseRepository } from "./repositories/log-record-storage.clickhouse.repository";
 import {
   type LogRecordStorageRepository,
@@ -46,10 +45,6 @@ export class LogRecordStorageService {
   }) {
     this.repository = repository;
     this.canonical = canonical;
-  }
-
-  async insertLogRecord(record: NormalizedLogRecord): Promise<void> {
-    await this.repository.insertLogRecord(record);
   }
 
   /**

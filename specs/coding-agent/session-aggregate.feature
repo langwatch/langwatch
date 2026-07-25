@@ -38,6 +38,11 @@ Feature: Coding-agent sessions
     When a user opens a trace that belongs to a coding-agent session
     Then the drawer offers the session view for that trace's session
 
+  Scenario: a stale hint degrades to a slower read, not a missing session
+    Given a session whose stored start time no longer matches the caller's hint
+    When the session is looked up with that hint
+    Then the lookup retries without the time bound and returns the session
+
   Scenario: traces from other sources are untouched
     When a user opens a trace that is not from a coding agent
     Then the trace view shows no coding-agent session surface

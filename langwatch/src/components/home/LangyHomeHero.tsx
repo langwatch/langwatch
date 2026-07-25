@@ -7,6 +7,7 @@ import { selectLangySuggestions } from "~/features/langy/logic/langyHomeSuggesti
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useHomeDevState } from "./dev/homeDevState";
 import "./homeHeroScroll.css";
+import { OnboardAgentPill } from "./OnboardAgentPill";
 import { useProjectReach } from "./useProjectReach";
 import { WelcomeHeader } from "./WelcomeHeader";
 
@@ -70,6 +71,11 @@ export function LangyHomeHero() {
   // an answer, so it skips the wait.
   const reachKnown =
     devState === "empty" || devState === "populated" || !reach.isLoading;
+  // Only once the answer is actually known: leading with "send your first
+  // trace" at a project that already has thousands is the product not knowing
+  // its own customer, and `isNewProject` reads false while the check is still
+  // in flight.
+  const leadWithOnboarding = reachKnown && isNewProject;
   const suggestions = !reachKnown
     ? []
     : selectLangySuggestions({
@@ -175,31 +181,52 @@ export function LangyHomeHero() {
           />
         </Box>
 
-        {/* The asks worth borrowing. Setup lives where the gap actually is —
-            each empty page carries its own set-up-with-AI control — so the
-            home's row stays purely prompts. The row keeps its height while
-            the project's reach is still being read, because there are no
-            honest asks to show until that lands. */}
-        <Box
-          width="full"
-          minHeight={ASK_ROW_MIN_HEIGHT}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <HStack gap={2} flexWrap="wrap" justify="center">
-            {canAsk
-              ? suggestions.map((suggestion) => (
-                  <AskChip
-                    key={suggestion.label}
-                    icon={<suggestion.icon size={12} />}
-                    label={suggestion.label}
-                    onClick={() => askLangy(suggestion.prompt)}
-                  />
-                ))
-              : null}
-          </HStack>
-        </Box>
+        {/* TWO TIERS, not one wrapping row.
+            The chips are prompts: click one and it goes to Langy. The
+            onboarding control is an ACTION: it hands you something to take
+            away, or a link to follow. They are different kinds, so the split
+            is the composition: a settled row of asks, and the action on its
+            own centre line. Every empty feature page also carries its own
+            set-up-with-AI control, but the home is where a new project lands
+            first, so the way in lives here too.
+
+            The row keeps its height while the project's reach is still being
+            read, because there are no honest asks to show until that lands. */}
+        <VStack width="full" gap={2.5} align="center">
+          {/* On a project with nothing in it, this LEADS. Everything else on
+              the page describes data that does not exist yet, so the one
+              control that changes that comes first, which in a stack means
+              above, not merely left. */}
+          {leadWithOnboarding ? (
+            <OnboardAgentPill
+              prominent
+              onAskLangy={canAsk ? askLangy : undefined}
+            />
+          ) : null}
+          <Box
+            width="full"
+            minHeight={ASK_ROW_MIN_HEIGHT}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <HStack gap={2} flexWrap="wrap" justify="center">
+              {canAsk
+                ? suggestions.map((suggestion) => (
+                    <AskChip
+                      key={suggestion.label}
+                      icon={<suggestion.icon size={12} />}
+                      label={suggestion.label}
+                      onClick={() => askLangy(suggestion.prompt)}
+                    />
+                  ))
+                : null}
+            </HStack>
+          </Box>
+          {!leadWithOnboarding && reachKnown ? (
+            <OnboardAgentPill onAskLangy={canAsk ? askLangy : undefined} />
+          ) : null}
+        </VStack>
 
         {!canAsk ? (
           <Text fontSize="12px" color="fg.subtle" textAlign="center">

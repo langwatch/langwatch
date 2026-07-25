@@ -20,7 +20,7 @@ export default defineConfig({
     server: {
       deps: {
         inline: [
-          /@langwatch\/(langy|handled-error|automations|observability)/,
+          /@langwatch\/(langy|handled-error|automations|observability|redaction)/,
         ],
       },
     },

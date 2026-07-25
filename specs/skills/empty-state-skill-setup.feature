@@ -1,17 +1,13 @@
 Feature: Set up with AI from every empty page
-  The set-up-with-AI control lives where the gap actually is: each feature
-  page's empty state, not the home. Every surface offers the same three
-  routes, fed by that surface's own docs skill: hand the job to Langy (who
-  has the skills loaded), copy a prompt that installs the skill into the
-  reader's own coding agent, or read that feature's docs.
+  Each feature page's empty state carries its own set-up-with-AI control, fed
+  by that surface's own docs skill. Every surface offers the same three
+  routes: hand the job to Langy (who has the skills loaded), copy a prompt
+  that installs the skill into the reader's own coding agent, or read that
+  feature's docs. The home keeps its own onboarding control too (a new
+  project lands there first), specified in specs/home/langy-home.feature.
 
   Background:
     Given a project with no data on the surface being visited
-
-  Scenario: The home no longer carries the setup control
-    When I open the Langy home
-    Then no onboarding pill renders in the hero
-    And the ask chips row is the only row under the field
 
   Scenario Outline: Every empty surface offers its own skill
     When I open the <surface> page with no <surface> yet

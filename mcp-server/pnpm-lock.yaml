@@ -37,6 +37,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../packages/handled-error
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../langwatch/packages/redaction
       '@langwatch/scenario':
         specifier: ^0.4.6
         version: 0.4.15(668bbc6991063a13cac3c4f471982977)
@@ -109,6 +112,18 @@ importers:
       zod-validation-error:
         specifier: ^5.0.0
         version: 5.0.0(zod@4.4.3)
+
+  ../langwatch/packages/redaction:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.1.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(vite@7.3.5(@types/node@26.1.1)(tsx@4.22.4)(yaml@2.9.0))
 
   ../langwatch/packages/ssrf:
     devDependencies:
@@ -4210,7 +4225,7 @@ snapshots:
   '@types/body-parser@1.19.6':
     dependencies:
       '@types/connect': 3.4.38
-      '@types/node': 25.9.1
+      '@types/node': 26.1.1
 
   '@types/chai@5.2.3':
     dependencies:
@@ -4219,7 +4234,7 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 26.1.1
 
   '@types/debug@4.1.13':
     dependencies:
@@ -4235,7 +4250,7 @@ snapshots:
 
   '@types/express-serve-static-core@5.1.1':
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 26.1.1
       '@types/qs': 6.15.1
       '@types/range-parser': 1.2.7
       '@types/send': 1.2.1
@@ -4264,7 +4279,7 @@ snapshots:
 
   '@types/prompts@2.4.9':
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 26.1.1
       kleur: 3.0.3
 
   '@types/qs@6.15.1': {}
@@ -4275,16 +4290,16 @@ snapshots:
 
   '@types/send@1.2.1':
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 26.1.1
 
   '@types/serve-static@2.2.0':
     dependencies:
       '@types/http-errors': 2.0.5
-      '@types/node': 25.9.1
+      '@types/node': 26.1.1
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 25.9.1
+      '@types/node': 26.1.1
 
   '@types/yargs-parser@21.0.3': {}
 
