@@ -217,3 +217,44 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given one conversation has been cut off at a hard rate limit
     When a different conversation's calls are relayed
     Then they pass through untouched with their own fresh count
+
+  # A provider can also fail AFTER answering 200: the stream opens, then an
+  # in-stream error event (OpenAI's insufficient_quota) ends it. Status-based
+  # cutting never sees these, every retry re-opens a fresh 200 stream and
+  # dies the same way, the same silent spinner with a different door.
+
+  @unit
+  Scenario: A hard limit delivered inside a 200 stream is cut like a rejected call
+    Given the model provider opens a 200 stream on a relayed call
+    And ends it with an in-stream error event naming exhausted quota
+    When the agent's SDK retries the call
+    Then the relay answers the retry with a failure the SDK does not retry
+    And it carries the provider's own error payload
+    And the turn fails with the provider's message instead of spinning
+
+  @unit
+  Scenario: A clean stream clears the in-stream failure capture
+    Given a conversation's relayed call previously ended with an in-stream error event
+    When a later relayed call streams to completion without an error event
+    Then the capture is cleared and later calls pass through untouched
+
+  # The turn stream's terminal error entry shares its `type: "error"`
+  # discriminant with the SSE transport's own protocol failure frame. The
+  # transport once claimed every such frame for itself, so the one entry that
+  # names the real failure killed the subscription instead: watching a turn
+  # fail LIVE showed the generic unknown card, while reloading the same
+  # conversation showed the correct one from the durable record. The live road
+  # and the reload road must end at the same card.
+  @unit
+  Scenario: A live-watched failure shows the same card a reload shows
+    Given the user is watching Langy answer when the turn fails
+    When the failure reaches the open conversation
+    Then the user sees the card that names what actually went wrong
+    And it is the same card a reload of the conversation would show
+    And the generic something-went-wrong card never appears in its place
+
+  @unit
+  Scenario: A genuinely dead stream still names the durable failure
+    Given the live connection drops before Langy can say what went wrong
+    When the turn's failure is already on the conversation's record
+    Then the user sees the card naming that recorded failure, not a generic apology

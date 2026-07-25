@@ -244,6 +244,34 @@ export function readLangyStreamError(
   };
 }
 
+/**
+ * Resolve the domain error behind a LIVE turn failure. Three roads, in order:
+ * a turn-START rejection carries it on the tRPC error (`error.data.error`); a
+ * mid-turn failure rides the stream's terminal entry as a JSON message; and
+ * when the stream itself died with no typed payload (a genuinely broken
+ * connection), the turn's real, classified failure is usually already on the
+ * DURABLE record: naming it beats a generic apology whose cause the server
+ * knew all along. Only when all three come up empty does the caller fall back
+ * to the unknown card.
+ */
+export function resolveLiveTurnError({
+  error,
+  durableLastError,
+}: {
+  error: { message: string } & object;
+  durableLastError: string | null | undefined;
+}): LangyDomainError {
+  return (
+    readLangyTrpcError(error) ??
+    readLangyStreamError(error.message) ??
+    (durableLastError ? readLangyStreamError(durableLastError) : null) ?? {
+      code: "unknown",
+      meta: error.message ? { error: error.message } : {},
+      httpStatus: 500,
+    }
+  );
+}
+
 /** Read a Langy domain error off a tRPC client error (`error.data.error`). */
 export function readLangyTrpcError(err: unknown): LangyDomainError | null {
   const domain = readHandledError(err);

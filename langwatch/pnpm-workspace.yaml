@@ -20,6 +20,7 @@ minimumReleaseAge: 10080
 # Version-pinned so only the pinned release bypasses the gate; drop each entry
 # once that version ages past it.
 minimumReleaseAgeExclude:
+  - langwatch@1.0.0
   - ws@8.21.1
   - "@browserbasehq/sdk@2.16.0"
   - postcss@8.5.19
