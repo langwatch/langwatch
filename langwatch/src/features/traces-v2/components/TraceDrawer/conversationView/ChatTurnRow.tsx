@@ -10,6 +10,7 @@ import {
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "~/components/Markdown";
+import { ContentIncompleteNotice } from "~/components/ui/ContentPrivacyMarkers";
 import { RedactedInline } from "~/components/ui/RedactedField";
 import type { RouterOutputs } from "~/utils/api";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
@@ -179,6 +180,14 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         />
       ) : null}
 
+      {/* Warn when the message shown is still a preview because the full input
+          couldn't be loaded at read time (#5835). The notice self-suppresses
+          when the input is redacted, so the rule lives in one place. */}
+      <ContentIncompleteNotice
+        incomplete={turn.inputTruncated}
+        redacted={turn.inputRedacted}
+      />
+
       {/*
         The loop that ran between the prompt and the reply. A coding-agent turn
         can call the model five times and run a dozen tools, and the two bubbles
@@ -250,6 +259,14 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           visibleTo={turn.outputVisibleTo}
         />
       ) : null}
+
+      {/* Warn when the response shown is still a preview because the full
+          output couldn't be loaded at read time (#5835). The notice
+          self-suppresses when the output is redacted. */}
+      <ContentIncompleteNotice
+        incomplete={turn.outputTruncated}
+        redacted={turn.outputRedacted}
+      />
     </VStack>
   );
 });

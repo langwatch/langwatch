@@ -3,6 +3,10 @@ import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { EvalSummary } from "~/server/app-layer/evaluations/types";
 import type { TopicService } from "~/server/app-layer/topic-clustering/topic.service";
+import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { pMapLimited } from "~/server/event-sourcing/replay/pMapLimited";
+import { overlayResolvedIO } from "~/server/traces/offload-truncation-detection";
+import { resolveOffloadedTracesBatch } from "~/server/traces/resolve-offloaded-traces-batch";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {
   parseMediaRefs,
@@ -34,8 +38,20 @@ import type {
   TraceListSort,
   TraceListSortColumn,
 } from "./repositories/trace-list.repository";
+import type { SpanReadBlobResolutionDeps } from "./span-storage.service";
+import type { TraceSpansReader } from "./trace-summary.service";
 import type { TraceSummaryData } from "./types";
 import { teaserOf } from "./visibility-window.service";
+
+/**
+ * Max concurrent per-row span reads while restoring full IO on the
+ * `resolveFullIO` path (#5835). Bounds ClickHouse load so a large conversation
+ * page streams its span reads instead of firing one per row at once — mirrors
+ * the event_log fan-out bound the downstream batch resolver already applies
+ * (`EVENT_LOG_RESOLVE_CONCURRENCY`). Sized to keep the CH client's pool busy
+ * without saturating it.
+ */
+export const SPAN_READ_CONCURRENCY = 25;
 
 export interface TraceListEvent {
   spanId: string;
@@ -86,6 +102,16 @@ export interface TraceListItem {
   sizeBytes: number;
   input: string | null;
   output: string | null;
+  /**
+   * Set at read time (ADR-022 / #5835) when this row's computed input/output
+   * still holds the write-time preview because its offloaded eventref could not
+   * be resolved from event_log — the value is incomplete. Only ever populated on
+   * the `resolveFullIO` path (the drawer's Conversation tab); the grid, which
+   * never resolves, leaves these undefined. Mirrors the identical fields on
+   * `TraceSummaryData` / the trace header.
+   */
+  inputTruncated?: boolean;
+  outputTruncated?: boolean;
   /** Compact fold-derived media refs for the winning IO; absent when media-free. */
   inputMediaRefs?: TraceMediaRef[];
   outputMediaRefs?: TraceMediaRef[];
@@ -105,6 +131,22 @@ export interface TraceListPage {
   totalHits: number;
   evaluations: Record<string, EvalSummary[]>;
   nextCursor: TraceListCursor | null;
+}
+
+/**
+ * Optional read-time blob-offload resolution dependencies (ADR-022 / #5835).
+ *
+ * Identical shape to `TraceSummaryService`'s `TraceSummaryBlobResolutionDeps`
+ * (a {@link SpanReadBlobResolutionDeps} plus a {@link TraceSpansReader}) — the
+ * composition root threads the SAME three instances to both services. When
+ * supplied AND a caller passes `resolveFullIO: true`, `getList` restores each
+ * row's FULL computed input/output from event_log before the visibility gate;
+ * when omitted (or `resolveFullIO` unset), the list returns the stored preview
+ * values unchanged — the grid's path, which issues zero event_log reads (AC5).
+ */
+export interface TraceListBlobResolutionDeps
+  extends SpanReadBlobResolutionDeps {
+  spansReader: TraceSpansReader;
 }
 
 interface FacetCounts {
@@ -133,6 +175,14 @@ interface ListParams {
    * input/output previews teaser-redacted. Omitted/null = ungated.
    */
   visibilityCutoffMs?: number | null;
+  /**
+   * When true AND blob-resolution deps were supplied at construction, restore
+   * each row's FULL computed input/output from event_log (ADR-022) before the
+   * visibility gate. The drawer's Conversation tab opts in (a turn needs its
+   * full message, not the 64 KB preview — #5835 AC2); the grid and every other
+   * caller omit it, keeping the preview-only, zero-event_log-read path (AC5).
+   */
+  resolveFullIO?: boolean;
 }
 
 interface FacetParams {
@@ -449,6 +499,10 @@ const discoverLogger = createLogger(
   "langwatch:app-layer:traces:trace-list-discover",
 );
 
+const resolveLogger = createLogger(
+  "langwatch:app-layer:traces:trace-list-resolve",
+);
+
 function isExpressionCategorical(
   def: FacetDefinition,
 ): def is ExpressionCategoricalDef {
@@ -487,6 +541,7 @@ export class TraceListService {
     private readonly repository: TraceListRepository,
     private readonly evaluationRunService: EvaluationRunService,
     private readonly topicService: TopicService,
+    private readonly blobResolutionDeps?: TraceListBlobResolutionDeps,
   ) {}
 
   /**
@@ -530,7 +585,19 @@ export class TraceListService {
     const visibleRows = hasMore
       ? result.rows.slice(0, params.pageSize)
       : result.rows;
-    const items = visibleRows.map((row) => mapToTraceListItem(row));
+
+    // ADR-022 read-time resolution (#5835 AC2): when the caller opted in via
+    // `resolveFullIO` (only the drawer's Conversation tab does), overlay each
+    // row's FULL computed input/output from event_log BEFORE mapping — and thus
+    // before the visibility gate below — so a turn shows its complete message
+    // rather than the 64 KB preview. A no-op returning `rows` untouched when
+    // `resolveFullIO` is unset or no deps were wired: the grid's path, which
+    // must issue zero span/event_log reads (AC5). Resolved against
+    // `visibleRows` (post sentinel-slice) so the extra hasMore-probe row never
+    // triggers an event_log read for a row the caller never sees.
+    const rows = await this.resolveFullIOForRows({ rows: visibleRows, params });
+
+    const items = rows.map((row) => mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
     const evaluations = await this.evaluationRunService.findSummariesByTraceIds(
@@ -568,6 +635,66 @@ export class TraceListService {
           ? cursorForTraceRow(visibleRows[visibleRows.length - 1]!, sortColumn)
           : null,
     };
+  }
+
+  /**
+   * Restores each row's full computed input/output from event_log (ADR-022) and
+   * flags any field whose eventref could not be resolved. Returns `rows`
+   * unchanged — issuing NO span or event_log reads — when `resolveFullIO` is
+   * unset or no resolution deps were wired (the grid's preview-only path, #5835
+   * AC5).
+   *
+   * Uses the BULK resolver ({@link resolveOffloadedTracesBatch}) so a 100-row
+   * conversation page fans a bounded set of event_log reads instead of N
+   * independent bursts. The per-row overlay + "content may be incomplete"
+   * flagging is the shared {@link overlayResolvedIO} helper, also used by
+   * `TraceSummaryService.resolveOffloadedIO` (#5835), so the rule lives in
+   * exactly one place.
+   */
+  private async resolveFullIOForRows({
+    rows,
+    params,
+  }: {
+    rows: TraceSummaryData[];
+    params: ListParams;
+  }): Promise<TraceSummaryData[]> {
+    const deps = this.blobResolutionDeps;
+    if (!params.resolveFullIO || !deps || rows.length === 0) return rows;
+
+    // Fetch each row's raw normalized spans — the eventref pointers live on span
+    // attributes, not on the summary row. `occurredAtMs` hints the span read for
+    // partition pruning (the summary row already knows when the trace occurred).
+    // Bounded at SPAN_READ_CONCURRENCY (not an unbounded `Promise.all`) so a
+    // large page can't fire up to `pageSize` concurrent ClickHouse reads at once.
+    // Results are written back by index to preserve row order for the overlay.
+    const spansPerTrace: NormalizedSpan[][] = new Array(rows.length);
+    await pMapLimited({
+      items: rows.map((row, i) => ({ row, i })),
+      concurrency: SPAN_READ_CONCURRENCY,
+      fn: async ({ row, i }) => {
+        spansPerTrace[i] = await deps.spansReader.getNormalizedSpansByTraceId({
+          tenantId: params.tenantId,
+          traceId: row.traceId,
+          occurredAtMs: row.occurredAt,
+        });
+      },
+    });
+
+    const resolvedPerTrace = await resolveOffloadedTracesBatch({
+      projectId: params.tenantId,
+      spansPerTrace,
+      blobStore: deps.blobStore,
+      ioExtractionService: deps.ioExtractionService,
+      logger: resolveLogger,
+    });
+
+    return rows.map((row, i) =>
+      overlayResolvedIO({
+        stored: row,
+        originalSpans: spansPerTrace[i]!,
+        resolved: resolvedPerTrace[i]!,
+      }),
+    );
   }
 
   async getFacets(params: FacetParams): Promise<FacetCounts> {
@@ -1344,6 +1471,8 @@ function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
     sizeBytes: row.sizeBytes ?? 0,
     input: row.computedInput,
     output: row.computedOutput,
+    inputTruncated: row.inputTruncated,
+    outputTruncated: row.outputTruncated,
     inputMediaRefs: presentMediaRefs(row.attributes[RESERVED_INPUT_MEDIA_REFS]),
     outputMediaRefs: presentMediaRefs(
       row.attributes[RESERVED_OUTPUT_MEDIA_REFS],

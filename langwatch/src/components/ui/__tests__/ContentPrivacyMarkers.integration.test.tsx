@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ContentPrivacy } from "~/server/api/routers/tracesV2.schemas";
 import {
+  ContentIncompleteNotice,
   ContentPrivacyMarkers,
   PiiIncompleteNotice,
 } from "../ContentPrivacyMarkers";
@@ -174,6 +175,52 @@ describe("PiiIncompleteNotice", () => {
       expect(container.textContent).toContain(
         "may still contain names or locations",
       );
+    });
+  });
+});
+
+describe("ContentIncompleteNotice", () => {
+  afterEach(cleanup);
+
+  describe("when the content loaded fully", () => {
+    it("renders nothing for incomplete=false", () => {
+      const { container } = render(
+        <Wrapper>
+          <ContentIncompleteNotice incomplete={false} />
+        </Wrapper>,
+      );
+      expect(container.textContent).toBe("");
+    });
+
+    it("renders nothing for an absent flag", () => {
+      const { container } = render(
+        <Wrapper>
+          <ContentIncompleteNotice />
+        </Wrapper>,
+      );
+      expect(container.textContent).toBe("");
+    });
+  });
+
+  describe("when some content could not be fully loaded", () => {
+    it("warns that the content may be a partial preview", () => {
+      const { container } = render(
+        <Wrapper>
+          <ContentIncompleteNotice incomplete />
+        </Wrapper>,
+      );
+      expect(container.textContent).toContain("could not be fully loaded");
+    });
+  });
+
+  describe("when the content is incomplete but redacted by a privacy rule", () => {
+    it("renders nothing — a Redacted marker is shown instead of a preview, so the incomplete warning would be contradictory", () => {
+      const { container } = render(
+        <Wrapper>
+          <ContentIncompleteNotice incomplete redacted />
+        </Wrapper>,
+      );
+      expect(container.textContent).toBe("");
     });
   });
 });

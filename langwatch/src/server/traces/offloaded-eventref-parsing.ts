@@ -25,6 +25,8 @@ export interface ParsedSpanEventRefs {
   eventrefEntries: EventRefEntry[];
   /** attrKeys whose eventref carried no usable eventId — caller warns + keeps preview. */
   missingEventIdKeys: string[];
+  /** attrKeys whose eventref value failed JSON.parse entirely — caller warns + keeps preview. */
+  malformedKeys: string[];
 }
 
 /** True when the attribute map carries at least one eventref pointer. */
@@ -40,8 +42,10 @@ export function hasEventRefs(attributes: Record<string, string>): boolean {
  *
  * - A reserved key missing/empty `eventId` is recorded in `missingEventIdKeys`
  *   (the caller logs a warning and keeps the preview) — never resolved.
- * - A reserved key with malformed JSON is silently dropped (the preview already
- *   sits in `cleanedAttrs` under the non-reserved IO key).
+ * - A reserved key whose value fails `JSON.parse` entirely is recorded in
+ *   `malformedKeys` (the caller logs a warning and keeps the preview) — never
+ *   resolved. The preview already sits in `cleanedAttrs` under the
+ *   non-reserved IO key.
  */
 export function parseSpanEventRefs(
   attrs: Record<string, string>,
@@ -49,6 +53,7 @@ export function parseSpanEventRefs(
   const cleanedAttrs: Record<string, string> = {};
   const eventrefEntries: EventRefEntry[] = [];
   const missingEventIdKeys: string[] = [];
+  const malformedKeys: string[] = [];
 
   for (const [key, value] of Object.entries(attrs)) {
     if (key.startsWith(EVENTREF_ATTR_PREFIX)) {
@@ -65,12 +70,14 @@ export function parseSpanEventRefs(
           eventId: ref.eventId,
         });
       } catch {
-        // Malformed eventref JSON — skip; preview in cleanedAttrs is still shown.
+        // Malformed eventref JSON — record so the caller can warn; preview in
+        // cleanedAttrs is still shown.
+        malformedKeys.push(attrKey);
       }
     } else {
       cleanedAttrs[key] = value;
     }
   }
 
-  return { cleanedAttrs, eventrefEntries, missingEventIdKeys };
+  return { cleanedAttrs, eventrefEntries, missingEventIdKeys, malformedKeys };
 }

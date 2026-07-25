@@ -31,6 +31,10 @@ import type {
   ExtractedIO,
   TraceIOExtractionService,
 } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  recomputeTraceIO,
+  TraceIOAccumulationService,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-io-accumulation.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 
@@ -59,6 +63,22 @@ export interface ResolvedTraceSpans {
    * stored in trace_summaries should remain in effect.
    */
   anyResolved: boolean;
+}
+
+/**
+ * Adapts the fold-replay's plain `computedInput` / `computedOutput` strings
+ * (see {@link recomputeTraceIO}) into the {@link ExtractedIO} shape the
+ * {@link ResolvedTraceSpans} contract exposes. The recomputed value has already
+ * been unwrapped to human-readable text by the fold's `preferText`, so `raw`
+ * mirrors `text` and `source` is the langwatch canonical convention. Consumers
+ * (`TraceSummaryService`, `ClickHouseTraceService.mergeResolvedTrace`) read only
+ * `.text`.
+ *
+ * Exported so the bulk sibling ({@link ./resolve-offloaded-traces-batch}) reuses
+ * the identical adapter instead of duplicating it.
+ */
+export function toRecomputedIO(text: string | null): ExtractedIO | null {
+  return text === null ? null : { raw: text, text, source: "langwatch" };
 }
 
 /**
@@ -124,8 +144,12 @@ export async function resolveOffloadedTraces({
       }
 
       // Separate eventref keys from regular attributes (shared decoder).
-      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-        parseSpanEventRefs(attrs);
+      const {
+        cleanedAttrs,
+        eventrefEntries,
+        missingEventIdKeys,
+        malformedKeys,
+      } = parseSpanEventRefs(attrs);
 
       // Eventref missing the embedded eventId — can't resolve. The reserved
       // key is already stripped (kept out of cleanedAttrs) so the UI never
@@ -139,6 +163,21 @@ export async function resolveOffloadedTraces({
             attrKey,
           },
           "eventref missing eventId — keeping preview value",
+        );
+      }
+
+      // Eventref value failed JSON.parse entirely — can't resolve. Same
+      // preview-preserving fallback as missingEventIdKeys, but a distinct
+      // message so the two causes are distinguishable in logs (#5835 AC4b).
+      for (const attrKey of malformedKeys) {
+        logger.warn(
+          {
+            projectId,
+            spanId: span.spanId,
+            traceId: span.traceId,
+            attrKey,
+          },
+          "eventref value is not valid JSON — keeping preview value",
         );
       }
 
@@ -252,14 +291,20 @@ export async function resolveOffloadedTraces({
   }
 
   // At least one span was resolved — recompute trace-level IO from the full
-  // span values.
-  const recomputedInput = ioExtractionService.extractFirstInput(resolvedSpans);
-  const recomputedOutput = ioExtractionService.extractLastOutput(resolvedSpans);
+  // span values. Reuse the FOLD's own winner-selection (accumulateIO, via
+  // recomputeTraceIO) rather than TraceIOExtractionService.extractFirstInput /
+  // extractLastOutput, so the read-time recompute agrees with the winner stored
+  // in trace_summaries on BOTH priority (root beats non-root) and exclusion
+  // (tool / evaluation / guardrail / claude-utility spans never win) — #5835 AC9.
+  const { computedInput, computedOutput } = recomputeTraceIO({
+    spans: resolvedSpans,
+    accumulationService: new TraceIOAccumulationService(ioExtractionService),
+  });
 
   return {
     resolvedSpans,
-    recomputedInput,
-    recomputedOutput,
+    recomputedInput: toRecomputedIO(computedInput),
+    recomputedOutput: toRecomputedIO(computedOutput),
     anyResolved: true,
   };
 }

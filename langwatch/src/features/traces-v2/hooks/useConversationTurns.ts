@@ -61,6 +61,11 @@ export function useConversationTurns(conversationId: string | null) {
             .replace(/\\/g, "\\\\")
             .replace(/"/g, '\\"')}"`
         : "",
+      // #5835: the Conversation tab renders each turn's full message, so it opts
+      // in to read-time event_log resolution — the grid's 64 KB preview
+      // truncates long inputs/outputs. This is the ONLY caller that opts in;
+      // every other `tracesV2.list` consumer omits it and stays preview-only.
+      resolveFullIO: true,
     },
     {
       // Backed by `tracesV2.list`, which stays project-protected (it is the

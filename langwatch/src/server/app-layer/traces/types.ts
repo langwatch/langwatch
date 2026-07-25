@@ -147,6 +147,14 @@ export const traceSummaryDataSchema = z.object({
   // Set at read time when computed input/output/error were teaser-redacted
   // by the plan's visibility window (never persisted).
   redactedByVisibilityWindow: z.boolean().optional(),
+  // Set at read time (ADR-022 / #5835) when the trace's computed input/output
+  // carried an offloaded eventref that could NOT be resolved from event_log, so
+  // the value returned is still the bounded write-time preview rather than the
+  // full content. Lets the UI warn "content may be incomplete". Best-effort and
+  // never persisted: absent/false means the field was either always complete or
+  // was successfully resolved to its full value.
+  inputTruncated: z.boolean().optional(),
+  outputTruncated: z.boolean().optional(),
 });
 
 export type TraceSummaryData = z.infer<typeof traceSummaryDataSchema>;
