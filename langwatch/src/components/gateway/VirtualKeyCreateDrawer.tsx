@@ -30,18 +30,15 @@ import {
 } from "./eligibleModelProviders";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import {
-  VK_TAG_MAX_LENGTH,
-  VK_TAGS_MAX_COUNT,
-} from "~/server/gateway/virtualKey.config";
+  parseTagsCsv,
+  TAGS_CSV_MAX_LENGTH,
+  tagsBeyondLimitsNotice,
+  VK_TAGS_FIELD_DESCRIPTION,
+} from "./virtualKeyTagsField";
 import {
   VirtualKeyScopePicker,
   type VirtualKeyScopeEntry,
 } from "./VirtualKeyScopePicker";
-
-// The field is one comma-separated line, so its own cap is the tag caps plus
-// a separator per tag. Anything past this is trimmed by normalizeVkTags on
-// save regardless; the input cap just stops a runaway paste getting that far.
-const TAGS_CSV_MAX_LENGTH = VK_TAGS_MAX_COUNT * (VK_TAG_MAX_LENGTH + 2);
 
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;
@@ -141,10 +138,7 @@ export function VirtualKeyCreateDrawer({
       return;
     }
     try {
-      const tags = tagsCsv
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0);
+      const tags = parseTagsCsv(tagsCsv);
       const result = await createMutation.mutateAsync({
         organizationId,
         name,
@@ -177,6 +171,7 @@ export function VirtualKeyCreateDrawer({
 
   const providers = orgProvidersQuery.data?.providers ?? [];
   const policies = policiesQuery.data ?? [];
+  const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
 
   const cannotIssueReason = (() => {
     if (!name) return "Name is required.";
@@ -226,8 +221,9 @@ export function VirtualKeyCreateDrawer({
               <Field.Label>
                 Tags
                 <FieldInfoTooltip
-                  description="Comma-separated tags attached to this VK. Every trace this key produces carries its tags as labels, so you can filter gateway traffic by team or app in the Trace Explorer. Cache-control rules also match VKs on tags using AND-subset semantics, so a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag. Duplicates are dropped."
+                  description={VK_TAGS_FIELD_DESCRIPTION}
                   docHref="/ai-gateway/cache-control#cache-rules"
+                  testId="vk-tags-info"
                 />
               </Field.Label>
               <Input
@@ -236,12 +232,11 @@ export function VirtualKeyCreateDrawer({
                 placeholder="e.g. tier=enterprise, team=ml"
                 maxLength={TAGS_CSV_MAX_LENGTH}
               />
-              <Field.HelperText>
-                Comma-separated, up to {VK_TAGS_MAX_COUNT} tags of{" "}
-                {VK_TAG_MAX_LENGTH} characters. Tags become labels on this
-                key&apos;s traces, and cache-control rules match VKs on tags as
-                AND-subset.
-              </Field.HelperText>
+              {tagsNotice && (
+                <Field.HelperText color="orange.600">
+                  {tagsNotice}
+                </Field.HelperText>
+              )}
             </Field.Root>
             <Separator />
 
