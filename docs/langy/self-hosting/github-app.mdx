@@ -8,7 +8,9 @@ keywords:
   - bot-authored pull requests
 ---
 
-Langy opens pull requests through a GitHub App you register and install. This is the deployment-time guide for that app. PRs are authored by the app and credit the requesting user via a `Co-authored-by` trailer and a `Requested by @<login> via LangWatch` note in the body. There is no per-user OAuth and no stored token: the app private key is the only credential, it lives only in the control-plane env, and 1-hour installation tokens are minted on demand and never persisted.
+Langy opens pull requests through a GitHub App you register and install. PRs are authored by the app and credit the requesting user via a `Co-authored-by` trailer and a `Requested by @<login> via LangWatch` note in the body.
+
+There is no per-user OAuth and no stored token: the app private key is the only credential, it lives only in the control-plane env, and 1-hour installation tokens are minted on demand and never persisted.
 
 To set it up: register a GitHub App, put its id, private key, webhook secret, and slug into the deployment env, and have org admins install it on the repos Langy may touch from **Settings > Integrations**.
 

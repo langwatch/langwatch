@@ -9,7 +9,11 @@ keywords:
   - ai agent self hosting
 ---
 
-Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, that ships in the LangWatch umbrella Helm chart but is **off by default**. To run Langy self-hosted you enable that pod and satisfy its one hard infrastructure requirement, a `gvisor` RuntimeClass. Once the pod is running, Langy is available. The GitHub App and outbound network egress are both optional and off until you configure them.
+Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, that ships in the LangWatch umbrella Helm chart but is **off by default**.
+
+To run Langy self-hosted you enable that pod and satisfy its one hard infrastructure requirement, a `gvisor` RuntimeClass. Once the pod is running, Langy is available.
+
+The GitHub App and outbound network egress are both optional and off until you configure them.
 
 The `langyagent` pod is a single Go "manager" process that spawns one gVisor-sandboxed [opencode](/langy/how-langy-works) worker per conversation. It never talks to your data stores directly; each worker reaches LangWatch only through the `langwatch` CLI, over the per-session credentials the control plane mints for that turn.
 

@@ -8,7 +8,11 @@ keywords:
   - langy firewall
 ---
 
-The Langy agent pod has **no outbound HTTPS by default**: `networkPolicy.allowExternalHttps` is `false`, so a fresh install cannot reach GitHub, npm, or any external host. To let Langy clone and push (open PRs), you enable egress and the pod's traffic then passes through an L7 egress adapter that require-TLS, allow-lists destinations, and enforces a GitHub FQDN floor. LLM traffic never uses this path; it goes to the in-cluster [AI Gateway](/ai-gateway/self-hosting/helm).
+The Langy agent pod has **no outbound HTTPS by default**: `networkPolicy.allowExternalHttps` is `false`, so a fresh install cannot reach GitHub, npm, or any external host.
+
+To let Langy clone and push (open PRs), you enable egress. The pod's traffic then passes through an L7 egress adapter that requires TLS, allow-lists destinations, and enforces a GitHub FQDN floor.
+
+LLM traffic never uses this path; it goes to the in-cluster [AI Gateway](/ai-gateway/self-hosting/helm).
 
 The one boundary to understand before you rely on this in a regulated environment: the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is designed but not shipped. The details are below and in [The sandbox](/langy/security/sandbox).
 
@@ -18,7 +22,9 @@ The one boundary to understand before you rely on this in a regulated environmen
 
 ## Why egress is L7, not iptables
 
-The pod runs under gVisor. gVisor's user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table. That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
+The pod runs under gVisor. gVisor's user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table.
+
+That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
 
 ## What the agent needs to reach
 

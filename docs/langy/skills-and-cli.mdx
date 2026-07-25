@@ -8,7 +8,7 @@ keywords:
   - claude code langwatch
 ---
 
-Yes. You can turn your own coding agent (Claude Code, Codex, Cursor, opencode) into a Langy-style LangWatch engineer with two public building blocks: the `langwatch` CLI and Skills. Langy is exactly that harness, already assembled and sandboxed, running the same CLI your own agent would.
+Bring whichever coding agent you already use, Claude Code, Codex, Cursor, or opencode itself, and give it the same two pieces Langy runs on: the `langwatch` CLI and Skills. What Langy adds on top of those, so you do not have to assemble it yourself, is covered further down.
 
 <Info>**Pairs with:** [Ask Langy](/langy/chat) (the assembled version), [Governance CLI](/ai-governance/cli) (the CLI namespace), [Skills Directory](/skills/directory) (install Skills into your own agent).</Info>
 
@@ -36,7 +36,9 @@ Because the CLI is the substrate, any coding agent that can run a shell command 
 
 ## Skills point your agent at the right command
 
-Skills are instruction sets (AgentSkills-style) that teach a coding agent when to reach for which command. Install a Skill into your own agent and it knows how to set up evals, write Scenario tests, and read traces without you spelling out each step. See the [Skills Directory](/skills/directory) to install them into Claude Code, Codex, Cursor, or another agent.
+Skills are instruction sets (AgentSkills-style) that teach a coding agent when to reach for which command. Install a Skill into your own agent and it knows how to set up evals, write Scenario tests, and read traces without you spelling out each step.
+
+See the [Skills Directory](/skills/directory) to install them into Claude Code, Codex, Cursor, or another agent.
 
 Langy ships with a native catalog of these Skills baked in. A few of them:
 

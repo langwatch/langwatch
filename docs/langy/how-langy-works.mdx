@@ -8,7 +8,11 @@ keywords:
   - opencode harness
 ---
 
-Langy is a coding-agent harness. A Go manager pod runs one sandboxed [opencode](https://github.com/anomalyco/opencode) worker per conversation, and that worker does the actual reading, testing, and code editing. The worker's only interface to LangWatch is the `langwatch` CLI: it shells out to CLI commands, not to an MCP server or an internal data API. Model calls leave through the LangWatch AI gateway, and code changes leave only as bot-authored GitHub pull requests. Every turn a worker takes is itself a traced run in your LangWatch project.
+A Go manager pod spawns and supervises one [opencode](https://github.com/anomalyco/opencode) worker per conversation. That worker does the actual reading, testing, and code editing, and it shells out to `langwatch` CLI commands rather than calling an MCP server or an internal data API.
+
+Model calls leave the worker only through the LangWatch AI gateway. Code changes leave only as bot-authored GitHub pull requests.
+
+Every turn a worker takes is itself a traced run in your LangWatch project.
 
 <Info>
   **Pairs with:** [Security and the sandbox](/langy/security/sandbox), [Self-hosting overview](/langy/self-hosting/overview)

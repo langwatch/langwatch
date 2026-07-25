@@ -5,7 +5,7 @@ sidebarTitle: API
 keywords: langy api, drive langy programmatically, langy mcp, langy rest api
 ---
 
-There is no public REST or SDK API to drive Langy programmatically yet. You cannot start a Langy turn, submit a task, or read a conversation over an HTTP endpoint from your own code today.
+You cannot start a Langy turn, submit a task, or read a conversation over an HTTP endpoint from your own code today. The table below lists what you can use instead.
 
 <Note>
 **Not yet available:** a programmatic Langy API (REST or SDK) to drive Langy from your own code. The surfaces below are what exists today.
@@ -22,11 +22,17 @@ There is no public REST or SDK API to drive Langy programmatically yet. You cann
 
 ## The CLI and Skills path
 
-If you want your own coding agent to do what Langy does, use the `langwatch` CLI and the Skills catalog. Langy itself is that CLI plus those Skills, assembled inside an isolated runtime; the same pieces run in your own agent. This is the supported way to get Langy-style behavior from your own code today. See [Skills and CLI](/langy/skills-and-cli).
+If you want your own coding agent to do what Langy does, use the `langwatch` CLI and the Skills catalog. Langy itself is that CLI plus those Skills, assembled inside an isolated runtime; the same pieces run in your own agent.
+
+This is the supported way to get Langy-style behavior from your own code today. See [Skills and CLI](/langy/skills-and-cli).
 
 ## Driving Langy over MCP
 
-Langy can be exposed over MCP so an external client drives it rather than a person typing in the chat panel. The launch demo used this: an external robot drove Langy over MCP and had it run Scenario simulations against a voice agent. MCP is the path when you want an external client, not your code, to send Langy work.
+Langy can be exposed over MCP so an external client drives it rather than a person typing in the chat panel.
+
+The launch demo used this: an external robot drove Langy over MCP and had it run Scenario simulations against a voice agent.
+
+MCP is the path when you want an external client, not your own code, to send Langy work.
 
 <Info>
 **Pairs with:** [Skills and CLI](/langy/skills-and-cli), [Chat](/langy/chat).

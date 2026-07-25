@@ -8,7 +8,7 @@ keywords:
   - bot authored pull requests
 ---
 
-Langy contributes to your code in exactly one way: **bot-authored pull requests through a GitHub App**. There is no per-user OAuth and no stored access token. Langy never pushes to a branch you have not reviewed and never merges its own PR. A human reviews and merges.
+Langy contributes to your code in exactly one way: **bot-authored pull requests through a GitHub App**. Langy never pushes to a branch you have not reviewed and never merges its own PR. A human reviews and merges.
 
 ## The credential model
 
@@ -17,11 +17,15 @@ Langy contributes to your code in exactly one way: **bot-authored pull requests 
 - **Installation tokens are minted per turn.** Each turn mints a fresh 1-hour installation token, cached in Redis just under its lifetime and never persisted. The worker receives it as the `GH_TOKEN` environment variable only; nothing is written to disk.
 - **Least privilege at mint time.** Tokens are minted with only `contents:write` and `pull_requests:write`, scoped to the installation's repositories, or to a single repository when the turn targets one.
 
-Inside the worker, `git config credential.helper '!gh auth git-credential'` wires `git` to read the token from the environment, so there is no `.gitconfig` or `.git-credentials` on disk. Commits are authored by `langwatch[bot]`, and the requesting user is credited with a `Co-authored-by` trailer plus a `Requested by @<login> via LangWatch` note in the PR body.
+Inside the worker, `git config credential.helper '!gh auth git-credential'` wires `git` to read the token from the environment, so there is no `.gitconfig` or `.git-credentials` on disk.
+
+Commits are authored by `langwatch[bot]`, and the requesting user is credited with a `Co-authored-by` trailer plus a `Requested by @<login> via LangWatch` note in the PR body.
 
 ## The install is the access boundary
 
-Langy can open pull requests only on the repositories the app is installed on. Installing the app on a repository is what grants access; there is no separate grant. A single LangWatch organization can install the app on several GitHub accounts, and each installation is listed separately.
+Langy can open pull requests only on the repositories the app is installed on. Installing the app on a repository is what grants access; there is no separate grant.
+
+A single LangWatch organization can install the app on several GitHub accounts, and each installation is listed separately.
 
 If the app is not installed when Langy reaches for `git` or `gh`, the platform stops the turn, shows an install card in chat, and re-runs the turn once the app is installed.
 

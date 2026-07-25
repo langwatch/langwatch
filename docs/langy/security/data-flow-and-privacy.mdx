@@ -1,6 +1,6 @@
 ---
 title: Langy Data Flow and Privacy
-description: Exactly what data leaves a Langy conversation and where it goes: every turn is traced into your own LangWatch project, external traffic is limited to the egress path, and an optional operator mirror lane is off unless you configure it.
+description: "Exactly what data leaves a Langy conversation and where it goes: every turn is traced into your own LangWatch project, external traffic is limited to the egress path, and an optional operator mirror lane is off unless you configure it."
 sidebarTitle: Data flow and privacy
 keywords:
   - ai agent data privacy
@@ -38,7 +38,11 @@ flowchart TD
 
 ## Destination 1: your own LangWatch project (always)
 
-Every Langy turn is an agent run, and it is traced like any other agent run in your project. The worker streams its spans through the trace relay (authenticated with the per-session key and a fail-closed resource-attribute allow-list), a platform-owned `langy.turn` root span is recorded, and the AI gateway records the `gen_ai` spans (including the full prompt and completion) for the LLM calls. You watch Langy work with the same tools you use to watch your own agents, and the cost of a Langy turn shows up as cost in your project.
+Every Langy turn is an agent run, and it is traced like any other agent run in your project.
+
+The worker streams its spans through the trace relay, authenticated with the per-session key and a fail-closed resource-attribute allow-list. A platform-owned `langy.turn` root span is recorded, and the AI gateway records the `gen_ai` spans, including the full prompt and completion, for the LLM calls.
+
+You watch Langy work with the same tools you use to watch your own agents, and the cost of a Langy turn shows up as cost in your project.
 
 ## Destination 2: external hosts (only through the egress path)
 
