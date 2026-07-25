@@ -1,7 +1,7 @@
 import { execa } from "execa";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, sep } from "node:path";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { LangwatchPaths } from "../shared/paths.ts";
@@ -20,15 +20,16 @@ export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: E
 
   const nodeModulesPath = join(langwatchDir, "node_modules");
   const distPath = join(langwatchDir, "dist");
-  const prismaClientPath = join(nodeModulesPath, ".prisma", "client", "index.js");
   const lockfilePath = join(langwatchDir, "pnpm-lock.yaml");
   const hashFile = join(nodeModulesPath, ".install-hash");
 
   const distAlreadyBuilt = existsSync(join(distPath, "client"));
   // Hash key combines the lockfile + package.json — either changing means
   // we need to re-run install. Use sha256 (not just mtime) because rsync
-  // during ensureAppDir resets mtimes.
-  const installKey = computeInstallKey(lockfilePath, join(langwatchDir, "package.json"));
+  // during ensureAppDir resets mtimes. The sequence tag versions the whole
+  // install recipe: bumping it re-runs the cycle on existing installs, which
+  // is how trees installed before the prod-prune step existed get pruned.
+  const installKey = `${computeInstallKey(lockfilePath, join(langwatchDir, "package.json"))}|seq2-prod-pruned`;
 
   // Top-level symlinks are the strongest "install completed" signal:
   // pnpm creates `.bin/` and direct package entries LAST after populating
@@ -41,7 +42,7 @@ export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: E
   const cachedHash = existsSync(hashFile) ? readFileSync(hashFile, "utf8").trim() : null;
   const installFresh = topLevelLinksOk && cachedHash === installKey;
 
-  if (installFresh && existsSync(prismaClientPath) && distAlreadyBuilt) {
+  if (installFresh && prismaClientGenerated(nodeModulesPath) && distAlreadyBuilt) {
     return;
   }
 
@@ -64,38 +65,18 @@ export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: E
   const pnpm = await resolvePnpm(ctx.paths);
 
   if (!installFresh) {
-    // Always install with `--prod=false`. We tried `--prod` for the
-    // prebuilt-dist path to save ~50 devDependencies (vite, esbuild,
-    // vitest, playwright, etc.), but it turned up two real-world
-    // breakages on dogfood:
-    //   1. .prisma/client/ never materialized → langwatch app crashed
-    //      on `Cannot find module '.prisma/client/index'`.
-    //   2. tsx's --tsconfig path-alias resolver failed to map `~/...`
-    //      imports inside src/tasks/* → `Cannot find module '~/server/...'`.
-    // The transitive deps that tsx + prisma + workers need at runtime
-    // overlap unpredictably with langwatch's devDependencies, and
-    // chasing each is a losing game. Disk hit is acceptable; reliability
-    // wins.
+    // Install everything, dev dependencies included, because the steps that
+    // follow genuinely need them: prisma generate needs the prisma CLI's
+    // build tooling and the full build needs vite. Installing with `--prod`
+    // up front was tried once and broke exactly those two steps. The dev
+    // dependencies come OUT again below (prune --prod, after the build),
+    // which is the same order the production Dockerfile uses — the pruned
+    // tree it produces is what every helm and docker deployment runs.
     await execAndPipe(
       bus,
       "prepare:langwatch",
       pnpm.command,
       [...pnpm.args, "-C", langwatchDir, "install", "--prod=false", "--frozen-lockfile"],
-    );
-    writeFileSync(hashFile, installKey);
-  }
-
-  // pnpm install does NOT auto-generate the prisma client. Run it whenever
-  // the generated client is missing. The full-build path below (when
-  // !distAlreadyBuilt) ALSO covers this via start:prepare:files →
-  // prisma:generate:typescript, so we only need the explicit call on the
-  // prebuilt-dist path.
-  if (distAlreadyBuilt && !existsSync(prismaClientPath)) {
-    await execAndPipe(
-      bus,
-      "prepare:langwatch",
-      pnpm.command,
-      [...pnpm.args, "-C", langwatchDir, "exec", "prisma", "generate"],
     );
   }
 
@@ -125,7 +106,85 @@ export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: E
     );
   }
 
+  // Take the dev dependencies back out, the way the production Dockerfile
+  // does after ITS build (install → build → prune --prod → prisma generate).
+  // This is what drops vite, vitest, playwright, biome and the rest of the
+  // build tooling from the tree the server actually runs — on the order of a
+  // gigabyte — while tsx and prisma stay, because they are runtime
+  // dependencies here (the server boots through tsx, migrations run through
+  // the prisma CLI) and are declared as such.
+  //
+  // ONLY on the relocated copy under LANGWATCH_HOME. A dev checkout runs the
+  // CLI against its own working tree, and pruning that would strip the
+  // developer's test and build tooling out from under them.
+  if (shouldPruneToProd(langwatchDir, ctx.paths)) {
+    await execAndPipe(
+      bus,
+      "prepare:langwatch",
+      pnpm.command,
+      [...pnpm.args, "-C", langwatchDir, "prune", "--prod"],
+      { env: { ...process.env, CI: "true" } },
+    );
+  }
+
+  // pnpm install does not auto-generate the prisma client, and prune removes
+  // a generated one (it is not a declared dependency, so prune sees it as
+  // extraneous — the Dockerfile regenerates after pruning for the same
+  // reason). One post-prune generate covers every path that needs it.
+  if (!prismaClientGenerated(nodeModulesPath)) {
+    await execAndPipe(
+      bus,
+      "prepare:langwatch",
+      pnpm.command,
+      [...pnpm.args, "-C", langwatchDir, "exec", "prisma", "generate"],
+    );
+  }
+
+  // Written LAST so an interrupted run never records success: any of the
+  // steps above dying leaves the old key (or none) and the next boot redoes
+  // the cycle.
+  writeFileSync(hashFile, installKey);
+
   bus.emit({ type: "healthy", service: "prepare:langwatch" as never, durationMs: Date.now() - start });
+}
+
+/**
+ * Whether `prisma generate` has produced a client in this tree. Under pnpm
+ * the generated files live inside the virtual store
+ * (node_modules/.pnpm/@prisma+client@<ver>/node_modules/.prisma/client/), NOT
+ * the top-level node_modules/.prisma/ that npm and yarn use. The old
+ * top-level-only check could never pass on a pnpm tree, so every single boot
+ * re-ran the entire prepare step — install, build, generate — for minutes,
+ * believing the client was missing. Exported for tests.
+ */
+export function prismaClientGenerated(nodeModulesPath: string): boolean {
+  if (existsSync(join(nodeModulesPath, ".prisma", "client", "index.js"))) {
+    return true;
+  }
+  const pnpmDir = join(nodeModulesPath, ".pnpm");
+  if (!existsSync(pnpmDir)) return false;
+  for (const entry of readdirSync(pnpmDir)) {
+    if (!entry.startsWith("@prisma+client@")) continue;
+    if (
+      existsSync(
+        join(pnpmDir, entry, "node_modules", ".prisma", "client", "index.js"),
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Prune is for the relocated install under LANGWATCH_HOME only. Exported for
+ * tests; the path comparison is the entire decision.
+ */
+export function shouldPruneToProd(
+  langwatchDir: string,
+  paths: Pick<LangwatchPaths, "app">,
+): boolean {
+  return langwatchDir === paths.app || langwatchDir.startsWith(paths.app + sep);
 }
 
 function computeInstallKey(...files: string[]): string {

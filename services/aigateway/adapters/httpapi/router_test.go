@@ -58,14 +58,14 @@ func (m *mockRateLimiter) Allow(ctx context.Context, vkID string, limits domain.
 }
 
 type mockBudget struct {
-	precheckFn func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error)
+	precheckFn func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error)
 }
 
-func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error) {
+func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error) {
 	if m.precheckFn != nil {
 		return m.precheckFn(ctx, bundle)
 	}
-	return domain.BudgetAllow, nil
+	return domain.BudgetDecision{Verdict: domain.BudgetAllow}, nil
 }
 
 // --- Helpers ---
@@ -313,8 +313,8 @@ func TestRouter_DispatchError_BudgetExceeded(t *testing.T) {
 		},
 	}
 	budget := &mockBudget{
-		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetVerdict, error) {
-			return domain.BudgetBlock, nil
+		precheckFn: func(_ context.Context, _ *domain.Bundle) (domain.BudgetDecision, error) {
+			return domain.BudgetDecision{Verdict: domain.BudgetBlock}, nil
 		},
 	}
 

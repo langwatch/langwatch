@@ -29,6 +29,9 @@ const PERSISTENT_SECRET_KEYS = [
   "LW_VIRTUAL_KEY_PEPPER",
   "LW_GATEWAY_INTERNAL_SECRET",
   "LW_GATEWAY_JWT_SECRET",
+  // The app and the Langy agent authenticate to each other with this; a
+  // regenerated value on one side and not the other makes every turn 401.
+  "LANGY_INTERNAL_SECRET",
 ] as const;
 
 const hex = (bytes: number) => randomBytes(bytes).toString("hex");
@@ -88,7 +91,38 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   set("LW_VIRTUAL_KEY_PEPPER", hex(32));
   set("LW_GATEWAY_INTERNAL_SECRET", hex(32));
   set("LW_GATEWAY_JWT_SECRET", hex(32));
-  set("LW_GATEWAY_BASE_URL", host);
+  // Where the gateway is, from the app's point of view. The gateway process
+  // reads this same name to mean the opposite direction (where the CONTROL
+  // PLANE is) and services/aigateway.ts sets it explicitly in that child's
+  // env, so this value only ever reaches the app — which uses it to hand
+  // Langy's workers, and CLI users, an OpenAI-compatible base URL. Pointed at
+  // the app itself, every one of those callers dialled a server with no /v1
+  // surface.
+  set("LW_GATEWAY_BASE_URL", `http://localhost:${ports.aigateway}`);
+
+  sectionBreak("LANGY ASSISTANT");
+  // Shared bearer between the app and the agent; see PERSISTENT_SECRET_KEYS.
+  set("LANGY_INTERNAL_SECRET", hex(32));
+  set("OPENCODE_AGENT_URL", `http://localhost:${ports.langyagent}`);
+  // Langy's rollout flag is SYSTEM-scoped and defaults off so the hosted
+  // product can open it one cohort at a time. A laptop install is a cohort of
+  // one, and it just installed the assistant on purpose.
+  set("FEATURE_FLAG_FORCE_ENABLE", "release_langy_enabled");
+
+  sectionBreak("OPTIONAL PIECES — flip one of these and restart the server");
+  // These are read by the installer AND by the app, so the same line decides
+  // what gets downloaded and what the product says about it.
+  set("LANGWATCH_ENABLE_LANGY", "true");
+  // The PII detection evaluator ships a ~670MB language model — larger than
+  // the rest of the evaluator environment put together. Off by default; the
+  // product points anyone who reaches for that evaluator back at this line.
+  set("LANGWATCH_ENABLE_PRESIDIO", "false");
+  // The language detection evaluator: ~95MB of language models, same deal.
+  set("LANGWATCH_ENABLE_LINGUA", "false");
+  // The deprecated legacy evaluators (old Ragas API), kept only so
+  // evaluations saved years ago keep running. When off they are hidden from
+  // the product entirely, not just disabled.
+  set("LANGWATCH_ENABLE_LEGACY_EVALUATORS", "false");
 
   sectionBreak("ENVIRONMENT");
   set("ENVIRONMENT", "local");

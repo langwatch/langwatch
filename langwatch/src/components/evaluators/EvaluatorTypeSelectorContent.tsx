@@ -185,7 +185,12 @@ export function EvaluatorTypeSelectorContent({
             availableEvaluatorsQuery.data?.[evaluatorType];
           const missingEnvVars = availableEntry?.missingEnvVars ?? [];
           const isAzureEvaluator = evaluatorType.startsWith("azure/");
-          const isDisabled = isAzureEvaluator && missingEnvVars.length > 0;
+          // Not installed on this server is a different state from installed
+          // but unconfigured: there is no settings screen that fixes it, so it
+          // gets the explanation instead of a call to action.
+          const unavailable = availableEntry?.unavailable;
+          const isDisabled =
+            !!unavailable || (isAzureEvaluator && missingEnvVars.length > 0);
 
           return (
             <EvaluatorCard
@@ -195,12 +200,14 @@ export function EvaluatorTypeSelectorContent({
               description={evaluator.description}
               disabled={isDisabled}
               disabledTooltip={
-                isDisabled
-                  ? "Configure Azure Safety provider in Settings → Model Providers"
-                  : undefined
+                unavailable
+                  ? `${unavailable.reason} ${unavailable.howToEnable}`
+                  : isDisabled
+                    ? "Configure Azure Safety provider in Settings → Model Providers"
+                    : undefined
               }
               disabledCta={
-                isDisabled
+                isDisabled && !unavailable
                   ? {
                       label: "Configure Azure Safety",
                       onClick: handleConfigureAzureSafety,

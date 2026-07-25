@@ -1,4 +1,5 @@
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -12,7 +13,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Archive, Eye, Gauge, MoreVertical, Pencil, Plus } from "lucide-react";
+import {
+  Archive,
+  Eye,
+  Gauge,
+  MoreVertical,
+  Pencil,
+  Plus,
+  TriangleAlert,
+} from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -40,7 +49,8 @@ function useBudgetRows(organizationId: string | undefined) {
     { enabled: !!organizationId },
   );
   return {
-    rows: listQuery.data ?? [],
+    rows: listQuery.data?.budgets ?? [],
+    spendAvailable: listQuery.data?.spendAvailable ?? true,
     isLoading: listQuery.isLoading,
     isError: listQuery.isError,
     error: listQuery.error,
@@ -55,9 +65,8 @@ function BudgetsPage() {
   const canDelete = hasPermission("gatewayBudgets:delete");
 
   const router = useRouter();
-  const { rows, isLoading, isError, error, refetch } = useBudgetRows(
-    organization?.id,
-  );
+  const { rows, spendAvailable, isLoading, isError, error, refetch } =
+    useBudgetRows(organization?.id);
 
   const utils = api.useContext();
   const archiveMutation = api.gatewayBudgets.archive.useMutation({
@@ -140,6 +149,19 @@ function BudgetsPage() {
               </EmptyState.Content>
             </EmptyState.Root>
           ) : (
+            <VStack align="stretch" gap={4}>
+            {!spendAvailable && (
+              <Alert.Root status="warning" data-testid="budget-spend-unavailable">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>Spend figures are unavailable</Alert.Title>
+                  <Alert.Description>
+                    Spend cannot be totalled right now, so these budgets are
+                    not stopping or warning about anything.
+                  </Alert.Description>
+                </Alert.Content>
+              </Alert.Root>
+            )}
             <Card.Root width="full" overflow="hidden">
               <Card.Body paddingY={0} paddingX={0}>
             <Table.Root variant="line" size="md" width="full">
@@ -198,11 +220,28 @@ function BudgetsPage() {
                         </VStack>
                       </Table.Cell>
                       <Table.Cell>
-                        <ScopeCell
-                          scopeType={b.scopeType}
-                          scopeTarget={b.scopeTarget ?? null}
-                          projectSlug={project?.slug ?? null}
-                        />
+                        <VStack align="start" gap={1}>
+                          <ScopeCell
+                            scopeType={b.scopeType}
+                            scopeTarget={b.scopeTarget ?? null}
+                            projectSlug={project?.slug ?? null}
+                          />
+                          {b.unreachableByAnyKey && (
+                            <Tooltip
+                              content="Traffic is attributed to the project a key is scoped to. No active key is scoped so that its traffic reaches this budget, so it will stay at zero and never stop a request."
+                            >
+                              <Badge
+                                colorPalette="orange"
+                                variant="subtle"
+                                fontSize="2xs"
+                                data-testid="budget-unreachable-badge"
+                              >
+                                <TriangleAlert size={10} /> No key sends
+                                traffic here
+                              </Badge>
+                            </Tooltip>
+                          )}
+                        </VStack>
                       </Table.Cell>
                       <Table.Cell>
                         <Badge variant="subtle" colorPalette="gray">
@@ -210,6 +249,14 @@ function BudgetsPage() {
                         </Badge>
                       </Table.Cell>
                       <Table.Cell minWidth="220px">
+                        {!b.spendAvailable ? (
+                          <HStack fontSize="xs">
+                            <Text color="fg.muted">Unavailable</Text>
+                            <Text color="fg.muted">
+                              / {formatBudgetUsd(limit)}
+                            </Text>
+                          </HStack>
+                        ) : (
                         <VStack align="stretch" gap={1}>
                           <HStack fontSize="xs">
                             <Text fontWeight="medium">
@@ -243,6 +290,7 @@ function BudgetsPage() {
                             </Progress.Track>
                           </Progress.Root>
                         </VStack>
+                        )}
                       </Table.Cell>
                       <Table.Cell>
                         <Badge
@@ -313,6 +361,7 @@ function BudgetsPage() {
             </Table.Root>
               </Card.Body>
             </Card.Root>
+            </VStack>
           )}
         </Box>
       </>

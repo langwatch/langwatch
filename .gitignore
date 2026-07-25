@@ -146,3 +146,4 @@ server.log
 .langwatch-slug
 /bin/haven
 langwatch/dev.log
+.claude/tmp/

@@ -124,16 +124,80 @@ Feature: AI Gateway — Virtual Key scope inheritance
   # Inline UX explainer — scope picker drives live preview
   # ============================================================================
 
-  Scenario: Picking a scope renders the resolved model set inline
+  Scenario: Picking a scope renders the resolved provider set inline
     Given I have virtualKeys:manage on ORGANIZATION "acme"
     And ModelProvider "openai-org" with chat models "gpt-5-mini, gpt-4o-mini"
     And ModelProvider "anthropic-team-platform" with chat models "claude-3-5-haiku"
     When I open the VK create drawer
     And I pick scope ORGANIZATION "acme"
-    Then I see "This VK will be usable within ORGANIZATION:acme and can fall back to 2 models (gpt-5-mini, gpt-4o-mini)"
+    Then I see "This key works in acme and can route to 1 provider (2 models)"
     When I change the scope to TEAM "platform"
-    Then I see "This VK will be usable within TEAM:platform and can fall back to 3 models (gpt-5-mini, gpt-4o-mini, claude-3-5-haiku)"
-    And each model row shows a "via ORG"/"via TEAM:platform" chip naming the inherited-from scope
+    Then I see "This key works in platform and can route to 2 providers (3 models)"
+    And the summary names the scopes the way the user picked them, never as a raw scope type
+
+  # ============================================================================
+  # Attribution — a row names the scope the provider is DEFINED at
+  # ============================================================================
+
+  Scenario: An org-scoped provider inherited into a project is attributed to the organization
+    Given a ModelProvider "openai-org" scoped to ORGANIZATION "acme"
+    And a ModelProvider "azure-project-demo" scoped to PROJECT "demo"
+    And I have virtualKeys:manage on PROJECT "demo"
+    When I open the VK create drawer and pick scope PROJECT "demo"
+    Then the "Eligible model providers" panel shows 2 entries
+    And the "openai-org" row is attributed to organization "acme"
+    And the "azure-project-demo" row is attributed to project "demo"
+    # The key's own scope is never a substitute for where the provider lives:
+    # an inherited provider must not read as though the project configured it.
+
+  Scenario: A provider reachable through several tiers is attributed to the broadest one
+    Given a ModelProvider "openai-wide" scoped to ORGANIZATION "acme" AND PROJECT "demo"
+    And I have virtualKeys:manage on PROJECT "demo"
+    When I open the VK create drawer and pick scope PROJECT "demo"
+    Then the "openai-wide" row is attributed to organization "acme"
+
+  Scenario: Scope attribution uses the same scope chip as every other settings surface
+    Given a ModelProvider "openai-org" scoped to ORGANIZATION "acme"
+    When I open the VK create drawer and pick any scope that reaches it
+    Then the row's scope reads exactly like the Scope column on Settings → Model Providers
+    And hovering it explains which kind of scope it is
+
+  # ============================================================================
+  # Only routable providers are eligible (no advertising pulled credentials)
+  # ============================================================================
+
+  Scenario: A provider an admin turned off is not offered to a new key
+    Given a ModelProvider "openai-org" scoped to ORGANIZATION "acme"
+    And a ModelProvider "groq-org" scoped to ORGANIZATION "acme"
+    When an admin turns "groq-org" off at Settings → Model Providers
+    And I open the VK create drawer and pick scope PROJECT "demo"
+    Then the "Eligible model providers" panel shows only "openai-org"
+    And the summary counts 1 provider
+    And the gateway would refuse to route to "groq-org" for any key in this scope
+
+  Scenario: A provider an admin removed is not offered to a new key
+    Given a ModelProvider "gemini-org" scoped to ORGANIZATION "acme"
+    And a VirtualKey create drawer open at scope PROJECT "demo"
+    When an admin removes "gemini-org" at Settings → Model Providers
+    And I reopen the VK create drawer at scope PROJECT "demo"
+    Then "gemini-org" is not listed
+    And no key can be issued that routes to it
+    # A key that advertises a withdrawn credential is a governance hole, not a
+    # stale count: the drawer must never widen a key's reach past what the
+    # gateway will actually dispatch to.
+
+  Scenario: The drawer and the gateway agree on which providers are routable
+    Given a VirtualKey "vk-project-demo" scoped to PROJECT "demo"
+    And some providers in scope are turned off and some are removed
+    When the drawer renders the eligible providers for that scope
+    And the gateway materialises the eligible ModelProvider set for "vk-project-demo"
+    Then both contain exactly the same providers
+
+  Scenario: The same provider is never listed twice
+    Given a ModelProvider "openai-wide" scoped to ORGANIZATION "acme" AND TEAM "platform" AND PROJECT "demo"
+    And a VirtualKey create drawer open at scope PROJECT "demo"
+    Then "openai-wide" appears exactly once
+    And the provider count counts it once
 
   # ============================================================================
   # Resolver is the single source of truth (no shadow filters)

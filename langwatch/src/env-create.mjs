@@ -42,12 +42,73 @@ const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
 };
 
+/**
+ * `BASE_HOST` / `NEXTAUTH_URL` are the app's own address. Every state-changing
+ * `/api/auth/*` call is matched against it (`server/routes/auth.ts` via
+ * `better-auth/originGate.ts`, and BetterAuth's own `baseURL` + `trustedOrigins`
+ * in `better-auth/index.ts`), so a value naming the wrong port turns every
+ * sign-in into `403 INVALID_ORIGIN`.
+ *
+ * In development the port is not knowable ahead of time: `.env` is committed
+ * with the default 5560 and a second checkout runs on whatever slot is free.
+ * `scripts/start.sh` exports the aligned value, but the entry points load `.env`
+ * with `override: true` afterwards (deliberately, so an explicitly pinned
+ * `LW_GATEWAY_PUBLIC_URL` and friends beat the launcher's derived defaults), and
+ * that puts 5560 back. Realigning here, after every `.env` file has loaded, is
+ * what makes the alignment stick, and it leaves every other `.env`-pinned value
+ * untouched.
+ *
+ * Only a plain `http://localhost:<port>` is treated as stale. Anything else is
+ * someone's deliberate setup: `127.0.0.1`, a proxy in front of a preview
+ * environment, a tunnel, or haven's `app.<slug>.langwatch.localhost`. Same rule
+ * as the shell-side twin `scripts/lib/sanitize-dev-env.sh`, which covers the
+ * Docker launchers.
+ *
+ * Mutates the env object so direct `process.env.BASE_HOST` readers (the MCP
+ * handler, the SSR API base, the scenario-events app) see the same address the
+ * auth layer does.
+ *
+ * @param {Record<string, string | undefined>} [processEnv]
+ * @returns {{ name: string, from: string, to: string }[]} the vars it realigned
+ */
+export function alignDevAuthUrlsToPort(processEnv = process.env) {
+  if (processEnv.NODE_ENV !== "development") return [];
+
+  const port = processEnv.LANGWATCH_APP_PORT ?? processEnv.PORT;
+  if (!port) return [];
+
+  const target = `http://localhost:${port}`;
+  const realigned = [];
+
+  for (const name of ["BASE_HOST", "NEXTAUTH_URL"]) {
+    const current = processEnv[name];
+    if (!current || current === target) continue;
+
+    let parsed;
+    try {
+      parsed = new URL(current);
+    } catch {
+      continue;
+    }
+    if (parsed.protocol !== "http:" || parsed.hostname !== "localhost") continue;
+
+    processEnv[name] = target;
+    realigned.push({ name, from: current, to: target });
+  }
+
+  return realigned;
+}
+
 // Memoize so double calls (env.mjs root + createAppConfigFromEnv) only validate once
 /** @type {any} */
 let _env = null;
 
 export function createEnvConfig() {
   if (_env) return _env;
+
+  // Runs before validation reads process.env below, and every entry point loads
+  // its .env files before the app graph (and therefore this module) evaluates.
+  alignDevAuthUrlsToPort();
 
   _env = createEnv({
     // clientPrefix required by env-core to distinguish client/server vars

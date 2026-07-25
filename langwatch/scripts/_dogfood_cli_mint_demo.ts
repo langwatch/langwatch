@@ -17,7 +17,8 @@ import {
   PersonalVirtualKeyAlreadyExistsError,
 } from "@ee/governance/services/personalVirtualKey.service";
 
-const CONTROL_PLANE = "http://localhost:5560";
+const CONTROL_PLANE =
+  process.env.BASE_HOST ?? `http://localhost:${process.env.PORT ?? 5560}`;
 const SANDBOX_CFG = "/tmp/dogfood-mint-config.json";
 const USER_EMAIL = "dogfood@acme.test";
 

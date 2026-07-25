@@ -17,9 +17,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * So `dirname(cli.cjs)/../../..` == package root in both.
  */
 function locatePackageSource(): string | null {
-  const candidate = join(__dirname, "..", "..", "..");
-  if (existsSync(join(candidate, "langwatch", "package.json"))) {
-    return candidate;
+  // Walk up rather than counting levels: the bundled entrypoint sits at
+  // packages/server/dist/cli.cjs and this module at packages/server/src/
+  // services/app-dir.ts, which are different depths. A fixed `../../..`
+  // resolves correctly from the bundle and one directory short from source,
+  // so running the CLI from a checkout (`tsx src/cli.ts`) died with "could
+  // not locate @langwatch/server package source" after every predep had
+  // already been downloaded.
+  let dir = __dirname;
+  for (let i = 0; i < 6; i++) {
+    if (existsSync(join(dir, "langwatch", "package.json"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
   return null;
 }
