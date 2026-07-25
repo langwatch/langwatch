@@ -22,8 +22,9 @@
  *
  * Guardrails, because provider keys and the default policy are org-wide
  * records: refuses to run against a non-local DATABASE_URL unless
- * --allow-remote-db is passed, and refuses to wipe a curated default-policy
- * modelAllowlist unless --clear-allowlist is passed.
+ * --allow-remote-db is passed, refuses to wipe a curated default-policy
+ * modelAllowlist unless --clear-allowlist is passed, and refuses to pick
+ * among multiple org memberships implicitly (pass --org <id or name>).
  */
 import { prisma } from "~/server/db";
 import { encrypt } from "~/utils/encryption";
@@ -32,21 +33,24 @@ import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtu
 
 interface Args {
   email: string;
+  org: string;
   allowRemoteDb: boolean;
   clearAllowlist: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
   let email = "";
+  let org = "";
   let allowRemoteDb = false;
   let clearAllowlist = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") email = argv[++i] ?? "";
+    if (argv[i] === "--org") org = argv[++i] ?? "";
     if (argv[i] === "--allow-remote-db") allowRemoteDb = true;
     if (argv[i] === "--clear-allowlist") clearAllowlist = true;
   }
   if (!email) throw new Error("--email is required");
-  return { email, allowRemoteDb, clearAllowlist };
+  return { email, org, allowRemoteDb, clearAllowlist };
 }
 
 const LOCAL_DB_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -128,10 +132,34 @@ async function main() {
   // Query through Organization (not OrganizationUser): the tenancy guard
   // requires an org-scoped where clause on membership models, and the
   // org-with-member shape is the sanctioned way to resolve "this user's org".
-  const org = await prisma.organization.findFirst({
+  // Never pick among multiple memberships implicitly: seeding the wrong
+  // tenant would plant credentials and a default policy on someone else's
+  // org, so ambiguity requires an explicit --org.
+  const orgs = await prisma.organization.findMany({
     where: { members: { some: { userId: user.id } } },
+    select: { id: true, name: true },
   });
-  if (!org) throw new Error(`user ${args.email} belongs to no organization`);
+  if (orgs.length === 0) {
+    throw new Error(`user ${args.email} belongs to no organization`);
+  }
+  let org: { id: string; name: string };
+  if (args.org) {
+    const picked = orgs.find((o) => o.id === args.org || o.name === args.org);
+    if (!picked) {
+      throw new Error(
+        `--org ${args.org} does not match any of ${args.email}'s organizations: ` +
+          orgs.map((o) => `${o.name} [${o.id}]`).join(", "),
+      );
+    }
+    org = picked;
+  } else if (orgs.length === 1) {
+    org = orgs[0]!;
+  } else {
+    throw new Error(
+      `user ${args.email} belongs to ${orgs.length} organizations, pass --org <id or name>: ` +
+        orgs.map((o) => `${o.name} [${o.id}]`).join(", "),
+    );
+  }
   process.stderr.write(`[seed-audio] user=${user.id} org=${org.id} (${org.name})\n`);
 
   const providerIds: string[] = [];
