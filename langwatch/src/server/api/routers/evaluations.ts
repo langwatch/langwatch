@@ -46,7 +46,9 @@ export const evaluationsRouter = createTRPCRouter({
           // did not download) drop out of the offer; saved references to
           // them still resolve against the static registry and fail their
           // runs with the clear not-installed message.
-          .filter(([key]) => !evaluatorUnavailability({ evaluatorType: key })?.hideFromUi)
+          .filter(
+            ([key]) => !evaluatorUnavailability({ evaluatorType: key })?.isHiddenFromUi,
+          )
           .map(([key, evaluator]) => [
             key,
             {

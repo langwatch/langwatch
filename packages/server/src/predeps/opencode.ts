@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import * as tar from "tar";
 import { downloadWithProgress } from "./_download.ts";
-import type { Predep } from "./types.ts";
+import type { Predep, PredepTask } from "./types.ts";
 
 // The runtime each Langy conversation runs inside. Pinned to an exact release
 // rather than tracking latest: this binary executes model-written shell with
@@ -53,6 +53,73 @@ async function resolveVersion(bin: string): Promise<string | null> {
  * (the manager itself) already ships inside the mono-binary we download for
  * the gateway.
  */
+async function detectOpencode(binDir: string): Promise<
+  { installed: true; version: string; resolvedPath: string } | { installed: false; reason: string }
+> {
+  const bundled = join(binDir, "opencode");
+  if (!existsSync(bundled)) {
+    return { installed: false, reason: "opencode not in ~/.langwatch/bin" };
+  }
+  const v = await resolveVersion(bundled);
+  // The pin is the contract: the skills are written against one opencode
+  // grammar, so bumping OPENCODE_VERSION must actually land on existing
+  // installs rather than being satisfied by whatever binary is already there.
+  if (v && v !== OPENCODE_VERSION) {
+    return {
+      installed: false,
+      reason: `opencode is v${v}, this release pins v${OPENCODE_VERSION} — re-downloading`,
+    };
+  }
+  return { installed: true, version: v ?? "unknown", resolvedPath: bundled };
+}
+
+async function installFromTarball(
+  url: string,
+  binDir: string,
+  task: PredepTask,
+  label: string,
+): Promise<void> {
+  const tmp = join(binDir, `.opencode-${OPENCODE_VERSION}.tgz`);
+  await downloadWithProgress(url, tmp, task, label);
+  task.output = "extracting";
+  // The archive holds a single `opencode` binary at its root; the exact-match
+  // filter is what keeps anything else from landing in bin/.
+  tar.x({ sync: true, file: tmp, cwd: binDir, filter: (p: string) => p === "opencode" });
+  rmSync(tmp, { force: true });
+}
+
+async function installFromZip(
+  url: string,
+  binDir: string,
+  task: PredepTask,
+  label: string,
+): Promise<void> {
+  const out = join(binDir, "opencode");
+  const tmp = join(binDir, `.opencode-${OPENCODE_VERSION}.zip`);
+  await downloadWithProgress(url, tmp, task, label);
+  task.output = "extracting";
+  // Node ships no zip reader; `unzip` is present on macOS by default.
+  // Extract to a staging dir so a multi-entry archive cannot scatter
+  // files into bin/, then lift the one binary out.
+  const stage = join(binDir, `.opencode-${OPENCODE_VERSION}-stage`);
+  rmSync(stage, { recursive: true, force: true });
+  mkdirSync(stage, { recursive: true });
+  try {
+    await execa("unzip", ["-q", "-o", tmp, "-d", stage]);
+    const extracted = join(stage, "opencode");
+    if (!existsSync(extracted)) {
+      throw new Error(
+        `opencode archive did not contain an \`opencode\` binary at its root (${url})`,
+      );
+    }
+    rmSync(out, { force: true });
+    renameSync(extracted, out);
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
+    rmSync(tmp, { force: true });
+  }
+}
+
 export function makeOpencodePredep({ isEnabled }: { isEnabled: boolean }): Predep {
   return {
     id: "opencode",
@@ -66,22 +133,7 @@ export function makeOpencodePredep({ isEnabled }: { isEnabled: boolean }): Prede
       if (!isEnabled) {
         return { installed: true, version: "skipped", resolvedPath: "" };
       }
-      const bundled = join(paths.bin, "opencode");
-      if (existsSync(bundled)) {
-        const v = await resolveVersion(bundled);
-        // The pin is the contract: the skills are written against one
-        // opencode grammar, so bumping OPENCODE_VERSION must actually land
-        // on existing installs rather than being satisfied by whatever
-        // binary is already there.
-        if (v && v !== OPENCODE_VERSION) {
-          return {
-            installed: false,
-            reason: `opencode is v${v}, this release pins v${OPENCODE_VERSION} — re-downloading`,
-          };
-        }
-        return { installed: true, version: v ?? "unknown", resolvedPath: bundled };
-      }
-      return { installed: false, reason: "opencode not in ~/.langwatch/bin" };
+      return detectOpencode(paths.bin);
     },
 
     async install({ platform, paths, task }) {
@@ -91,35 +143,9 @@ export function makeOpencodePredep({ isEnabled }: { isEnabled: boolean }): Prede
       const label = `downloading langy assistant runtime ${OPENCODE_VERSION}`;
 
       if (src.kind === "tarball") {
-        const tmp = join(paths.bin, `.opencode-${OPENCODE_VERSION}.tgz`);
-        await downloadWithProgress(src.url, tmp, task, label);
-        task.output = "extracting";
-        // The archive holds a single `opencode` binary at its root.
-        tar.x({ sync: true, file: tmp, cwd: paths.bin, filter: (p: string) => p === "opencode" });
-        rmSync(tmp, { force: true });
+        await installFromTarball(src.url, paths.bin, task, label);
       } else {
-        const tmp = join(paths.bin, `.opencode-${OPENCODE_VERSION}.zip`);
-        await downloadWithProgress(src.url, tmp, task, label);
-        task.output = "extracting";
-        // Node ships no zip reader; `unzip` is present on macOS by default.
-        // Extract to a staging dir so a multi-entry archive cannot scatter
-        // files into bin/, then lift the one binary out.
-        const stage = join(paths.bin, `.opencode-${OPENCODE_VERSION}-stage`);
-        rmSync(stage, { recursive: true, force: true });
-        mkdirSync(stage, { recursive: true });
-        await execa("unzip", ["-q", "-o", tmp, "-d", stage]);
-        const extracted = join(stage, "opencode");
-        if (!existsSync(extracted)) {
-          rmSync(stage, { recursive: true, force: true });
-          rmSync(tmp, { force: true });
-          throw new Error(
-            `opencode archive did not contain an \`opencode\` binary at its root (${src.url})`,
-          );
-        }
-        rmSync(out, { force: true });
-        renameSync(extracted, out);
-        rmSync(stage, { recursive: true, force: true });
-        rmSync(tmp, { force: true });
+        await installFromZip(src.url, paths.bin, task, label);
       }
 
       if (!existsSync(out)) {

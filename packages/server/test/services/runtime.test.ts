@@ -68,7 +68,9 @@ vi.mock("../../src/services/langwatch-workers.ts", () => ({
   startLangwatchWorkers: () => ({
     name: "workers",
     pid: 0,
-    stop: async () => {},
+    stop: async () => {
+      callLog.push("stop:workers");
+    },
   }),
 }));
 vi.mock("../../src/services/migrate.ts", () => ({ runMigrations: migrateFn }));
@@ -291,11 +293,11 @@ describe("services/runtime", () => {
       callLog.length = 0; // reset to count only stops
       await runtime.stopAll(handles);
       const stopOrder = callLog.filter((entry) => entry.startsWith("stop:"));
-      expect(stopOrder).toHaveLength(8);
+      expect(stopOrder).toHaveLength(9);
       // First stopped should be langwatch (last started); last stopped should be one of the infra.
       const firstStopped = stopOrder[0]!.replace("stop:", "");
       const lastStopped = stopOrder[stopOrder.length - 1]!.replace("stop:", "");
-      expect(["langwatch", "aigateway", "langevals", "nlpgo", "langyagent"]).toContain(firstStopped);
+      expect(firstStopped).toBe("workers");
       expect(["postgres", "redis", "clickhouse"]).toContain(lastStopped);
     });
 

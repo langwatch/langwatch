@@ -6,8 +6,7 @@ import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { servicePaths } from "./paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
-import { readEnvFile } from "./env-file.ts";
-import { resolveFeatures } from "../shared/features.ts";
+import { resolveEffectiveFeatures } from "../shared/features.ts";
 
 type VenvSpec = {
   name: "langevals";
@@ -85,10 +84,7 @@ function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
   // product tells anyone who reaches for one of these how to get it. Nothing
   // about redaction depends on the PII toggle: LangWatch's own secret and
   // PII redaction in the ingestion pipeline is not implemented with presidio.
-  const features = resolveFeatures({
-    ...readEnvFile(ctx.envFile),
-    ...process.env,
-  });
+  const features = resolveEffectiveFeatures(ctx.envFile);
   const extras = [
     ...LANGEVALS_BASE_EXTRAS,
     ...(features.isLinguaEnabled ? ["lingua"] : []),

@@ -27,8 +27,17 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
   const cliRoot = join(ctx.paths.root, "cli");
   const marker = join(cliRoot, ".installed-version");
   const shim = join(ctx.paths.bin, "langwatch");
+  const entry = join(cliRoot, "node_modules", "langwatch", "dist", "cli", "index.js");
 
-  if (existsSync(marker) && readFileSync(marker, "utf8").trim() === LANGY_CLI_VERSION && existsSync(shim)) {
+  // The entrypoint is part of the fast-path condition: a pruned or
+  // half-deleted cli/node_modules with the marker still present would
+  // otherwise leave a shim pointing at nothing until the pin next moved.
+  if (
+    existsSync(marker) &&
+    readFileSync(marker, "utf8").trim() === LANGY_CLI_VERSION &&
+    existsSync(shim) &&
+    existsSync(entry)
+  ) {
     return;
   }
 
@@ -49,7 +58,6 @@ export async function ensureLangyCli(ctx: RuntimeContext, bus: EventBus): Promis
     stdio: "pipe",
   });
 
-  const entry = join(cliRoot, "node_modules", "langwatch", "dist", "cli", "index.js");
   if (!existsSync(entry)) {
     throw new Error(`langwatch CLI ${LANGY_CLI_VERSION} installed but ${entry} is missing`);
   }

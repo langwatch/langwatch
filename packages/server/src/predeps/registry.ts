@@ -6,7 +6,8 @@ import { pnpmPredep } from "./pnpm.ts";
 import { postgresPredep } from "./postgres.ts";
 import { redisPredep } from "./redis.ts";
 import { uvPredep } from "./uv.ts";
-import { resolveFeatures } from "../shared/features.ts";
+import { resolveEffectiveFeatures } from "../shared/features.ts";
+import { paths } from "../shared/paths.ts";
 import type { Predep } from "./types.ts";
 
 export function predepRegistry({ version }: { version: string }): Predep[] {
@@ -16,7 +17,11 @@ export function predepRegistry({ version }: { version: string }): Predep[] {
   // doesn't depend on pnpm.
   // The assistant's runtime is last: it is the only optional one, and the
   // only one whose failure leaves a working install behind.
-  const features = resolveFeatures();
+  // Resolved the same way the runtime resolves them (persisted .env first,
+  // shell on top): a LANGWATCH_ENABLE_LANGY=false line in ~/.langwatch/.env
+  // must stop the assistant runtime from being downloaded, not only from
+  // being started.
+  const features = resolveEffectiveFeatures(paths.envFile);
   return [
     pnpmPredep,
     uvPredep,

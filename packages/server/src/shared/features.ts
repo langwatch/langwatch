@@ -10,6 +10,8 @@
  * works in a shell, in `~/.langwatch/.env`, and in a container.
  */
 
+import { readEnvFile } from "../services/env-file.ts";
+
 export type FeatureToggles = {
   /**
    * The Langy assistant. Costs ~45MB (the opencode runtime, fetched once) and
@@ -105,4 +107,14 @@ export function featureEnv(features: FeatureToggles): Record<string, string> {
     [LINGUA_ENV_KEY]: String(features.isLinguaEnabled),
     [LEGACY_EVALUATORS_ENV_KEY]: String(features.isLegacyEvaluatorsEnabled),
   };
+}
+
+/**
+ * The toggles as an install actually experiences them: the persisted .env
+ * first, the shell environment on top. Every consumer (predep registry,
+ * installer, service composition, venv extras) resolves through here so the
+ * precedence order lives in exactly one place.
+ */
+export function resolveEffectiveFeatures(envFilePath: string): FeatureToggles {
+  return resolveFeatures({ ...readEnvFile(envFilePath), ...process.env });
 }

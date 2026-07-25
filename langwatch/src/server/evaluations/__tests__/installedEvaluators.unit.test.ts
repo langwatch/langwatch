@@ -71,7 +71,7 @@ describe("evaluator availability on this install", () => {
       expect(result!.reason).toMatch(/not installed/i);
       expect(result!.howToEnable).toContain(LINGUA_ENABLE_ENV_VAR);
       // It stays visible as a disabled card; only deprecated families hide.
-      expect(result!.hideFromUi).toBeUndefined();
+      expect(result!.isHiddenFromUi).toBeUndefined();
     });
   });
 
@@ -81,7 +81,7 @@ describe("evaluator availability on this install", () => {
     it("hides them from pickers entirely", () => {
       const result = evaluatorUnavailability({ evaluatorType: "legacy/ragas_faithfulness", env });
       expect(result).toBeDefined();
-      expect(result!.hideFromUi).toBe(true);
+      expect(result!.isHiddenFromUi).toBe(true);
     });
 
     it("still explains itself when a saved evaluation runs one", () => {

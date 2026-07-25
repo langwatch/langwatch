@@ -33,7 +33,7 @@ export type EvaluatorUnavailability = {
    * nobody should be adopting anyway. Execution still gets the clear message
    * either way, since something saved long ago may reference it.
    */
-  hideFromUi?: boolean;
+  isHiddenFromUi?: boolean;
 };
 
 function explicitlyDisabled({
@@ -83,7 +83,7 @@ export function evaluatorUnavailability({
     return {
       reason: "Legacy evaluators are not installed on this server.",
       howToEnable: `They are deprecated; prefer their current equivalents. If a saved evaluation still needs one, set ${LEGACY_EVALUATORS_ENABLE_ENV_VAR}=true and restart LangWatch.`,
-      hideFromUi: true,
+      isHiddenFromUi: true,
     };
   }
   return undefined;

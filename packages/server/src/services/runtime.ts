@@ -19,7 +19,7 @@ import { startLangwatchWorkers } from "./langwatch-workers.ts";
 import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
 import { ensureLangyCli } from "./langy-cli.ts";
 import { startNlpgo } from "./nlpgo.ts";
-import { featureEnv, resolveFeatures } from "../shared/features.ts";
+import { featureEnv, resolveEffectiveFeatures } from "../shared/features.ts";
 import { runMigrations } from "./migrate.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
 import { startPostgres } from "./postgres.ts";
@@ -57,7 +57,7 @@ const runtimeImpl: RuntimeApi = {
     // uv sync + langwatch node_modules + prepare:files run in parallel.
     // Each helper is idempotent and prints "already cached" + early-returns
     // when its lockfile hash matches the previous run.
-    const features = resolveFeatures({ ...readEnvFile(ctx.envFile), ...process.env });
+    const features = resolveEffectiveFeatures(ctx.envFile);
     await Promise.all([
       syncVenvs(ctx, bus),
       ensureLangwatchDeps(ctx, bus),
@@ -96,7 +96,7 @@ const runtimeImpl: RuntimeApi = {
     // win over the blank .env entries written by scaffoldEnvFile. The
     // resolved feature toggles ride along explicitly (see featureEnv) so the
     // app describes exactly the install this process just built.
-    const features = resolveFeatures({ ...envFromFile, ...process.env });
+    const features = resolveEffectiveFeatures(ctx.envFile);
     // The assistant is OPTIONAL: nothing else depends on it, so no failure of
     // its own may take the install down. It boots (or declines to) BEFORE the
     // app tier, because the app must be told the truth about it: an agent URL
