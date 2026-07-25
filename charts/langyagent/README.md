@@ -16,38 +16,42 @@ The chart ships as a sub-chart of the umbrella `langwatch` chart (aliased
 
 ## Install
 
-Preferred — via the umbrella `langwatch` chart, which wires the app and the
-workers to the agent, materialises the shared `LANGY_INTERNAL_SECRET` into its
-own app Secret, and opens the assistant to the people in the install:
+Preferred: via the umbrella `langwatch` chart, which deploys the agent by
+default, wires the app and the workers to it, materialises the shared
+`LANGY_INTERNAL_SECRET` into its own app Secret, and opens the assistant to
+the people in the install:
 
 ```bash
 helm install langwatch ./charts/langwatch -n langwatch \
-  -f values.prod.yaml \
-  --set langyagent.chartManaged=true
+  -f values.prod.yaml
 ```
 
 There is nothing to create beforehand. If you supply your own app Secret
 instead of letting the chart generate one (`autogen.enabled: false`), add a
 `LANGY_INTERNAL_SECRET` key to it — the install tells you so and stops rather
-than half-deploying.
+than half-deploying. To run without the assistant, set
+`langyagent.chartManaged=false`.
 
-### On a cluster with no sandboxed runtime
+### The sandboxed runtime
 
-The agent runs LLM-written shell, so it asks for a sandboxed runtime (`gvisor`)
-by default. Most self-managed clusters have none, and the install refuses to
-render rather than silently dropping the sandbox. To run it anyway, say so:
+The agent runs LLM-written shell. Under the umbrella chart the default runs on
+the node's normal runtime so the install works on any cluster, and the install
+notes state that the pod-to-host sandbox is absent. Harden it once the cluster
+defines a `gvisor` RuntimeClass:
 
 ```yaml
 langyagent:
-  chartManaged: true
-  runtimeClassName: ""
-  acceptUnsandboxedRuntime: true
+  runtimeClassName: "gvisor"
 ```
 
-You keep per-worker UID isolation, the per-worker opencode password, and the
-NetworkPolicy; you give up the pod-to-host sandbox. A single-tenant install
-whose users are colleagues carries a much smaller worker-versus-worker risk
-than a multi-tenant one — read the trade that way, not as a formality.
+Standalone, this chart's own defaults still demand a sandboxed runtime and
+refuse to render without one unless `acceptUnsandboxedRuntime: true` is set.
+
+Unsandboxed, you keep per-worker UID isolation, the per-worker opencode
+password, and the NetworkPolicy; you give up the pod-to-host sandbox. A
+single-tenant install whose users are colleagues carries a much smaller
+worker-versus-worker risk than a multi-tenant one; read the trade that way,
+not as a formality.
 
 ### Standalone
 

@@ -27,16 +27,17 @@ Feature: Langy comes up with a self-hosted LangWatch install
   # Installing it is enough
   # ===========================================================================
 
-  Scenario: Installing the chart with Langy enabled brings up a working assistant
+  Scenario: A plain install brings up a working assistant
     Given an operator installs the LangWatch chart on their own cluster
-    When they enable the Langy agent
-    Then the install completes without asking them to create anything by hand
+    When the install completes with default values
+    Then the Langy agent is running without any Langy-specific values set
+    And nothing was created by hand
     And the app and the agent recognise each other on the first request
     And no pod is left waiting on a secret the operator was never told about
 
   Scenario: An operator who brings their own secrets is told exactly which one Langy needs
     Given an operator supplies their own secrets instead of generated ones
-    When they enable the Langy agent
+    When they install with the Langy agent kept on
     Then the install names the one value Langy needs from them
     And it fails before deploying rather than half-installing
 
@@ -94,19 +95,27 @@ Feature: Langy comes up with a self-hosted LangWatch install
 
   # Langy runs LLM-written shell, so the sandboxed runtime is the posture we
   # want everywhere. But requiring it silently made "no sandboxed runtime" mean
-  # "no Langy at all", which is most self-managed clusters. The rule we keep is
-  # that nobody runs it unsandboxed by ACCIDENT: the risk has to be accepted out
-  # loud, in the values file, before the chart will render it.
-  Scenario: An operator whose cluster has no sandboxed runtime can still run Langy, deliberately
+  # "no Langy at all", which is most self-managed clusters. So the umbrella
+  # chart ships unsandboxed-and-accepted as its default: a plain install runs
+  # Langy on any cluster, and the install notes say the sandbox is absent and
+  # how to add it. The refusal survives for the operator who withdraws the
+  # acceptance, and for the standalone subchart, whose defaults still demand a
+  # sandboxed runtime.
+  Scenario: A default install runs Langy without a sandbox and says so
     Given a cluster with no sandboxed runtime available
-    When the operator accepts the reduced isolation explicitly
+    When the operator installs with default values
     Then Langy installs and runs
-    And the acceptance is recorded in their own values, not buried in a default
+    And the install notes state the sandbox is absent and name the hardening value
 
-  Scenario: Leaving the sandbox out without saying so is still refused
+  Scenario: An operator can harden the pod with a sandboxed runtime
+    Given a cluster with a gvisor RuntimeClass available
+    When the operator pins the agent to it
+    Then Langy installs and runs under the sandboxed runtime
+
+  Scenario: Withdrawing the acceptance without providing a sandbox is refused
     Given a cluster with no sandboxed runtime available
-    When the operator has not accepted the reduced isolation
-    Then the install still refuses to render
+    When the operator withdraws the unsandboxed acceptance without setting a runtime
+    Then the install refuses to render
     And the refusal explains both what is missing and how to accept it
 
   # ===========================================================================
@@ -127,7 +136,7 @@ Feature: Langy comes up with a self-hosted LangWatch install
   # ===========================================================================
 
   Scenario: An install that does not want Langy is unaffected by it
-    Given an operator installs LangWatch without the Langy agent
+    Given an operator installs LangWatch with the Langy agent disabled
     When the install completes
     Then nothing in the install references the assistant
     And the rest of the product behaves exactly as it did before Langy existed

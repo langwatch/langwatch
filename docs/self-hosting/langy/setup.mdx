@@ -7,35 +7,21 @@ sidebarTitle: Setup
 Langy is the assistant inside LangWatch: it answers questions about your traces,
 runs LangWatch's own CLI on your behalf, and can open pull requests against your
 repositories. On a self-hosted install it runs as one extra pod, alongside the
-app, and it is off until you turn it on.
+app, and it ships enabled: a plain `helm install` deploys it.
 
 ## What it needs
 
-| Requirement | Why |
-|-------------|-----|
-| The `langyagent` pod | Runs one isolated OpenCode worker per conversation |
-| A model provider | Langy talks to a model like every other LangWatch feature |
-| A sandboxed runtime, or an explicit acceptance | The workers execute model-written shell |
+The chart handles the deployment: the agent pod, the secret the app and the
+agent use to authenticate to each other, and the in-cluster addresses they use
+to reach the LangWatch AI Gateway and to send answers back.
 
-Everything else is handled by the chart: the secret the app and the agent use to
-authenticate to each other, and the in-cluster addresses they use to reach the
-gateway and to send answers back.
-
-## Turning it on
-
-```yaml
-langyagent:
-  chartManaged: true
-```
+The one thing Langy needs from you is a model to talk to. Configure a
+[model provider](/platform/model-providers) for the project, then open the
+assistant from any page.
 
 ```bash
-helm upgrade langwatch langwatch/langwatch -n langwatch -f values.yaml
+kubectl -n langwatch get pods -l app.kubernetes.io/name=langyagent
 ```
-
-That deploys the agent, wires the app and the workers to it, and makes the
-assistant available to everyone in your install. Give it a model to talk to by
-configuring a [model provider](/platform/model-providers) for the project, then
-open the assistant from any page.
 
 <Note>
 Langy is single-tenant by nature here: every person with access to your
@@ -43,28 +29,30 @@ LangWatch install can use it, and it runs with the permissions of whoever is
 asking. To roll it out gradually instead, see [Staged rollout](#staged-rollout).
 </Note>
 
-## Clusters without a sandboxed runtime
+## Hardening with a sandboxed runtime
 
-Langy's workers run shell written by a language model, so the chart asks for a
-sandboxed runtime, [gVisor](https://gvisor.dev/docs/user_guide/install/), and
-refuses to install without one rather than dropping the sandbox quietly. Managed
-offerings like GKE Sandbox provide it; most self-managed clusters do not.
+Langy's workers run shell written by a language model. The default install runs
+the pod on the node's normal runtime so the chart installs on any cluster, and
+the install notes state that the pod-to-host sandbox is absent.
 
-If yours cannot, say so explicitly and the install proceeds:
-
-```yaml
-langyagent:
-  chartManaged: true
-  runtimeClassName: ""
-  acceptUnsandboxedRuntime: true
-```
-
-What you keep either way: each conversation's worker runs under its own UID with
+What you keep by default: each conversation's worker runs under its own UID with
 its own credentials, workers cannot read each other's, and a NetworkPolicy bounds
 what any of them can reach. What the sandbox adds on top is protection of the
 node itself from a worker that escapes its container. An install whose users are
-all colleagues carries a very different risk here than one exposed to
-untrusted users, and that judgement is yours to make.
+all colleagues carries a very different risk here than one exposed to untrusted
+users, and that judgement is yours to make.
+
+For production, pin the pod to [gVisor](https://gvisor.dev/docs/user_guide/install/).
+Managed offerings like GKE Sandbox provide the RuntimeClass; on self-managed
+clusters install the gVisor operator or a RuntimeClass manifest first:
+
+```yaml
+langyagent:
+  runtimeClassName: "gvisor"
+```
+
+To make the chart refuse to render unless a sandboxed runtime is configured,
+also set `acceptUnsandboxedRuntime: false`.
 
 ## Letting Langy reach the internet
 
@@ -117,7 +105,6 @@ authoritative:
 
 ```yaml
 langyagent:
-  chartManaged: true
   enableForAllUsers: false
 ```
 

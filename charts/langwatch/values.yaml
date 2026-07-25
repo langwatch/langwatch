@@ -1642,33 +1642,35 @@ gateway:
 ## cluster DNS. The subchart defaults (image, probes, NetworkPolicy,
 ## SecurityContext, single-replica) live in charts/langyagent/values.yaml.
 ##
-## TURNING LANGY ON is one value:
-##
-##   langyagent:
-##     chartManaged: true
-##
-## and, on a cluster with no sandboxed runtime available (most self-managed
-## ones — see langyagent.runtimeClassName in the subchart), two more:
-##
-##     runtimeClassName: ""
-##     acceptUnsandboxedRuntime: true
-##
-## Everything else is materialised by this chart: the shared LANGY_INTERNAL_SECRET
-## lands in the app Secret alongside the gateway's pair, the app and workers pods
-## both get the agent URL, and the assistant is opened to the install's users.
+## Langy ships ENABLED: a plain `helm install` deploys the agent, wires the app
+## and workers to it, and opens the assistant to the install's users. The shared
+## LANGY_INTERNAL_SECRET lands in the app Secret alongside the gateway's pair.
 ## There is no out-of-band `kubectl create secret` step and no internal screen to
 ## visit. What Langy still needs from you is a model to talk to: configure a model
 ## provider for the project as you would for any other LangWatch feature.
 ##
-## WHY default off: enabling it adds a pod that runs LLM-written shell under a
-## deliberate security posture (root in-container for per-worker UID handoff, a
-## sandboxed runtime where one exists). That is a decision an operator should
-## make on purpose rather than inherit from a chart upgrade, so the default
-## leaves existing installs exactly as they are.
+## The default runs on the node's normal runtime so the install works on any
+## cluster. Workers still get per-UID isolation, a per-worker opencode password,
+## and a NetworkPolicy with egress off. HARDENING for production: give the pod a
+## sandboxed runtime so a worker that escapes its container does not face the
+## node kernel directly:
+##
+##   langyagent:
+##     runtimeClassName: "gvisor"
+##
+## (requires a gvisor RuntimeClass in the cluster; see the subchart values.)
+## To not run Langy at all: langyagent.chartManaged: false removes the pod and
+## every reference to it.
 ## NOTE: hyphenated key — reference as (index .Values "langyagent") in templates.
 langyagent:
-  ## @param langyagent.chartManaged [default: false] Lift the Langy agent pod as part of this chart, wire the app and workers to it, and open the assistant to this install. Off by default so an upgrade never adds this workload on its own.
-  chartManaged: false
+  ## @param langyagent.chartManaged [default: true] Deploy the Langy agent pod as part of this chart, wire the app and workers to it, and open the assistant to this install. Set false to run without the assistant; the pod and every reference to it are removed on the next upgrade.
+  chartManaged: true
+
+  ## @param langyagent.runtimeClassName [string, default: ""] RuntimeClass for the agent pod. Empty runs on the node's default runtime so the chart installs anywhere; set "gvisor" (with the RuntimeClass present in the cluster) to add the pod-to-host sandbox. Overrides the subchart default.
+  runtimeClassName: ""
+
+  ## @param langyagent.acceptUnsandboxedRuntime [default: true] Acknowledges that an empty runtimeClassName runs LLM-driven shell without a pod-to-host sandbox. On by default so the out-of-the-box install renders; set false to make the chart refuse to render unless a sandboxed runtime is configured.
+  acceptUnsandboxedRuntime: true
 
   ## @param langyagent.enableForAllUsers [default: true] Make Langy available to everyone in this install as soon as the agent is deployed. Set false to keep the rollout flag authoritative and open Langy to chosen projects/orgs from /ops/feature-flags instead — the staged path the hosted product uses.
   enableForAllUsers: true

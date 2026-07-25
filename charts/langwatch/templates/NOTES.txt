@@ -79,6 +79,12 @@ dev's Personal Workspace at https://<your-host>/me .
 {{- if (index .Values "langyagent").chartManaged }}
   • Langy, the in-product assistant:
       kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name=langyagent
+{{- if not (index .Values "langyagent").runtimeClassName }}
+    ⚠ Running without a pod-to-host sandbox (no runtimeClassName). Workers
+    keep per-UID isolation and the NetworkPolicy. To harden, install a
+    gvisor RuntimeClass in the cluster and set:
+      langyagent.runtimeClassName=gvisor
+{{- end }}
 {{- if (index .Values "langyagent").enableForAllUsers }}
     It is available to everyone in this install. Give it a model to talk to
     by wiring a Model Provider (step 2 above), then open the assistant from

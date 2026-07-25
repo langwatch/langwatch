@@ -9,9 +9,9 @@ keywords:
   - ai agent self hosting
 ---
 
-Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, that ships in the LangWatch umbrella Helm chart but is **off by default**.
+Langy runs as a separate Kubernetes Deployment, the `langyagent` pod, and ships **enabled**: a plain `helm install` deploys it, materialises the shared secret, wires the app and workers to it, and opens Langy to everyone in the install.
 
-One value turns it on: `langyagent.chartManaged: true`. The chart materialises the shared secret, wires the app and workers to the agent, and opens Langy to everyone in the install. The one infrastructure requirement is a sandboxed runtime, a `gvisor` RuntimeClass; clusters without one accept unsandboxed mode explicitly. See [Setup](/self-hosting/langy/setup).
+The default runs on the node's normal runtime so the chart installs on any cluster. For production, harden the pod with a gVisor RuntimeClass: `langyagent.runtimeClassName: "gvisor"`. See [Setup](/self-hosting/langy/setup).
 
 The GitHub App and outbound network egress are both optional and off until you configure them.
 
@@ -22,7 +22,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 </Info>
 
 <Note>
-**Turning Langy off.** Set `langyagent.chartManaged: false` (its default): the agent pod and every reference to it are removed on the next upgrade, and nothing else in the install changes. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
+**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, and nothing else in the install changes. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
 </Note>
 
 ## At a glance
@@ -30,11 +30,11 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 | | |
 |---|---|
 | Deployment | Separate `langyagent` Deployment + ConfigMap + Service + NetworkPolicy in the umbrella chart |
-| Default state | Off (`langyagent.chartManaged: false` at the umbrella level) |
-| Access once deployed | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
+| Default state | On (`langyagent.chartManaged: true`); disable with `chartManaged: false` |
+| Access | Everyone in the install (`enableForAllUsers: true`); staged rollout via the flag instead |
 | Replicas | 1 (render-time guard blocks more until conversation-sticky routing exists) |
 | Update strategy | `Recreate`, no HPA. Scale vertically. |
-| Sandbox | gVisor (`runtimeClassName: gvisor`); clusters without it set `acceptUnsandboxedRuntime: true` explicitly |
+| Sandbox | Node default runtime out of the box; harden with `runtimeClassName: gvisor` |
 | Sizing | ~5 to 15 concurrent sessions at 500m to 2 CPU / 1 to 4Gi |
 | Shared secret | `LANGY_INTERNAL_SECRET`, materialised in the app Secret by the chart; add it to your own Secret when `autogen.enabled: false` |
 | GitHub App | Optional, for bot-authored pull requests |
@@ -42,7 +42,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 
 ## Hard requirements
 
-- **A sandboxed runtime, or an explicit acceptance.** The pod runs under gVisor (`runsc`), a user-space kernel that shrinks the pod-to-host escape surface, because the workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`). Without a `gvisor` RuntimeClass in the cluster, pods fail to schedule with `FailedCreatePodSandBox ... runtimeclasses.node.k8s.io "gvisor" not found`; install it with the gVisor operator or a RuntimeClass manifest. On a cluster that cannot provide one, set `runtimeClassName: ""` together with `acceptUnsandboxedRuntime: true`; the chart refuses to render without the explicit acceptance. You then lose pod-to-host sandboxing but keep the in-pod per-worker isolation. See [The sandbox](/langy/security/sandbox).
+- **A sandboxed runtime, for production.** The default install runs the pod on the node's normal runtime and states that in the install notes; workers keep per-UID isolation, per-worker credentials, and the NetworkPolicy. Because the workload is LLM-driven arbitrary shell (workers spawn `git`, `gh`, and `npm`), production installs should add the pod-to-host sandbox: install a `gvisor` RuntimeClass (the gVisor operator or a RuntimeClass manifest; GKE Sandbox ships one) and set `langyagent.runtimeClassName: "gvisor"`. Setting `acceptUnsandboxedRuntime: false` makes the chart refuse to render until a sandboxed runtime is configured. See [The sandbox](/langy/security/sandbox).
 - **A separate pod and service.** The agent is its own Deployment, ConfigMap, ClusterIP Service, and NetworkPolicy (plus an optional PodDisruptionBudget and CiliumNetworkPolicy). It runs a single replica with `strategy: Recreate` and no HPA, sized for roughly 5 to 15 concurrent sessions at 500m to 2 CPU and 1 to 4Gi. Scale it vertically, not horizontally.
 - **The shared internal secret.** The app and the agent authenticate to each other with a bearer token, `LANGY_INTERNAL_SECRET`. The chart materialises it in the app Secret when `autogen.enabled` is on; with your own Secret, add the key yourself and the install checks for it before starting. See [Setup](/self-hosting/langy/setup#bringing-your-own-secrets).
 
