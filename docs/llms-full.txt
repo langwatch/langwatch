@@ -25999,7 +25999,7 @@ You watch Langy work with the same tools you use to watch your own agents, and t
 Langy does not open arbitrary outbound connections. Two kinds of external traffic exist, and both are constrained:
 
 - **LLM traffic** goes to the LangWatch AI Gateway, never directly to a model provider. The worker's LLM base URL points at the gateway, so tracing, rate limits, budgets, and model policy all apply. See [How Langy's model calls are routed](/langy/models).
-- **`git` / `gh` / `npm` traffic** reaches the internet only when `allowExternalHttps` is on and the destination passes the L7 egress adapter. The operator floor is `github.com`, `api.github.com`, and `codeload.github.com`; a project can add to the allow-list.
+- **`git` / `gh` / `npm` traffic** reaches the internet only when `allowExternalHttps` is on, and it is routed through the L7 egress adapter. The operator floor is `github.com`, `api.github.com`, and `codeload.github.com`; a project can add to the allow-list. The adapter is cooperative in the stock pod, so treat the allow-list as the intended path rather than a hard boundary. See [the isolation limits](/langy/security/sandbox).
 
 Regardless of the allow-list, these are blocked at L3/L4:
 
@@ -26198,7 +26198,8 @@ For a self-hosted install, egress is **denied by default**: `networkPolicy.allow
 ## What the sandbox can and cannot reach
 
 - **Can reach (when configured):** the LangWatch API (through the per-session `langwatch` CLI credentials), the LangWatch AI Gateway for LLM traffic, and `github.com` / `api.github.com` / `codeload.github.com` when external HTTPS is enabled.
-- **Cannot reach:** RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint (blocked at L3/L4 to prevent SSRF and IMDS credential theft), and any other external host unless the project allow-lists it and it passes the L7 adapter.
+- **Cannot reach:** RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint. These are blocked at L3/L4 to prevent SSRF and IMDS credential theft, so the block holds regardless of what the worker attempts.
+- **Reaches only through the adapter, by cooperation:** any other external host goes through the L7 egress adapter, which enforces the project allow-list and the operator floor. In the stock pod that path is cooperative, not mandatory: a worker that ignores `HTTPS_PROXY` and dials a public address on `:443` directly is monitored rather than blocked, per the limits above.
 - **Does not keep at rest:** nothing durable lives worker-side. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
@@ -29145,7 +29146,7 @@ keywords:
 
 Langy opens pull requests through a GitHub App you register and install. PRs are authored by the app and credit the requesting user via a `Co-authored-by` trailer and a `Requested by @<login> via LangWatch` note in the body.
 
-There is no per-user OAuth and no stored token: the app private key is the only credential, it lives only in the control-plane env, and 1-hour installation tokens are minted on demand and never persisted.
+There is no per-user OAuth and no long-lived stored token: the app private key is the only credential, it lives only in the control-plane env, and installation tokens are minted on demand, cached in Redis a hair under their 1 hour lifetime, and never written to the database.
 
 To set it up: register a GitHub App, put its id, private key, webhook secret, and slug into the deployment env, and have org admins install it on the repos Langy may touch from **Settings > Integrations**.
 
