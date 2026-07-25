@@ -48,7 +48,7 @@ const platformIcon = (platform: string | null) => {
 function MyDevicesPage() {
   const ctx = usePersonalContext();
   const [pendingRevokeId, setPendingRevokeId] = useState<number | null>(null);
-  const [pendingRevokeAll, setPendingRevokeAll] = useState(false);
+  const [isPendingRevokeAll, setIsPendingRevokeAll] = useState(false);
 
   const utils = api.useUtils();
   const sessionsQuery = api.personalSessions.list.useQuery(
@@ -82,7 +82,7 @@ function MyDevicesPage() {
       void utils.personalSessions.list.invalidate({
         organizationId: ctx.organizationId,
       });
-      setPendingRevokeAll(false);
+      setIsPendingRevokeAll(false);
       toaster.create({
         title: "All devices revoked",
         description: `Cleared ${res.revokedTokens} token${res.revokedTokens === 1 ? "" : "s"} across every device. You'll need to re-run \`langwatch login\` on each.`,
@@ -118,19 +118,19 @@ function MyDevicesPage() {
             </Text>
           </VStack>
           <Spacer />
-          {sessions.length > 1 && !pendingRevokeAll && (
+          {sessions.length > 1 && !isPendingRevokeAll && (
             <Button
               size="sm"
               variant="outline"
               colorPalette="red"
-              onClick={() => setPendingRevokeAll(true)}
+              onClick={() => setIsPendingRevokeAll(true)}
             >
               Revoke all
             </Button>
           )}
         </HStack>
 
-        {pendingRevokeAll && (
+        {isPendingRevokeAll && (
           <HStack
             gap={2}
             paddingY={2}
@@ -147,7 +147,7 @@ function MyDevicesPage() {
             <Button
               size="xs"
               variant="ghost"
-              onClick={() => setPendingRevokeAll(false)}
+              onClick={() => setIsPendingRevokeAll(false)}
               disabled={revokeAllMutation.isPending}
             >
               Cancel
