@@ -43,11 +43,3 @@ export const limitsRouter = createTRPCRouter({
       };
     }),
 });
-
-export const getOrganizationProjectsCount = async (organizationId: string) => {
-  return await prisma.project.count({
-    where: {
-      team: { organizationId },
-    },
-  });
-};

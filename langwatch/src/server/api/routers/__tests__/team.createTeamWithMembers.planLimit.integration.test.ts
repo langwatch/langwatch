@@ -6,7 +6,11 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -30,11 +34,7 @@ import {
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 
-// Skip when running with testcontainers only (no PostgreSQL)
-// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)(
+describe(
   "team.createTeamWithMembers plan limit enforcement",
   () => {
     const testNamespace = `team-limit-${nanoid(8)}`;
@@ -65,6 +65,18 @@ describe.skipIf(isTestcontainersOnly)(
           userId: user.id,
           organizationId: organization.id,
           role: OrganizationUserRole.ADMIN,
+        },
+      });
+
+      // `organization:manage` resolves through an ORGANIZATION-scoped
+      // RoleBinding; OrganizationUser.role alone never grants it.
+      await prisma.roleBinding.create({
+        data: {
+          userId: user.id,
+          organizationId: organization.id,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: organization.id,
         },
       });
 
@@ -106,6 +118,11 @@ describe.skipIf(isTestcontainersOnly)(
     });
 
     afterAll(async () => {
+      await prisma.roleBinding
+        .deleteMany({
+          where: { organization: { slug: `--test-org-${testNamespace}` } },
+        })
+        .catch(() => {});
       await prisma.teamUser
         .deleteMany({
           where: {
