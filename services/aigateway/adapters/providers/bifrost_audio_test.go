@@ -61,13 +61,13 @@ func TestExtractTranscriptionUsage_DurationMeasure(t *testing.T) {
 
 	dur := 2.51
 	u := extractTranscriptionUsage(&bfschemas.BifrostTranscriptionResponse{Duration: &dur})
-	assert.Equal(t, 2.51, u.AudioSeconds)
+	assert.InDelta(t, 2.51, u.AudioSeconds, 1e-9)
 
 	secs := 3
 	u = extractTranscriptionUsage(&bfschemas.BifrostTranscriptionResponse{
 		Usage: &bfschemas.TranscriptionUsage{Type: "duration", Seconds: &secs},
 	})
-	assert.Equal(t, 3.0, u.AudioSeconds)
+	assert.InDelta(t, 3.0, u.AudioSeconds, 1e-9)
 
 	in, out, tot := 11, 0, 11
 	u = extractTranscriptionUsage(&bfschemas.BifrostTranscriptionResponse{
