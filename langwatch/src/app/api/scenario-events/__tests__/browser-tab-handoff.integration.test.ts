@@ -253,7 +253,7 @@ describe("POST /api/scenario-events/browser-tab", () => {
       );
     });
 
-    /** @scenario "The handoff is delivered when a tab is listening" */
+    /** @scenario "A handoff sent while the tab was reloading is not lost" */
     it("parks the run so a tab that was reloading can still claim it", async () => {
       const tabKey = `tab-${nanoid(8)}`;
       await registerTab({ projectId, tabKey });

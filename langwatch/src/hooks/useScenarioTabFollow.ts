@@ -21,7 +21,7 @@ function readSession(key: string): string | null {
   }
 }
 
-function writeSession(key: string, value: string): void {
+function writeSession({ key, value }: { key: string; value: string }): void {
   try {
     window.sessionStorage.setItem(key, value);
   } catch {
@@ -81,7 +81,7 @@ export function useScenarioTabFollow(): ScenarioTabFollowState {
     const queryKey = Array.isArray(fromQuery) ? fromQuery[0] : fromQuery;
 
     if (queryKey) {
-      writeSession(SESSION_KEY, queryKey);
+      writeSession({ key: SESSION_KEY, value: queryKey });
 
       // Drop the param so the visible URL stays shareable. Shallow: this is a
       // cosmetic rewrite, not a navigation.
@@ -97,7 +97,7 @@ export function useScenarioTabFollow(): ScenarioTabFollowState {
     let resolvedTabId = readSession(SESSION_TAB_ID_KEY);
     if (!resolvedTabId) {
       resolvedTabId = randomTabId();
-      writeSession(SESSION_TAB_ID_KEY, resolvedTabId);
+      writeSession({ key: SESSION_TAB_ID_KEY, value: resolvedTabId });
     }
 
     setTabKey(resolvedKey);

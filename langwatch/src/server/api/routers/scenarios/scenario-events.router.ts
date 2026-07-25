@@ -464,8 +464,8 @@ export const scenarioEventsRouter = createTRPCRouter({
       // this generator suspended, its emitter listener attached, and its tab
       // registered forever.
       const signal =
-        (opts.ctx as { signal?: AbortSignal }).signal ??
-        // @ts-expect-error - signal is not typed
+        opts.ctx.signal ??
+        // @ts-expect-error - tRPC v10 does not type `signal` on procedure opts
         (opts.signal as AbortSignal | undefined);
 
       try {

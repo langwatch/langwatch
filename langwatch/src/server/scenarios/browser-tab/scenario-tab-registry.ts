@@ -25,8 +25,18 @@ export const SCENARIO_TAB_REFRESH_MS = 10_000;
  * tab and open a new one — the exact thing this exists to prevent. A few
  * seconds of grace covers every one of those, while a genuinely closed tab
  * still stops taking runs almost immediately.
+ *
+ * Must stay below {@link SCENARIO_TAB_TTL_SECONDS}: `unregister` retires an
+ * entry by ageing its score by the difference, so an equal or larger grace
+ * would extend a tab's life instead of ending it.
  */
 export const SCENARIO_TAB_DISCONNECT_GRACE_SECONDS = 5;
+
+if (SCENARIO_TAB_DISCONNECT_GRACE_SECONDS >= SCENARIO_TAB_TTL_SECONDS) {
+  throw new Error(
+    "SCENARIO_TAB_DISCONNECT_GRACE_SECONDS must be shorter than SCENARIO_TAB_TTL_SECONDS",
+  );
+}
 
 /**
  * How long a handed-off run stays claimable by a tab that was not connected at
@@ -39,7 +49,11 @@ function tabSetKey(projectId: string, tabKey: string): string {
   return `${KEY_PREFIX}:${projectId}:${tabKey}`;
 }
 
-function pendingKey(projectId: string, tabKey: string): string {
+/** Exported as a test seam so suites never hand-copy the key format. */
+export function scenarioTabPendingKey(
+  projectId: string,
+  tabKey: string,
+): string {
   return `${KEY_PREFIX}:pending:${projectId}:${tabKey}`;
 }
 
@@ -60,10 +74,24 @@ function memoryEntry(key: string): Map<string, number> {
   return entry;
 }
 
-function pruneMemory(entry: Map<string, number>, now: number): void {
+function pruneMemory(
+  key: string,
+  entry: Map<string, number>,
+  now: number,
+): void {
   const cutoff = now - SCENARIO_TAB_TTL_SECONDS * 1000;
   for (const [tabId, seenAt] of entry) {
     if (seenAt < cutoff) entry.delete(tabId);
+  }
+  // Drop the outer entry too, or every machine key this process ever saw
+  // leaves an empty Map behind for its lifetime.
+  if (entry.size === 0) memoryTabs.delete(key);
+}
+
+/** Evict parked handoffs nobody came back for. */
+function prunePendingMemory(now: number): void {
+  for (const [key, entry] of memoryPending) {
+    if (entry.expiresAt <= now) memoryPending.delete(key);
   }
 }
 
@@ -93,7 +121,7 @@ export const scenarioTabRegistry = {
     if (!connection) {
       const entry = memoryEntry(key);
       entry.set(tabId, now);
-      pruneMemory(entry, now);
+      pruneMemory(key, entry, now);
       return;
     }
 
@@ -132,14 +160,20 @@ export const scenarioTabRegistry = {
 
     if (!connection) {
       const entry = memoryTabs.get(key);
-      if (entry?.has(tabId)) entry.set(tabId, retiredScore);
+      const current = entry?.get(tabId);
+      // Only ever bring the score down: a goodbye that arrives after the tab
+      // already aged out must not put it back inside the live window.
+      if (current !== void 0 && retiredScore < current) {
+        entry?.set(tabId, retiredScore);
+      }
       return;
     }
 
     try {
-      // XX: only re-score a member that is still there; never resurrect one
-      // that already aged out.
-      await connection.zadd(key, "XX", retiredScore, tabId);
+      // XX: only touch a member that is still there. LT: only lower its score,
+      // so a late goodbye cannot revive a tab that already aged out. Older
+      // Redis servers reject LT; the entry then just ages out on its own.
+      await connection.zadd(key, "XX", "LT", retiredScore, tabId);
     } catch (error) {
       logger.warn({ error, projectId }, "Failed to retire scenario tab");
     }
@@ -161,7 +195,7 @@ export const scenarioTabRegistry = {
     if (!connection) {
       const entry = memoryTabs.get(key);
       if (!entry) return false;
-      pruneMemory(entry, now);
+      pruneMemory(key, entry, now);
       return entry.size > 0;
     }
 
@@ -192,9 +226,10 @@ export const scenarioTabRegistry = {
     url: string;
     now?: number;
   }): Promise<void> {
-    const key = pendingKey(projectId, tabKey);
+    const key = scenarioTabPendingKey(projectId, tabKey);
 
     if (!connection) {
+      prunePendingMemory(now);
       memoryPending.set(key, {
         url,
         expiresAt: now + SCENARIO_TAB_PENDING_TTL_SECONDS * 1000,
@@ -222,7 +257,7 @@ export const scenarioTabRegistry = {
     tabKey: string;
     now?: number;
   }): Promise<string | null> {
-    const key = pendingKey(projectId, tabKey);
+    const key = scenarioTabPendingKey(projectId, tabKey);
 
     if (!connection) {
       const entry = memoryPending.get(key);
@@ -231,6 +266,16 @@ export const scenarioTabRegistry = {
     }
 
     try {
+      // GETDEL keeps read-and-clear atomic, so two subscriptions reconnecting
+      // at once cannot both claim the same parked run. Older Redis servers
+      // fall back to the non-atomic pair.
+      if (typeof (connection as { getdel?: unknown }).getdel === "function") {
+        return await (
+          connection as unknown as {
+            getdel: (k: string) => Promise<string | null>;
+          }
+        ).getdel(key);
+      }
       const url = await connection.get(key);
       if (url) await connection.del(key);
       return url;

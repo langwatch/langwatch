@@ -16,6 +16,7 @@ import {
   SCENARIO_TAB_DISCONNECT_GRACE_SECONDS,
   SCENARIO_TAB_PENDING_TTL_SECONDS,
   SCENARIO_TAB_TTL_SECONDS,
+  scenarioTabPendingKey,
   scenarioTabRegistry,
 } from "../scenario-tab-registry";
 
@@ -187,12 +188,11 @@ describe("scenarioTabRegistry", () => {
       ).resolves.toBe(true);
     });
 
-    it("never resurrects a tab that already aged out", async () => {
+    it("does not register a tab that was never there", async () => {
       const tabKey = `tab-${nanoid(8)}`;
       track(projectId, tabKey);
       const now = Date.now();
 
-      // Nothing was ever registered under this id.
       await scenarioTabRegistry.unregister({
         projectId,
         tabKey,
@@ -202,6 +202,36 @@ describe("scenarioTabRegistry", () => {
 
       await expect(
         scenarioTabRegistry.hasLiveTab({ projectId, tabKey, now }),
+      ).resolves.toBe(false);
+    });
+
+    it("does not revive a tab that had already aged out", async () => {
+      const tabKey = `tab-${nanoid(8)}`;
+      track(projectId, tabKey);
+      const now = Date.now();
+      const wellPastTtl = now + (SCENARIO_TAB_TTL_SECONDS + 60) * 1000;
+
+      await scenarioTabRegistry.register({
+        projectId,
+        tabKey,
+        tabId: "tab-a",
+        now,
+      });
+      // The browser died long ago; the late goodbye must not push it back
+      // inside the live window.
+      await scenarioTabRegistry.unregister({
+        projectId,
+        tabKey,
+        tabId: "tab-a",
+        now: wellPastTtl,
+      });
+
+      await expect(
+        scenarioTabRegistry.hasLiveTab({
+          projectId,
+          tabKey,
+          now: wellPastTtl,
+        }),
       ).resolves.toBe(false);
     });
   });
@@ -280,7 +310,7 @@ describe("scenarioTabRegistry", () => {
     /** @scenario "A handoff sent while the tab was reloading is not lost" */
     it("hands a parked run to the next subscription", async () => {
       const tabKey = `tab-${nanoid(8)}`;
-      pendingKeys.push(`scenario_tab:v1:pending:${projectId}:${tabKey}`);
+      pendingKeys.push(scenarioTabPendingKey(projectId, tabKey));
 
       await scenarioTabRegistry.setPendingNavigate({
         projectId,
@@ -295,7 +325,7 @@ describe("scenarioTabRegistry", () => {
 
     it("hands it over only once", async () => {
       const tabKey = `tab-${nanoid(8)}`;
-      pendingKeys.push(`scenario_tab:v1:pending:${projectId}:${tabKey}`);
+      pendingKeys.push(scenarioTabPendingKey(projectId, tabKey));
 
       await scenarioTabRegistry.setPendingNavigate({
         projectId,
@@ -309,9 +339,9 @@ describe("scenarioTabRegistry", () => {
       ).resolves.toBeNull();
     });
 
-    it("gives a tab that opens much later nothing to jump to", async () => {
+    it("expires a parked run so a tab opening much later does not jump to it", async () => {
       const tabKey = `tab-${nanoid(8)}`;
-      const key = `scenario_tab:v1:pending:${projectId}:${tabKey}`;
+      const key = scenarioTabPendingKey(projectId, tabKey);
       pendingKeys.push(key);
 
       await scenarioTabRegistry.setPendingNavigate({
@@ -320,15 +350,21 @@ describe("scenarioTabRegistry", () => {
         url: "https://app.langwatch.test/p/simulations/s/batch-1",
       });
 
+      // Redis holds the expiry, so the guarantee is the TTL it was given.
       const ttl = await connection!.ttl(key);
       expect(ttl).toBeGreaterThan(0);
       expect(ttl).toBeLessThanOrEqual(SCENARIO_TAB_PENDING_TTL_SECONDS);
+
+      await connection!.del(key);
+      await expect(
+        scenarioTabRegistry.takePendingNavigate({ projectId, tabKey }),
+      ).resolves.toBeNull();
     });
 
     it("keeps parked handoffs apart per machine", async () => {
       const mine = `tab-${nanoid(8)}`;
       const theirs = `tab-${nanoid(8)}`;
-      pendingKeys.push(`scenario_tab:v1:pending:${projectId}:${mine}`);
+      pendingKeys.push(scenarioTabPendingKey(projectId, mine));
 
       await scenarioTabRegistry.setPendingNavigate({
         projectId,

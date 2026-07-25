@@ -16,7 +16,7 @@ import { subDays } from "date-fns";
 import { Plus, TriangleAlert } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -125,12 +125,18 @@ export default function SimulationsPage() {
   // When the SDK opened this tab, later runs from the same machine are steered
   // here instead of spawning yet another browser tab.
   const scenarioTab = useScenarioTabFollow();
+  const lastFollowedRef = useRef<string | null>(null);
 
   const followRun = useCallback(
     (payload: ScenarioTabNavigatePayload) => {
       const target = new URL(payload.url);
       if (target.origin !== window.location.origin) return;
       if (target.pathname === window.location.pathname) return;
+      // A handoff is parked as well as broadcast, so a tab that took the live
+      // one and then re-subscribed is offered the same run again. Without this
+      // it would be yanked back to a run the user had already moved on from.
+      if (lastFollowedRef.current === payload.url) return;
+      lastFollowedRef.current = payload.url;
 
       void router.push(target.pathname + target.search);
 

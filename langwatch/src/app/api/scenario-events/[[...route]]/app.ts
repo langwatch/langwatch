@@ -197,10 +197,12 @@ secured.access(requires("scenarios:create")).post(
     }
 
     // Built server-side from ids rather than accepted as a URL: a handoff can
-    // only ever point a browser at this instance's own simulations page.
-    const url = `${base}/${project.slug}/simulations/${
-      scenarioSetId || DEFAULT_SET_ID
-    }/${batchRunId}`;
+    // only ever point a browser at this instance's own simulations page. The
+    // ids are caller-supplied and only length-bounded, so they are encoded — a
+    // `#` or `?` in one would otherwise truncate the rest of the path.
+    const url = `${base}/${project.slug}/simulations/${encodeURIComponent(
+      scenarioSetId || DEFAULT_SET_ID,
+    )}/${encodeURIComponent(batchRunId)}`;
 
     const hasLiveTab = await scenarioTabRegistry.hasLiveTab({
       projectId: project.id,
