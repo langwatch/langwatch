@@ -18,7 +18,7 @@ export function ScenarioTabConnectedBadge({ visible }: { visible: boolean }) {
           <Text marginTop={1}>
             Scenario runs started on this machine reuse this tab: when a new run
             starts, this view moves to it instead of opening another browser
-            tab. Closing the tab brings the old behaviour back.
+            tab.
           </Text>
         </Box>
       }
