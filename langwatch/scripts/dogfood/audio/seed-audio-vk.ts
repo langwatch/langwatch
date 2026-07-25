@@ -88,7 +88,7 @@ async function ensureProvider({
   // more than one row for the provider, since only one gets the fresh key.
   const existingRows = await prisma.modelProvider.findMany({
     where: { organizationId, provider },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: { id: true },
   });
   const existing = existingRows[0];
