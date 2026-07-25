@@ -5,7 +5,7 @@ Feature: Hand a scenario run to the simulations tab that is already open
 
   Background:
     Given a project with an API key that holds "scenarios:create"
-    And the simulations page opens an SSE subscription while it is mounted
+    And a simulations page that stays connected to the project while it is open
 
   # ---------------------------------------------------------------------------
   # Presence: the tab tells the server it is alive
@@ -14,36 +14,35 @@ Feature: Hand a scenario run to the simulations tab that is already open
   @integration
   Scenario: A simulations tab opened by the SDK registers itself
     Given the SDK opened the simulations page with a scenarioTab query param
-    When the page mounts and its SSE subscription connects
-    Then a presence entry exists in Redis for that project and scenario tab key
-    And the entry carries a TTL so a crashed browser expires on its own
+    When the page is open
+    Then a run started on that machine is offered to that tab
+    And a tab whose browser died stops being offered runs on its own
 
   @integration
   Scenario: Presence is refreshed while the subscription stays open
-    Given a simulations tab has been registered for longer than the presence TTL
-    When the SSE subscription is still connected
-    Then the presence entry is still readable
-    And the refresh is driven server-side so background-tab timer throttling cannot expire it
+    Given a simulations tab that has been open longer than the presence window
+    When the tab is still open, sitting in the background
+    Then it is still offered new runs
 
   @integration
   Scenario: A tab that is only reconnecting keeps its place
-    Given a simulations tab is registered
-    When its subscription ends because the tab routed to another run
-    Then the tab is still offered runs for a short grace window
-    And reconnecting inside that window restores it outright
+    Given a simulations tab that is being offered runs
+    When it drops off because it routed to another run
+    Then it is still offered runs for a short grace window
+    And coming back inside that window restores it outright
 
   @integration
   Scenario: A tab that really went away stops taking runs
-    Given a simulations tab whose subscription ended
-    When the grace window passes without it reconnecting
+    Given a simulations tab that dropped off
+    When the grace window passes without it coming back
     Then it is no longer offered runs
     And the next run opens a browser tab again
 
   @integration
   Scenario: A simulations tab without a scenario tab key never registers
     Given a user opened the simulations page directly
-    When the page mounts and its SSE subscription connects
-    Then no presence entry is written
+    When the page is open
+    Then a run started from a terminal is never handed to it
 
   # ---------------------------------------------------------------------------
   # Handoff: the SDK asks whether a tab can take the run
@@ -54,14 +53,14 @@ Feature: Hand a scenario run to the simulations tab that is already open
     Given a simulations tab is registered for scenario tab key "abc"
     When the SDK posts a browser-tab handoff for key "abc" with a batch URL
     Then the response reports the handoff as delivered
-    And a navigate payload is broadcast on the project's tenant channel
+    And that tab is sent to the batch URL
 
   @integration
   Scenario: The handoff is not delivered when no tab is listening
     Given no simulations tab is registered for scenario tab key "abc"
     When the SDK posts a browser-tab handoff for key "abc"
     Then the response reports the handoff as not delivered
-    And nothing is broadcast
+    And no tab is navigated
 
   @integration
   Scenario: A handoff never crosses projects
@@ -75,28 +74,28 @@ Feature: Hand a scenario run to the simulations tab that is already open
     Given a request with no API key
     When it posts a browser-tab handoff
     Then the request is declined
-    And nothing is broadcast
+    And the open tab stays where it was
 
   @integration
   Scenario: The handoff URL must belong to this LangWatch instance
     Given a simulations tab is registered for scenario tab key "abc"
     When the SDK posts a handoff whose URL points at another host
     Then the request is rejected
-    And nothing is broadcast
+    And no tab is navigated
 
   @integration
   Scenario: A handoff sent while the tab was reloading is not lost
     Given a simulations tab is registered for scenario tab key "abc"
-    When the SDK posts a handoff and the tab reconnects a moment later
-    Then the reconnecting subscription is handed the parked run
-    And the parked run is handed over only once
-    And it expires quickly so a tab opened much later does not jump to a stale run
+    When the SDK posts a handoff and the tab comes back a moment later
+    Then the tab that comes back is sent to the run it missed
+    And only the first tab back is sent to it
+    And a tab that comes back much later is not sent to that stale run
 
   @integration
   Scenario: Nothing is parked when no tab was listening
     Given no simulations tab is registered for scenario tab key "abc"
     When the SDK posts a browser-tab handoff for key "abc"
-    Then nothing is parked for that key
+    Then a tab opening afterwards is not sent to that run
 
   # ---------------------------------------------------------------------------
   # The tab follows
@@ -105,21 +104,21 @@ Feature: Hand a scenario run to the simulations tab that is already open
   @integration
   Scenario: The registered tab navigates to the handed-off run
     Given the simulations page is mounted with scenario tab key "abc"
-    When a navigate payload for key "abc" arrives over SSE
-    Then the page routes to the batch URL from the payload
+    When a run is handed to key "abc"
+    Then the page routes to that batch URL
     And a toast tells the user the tab followed a new run
 
   @integration
   Scenario: A navigate payload for another machine is ignored
     Given the simulations page is mounted with scenario tab key "abc"
-    When a navigate payload for key "xyz" arrives over SSE
+    When a run is handed to key "xyz"
     Then the page does not navigate
 
   @integration
   Scenario: The user can stop the tab from following
     Given the simulations page followed a run and showed its toast
     When the user chooses to stop following
-    Then the tab stops registering presence
+    Then the tab stops taking runs
     And later runs open their own browser tab again
     And the choice survives a page reload
 

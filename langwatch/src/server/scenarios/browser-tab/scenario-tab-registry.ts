@@ -28,15 +28,10 @@ export const SCENARIO_TAB_REFRESH_MS = 10_000;
  *
  * Must stay below {@link SCENARIO_TAB_TTL_SECONDS}: `unregister` retires an
  * entry by ageing its score by the difference, so an equal or larger grace
- * would extend a tab's life instead of ending it.
+ * would extend a tab's life instead of ending it. The registry suite asserts
+ * that relation.
  */
 export const SCENARIO_TAB_DISCONNECT_GRACE_SECONDS = 5;
-
-if (SCENARIO_TAB_DISCONNECT_GRACE_SECONDS >= SCENARIO_TAB_TTL_SECONDS) {
-  throw new Error(
-    "SCENARIO_TAB_DISCONNECT_GRACE_SECONDS must be shorter than SCENARIO_TAB_TTL_SECONDS",
-  );
-}
 
 /**
  * How long a handed-off run stays claimable by a tab that was not connected at
@@ -267,15 +262,24 @@ export const scenarioTabRegistry = {
 
     try {
       // GETDEL keeps read-and-clear atomic, so two subscriptions reconnecting
-      // at once cannot both claim the same parked run. Older Redis servers
-      // fall back to the non-atomic pair.
-      if (typeof (connection as { getdel?: unknown }).getdel === "function") {
-        return await (
-          connection as unknown as {
-            getdel: (k: string) => Promise<string | null>;
-          }
-        ).getdel(key);
+      // at once cannot both claim the same parked run.
+      return await connection.getdel(key);
+    } catch (error) {
+      if (!isUnknownCommandError(error)) {
+        logger.warn(
+          { error, projectId },
+          "Failed to read a parked scenario tab handoff",
+        );
+        return null;
       }
+    }
+
+    try {
+      // Redis below 6.2 has no GETDEL. The client exposes the method either
+      // way, so the server rejecting it is the only signal. Reading and
+      // deleting separately loses atomicity, which at worst lets two tabs
+      // reconnecting in the same instant follow the same run: far cheaper than
+      // dropping a handoff the SDK was already told had been delivered.
       const url = await connection.get(key);
       if (url) await connection.del(key);
       return url;
@@ -288,6 +292,12 @@ export const scenarioTabRegistry = {
     }
   },
 };
+
+/** Redis answers an unsupported command with "ERR unknown command 'GETDEL'". */
+function isUnknownCommandError(error: unknown): boolean {
+  const message = (error as { message?: string })?.message;
+  return typeof message === "string" && /unknown command/i.test(message);
+}
 
 /** Test seam: forget every in-memory registration. */
 export function resetScenarioTabMemoryRegistry(): void {

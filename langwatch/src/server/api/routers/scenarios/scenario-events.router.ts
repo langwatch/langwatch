@@ -4,14 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import {
-  SCENARIO_TAB_NAVIGATE_EVENT,
-  type ScenarioTabNavigatePayload,
-} from "~/server/scenarios/browser-tab/scenario-tab-events";
-import {
-  SCENARIO_TAB_REFRESH_MS,
-  scenarioTabRegistry,
-} from "~/server/scenarios/browser-tab/scenario-tab-registry";
+import { startScenarioTabPresence } from "~/server/scenarios/browser-tab/scenario-tab-presence";
 import type {
   BatchRunDataResult,
   ScenarioRunData,
@@ -428,35 +421,18 @@ export const scenarioEventsRouter = createTRPCRouter({
 
       logger.info({ projectId }, "Simulation SSE subscription started");
 
-      // Refreshed from the server rather than the browser: a background tab's
-      // timers get throttled to once a minute, which would expire presence on
-      // exactly the tab this feature exists to reuse.
-      const tabRegistration =
-        tabKey && tabId ? { projectId, tabKey, tabId } : null;
-      let refreshTimer: ReturnType<typeof setInterval> | null = null;
+      const presence =
+        tabKey && tabId
+          ? await startScenarioTabPresence({ projectId, tabKey, tabId })
+          : null;
 
-      if (tabRegistration) {
-        await scenarioTabRegistry.register(tabRegistration);
-        refreshTimer = setInterval(() => {
-          void scenarioTabRegistry.register(tabRegistration);
-        }, SCENARIO_TAB_REFRESH_MS);
-
-        // A handoff broadcast while this tab was reloading would have been
-        // lost, even though the SDK was told it was delivered. Claim it now.
-        const pending = await scenarioTabRegistry.takePendingNavigate({
-          projectId,
-          tabKey: tabRegistration.tabKey,
-        });
-        if (pending) {
-          const payload: ScenarioTabNavigatePayload = {
-            event: SCENARIO_TAB_NAVIGATE_EVENT,
-            tabKey: tabRegistration.tabKey,
-            url: pending,
-          };
-          // Same envelope the broadcast path emits, so the client has one
-          // shape to parse.
-          yield { event: JSON.stringify(payload), timestamp: Date.now() };
-        }
+      if (presence?.parkedNavigate) {
+        // Same envelope the broadcast path emits, so the client has one shape
+        // to parse.
+        yield {
+          event: JSON.stringify(presence.parkedNavigate),
+          timestamp: Date.now(),
+        };
       }
 
       // tRPC v10 callers leave `opts.signal` undefined, so the request's own
@@ -483,10 +459,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         // subscription, not something to surface as a stream error.
         if ((error as { name?: string })?.name !== "AbortError") throw error;
       } finally {
-        if (refreshTimer) clearInterval(refreshTimer);
-        if (tabRegistration) {
-          await scenarioTabRegistry.unregister(tabRegistration);
-        }
+        await presence?.stop();
       }
     }),
 });

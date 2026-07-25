@@ -52,6 +52,15 @@ afterAll(async () => {
 });
 
 describe("scenarioTabRegistry", () => {
+  it("keeps the disconnect grace inside the presence TTL", () => {
+    // `unregister` retires a tab by ageing its score by the difference between
+    // these two, so a grace at or above the TTL would extend a tab's life
+    // instead of ending it, and a closed tab would keep taking runs.
+    expect(SCENARIO_TAB_DISCONNECT_GRACE_SECONDS).toBeLessThan(
+      SCENARIO_TAB_TTL_SECONDS,
+    );
+  });
+
   it("reports no live tab before anything registers", async () => {
     const tabKey = `tab-${nanoid(8)}`;
     track(projectId, tabKey);
