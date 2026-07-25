@@ -83,6 +83,18 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 	if entry == nil {
 		return
 	}
+	// A prior call's 200 stream ended in a hard in-stream error event (see the
+	// SSE sniffer below). Every retry re-opens a fresh 200 stream and dies
+	// identically, so status-based cutting never fires, answer this retry
+	// terminally with the provider's own payload instead of proxying it.
+	if body, ok := entry.takeLLMStreamCut(); ok {
+		clog.Get(r.baseCtx).Info("otelrelay llm in-stream failure retry cut",
+			zap.String("conversation", entry.info.ConversationID))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(body)
+		return
+	}
 	target, err := llmTargetURL(entry.info.GatewayBaseURL, req.PathValue("token"), req.URL)
 	if err != nil {
 		clog.Get(r.baseCtx).Warn("otelrelay llm target resolution failed",
@@ -147,6 +159,16 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 		// message. The body is restored untouched for the worker's SDK.
 		ModifyResponse: func(resp *http.Response) error {
 			if resp.StatusCode < 400 {
+				if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+					// A 200 stream can still fail: providers signal hard
+					// limits (OpenAI's insufficient_quota) as an in-stream
+					// error event after the stream opens. Watch the frames as
+					// they pass through untouched; a clean end clears the
+					// capture, an error event captures and latches (see
+					// llmStreamSniffer).
+					resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
+					return nil
+				}
 				// A later successful call clears the capture: a transient failure
 				// the SDK retried past must not be blamed for an unrelated error
 				// the agent reports afterwards.
@@ -249,14 +271,18 @@ const llmUpstreamErrorCode = herr.Code("llm_upstream_error")
 // three in a row.
 const rateLimitCutAfter = 3
 
-// hardLimitReasonCodes are the provider discriminants that mark a 429 as a
-// PLAN limit — deterministic until the provider's window resets — rather than
-// a burst. These cut the retry loop on the FIRST strike: every retry would be
-// answered identically, and the panel already has bespoke copy for them
-// (langyErrorExplainer promotes `usage_limit_reached` to the plan-limit card).
+// hardLimitReasonCodes are the provider discriminants that mark a failure as a
+// PLAN limit, deterministic until the provider's window or billing resets
+// rather than a burst. These cut the retry loop on the FIRST strike: every
+// retry would be answered identically, and the panel already has bespoke copy
+// for them (langyErrorExplainer promotes `usage_limit_reached` to the
+// plan-limit card). Applies to rejected calls (429) and to in-stream error
+// events on 200 streams alike.
 var hardLimitReasonCodes = map[herr.Code]bool{
-	"usage_limit_reached": true,
-	"codex_plan_limit":    true,
+	"usage_limit_reached":        true,
+	"codex_plan_limit":           true,
+	"insufficient_quota":         true,
+	"billing_hard_limit_reached": true,
 }
 
 // hasHardLimitReason walks a captured LLM error's code and reason chain for a
