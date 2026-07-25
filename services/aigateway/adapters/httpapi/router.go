@@ -93,6 +93,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 		v1.Post("/messages", messagesHandler(deps))
 		v1.Post("/responses", responsesHandler(deps))
 		v1.Post("/embeddings", embeddingsHandler(deps))
+		v1.Post("/audio/speech", speechHandler(deps))
+		v1.Post("/audio/transcriptions", transcriptionsHandler(deps))
 		v1.Get("/models", modelsHandler(deps))
 	})
 
@@ -295,6 +297,111 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 
 		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.EmbeddingResult, error) {
 			return deps.App.HandleEmbeddings(r.Context(), bundle, body, app.PeekModel(peek))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// speechHandler terminates POST /v1/audio/speech (OpenAI-wire TTS). The
+// request body is small JSON; the response body is binary audio whose
+// Content-Type the dispatcher attached, so writeJSONResponse forwards it
+// without a JSON envelope. Never streams.
+func speechHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		if !ok {
+			return
+		}
+		defer release()
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleSpeech(r.Context(), bundle, body, app.PeekModel(peek))
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// maxTranscriptionBodyBytes caps a /v1/audio/transcriptions upload. OpenAI's
+// own endpoint accepts at most 25 MB of audio; one extra MB covers multipart
+// framing and the small text fields. Requests over the cap get 413 before any
+// provider is contacted.
+const maxTranscriptionBodyBytes = 26 << 20
+
+// transcriptionFormFields are the OpenAI-wire optional text fields forwarded
+// to the provider. Anything else in the form is dropped rather than sent
+// blind.
+var transcriptionFormFields = []string{"language", "prompt", "response_format", "temperature"}
+
+// transcriptionsHandler terminates POST /v1/audio/transcriptions (OpenAI-wire
+// multipart STT). Unlike every other v1 route the body is multipart/form-data,
+// so the handler parses the form here — the only layer with the *http.Request
+// — and hands the app a normalized upload. Never streams.
+func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, maxTranscriptionBodyBytes)
+		// Memory threshold: files up to 10 MB stay in memory, larger ones
+		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			var maxErr *http.MaxBytesError
+			if errors.As(err, &maxErr) {
+				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+					"message": "audio upload exceeds the 25 MB transcription limit",
+				}))
+				return
+			}
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "malformed multipart/form-data body: " + err.Error(),
+			}))
+			return
+		}
+
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": `missing required multipart field: "file"`,
+			}))
+			return
+		}
+		defer func() { _ = file.Close() }()
+
+		data, err := io.ReadAll(file)
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "failed reading uploaded file: " + err.Error(),
+			}))
+			return
+		}
+
+		params := make(map[string]string, len(transcriptionFormFields))
+		for _, f := range transcriptionFormFields {
+			if v := r.FormValue(f); v != "" {
+				params[f] = v
+			}
+		}
+		upload := &domain.TranscriptionUpload{File: data, Filename: header.Filename, Params: params}
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleTranscription(r.Context(), bundle, upload, r.FormValue("model"))
 		})
 		if err != nil {
 			writeError(deps.Logger, hw, r.Context(), err)
@@ -915,6 +1022,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
