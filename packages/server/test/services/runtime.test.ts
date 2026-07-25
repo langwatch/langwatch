@@ -58,7 +58,11 @@ vi.mock("../../src/services/nlpgo.ts", () => ({ startNlpgo: nlpStub.fn }));
 vi.mock("../../src/services/langevals.ts", () => ({ startLangevals: langevalsStub.fn }));
 vi.mock("../../src/services/aigateway.ts", () => ({ startAigateway: gatewayStub.fn }));
 vi.mock("../../src/services/langwatch.ts", () => ({ startLangwatch: langwatchStub.fn }));
-vi.mock("../../src/services/langyagent.ts", () => ({ startLangyagent: langyStub.fn }));
+let langyBinarySupported = true;
+vi.mock("../../src/services/langyagent.ts", () => ({
+  startLangyagent: langyStub.fn,
+  monobinarySupportsLangyagent: vi.fn(async () => langyBinarySupported),
+}));
 vi.mock("../../src/services/langy-cli.ts", () => ({ ensureLangyCli: langyCliFn }));
 vi.mock("../../src/services/langwatch-workers.ts", () => ({
   startLangwatchWorkers: () => ({
@@ -111,7 +115,7 @@ function fakeCtx(): RuntimeContext {
       envFile: "/tmp/.langwatch-test/.env",
       installManifest: "/tmp/.langwatch-test/install-manifest.json",
     },
-    predeps: {},
+    predeps: { aigateway: { version: "test", resolvedPath: "/fake/bin/aigateway", preInstalled: false } },
     envFile: "/tmp/.langwatch-test/.env",
     version: "test",
     userEnv: {},
@@ -120,6 +124,7 @@ function fakeCtx(): RuntimeContext {
 
 describe("services/runtime", () => {
   beforeEach(() => {
+    langyBinarySupported = true;
     callLog.length = 0;
     [
       postgresStub.fn,
@@ -233,6 +238,34 @@ describe("services/runtime", () => {
         envFileContent = {};
         delete process.env.LANGWATCH_ENABLE_LANGY;
       }
+    });
+
+    it("comes up without the assistant when the release binary predates it, and says so", async () => {
+      langyBinarySupported = false;
+      const events: unknown[] = [];
+      const ctx = fakeCtx();
+      const bus = runtime.events(ctx) as { emit(e: unknown): void };
+      const origEmit = bus.emit.bind(bus);
+      bus.emit = (e: unknown) => {
+        events.push(e);
+        origEmit(e);
+      };
+      const handles = await runtime.startAll(ctx);
+      // The whole install still boots; only the assistant is absent.
+      expect(callLog).not.toContain("start:langyagent");
+      expect(callLog).toContain("start:langwatch");
+      expect(handles).toHaveLength(8);
+      // The app is told the assistant is off, not left pointing at a corpse.
+      const childEnv = langwatchStub.fn.mock.calls.at(-1)![2] as Record<string, string>;
+      expect(childEnv.LANGWATCH_ENABLE_LANGY).toBe("false");
+      expect(childEnv.OPENCODE_AGENT_URL).toBeUndefined();
+      // And the person running the install is told why.
+      const warning = events.find(
+        (e) =>
+          (e as { type?: string; line?: string }).type === "log" &&
+          ((e as { line?: string }).line ?? "").includes("langy assistant disabled"),
+      );
+      expect(warning).toBeDefined();
     });
 
     it("tells the app exactly which evaluators this install skipped", async () => {

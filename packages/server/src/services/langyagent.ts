@@ -1,3 +1,4 @@
+import { execa } from "execa";
 import { mkdirSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
@@ -25,6 +26,20 @@ import { supervise, type SupervisedHandle } from "./spawn.ts";
  * unsandboxed instead, and say so rather than implying a boundary that is not
  * there.
  */
+/**
+ * Whether the downloaded mono-binary knows the `langyagent` subcommand.
+ * Binaries released before the assistant existed answer any unknown command
+ * with a usage line listing the services they do have, so the presence of
+ * the name in that output is the honest capability check. Without this
+ * probe, an older binary dies at boot with "unknown service" and takes the
+ * whole install down with it; with it, the install comes up assistant-less
+ * and says why.
+ */
+export async function monobinarySupportsLangyagent(binary: string): Promise<boolean> {
+  const { stdout, stderr } = await execa(binary, [], { reject: false });
+  return `${stdout}\n${stderr}`.includes("langyagent");
+}
+
 export async function startLangyagent(
   ctx: RuntimeContext,
   bus: EventBus,

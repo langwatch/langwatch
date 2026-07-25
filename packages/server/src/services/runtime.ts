@@ -16,7 +16,7 @@ import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { startLangwatchWorkers } from "./langwatch-workers.ts";
-import { startLangyagent } from "./langyagent.ts";
+import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
 import { ensureLangyCli } from "./langy-cli.ts";
 import { startNlpgo } from "./nlpgo.ts";
 import { featureEnv, resolveFeatures } from "../shared/features.ts";
@@ -97,12 +97,33 @@ const runtimeImpl: RuntimeApi = {
     // resolved feature toggles ride along explicitly (see featureEnv) so the
     // app describes exactly the install this process just built.
     const features = resolveFeatures({ ...envFromFile, ...process.env });
+    // The assistant additionally needs a mono-binary new enough to carry the
+    // langyagent service. The npm package and the release binary move in
+    // lockstep, but a smoke run of an unreleased CLI, or an install mid
+    // release-window, gets the previous release's binary; starting the
+    // assistant against it dies with "unknown service" and would take the
+    // whole install down. Come up without the assistant instead, and say so.
+    let langyRunnable = features.langy;
+    if (langyRunnable) {
+      const binary = ctx.predeps.aigateway?.resolvedPath;
+      langyRunnable = !!binary && (await monobinarySupportsLangyagent(binary));
+      if (!langyRunnable) {
+        bus.emit({
+          type: "log",
+          service: "langyagent",
+          stream: "stderr",
+          line:
+            "langy assistant disabled: the installed ai-gateway binary predates it. The next release's binary includes it and will be picked up automatically.",
+        });
+      }
+    }
+    const effective = { ...features, langy: langyRunnable };
     const childEnv: Record<string, string> = {
       ...envFromFile,
       ...ctx.userEnv,
-      ...featureEnv(features),
+      ...featureEnv(effective),
     };
-    if (!features.langy) {
+    if (!effective.langy) {
       // With the assistant off, the app must not think it exists: an agent
       // URL with no agent behind it turns every send into a hang, and the
       // forced rollout flag would render the panel. The .env keeps its lines
@@ -127,7 +148,7 @@ const runtimeImpl: RuntimeApi = {
         startLangwatch(ctx, bus, childEnv),
         // The assistant is optional; when it is off nothing references it and
         // the app simply never offers it.
-        features.langy
+        effective.langy
           ? startLangyagent(ctx, bus, childEnv)
           : Promise.resolve(null),
       ]);
