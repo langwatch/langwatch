@@ -1,49 +1,42 @@
 /**
  * Client-safe heuristic for picking a sensible "default" model from a
- * provider's catalog. Mirrors the server-side `buildSeedPlanForProvider`
- * in `src/server/modelProviders/seedOnboardingDefaults.ts` so the
- * provider drawer's "Use as default" toggle pre-fills the same model
- * the onboarding seed would write at organization scope.
+ * provider's catalog, given a list of `provider/model` ids rather than
+ * the registry. Resolves to the same model as the server-side
+ * `resolveLatestAlias` in `src/server/modelProviders/latestAliases.ts`,
+ * which is what the onboarding seed writes at organization scope.
  *
  * Why two implementations: the server-side variant reads the full
- * `llmModels.json` registry (427KB, intentionally kept off the
- * client bundle). The client only has `modelSelectorOptions`, which
- * is already filtered to the provider's models in the drawer, so the
- * picker can run the same family-ranked sort over that array.
+ * `llmModels.json` registry (427KB, intentionally kept off the client
+ * bundle). A client caller only has its already-filtered options array,
+ * so the picker runs the same family-ranked sort over that array. The
+ * tier grammar and sort order live in `utils/modelTiers` so the two
+ * cannot drift.
  *
  * If the heuristic doesn't match anything (unknown provider, or a
  * variant the provider doesn't ship), the caller can fall back to
  * the first model in its options list.
  */
+import {
+  compareModelSortKeys,
+  type ModelSortKey,
+  type OpenAIVariant,
+  rankOpenAIChatModel,
+} from "./modelTiers";
 
-export type Variant = "flagship" | "mini";
+export type Variant = OpenAIVariant;
 
-interface Candidate {
-  id: string;
-  major: number;
-  minor: number;
-}
+type Candidate = ModelSortKey & { id: string };
 
 function rankCandidates(candidates: Candidate[]): string | undefined {
-  candidates.sort((a, b) =>
-    b.major !== a.major ? b.major - a.major : b.minor - a.minor,
-  );
+  candidates.sort(compareModelSortKeys);
   return candidates[0]?.id;
 }
 
-function pickOpenAI(
-  modelIds: string[],
-  variant: Variant,
-): string | undefined {
+function pickOpenAI(modelIds: string[], variant: Variant): string | undefined {
   const candidates: Candidate[] = [];
   for (const id of modelIds) {
-    const m = /^openai\/gpt-(\d+)\.(\d+)(-[a-z0-9-]+)?$/.exec(id);
-    if (!m) continue;
-    const [, major, minor, suffix] = m;
-    const suffixWord = suffix?.slice(1) ?? "";
-    if (variant === "flagship" && suffixWord) continue;
-    if (variant === "mini" && suffixWord !== "mini") continue;
-    candidates.push({ id, major: Number(major), minor: Number(minor) });
+    const ranked = rankOpenAIChatModel({ id, variant });
+    if (ranked) candidates.push({ id, ...ranked });
   }
   return rankCandidates(candidates);
 }
@@ -66,10 +59,7 @@ function pickAnthropic(
   return rankCandidates(candidates);
 }
 
-function pickGemini(
-  modelIds: string[],
-  variant: Variant,
-): string | undefined {
+function pickGemini(modelIds: string[], variant: Variant): string | undefined {
   const family = variant === "flagship" ? "pro" : "flash";
   const candidates: Candidate[] = [];
   // Allow-list rather than prefix-match: the catalog ships variants
@@ -121,9 +111,7 @@ export function pickLatestEmbeddingFromOptions(
   providerKey: string,
   modelIds: string[],
 ): string | undefined {
-  const matches = modelIds.filter((id) =>
-    id.startsWith(`${providerKey}/`),
-  );
+  const matches = modelIds.filter((id) => id.startsWith(`${providerKey}/`));
   if (matches.length === 0) return undefined;
   matches.sort((a, b) => {
     const aN = Number(/\d+/.exec(a.split("/")[1] ?? "")?.[0] ?? 0);

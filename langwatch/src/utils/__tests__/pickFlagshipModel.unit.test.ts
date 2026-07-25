@@ -52,6 +52,47 @@ describe("pickFlagshipFromOptions", () => {
         undefined,
       );
     });
+
+    describe("when the generation ships named tiers instead of a suffix", () => {
+      const options = [
+        "openai/gpt-5.5",
+        "openai/gpt-5.5-mini",
+        "openai/gpt-5.6-luna",
+        "openai/gpt-5.6-luna-pro",
+        "openai/gpt-5.6-terra",
+        "openai/gpt-5.6-sol",
+        "openai/gpt-5.6-sol-pro",
+      ];
+
+      /** @scenario Enabling OpenAI pre-fills the current flagship */
+      it("pre-fills the named flagship and fast tiers, not the previous generation", () => {
+        expect(pickFlagshipFromOptions("openai", "flagship", options)).toBe(
+          "openai/gpt-5.6-sol",
+        );
+        expect(pickFlagshipFromOptions("openai", "mini", options)).toBe(
+          "openai/gpt-5.6-luna",
+        );
+      });
+
+      it("never picks the balanced middle tier", () => {
+        expect(pickFlagshipFromOptions("openai", "flagship", options)).not.toBe(
+          "openai/gpt-5.6-terra",
+        );
+        expect(pickFlagshipFromOptions("openai", "mini", options)).not.toBe(
+          "openai/gpt-5.6-terra",
+        );
+      });
+
+      /** @scenario A generation shipping both an unsuffixed model and a named flagship */
+      it("prefers the named tier when a generation ships both spellings", () => {
+        expect(
+          pickFlagshipFromOptions("openai", "flagship", [
+            "openai/gpt-5.7",
+            "openai/gpt-5.7-sol",
+          ]),
+        ).toBe("openai/gpt-5.7-sol");
+      });
+    });
   });
 
   describe("anthropic", () => {
@@ -119,9 +160,9 @@ describe("pickFlagshipFromOptions", () => {
   });
 
   it("returns undefined for unknown providers", () => {
-    expect(pickFlagshipFromOptions("cohere", "flagship", ["cohere/command-r"])).toBe(
-      undefined,
-    );
+    expect(
+      pickFlagshipFromOptions("cohere", "flagship", ["cohere/command-r"]),
+    ).toBe(undefined);
   });
 });
 
@@ -153,7 +194,9 @@ describe("pickLatestEmbeddingFromOptions", () => {
 
   it("returns undefined when no model belongs to the provider", () => {
     expect(
-      pickLatestEmbeddingFromOptions("gemini", ["openai/text-embedding-3-small"]),
+      pickLatestEmbeddingFromOptions("gemini", [
+        "openai/text-embedding-3-small",
+      ]),
     ).toBe(undefined);
   });
 });
