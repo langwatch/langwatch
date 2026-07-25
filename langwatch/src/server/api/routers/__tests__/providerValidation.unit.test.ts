@@ -75,6 +75,61 @@ describe("validateProviderApiKey", () => {
     });
   });
 
+  describe("ElevenLabs validation", () => {
+    /** @scenario "ElevenLabs keys validate with the xi-api-key header" */
+    it("uses xi-api-key header against the ElevenLabs models endpoint", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+      const result = await validateProviderApiKey("elevenlabs", {
+        ELEVENLABS_API_KEY: "sk_test",
+      });
+
+      expect(result).toEqual({ valid: true });
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.elevenlabs.io/v1/models",
+        expect.objectContaining({
+          method: "GET",
+          headers: expect.objectContaining({ "xi-api-key": "sk_test" }),
+        }),
+      );
+    });
+
+    it("reports an invalid key on 401, not a network problem", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+      const result = await validateProviderApiKey("elevenlabs", {
+        ELEVENLABS_API_KEY: "sk_wrong",
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("Invalid API key");
+      expect(result.error).not.toContain("network");
+    });
+
+    it("reports a network error only when the fetch itself fails", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+
+      const result = await validateProviderApiKey("elevenlabs", {
+        ELEVENLABS_API_KEY: "sk_test",
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("network");
+    });
+  });
+
+  describe("Providers without a validation endpoint", () => {
+    /** @scenario "Providers with no known validation endpoint skip validation" */
+    it("skips validation instead of fetching a relative URL", async () => {
+      const result = await validateProviderApiKey("voyage", {
+        VOYAGE_API_KEY: "pa-test",
+      });
+
+      expect(result).toEqual({ valid: true });
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("Bearer token validation (OpenAI)", () => {
     it("returns valid when API key is accepted", async () => {
       mockFetch.mockResolvedValueOnce({

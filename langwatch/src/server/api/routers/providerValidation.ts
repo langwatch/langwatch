@@ -12,8 +12,9 @@ export type ValidationResult = { valid: boolean; error?: string };
  * - `bearer`: Uses `Authorization: Bearer {key}` header (OpenAI-compatible) - DEFAULT
  * - `anthropic`: Uses `x-api-key` header with `anthropic-version`
  * - `gemini`: Uses query parameter `?key=`
+ * - `elevenlabs`: Uses `xi-api-key` header
  */
-type AuthStrategy = "bearer" | "anthropic" | "gemini";
+type AuthStrategy = "bearer" | "anthropic" | "gemini" | "elevenlabs";
 
 /**
  * Providers that use non-standard auth. All others default to bearer auth.
@@ -21,10 +22,21 @@ type AuthStrategy = "bearer" | "anthropic" | "gemini";
 const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
   anthropic: "anthropic",
   gemini: "gemini",
+  elevenlabs: "elevenlabs",
 };
 
 /** Providers with complex auth (AWS, gcloud, etc.) that skip validation */
 const SKIP_VALIDATION = new Set(["bedrock", "vertex_ai", "azure"]);
+
+/**
+ * Validation endpoints for providers that are not part of the onboarding
+ * registry (which is what feeds `providerDefaultBaseUrls`). ElevenLabs is an
+ * audio-only provider added directly in Settings, so its models endpoint
+ * lives here.
+ */
+const VALIDATION_ONLY_BASE_URLS: Record<string, string> = {
+  elevenlabs: "https://api.elevenlabs.io/v1",
+};
 
 /**
  * Builds the models endpoint URL by normalizing and appending /models if needed.
@@ -121,6 +133,44 @@ async function validateWithAnthropicAuth(
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      return handleHttpError(response);
+    }
+
+    return { valid: true };
+  } catch {
+    return {
+      valid: false,
+      error:
+        "Failed to validate API key. Please check your network connection.",
+    };
+  }
+}
+
+/**
+ * Validates using ElevenLabs' xi-api-key header authentication.
+ *
+ * @param apiKey - The API key to validate
+ * @param baseUrl - The user-provided base URL (may be empty)
+ * @param defaultBaseUrl - The default base URL for ElevenLabs
+ * @returns Promise resolving to validation result
+ */
+async function validateWithElevenLabsAuth(
+  apiKey: string,
+  baseUrl: string,
+  defaultBaseUrl: string,
+): Promise<ValidationResult> {
+  const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "xi-api-key": apiKey,
         "Content-Type": "application/json",
       },
     });
@@ -304,7 +354,18 @@ export async function validateProviderApiKey(
 
   // Get auth strategy (default to bearer) and base URL
   const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
-  const defaultBaseUrl = providerDefaultBaseUrls[provider] ?? "";
+  const defaultBaseUrl =
+    providerDefaultBaseUrls[provider] ??
+    VALIDATION_ONLY_BASE_URLS[provider] ??
+    "";
+
+  // No endpoint to probe (e.g. voyage, which has no models listing): skip
+  // rather than fetch a relative URL, which would always throw and surface
+  // as a misleading "check your network connection" error. The key is
+  // exercised on the first real call instead.
+  if (!baseUrl && !defaultBaseUrl) {
+    return { valid: true };
+  }
 
   switch (authStrategy) {
     case "bearer":
@@ -313,6 +374,8 @@ export async function validateProviderApiKey(
       return validateWithAnthropicAuth(apiKey, baseUrl, defaultBaseUrl);
     case "gemini":
       return validateWithGeminiAuth(apiKey, defaultBaseUrl);
+    case "elevenlabs":
+      return validateWithElevenLabsAuth(apiKey, baseUrl, defaultBaseUrl);
     default:
       return { valid: true };
   }
