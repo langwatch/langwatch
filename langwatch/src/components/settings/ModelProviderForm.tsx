@@ -25,9 +25,11 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
 import {
+  getEmptyRequiredCredentialKeys,
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../utils/modelProviderHelpers";
+import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
@@ -283,6 +285,13 @@ export const EditModelProviderForm = ({
 
   const isLlmProvider = providerDefinition?.type === "llm";
 
+  // Same answer the credential fields render their required markers from.
+  const requiredKeys = useRequiredCredentialKeys({
+    providerKey: provider.provider,
+    displayKeys: state.displayKeys,
+    customKeys: state.customKeys,
+  });
+
   // oauth-device providers (codex) credential through the provider's own
   // sign-in flow: the drawer swaps the API-key fields for it, and Save
   // (name / scope edits) skips every API-key validation path, since the
@@ -340,9 +349,25 @@ export const EditModelProviderForm = ({
       const result = keysSchema.safeParse(keysToValidate);
 
       if (!result.success) {
-        const parsedErrors = parseZodFieldErrors(
-          result.error as ZodErrorStructure,
-        );
+        const zodError = result.error as ZodErrorStructure;
+        const parsedErrors = parseZodFieldErrors(zodError);
+        // A rule that spans several credentials (an API key, or a base URL
+        // instead) names no single field, so it has no path to land on and
+        // would leave Save doing nothing visible. Anchor it on a required
+        // field the customer has left empty.
+        const schemaWideMessage = zodError.issues.find(
+          (issue) => !issue.path?.length,
+        )?.message;
+        if (schemaWideMessage) {
+          const anchorKey =
+            getEmptyRequiredCredentialKeys({
+              requiredKeys,
+              values: state.customKeys,
+            })[0] ?? Object.keys(state.displayKeys)[0];
+          if (anchorKey && !parsedErrors[anchorKey]) {
+            parsedErrors[anchorKey] = schemaWideMessage;
+          }
+        }
         setFieldErrors(parsedErrors);
         return;
       }
@@ -368,7 +393,9 @@ export const EditModelProviderForm = ({
     isOAuthDeviceProvider,
     isUsingEnvVars,
     providerDefinition,
+    requiredKeys,
     state.customKeys,
+    state.displayKeys,
     state.initialKeys,
     actions,
     validateApiKey,

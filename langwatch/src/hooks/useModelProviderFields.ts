@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 import { modelProviders as serverModelProviders } from "../server/modelProviders/registry";
-import { KEY_CHECK } from "../utils/constants";
+import {
+  getRequiredCredentialKeys,
+  getSchemaShape,
+  isApiKeyField,
+} from "../utils/modelProviderHelpers";
 
 export type ServerModelProviderKey = keyof typeof serverModelProviders;
 
@@ -14,34 +18,8 @@ export interface DerivedFieldMeta {
   type: DerivedFieldType;
 }
 
-function extractObjectShape(schema: any): Record<string, any> {
-  if (!schema) return {};
-  if ("shape" in schema) {
-    return schema.shape as Record<string, any>;
-  }
-  if ("_def" in schema && schema._def && "schema" in schema._def) {
-    const inner = schema._def.schema;
-    if (inner && "shape" in inner) return inner.shape as Record<string, any>;
-  }
-  return {};
-}
-
-function isOptionalZodType(zodType: any): boolean {
-  try {
-    return (
-      !!zodType &&
-      ((zodType._def && zodType._def.typeName === "ZodOptional") ||
-        // Optional chained via effects or passthrough can hide inside ._def.innerType
-        (zodType._def?.innerType?._def &&
-          zodType._def.innerType._def.typeName === "ZodOptional"))
-    );
-  } catch {
-    return false;
-  }
-}
-
 function deriveTypeFromKey(key: string): DerivedFieldType {
-  return KEY_CHECK.some((k) => key.includes(k)) ? "password" : "text";
+  return isApiKeyField(key) ? "password" : "text";
 }
 
 export interface UseModelProviderFieldsResult {
@@ -56,9 +34,18 @@ export interface UseModelProviderFieldsResult {
   ) => Record<string, string>;
 }
 
+/**
+ * Field metadata for a provider's credential inputs.
+ *
+ * `values` is what the customer has typed so far: requiredness depends on it
+ * for providers that accept either an API key or a base URL, so pass the
+ * live form state and the markers keep up. Omit it and every field is judged
+ * against an empty form.
+ */
 export function useModelProviderFields(
   // eslint-disable-next-line @typescript-eslint/ban-types
   providerKey: ServerModelProviderKey | (string & {}),
+  values?: Record<string, string>,
 ): UseModelProviderFieldsResult {
   return useMemo(() => {
     const provider = serverModelProviders[
@@ -67,17 +54,24 @@ export function useModelProviderFields(
       | (typeof serverModelProviders)[keyof typeof serverModelProviders]
       | undefined;
 
-    const shape = extractObjectShape(provider?.keysSchema);
+    const shape = getSchemaShape(provider?.keysSchema);
     const orderedFieldKeys = Object.keys(shape ?? {});
 
+    const requiredKeys = getRequiredCredentialKeys({
+      keysSchema: provider?.keysSchema,
+      fieldSchemas: shape,
+      values: values ?? {},
+      optionalKeys: (provider as { optionalKeys?: readonly string[] })
+        ?.optionalKeys,
+    });
+
     const fields: DerivedFieldMeta[] = orderedFieldKeys.map((key) => {
-      const zodType = (shape as any)[key];
-      const optional = isOptionalZodType(zodType);
+      const required = requiredKeys.has(key);
       return {
         key,
         label: key,
-        required: !optional,
-        placeholder: optional ? "optional" : undefined,
+        required,
+        placeholder: required ? undefined : "optional",
         type: deriveTypeFromKey(key),
       };
     });
@@ -92,5 +86,5 @@ export function useModelProviderFields(
     };
 
     return { fields, orderedFieldKeys, buildDefaultValues };
-  }, [providerKey]);
+  }, [providerKey, values]);
 }
