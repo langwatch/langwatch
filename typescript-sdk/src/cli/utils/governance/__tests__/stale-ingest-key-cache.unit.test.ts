@@ -15,8 +15,6 @@
  *      in the live list, keep ones that are.
  */
 import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appSettingsTargetFor, installAppEnv } from "../app-settings";
@@ -27,6 +25,7 @@ import * as deviceFlow from "../device-flow";
 import { runUnifiedLoginFlow } from "../login-flow";
 import { buildOtelEnvBlock } from "../otel-env-block";
 import { resolveWrapperMode } from "../wrapper-mode";
+import { installTempHomeAndCwd } from "./telemetry-refresh-test-helpers";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
@@ -85,40 +84,17 @@ function makeToken({
 // login flow's latest-login wiring refresh have real fs side effects rooted
 // at the home dir / cwd. Sandbox them so the developer's own ~/.claude,
 // ~/.codex, and repo checkout are never touched by a test run.
-let tmpHome: string;
+const temp = installTempHomeAndCwd();
 let cwdSpy: ReturnType<typeof vi.spyOn>;
-const origHome = process.env.HOME;
-const origUserprofile = process.env.USERPROFILE;
-const origCodexHome = process.env.CODEX_HOME;
 
 beforeEach(() => {
-	tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "lw-stale-key-"));
-	process.env.HOME = tmpHome;
-	process.env.USERPROFILE = tmpHome;
-	delete process.env.CODEX_HOME;
-	cwdSpy = vi
-		.spyOn(process, "cwd")
-		.mockReturnValue(path.join(tmpHome, "project")) as ReturnType<
+	cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(temp.cwd) as ReturnType<
 		typeof vi.spyOn
 	>;
-	fs.mkdirSync(path.join(tmpHome, "project"), { recursive: true });
 });
 
 afterEach(() => {
 	cwdSpy.mockRestore();
-	// Direct assignment of a possibly-undefined value coerces to the
-	// literal string "undefined" (Node stringifies every env write), which
-	// would leak a polluted HOME/USERPROFILE into every later test in this
-	// worker when the var was genuinely unset beforehand. Restore with the
-	// same check-then-delete-or-assign pattern as CODEX_HOME below.
-	if (origHome === undefined) delete process.env.HOME;
-	else process.env.HOME = origHome;
-	if (origUserprofile === undefined) delete process.env.USERPROFILE;
-	else process.env.USERPROFILE = origUserprofile;
-	if (origCodexHome === undefined) delete process.env.CODEX_HOME;
-	else process.env.CODEX_HOME = origCodexHome;
-	fs.rmSync(tmpHome, { recursive: true, force: true });
-	vi.clearAllMocks();
 });
 
 // ─── wrapper-mode: stale cache detection ─────────────────────────────────────
