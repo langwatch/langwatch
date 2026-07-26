@@ -195,13 +195,50 @@ describe("createSSRFValidator (dependency injection)", () => {
   it("allowlisted host that is also a cloud domain pattern is still blocked", async () => {
     const validator = createSSRFValidator({
       blockLocal: true,
-      allowedHosts: ["myhost.local"],
+      allowedHosts: ["s3.amazonaws.com"],
     });
 
-    // myhost.local matches the .local cloud-domain block — that ALWAYS wins.
-    await expect(validator("http://myhost.local/api")).rejects.toThrow(
+    // Cloud internal domains are rejected before the allowlist is consulted.
+    await expect(validator("http://s3.amazonaws.com/bucket")).rejects.toThrow(
       "cloud provider internal domains",
     );
+  });
+
+  it("allowlisted on-premise .local host is reachable", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["llm.corp.local"],
+    });
+
+    // .local names on-premise infrastructure, so an operator may re-enable a
+    // specific host through ALLOWED_PROXY_HOSTS.
+    const result = await validator("http://llm.corp.local/v1/chat");
+    expect(result.type).toBe("allowlisted");
+  });
+
+  it("non-allowlisted .local host stays blocked", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["llm.corp.local"],
+    });
+
+    // Deferring the cloud-domain check past the allowlist must not open up
+    // every .local host.
+    await expect(validator("http://other.corp.local/api")).rejects.toThrow(
+      "cloud provider internal domains",
+    );
+  });
+
+  it("cloud internal domain is not allowlistable via a .local suffix", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["metadata.google.internal.local"],
+    });
+
+    // Matches .internal as well, so the on-premise exemption does not apply.
+    await expect(
+      validator("http://metadata.google.internal.local/computeMetadata/v1/"),
+    ).rejects.toThrow("cloud provider internal domains");
   });
 
   it("permissive mode allows private IPs without an allowlist", async () => {
