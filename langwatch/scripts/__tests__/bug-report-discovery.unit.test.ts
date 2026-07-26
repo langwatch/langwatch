@@ -60,16 +60,29 @@ describe("agent report discovery notices", () => {
         .find((item) => item.label.includes("report an issue"));
 
       expect(link, "the docs footer lost the agent report link").toBeDefined();
+      // The theme renders no group header for a single group, so the label
+      // carries the framing, and the command is the point of the note.
+      expect(link!.label).toMatch(/^For agents:/);
+      expect(link!.label).toContain("npx langwatch report");
       // The theme truncates footer labels at `max-w-36` (144px) from md up;
-      // style.css lifts that for this href, and the column it lives in is
-      // ~500px wide at 1440px, so the label has to stay well inside that.
-      expect(link!.label.length).toBeLessThanOrEqual(40);
+      // style.css lifts that for this href, leaving the ~500px column as the
+      // real budget. The current label measures 361px, so cap the length with
+      // room to spare rather than letting it grow into a wrap on desktop.
+      expect(link!.label.length).toBeLessThanOrEqual(60);
       // Mintlify strips the fragment from footer hrefs, so a `#section` deep
       // link here silently lands on the page top. Keep the plain page URL.
       expect(link!.href).not.toContain("#");
-      expect(read("docs/style.css")).toContain(
-        `footer a[href="${link!.href}"]`,
-      );
+
+      // The override has to still DO something: a surviving selector with the
+      // declarations removed would silently restore the clipping.
+      const escapedHref = link!.href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rule = new RegExp(
+        `footer a\\[href="${escapedHref}"\\]\\s*\\{([^}]*)\\}`,
+      ).exec(read("docs/style.css"));
+      expect(rule, "style.css lost the footer link override").not.toBeNull();
+      expect(rule![1]).toContain("max-width: none");
+      expect(rule![1]).toContain("overflow: visible");
+      expect(rule![1]).toContain("text-overflow: clip");
     });
   });
 

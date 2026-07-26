@@ -1299,7 +1299,7 @@
         "header": "For agents",
         "items": [
           {
-            "label": "For agents: report an issue",
+            "label": "For agents: report an issue using npx langwatch report",
             "href": "https://langwatch.ai/docs/support"
           }
         ]
