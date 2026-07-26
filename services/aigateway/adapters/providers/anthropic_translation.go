@@ -19,13 +19,20 @@ import (
 // Anthropic Messages wire format natively, so a /v1/messages body can be
 // raw-forwarded byte-for-byte.
 //
-// Only Bifrost's Anthropic provider qualifies. It is the sole adapter with an
-// Anthropic-native passthrough (POST /v1/messages with x-api-key +
-// anthropic-version), and it is also where a self-hosted Anthropic-compatible
-// endpoint lands when a credential carries a base-URL override. Byte identity
-// matters there: it is what keeps prompt-cache prefixes hitting and what
-// preserves `thinking`, `cache_control` and the cache-token telemetry that the
-// passthrough usage parser reads back off the wire.
+// Two provider keys qualify, and both run Bifrost's Anthropic adapter, the
+// only one with an Anthropic-native passthrough (POST /v1/messages with
+// x-api-key + anthropic-version):
+//
+//   - the plain Anthropic provider, api.anthropic.com;
+//   - the per-endpoint derived keys minted for a self-hosted
+//     Anthropic-compatible server, whose base type is Anthropic and whose URL
+//     rides on the provider config rather than the key.
+//
+// Byte identity matters for both: it is what keeps prompt-cache prefixes
+// hitting and what preserves `thinking`, `cache_control` and the cache-token
+// telemetry the passthrough usage parser reads back off the wire. Matching
+// only the plain key would quietly divert every self-hosted endpoint onto the
+// translated lane and undo that.
 //
 // Every other destination gets the translation lane. Bedrock and Vertex host
 // Anthropic models but do not expose an Anthropic-shaped HTTP surface: Bedrock
@@ -33,7 +40,7 @@ import (
 // no fallback, which is why streaming /v1/messages on a Bedrock virtual key
 // hangs today. Routing them through the translated lane is what fixes that.
 func isAnthropicWireProvider(p bfschemas.ModelProvider) bool {
-	return p == bfschemas.Anthropic
+	return p == bfschemas.Anthropic || strings.HasPrefix(string(p), anthropicCompatPrefix)
 }
 
 // anthropicMessageIDCounter backs the synthetic message ids handed to clients
@@ -162,7 +169,7 @@ func anthropicErrorFromBifrost(berr *bfschemas.BifrostError) *domain.UpstreamErr
 
 // --- Streaming: the Anthropic event framing state machine ---
 
-// anthropicSSEFrame serialises one Anthropic stream event into SSE wire bytes.
+// anthropicSSEFrame serializes one Anthropic stream event into SSE wire bytes.
 // Anthropic names the event on the `event:` line as well as inside the JSON
 // payload, and clients read the former to pick a decoder.
 func anthropicSSEFrame(ev *bfanthropic.AnthropicStreamEvent) []byte {
@@ -256,10 +263,37 @@ func (f *anthropicStreamFramer) dense(upstream int) int {
 	if idx, ok := f.denseIndex[upstream]; ok {
 		return idx
 	}
+	return f.remap(upstream)
+}
+
+// remap points an upstream index at a fresh Anthropic block index. Used when a
+// single upstream index has to be split across several Anthropic blocks.
+func (f *anthropicStreamFramer) remap(upstream int) int {
 	idx := f.nextDense
 	f.denseIndex[upstream] = idx
 	f.nextDense++
 	return idx
+}
+
+// blockKindForDelta reports the content-block kind a delta belongs in. The
+// second result is false for deltas that do not by themselves determine a kind.
+func blockKindForDelta(delta *bfanthropic.AnthropicStreamDelta) (bfanthropic.AnthropicContentBlockType, bool) {
+	if delta == nil {
+		return "", false
+	}
+	switch delta.Type {
+	case bfanthropic.AnthropicStreamDeltaTypeText:
+		return bfanthropic.AnthropicContentBlockTypeText, true
+	case bfanthropic.AnthropicStreamDeltaTypeThinking,
+		bfanthropic.AnthropicStreamDeltaTypeSignature:
+		return bfanthropic.AnthropicContentBlockTypeThinking, true
+	case bfanthropic.AnthropicStreamDeltaTypeInputJSON:
+		return bfanthropic.AnthropicContentBlockTypeToolUse, true
+	default:
+		// citations and compaction deltas ride inside a block opened by an
+		// explicit content_block_start; they do not imply a kind of their own.
+		return "", false
+	}
 }
 
 // ensureStarted emits message_start once, before anything else can reference
@@ -354,7 +388,7 @@ func (f *anthropicStreamFramer) closeAllBlocks(out []*bfanthropic.AnthropicStrea
 	return out
 }
 
-// push normalises one converter event into a valid sub-sequence.
+// push normalizes one converter event into a valid sub-sequence.
 func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bfanthropic.AnthropicStreamEvent {
 	if ev == nil || f.terminated {
 		return nil
@@ -420,6 +454,19 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 			ev.Index = bfschemas.Ptr(0)
 		}
 		idx := f.dense(*ev.Index)
+		// A block must be the kind its deltas describe. Reasoning models trip
+		// this: the upstream conversion opens output index 0 as a text item and
+		// then streams thinking deltas at that same index, which would render
+		// the model's private reasoning as the visible answer. When the kinds
+		// disagree, close the block and start the right one.
+		if want, known := blockKindForDelta(ev.Delta); known {
+			if tracker, isOpen := f.openBlocks[idx]; isOpen && tracker.kind != want &&
+				want != bfanthropic.AnthropicContentBlockTypeToolUse &&
+				tracker.kind != bfanthropic.AnthropicContentBlockTypeToolUse {
+				out = f.closeBlock(out, idx)
+				idx = f.remap(*ev.Index)
+			}
+		}
 		out = f.openBlock(out, idx, ev.Delta)
 		ev.Index = &idx
 		return append(out, ev)
@@ -472,6 +519,9 @@ func (f *anthropicStreamFramer) noteBlockKind(kind bfanthropic.AnthropicContentB
 		bfanthropic.AnthropicContentBlockTypeServerToolUse,
 		bfanthropic.AnthropicContentBlockTypeMCPToolUse:
 		f.sawToolUse = true
+	default:
+		// Every other block kind (text, thinking, tool results, documents,
+		// images) says nothing about why the turn ended.
 	}
 }
 
@@ -658,6 +708,9 @@ func (it *anthropicTranslatedStreamIterator) consume(resp *bfschemas.BifrostResp
 		it.err = anthropicUpstreamError(http.StatusBadGateway, msg)
 		it.drained = true
 		return
+	default:
+		// Everything else is a mid-stream event the converter below knows how
+		// to map, or one it deliberately ignores.
 	}
 
 	for _, ev := range bfanthropic.ToAnthropicResponsesStreamResponse(it.bfCtx, resp) {

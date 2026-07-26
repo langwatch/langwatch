@@ -44,10 +44,10 @@ type sseEvent struct {
 
 // collectAnthropicStream drives the iterator to exhaustion and parses every
 // frame it produced into the Anthropic event union.
-func collectAnthropicStream(t *testing.T, iter domain.StreamIterator) ([]sseEvent, error) {
+func collectAnthropicStream(t *testing.T, ctx context.Context, iter domain.StreamIterator) ([]sseEvent, error) {
 	t.Helper()
 	var events []sseEvent
-	for iter.Next(context.Background()) {
+	for iter.Next(ctx) {
 		chunk := string(iter.Chunk())
 		for _, frame := range strings.Split(chunk, "\n\n") {
 			frame = strings.TrimSpace(frame)
@@ -234,7 +234,7 @@ func TestMessagesTranslatedStream_TextAnswer_ProducesValidAnthropicUnion(t *test
 	iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
 	require.NoError(t, err)
 
-	events, streamErr := collectAnthropicStream(t, iter)
+	events, streamErr := collectAnthropicStream(t, context.Background(), iter)
 	require.NoError(t, streamErr)
 	assertValidAnthropicSequence(t, events)
 
@@ -285,7 +285,7 @@ func TestMessagesTranslatedStream_ToolCall_RoundTripsAsToolUseBlock(t *testing.T
 	iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
 	require.NoError(t, err)
 
-	events, streamErr := collectAnthropicStream(t, iter)
+	events, streamErr := collectAnthropicStream(t, context.Background(), iter)
 	require.NoError(t, streamErr)
 	assertValidAnthropicSequence(t, events)
 
@@ -349,7 +349,7 @@ func TestMessagesTranslatedStream_ParallelToolCalls_EachGetOwnBlock(t *testing.T
 	iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
 	require.NoError(t, err)
 
-	events, streamErr := collectAnthropicStream(t, iter)
+	events, streamErr := collectAnthropicStream(t, context.Background(), iter)
 	require.NoError(t, streamErr)
 	assertValidAnthropicSequence(t, events)
 
@@ -394,7 +394,7 @@ func TestMessagesTranslatedStream_TruncatedAnswer_StillClosesTheMessage(t *testi
 	iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
 	require.NoError(t, err)
 
-	events, streamErr := collectAnthropicStream(t, iter)
+	events, streamErr := collectAnthropicStream(t, context.Background(), iter)
 	require.NoError(t, streamErr)
 	assertValidAnthropicSequence(t, events)
 
@@ -435,17 +435,14 @@ func TestMessagesTranslatedStream_UpstreamClosesEarly_ClientStillGetsTerminalFra
 	iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
 	require.NoError(t, err)
 
-	done := make(chan struct{})
-	var events []sseEvent
-	go func() {
-		defer close(done)
-		events, _ = collectAnthropicStream(t, iter)
-	}()
-	select {
-	case <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatal("the stream never terminated; a dropped upstream must not leave the client waiting")
-	}
+	// A bounded context is the watchdog: if the dropped upstream ever left the
+	// iterator blocked, the deadline would fire and the terminal frames below
+	// would be missing.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	events, _ := collectAnthropicStream(t, ctx, iter)
+	require.NoError(t, ctx.Err(),
+		"the stream never terminated; a dropped upstream must not leave the client waiting")
 
 	require.NotEmpty(t, events, "an upstream that vanishes must not produce zero bytes")
 
@@ -492,7 +489,7 @@ func TestMessagesTranslatedStream_ProviderRejects_SurfacesAnthropicError(t *test
 	if err != nil {
 		failure = err
 	} else {
-		_, failure = collectAnthropicStream(t, iter)
+		_, failure = collectAnthropicStream(t, context.Background(), iter)
 	}
 	require.Error(t, failure, "a rejected request must produce an error, never an empty successful stream")
 
@@ -508,6 +505,113 @@ func TestMessagesTranslatedStream_ProviderRejects_SurfacesAnthropicError(t *test
 	assert.Equal(t, "rate_limit_error", detail["type"],
 		"a 429 must be named rate_limit_error, the term the Anthropic client retries on")
 	assert.NotEmpty(t, detail["message"], "the error must say something actionable")
+}
+
+// A provider can fail a stream that already returned 200, by emitting an error
+// payload part-way through. The client has already begun building a message,
+// so it needs the open blocks closed and a terminal error it can surface.
+//
+// @scenario "A provider failure mid-stream reaches the client as an error frame"
+func TestMessagesTranslatedStream_ProviderFailsMidStream_ClosesBlocksAndErrors(t *testing.T) {
+	script := chatChunk(`"choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]`) +
+		chatChunk(`"choices":[{"index":0,"delta":{"content":"starting to ans"},"finish_reason":null}]`) +
+		"data: {\"error\":{\"message\":\"model overloaded, try again\",\"type\":\"server_error\"}}\n\n"
+
+	backend, _ := chatSSEBackend(t, script)
+	router := newTestRouter(t)
+
+	iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	events, streamErr := collectAnthropicStream(t, ctx, iter)
+	require.NoError(t, ctx.Err(), "a mid-stream failure must terminate promptly, not stall")
+
+	require.Error(t, streamErr,
+		"a mid-stream provider failure must terminate the stream with an error the writer can frame")
+
+	// The events emitted before the failure are still a well-formed prefix, and
+	// nothing is left dangling.
+	require.NotEmpty(t, events)
+	assert.Equal(t, "message_start", eventTypes(events)[0])
+	open := map[int]bool{}
+	for _, e := range events {
+		switch e.Type {
+		case "content_block_start":
+			open[*e.Index] = true
+		case "content_block_stop":
+			open[*e.Index] = false
+		}
+	}
+	for idx, stillOpen := range open {
+		assert.False(t, stillOpen,
+			"block %d must be closed before the stream errors, or the client keeps a half-built block", idx)
+	}
+
+	var ue *domain.UpstreamError
+	require.ErrorAs(t, streamErr, &ue)
+	require.NotEmpty(t, ue.Body, "the client needs a decodable Anthropic error envelope")
+	var envelope map[string]any
+	require.NoError(t, json.Unmarshal(ue.Body, &envelope))
+	assert.Equal(t, "error", envelope["type"])
+	detail, ok := envelope["error"].(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, detail["message"], "overloaded",
+		"the provider's own message must survive so the user learns what actually went wrong")
+}
+
+// Reasoning models are the common non-Anthropic target for Claude Code, and
+// their thinking deltas must land in a thinking block rather than being
+// smuggled into a text block, which would print the chain of thought as if it
+// were the answer.
+//
+// @scenario "Every content block delta arrives inside a matching start and stop pair"
+func TestMessagesTranslatedStream_ReasoningModel_ThinkingStaysInItsOwnBlock(t *testing.T) {
+	script := chatChunk(`"choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]`) +
+		chatChunk(`"choices":[{"index":0,"delta":{"reasoning":"let me think"},"finish_reason":null}]`) +
+		chatChunk(`"choices":[{"index":0,"delta":{"content":"the answer"},"finish_reason":null}]`) +
+		chatChunk(`"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":6,"total_tokens":10}`) +
+		"data: [DONE]\n\n"
+
+	backend, _ := chatSSEBackend(t, script)
+	router := newTestRouter(t)
+
+	iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
+	require.NoError(t, err)
+
+	events, streamErr := collectAnthropicStream(t, context.Background(), iter)
+	require.NoError(t, streamErr)
+	assertValidAnthropicSequence(t, events)
+
+	// Whatever block a thinking delta lands in must have been opened as a
+	// thinking block; a text block receiving thinking_delta would render the
+	// model's reasoning as the visible answer.
+	blockKind := map[int]string{}
+	for _, e := range events {
+		if e.Type != "content_block_start" {
+			continue
+		}
+		if block, ok := e.Raw["content_block"].(map[string]any); ok {
+			kind, _ := block["type"].(string)
+			blockKind[*e.Index] = kind
+		}
+	}
+	for _, e := range events {
+		if e.Type != "content_block_delta" {
+			continue
+		}
+		delta, ok := e.Raw["delta"].(map[string]any)
+		require.True(t, ok)
+		if delta["type"] == "thinking_delta" {
+			assert.Equal(t, "thinking", blockKind[*e.Index],
+				"a thinking_delta must land in a thinking block, not a %s block", blockKind[*e.Index])
+		}
+		if delta["type"] == "text_delta" {
+			assert.Equal(t, "text", blockKind[*e.Index],
+				"a text_delta must land in a text block")
+		}
+	}
 }
 
 // The non-streaming lane has to assemble a whole Anthropic message envelope.
@@ -603,6 +707,23 @@ func TestMessagesFamilyRouting_OnlyAnthropicWireStaysRaw(t *testing.T) {
 	assert.True(t, isAnthropicWireProvider(bfschemas.Anthropic),
 		"Anthropic speaks the Messages wire format natively and must keep byte-for-byte forwarding")
 
+	// A self-hosted Anthropic-compatible endpoint dispatches under a derived
+	// per-endpoint provider key whose base type is Anthropic. It speaks the
+	// Messages API natively, so it must stay on the raw lane; matching only
+	// the plain Anthropic key would silently divert it into translation and
+	// undo the self-hosted support.
+	selfHosted := domain.Credential{
+		ID:         "cred-self-hosted",
+		ProviderID: domain.ProviderAnthropic,
+		APIKey:     "sk-test",
+		Extra:      map[string]string{"base_url": "https://claude.internal.acme.test"},
+	}
+	derived := mapProvider(selfHosted)
+	require.NotEqual(t, bfschemas.Anthropic, derived,
+		"a base-URL override must derive its own provider key, or it would hit api.anthropic.com")
+	assert.True(t, isAnthropicWireProvider(derived),
+		"a self-hosted Anthropic-compatible endpoint must keep the raw-forward lane")
+
 	// Everything else is translated. Bedrock and Vertex host Anthropic models
 	// but expose Converse / their own API, and their Anthropic-native
 	// passthrough is what returns unsupported-operation and hangs today.
@@ -623,7 +744,7 @@ func TestMessagesFamilyRouting_OnlyAnthropicWireStaysRaw(t *testing.T) {
 	req := messagesRequest(simpleMessagesBody)
 	bfReq, _, err := buildChatRequest(context.Background(), req, bfschemas.Anthropic, "claude-sonnet-4-5")
 	require.NoError(t, err)
-	assert.Equal(t, req.Body, []byte(bfReq.RawRequestBody),
+	assert.Equal(t, req.Body, bfReq.RawRequestBody,
 		"the Anthropic lane must forward the inbound body byte-for-byte; prompt caching depends on it")
 	assert.Empty(t, bfReq.Input, "the raw lane must not parse the body into structured input")
 }
@@ -645,7 +766,7 @@ func TestAnthropicErrorType_UsesAnthropicVocabulary(t *testing.T) {
 	}
 	for status, want := range cases {
 		assert.Equal(t, want, anthropicErrorType(status),
-			"status %d must be named %q, the term the Anthropic client recognises", status, want)
+			"status %d must be named %q, the term the Anthropic client recognizes", status, want)
 	}
 }
 
@@ -679,7 +800,7 @@ func TestMessagesTranslatedStream_StopReasonMapping(t *testing.T) {
 			iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
 			require.NoError(t, err)
 
-			events, streamErr := collectAnthropicStream(t, iter)
+			events, streamErr := collectAnthropicStream(t, context.Background(), iter)
 			require.NoError(t, streamErr)
 			assertValidAnthropicSequence(t, events)
 
