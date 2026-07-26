@@ -568,6 +568,52 @@ class OpenAIChatCompletionTracer:
                         last_item["content"] = (
                             last_item.get("content", "") or ""
                         ) + delta.content
+                    if delta.function_call:
+                        if "function_call" in last_item and last_item["function_call"]:
+                            current_arguments = last_item["function_call"].get(
+                                "arguments", ""
+                            )
+                            last_item["function_call"]["arguments"] = (
+                                current_arguments
+                                + (delta.function_call.arguments or "")
+                            )
+                            if delta.function_call.name:
+                                last_item["function_call"]["name"] = (
+                                    delta.function_call.name
+                                )
+                        else:
+                            last_item["function_call"] = {
+                                "name": delta.function_call.name or "",
+                                "arguments": delta.function_call.arguments or "",
+                            }
+                    if delta.tool_calls:
+                        if "tool_calls" in last_item and last_item["tool_calls"]:
+                            for tool in delta.tool_calls:
+                                last_item["tool_calls"][tool.index]["function"][
+                                    "arguments"
+                                ] = last_item["tool_calls"][tool.index][
+                                    "function"
+                                ].get(
+                                    "arguments", ""
+                                ) + (
+                                    safe_get(tool, "function", "arguments") or ""
+                                )
+                        else:
+                            last_item["tool_calls"] = [
+                                {
+                                    "id": tool.id or "",
+                                    "type": tool.type or "",
+                                    "function": {
+                                        "name": safe_get(tool, "function", "name")
+                                        or "",
+                                        "arguments": safe_get(
+                                            tool, "function", "arguments"
+                                        )
+                                        or "",
+                                    },
+                                }
+                                for tool in delta.tool_calls
+                            ]
                     synthesized_roles.discard(index)
                     continue
                 # Some OpenAI-compatible backends (the LangWatch AI Gateway

@@ -145,3 +145,38 @@ def test_role_after_roleless_delta_stays_one_message():
     assert len(outputs[0]) == 1
     assert outputs[0][0]["role"] == "assistant"
     assert outputs[0][0]["content"] == "Hello world!"
+
+
+def test_late_role_delta_carrying_tool_calls_keeps_the_payload():
+    outputs = accumulate(
+        [
+            chunk(content="Working on it"),
+            chunk(
+                role="assistant",
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        id="call_1",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(
+                            name="get_weather", arguments='{"city":'
+                        ),
+                    )
+                ],
+            ),
+            chunk(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        function=ChoiceDeltaToolCallFunction(arguments='"Paris"}'),
+                    )
+                ]
+            ),
+        ]
+    )
+    assert len(outputs[0]) == 1
+    message = outputs[0][0]
+    assert message["role"] == "assistant"
+    assert message["content"] == "Working on it"
+    assert message["tool_calls"][0]["function"]["name"] == "get_weather"
+    assert message["tool_calls"][0]["function"]["arguments"] == '{"city":"Paris"}'
