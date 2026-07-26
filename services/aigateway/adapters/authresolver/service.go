@@ -499,6 +499,12 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 		}
 		return nil, cause
 	}
+	// classNone here means the auth succeeded and the CONFIG fetch failed;
+	// log that instead of a misleading "none" error class.
+	classLabel := cls.String()
+	if cls == classNone {
+		classLabel = "config_fetch_failed"
+	}
 	s.logger.Warn("auth_cache_refresh_transport_failure",
 		zap.String("vk_id", vkID),
 		zap.Time("new_soft_expires_at", newSoft),
@@ -509,7 +515,7 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 		zap.String("vk_id", vkID),
 		zap.Duration("stale_for", time.Since(staleBundle.ExpiresAt)),
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
-		zap.String("refresh_error_class", cls.String()),
+		zap.String("refresh_error_class", classLabel),
 	)
 	return staleBundle, nil
 }

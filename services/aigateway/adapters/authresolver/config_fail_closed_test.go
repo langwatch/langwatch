@@ -101,6 +101,35 @@ func TestResolve_StaleEntry_ConfigFetchFailure_ServesStaleCredentials(t *testing
 	}
 }
 
+// The hard-cap tail of the same scenario: when the stale entry has burnt
+// its whole grace window and the config fetch still fails, the caller gets
+// the retryable auth_upstream_unavailable, not the ResolveKey nil error.
+// @scenario "config fetch fails during a stale-entry refresh -> stale credentials keep serving"
+func TestResolve_StaleEntryAtHardCap_ConfigFetchFailure_FailsRetryable(t *testing.T) {
+	fetcher := &fakeConfigFetcher{
+		cfgErr: errors.New("config fetch returned 503"),
+	}
+	fetcher.returns = []resolverReturn{
+		{bundle: freshBundle("vk_capped", time.Now().Add(10 * time.Minute))},
+	}
+	svc, _ := newService(t, Options{
+		Resolver:      &fetcher.fakeResolver,
+		ConfigFetcher: fetcher,
+		HardGrace:     1 * time.Nanosecond,
+	})
+
+	rawKey := "vk-lw-capped"
+	seedExpiredEntry(t, svc, rawKey, "vk_capped", 30*time.Second)
+
+	_, err := svc.Resolve(context.Background(), rawKey)
+	if err == nil {
+		t.Fatal("expected a failure once the hard grace cap is exhausted")
+	}
+	if !errors.Is(err, domain.ErrAuthUpstream) {
+		t.Fatalf("expected auth_upstream_unavailable (retryable), got %v", err)
+	}
+}
+
 // @scenario "config fetch fails during a proactive background refresh -> the healthy entry survives"
 func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 	fetcher := &fakeConfigFetcher{
