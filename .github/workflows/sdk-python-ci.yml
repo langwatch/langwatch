@@ -32,12 +32,16 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the e2e
+          # step spends real LLM money, so it must not run on pushes or
+          # release PRs that touched nothing under python-sdk/. An SDK
+          # release PR still matches via python-sdk/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
               - 'python-sdk/**'
               - '!python-sdk/src/langwatch/__version__.py'
               - '.github/workflows/sdk-python-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   test:
     needs: changes
@@ -85,10 +89,14 @@ jobs:
           TEST_EVALUATION_SLUG: "test-evaluation"
           AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
           AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
-          GEMINI_API_KEY: ${{ secrets.PYTHON_SDK_GEMINI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
-          CEREBRAS_API_KEY: ${{ secrets.PYTHON_SDK_CEREBRAS_API_KEY }}
+          # OpenAI traffic rides the LangWatch AI Gateway: the key is a
+          # LangWatch virtual key, and both base-URL spellings cover every
+          # client family in the examples (openai SDK and haystack read
+          # OPENAI_BASE_URL; litellm, dspy and langchain read
+          # OPENAI_API_BASE). Azure keeps its own endpoint above.
+          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
         run: |
           make test-e2e
           make cli-examples

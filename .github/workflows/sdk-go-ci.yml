@@ -27,11 +27,15 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the test
+          # job spends real LLM money, so it must not run on pushes or
+          # release PRs that touched nothing under sdk-go/. An SDK release
+          # PR still matches via sdk-go/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
               - 'sdk-go/**'
               - '.github/workflows/sdk-go-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   test:
     needs: changes
