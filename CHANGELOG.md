@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.7.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.6.0...langwatch@v3.7.0) (2026-07-26)
+
+
+### Features
+
+* **costs:** price TTS per character and STT per second from the model catalog ([#6199](https://github.com/langwatch/langwatch/issues/6199)) ([606b889](https://github.com/langwatch/langwatch/commit/606b8892f3c2b9c9f2a3532ee9b933b07c84d7d9))
+* **gateway:** route anthropic providers with a base URL to self-hosted endpoints ([#5940](https://github.com/langwatch/langwatch/issues/5940)) ([9b0a48f](https://github.com/langwatch/langwatch/commit/9b0a48fe6b25c974662e805e8650e62b0a3ad9aa))
+
+
+### Bug Fixes
+
+* **charts:** let the gateway find the control plane of its own install ([#6194](https://github.com/langwatch/langwatch/issues/6194)) ([a9a3c0a](https://github.com/langwatch/langwatch/commit/a9a3c0a7e90052fb653424598474a8b158381d63))
+* **cli:** latest login wins over stale tool wiring ([#6204](https://github.com/langwatch/langwatch/issues/6204)) ([f7bb069](https://github.com/langwatch/langwatch/commit/f7bb069462a1c72950dcc49d9025cd2f689d1891))
+* **docs:** make the agents footer link readable on desktop ([#6193](https://github.com/langwatch/langwatch/issues/6193)) ([fedd15f](https://github.com/langwatch/langwatch/commit/fedd15f7656702762a9b1370c9599e7398834fd3))
+* **gateway:** stop transient config-fetch failures from answering (and caching) no_provider_configured ([#6198](https://github.com/langwatch/langwatch/issues/6198)) ([004634b](https://github.com/langwatch/langwatch/commit/004634b0fe9772798c672c6a988658b4c624d08f))
+* **model-providers:** let an organization with no project add a provider ([#6186](https://github.com/langwatch/langwatch/issues/6186)) ([bfabeca](https://github.com/langwatch/langwatch/commit/bfabecaf93de7959b63cac05aebf0393bc838995))
+* **server:** restart crashed services with bounded backoff ([#6203](https://github.com/langwatch/langwatch/issues/6203)) ([852d48d](https://github.com/langwatch/langwatch/commit/852d48d2e24f91cf3569ad8ac1ac17d57acf17ce))
+* **server:** ship the workspace packages the app imports, and boot smoke from the packed tarball ([#6200](https://github.com/langwatch/langwatch/issues/6200)) ([d7327e1](https://github.com/langwatch/langwatch/commit/d7327e1a9f93863535e4a36c4b76d1b6fa325f39))
+
+
+### Miscellaneous
+
+* sync model registry (359 models) ([#6206](https://github.com/langwatch/langwatch/issues/6206)) ([140e5ff](https://github.com/langwatch/langwatch/commit/140e5fff7690d5ee1f0128519d18495296a73f96))
+
 ## [3.6.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.5.0...langwatch@v3.6.0) (2026-07-26)
 
 
