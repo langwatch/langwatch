@@ -19,4 +19,11 @@ describe("abbreviateModel", () => {
       "anthropic/claude-opus-4-8",
     );
   });
+
+  it("leaves bracket suffixes on non-Anthropic ids untouched", () => {
+    expect(abbreviateModel("openai/model[variant]")).toBe(
+      "openai/model[variant]",
+    );
+    expect(abbreviateModel("custom/thing[beta]")).toBe("custom/thing[beta]");
+  });
 });

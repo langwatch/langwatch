@@ -10,6 +10,7 @@ package customertracebridge
 //     on every codex Path A trace.
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -225,5 +226,30 @@ func TestExtractOutputMessages_TranscriptionCarriesTranscript(t *testing.T) {
 func TestExtractOutputMessages_SpeechBinaryStaysEmpty(t *testing.T) {
 	if got := extractOutputMessages([]byte{0xff, 0xf3, 0x01, 0x02}, domain.RequestTypeSpeech); got != "" {
 		t.Fatalf("speech output = %q, want empty (binary audio)", got)
+	}
+}
+
+
+// Go's %q escaping is not JSON (a vertical tab becomes \v, which JSON
+// rejects); every extracted message must marshal through encoding/json so
+// control characters in transcripts survive as parseable JSON.
+func TestExtractedMessagesAreValidJSONWithControlChars(t *testing.T) {
+	speech := []byte("{\"model\":\"m\",\"input\":\"line one\\u000bline two\"}")
+	in := extractInputMessages(speech, domain.RequestTypeSpeech)
+	if !json.Valid([]byte(in)) {
+		t.Fatalf("speech input with control char is not valid JSON: %s", in)
+	}
+
+	stt := []byte("{\"text\":\"tab\\u000bseparated\"}")
+	out := extractOutputMessages(stt, domain.RequestTypeTranscription)
+	if !json.Valid([]byte(out)) {
+		t.Fatalf("transcription output with control char is not valid JSON: %s", out)
+	}
+	var parsed []map[string]string
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if parsed[0]["content"] != "tab\u000bseparated" {
+		t.Fatalf("content round-trip lost the control char: %q", parsed[0]["content"])
 	}
 }

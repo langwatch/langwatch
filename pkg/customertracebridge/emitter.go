@@ -480,6 +480,14 @@ func clientSessionID(ctx context.Context, params domain.AITraceParams) string {
 }
 
 // extractInputMessages returns the JSON-encoded messages array from the request body.
+// jsonString renders s as a JSON string literal. fmt's %q follows Go escape
+// rules, not JSON: a vertical tab becomes \v, which JSON parsers reject, so
+// every message array built in this file must marshal through encoding/json.
+func jsonString(s string) string {
+	b, _ := json.Marshal(s) // marshaling a string never fails
+	return string(b)
+}
+
 func extractInputMessages(body []byte, reqType domain.RequestType) string {
 	if len(body) == 0 {
 		return ""
@@ -501,7 +509,7 @@ func extractInputMessages(body []byte, reqType domain.RequestType) string {
 		// TTS: the synthesized text is the meaningful input. Rendered as a
 		// single user message so the trace viewer shows it like any chat.
 		if in := gjson.GetBytes(body, "input"); in.Exists() && in.String() != "" {
-			return fmt.Sprintf(`[{"role":"user","content":%q}]`, in.String())
+			return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(in.String()))
 		}
 		return ""
 	default:
@@ -525,7 +533,7 @@ func responsesInputAsMessages(body []byte) string {
 		return ""
 	}
 	if input.Type == gjson.String {
-		return fmt.Sprintf(`[{"role":"user","content":%q}]`, input.String())
+		return fmt.Sprintf(`[{"role":"user","content":%s}]`, jsonString(input.String()))
 	}
 	if !input.IsArray() {
 		return ""
@@ -541,7 +549,7 @@ func responsesInputAsMessages(body []byte) string {
 			return true
 		}
 		if content.Type == gjson.String {
-			msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, content.String()))
+			msgs = append(msgs, fmt.Sprintf(`{"role":%s,"content":%s}`, jsonString(role), jsonString(content.String())))
 			return true
 		}
 		if !content.IsArray() {
@@ -558,7 +566,7 @@ func responsesInputAsMessages(body []byte) string {
 			return true
 		})
 		if text.Len() > 0 {
-			msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, text.String()))
+			msgs = append(msgs, fmt.Sprintf(`{"role":%s,"content":%s}`, jsonString(role), jsonString(text.String())))
 		}
 		return true
 	})
@@ -577,7 +585,7 @@ func geminiContentsAsMessages(body []byte) string {
 	if sys := gjson.GetBytes(body, "systemInstruction"); sys.Exists() {
 		text := joinGeminiPartsText(sys.Get("parts"))
 		if text != "" {
-			msgs = append(msgs, fmt.Sprintf(`{"role":"system","content":%q}`, text))
+			msgs = append(msgs, fmt.Sprintf(`{"role":"system","content":%s}`, jsonString(text)))
 		}
 	}
 	contents := gjson.GetBytes(body, "contents")
@@ -599,7 +607,7 @@ func geminiContentsAsMessages(body []byte) string {
 		if text == "" {
 			return true
 		}
-		msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, text))
+		msgs = append(msgs, fmt.Sprintf(`{"role":%s,"content":%s}`, jsonString(role), jsonString(text)))
 		return true
 	})
 	if len(msgs) == 0 {
@@ -675,7 +683,7 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 		// OpenAI transcription JSON; anything without a text field (or a
 		// non-JSON body) renders as empty rather than as raw bytes.
 		if t := gjson.GetBytes(body, "text"); t.Exists() && t.String() != "" {
-			return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, t.String())
+			return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(t.String()))
 		}
 		return ""
 	default:
@@ -743,7 +751,7 @@ func openAIChatOutputFromSSE(body []byte) string {
 	if text.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text.String()))
 }
 
 func anthropicOutputFromJSON(body []byte) string {
@@ -778,7 +786,7 @@ func anthropicOutputFromSSE(body []byte) string {
 	if text.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":[{"type":"text","text":%q}]}]`, text.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":[{"type":"text","text":%s}]}]`, jsonString(text.String()))
 }
 
 func responsesOutputFromJSON(body []byte) string {
@@ -811,7 +819,7 @@ func responsesOutputFromJSON(body []byte) string {
 	if text.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text.String()))
 }
 
 // responsesOutputFromSSE walks Responses-API SSE
@@ -845,7 +853,7 @@ func responsesOutputFromSSE(body []byte) string {
 	if deltas.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, deltas.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(deltas.String()))
 }
 
 func geminiOutputFromJSON(body []byte) string {
@@ -853,7 +861,7 @@ func geminiOutputFromJSON(body []byte) string {
 	if text == "" {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text)
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text))
 }
 
 // geminiOutputFromSSE concatenates candidates[0].content.parts[*].text
@@ -877,7 +885,7 @@ func geminiOutputFromSSE(body []byte) string {
 	if text.Len() == 0 {
 		return ""
 	}
-	return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text.String())
+	return fmt.Sprintf(`[{"role":"assistant","content":%s}]`, jsonString(text.String()))
 }
 
 // walkStreamEvents yields each per-event JSON payload from a streamed
