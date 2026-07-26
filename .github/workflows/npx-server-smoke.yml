@@ -377,15 +377,10 @@ jobs:
     steps:
       - name: Decide on aggregate status
         run: |
-          # Smoke is informational until it's been running clean for a week —
-          # only fail the aggregator on workflow_dispatch + scheduled runs.
+          # The smoke boots the packed artifact — the thing npm users run —
+          # so a red smoke is a shippability signal on every trigger, not an
+          # informational one. Reporting success over failed or cancelled
+          # matrix jobs is how a broken artifact reads as green.
           status='${{ needs.smoke.result }}'
           echo "smoke status: $status"
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "$status" != "success" ]; then
-            exit 1
-          fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$status" != "success" ]; then
-            exit 1
-          fi
-          # On push, never fail — let humans decide.
-          exit 0
+          [ "$status" = "success" ] || exit 1
