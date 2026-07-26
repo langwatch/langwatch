@@ -173,22 +173,27 @@ jobs:
           # window meant a boot that outlived the first window was then
           # sought on ports it never bound, turning a slow build into a
           # guaranteed 3x-window failure.
-          for i in $(seq 1 360); do
+          SECONDS=0
+          i=0
+          while [ "$SECONDS" -lt 1800 ]; do
+            i=$((i + 1))
             for shift in 0 10 20; do
               url="http://127.0.0.1:$((base + shift))/api/health"
-              if curl -fsS "$url" >/dev/null 2>&1; then
-                echo "✓ $url is healthy after $((i*5))s"
+              # -m bounds each probe: a half-open listener must not be able
+              # to hang the loop past the advertised budget.
+              if curl -fsS -m 5 "$url" >/dev/null 2>&1; then
+                echo "✓ $url is healthy after ${SECONDS}s"
                 echo "RESOLVED_BASE=$((base + shift))" >> "$GITHUB_ENV"
                 exit 0
               fi
             done
             if [ $((i % 24)) -eq 0 ]; then
-              echo "  …still waiting at $((i*5))s — last cli.log lines:"
+              echo "  …still waiting at ${SECONDS}s — last cli.log lines:"
               tail -n 10 "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null | sed 's/^/    /' || true
             fi
             sleep 5
           done
-          echo "✗ langwatch never reported healthy on any port slot"
+          echo "✗ langwatch never reported healthy on any port slot within ${SECONDS}s"
           exit 1
 
       - name: Probe service health endpoints
