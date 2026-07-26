@@ -111,6 +111,19 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build
 
+      # Same prebuild as npx-server-publish.yml: every published artifact
+      # ships langwatch/dist + mcp-server/dist (the publish sanity check
+      # asserts both), so the artifact THIS job boots must carry them too —
+      # otherwise the smoke exercises a tree shape no npm user ever receives
+      # and pays a full on-runner vite build for it inside the health budget.
+      - name: Install langwatch app deps
+        run: pnpm -C langwatch install --frozen-lockfile --prod=false
+
+      - name: Build langwatch app (vite + scenario + mcp + generated types)
+        run: pnpm -C langwatch run build
+        env:
+          NODE_ENV: production
+
       - name: Pack the npm tarball
         id: pack
         # Use the same wrapper as npx-server-publish.yml so the smoke tarball
