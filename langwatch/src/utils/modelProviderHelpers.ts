@@ -185,6 +185,76 @@ export function getEmptyRequiredCredentialKeys({
   return [...requiredKeys].filter((key) => (values[key] ?? "").trim() === "");
 }
 
+/**
+ * Where a provider's saved API key starts going when the customer edits the
+ * base URL, or `null` when nothing is being re-pointed.
+ *
+ * The edit that adds an optional field and the edit that hands an existing
+ * credential to a different host look identical in this form, so the drawer
+ * says which one is happening. `destinationHost` is `null` when the base URL
+ * is cleared and requests go back to the provider's own endpoint.
+ */
+export function getCredentialRepointNotice({
+  endpointKey,
+  values,
+  storedKeys,
+}: {
+  endpointKey: string | undefined;
+  values: Record<string, string>;
+  storedKeys: Record<string, unknown>;
+}): { destinationHost: string | null } | null {
+  if (!endpointKey) return null;
+
+  const storedEndpoint = storedKeys[endpointKey];
+  const previous =
+    typeof storedEndpoint === "string" ? storedEndpoint.trim() : "";
+  const next = (values[endpointKey] ?? "").trim();
+  if (next === previous) return null;
+
+  if (!hasSavedApiKey({ values, storedKeys })) return null;
+
+  if (next === "") return { destinationHost: null };
+
+  const host = hostFromBaseUrl(next);
+  if (!host) return null;
+  return { destinationHost: host };
+}
+
+/**
+ * Whether a credential is already on file for this provider. Stored keys
+ * reach the browser masked, and a provider fed by an environment variable
+ * shows the same placeholder without storing anything, so both count.
+ */
+function hasSavedApiKey({
+  values,
+  storedKeys,
+}: {
+  values: Record<string, string>;
+  storedKeys: Record<string, unknown>;
+}): boolean {
+  const stored = Object.entries(storedKeys ?? {}).some(
+    ([key, value]) =>
+      isApiKeyField(key) && typeof value === "string" && value.trim() !== "",
+  );
+  if (stored) return true;
+  return Object.entries(values ?? {}).some(
+    ([key, value]) => isApiKeyField(key) && value === MASKED_KEY_PLACEHOLDER,
+  );
+}
+
+/**
+ * Host of a base URL the customer is typing, or `null` while it is not yet
+ * a URL. Keeps the notice from naming half-typed hosts on every keystroke.
+ */
+function hostFromBaseUrl(baseUrl: string): string | null {
+  try {
+    const { host } = new URL(baseUrl);
+    return host || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Returns visible credential keys for provider (Azure has special API Gateway handling) */
 export function getDisplayKeysForProvider(
   providerName: string,

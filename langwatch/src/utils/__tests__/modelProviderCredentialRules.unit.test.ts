@@ -1,6 +1,6 @@
 /**
- * The credential-requiredness rule the model-provider drawer renders from,
- * tested against the REAL registry schemas (no registry mock, unlike the sibling
+ * The two credential rules the model-provider drawer renders from, tested
+ * against the REAL registry schemas (no registry mock, unlike the sibling
  * modelProviderHelpers.unit.test.ts) — the whole point of deriving
  * requiredness from the schema is that the two cannot drift apart, so a
  * test that invents its own schemas would prove nothing about the drawer.
@@ -11,7 +11,9 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { modelProviders } from "../../server/modelProviders/registry";
+import { MASKED_KEY_PLACEHOLDER } from "../constants";
 import {
+  getCredentialRepointNotice,
   getDisplayKeysForProvider,
   getEmptyRequiredCredentialKeys,
   getRequiredCredentialKeys,
@@ -246,5 +248,116 @@ describe("getEmptyRequiredCredentialKeys()", () => {
         values: { ACME_API_KEY: "  ", ACME_ENDPOINT: "https://acme.test" },
       }),
     ).toEqual(["ACME_API_KEY"]);
+  });
+});
+
+describe("getCredentialRepointNotice()", () => {
+  const storedWithKey = {
+    OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+    OPENAI_BASE_URL: "",
+  };
+
+  describe("given a provider that already holds a key", () => {
+    /** @scenario Adding a base URL warns where the saved API key will go */
+    it("names the host a newly entered base URL points at", () => {
+      expect(
+        getCredentialRepointNotice({
+          endpointKey: "OPENAI_BASE_URL",
+          values: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "https://llm.acme.internal/v1",
+          },
+          storedKeys: storedWithKey,
+        }),
+      ).toEqual({ destinationHost: "llm.acme.internal" });
+    });
+
+    /** @scenario Clearing the base URL warns that the saved API key goes back to the provider */
+    it("reports the provider's own endpoint when the base URL is cleared", () => {
+      expect(
+        getCredentialRepointNotice({
+          endpointKey: "OPENAI_BASE_URL",
+          values: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "",
+          },
+          storedKeys: {
+            ...storedWithKey,
+            OPENAI_BASE_URL: "https://llm.acme.internal/v1",
+          },
+        }),
+      ).toEqual({ destinationHost: null });
+    });
+
+    /** @scenario Editing a provider without touching its base URL shows no warning */
+    it("stays quiet while the base URL is untouched", () => {
+      expect(
+        getCredentialRepointNotice({
+          endpointKey: "OPENAI_BASE_URL",
+          values: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: " https://llm.acme.internal/v1 ",
+          },
+          storedKeys: {
+            ...storedWithKey,
+            OPENAI_BASE_URL: "https://llm.acme.internal/v1",
+          },
+        }),
+      ).toBeNull();
+    });
+
+    it("stays quiet until the base URL is a URL", () => {
+      expect(
+        getCredentialRepointNotice({
+          endpointKey: "OPENAI_BASE_URL",
+          values: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "https:/",
+          },
+          storedKeys: storedWithKey,
+        }),
+      ).toBeNull();
+    });
+
+    it("names the host for a provider whose key comes from the environment", () => {
+      expect(
+        getCredentialRepointNotice({
+          endpointKey: "OPENAI_BASE_URL",
+          values: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "https://llm.acme.internal/v1",
+          },
+          storedKeys: {},
+        }),
+      ).toEqual({ destinationHost: "llm.acme.internal" });
+    });
+  });
+
+  describe("given a provider being configured for the first time", () => {
+    /** @scenario Configuring a provider for the first time shows no warning */
+    it("stays quiet: there is no saved key to re-point", () => {
+      expect(
+        getCredentialRepointNotice({
+          endpointKey: "OPENAI_BASE_URL",
+          values: {
+            OPENAI_API_KEY: "sk-typed-just-now",
+            OPENAI_BASE_URL: "https://llm.acme.internal/v1",
+          },
+          storedKeys: {},
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("given a provider with no base URL of its own", () => {
+    it("stays quiet", () => {
+      expect(
+        getCredentialRepointNotice({
+          endpointKey: undefined,
+          values: { GEMINI_API_KEY: MASKED_KEY_PLACEHOLDER },
+          storedKeys: { GEMINI_API_KEY: MASKED_KEY_PLACEHOLDER },
+        }),
+      ).toBeNull();
+    });
   });
 });

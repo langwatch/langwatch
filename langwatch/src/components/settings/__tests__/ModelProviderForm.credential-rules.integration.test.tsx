@@ -1,10 +1,14 @@
 /**
  * @vitest-environment jsdom
  *
- * Credential requiredness in the model-provider drawer, exercised through
- * the real form tree: a provider that accepts either an API key or a base
- * URL must stop demanding the key the moment a base URL is entered, and
- * demand it again when that base URL goes away (#6172).
+ * Two credential behaviours of the model-provider drawer, exercised through
+ * the real form tree:
+ *
+ *   #6172 — a provider that accepts either an API key or a base URL must
+ *   stop demanding the key the moment a base URL is entered, and demand it
+ *   again when that base URL goes away.
+ *   #6173 — pointing an already-credentialed provider at a new base URL
+ *   sends the saved key somewhere new, so the drawer says where.
  *
  * Covers @integration scenarios from
  * specs/model-providers/provider-configuration.feature.
@@ -109,6 +113,7 @@ vi.mock("../../../hooks/useFeatureFlag", () => ({
 vi.mock("../../ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
+import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { EditModelProviderForm } from "../ModelProviderForm";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -116,6 +121,41 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 const SELF_HOSTED_URL = "https://llm.acme.internal/v1";
+
+/** A saved provider whose API key is already on file. */
+function keyedRow({
+  providerKey,
+  apiKey,
+  baseUrl,
+  storedBaseUrl = "",
+}: {
+  providerKey: string;
+  apiKey: string;
+  baseUrl: string;
+  storedBaseUrl?: string;
+}): MaybeStoredModelProvider {
+  return {
+    id: `row-${providerKey}`,
+    name: providerKey,
+    provider: providerKey,
+    enabled: true,
+    // Stored keys reach the browser masked, never in plaintext.
+    customKeys: {
+      [apiKey]: MASKED_KEY_PLACEHOLDER,
+      [baseUrl]: storedBaseUrl,
+    },
+    models: null,
+    embeddingsModels: null,
+    customModels: null,
+    customEmbeddingsModels: null,
+    disabledByDefault: false,
+    deploymentMapping: null,
+    extraHeaders: [],
+    scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+    scopeType: "PROJECT",
+    scopeId: "proj-1",
+  };
+}
 
 function readyQueryResult<T>(data: T) {
   return {
@@ -325,6 +365,136 @@ describe("Feature: the drawer asks for the credentials the provider actually nee
 
       expect(isMarkedRequired("GEMINI_API_KEY")).toBe(true);
       expect(screen.queryByText(/BASE_URL/)).toBeNull();
+    });
+  });
+
+  describe.each(eitherOrProviders)(
+    "given a saved $providerKey provider that already holds an API key",
+    ({ providerKey, apiKey, baseUrl }) => {
+      const repointWarning = /requests carry it to/i;
+      const rowId = `row-${providerKey}`;
+
+      describe("when a base URL is added", () => {
+        /** @scenario Adding a base URL warns where the saved API key will go */
+        it("says the saved key starts going to that host", async () => {
+          primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
+          renderDrawer({ modelProviderId: rowId, providerKey });
+          const user = userEvent.setup();
+
+          expect(screen.queryByText(repointWarning)).toBeNull();
+
+          await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
+
+          await waitFor(() => {
+            expect(
+              screen.getByText(
+                "After you save, requests carry it to llm.acme.internal.",
+              ),
+            ).toBeInTheDocument();
+          });
+          expect(
+            screen.getByText("The saved API key follows this change"),
+          ).toBeInTheDocument();
+        });
+
+        /**
+         * The two fixes have to compose: the key is optional now (a base URL
+         * covers it) AND it is still on file, so it still travels.
+         */
+        /** @scenario Adding a base URL warns where the saved API key will go */
+        it("stops marking the API key required while still warning about it", async () => {
+          primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
+          renderDrawer({ modelProviderId: rowId, providerKey });
+          const user = userEvent.setup();
+
+          expect(isMarkedRequired(apiKey)).toBe(true);
+          await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
+
+          await waitFor(() => {
+            expect(isMarkedRequired(apiKey)).toBe(false);
+          });
+          expect(screen.getByText(repointWarning)).toBeInTheDocument();
+        });
+      });
+
+      describe("when the base URL it already had is cleared", () => {
+        /** @scenario Clearing the base URL warns that the saved API key goes back to the provider */
+        it("says the saved key goes back to the provider's own endpoint", async () => {
+          primeQueries([
+            keyedRow({
+              providerKey,
+              apiKey,
+              baseUrl,
+              storedBaseUrl: SELF_HOSTED_URL,
+            }),
+          ]);
+          renderDrawer({ modelProviderId: rowId, providerKey });
+          const user = userEvent.setup();
+
+          await user.clear(inputFor(baseUrl));
+
+          await waitFor(() => {
+            expect(
+              screen.getByText(
+                "After you save, requests carry it to the provider's own endpoint.",
+              ),
+            ).toBeInTheDocument();
+          });
+        });
+      });
+
+      describe("when the drawer is opened and the base URL left alone", () => {
+        /** @scenario Editing a provider without touching its base URL shows no warning */
+        it("says nothing about where the key goes", () => {
+          primeQueries([
+            keyedRow({
+              providerKey,
+              apiKey,
+              baseUrl,
+              storedBaseUrl: SELF_HOSTED_URL,
+            }),
+          ]);
+          renderDrawer({ modelProviderId: rowId, providerKey });
+
+          expect(screen.queryByText(repointWarning)).toBeNull();
+        });
+      });
+
+      describe("when the saved provider is edited and saved", () => {
+        /** @scenario Adding a base URL warns where the saved API key will go */
+        it("leaves the provider's scope selection untouched", async () => {
+          primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
+          renderDrawer({ modelProviderId: rowId, providerKey });
+          const user = userEvent.setup();
+
+          await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
+          await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+          await waitFor(() => {
+            expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+          });
+          expect(mockMutateAsync).toHaveBeenCalledWith(
+            expect.objectContaining({
+              id: rowId,
+              scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+            }),
+          );
+        });
+      });
+    },
+  );
+
+  describe("given a provider being configured for the first time", () => {
+    /** @scenario Configuring a provider for the first time shows no warning */
+    it("says nothing about a saved key when a base URL is typed", async () => {
+      primeQueries([]);
+      renderDrawer({ modelProviderId: "new" });
+      const user = userEvent.setup();
+
+      await user.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
+      await user.type(inputFor("OPENAI_BASE_URL"), SELF_HOSTED_URL);
+
+      expect(screen.queryByText(/requests carry it to/i)).toBeNull();
     });
   });
 });
