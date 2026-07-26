@@ -309,6 +309,34 @@ describe("getAzureBlobToken", () => {
     });
 
     /**
+     * AADSTS70021 is the most common workload-identity misconfiguration:
+     * the federated credential's issuer/subject/audience does not match the
+     * token the cluster presented. The code is an identifier, not credential
+     * material, and without it an operator is left guessing.
+     */
+    /** @scenario "A failed token exchange surfaces as a configuration error, not a storage error" */
+    it("surfaces the AADSTS code and the federated-credential remedy, without the SDK message", async () => {
+      workloadGetToken.mockRejectedValueOnce(
+        new Error(
+          "AADSTS70021: No matching federated identity record found for " +
+            "presented assertion. Assertion: eyJhbGciOiJSUzI1NiJ9.secret.sig",
+        ),
+      );
+
+      const error = await getAzureBlobToken(workloadIdentityCredentials).then(
+        () => null,
+        (e: unknown) => e as Error & { aadstsCode?: string },
+      );
+
+      expect(error?.aadstsCode).toBe("AADSTS70021");
+      expect(error?.message).toContain("AADSTS70021");
+      expect(error?.message).toMatch(/system:serviceaccount/);
+      expect(error?.message).toMatch(/api:\/\/AzureADTokenExchange/);
+      // The assertion the SDK quoted must not ride along.
+      expect(error?.message).not.toContain("eyJhbGciOiJSUzI1NiJ9");
+    });
+
+    /**
      * @azure/identity ships @azure/core-rest-pipeline, whose retry policy
      * already honours the provider's Retry-After. A retry loop here would
      * nest inside that one and multiply attempts against an endpoint that

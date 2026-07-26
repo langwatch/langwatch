@@ -52,13 +52,43 @@ type CacheEntry = {
 const tokenCache = new Map<string, CacheEntry>();
 
 /** Thrown when the identity provider rejects a token request. Never carries credential material. */
+/**
+ * Entra returns a machine-readable AADSTS code on every rejection, and it is
+ * the single most useful line an operator can have — AADSTS70021 ("no matching
+ * federated identity record") means the federated credential's issuer, subject
+ * or audience does not match the token the cluster presented, which is the most
+ * common workload-identity misconfiguration by a wide margin.
+ *
+ * The code is an error identifier, not credential material, so it is safe to
+ * surface. The surrounding SDK message is not: it can quote the request and
+ * the assertion. We extract the code and discard everything else.
+ */
+const AADSTS_CODE = /\bAADSTS\d{4,6}\b/;
+
+function aadstsCodeOf(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return AADSTS_CODE.exec(error.message)?.[0];
+}
+
 export class AzureTokenExchangeError extends Error {
-  constructor(reason?: string) {
+  /** The AADSTS code, when Entra supplied one. */
+  readonly aadstsCode?: string;
+
+  constructor(reason?: string, aadstsCode?: string) {
+    const remedy =
+      aadstsCode === "AADSTS70021" || aadstsCode === "AADSTS700213"
+        ? " The federated identity credential does not match the token this pod " +
+          "presented: check its issuer (including the trailing slash), its " +
+          'subject ("system:serviceaccount:NAMESPACE:SERVICEACCOUNT", ' +
+          'case-exact), and that its audience is "api://AzureADTokenExchange".'
+        : "";
     super(
-      `Azure Blob token exchange failed${reason ? ` (${reason})` : ""}: the ` +
-        "identity provider rejected the credential request.",
+      `Azure Blob token exchange failed${reason ? ` (${reason})` : ""}` +
+        `${aadstsCode ? ` [${aadstsCode}]` : ""}: the identity provider ` +
+        `rejected the credential request.${remedy}`,
     );
     this.name = "AzureTokenExchangeError";
+    this.aadstsCode = aadstsCode;
   }
 }
 
@@ -114,8 +144,11 @@ async function exchangeToken(
   } catch (error: unknown) {
     // Identify the failure as a token exchange only — the underlying SDK
     // error can embed request/assertion details we never want to surface.
+    // The AADSTS code is the exception: an identifier, not a secret, and the
+    // one thing that tells an operator which knob is wrong.
     throw new AzureTokenExchangeError(
       error instanceof Error ? error.name : undefined,
+      aadstsCodeOf(error),
     );
   }
   if (!accessToken) {
