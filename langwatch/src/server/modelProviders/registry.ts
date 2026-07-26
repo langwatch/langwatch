@@ -42,11 +42,14 @@ type ModelProviderDefinition = {
   /** Provider-level parameter constraints (e.g., temperature max for Anthropic) */
   parameterConstraints?: ParameterConstraints;
   /**
-   * Keys that are operationally optional for manual setup. The credential
-   * schemas use `.nullable().optional()` to permit env-var fallback, so
-   * Zod's `.isOptional()` can't distinguish "truly optional override" from
-   * "required but nullable for storage". This list is the UI source of
-   * truth for which fields render the muted "optional" affordance.
+   * Keys that are never required for manual setup. The credential schemas
+   * use `.nullable().optional()` to permit env-var fallback, so Zod's
+   * `.isOptional()` can't distinguish "truly optional override" from
+   * "required but nullable for storage" — this list settles that.
+   *
+   * It is a floor, not the whole answer: a schema whose refinement accepts
+   * one credential in place of another relaxes the remaining fields as the
+   * customer fills the form in. See `getRequiredCredentialKeys`.
    */
   optionalKeys?: string[];
   /**
@@ -283,17 +286,20 @@ export const modelProviders = {
           (!data.OPENAI_API_KEY || data.OPENAI_API_KEY.trim() === "") &&
           (!data.OPENAI_BASE_URL || data.OPENAI_BASE_URL.trim() === "")
         ) {
+          // Reaches the customer as the drawer's inline error, so it reads
+          // as guidance rather than as a schema complaint.
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              "Either OPENAI_API_KEY or OPENAI_BASE_URL must be provided with a non-empty value",
+              "Add an API key, or a base URL if your endpoint does not need one.",
           });
         }
       }),
-    // The base URL is an override (defaults to api.openai.com). The API
-    // key is the primary credential — the superRefine still permits an
-    // empty key when a base URL is set, but the typical user path is
-    // "paste key here".
+    // The base URL is an override (defaults to api.openai.com), so it is
+    // never required. The API key is required until a base URL is set: a
+    // self-hosted OpenAI-compatible server commonly runs unauthenticated,
+    // and the drawer follows the refinement above rather than a second
+    // list that could disagree with it.
     optionalKeys: ["OPENAI_BASE_URL"],
     enabledSince: new Date("2023-01-01"),
   },
@@ -312,17 +318,21 @@ export const modelProviders = {
           (!data.ANTHROPIC_API_KEY || data.ANTHROPIC_API_KEY.trim() === "") &&
           (!data.ANTHROPIC_BASE_URL || data.ANTHROPIC_BASE_URL.trim() === "")
         ) {
+          // Reaches the customer as the drawer's inline error, so it reads
+          // as guidance rather than as a schema complaint.
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              "Either ANTHROPIC_API_KEY or ANTHROPIC_BASE_URL must be provided with a non-empty value",
+              "Add an API key, or a base URL if your endpoint does not need one.",
           });
         }
       }),
     // The base URL points at an Anthropic-compatible self-hosted server
     // (vLLM >= 0.24). Such servers commonly run unauthenticated, so the
     // API key may be empty when a base URL is set — mirroring openai
-    // above. api.anthropic.com itself always requires the key.
+    // above. api.anthropic.com itself always requires the key, and the
+    // drawer follows this refinement rather than a second list that could
+    // disagree with it.
     optionalKeys: ["ANTHROPIC_BASE_URL"],
     enabledSince: new Date("2023-01-01"),
     // Anthropic API limits temperature to 0-1 range

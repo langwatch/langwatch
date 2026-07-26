@@ -476,7 +476,10 @@ describe("useProviderFormSubmit()", () => {
     });
 
     describe("when one key edited and one still masked", () => {
-      it("includes the edited key and omits the masked one", async () => {
+      // The masked field goes back as it came: that placeholder is what
+      // tells the server to keep the value already on file. Stripping it
+      // read as "this provider has no such credential" and overwrote it.
+      it("includes the edited key and sends the untouched one masked", async () => {
         const snapshot = buildSnapshot({
           isUsingEnvVars: false,
           useAsDefaultProvider: false,
@@ -499,6 +502,7 @@ describe("useProviderFormSubmit()", () => {
         const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
         expect(payload?.customKeys).toEqual({
           AZURE_OPENAI_API_KEY: "sk-newly-typed",
+          AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
         });
       });
     });
@@ -527,6 +531,7 @@ describe("useProviderFormSubmit()", () => {
         const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
         expect(payload?.customKeys).toEqual({
           AZURE_OPENAI_API_KEY: "",
+          AZURE_OPENAI_ENDPOINT: MASKED_KEY_PLACEHOLDER,
         });
       });
     });
