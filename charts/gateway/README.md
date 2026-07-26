@@ -68,7 +68,7 @@ self-hosting. The values you most often override:
 | Path                          | Purpose                                                              |
 |-------------------------------|----------------------------------------------------------------------|
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                  |
-| `controlPlane.baseUrl`        | URL of your LangWatch app — e.g. `http://langwatch-app:5560`         |
+| `controlPlane.baseUrl`        | URL of your LangWatch app. Empty resolves to `<release>-app:5560`     |
 | `secrets.existingSecretName`  | Name of the Secret created above (default `gateway-runtime-secrets`) |
 | `ingress.host`                | Customer-facing hostname for the gateway                             |
 | `ingress.tls.secretName`      | TLS Secret managed by cert-manager (or BYO)                          |

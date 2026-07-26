@@ -209,6 +209,42 @@ jobs:
             exit 1
           fi
 
+      - name: Assert the gateway follows the release name to the control plane
+        working-directory: charts/langwatch
+        run: |
+          # A fixed control-plane address resolves only on an install named the
+          # same as ours, and the failure is silent: every pod healthy, then
+          # every virtual-key request refused. Render under a release name that
+          # is deliberately NOT "langwatch" so a hardcoded default cannot pass.
+          helm template lw . --set autogen.enabled=true --dry-run > /tmp/umbrella-lw.yaml
+          if ! grep -q 'LW_GATEWAY_BASE_URL: "http://lw-app:5560"' /tmp/umbrella-lw.yaml; then
+            echo "gateway control-plane URL does not follow the release name:"
+            grep "LW_GATEWAY_BASE_URL" /tmp/umbrella-lw.yaml || echo "  (not rendered at all)"
+            exit 1
+          fi
+
+          # An address the operator set is theirs, not a starting point.
+          helm template lw . --set autogen.enabled=true \
+            --set gateway.controlPlane.baseUrl=http://elsewhere.internal:9000 --dry-run \
+            > /tmp/umbrella-cp-override.yaml
+          if ! grep -q 'LW_GATEWAY_BASE_URL: "http://elsewhere.internal:9000"' /tmp/umbrella-cp-override.yaml; then
+            echo "an explicit gateway.controlPlane.baseUrl was overridden by the derived one"
+            exit 1
+          fi
+
+          # The derivation can only assume the default app port, so an app moved
+          # off it has to be refused rather than silently dialled.
+          if helm template lw . --set autogen.enabled=true --set app.service.port=8080 --dry-run \
+            > /tmp/umbrella-cp-port.yaml 2>&1; then
+            echo "a non-default app.service.port with no gateway.controlPlane.baseUrl should fail to render"
+            exit 1
+          fi
+          if ! grep -q "gateway.controlPlane.baseUrl" /tmp/umbrella-cp-port.yaml; then
+            echo "the refusal does not name the value that fixes it:"
+            cat /tmp/umbrella-cp-port.yaml
+            exit 1
+          fi
+
       - name: helm template (umbrella gateway disabled)
         working-directory: charts/langwatch
         run: |

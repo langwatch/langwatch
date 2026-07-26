@@ -67,11 +67,18 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 
-# Control-plane connection (LangWatch app). Port 5560 matches the
-# langwatch Helm chart's main-app Service (consistent with the local-
-# dev port: app=5560, nlp=5561, langevals=5562, gateway=5563).
+# Control-plane connection (LangWatch app). Left empty, this resolves to the
+# app Service of the install the gateway is part of, `<release>-app:5560` —
+# the cluster names that Service after the release, so a fixed address would
+# only resolve on an install that happens to share ours. Port 5560 is the
+# langwatch chart's main-app Service (consistent with the local-dev port:
+# app=5560, nlp=5561, langevals=5562, gateway=5563).
+#
+# Set it when the control plane is somewhere the derivation cannot reach: a
+# gateway installed on its own rather than as part of the umbrella chart, an
+# app served on another port, or a split topology where the two live apart.
 controlPlane:
-  baseUrl: http://langwatch-app:5560
+  baseUrl: ""
   requestTimeout: 2s
   longPollTimeout: 25s
 
