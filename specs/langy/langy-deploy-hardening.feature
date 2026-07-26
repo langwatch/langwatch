@@ -62,6 +62,15 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
     Then the pod renders successfully
     And the pod is pinned to the sandboxed runtime
 
+  Scenario: A default install on a cluster without the RuntimeClass degrades to Pending, not to unsandboxed
+    Given an operator installs the umbrella chart with default values
+    And the cluster defines no matching RuntimeClass
+    When the install completes
+    Then every other workload runs
+    And the langy-agent pod waits rather than running without its sandbox
+    And the install notes explain where a sandboxed runtime comes from on each major cloud
+    And the install notes name the values that accept running without one
+
   Scenario: The guard does not fire when the agent is not chart-managed
     Given the chart does not manage the langy-agent pod
     And no sandboxed runtime is configured for the pod

@@ -55,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p sboms
-          for IMAGE in langwatch langwatch_nlp langevals ai-gateway; do
+          for IMAGE in langwatch langwatch_nlp langevals ai-gateway langyagent; do
             REPO="langwatch/${IMAGE}" \
             IMAGE_NAME="${IMAGE}" \
             INSPECT_TAG="${VERSION}" \

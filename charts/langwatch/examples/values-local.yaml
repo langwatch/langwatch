@@ -76,3 +76,6 @@ redis:
 
 prometheus: { chartManaged: false }
 cronjobs:   { enabled: false }
+
+# Nothing to set for Langy: the chart default already runs the agent on the
+# node's normal runtime, which is what kind and minikube offer.

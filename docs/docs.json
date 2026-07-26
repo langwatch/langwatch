@@ -744,6 +744,53 @@
         ]
       },
       {
+        "anchor": "Langy",
+        "icon": "robot",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "langy/overview",
+              "langy/getting-started",
+              "langy/how-langy-works"
+            ]
+          },
+          {
+            "group": "Using Langy",
+            "pages": [
+              "langy/chat",
+              "langy/scenario-tests-and-evals",
+              "langy/pull-requests",
+              "langy/insights"
+            ]
+          },
+          {
+            "group": "Models & Cost",
+            "pages": [
+              "langy/models",
+              "langy/codex",
+              "langy/token-usage-and-cost"
+            ]
+          },
+          {
+            "group": "Security & Control",
+            "pages": [
+              "langy/security/sandbox",
+              "langy/security/data-flow-and-privacy",
+              "langy/security/github-access"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "langy/reference/supported-models",
+              "langy/reference/limits",
+              "langy/reference/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
         "anchor": "Self Hosting",
         "icon": "server",
         "groups": [
@@ -762,9 +809,18 @@
               "self-hosting/configuration/sizing-and-scaling",
               "self-hosting/configuration/backups",
               "self-hosting/configuration/sso",
-              "self-hosting/configuration/langy-assistant",
               "self-hosting/configuration/observability",
               "self-hosting/configuration/third-party-integrations"
+            ]
+          },
+          {
+            "group": "Langy",
+            "pages": [
+              "self-hosting/langy/overview",
+              "self-hosting/langy/setup",
+              "self-hosting/langy/github-app",
+              "self-hosting/langy/environment-variables",
+              "self-hosting/langy/networking-and-egress"
             ]
           },
           {

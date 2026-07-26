@@ -168,6 +168,14 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 | `SENTRY_DSN` | Sentry DSN for error tracking |, |
 | `METRICS_API_KEY` | API key for metrics collection |, |
 
+## Langy (optional)
+
+Langy, the automated AI engineer, runs as a separate agent pod that is off by default. Enabling it adds a `langyagent.chartManaged` toggle and a shared `LANGY_INTERNAL_SECRET` (plus optional `GITHUB_LANGY_*` and mirror-lane vars). Those are documented on their own page.
+
+<Note>
+See [Langy environment variables](/self-hosting/langy/environment-variables) for the full `LANGY_*` and `GITHUB_LANGY_*` reference, and [Setup](/self-hosting/langy/setup) for the `langyagent.chartManaged` toggle and the `LANGY_INTERNAL_SECRET` secret.
+</Note>
+
 ## Helm Chart Mapping
 
 When using the Helm chart, configuration is set in `values.yaml` rather than environment variables directly. Here's how key values map:

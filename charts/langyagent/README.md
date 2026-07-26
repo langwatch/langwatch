@@ -16,38 +16,45 @@ The chart ships as a sub-chart of the umbrella `langwatch` chart (aliased
 
 ## Install
 
-Preferred — via the umbrella `langwatch` chart, which wires the app and the
-workers to the agent, materialises the shared `LANGY_INTERNAL_SECRET` into its
-own app Secret, and opens the assistant to the people in the install:
+Preferred: via the umbrella `langwatch` chart, which deploys the agent by
+default, wires the app and the workers to it, materialises the shared
+`LANGY_INTERNAL_SECRET` into its own app Secret, and opens the assistant to
+the people in the install:
 
 ```bash
 helm install langwatch ./charts/langwatch -n langwatch \
-  -f values.prod.yaml \
-  --set langyagent.chartManaged=true
+  -f values.prod.yaml
 ```
 
 There is nothing to create beforehand. If you supply your own app Secret
 instead of letting the chart generate one (`autogen.enabled: false`), add a
 `LANGY_INTERNAL_SECRET` key to it — the install tells you so and stops rather
-than half-deploying.
+than half-deploying. To run without the assistant, set
+`langyagent.chartManaged=false`.
 
-### On a cluster with no sandboxed runtime
+### The sandboxed runtime
 
-The agent runs LLM-written shell, so it asks for a sandboxed runtime (`gvisor`)
-by default. Most self-managed clusters have none, and the install refuses to
-render rather than silently dropping the sandbox. To run it anyway, say so:
+The agent runs LLM-written shell, so the default pins the pod to a `gvisor`
+RuntimeClass. On a cluster without one, the pod stays Pending (RuntimeClass
+not found) while everything else runs: GKE ships the class managed (GKE
+Sandbox), on AKS point `runtimeClassName` at your Kata VM isolation class, on
+EKS install gVisor on the node group. To run without a sandbox, say so
+explicitly:
 
 ```yaml
 langyagent:
-  chartManaged: true
   runtimeClassName: ""
   acceptUnsandboxedRuntime: true
 ```
 
-You keep per-worker UID isolation, the per-worker opencode password, and the
-NetworkPolicy; you give up the pod-to-host sandbox. A single-tenant install
-whose users are colleagues carries a much smaller worker-versus-worker risk
-than a multi-tenant one — read the trade that way, not as a formality.
+The chart refuses a blank runtime without the acceptance, so an unsandboxed
+deploy is always deliberate.
+
+Unsandboxed, you keep per-worker UID isolation, the per-worker opencode
+password, and the NetworkPolicy; you give up the pod-to-host sandbox. A
+single-tenant install whose users are colleagues carries a much smaller
+worker-versus-worker risk than a multi-tenant one; read the trade that way,
+not as a formality.
 
 ### Standalone
 

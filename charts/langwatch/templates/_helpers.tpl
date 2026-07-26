@@ -464,7 +464,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
        terraform); only the untouched default is treated as an oversight. */}}
   {{- $appSecretName := include "langwatch.appSecretName" . }}
   {{- if and (ne $appSecretName "langwatch-app-secrets") (eq ($langySecrets.existingSecretName | default "") "langwatch-app-secrets") }}
-    {{- $errors = append $errors (printf "langyagent.secrets.existingSecretName is still the default %q but the app Secret is named %q. The app, the workers, and the agent pod would all mount a Secret this install does not have. Set langyagent.secrets.existingSecretName to %q, or to whichever Secret holds %s." "langwatch-app-secrets" $appSecretName $appSecretName $langyKey) }}
+    {{- $errors = append $errors (printf "langyagent.secrets.existingSecretName is still the default %q but the app Secret is named %q. The app, the workers, and the agent pod would all mount a Secret this install does not have. Set langyagent.secrets.existingSecretName to %q, or to whichever Secret holds %s (the same mirroring the gateway subchart needs). To run without the Langy assistant instead, set langyagent.chartManaged=false." "langwatch-app-secrets" $appSecretName $appSecretName $langyKey) }}
   {{- end }}
   {{/* A configured key that collides with one of the app Secret's own keys would
        emit the same Secret.data entry twice, and the second write wins — Langy's

@@ -79,6 +79,36 @@ dev's Personal Workspace at https://<your-host>/me .
 {{- if (index .Values "langyagent").chartManaged }}
   • Langy, the in-product assistant:
       kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name=langyagent
+{{- $langyRtc := (index .Values "langyagent").runtimeClassName }}
+{{- if $langyRtc }}
+    Isolation: sandboxed. The pod is pinned to the "{{ $langyRtc }}" RuntimeClass.
+    If the command above lists NOTHING, your cluster does not define that class:
+    the pod is rejected at admission, so none is ever created and the reason
+    sits on the Deployment instead:
+      kubectl -n {{ .Release.Namespace }} get deploy {{ .Release.Name }}-langyagent \
+        -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
+    Everything else in the install keeps running either way.
+{{- else }}
+    Isolation: each conversation's worker runs under its own UID with its own
+    credentials, workers cannot read each other's, and the NetworkPolicy denies
+    egress to the internet{{ if (index .Values "langyagent").networkPolicy.allowExternalHttps }} (you have turned external HTTPS ON){{ end }}. The pod runs on the node's
+    normal runtime, so a worker that escapes its container faces the node
+    kernel. Hardening that last step is a sandboxed RuntimeClass:
+      https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+{{- /* Non-blocking hint: only when the cluster already offers a sandboxed class
+       that this install is not using. `lookup` is empty during `helm template`
+       and GitOps renders, so this stays silent there rather than guessing. */}}
+{{- $sandboxed := list }}
+{{- range (lookup "node.k8s.io/v1" "RuntimeClass" "" "").items }}
+{{- if or (eq .handler "runsc") (hasPrefix "kata" .handler) }}
+{{- $sandboxed = append $sandboxed .metadata.name }}
+{{- end }}
+{{- end }}
+{{- if $sandboxed }}
+    → This cluster already offers {{ join ", " $sandboxed }}. To use it:
+      langyagent.runtimeClassName={{ first $sandboxed }}  langyagent.acceptUnsandboxedRuntime=false
+{{- end }}
+{{- end }}
 {{- if (index .Values "langyagent").enableForAllUsers }}
     It is available to everyone in this install. Give it a model to talk to
     by wiring a Model Provider (step 2 above), then open the assistant from
