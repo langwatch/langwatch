@@ -281,7 +281,11 @@ program
 			version: VERSION,
 			userEnv: captureUserEnv(),
 		};
-		await ensureEnvFile(runtime, ctx);
+		// No conflict resolution has run for this port table (unlike "start",
+		// which calls resolvePortConflicts first): base is just
+		// PORT_BASE_DEFAULT. Reconciling now would rewrite a real install's
+		// .env to that guess; leave existing port-bound URLs alone.
+		await ensureEnvFile(runtime, ctx, { shouldReconcilePorts: false });
 		await runtime.installServices(ctx);
 		console.log(
 			chalk.green("✓ install complete — run `npx @langwatch/server` to start"),

@@ -60,18 +60,23 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 35
     env:
-      # Outside $GITHUB_WORKSPACE on purpose (see the "Run npx @langwatch/server
-      # in a sandbox" step below): Node walks every ancestor directory looking
-      # for a node_modules, and the checkout's own workspace install would sit
-      # on that ancestor chain if LANGWATCH_HOME or the extracted tarball lived
-      # under the workspace.
-      LANGWATCH_HOME: ${{ runner.temp }}/.langwatch-smoke
       PORT_BASE: ${{ inputs.port_base || '5560' }}
       CI: "true"
 
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+
+      - name: Set LANGWATCH_HOME outside the workspace
+        # Outside $GITHUB_WORKSPACE on purpose (see the "Run npx @langwatch/server
+        # in a sandbox" step below): Node walks every ancestor directory looking
+        # for a node_modules, and the checkout's own workspace install would sit
+        # on that ancestor chain if LANGWATCH_HOME or the extracted tarball lived
+        # under the workspace. jobs.<job_id>.env only allows the github, inputs,
+        # matrix, needs, secrets, strategy and vars expression contexts, not
+        # runner, so $RUNNER_TEMP is resolved here as a shell variable instead
+        # and exported to every later step via $GITHUB_ENV.
+        run: echo "LANGWATCH_HOME=$RUNNER_TEMP/.langwatch-smoke" >> "$GITHUB_ENV"
 
       - name: Identify runner
         run: |

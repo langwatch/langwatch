@@ -53,6 +53,22 @@ export type RuntimeEvent =
 	| { type: "crashed"; service: string; code: number; signal?: NodeJS.Signals }
 	| { type: "stopped"; service: string };
 
+/**
+ * Format a process exit the same way everywhere it is reported: the
+ * supervisor's log-file marker lines (spawn.ts) and the CLI's TTY render
+ * (log-tee.ts) must read identically, so both call this instead of keeping
+ * their own copy.
+ */
+export function exitCause({
+	code,
+	signal,
+}: {
+	code: number | null;
+	signal?: NodeJS.Signals | null;
+}): string {
+	return signal ? `signal ${signal}` : `code ${code ?? "unknown"}`;
+}
+
 export type RuntimeApi = {
 	scaffoldEnv(
 		ctx: RuntimeContext,

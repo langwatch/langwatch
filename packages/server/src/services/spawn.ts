@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { dirname } from "node:path";
 import { createInterface } from "node:readline";
+import { exitCause } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { ServiceName, ServicePaths } from "./paths.ts";
 
@@ -156,7 +157,7 @@ function makeSupervisionState({
 	return state;
 }
 
-/** Launch (or relaunch, on restart) the child and wire its exit to `handleExit`. */
+/** Launch (or relaunch, on restart) the child and wire its termination to `handleExit`. */
 function spawnAttempt(state: SupervisionState): void {
 	const logStream = createWriteStream(state.logPath, { flags: "a" });
 	const child = nodeSpawn(state.spec.command, state.spec.args, {
@@ -183,14 +184,45 @@ function spawnAttempt(state: SupervisionState): void {
 	];
 
 	restartSteadyTimer(state);
+	wireChildTermination(state, child, logStream, pipesDrained);
+}
 
-	child.on("exit", (code, signal) => {
+/**
+ * A child ends its life one of two ways: it exits (cleanly or a crash), or
+ * it never really started at all ("error": ENOENT/EACCES/EPERM spawning the
+ * command). Both funnel into the same handleExit dispatch, gated by a
+ * settle-once guard so only whichever fires first is processed. Node does
+ * not reliably follow a failed spawn with "exit", so relying on "exit"
+ * alone leaves that failure completely unhandled, and an unhandled "error"
+ * event throws and takes down the whole CLI process, restart logic or not.
+ */
+function wireChildTermination(
+	state: SupervisionState,
+	child: ChildProcess,
+	logStream: WriteStream,
+	pipesDrained: Promise<void>[],
+): void {
+	let settled = false;
+	const settleOnce = (
+		code: number | null,
+		signal: NodeJS.Signals | null,
+	): void => {
+		if (settled) return;
+		settled = true;
 		safeUnlink(state.pidPath);
 		clearSteadyTimer(state);
 		void Promise.all(pipesDrained).then(() =>
 			handleExit(state, { code, signal, logStream }),
 		);
+	};
+
+	child.on("error", (err) => {
+		logStream.write(
+			`[supervisor] ${state.spec.name} failed to spawn: ${err.message}\n`,
+		);
+		settleOnce(null, null);
 	});
+	child.on("exit", (code, signal) => settleOnce(code, signal));
 }
 
 function clearSteadyTimer(state: SupervisionState): void {
@@ -207,10 +239,6 @@ function restartSteadyTimer(state: SupervisionState): void {
 		state.steadyTimer = null;
 		state.restartCount = 0;
 	}, state.restartPolicy.steadyUptimeMs);
-}
-
-function exitCause(code: number | null, signal: NodeJS.Signals | null): string {
-	return signal ? `signal ${signal}` : `code ${code ?? "unknown"}`;
 }
 
 /** Dispatch a child's exit: a clean/requested stop, a restart, or a terminal crash. */
@@ -244,7 +272,7 @@ function scheduleRestart(
 			Math.min(attempt, state.restartPolicy.backoffMs.length) - 1
 		] ?? 1_000;
 	logStream.write(
-		`[supervisor] ${state.spec.name} exited (${exitCause(code, signal)}), restarting in ${delayMs}ms (attempt ${attempt}/${state.restartPolicy.maxRestarts})\n`,
+		`[supervisor] ${state.spec.name} exited (${exitCause({ code, signal })}), restarting in ${delayMs}ms (attempt ${attempt}/${state.restartPolicy.maxRestarts})\n`,
 	);
 	logStream.end();
 	state.bus.emit({
@@ -272,7 +300,7 @@ function emitCrashed(
 		? "restart budget exhausted"
 		: "died before first healthy";
 	logStream.write(
-		`[supervisor] ${state.spec.name} exited (${exitCause(code, signal)}), ${reason}, not restarting\n`,
+		`[supervisor] ${state.spec.name} exited (${exitCause({ code, signal })}), ${reason}, not restarting\n`,
 	);
 	logStream.end();
 	state.untap();

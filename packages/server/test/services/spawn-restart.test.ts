@@ -67,6 +67,11 @@ function exitChild(
 	child.emit("exit", code, signal);
 }
 
+/** Fail a spawn the way Node does for ENOENT/EACCES/EPERM: an "error" event, usually with no "exit" follow-up. */
+function failToSpawn(child: FakeChild, err: NodeJS.ErrnoException): void {
+	child.emit("error", err);
+}
+
 /** Let the exit handler's pipe-drain microtasks run without moving the clock. */
 async function flushMicrotasks(): Promise<void> {
 	await vi.advanceTimersByTimeAsync(0);
@@ -302,6 +307,41 @@ describe("supervise restart policy", () => {
 				expect(spawnedChildren).toHaveLength(1);
 			});
 		});
+
+		describe("when its process fails to respawn mid-life", () => {
+			it("treats a spawn error the same as any other crash, restarting with backoff", async () => {
+				boot();
+				markHealthy();
+				const err = Object.assign(new Error("spawn workers EACCES"), {
+					code: "EACCES",
+				});
+				failToSpawn(childAt(0), err);
+				await flushMicrotasks();
+
+				expect(restartingEvents()).toHaveLength(1);
+				expect(restartingEvents()[0]).toMatchObject({
+					service: "workers",
+					attempt: 1,
+					maxAttempts: 3,
+					delayMs: 1_000,
+				});
+			});
+		});
+
+		describe("when a spawn both errors and (on some platforms) still exits", () => {
+			it("only dispatches once, keyed off whichever event arrives first", async () => {
+				boot();
+				markHealthy();
+				const err = Object.assign(new Error("spawn workers ENOENT"), {
+					code: "ENOENT",
+				});
+				failToSpawn(childAt(0), err);
+				exitChild(childAt(0), { code: 1 });
+				await flushMicrotasks();
+
+				expect(restartingEvents()).toHaveLength(1);
+			});
+		});
 	});
 
 	describe("given a service that never reported healthy", () => {
@@ -318,6 +358,41 @@ describe("supervise restart policy", () => {
 
 				await vi.advanceTimersByTimeAsync(120_000);
 				expect(spawnedChildren).toHaveLength(1);
+			});
+		});
+
+		describe("when the command fails to spawn at all", () => {
+			it("emits crashed instead of crashing the CLI process", async () => {
+				boot();
+				const err = Object.assign(new Error("spawn workers ENOENT"), {
+					code: "ENOENT",
+				});
+				failToSpawn(childAt(0), err);
+				await flushMicrotasks();
+
+				expect(events.some((e) => e.type === "restarting")).toBe(false);
+				const crashes = events.filter((e) => e.type === "crashed");
+				expect(crashes).toHaveLength(1);
+				expect(crashes[0]).toMatchObject({ service: "workers" });
+
+				await vi.advanceTimersByTimeAsync(120_000);
+				expect(spawnedChildren).toHaveLength(1);
+			});
+
+			it("writes the spawn error into the service log", async () => {
+				boot();
+				const err = Object.assign(new Error("spawn workers ENOENT"), {
+					code: "ENOENT",
+				});
+				failToSpawn(childAt(0), err);
+				await flushMicrotasks();
+
+				vi.useRealTimers();
+				await vi.waitFor(() => {
+					expect(readFileSync(sp.log("workers"), "utf8")).toContain(
+						"[supervisor] workers failed to spawn: spawn workers ENOENT",
+					);
+				});
 			});
 		});
 	});

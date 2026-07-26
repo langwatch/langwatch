@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import chalk from "chalk";
 import { paths } from "../shared/paths.ts";
-import type { RuntimeEvent } from "../shared/runtime-contract.ts";
+import { exitCause, type RuntimeEvent } from "../shared/runtime-contract.ts";
 
 const COLORS: Record<string, (s: string) => string> = {
 	langwatch: chalk.green,
@@ -34,10 +34,6 @@ function serviceLogPath(service: string): string {
 	const full = join(paths.logs, `${service}.log`);
 	const home = homedir();
 	return full.startsWith(home) ? `~${full.slice(home.length)}` : full;
-}
-
-function exitCause(ev: { code: number; signal?: NodeJS.Signals }): string {
-	return ev.signal ? `signal ${ev.signal}` : `code ${ev.code}`;
 }
 
 /**
@@ -73,7 +69,7 @@ export function renderEvent(ev: RuntimeEvent): string | null {
 /**
  * Drain the runtime's event stream to the user's TTY, never blocking the
  * CLI's main flow. Returns an awaitable that resolves once the stream
- * closes — typically after `runtime.stopAll` is called and every
+ * closes, typically after `runtime.stopAll` is called and every
  * supervised child has exited.
  */
 export async function streamEventsToTTY(
