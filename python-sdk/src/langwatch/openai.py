@@ -557,9 +557,14 @@ class OpenAIChatCompletionTracer:
             for choice in delta.choices:
                 index = choice.index
                 delta = choice.delta
-                if delta.role:
+                # Some OpenAI-compatible backends (the LangWatch AI Gateway
+                # among them) never send the role-carrying first delta that
+                # api.openai.com sends, so the first delta for a choice may
+                # already carry content or tool calls. Start the message on
+                # whichever delta arrives first.
+                if delta.role or index not in chat_outputs:
                     chat_message: ChatMessage = {
-                        "role": delta.role,  # type: ignore
+                        "role": delta.role or "assistant",  # type: ignore
                         "content": delta.content,
                     }
                     if delta.function_call:

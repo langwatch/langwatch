@@ -78,7 +78,12 @@ jobs:
            || github.event_name == 'pull_request_target')
         env:
           LANGWATCH_ENDPOINT: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_ENDPOINT }}
-          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          # OpenAI traffic rides the LangWatch AI Gateway: the key is a
+          # LangWatch virtual key and both base-URL spellings point the
+          # openai and langchain client families at it.
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
@@ -254,7 +259,12 @@ jobs:
            || github.event_name == 'pull_request_target')
         env:
           LANGWATCH_API_KEY: sk-lw-1234567890
-          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          # OpenAI traffic rides the LangWatch AI Gateway (virtual key +
+          # gateway base URL). Step-scoped on purpose: the LangWatch app
+          # booted above must not inherit a gateway base URL.
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
+          OPENAI_API_BASE: https://gateway.langwatch.ai/v1
           E2E_TIMEOUT: 120000
           E2E_POLL_TIMEOUT: 120000
         run: pnpm test:e2e
