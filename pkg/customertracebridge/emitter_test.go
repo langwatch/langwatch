@@ -288,8 +288,9 @@ func TestEmitter_SpeechSpanIsNotSuppressedAsProbe(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
 
-	// A successful TTS call: zero completion tokens, zero cost (no catalog
-	// pricing yet), binary response body so no extractable output.
+	// A successful TTS call: zero completion tokens, zero provider-reported
+	// cost, binary response body so no extractable output. The character
+	// count is the usage measure the cost pipeline prices TTS by.
 	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeSpeech)
 	e.EndSpan(spanCtx, domain.AITraceParams{
 		Model:        "gpt-4o-mini-tts",
@@ -301,10 +302,58 @@ func TestEmitter_SpeechSpanIsNotSuppressedAsProbe(t *testing.T) {
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 
 	select {
-	case <-received:
-		// span reached the wire: not suppressed
+	case body := <-received:
+		// span reached the wire: not suppressed, and it carries the
+		// character count the cost pipeline prices TTS by.
+		require.Contains(t, string(body), AttrGenAIUsageInputChars,
+			"speech span must carry gen_ai.usage.input_chars")
 	case <-time.After(3 * time.Second):
 		t.Fatal("speech span was suppressed by the zero-cost probe filter")
+	}
+}
+
+// @scenario "A transcription call lands as a trace with duration usage"
+func TestEmitter_TranscriptionSpanCarriesAudioSeconds(t *testing.T) {
+	received := make(chan []byte, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		select {
+		case received <- body:
+		default:
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	registry := NewRegistry()
+	require.NoError(t, registry.Set("proj-1", srv.URL, nil))
+
+	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{
+		Service: "langwatch-service-aigateway",
+		Version: "test",
+	})
+	e, err := NewEmitter(ctx, EmitterOptions{
+		Registry:     registry,
+		BatchTimeout: 50 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
+
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeTranscription)
+	e.EndSpan(spanCtx, domain.AITraceParams{
+		Model:        "scribe_v1",
+		RequestType:  domain.RequestTypeTranscription,
+		ResponseBody: []byte(`{"text":"hello world"}`),
+		Usage:        domain.Usage{AudioSeconds: 4.2},
+	})
+	require.NoError(t, e.tp.ForceFlush(context.Background()))
+
+	select {
+	case body := <-received:
+		require.Contains(t, string(body), AttrGenAIUsageAudioSeconds,
+			"transcription span must carry gen_ai.usage.audio_seconds")
+	case <-time.After(3 * time.Second):
+		t.Fatal("transcription span did not reach the exporter")
 	}
 }
 
