@@ -29,26 +29,26 @@ const BEGIN = "# >>> langwatch otel begin >>>";
 const END = "# <<< langwatch otel end <<<";
 
 export interface CodexOtelBlockInputs {
-  /** Full OTLP endpoint, e.g. https://app.langwatch.ai/api/otel */
-  endpoint: string;
-  /** Plaintext personal ingest key (sk-lw-<...>). */
-  ingestionToken: string;
-  /** Logical environment label (e.g. user@org). Lands on resource.deployment.environment.name. */
-  environment?: string;
+	/** Full OTLP endpoint, e.g. https://app.langwatch.ai/api/otel */
+	endpoint: string;
+	/** Plaintext personal ingest key (sk-lw-<...>). */
+	ingestionToken: string;
+	/** Logical environment label (e.g. user@org). Lands on resource.deployment.environment.name. */
+	environment?: string;
 }
 
 /** Default config.toml path under the user's home directory. */
 export function defaultCodexConfigPath(): string {
-  const codexHome = process.env.CODEX_HOME;
-  if (codexHome) return path.join(codexHome, "config.toml");
-  return path.join(os.homedir(), ".codex", "config.toml");
+	const codexHome = process.env.CODEX_HOME;
+	if (codexHome) return path.join(codexHome, "config.toml");
+	return path.join(os.homedir(), ".codex", "config.toml");
 }
 
 /** Path shown in the persist prompt (`~/.codex/config.toml`). */
 export function displayCodexConfigPath(): string {
-  const codexHome = process.env.CODEX_HOME;
-  if (codexHome) return path.join(codexHome, "config.toml");
-  return "~/.codex/config.toml";
+	const codexHome = process.env.CODEX_HOME;
+	if (codexHome) return path.join(codexHome, "config.toml");
+	return "~/.codex/config.toml";
 }
 
 /**
@@ -58,12 +58,12 @@ export function displayCodexConfigPath(): string {
  * pass the bare ingestion base (e.g. https://app.langwatch.ai/api/otel).
  */
 export function codexTraceEndpoint(baseEndpoint: string): string {
-  return `${baseEndpoint.replace(/\/+$/, "")}/v1/traces`;
+	return `${baseEndpoint.replace(/\/+$/, "")}/v1/traces`;
 }
 
 /** Escape a value for a TOML basic (double-quoted) string. */
 function tomlStr(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+	return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 /**
@@ -84,46 +84,46 @@ function tomlStr(s: string): string {
  * disk until the user opts in).
  */
 export function buildCodexOtelBlock(
-  inputs: CodexOtelBlockInputs,
-  options: { includeAuthHeader?: boolean } = {},
+	inputs: CodexOtelBlockInputs,
+	options: { includeAuthHeader?: boolean } = {},
 ): string {
-  const env = inputs.environment ?? "langwatch";
-  const includeAuthHeader = options.includeAuthHeader ?? false;
+	const env = inputs.environment ?? "langwatch";
+	const includeAuthHeader = options.includeAuthHeader ?? false;
 
-  const authNote = includeAuthHeader
-    ? [
-        `# The Authorization header below carries a write-only ingest key so`,
-        `# a plain 'codex' (without the langwatch wrapper) captures too. The`,
-        `# file is written 0600; remove the marker pair to opt back out.`,
-      ]
-    : [
-        `# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,
-        `# this file persists only the endpoint + environment label.`,
-      ];
+	const authNote = includeAuthHeader
+		? [
+				`# The Authorization header below carries a write-only ingest key so`,
+				`# a plain 'codex' (without the langwatch wrapper) captures too. The`,
+				`# file is written 0600; remove the marker pair to opt back out.`,
+			]
+		: [
+				`# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,
+				`# this file persists only the endpoint + environment label.`,
+			];
 
-  const exporter = [
-    "[otel.trace_exporter.otlp-http]",
-    `endpoint = "${tomlStr(inputs.endpoint)}"`,
-    `protocol = "json"`,
-  ];
-  if (includeAuthHeader) {
-    exporter.push(
-      `headers = { "Authorization" = "Bearer ${tomlStr(inputs.ingestionToken)}" }`,
-    );
-  }
+	const exporter = [
+		"[otel.trace_exporter.otlp-http]",
+		`endpoint = "${tomlStr(inputs.endpoint)}"`,
+		`protocol = "json"`,
+	];
+	if (includeAuthHeader) {
+		exporter.push(
+			`headers = { "Authorization" = "Bearer ${tomlStr(inputs.ingestionToken)}" }`,
+		);
+	}
 
-  return [
-    BEGIN,
-    `# Managed by 'langwatch codex'. Re-running the command updates this`,
-    `# block in place; remove the marker pair above and below to opt out.`,
-    ...authNote,
-    "[otel]",
-    `environment = "${tomlStr(env)}"`,
-    "",
-    ...exporter,
-    END,
-    "",
-  ].join("\n");
+	return [
+		BEGIN,
+		`# Managed by 'langwatch codex'. Re-running the command updates this`,
+		`# block in place; remove the marker pair above and below to opt out.`,
+		...authNote,
+		"[otel]",
+		`environment = "${tomlStr(env)}"`,
+		"",
+		...exporter,
+		END,
+		"",
+	].join("\n");
 }
 
 /**
@@ -133,17 +133,40 @@ export function buildCodexOtelBlock(
  * is installed and (b) let the unconditional setup write preserve it.
  */
 export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
-  let content: string;
-  try {
-    content = fs.readFileSync(filePath, "utf8");
-  } catch {
-    return false;
-  }
-  const begin = content.indexOf(BEGIN);
-  const end = content.indexOf(END);
-  if (begin === -1 || end === -1 || end < begin) return false;
-  const block = content.slice(begin, end);
-  return /^\s*headers\s*=/m.test(block);
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return false;
+	}
+	const begin = content.indexOf(BEGIN);
+	const end = content.indexOf(END);
+	if (begin === -1 || end === -1 || end < begin) return false;
+	const block = content.slice(begin, end);
+	return /^\s*headers\s*=/m.test(block);
+}
+
+/**
+ * The trace-exporter endpoint currently written inside the langwatch
+ * [otel] marker block, or null when the file / block / endpoint line is
+ * absent. The login-time "latest login wins" refresh compares this to
+ * the current login's endpoint to decide whether the block is stale.
+ */
+export function codexOtelBlockEndpoint(
+	filePath: string = defaultCodexConfigPath(),
+): string | null {
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return null;
+	}
+	const begin = content.indexOf(BEGIN);
+	const end = content.indexOf(END);
+	if (begin === -1 || end === -1 || end < begin) return null;
+	const block = content.slice(begin, end);
+	const match = /^\s*endpoint\s*=\s*"([^"]*)"/m.exec(block);
+	return match?.[1] ?? null;
 }
 
 /**
@@ -153,8 +176,8 @@ export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
 export type CodexOtelWriteAction = "created" | "updated" | "unchanged";
 
 export interface CodexOtelWriteResult {
-  action: CodexOtelWriteAction;
-  path: string;
+	action: CodexOtelWriteAction;
+	path: string;
 }
 
 /**
@@ -169,43 +192,43 @@ export interface CodexOtelWriteResult {
  *   when the inputs haven't changed → returns 'unchanged'.
  */
 export function writeCodexOtelBlock(
-  inputs: CodexOtelBlockInputs,
-  options: { filePath?: string; persistAuthHeader?: boolean } = {},
+	inputs: CodexOtelBlockInputs,
+	options: { filePath?: string; persistAuthHeader?: boolean } = {},
 ): CodexOtelWriteResult {
-  const filePath = options.filePath ?? defaultCodexConfigPath();
-  // Emit the Authorization header when explicitly asked (the persist
-  // opt-in); otherwise preserve whatever the current block has, so the
-  // unconditional setup write never strips a header a prior persist
-  // installed.
-  const includeAuthHeader =
-    options.persistAuthHeader ?? codexOtelBlockHasAuthHeader(filePath);
-  const block = buildCodexOtelBlock(inputs, { includeAuthHeader });
+	const filePath = options.filePath ?? defaultCodexConfigPath();
+	// Emit the Authorization header when explicitly asked (the persist
+	// opt-in); otherwise preserve whatever the current block has, so the
+	// unconditional setup write never strips a header a prior persist
+	// installed.
+	const includeAuthHeader =
+		options.persistAuthHeader ?? codexOtelBlockHasAuthHeader(filePath);
+	const block = buildCodexOtelBlock(inputs, { includeAuthHeader });
 
-  if (!fs.existsSync(filePath)) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFile0600(filePath, block);
-    return { action: "created", path: filePath };
-  }
+	if (!fs.existsSync(filePath)) {
+		fs.mkdirSync(path.dirname(filePath), { recursive: true });
+		writeFile0600(filePath, block);
+		return { action: "created", path: filePath };
+	}
 
-  const prior = fs.readFileSync(filePath, "utf8");
-  const re = new RegExp(
-    `${escapeRe(BEGIN)}[\\s\\S]*?${escapeRe(END)}\\n?`,
-    "m",
-  );
-  if (re.test(prior)) {
-    const next = prior.replace(re, block);
-    if (next === prior) return { action: "unchanged", path: filePath };
-    writeFile0600(filePath, next);
-    return { action: "updated", path: filePath };
-  }
+	const prior = fs.readFileSync(filePath, "utf8");
+	const re = new RegExp(
+		`${escapeRe(BEGIN)}[\\s\\S]*?${escapeRe(END)}\\n?`,
+		"m",
+	);
+	if (re.test(prior)) {
+		const next = prior.replace(re, block);
+		if (next === prior) return { action: "unchanged", path: filePath };
+		writeFile0600(filePath, next);
+		return { action: "updated", path: filePath };
+	}
 
-  const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-  writeFile0600(filePath, prior + sep + block);
-  return { action: "updated", path: filePath };
+	const sep = prior.endsWith("\n") ? "\n" : "\n\n";
+	writeFile0600(filePath, prior + sep + block);
+	return { action: "updated", path: filePath };
 }
 
 function escapeRe(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -219,55 +242,55 @@ function escapeRe(s: string): string {
  * `0600` up front. The final chmod is a belt-and-suspenders safety check.
  */
 function writeFile0600(filePath: string, content: string): void {
-  if (fs.existsSync(filePath)) {
-    fs.chmodSync(filePath, 0o600);
-  }
-  fs.writeFileSync(filePath, content, { mode: 0o600 });
-  fs.chmodSync(filePath, 0o600);
+	if (fs.existsSync(filePath)) {
+		fs.chmodSync(filePath, 0o600);
+	}
+	fs.writeFileSync(filePath, content, { mode: 0o600 });
+	fs.chmodSync(filePath, 0o600);
 }
 
 const GW_BEGIN = "# >>> langwatch gateway begin >>>";
 const GW_END = "# <<< langwatch gateway end <<<";
 
 export interface CodexGatewayBlockInputs {
-  /** Gateway base URL, e.g. https://gateway.langwatch.ai */
-  gatewayUrl: string;
-  /**
-   * Env var name codex should read the API key from. Defaults to
-   * OPENAI_API_KEY because that's the standard codex env. The
-   * wrapper still sets OPENAI_API_KEY to the user's VK before
-   * spawning codex, so this matches the wrapper's env injection
-   * out of the box.
-   */
-  envKey?: string;
+	/** Gateway base URL, e.g. https://gateway.langwatch.ai */
+	gatewayUrl: string;
+	/**
+	 * Env var name codex should read the API key from. Defaults to
+	 * OPENAI_API_KEY because that's the standard codex env. The
+	 * wrapper still sets OPENAI_API_KEY to the user's VK before
+	 * spawning codex, so this matches the wrapper's env injection
+	 * out of the box.
+	 */
+	envKey?: string;
 }
 
 export interface CodexGatewayWriteResult {
-  action: CodexOtelWriteAction;
-  /**
-   * The ~/.codex/config.toml path that received the
-   * [model_providers.langwatch] block.
-   */
-  path: string;
-  /**
-   * The separate ~/.codex/<profile>.config.toml path that received
-   * the profile body. codex 0.134+ rejects [profiles.X] entries
-   * inside config.toml when the user passes --profile X, requiring
-   * a sibling file named <profile>.config.toml.
-   */
-  profilePath: string;
-  /**
-   * Result of the profile-file write. Independent of `action` so
-   * callers can report both writes accurately.
-   */
-  profileAction: CodexOtelWriteAction;
-  /**
-   * The profile name codex must be invoked with to actually route
-   * through the langwatch provider — e.g. `codex --profile
-   * langwatch-gateway`. Returned so the wrapper doesn't have to
-   * hardcode the name in two places.
-   */
-  profile: string;
+	action: CodexOtelWriteAction;
+	/**
+	 * The ~/.codex/config.toml path that received the
+	 * [model_providers.langwatch] block.
+	 */
+	path: string;
+	/**
+	 * The separate ~/.codex/<profile>.config.toml path that received
+	 * the profile body. codex 0.134+ rejects [profiles.X] entries
+	 * inside config.toml when the user passes --profile X, requiring
+	 * a sibling file named <profile>.config.toml.
+	 */
+	profilePath: string;
+	/**
+	 * Result of the profile-file write. Independent of `action` so
+	 * callers can report both writes accurately.
+	 */
+	profileAction: CodexOtelWriteAction;
+	/**
+	 * The profile name codex must be invoked with to actually route
+	 * through the langwatch provider — e.g. `codex --profile
+	 * langwatch-gateway`. Returned so the wrapper doesn't have to
+	 * hardcode the name in two places.
+	 */
+	profile: string;
 }
 
 const PROFILE_NAME = "langwatch-gateway";
@@ -285,28 +308,30 @@ const PROFILE_NAME = "langwatch-gateway";
  * body is now written to a sibling file (see buildCodexGatewayProfileFile).
  */
 export function buildCodexGatewayBlock(
-  inputs: CodexGatewayBlockInputs,
+	inputs: CodexGatewayBlockInputs,
 ): string {
-  const envKey = inputs.envKey ?? "OPENAI_API_KEY";
-  const cleanedBase = inputs.gatewayUrl.replace(/\/+$/, "");
-  const baseUrl = cleanedBase.endsWith("/v1") ? cleanedBase : `${cleanedBase}/v1`;
-  return [
-    GW_BEGIN,
-    `# Managed by 'langwatch codex' (Path A wrapper). Re-running the`,
-    `# wrapper updates this block in place; remove the marker pair`,
-    `# above and below to opt back out.`,
-    `# The wrapper spawns codex with --profile ${PROFILE_NAME} so this`,
-    `# provider doesn't change codex's default model_provider.`,
-    `# The matching profile body lives at ~/.codex/${PROFILE_NAME}.config.toml`,
-    `# (codex 0.134+ requires the profile in a separate file).`,
-    `[model_providers.langwatch]`,
-    `name = "OpenAI"`,
-    `base_url = "${baseUrl}"`,
-    `env_key = "${envKey}"`,
-    `wire_api = "responses"`,
-    GW_END,
-    "",
-  ].join("\n");
+	const envKey = inputs.envKey ?? "OPENAI_API_KEY";
+	const cleanedBase = inputs.gatewayUrl.replace(/\/+$/, "");
+	const baseUrl = cleanedBase.endsWith("/v1")
+		? cleanedBase
+		: `${cleanedBase}/v1`;
+	return [
+		GW_BEGIN,
+		`# Managed by 'langwatch codex' (Path A wrapper). Re-running the`,
+		`# wrapper updates this block in place; remove the marker pair`,
+		`# above and below to opt back out.`,
+		`# The wrapper spawns codex with --profile ${PROFILE_NAME} so this`,
+		`# provider doesn't change codex's default model_provider.`,
+		`# The matching profile body lives at ~/.codex/${PROFILE_NAME}.config.toml`,
+		`# (codex 0.134+ requires the profile in a separate file).`,
+		`[model_providers.langwatch]`,
+		`name = "OpenAI"`,
+		`base_url = "${baseUrl}"`,
+		`env_key = "${envKey}"`,
+		`wire_api = "responses"`,
+		GW_END,
+		"",
+	].join("\n");
 }
 
 /**
@@ -321,25 +346,27 @@ export function buildCodexGatewayBlock(
  * (a header comment explains this to anyone reading the file).
  */
 export function buildCodexGatewayProfileFile(): string {
-  return [
-    `# Managed by 'langwatch codex' (Path A wrapper).`,
-    `# This file is the body of the '${PROFILE_NAME}' codex profile,`,
-    `# selected at spawn time via 'codex --profile ${PROFILE_NAME}'.`,
-    `# The matching [model_providers.langwatch] entry lives in`,
-    `# ~/.codex/config.toml, bracketed by langwatch marker comments.`,
-    `# Re-running 'langwatch codex' regenerates this file in place;`,
-    `# remove it and the [model_providers.langwatch] block in`,
-    `# config.toml to opt back out.`,
-    `model_provider = "langwatch"`,
-    "",
-  ].join("\n");
+	return [
+		`# Managed by 'langwatch codex' (Path A wrapper).`,
+		`# This file is the body of the '${PROFILE_NAME}' codex profile,`,
+		`# selected at spawn time via 'codex --profile ${PROFILE_NAME}'.`,
+		`# The matching [model_providers.langwatch] entry lives in`,
+		`# ~/.codex/config.toml, bracketed by langwatch marker comments.`,
+		`# Re-running 'langwatch codex' regenerates this file in place;`,
+		`# remove it and the [model_providers.langwatch] block in`,
+		`# config.toml to opt back out.`,
+		`model_provider = "langwatch"`,
+		"",
+	].join("\n");
 }
 
 /** Default path for the sibling profile file. */
-export function defaultCodexProfilePath(profile: string = PROFILE_NAME): string {
-  const codexHome = process.env.CODEX_HOME;
-  const baseDir = codexHome ?? path.join(os.homedir(), ".codex");
-  return path.join(baseDir, `${profile}.config.toml`);
+export function defaultCodexProfilePath(
+	profile: string = PROFILE_NAME,
+): string {
+	const codexHome = process.env.CODEX_HOME;
+	const baseDir = codexHome ?? path.join(os.homedir(), ".codex");
+	return path.join(baseDir, `${profile}.config.toml`);
 }
 
 /**
@@ -356,56 +383,62 @@ export function defaultCodexProfilePath(profile: string = PROFILE_NAME): string 
  * owned by langwatch.
  */
 export function writeCodexGatewayBlock(
-  inputs: CodexGatewayBlockInputs,
-  options: { filePath?: string; profilePath?: string } = {},
+	inputs: CodexGatewayBlockInputs,
+	options: { filePath?: string; profilePath?: string } = {},
 ): CodexGatewayWriteResult {
-  const filePath = options.filePath ?? defaultCodexConfigPath();
-  const profilePath = options.profilePath ?? defaultCodexProfilePath();
-  const block = buildCodexGatewayBlock(inputs);
-  const profileBody = buildCodexGatewayProfileFile();
+	const filePath = options.filePath ?? defaultCodexConfigPath();
+	const profilePath = options.profilePath ?? defaultCodexProfilePath();
+	const block = buildCodexGatewayBlock(inputs);
+	const profileBody = buildCodexGatewayProfileFile();
 
-  let action: CodexOtelWriteAction;
-  if (!fs.existsSync(filePath)) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFile0600(filePath, block);
-    action = "created";
-  } else {
-    const prior = fs.readFileSync(filePath, "utf8");
-    const re = new RegExp(
-      `${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`,
-      "m",
-    );
-    if (re.test(prior)) {
-      const next = prior.replace(re, block);
-      if (next === prior) {
-        action = "unchanged";
-      } else {
-        writeFile0600(filePath, next);
-        action = "updated";
-      }
-    } else {
-      const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-      writeFile0600(filePath, prior + sep + block);
-      action = "updated";
-    }
-  }
+	let action: CodexOtelWriteAction;
+	if (!fs.existsSync(filePath)) {
+		fs.mkdirSync(path.dirname(filePath), { recursive: true });
+		writeFile0600(filePath, block);
+		action = "created";
+	} else {
+		const prior = fs.readFileSync(filePath, "utf8");
+		const re = new RegExp(
+			`${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`,
+			"m",
+		);
+		if (re.test(prior)) {
+			const next = prior.replace(re, block);
+			if (next === prior) {
+				action = "unchanged";
+			} else {
+				writeFile0600(filePath, next);
+				action = "updated";
+			}
+		} else {
+			const sep = prior.endsWith("\n") ? "\n" : "\n\n";
+			writeFile0600(filePath, prior + sep + block);
+			action = "updated";
+		}
+	}
 
-  let profileAction: CodexOtelWriteAction;
-  if (!fs.existsSync(profilePath)) {
-    fs.mkdirSync(path.dirname(profilePath), { recursive: true });
-    writeFile0600(profilePath, profileBody);
-    profileAction = "created";
-  } else {
-    const priorProfile = fs.readFileSync(profilePath, "utf8");
-    if (priorProfile === profileBody) {
-      profileAction = "unchanged";
-    } else {
-      writeFile0600(profilePath, profileBody);
-      profileAction = "updated";
-    }
-  }
+	let profileAction: CodexOtelWriteAction;
+	if (!fs.existsSync(profilePath)) {
+		fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+		writeFile0600(profilePath, profileBody);
+		profileAction = "created";
+	} else {
+		const priorProfile = fs.readFileSync(profilePath, "utf8");
+		if (priorProfile === profileBody) {
+			profileAction = "unchanged";
+		} else {
+			writeFile0600(profilePath, profileBody);
+			profileAction = "updated";
+		}
+	}
 
-  return { action, path: filePath, profilePath, profileAction, profile: PROFILE_NAME };
+	return {
+		action,
+		path: filePath,
+		profilePath,
+		profileAction,
+		profile: PROFILE_NAME,
+	};
 }
 
 /** Exported so callers + tests can reference the profile name from one place. */
@@ -419,58 +452,58 @@ export const CODEX_GATEWAY_PROFILE_NAME = PROFILE_NAME;
  * null when no such block is present.
  */
 function stripMarkerBlock(
-  content: string,
-  begin: string,
-  end: string,
+	content: string,
+	begin: string,
+	end: string,
 ): string | null {
-  const re = new RegExp(
-    `\\n?${escapeRe(begin)}[\\s\\S]*?${escapeRe(end)}\\n?`,
-    "m",
-  );
-  if (!re.test(content)) return null;
-  return content.replace(re, "");
+	const re = new RegExp(
+		`\\n?${escapeRe(begin)}[\\s\\S]*?${escapeRe(end)}\\n?`,
+		"m",
+	);
+	if (!re.test(content)) return null;
+	return content.replace(re, "");
 }
 
 function removeMarkerBlockFromFile(
-  filePath: string,
-  begin: string,
-  end: string,
+	filePath: string,
+	begin: string,
+	end: string,
 ): boolean {
-  let content: string;
-  try {
-    content = fs.readFileSync(filePath, "utf8");
-  } catch {
-    return false; // ENOENT
-  }
-  const next = stripMarkerBlock(content, begin, end);
-  if (next === null) return false;
-  // Plain write preserves the file's existing mode (writeFileSync's `mode`
-  // is ignored on an existing file) — removal strips our block, adding no
-  // secret, so a pre-existing 0600 stays 0600.
-  fs.writeFileSync(filePath, next);
-  return true;
+	let content: string;
+	try {
+		content = fs.readFileSync(filePath, "utf8");
+	} catch {
+		return false; // ENOENT
+	}
+	const next = stripMarkerBlock(content, begin, end);
+	if (next === null) return false;
+	// Plain write preserves the file's existing mode (writeFileSync's `mode`
+	// is ignored on an existing file) — removal strips our block, adding no
+	// secret, so a pre-existing 0600 stays 0600.
+	fs.writeFileSync(filePath, next);
+	return true;
 }
 
 function fileHasMarker(filePath: string, begin: string): boolean {
-  try {
-    return fs.readFileSync(filePath, "utf8").includes(begin);
-  } catch {
-    return false;
-  }
+	try {
+		return fs.readFileSync(filePath, "utf8").includes(begin);
+	} catch {
+		return false;
+	}
 }
 
 /** Whether config.toml currently carries the langwatch `[otel]` block. */
 export function codexHasOtelBlock(
-  filePath: string = defaultCodexConfigPath(),
+	filePath: string = defaultCodexConfigPath(),
 ): boolean {
-  return fileHasMarker(filePath, BEGIN);
+	return fileHasMarker(filePath, BEGIN);
 }
 
 /** Whether config.toml currently carries the langwatch gateway block. */
 export function codexHasGatewayBlock(
-  filePath: string = defaultCodexConfigPath(),
+	filePath: string = defaultCodexConfigPath(),
 ): boolean {
-  return fileHasMarker(filePath, GW_BEGIN);
+	return fileHasMarker(filePath, GW_BEGIN);
 }
 
 /**
@@ -479,9 +512,9 @@ export function codexHasGatewayBlock(
  * when a block was removed (idempotent — false when absent).
  */
 export function removeCodexOtelBlock(
-  filePath: string = defaultCodexConfigPath(),
+	filePath: string = defaultCodexConfigPath(),
 ): boolean {
-  return removeMarkerBlockFromFile(filePath, BEGIN, END);
+	return removeMarkerBlockFromFile(filePath, BEGIN, END);
 }
 
 /**
@@ -489,9 +522,9 @@ export function removeCodexOtelBlock(
  * config.toml, if present. Returns true when a block was removed.
  */
 export function removeCodexGatewayBlock(
-  filePath: string = defaultCodexConfigPath(),
+	filePath: string = defaultCodexConfigPath(),
 ): boolean {
-  return removeMarkerBlockFromFile(filePath, GW_BEGIN, GW_END);
+	return removeMarkerBlockFromFile(filePath, GW_BEGIN, GW_END);
 }
 
 /**
@@ -500,9 +533,30 @@ export function removeCodexGatewayBlock(
  * false when it was already absent).
  */
 export function removeCodexGatewayProfileFile(
-  profilePath: string = defaultCodexProfilePath(),
+	profilePath: string = defaultCodexProfilePath(),
 ): boolean {
-  if (!fs.existsSync(profilePath)) return false;
-  fs.rmSync(profilePath, { force: true });
-  return true;
+	if (!codexProfileFileIsLangwatchOwned(profilePath)) return false;
+	fs.rmSync(profilePath, { force: true });
+	return true;
+}
+
+/**
+ * Whether the file at `profilePath` looks like the profile body this CLI
+ * writes (`model_provider = "langwatch"`, the entire content of
+ * buildCodexGatewayProfileFile()) rather than some unrelated file a user
+ * happened to place at this distinctively-named path. The path name alone
+ * is a strong hint but not proof of ownership - this content check is what
+ * the logout scan and the remover itself gate listing/deletion on, so a
+ * non-owned file at the same path is never presented as removable or
+ * silently deleted.
+ */
+export function codexProfileFileIsLangwatchOwned(
+	profilePath: string = defaultCodexProfilePath(),
+): boolean {
+	try {
+		const content = fs.readFileSync(profilePath, "utf8");
+		return /model_provider\s*=\s*"langwatch"/.test(content);
+	} catch {
+		return false;
+	}
 }
