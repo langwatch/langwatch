@@ -81,6 +81,23 @@ describe("EventBus", () => {
 		});
 	});
 
+	describe("when a tap throws", () => {
+		it("still delivers the event to other taps and to the iterator", async () => {
+			const bus = new EventBus();
+			const seen: string[] = [];
+			bus.tap(() => {
+				throw new Error("boom");
+			});
+			bus.tap((ev) => seen.push(ev.type));
+
+			bus.emit({ type: "starting", service: "postgres" });
+
+			expect(seen).toEqual(["starting"]);
+			const it = bus[Symbol.asyncIterator]();
+			expect((await it.next()).value).toMatchObject({ type: "starting" });
+		});
+	});
+
 	describe("when an iterator's return() is called", () => {
 		it("ends the bus and unblocks every other waiter", async () => {
 			const bus = new EventBus();

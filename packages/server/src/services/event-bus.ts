@@ -6,7 +6,7 @@ import type { RuntimeEvent } from "../shared/runtime-contract.ts";
  * which buffers if no consumer is currently awaiting `next()`. Once `bus.end()`
  * is called every pending consumer wakes up with `{ done: true }`.
  *
- * Multi-consumer is intentionally not supported — the CLI animates and tees
+ * Multi-consumer is intentionally not supported: the CLI animates and tees
  * logs from a single iterator. If we ever need fan-out we tee at the consumer.
  */
 export class EventBus implements AsyncIterable<RuntimeEvent> {
@@ -33,7 +33,13 @@ export class EventBus implements AsyncIterable<RuntimeEvent> {
 
 	emit(event: RuntimeEvent): void {
 		if (this.done) return;
-		for (const tap of this.taps) tap(event);
+		for (const tap of this.taps) {
+			try {
+				tap(event);
+			} catch {
+				// A misbehaving tap must not break delivery to other taps or the iterator.
+			}
+		}
 		const waiter = this.waiters.shift();
 		if (waiter) {
 			waiter({ value: event, done: false });
