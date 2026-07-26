@@ -110,7 +110,7 @@ func TestResolve_StaleEntryAtHardCap_ConfigFetchFailure_FailsRetryable(t *testin
 		cfgErr: errors.New("config fetch returned 503"),
 	}
 	fetcher.returns = []resolverReturn{
-		{bundle: freshBundle("vk_capped", time.Now().Add(10 * time.Minute))},
+		{bundle: freshBundle("vk_capped", time.Now().Add(10*time.Minute))},
 	}
 	svc, _ := newService(t, Options{
 		Resolver:      &fetcher.fakeResolver,
