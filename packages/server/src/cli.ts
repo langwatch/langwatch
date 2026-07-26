@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
 import prompts from "prompts";
@@ -54,12 +53,12 @@ async function loadRuntime(): Promise<RuntimeApi> {
 
 function ensureEnvFile(
 	ctx: RuntimeContext,
-	{ reconcilePorts = false }: { reconcilePorts?: boolean } = {},
+	{ shouldReconcilePorts = false }: { shouldReconcilePorts?: boolean } = {},
 ): { written: boolean; path: string; reconciledKeys: string[] } {
 	return scaffoldEnvFile({
 		ports: ctx.ports,
 		path: ctx.paths.envFile,
-		reconcilePorts,
+		shouldReconcilePorts,
 	});
 }
 
@@ -148,7 +147,7 @@ program
 			userEnv: captureUserEnv(),
 		};
 
-		const envResult = ensureEnvFile(ctx, { reconcilePorts: true });
+		const envResult = ensureEnvFile(ctx, { shouldReconcilePorts: true });
 		if (envResult.reconciledKeys.length > 0) {
 			console.log(
 				chalk.yellow(
@@ -313,6 +312,3 @@ program.parseAsync(process.argv).catch((err) => {
 	console.error(chalk.red(`✗ ${err.message ?? err}`));
 	process.exit(1);
 });
-
-// Pull resolve to silence "unused import" if commander is configured oddly.
-void resolve;

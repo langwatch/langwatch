@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
 import {
 	existsSync,
+	lstatSync,
 	mkdirSync,
 	readdirSync,
 	readFileSync,
 	symlinkSync,
+	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
@@ -226,7 +228,10 @@ export async function ensureLangwatchDeps(
  */
 export function linkExternalMemberPeers(appRootDir: string): string[] {
 	const appNodeModules = join(appRootDir, "langwatch", "node_modules");
-	const memberDirs = [join(appRootDir, "mcp-server"), ...listDirs(join(appRootDir, "packages"))];
+	const memberDirs = [
+		join(appRootDir, "mcp-server"),
+		...listDirs(join(appRootDir, "packages")),
+	];
 	const linked: string[] = [];
 	for (const memberDir of memberDirs) {
 		const pkgPath = join(memberDir, "package.json");
@@ -244,7 +249,17 @@ export function linkExternalMemberPeers(appRootDir: string): string[] {
 			const target = join(appNodeModules, ...name.split("/"));
 			if (!existsSync(target)) continue;
 			const linkPath = join(memberDir, "node_modules", ...name.split("/"));
-			if (existsSync(linkPath)) continue;
+			// existsSync follows symlinks, so it says false for a dangling link
+			// whose directory entry is still there — and symlinkSync would then
+			// die with EEXIST. lstat sees the entry itself: keep it when it
+			// resolves, replace it when it dangles (a re-install after an app
+			// tree wipe leaves exactly that).
+			if (lstatSafely(linkPath)) {
+				if (existsSync(linkPath)) continue;
+				// unlinkSync, not rmSync: rm stats the TARGET, and on a dangling
+				// link it silently does nothing — unlink removes the entry itself.
+				unlinkSync(linkPath);
+			}
 			mkdirSync(dirname(linkPath), { recursive: true });
 			symlinkSync(relative(dirname(linkPath), target), linkPath);
 			linked.push(`${basename(memberDir)}:${name}`);
@@ -258,6 +273,15 @@ function listDirs(dir: string): string[] {
 	return readdirSync(dir)
 		.map((entry) => join(dir, entry))
 		.filter((p) => existsSync(join(p, "package.json")));
+}
+
+function lstatSafely(path: string): boolean {
+	try {
+		lstatSync(path);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**

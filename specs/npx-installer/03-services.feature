@@ -132,6 +132,7 @@ Feature: Service orchestration after pre-deps are installed
   Scenario: Explicit --port flag wins over auto-shift
     When the user runs `npx @langwatch/server --port 6660`
     Then port-base is 6660
+    And no auto-shift occurs even if 6660 is in use (instead, the CLI errors loudly)
 
   Scenario: A run that lands on a different port slot updates the install's URLs
     Given an install whose .env was scaffolded on the 5560 slot
@@ -146,7 +147,6 @@ Feature: Service orchestration after pre-deps are installed
     When a later run auto-shifts to a different port slot
     Then BASE_HOST still carries the user's hostname
     And only values still in their scaffolded localhost shape were updated
-    And no auto-shift occurs even if 6660 is in use (instead, the CLI errors loudly)
 
   # =========================================================================
   # Browser auto-open

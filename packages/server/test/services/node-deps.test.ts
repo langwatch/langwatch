@@ -99,12 +99,20 @@ describe("workspace link integrity", () => {
 describe("external member peer links", () => {
 	async function makeAppTree(): Promise<string> {
 		const appRoot = await mkdtemp(join(tmpdir(), "langwatch-peers-"));
-		mkdirSync(join(appRoot, "langwatch", "node_modules", "zod"), { recursive: true });
-		writeFileSync(join(appRoot, "langwatch", "node_modules", "zod", "package.json"), "{}");
+		mkdirSync(join(appRoot, "langwatch", "node_modules", "zod"), {
+			recursive: true,
+		});
+		writeFileSync(
+			join(appRoot, "langwatch", "node_modules", "zod", "package.json"),
+			"{}",
+		);
 		mkdirSync(join(appRoot, "packages", "langy"), { recursive: true });
 		writeFileSync(
 			join(appRoot, "packages", "langy", "package.json"),
-			JSON.stringify({ name: "@langwatch/langy", peerDependencies: { zod: ">=3.25.0 <5", "left-pad": "*" } }),
+			JSON.stringify({
+				name: "@langwatch/langy",
+				peerDependencies: { zod: ">=3.25.0 <5", "left-pad": "*" },
+			}),
 		);
 		return appRoot;
 	}
@@ -116,7 +124,14 @@ describe("external member peer links", () => {
 			const appRoot = await makeAppTree();
 			const linked = linkExternalMemberPeers(appRoot);
 			expect(linked).toContain("langy:zod");
-			const linkPath = join(appRoot, "packages", "langy", "node_modules", "zod", "package.json");
+			const linkPath = join(
+				appRoot,
+				"packages",
+				"langy",
+				"node_modules",
+				"zod",
+				"package.json",
+			);
 			expect(existsSync(linkPath)).toBe(true);
 		});
 
@@ -124,6 +139,21 @@ describe("external member peer links", () => {
 			const appRoot = await makeAppTree();
 			linkExternalMemberPeers(appRoot);
 			expect(linkExternalMemberPeers(appRoot)).toEqual([]);
+		});
+	});
+
+	describe("when a previous link at the peer path dangles", () => {
+		it("replaces it instead of dying with EEXIST", async () => {
+			// existsSync follows symlinks and reports false for a dangling one,
+			// but the directory entry still blocks symlinkSync. An app-tree wipe
+			// leaves exactly this state behind.
+			const root = await makeAppTree();
+			const memberNm = join(root, "packages", "langy", "node_modules");
+			mkdirSync(memberNm, { recursive: true });
+			symlinkSync(join(root, "not-there"), join(memberNm, "zod"));
+			const linked = linkExternalMemberPeers(root);
+			expect(linked).toContain("langy:zod");
+			expect(existsSync(join(memberNm, "zod", "package.json"))).toBe(true);
 		});
 	});
 

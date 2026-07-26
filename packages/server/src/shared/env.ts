@@ -218,7 +218,7 @@ export function buildEnv({
  * .env file stays free of user secrets. See 04-validation.feature.
  */
 export function scaffoldEnvFile(
-	input: EnvScaffoldInput & { path: string; reconcilePorts?: boolean },
+	input: EnvScaffoldInput & { path: string; shouldReconcilePorts?: boolean },
 ): { written: boolean; path: string; reconciledKeys: string[] } {
 	const secretsPath = join(dirname(input.path), "secrets.json");
 
@@ -240,7 +240,9 @@ export function scaffoldEnvFile(
 		// real, conflict-checked allocation ask for this — a default-port guess
 		// (the bare `install` command) must not rewrite a shifted install
 		// backwards.
-		const reconciledKeys = input.reconcilePorts ? reconcileEnvFile(input) : [];
+		const reconciledKeys = input.shouldReconcilePorts
+			? reconcileEnvFile(input)
+			: [];
 		return { written: false, path: input.path, reconciledKeys };
 	}
 

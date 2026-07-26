@@ -165,6 +165,7 @@ describe("services/runtime", () => {
 			venvsFn,
 			nodeDepsFn,
 			ensureAppDirFn,
+			langyCliFn,
 		].forEach((fn) => fn.mockClear());
 	});
 

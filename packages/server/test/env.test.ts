@@ -125,17 +125,27 @@ describe("reconcileEnvFile", () => {
 
 		it("keeps everything that is not a port-bound URL byte for byte", async () => {
 			const { envPath } = await scaffoldAt(5560);
-			const before = readFileSync(envPath, "utf8");
-			const secret = before.match(/CREDENTIALS_SECRET=(.*)/)?.[1];
 			writeFileSync(
 				envPath,
-				before.replace("OPENAI_API_KEY=", "OPENAI_API_KEY=sk-test-123"),
+				readFileSync(envPath, "utf8").replace(
+					"OPENAI_API_KEY=",
+					"OPENAI_API_KEY=sk-test-123",
+				),
 			);
-			reconcileEnvFile({ ports: allocatePorts(5580), path: envPath });
-			const after = readFileSync(envPath, "utf8");
-			expect(after).toContain(`CREDENTIALS_SECRET=${secret}`);
+			const before = readFileSync(envPath, "utf8").split("\n");
+			const reconciled = reconcileEnvFile({
+				ports: allocatePorts(5580),
+				path: envPath,
+			});
+			const after = readFileSync(envPath, "utf8").split("\n");
+			// Same line count, same order, and every line that differs is one
+			// of the keys reconcile reported — nothing else moved at all.
+			expect(after).toHaveLength(before.length);
+			for (let i = 0; i < before.length; i++) {
+				if (before[i] === after[i]) continue;
+				expect(reconciled).toContain((before[i] ?? "").split("=")[0]);
+			}
 			expect(after).toContain("OPENAI_API_KEY=sk-test-123");
-			expect(after).toContain("# LANGY ASSISTANT");
 		});
 
 		it("is a no-op when the allocation already matches", async () => {
@@ -184,7 +194,7 @@ describe("reconcileEnvFile", () => {
 			const asked = scaffoldEnvFile({
 				ports: allocatePorts(5560),
 				path: envPath,
-				reconcilePorts: true,
+				shouldReconcilePorts: true,
 			});
 			expect(asked.reconciledKeys).toContain("REDIS_URL");
 			expect(readFileSync(envPath, "utf8")).toContain(

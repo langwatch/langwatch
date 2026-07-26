@@ -15,6 +15,6 @@ export function scaffoldEnv(ctx: RuntimeContext): {
 	return scaffoldEnvFile({
 		ports: ctx.ports,
 		path: ctx.envFile,
-		reconcilePorts: true,
+		shouldReconcilePorts: true,
 	});
 }
