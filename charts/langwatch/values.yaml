@@ -1603,9 +1603,9 @@ gateway:
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common
   # umbrella-level overrides below; everything else inherits.
 
-  ## @param gateway.controlPlane.baseUrl [string, default: http://langwatch-app:5560] URL the gateway uses to reach langwatch-app. Defaults assume release name `langwatch`.
+  ## @param gateway.controlPlane.baseUrl [string, default: ""] URL the gateway uses to reach the app. Empty resolves to this install's own app Service, `<release>-app:5560`. Set it for a control plane outside this install, or an app served on another port.
   controlPlane:
-    baseUrl: http://langwatch-app:5560
+    baseUrl: ""
 
   ## @param gateway.secrets.existingSecretName [string, default: langwatch-app-secrets] Name of the Secret the gateway pod mounts for LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET. this release collapsed gateway-auth into the umbrella's app Secret so both langwatch-app and the gateway pod mount the SAME Secret. Default matches the autogen app-secret name when release name is `langwatch`. If you override the release name OR set `autogen.secretNames.app` / `secrets.existingSecret`, set this to the same Secret name so the gateway subchart bridges to it.
   secrets:
