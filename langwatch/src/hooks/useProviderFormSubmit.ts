@@ -238,24 +238,27 @@ export function useProviderFormSubmit({
       const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
       if (!isUsingEnvVars) {
         // When editing an existing provider, the stored key is shown masked.
-        // Strip the masked placeholders, then keep the result only if something
-        // actually changed versus the stored values. If nothing changed (the
-        // common case of opening the drawer and saving without re-entering the
-        // key), send `undefined` so the server preserves the stored credentials
-        // instead of validating a partial object (e.g. just an empty base URL)
-        // against the provider's required-key schema and rejecting the save.
-        // A genuine change — a new key, a cleared key, or an edited field —
-        // still goes through.
-        const filtered = filterMaskedApiKeys(customKeys);
-        const hasRealChange = Object.entries(filtered).some(([key, value]) => {
-          const current = (value ?? "").trim();
-          const stored =
-            typeof initialKeys[key] === "string"
-              ? (initialKeys[key] as string).trim()
-              : "";
-          return current !== stored;
-        });
-        customKeysToSend = hasRealChange ? filtered : undefined;
+        // Decide whether anything changed by ignoring those placeholders — an
+        // untouched key must not count as an edit — but send the form as the
+        // customer left it, placeholders included: each one tells the server
+        // to keep the credential already on file. Sending the stripped object
+        // instead reads as "this provider has no key", and editing any other
+        // field (a base URL, most often) overwrites the stored key out of
+        // existence. When nothing changed, send `undefined` so the save is a
+        // no-op for credentials rather than a partial object validated
+        // against the provider's schema.
+        const withoutPlaceholders = filterMaskedApiKeys(customKeys);
+        const hasRealChange = Object.entries(withoutPlaceholders).some(
+          ([key, value]) => {
+            const current = (value ?? "").trim();
+            const stored =
+              typeof initialKeys[key] === "string"
+                ? (initialKeys[key] as string).trim()
+                : "";
+            return current !== stored;
+          },
+        );
+        customKeysToSend = hasRealChange ? { ...customKeys } : undefined;
       } else if (userEnteredNewKey || hasNonApiKeyChanges) {
         customKeysToSend = userEnteredNewKey
           ? { ...customKeys }

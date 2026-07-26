@@ -274,6 +274,8 @@ Feature: Model Provider Configuration
     When I open its model provider configuration drawer
     And I clear the base URL field
     Then I see a warning that requests carry the saved API key to the provider's own endpoint
+    And I can save the removal
+    And the saved API key is still on file afterwards
 
     Examples:
       | provider  |

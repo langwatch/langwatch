@@ -346,7 +346,7 @@ export function hasUserEnteredNewApiKey(
  *
  * @param customKeys - The current form state
  * @param initialKeys - The initial stored keys (empty for env var providers)
- * @returns true if any non-API-key field has a non-empty value
+ * @returns true if any non-API-key field differs from what was stored
  */
 export function hasUserModifiedNonApiKeyFields(
   customKeys: Record<string, string>,
@@ -357,12 +357,14 @@ export function hasUserModifiedNonApiKeyFields(
     if (isApiKeyField(key)) {
       return false;
     }
-    // Check if value is non-empty and different from initial
+    // Emptying a field the provider had a value for is a change like any
+    // other: it is how a base URL gets removed, and treating it as "nothing
+    // happened" left Save disabled with no way to undo the endpoint.
     const initialValue = initialKeys[key];
     const currentValue = value?.trim() ?? "";
     const storedValue =
       typeof initialValue === "string" ? initialValue.trim() : "";
-    return currentValue !== "" && currentValue !== storedValue;
+    return currentValue !== storedValue;
   });
 }
 

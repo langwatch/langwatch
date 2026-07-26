@@ -418,8 +418,7 @@ describe("Feature: the drawer asks for the credentials the provider actually nee
       });
 
       describe("when the base URL it already had is cleared", () => {
-        /** @scenario Clearing the base URL warns that the saved API key goes back to the provider */
-        it("says the saved key goes back to the provider's own endpoint", async () => {
+        const renderWithStoredBaseUrl = () => {
           primeQueries([
             keyedRow({
               providerKey,
@@ -429,7 +428,12 @@ describe("Feature: the drawer asks for the credentials the provider actually nee
             }),
           ]);
           renderDrawer({ modelProviderId: rowId, providerKey });
-          const user = userEvent.setup();
+          return userEvent.setup();
+        };
+
+        /** @scenario Clearing the base URL warns that the saved API key goes back to the provider */
+        it("says the saved key goes back to the provider's own endpoint", async () => {
+          const user = renderWithStoredBaseUrl();
 
           await user.clear(inputFor(baseUrl));
 
@@ -440,6 +444,33 @@ describe("Feature: the drawer asks for the credentials the provider actually nee
               ),
             ).toBeInTheDocument();
           });
+        });
+
+        /**
+         * Emptying a field is a change like any other. Reading it as
+         * "nothing happened" left Save disabled, so a base URL added by
+         * mistake could never be taken off again.
+         */
+        /** @scenario Clearing the base URL warns that the saved API key goes back to the provider */
+        it("lets the customer save the removal", async () => {
+          const user = renderWithStoredBaseUrl();
+
+          await user.clear(inputFor(baseUrl));
+          const save = screen.getByRole("button", { name: /^save$/i });
+          await waitFor(() => expect(save).toBeEnabled());
+          await user.click(save);
+
+          await waitFor(() => {
+            expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+          });
+          expect(mockMutateAsync).toHaveBeenCalledWith(
+            expect.objectContaining({
+              customKeys: {
+                [apiKey]: MASKED_KEY_PLACEHOLDER,
+                [baseUrl]: "",
+              },
+            }),
+          );
         });
       });
 
@@ -477,6 +508,35 @@ describe("Feature: the drawer asks for the credentials the provider actually nee
             expect.objectContaining({
               id: rowId,
               scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+            }),
+          );
+        });
+
+        /**
+         * The key the customer never retyped has to go back exactly as it
+         * came: the masked placeholder is what tells the server to keep the
+         * credential on file. Send the field stripped instead and the save
+         * reads as "this provider has no key", which is how a base-URL edit
+         * came to delete it.
+         */
+        /** @scenario Preserve original API key when saving with masked placeholder */
+        it("sends the untouched key back masked so the stored one survives", async () => {
+          primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
+          renderDrawer({ modelProviderId: rowId, providerKey });
+          const user = userEvent.setup();
+
+          await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
+          await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+          await waitFor(() => {
+            expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+          });
+          expect(mockMutateAsync).toHaveBeenCalledWith(
+            expect.objectContaining({
+              customKeys: {
+                [apiKey]: MASKED_KEY_PLACEHOLDER,
+                [baseUrl]: SELF_HOSTED_URL,
+              },
             }),
           );
         });
