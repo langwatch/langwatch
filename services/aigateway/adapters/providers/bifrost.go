@@ -1476,6 +1476,10 @@ type bifrostStreamIterator struct {
 	// right parser at iterator-construction time. When nil, the
 	// iterator skips usage extraction (final Usage() reports zeros).
 	parseUsage func([]byte) (domain.Usage, bool)
+	// roleSeenByChoice tracks which chat choice indices have emitted their
+	// first delta, driving the leading-role repair in ensureLeadingRoleDelta
+	// (see chat_stream_role.go). Lazily allocated on the first chat chunk.
+	roleSeenByChoice map[int]bool
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
@@ -1498,6 +1502,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			return false
 		}
 		if chunk.BifrostChatResponse != nil {
+			it.ensureLeadingRoleDelta(chunk.BifrostChatResponse)
 			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
 			it.current = data
 			if chunk.BifrostChatResponse.Usage != nil {
