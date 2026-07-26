@@ -10,6 +10,9 @@ import { api } from "../utils/api";
  * @param customKeys - The form state containing API keys and configuration
  * @param projectId - Project handle for the tenant, when there is one
  * @param organizationId - Organization handle for the tenant
+ * @param scopes - Scopes the credential is being set up for. On the
+ *   no-project path these are what the probe is authorized against, so a
+ *   caller who cannot manage them cannot reach the outbound request.
  * @returns Object containing validation state and functions
  */
 export function useModelProviderApiKeyValidation(
@@ -17,6 +20,10 @@ export function useModelProviderApiKeyValidation(
   customKeys: Record<string, string>,
   projectId: string | undefined,
   organizationId: string | undefined,
+  scopes?: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>,
 ) {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
@@ -40,6 +47,7 @@ export function useModelProviderApiKeyValidation(
         organizationId,
         provider,
         customKeys,
+        scopes: scopes && scopes.length > 0 ? scopes : undefined,
       });
 
       if (!result.valid) {
@@ -63,6 +71,7 @@ export function useModelProviderApiKeyValidation(
     organizationId,
     provider,
     customKeys,
+    scopes,
     utils.modelProvider.validateApiKey,
   ]);
 

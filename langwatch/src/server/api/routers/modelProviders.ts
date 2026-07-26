@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   SCOPE_TIERS,
+  type ScopeAssignment,
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
 import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
@@ -27,6 +28,7 @@ import {
   setRoleAtScope,
   updateConfig,
 } from "../../modelProviders/modelDefaults.service";
+import { assertCanManageAllScopes } from "../../modelProviders/modelProvider.authz";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   checkOrganizationPermission,
@@ -256,10 +258,14 @@ export const modelProviderRouter = createTRPCRouter({
           ...tenantAnchorSchema,
           provider: z.string(),
           customKeys: z.record(z.string()),
+          // The scopes the credential is being set up for. Required on the
+          // no-project path, where they are what the probe is authorized
+          // against — see checkProviderValidationPermission.
+          scopes: z.array(scopeAssignmentSchema).min(1).optional(),
         })
         .superRefine(requireTenantAnchor),
     )
-    .use(checkProjectOrOrganizationPermission("project:update"))
+    .use(checkProviderValidationPermission())
     .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
@@ -748,6 +754,56 @@ function checkProjectOrOrganizationPermission(projectPermission: Permission) {
       ...params,
       input: { ...params.input, organizationId: params.input.organizationId },
     });
+  };
+}
+
+/**
+ * Tenant gate for the credential probe.
+ *
+ * Nothing downstream re-authorizes this one. The handler goes straight out
+ * to the provider with caller-supplied keys and, for the `custom` provider,
+ * a caller-supplied base URL, so whatever gate sits here IS the
+ * authorization rather than a coarse pre-filter. Organization membership
+ * would not do: `organization:view` is held by MEMBER and EXTERNAL, which
+ * would turn a read-only seat into an arbitrary outbound request from our
+ * servers.
+ *
+ * With a project this stays the pre-existing `project:update` check.
+ * Without one it runs the same per-scope check the provider writes use, so
+ * "may I probe a credential for this scope" is the same question, answered
+ * by the same code, as "may I store a credential at this scope".
+ */
+function checkProviderValidationPermission() {
+  const projectCheck = checkProjectPermission("project:update");
+  return async (params: {
+    ctx: any;
+    input: {
+      projectId?: string;
+      organizationId?: string;
+      scopes?: ScopeAssignment[];
+    };
+    next: () => any;
+  }) => {
+    if (params.input.projectId) {
+      return projectCheck({
+        ...params,
+        input: { ...params.input, projectId: params.input.projectId },
+      });
+    }
+    const scopes = params.input.scopes;
+    if (!scopes || scopes.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Validating a credential without a project needs the scopes it is being set up for.",
+      });
+    }
+    await assertCanManageAllScopes(
+      { prisma: params.ctx.prisma, session: params.ctx.session },
+      scopes,
+    );
+    params.ctx.permissionChecked = true;
+    return params.next();
   };
 }
 

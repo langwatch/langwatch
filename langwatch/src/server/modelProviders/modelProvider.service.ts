@@ -112,6 +112,25 @@ type AdvancedGatewayInput = {
   providerConfig?: Record<string, unknown> | null;
 };
 
+/**
+ * Refuse to act on a row that carries no scope grants.
+ *
+ * `assertCanManageAllScopes` answers "can you manage every one of these
+ * scopes", which an empty list satisfies vacuously. The org-anchored
+ * lookup finds rows by `(id, organizationId)` without a scope predicate,
+ * so a scopeless row is reachable by id even though no listing query can
+ * see it. Without this, the per-scope gate would wave such a row through
+ * on the strength of having nothing to check.
+ */
+function assertRowCarriesScopes(row: { id: string; scopes: unknown[] }): void {
+  if (row.scopes.length === 0) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Model provider not found",
+    });
+  }
+}
+
 function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
   const out: AdvancedGatewayInput = {};
   if (input.rateLimitRpm !== undefined) out.rateLimitRpm = input.rateLimitRpm;
@@ -509,6 +528,7 @@ export class ModelProviderService {
     // is one they have no rights on. Validate against the row's
     // *current* scopes before considering any incoming changes.
     if (ctx && existingProvider) {
+      assertRowCarriesScopes(existingProvider);
       await assertCanManageAllScopes(
         ctx,
         existingProvider.scopes.map((s) => ({
@@ -724,6 +744,7 @@ export class ModelProviderService {
           message: "Model provider not found",
         });
       }
+      assertRowCarriesScopes(existing);
       await assertCanManageAllScopes(
         ctx,
         existing.scopes.map((s) => ({

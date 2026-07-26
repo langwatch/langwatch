@@ -27,7 +27,15 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
@@ -44,6 +52,8 @@ describe(
     let outsiderOrgId: string;
     let adminUserId: string;
     let outsiderUserId: string;
+    let viewOnlyMemberUserId: string;
+    let externalMemberUserId: string;
 
     const service = () => ModelProviderService.create(prisma);
 
@@ -115,6 +125,40 @@ describe(
         },
       });
 
+      // A plain MEMBER of this organization. Holds `organization:view` and
+      // no manage permission anywhere.
+      const viewOnly = await prisma.user.create({
+        data: {
+          name: "NoProj Read Only",
+          email: `noproj-readonly-${ns}@example.com`,
+        },
+      });
+      viewOnlyMemberUserId = viewOnly.id;
+      await prisma.organizationUser.create({
+        data: {
+          userId: viewOnly.id,
+          organizationId: orgId,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+
+      // An EXTERNAL (lite) member, the weakest seat that is still inside
+      // the organization.
+      const external = await prisma.user.create({
+        data: {
+          name: "NoProj External",
+          email: `noproj-external-${ns}@example.com`,
+        },
+      });
+      externalMemberUserId = external.id;
+      await prisma.organizationUser.create({
+        data: {
+          userId: external.id,
+          organizationId: orgId,
+          role: OrganizationUserRole.EXTERNAL,
+        },
+      });
+
       const outsider = await prisma.user.create({
         data: {
           name: "NoProj Outsider",
@@ -165,6 +209,8 @@ describe(
               in: [
                 `noproj-admin-${ns}@example.com`,
                 `noproj-outsider-${ns}@example.com`,
+                `noproj-readonly-${ns}@example.com`,
+                `noproj-external-${ns}@example.com`,
               ],
             },
           },
@@ -495,6 +541,119 @@ describe(
             scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
           } as any),
         ).rejects.toThrow(/projectId or organizationId/);
+      });
+    });
+
+    // The credential probe sends caller-supplied keys, and for the `custom`
+    // provider a caller-supplied base URL, straight out over the network.
+    // Nothing downstream re-authorizes it, so the gate on the way in is the
+    // whole of the authorization. `organization:view` is held by MEMBER and
+    // EXTERNAL, which would have made this an arbitrary outbound request
+    // from a read-only seat.
+    describe("given a read-only member of a projectless organization", () => {
+      let fetchCalls: string[];
+      let realFetch: typeof globalThis.fetch;
+
+      beforeEach(() => {
+        fetchCalls = [];
+        realFetch = globalThis.fetch;
+        // Records rather than stubs the outcome: the assertion is that the
+        // request never leaves, so a test that passed because the fetch
+        // merely failed would be worthless.
+        globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+          fetchCalls.push(String(args[0]));
+          throw new Error("network disabled in test");
+        }) as typeof globalThis.fetch;
+      });
+
+      afterEach(() => {
+        globalThis.fetch = realFetch;
+      });
+
+      /** @scenario "A read-only member cannot probe an arbitrary URL" */
+      it("refuses a MEMBER before any URL is fetched", async () => {
+        await expect(
+          callerFor(viewOnlyMemberUserId).modelProvider.validateApiKey({
+            organizationId: orgId,
+            provider: "custom",
+            customKeys: {
+              CUSTOM_API_KEY: "x",
+              CUSTOM_BASE_URL: "http://169.254.169.254/latest/meta-data",
+            },
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          }),
+        ).rejects.toThrow(/organization:manage/);
+
+        expect(fetchCalls).toEqual([]);
+      });
+
+      /** @scenario "A read-only member cannot probe an arbitrary URL" */
+      it("refuses an EXTERNAL member before any URL is fetched", async () => {
+        await expect(
+          callerFor(externalMemberUserId).modelProvider.validateApiKey({
+            organizationId: orgId,
+            provider: "custom",
+            customKeys: {
+              CUSTOM_API_KEY: "x",
+              CUSTOM_BASE_URL: "http://169.254.169.254/latest/meta-data",
+            },
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          }),
+        ).rejects.toThrow(/organization:manage/);
+
+        expect(fetchCalls).toEqual([]);
+      });
+
+      /** @scenario "A read-only member cannot probe an arbitrary URL" */
+      it("refuses a member who names a team they cannot manage", async () => {
+        await expect(
+          callerFor(viewOnlyMemberUserId).modelProvider.validateApiKey({
+            organizationId: orgId,
+            provider: "custom",
+            customKeys: {
+              CUSTOM_API_KEY: "x",
+              CUSTOM_BASE_URL: "http://169.254.169.254/latest/meta-data",
+            },
+            scopes: [{ scopeType: "TEAM", scopeId: teamId }],
+          }),
+        ).rejects.toThrow(/team:manage/);
+
+        expect(fetchCalls).toEqual([]);
+      });
+
+      /** @scenario "A read-only member cannot probe an arbitrary URL" */
+      it("refuses a probe that names no scopes to be authorized against", async () => {
+        await expect(
+          callerFor(viewOnlyMemberUserId).modelProvider.validateApiKey({
+            organizationId: orgId,
+            provider: "custom",
+            customKeys: {
+              CUSTOM_API_KEY: "x",
+              CUSTOM_BASE_URL: "http://169.254.169.254/latest/meta-data",
+            },
+          }),
+        ).rejects.toThrow(/scopes/);
+
+        expect(fetchCalls).toEqual([]);
+      });
+
+      // The gate has to let the legitimate case through, or the fix is just
+      // a broken feature. An org admin reaches the probe, and the recorded
+      // call proves it got as far as the network.
+      it("lets an org admin through to the request", async () => {
+        await expect(
+          callerFor(adminUserId).modelProvider.validateApiKey({
+            organizationId: orgId,
+            provider: "custom",
+            customKeys: {
+              CUSTOM_API_KEY: "x",
+              CUSTOM_BASE_URL: "https://example.invalid/v1",
+            },
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
+          }),
+        ).resolves.toEqual(expect.objectContaining({ valid: false }));
+
+        expect(fetchCalls.length).toBeGreaterThan(0);
       });
     });
 
