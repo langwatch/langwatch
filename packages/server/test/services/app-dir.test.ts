@@ -1,13 +1,20 @@
-import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { restoreShellScriptBits } from "../../src/services/app-dir.ts";
 
 describe("shell script bits after relocation", () => {
+	const roots: string[] = [];
+	afterEach(() => {
+		for (const root of roots.splice(0))
+			rmSync(root, { recursive: true, force: true });
+	});
+
 	async function makeTree(): Promise<string> {
 		const root = await mkdtemp(join(tmpdir(), "langwatch-appdir-"));
+		roots.push(root);
 		mkdirSync(join(root, "langwatch", "scripts"), { recursive: true });
 		mkdirSync(join(root, "node_modules", "dep"), { recursive: true });
 		// pnpm pack normalizes modes: scripts arrive 0644.
