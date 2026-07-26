@@ -195,7 +195,12 @@ jobs:
 
       - name: Assert gateway subchart renders under the umbrella
         run: |
-          if ! grep -q "app.kubernetes.io/name: gateway" /tmp/umbrella.yaml; then
+          # Assert on the Source marker helm stamps on every rendered file, not on
+          # the gateway's pod label: sibling charts legitimately SELECT that label
+          # (langyagent's NetworkPolicy has an egress rule to the gateway), so a
+          # label grep answers "does anything mention the gateway", not "did the
+          # subchart render".
+          if ! grep -q "^# Source: langwatch/charts/gateway/" /tmp/umbrella.yaml; then
             echo "umbrella chart did NOT include the gateway subchart — dependency broken?"
             exit 1
           fi
@@ -211,7 +216,7 @@ jobs:
 
       - name: Assert opt-out drops the gateway
         run: |
-          if grep -q "app.kubernetes.io/name: gateway" /tmp/umbrella-no-gw.yaml; then
+          if grep -q "^# Source: langwatch/charts/gateway/" /tmp/umbrella-no-gw.yaml; then
             echo "gateway.chartManaged=false should suppress the subchart"
             exit 1
           fi
