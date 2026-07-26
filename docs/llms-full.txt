@@ -53633,6 +53633,14 @@ Three rules worth knowing before you configure it:
 
 In the chart, set `app.dataplane.providers.azureBlob.authMode` and enable `global.serviceAccount` (`create: true` plus the `azure.workload.identity/client-id` annotation). The chart refuses to render `workloadIdentity` without a ServiceAccount, since the identity would have nothing to bind to. Federated Kubernetes identity is supported on **AKS only** — the token injection depends on the Azure workload-identity webhook. On clusters without it, use `managedIdentity` or `sharedKey`.
 
+On AKS, three things must line up or the token exchange fails with `AADSTS70021` before any storage call is made. The app surfaces that code and this remedy in the error, but they are easier to get right up front:
+
+- The **federated identity credential's issuer** must match the cluster's OIDC issuer exactly — *including the trailing slash*. Read it with `az aks show --query oidcIssuerProfile.issuerUrl`. If the cluster is ever recreated the issuer changes and every federated credential silently stops working.
+- Its **subject** must be `system:serviceaccount:<namespace>:<service-account-name>`, matched case-exactly against the ServiceAccount the chart creates.
+- Its **audience** must be `api://AzureADTokenExchange`.
+
+The pod label and the ServiceAccount annotation are both emitted by the chart; the federated credential itself is configured on the Azure side and is the piece the chart cannot do for you.
+
 The same identity must be available to any out-of-band job that writes bytes, such as the dataset backfill task; run it with the same ServiceAccount as the app and workers.
 </Warning>
 
