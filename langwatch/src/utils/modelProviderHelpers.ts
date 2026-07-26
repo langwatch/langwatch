@@ -159,10 +159,7 @@ export function getRequiredCredentialKeys({
       values: blankValues,
       key,
     });
-    if (
-      alwaysDemanded &&
-      !schemaDemandsKey({ keysSchema, values, key })
-    ) {
+    if (alwaysDemanded && !schemaDemandsKey({ keysSchema, values, key })) {
       continue;
     }
     required.add(key);
