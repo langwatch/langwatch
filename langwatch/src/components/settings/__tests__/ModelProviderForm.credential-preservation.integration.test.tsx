@@ -235,7 +235,8 @@ describe("Feature: edits beside a saved credential leave that credential intact"
           return userEvent.setup();
         };
 
-        /** @scenario Removing the base URL is a change that can be saved */
+        // Prefill is the scenario's given: the drawer must show the stored
+        // value, or an untouched field would read as cleared on save.
         it("shows the stored base URL in the field to begin with", async () => {
           renderWithStoredBaseUrl();
 
