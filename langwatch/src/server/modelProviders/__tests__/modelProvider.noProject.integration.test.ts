@@ -185,22 +185,33 @@ describe(
     });
 
     afterAll(async () => {
+      // A `beforeAll` that threw partway leaves these ids unset, and Prisma
+      // drops an `undefined` from a where clause rather than matching
+      // nothing: `deleteMany({ where: { id: undefined } })` is
+      // `deleteMany({})`, which empties the table. This database is shared
+      // with every other suite and worktree, so a broken setup must not
+      // escalate into a destructive teardown.
+      const orgIds = [orgId, outsiderOrgId].filter(Boolean);
+      if (orgIds.length === 0) return;
+
       await prisma.modelProvider
         .deleteMany({
-          where: { organizationId: { in: [orgId, outsiderOrgId] } },
+          where: { organizationId: { in: orgIds } },
         })
         .catch(() => {});
       await prisma.roleBinding
-        .deleteMany({ where: { organizationId: { in: [orgId, outsiderOrgId] } } })
+        .deleteMany({ where: { organizationId: { in: orgIds } } })
         .catch(() => {});
       await prisma.organizationUser
         .deleteMany({
-          where: { organizationId: { in: [orgId, outsiderOrgId] } },
+          where: { organizationId: { in: orgIds } },
         })
         .catch(() => {});
-      await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
+      if (teamId) {
+        await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
+      }
       await prisma.organization
-        .deleteMany({ where: { id: { in: [orgId, outsiderOrgId] } } })
+        .deleteMany({ where: { id: { in: orgIds } } })
         .catch(() => {});
       await prisma.user
         .deleteMany({

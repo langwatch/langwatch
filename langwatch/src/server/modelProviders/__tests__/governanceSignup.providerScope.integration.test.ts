@@ -66,10 +66,21 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
     // calls, so the personal team/project are provisioned the way a signup
     // provisions them rather than hand-built here.
     //
-    // The org + shared team are created directly because booting the full
-    // app layer (which owns `createAndAssign`) inside vitest fails on a
-    // module alias, and `createTestApp` swaps in a null repository that
-    // writes nothing.
+    // Two things this deliberately does NOT use, so the next reader does not
+    // try to "simplify" it back into either:
+    //
+    //   - `onboarding.initializeOrganization` itself. It goes through the
+    //     app layer, and there is no way to boot that here: `createTestApp`
+    //     wires a NullOrganizationRepository, so `createAndAssign` returns
+    //     empty strings and writes no rows, while `initializeDefaultApp()`
+    //     fails inside vitest resolving the `~/server/db` alias.
+    //   - `src/test-utils/personalWorkspaceOrganization.ts`. That helper is
+    //     a pure in-memory fixture of the `organization.getAll` response,
+    //     with hardcoded ids, for jsdom tests that mock the query. This
+    //     suite needs real rows: the RBAC on `modelProvider.update` reads
+    //     RoleBinding from the database, and `PersonalWorkspaceService`
+    //     writes to it. Teaching that fixture to create rows would pull
+    //     Prisma into the two jsdom tests that import it.
     const org = await prisma.organization.create({
       data: { name: `ACME Governance ${ns}`, slug: `--gov-${ns}` },
     });
@@ -109,31 +120,39 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
   });
 
   afterAll(async () => {
-    const teams = await prisma.team.findMany({
-      where: { organizationId },
-      select: { id: true },
-    });
-    const teamIds = teams.map((t) => t.id);
-    await prisma.modelProvider
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.teamUser
-      .deleteMany({ where: { teamId: { in: teamIds } } })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.project
-      .deleteMany({ where: { teamId: { in: teamIds } } })
-      .catch(() => {});
-    await prisma.team.deleteMany({ where: { organizationId } }).catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { id: organizationId } })
-      .catch(() => {});
-    await prisma.user.deleteMany({ where: { email } }).catch(() => {});
+    // A `beforeAll` that threw partway leaves these ids unset, and Prisma
+    // drops an `undefined` from a where clause rather than matching nothing:
+    // `deleteMany({ where: { organizationId: undefined } })` is
+    // `deleteMany({})`, which empties the table. This database is shared with
+    // every other suite and worktree, so a broken setup must not escalate
+    // into a destructive teardown. Clean up only what was actually created,
+    // and let a genuine cleanup failure surface instead of swallowing it —
+    // blanket catches are what hid the tenancy-guard errors here before.
+    if (organizationId) {
+      const teams = await prisma.team.findMany({
+        where: { organizationId },
+        select: { id: true },
+      });
+      const teamIds = teams.map((t) => t.id);
+
+      await prisma.modelProvider.deleteMany({ where: { organizationId } });
+      await prisma.roleBinding.deleteMany({ where: { organizationId } });
+      if (teamIds.length > 0) {
+        await prisma.teamUser.deleteMany({
+          where: { teamId: { in: teamIds } },
+        });
+        await prisma.project.deleteMany({
+          where: { teamId: { in: teamIds } },
+        });
+      }
+      await prisma.organizationUser.deleteMany({ where: { organizationId } });
+      await prisma.team.deleteMany({ where: { organizationId } });
+      await prisma.organization.deleteMany({ where: { id: organizationId } });
+    }
+
+    if (userId) {
+      await prisma.user.deleteMany({ where: { id: userId } });
+    }
   });
 
   /** Step 1: the signup really produces the shape the seam assumes. */
