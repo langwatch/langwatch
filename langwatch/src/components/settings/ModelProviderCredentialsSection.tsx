@@ -111,6 +111,9 @@ export const CredentialsSection = ({
           const isInvalid = Boolean(fieldErrors[key]);
           const showsRepointNotice =
             !!repointNotice && key === providerDefinition?.endpointKey;
+          // Ties the notice to the input it belongs to, so focusing the
+          // field announces where the key is about to go.
+          const repointNoticeId = `${key}-repoint-notice`;
 
           return (
             <React.Fragment key={key}>
@@ -144,6 +147,9 @@ export const CredentialsSection = ({
                     autoComplete="off"
                     placeholder={isOptional ? "optional" : undefined}
                     width="full"
+                    aria-describedby={
+                      showsRepointNotice ? repointNoticeId : undefined
+                    }
                   />
                 </Box>
                 {fieldErrors[key] && (
@@ -151,7 +157,7 @@ export const CredentialsSection = ({
                 )}
               </Field.Root>
               {showsRepointNotice && (
-                <Alert.Root status="warning" size="sm">
+                <Alert.Root status="warning" size="sm" id={repointNoticeId}>
                   <Alert.Indicator />
                   <Alert.Content>
                     <Alert.Title>

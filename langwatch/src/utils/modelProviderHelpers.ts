@@ -124,6 +124,10 @@ function schemaDemandsKey({
  * credential schemas are deliberately permissive so a key can also arrive
  * from an environment variable, which says nothing about what the customer
  * must type here.
+ *
+ * Values are trimmed before the schema sees them, so a field holding only
+ * spaces counts as blank here whether or not the provider's own refinement
+ * remembers to trim.
  */
 export function getRequiredCredentialKeys({
   keysSchema,
@@ -138,6 +142,9 @@ export function getRequiredCredentialKeys({
 }): Set<string> {
   const keys = Object.keys(fieldSchemas ?? {});
   const declaredOptional = optionalKeys ? new Set(optionalKeys) : undefined;
+  const trimmedValues = Object.fromEntries(
+    Object.entries(values ?? {}).map(([key, value]) => [key, value?.trim() ?? ""]),
+  );
   const blankValues = Object.fromEntries(keys.map((key) => [key, ""]));
 
   const required = new Set<string>();
@@ -159,7 +166,10 @@ export function getRequiredCredentialKeys({
       values: blankValues,
       key,
     });
-    if (alwaysDemanded && !schemaDemandsKey({ keysSchema, values, key })) {
+    if (
+      alwaysDemanded &&
+      !schemaDemandsKey({ keysSchema, values: trimmedValues, key })
+    ) {
       continue;
     }
     required.add(key);
@@ -338,6 +348,24 @@ export function hasUserEnteredNewApiKey(
 }
 
 /**
+ * Whether one credential field now holds something other than what was
+ * stored for it. Emptying a field counts: it is how a base URL gets
+ * removed, and reading that as "nothing happened" left Save disabled with
+ * no way to undo the endpoint.
+ */
+function credentialFieldChanged({
+  value,
+  storedValue,
+}: {
+  value: string | undefined;
+  storedValue: unknown;
+}): boolean {
+  const current = value?.trim() ?? "";
+  const stored = typeof storedValue === "string" ? storedValue.trim() : "";
+  return current !== stored;
+}
+
+/**
  * Detects if user has modified any non-API-key fields (like URLs).
  * Used to determine if validation/save should run when using env vars.
  *
@@ -349,20 +377,31 @@ export function hasUserModifiedNonApiKeyFields(
   customKeys: Record<string, string>,
   initialKeys: Record<string, unknown>,
 ): boolean {
-  return Object.entries(customKeys).some(([key, value]) => {
-    // Skip API key fields
-    if (isApiKeyField(key)) {
-      return false;
-    }
-    // Emptying a field the provider had a value for is a change like any
-    // other: it is how a base URL gets removed, and treating it as "nothing
-    // happened" left Save disabled with no way to undo the endpoint.
-    const initialValue = initialKeys[key];
-    const currentValue = value?.trim() ?? "";
-    const storedValue =
-      typeof initialValue === "string" ? initialValue.trim() : "";
-    return currentValue !== storedValue;
-  });
+  return Object.entries(customKeys).some(
+    ([key, value]) =>
+      !isApiKeyField(key) &&
+      credentialFieldChanged({ value, storedValue: initialKeys[key] }),
+  );
+}
+
+/**
+ * Whether any credential the customer can actually see has changed.
+ * Fields still holding the masked placeholder are the ones they never
+ * touched, so they are skipped rather than compared against a secret the
+ * browser never receives.
+ *
+ * @param customKeys - The current form state
+ * @param initialKeys - The stored keys the form was seeded from
+ */
+export function hasUserModifiedAnyCredential(
+  customKeys: Record<string, string>,
+  initialKeys: Record<string, unknown>,
+): boolean {
+  return Object.entries(customKeys).some(
+    ([key, value]) =>
+      value !== MASKED_KEY_PLACEHOLDER &&
+      credentialFieldChanged({ value, storedValue: initialKeys[key] }),
+  );
 }
 
 /**

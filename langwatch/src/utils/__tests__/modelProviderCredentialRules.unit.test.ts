@@ -91,6 +91,15 @@ describe("getRequiredCredentialKeys()", () => {
         /** @scenario The API key stops being required once a base URL is entered */
         it("requires the API key again", () => {
           expect(
+            requiredKeysFor(providerKey, { [apiKey]: "", [baseUrl]: "" }),
+          ).toEqual([apiKey]);
+        });
+      });
+
+      describe("when the base URL holds only whitespace", () => {
+        /** @scenario The API key stops being required once a base URL is entered */
+        it("treats it as blank and requires the API key", () => {
+          expect(
             requiredKeysFor(providerKey, { [apiKey]: "", [baseUrl]: "   " }),
           ).toEqual([apiKey]);
         });

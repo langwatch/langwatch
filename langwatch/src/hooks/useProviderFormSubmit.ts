@@ -11,6 +11,7 @@ import { api } from "../utils/api";
 import {
   filterMaskedApiKeys,
   hasUserEnteredNewApiKey,
+  hasUserModifiedAnyCredential,
   hasUserModifiedNonApiKeyFields,
 } from "../utils/modelProviderHelpers";
 import {
@@ -247,16 +248,9 @@ export function useProviderFormSubmit({
         // existence. When nothing changed, send `undefined` so the save is a
         // no-op for credentials rather than a partial object validated
         // against the provider's schema.
-        const withoutPlaceholders = filterMaskedApiKeys(customKeys);
-        const hasRealChange = Object.entries(withoutPlaceholders).some(
-          ([key, value]) => {
-            const current = (value ?? "").trim();
-            const stored =
-              typeof initialKeys[key] === "string"
-                ? (initialKeys[key] as string).trim()
-                : "";
-            return current !== stored;
-          },
+        const hasRealChange = hasUserModifiedAnyCredential(
+          customKeys,
+          initialKeys,
         );
         customKeysToSend = hasRealChange ? { ...customKeys } : undefined;
       } else if (userEnteredNewKey || hasNonApiKeyChanges) {

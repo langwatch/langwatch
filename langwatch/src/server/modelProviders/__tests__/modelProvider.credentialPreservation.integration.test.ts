@@ -91,6 +91,10 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
     });
 
     afterAll(async () => {
+      // A half-finished beforeAll leaves these undefined, and Prisma drops
+      // undefined predicates rather than matching nothing — so bail out
+      // instead of deleting by an unfiltered `where`.
+      if (!projectId || !organizationId) return;
       await prisma.modelProvider.deleteMany({
         where: {
           scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },

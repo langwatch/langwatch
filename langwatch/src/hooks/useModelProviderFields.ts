@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { modelProviders as serverModelProviders } from "../server/modelProviders/registry";
 import {
+  getDisplayKeysForProvider,
   getRequiredCredentialKeys,
   getSchemaShape,
   isApiKeyField,
@@ -41,11 +42,16 @@ export interface UseModelProviderFieldsResult {
  * for providers that accept either an API key or a base URL, so pass the
  * live form state and the markers keep up. Omit it and every field is judged
  * against an empty form.
+ *
+ * `useApiGateway` mirrors the drawer's Azure toggle: requiredness is judged
+ * over the fields actually on screen, so the hidden half of the Azure form
+ * never decides anything.
  */
 export function useModelProviderFields(
   // eslint-disable-next-line @typescript-eslint/ban-types
   providerKey: ServerModelProviderKey | (string & {}),
   values?: Record<string, string>,
+  useApiGateway?: boolean,
 ): UseModelProviderFieldsResult {
   return useMemo(() => {
     const provider = serverModelProviders[
@@ -59,7 +65,11 @@ export function useModelProviderFields(
 
     const requiredKeys = getRequiredCredentialKeys({
       keysSchema: provider?.keysSchema,
-      fieldSchemas: shape,
+      fieldSchemas: getDisplayKeysForProvider(
+        providerKey,
+        useApiGateway ?? false,
+        shape,
+      ),
       values: values ?? {},
       optionalKeys: (provider as { optionalKeys?: readonly string[] })
         ?.optionalKeys,
@@ -86,5 +96,5 @@ export function useModelProviderFields(
     };
 
     return { fields, orderedFieldKeys, buildDefaultValues };
-  }, [providerKey, values]);
+  }, [providerKey, values, useApiGateway]);
 }

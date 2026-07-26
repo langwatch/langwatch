@@ -225,7 +225,7 @@ Feature: Model Provider Configuration
     And I leave the API key field empty
     And I click "Save"
     Then the provider is saved
-    And no API key value is sent with it
+    And the API key is saved empty, so nothing is sent to my endpoint as a credential
 
     Examples:
       | provider  |
