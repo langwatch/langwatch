@@ -13,6 +13,13 @@ const (
 	AttrGenAIUsageCacheCreate = "gen_ai.usage.cache_creation.input_tokens"
 	AttrGenAIConversationID   = "gen_ai.conversation.id"
 
+	// Audio usage measures (no upstream semconv exists yet for either):
+	// characters synthesized by a TTS call and seconds of audio transcribed
+	// by an STT call, the units character- and duration-priced audio
+	// providers bill by. The cost pipeline prices audio spans from these.
+	AttrGenAIUsageInputChars   = "gen_ai.usage.input_chars"
+	AttrGenAIUsageAudioSeconds = "gen_ai.usage.audio_seconds"
+
 	// AttrLabels carries the VK's tags; the trace pipeline ingests this
 	// exact key into metadata.labels (otel.traces.ts), which the Trace
 	// Explorer filters as "Label".

@@ -282,6 +282,15 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.Usage.CacheCreationTokens > 0 {
 		attrs = append(attrs, attribute.Int(AttrGenAIUsageCacheCreate, params.Usage.CacheCreationTokens))
 	}
+	// Audio usage: TTS reports the characters synthesized, STT the seconds
+	// transcribed. Character- and duration-priced audio models have no token
+	// usage, so these attrs are what the cost pipeline prices them from.
+	if params.Usage.InputChars > 0 {
+		attrs = append(attrs, attribute.Int(AttrGenAIUsageInputChars, params.Usage.InputChars))
+	}
+	if params.Usage.AudioSeconds > 0 {
+		attrs = append(attrs, attribute.Float64(AttrGenAIUsageAudioSeconds, params.Usage.AudioSeconds))
+	}
 	// VK id + request id let the control plane's trace-processing pipeline
 	// identify gateway traces and fold idempotent budget debits into ClickHouse.
 	// See specs/ai-gateway/_shared/contract.md §4.5.
