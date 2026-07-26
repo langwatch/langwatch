@@ -25,6 +25,11 @@ permissions:
 
 jobs:
   check:
+    # Release PRs are exempt. release-please writes their description itself
+    # from the changelog, so there is no author to fill the section in, and the
+    # operator impact of everything the release carries was already stated on
+    # the PRs that composed it.
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     steps:
       - name: Verify deployment-impact section in PR description
