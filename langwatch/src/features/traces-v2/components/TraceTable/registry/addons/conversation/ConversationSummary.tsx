@@ -31,7 +31,9 @@ export const ConversationSummaryLine: React.FC<SummaryProps> = ({ group }) => {
       {group.primaryModel && (
         <>
           <Separator />
-          <Text>{(group.primaryModel)}</Text>
+          <Text truncate maxW="16rem" title={group.primaryModel}>
+            {group.primaryModel}
+          </Text>
         </>
       )}
       {group.totalCost > 0 && (
@@ -76,7 +78,9 @@ export const ConversationSummaryDetail: React.FC<SummaryProps> = ({
       {group.primaryModel && (
         <>
           <Separator />
-          <Text>{(group.primaryModel)}</Text>
+          <Text truncate maxW="16rem" title={group.primaryModel}>
+            {group.primaryModel}
+          </Text>
         </>
       )}
       {group.totalSpans > 0 && (

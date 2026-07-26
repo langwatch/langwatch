@@ -230,8 +230,10 @@ func TestExtractOutputMessages_SpeechBinaryStaysEmpty(t *testing.T) {
 }
 
 // Go's %q escaping is not JSON (a vertical tab becomes \v, which JSON
-// rejects); every extracted message must marshal through encoding/json so
-// control characters in transcripts survive as parseable JSON.
+// rejects); every message wrapper this file CONSTRUCTS must marshal through
+// encoding/json so control characters survive as parseable JSON. (The
+// default chat path returns the request's own `messages` JSON verbatim and
+// needs no re-encoding.)
 func TestExtractedMessagesAreValidJSONWithControlChars(t *testing.T) {
 	speech := []byte("{\"model\":\"m\",\"input\":\"line one\\u000bline two\"}")
 	in := extractInputMessages(speech, domain.RequestTypeSpeech)
@@ -247,6 +249,9 @@ func TestExtractedMessagesAreValidJSONWithControlChars(t *testing.T) {
 	var parsed []map[string]string
 	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
 		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(parsed) != 1 {
+		t.Fatalf("expected exactly one message, got %d: %s", len(parsed), out)
 	}
 	if parsed[0]["content"] != "tab\u000bseparated" {
 		t.Fatalf("content round-trip lost the control char: %q", parsed[0]["content"])

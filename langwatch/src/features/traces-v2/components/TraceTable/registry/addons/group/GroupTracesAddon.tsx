@@ -110,8 +110,8 @@ const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
               {formatCost(trace.totalCost, trace.tokensEstimated)}
             </MonoCell>
             {groupBy !== "model" && trace.models[0] && (
-              <MonoCell flexShrink={0}>
-                {(trace.models[0])}
+              <MonoCell truncate maxW="16rem" title={trace.models[0]}>
+                {trace.models[0]}
               </MonoCell>
             )}
             {trace.totalTokens > 0 && (
