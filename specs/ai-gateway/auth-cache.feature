@@ -104,6 +104,50 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
         | 404 Not Found         | invalid_api_key       |
         | 403 Forbidden         | virtual_key_revoked   |
 
+  Rule: A config fetch failure never manufactures a "no provider configured" answer
+    resolve-key authenticates the key; the /config fetch carries the org's
+    provider credentials. If the config fetch fails, a bundle with zero
+    credentials must never be cached or served: dispatch would answer the
+    terminal no_provider_configured 400 — telling an org with perfectly good
+    keys to go add a provider API key — and the poisoned bundle would keep
+    that answer alive until expiry, on every node sharing the cache.
+
+    @unit
+    Scenario: config fetch fails on a cold miss -> retryable error, nothing cached
+      Given the control plane resolves the key successfully
+      But the config fetch fails with a transport error
+      When I send a request with that VK
+      Then the request is rejected with error.type "auth_upstream_unavailable" (503, retryable)
+      And no bundle is cached in L1 or L2
+      And the next request retries the control plane and succeeds once it recovers
+
+    @unit
+    Scenario: config fetch succeeds with zero credentials -> the real no-provider answer stands
+      Given the control plane resolves the key successfully
+      And the config fetch succeeds carrying an empty credential list
+      When I send a request with that VK
+      Then the bundle is cached and served with zero credentials
+      And dispatch answers no_provider_configured (the org genuinely has no provider key)
+
+    @unit
+    Scenario: config fetch fails during a stale-entry refresh -> stale credentials keep serving
+      Given the cache holds a soft-expired entry whose bundle carries known-good credentials
+      And the control plane resolves the key successfully
+      But the config fetch fails with a transport error
+      When I send a request with that VK
+      Then the stale bundle with its credentials is served
+      And its soft expiry is bumped, transport-failure style
+      And the config-less fresh bundle is not cached
+
+    @unit
+    Scenario: config fetch fails during a proactive background refresh -> the healthy entry survives
+      Given the cache holds a fresh entry near its soft expiry with known-good credentials
+      And the control plane resolves the key successfully
+      But the config fetch fails with a transport error
+      When the proactive background refresh runs
+      Then the existing entry keeps serving its credentials
+      And the config-less fresh bundle does not replace it
+
     @unit @unimplemented
     Scenario: hard expiry cap stops the stale-while-error chain
       Given the cache holds an entry stale-extended past the LW_GATEWAY_AUTH_CACHE_HARD_GRACE cap (default 6h)

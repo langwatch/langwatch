@@ -1091,4 +1091,7 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)
+	// Retryable by contract: the control plane failed us, not the caller.
+	// A 5xx keeps client SDKs retrying instead of bubbling a config error.
+	herr.RegisterStatus(domain.ErrAuthUpstream, http.StatusServiceUnavailable)
 }
