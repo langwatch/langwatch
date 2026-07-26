@@ -227,6 +227,14 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchPassthrough(ctx, req, provider, model, cred)
 	}
 
+	// /v1/messages to a destination that does not speak the Anthropic wire
+	// format is translated rather than raw-forwarded. Forwarding verbatim
+	// hands the provider a body it cannot parse and surfaces its own
+	// "Unknown parameter: 'system'" back to the caller.
+	if req.Type == domain.RequestTypeMessages && !isAnthropicWireProvider(provider) {
+		return r.dispatchMessagesTranslated(ctx, req, provider, model, cred)
+	}
+
 	// Managed-Bedrock with a per-request runtime endpoint (the customer's
 	// VPC endpoint) dispatches through the official AWS SDK bedrockruntime
 	// client with BaseEndpoint pinned to that VPCE, so the request is
@@ -516,7 +524,15 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	}
 
 	if req.Type == domain.RequestTypeMessages {
-		return r.dispatchMessagesStream(ctx, req, provider, model, cred)
+		// Anthropic-wire destinations keep the raw-forward passthrough so the
+		// provider's own SSE frames reach the client untouched. Everything
+		// else is translated: PassthroughStream would POST /v1/messages to a
+		// provider that has no such route, and the iterator would then block
+		// on a channel yielding neither chunk nor error.
+		if isAnthropicWireProvider(provider) {
+			return r.dispatchMessagesStream(ctx, req, provider, model, cred)
+		}
+		return r.dispatchMessagesTranslatedStream(ctx, req, provider, model, cred)
 	}
 
 	// Managed-Bedrock with a per-request runtime endpoint streams through the
