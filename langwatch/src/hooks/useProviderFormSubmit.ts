@@ -248,10 +248,10 @@ export function useProviderFormSubmit({
         // existence. When nothing changed, send `undefined` so the save is a
         // no-op for credentials rather than a partial object validated
         // against the provider's schema.
-        const hasRealChange = hasUserModifiedAnyCredential(
+        const hasRealChange = hasUserModifiedAnyCredential({
           customKeys,
           initialKeys,
-        );
+        });
         customKeysToSend = hasRealChange ? { ...customKeys } : undefined;
       } else if (userEnteredNewKey || hasNonApiKeyChanges) {
         customKeysToSend = userEnteredNewKey

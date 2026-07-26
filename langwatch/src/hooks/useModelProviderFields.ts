@@ -47,12 +47,16 @@ export interface UseModelProviderFieldsResult {
  * over the fields actually on screen, so the hidden half of the Azure form
  * never decides anything.
  */
-export function useModelProviderFields(
+export function useModelProviderFields({
+  providerKey,
+  values,
+  useApiGateway,
+}: {
   // eslint-disable-next-line @typescript-eslint/ban-types
-  providerKey: ServerModelProviderKey | (string & {}),
-  values?: Record<string, string>,
-  useApiGateway?: boolean,
-): UseModelProviderFieldsResult {
+  providerKey: ServerModelProviderKey | (string & {});
+  values?: Record<string, string>;
+  useApiGateway?: boolean;
+}): UseModelProviderFieldsResult {
   return useMemo(() => {
     const provider = serverModelProviders[
       providerKey as keyof typeof serverModelProviders

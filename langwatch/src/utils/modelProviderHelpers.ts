@@ -143,7 +143,10 @@ export function getRequiredCredentialKeys({
   const keys = Object.keys(fieldSchemas ?? {});
   const declaredOptional = optionalKeys ? new Set(optionalKeys) : undefined;
   const trimmedValues = Object.fromEntries(
-    Object.entries(values ?? {}).map(([key, value]) => [key, value?.trim() ?? ""]),
+    Object.entries(values ?? {}).map(([key, value]) => [
+      key,
+      value?.trim() ?? "",
+    ]),
   );
   const blankValues = Object.fromEntries(keys.map((key) => [key, ""]));
 
@@ -389,14 +392,16 @@ export function hasUserModifiedNonApiKeyFields(
  * Fields still holding the masked placeholder are the ones they never
  * touched, so they are skipped rather than compared against a secret the
  * browser never receives.
- *
- * @param customKeys - The current form state
- * @param initialKeys - The stored keys the form was seeded from
  */
-export function hasUserModifiedAnyCredential(
-  customKeys: Record<string, string>,
-  initialKeys: Record<string, unknown>,
-): boolean {
+export function hasUserModifiedAnyCredential({
+  customKeys,
+  initialKeys,
+}: {
+  /** The current form state. */
+  customKeys: Record<string, string>;
+  /** The stored keys the form was seeded from. */
+  initialKeys: Record<string, unknown>;
+}): boolean {
   return Object.entries(customKeys).some(
     ([key, value]) =>
       value !== MASKED_KEY_PLACEHOLDER &&

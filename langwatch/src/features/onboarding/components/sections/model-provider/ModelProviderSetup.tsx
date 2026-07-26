@@ -204,11 +204,11 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     [backendModelProviderKey],
   );
 
-  const { fields: derivedFields } = useModelProviderFields(
-    backendModelProviderKey,
-    state.customKeys,
-    state.useApiGateway,
-  );
+  const { fields: derivedFields } = useModelProviderFields({
+    providerKey: backendModelProviderKey,
+    values: state.customKeys,
+    useApiGateway: state.useApiGateway,
+  });
   const [openAiValidationError, setOpenAiValidationError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
