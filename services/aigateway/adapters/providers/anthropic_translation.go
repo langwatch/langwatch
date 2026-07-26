@@ -88,8 +88,56 @@ func buildMessagesResponsesRequest(
 	bfReq.Provider = provider
 	bfReq.Model = model
 	bfReq.Fallbacks = nil
+	normalizeReasoningBudget(bfReq)
 
 	return bfReq, nil
+}
+
+// normalizeReasoningBudget turns an Anthropic thinking budget into a reasoning
+// effort before the request leaves for a non-Anthropic provider.
+//
+// `thinking.budget_tokens` is an absolute token count that only means anything
+// against Anthropic's own limits. Carried across verbatim it is not merely
+// imprecise, it is fatal: Claude Code asks for 31999 tokens, Gemini 2.5 Flash
+// caps thinking at 24576, and the provider's converter rejects the whole
+// request rather than clamping, so every Claude Code turn fails. Effort buckets
+// are the portable currency here, because each provider maps a bucket onto its
+// own valid range.
+//
+// The turn keeps its reasoning either way. Only the units change, and only on
+// the translated lane: the Anthropic lane never reaches this code and its
+// budget stays exact.
+func normalizeReasoningBudget(bfReq *bfschemas.BifrostResponsesRequest) {
+	if bfReq == nil || bfReq.Params == nil || bfReq.Params.Reasoning == nil {
+		return
+	}
+	reasoning := bfReq.Params.Reasoning
+	if reasoning.MaxTokens == nil {
+		return
+	}
+	budget := *reasoning.MaxTokens
+	reasoning.MaxTokens = nil
+	if reasoning.Effort != nil {
+		// The caller already expressed intent in the portable unit.
+		return
+	}
+	reasoning.Effort = bfschemas.Ptr(effortForThinkingBudget(budget))
+}
+
+// effortForThinkingBudget buckets an Anthropic thinking budget. The thresholds
+// follow Anthropic's own guidance: 1024 is the documented minimum budget, and
+// their examples treat low tens of thousands as deep thinking.
+func effortForThinkingBudget(budget int) string {
+	switch {
+	case budget <= 0:
+		return "none"
+	case budget < 4096:
+		return "low"
+	case budget < 16384:
+		return "medium"
+	default:
+		return "high"
+	}
 }
 
 // --- Anthropic error envelopes ---
@@ -524,6 +572,21 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 	}
 }
 
+// hasToolUseBlock reports whether a content block array contains a tool call.
+func hasToolUseBlock(blocks []bfanthropic.AnthropicContentBlock) bool {
+	for i := range blocks {
+		switch blocks[i].Type {
+		case bfanthropic.AnthropicContentBlockTypeToolUse,
+			bfanthropic.AnthropicContentBlockTypeServerToolUse,
+			bfanthropic.AnthropicContentBlockTypeMCPToolUse:
+			return true
+		default:
+			continue
+		}
+	}
+	return false
+}
+
 // noteBlockKind remembers block kinds that carry meaning for the terminal
 // stop reason.
 func (f *anthropicStreamFramer) noteBlockKind(kind bfanthropic.AnthropicContentBlockType) {
@@ -771,6 +834,13 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 	}
 	if anthResp.Content == nil {
 		anthResp.Content = []bfanthropic.AnthropicContentBlock{}
+	}
+	// A reply carrying a tool call ends in tool_use, whatever the provider
+	// reported. Providers that translate through their own chat shape lose the
+	// distinction and answer end_turn, which tells the client the turn is over
+	// and leaves the tool call unrun. Mirrors the streaming framer.
+	if anthResp.StopReason == bfanthropic.AnthropicStopReasonEndTurn && hasToolUseBlock(anthResp.Content) {
+		anthResp.StopReason = bfanthropic.AnthropicStopReasonToolUse
 	}
 
 	body, marshalErr := sonic.Marshal(anthResp)

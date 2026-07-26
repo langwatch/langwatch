@@ -669,6 +669,84 @@ func TestMessagesTranslated_NonStreaming_ReturnsCompleteAnthropicMessage(t *test
 	assert.Equal(t, 7, resp.Usage.PromptTokens, "usage must also reach the gateway's billing pipeline")
 }
 
+// Claude Code always sends `thinking.budget_tokens`, an absolute count that
+// only means anything against Anthropic's own limits. Forwarded verbatim it is
+// fatal rather than merely imprecise: Claude Code asks for 31999 tokens, Gemini
+// 2.5 Flash caps thinking at 24576, and the provider's converter rejects the
+// entire request. Every Claude Code turn against Gemini failed on this.
+//
+// @scenario "A non-Anthropic destination is translated instead of raw-forwarded"
+func TestMessagesTranslated_ThinkingBudget_BecomesPortableEffort(t *testing.T) {
+	bfCtx := bfschemas.NewBifrostContext(context.Background(), time.Time{})
+	body := `{"model":"claude-sonnet-4-5","max_tokens":32000,` +
+		`"thinking":{"type":"enabled","budget_tokens":31999},` +
+		`"messages":[{"role":"user","content":"think hard"}]}`
+
+	bfReq, err := buildMessagesResponsesRequest(bfCtx, messagesRequest(body), bfschemas.Gemini, "gemini-2.5-flash")
+	require.NoError(t, err)
+	require.NotNil(t, bfReq.Params)
+	require.NotNil(t, bfReq.Params.Reasoning, "an enabled thinking block must still request reasoning")
+
+	assert.Nil(t, bfReq.Params.Reasoning.MaxTokens,
+		"an absolute Anthropic token budget must not reach a provider with a different ceiling")
+	require.NotNil(t, bfReq.Params.Reasoning.Effort,
+		"the reasoning request must survive as a portable effort bucket, not be dropped")
+	assert.NotEmpty(t, *bfReq.Params.Reasoning.Effort,
+		"the effort bucket must actually name a level")
+}
+
+// The bucketing itself, at the boundaries.
+//
+// @scenario "A non-Anthropic destination is translated instead of raw-forwarded"
+func TestEffortForThinkingBudget_Buckets(t *testing.T) {
+	cases := map[int]string{
+		0: "none", -1: "none",
+		1024: "low", 4095: "low",
+		4096: "medium", 16383: "medium",
+		16384: "high", 31999: "high",
+	}
+	for budget, want := range cases {
+		assert.Equal(t, want, effortForThinkingBudget(budget),
+			"a %d token thinking budget is %s effort", budget, want)
+	}
+}
+
+// The non-streaming sibling of the streaming stop-reason promotion. A reply
+// carrying a tool call must say tool_use, or the client ends the turn and never
+// runs the tool.
+//
+// @scenario "A non-streaming translated response is a complete Anthropic message"
+func TestMessagesTranslated_NonStreamingToolCall_ReportsToolUseStopReason(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"c1","object":"chat.completion","created":1,"model":"local-model",` +
+			`"choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[` +
+			`{"id":"call_x","type":"function","function":{"name":"Read","arguments":"{\"path\":\"/tmp/a\"}"}}]},` +
+			`"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8}}`))
+	}))
+	defer backend.Close()
+
+	router := newTestRouter(t)
+	req := messagesRequest(`{"model":"claude-sonnet-4-5","max_tokens":512,"messages":[{"role":"user","content":"read it"}]}`)
+	resp, err := router.Dispatch(context.Background(), req, customEndpointCred(backend.URL))
+	require.NoError(t, err)
+
+	var msg map[string]any
+	require.NoError(t, json.Unmarshal(resp.Body, &msg))
+
+	content, ok := msg["content"].([]any)
+	require.True(t, ok)
+	var sawToolUse bool
+	for _, c := range content {
+		if block, ok := c.(map[string]any); ok && block["type"] == "tool_use" {
+			sawToolUse = true
+		}
+	}
+	require.True(t, sawToolUse, "the tool call must reach the client as a tool_use block")
+	assert.Equal(t, "tool_use", msg["stop_reason"],
+		"a reply carrying a tool call must report tool_use, or the client ends the turn without running it")
+}
+
 // The other half of the tool loop: a tool_result the client sends back must
 // reach the provider attached to the call it answers.
 //
