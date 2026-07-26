@@ -6,7 +6,7 @@ import { computeSpanCost } from "../model-cost-matching";
 // Catalog rates under test (llmModels.overlay.json): flash v2 $0.05/1k chars,
 // scribe $0.22/hour, gpt-4o-transcribe $0.006/min.
 const FLASH_PER_CHAR = 5e-5;
-const SCRIBE_PER_SECOND = 6.111e-5;
+const SCRIBE_PER_SECOND = 6.11e-5;
 const TRANSCRIBE_PER_SECOND = 1e-4;
 
 describe("audio model cost", () => {

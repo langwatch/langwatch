@@ -1,6 +1,6 @@
 {
   "updatedAt": "2026-07-26T15:42:18.790Z",
-  "modelCount": 359,
+  "modelCount": 363,
   "models": {
     "anthropic/claude-opus-5-fast": {
       "id": "anthropic/claude-opus-5-fast",
@@ -13519,6 +13519,90 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": true
+    },
+    "elevenlabs/scribe_v1": {
+      "id": "elevenlabs/scribe_v1",
+      "name": "scribe_v1",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.0000611
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/tts-1": {
+      "id": "openai/tts-1",
+      "name": "tts-1",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.000015
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/tts-1-hd": {
+      "id": "openai/tts-1-hd",
+      "name": "tts-1-hd",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.00003
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/whisper-1": {
+      "id": "openai/whisper-1",
+      "name": "whisper-1",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.0001
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
     }
   }
 }

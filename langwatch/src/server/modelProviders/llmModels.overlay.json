@@ -1,5 +1,5 @@
 {
-  "_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load \u2014 see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog.",
+  "_comment": "Hand-curated model entries for direct-API providers that the upstream model-catalog source does not carry (Voyage AI's direct API today, others later). Merged into llmModels at module load \u2014 see loadModelCatalog.ts. The base llmModels.json is regenerated periodically and overwriting hand-added entries would silently drop these providers; the overlay file is never touched by the regen task. Add entries here when integrating a provider whose models aren't reachable via the upstream catalog. Audio entries here are the ones litellm's price registry cannot serve correctly: models it lacks (ElevenLabs flash/turbo), models it prices without audio units (gpt-4o-mini-tts, the gpt-4o transcribe pair), and models where its rate lags a provider price change (eleven_multilingual_v2 still carries the pre-cut rate upstream). Entries litellm carries correctly (tts-1, tts-1-hd, whisper-1, scribe_v1) were retired from the overlay and flow in via the weekly sync.",
   "models": {
     "voyage/voyage-3.5": {
       "id": "voyage/voyage-3.5",
@@ -107,48 +107,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/tts-1": {
-      "id": "openai/tts-1",
-      "name": "OpenAI: TTS-1",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 1.5e-05
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "OpenAI speech synthesis, standard latency-optimized tier. Priced per input character ($15 per 1M characters).",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    },
-    "openai/tts-1-hd": {
-      "id": "openai/tts-1-hd",
-      "name": "OpenAI: TTS-1 HD",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 3e-05
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "OpenAI speech synthesis, high-definition tier. Priced per input character ($30 per 1M characters).",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    },
     "openai/gpt-4o-mini-tts": {
       "id": "openai/gpt-4o-mini-tts",
       "name": "OpenAI: GPT-4o mini TTS",
@@ -169,27 +127,6 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": true
-    },
-    "openai/whisper-1": {
-      "id": "openai/whisper-1",
-      "name": "OpenAI: Whisper",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerSecond": 0.0001
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "audio->text",
-      "mode": "audio",
-      "description": "OpenAI speech-to-text. Priced per second of audio ($0.006 per minute).",
-      "supportsImageInput": false,
-      "supportsAudioInput": true,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
     },
     "openai/gpt-4o-transcribe": {
       "id": "openai/gpt-4o-transcribe",
@@ -316,27 +253,6 @@
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": true
-    },
-    "elevenlabs/scribe_v1": {
-      "id": "elevenlabs/scribe_v1",
-      "name": "ElevenLabs: Scribe v1",
-      "provider": "elevenlabs",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerSecond": 6.111e-05
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "audio->text",
-      "mode": "audio",
-      "description": "ElevenLabs speech-to-text. Priced per second of audio ($0.22 per hour).",
-      "supportsImageInput": false,
-      "supportsAudioInput": true,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
     }
   }
 }
