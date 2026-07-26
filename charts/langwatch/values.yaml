@@ -1649,19 +1649,33 @@ gateway:
 ## visit. What Langy still needs from you is a model to talk to: configure a model
 ## provider for the project as you would for any other LangWatch feature.
 ##
-## The default pins the pod to a gvisor RuntimeClass, the secure posture. The
-## install itself never fails on this: on a cluster without the RuntimeClass,
-## only the langyagent pod stays Pending (with a "RuntimeClass not found"
-## event) while the rest of the install runs, and the install notes explain the
-## choice. Where to get one: GKE ships it managed (GKE Sandbox; Autopilot
-## schedules gvisor pods directly), AKS offers Kata VM isolation (set
-## runtimeClassName to your Kata class; any sandboxed RuntimeClass is fine),
-## EKS has no managed option, so install gVisor on your node group or accept
-## unsandboxed explicitly:
+## ISOLATION. The agent runs shell written by a language model, and the workers
+## hold the requesting user's credentials, so the controls that bound that are
+## on by DEFAULT and cost nothing: each conversation's worker runs under its own
+## UID with its own credentials, workers cannot read each other's, the per-worker
+## opencode password separates them, and the NetworkPolicy denies egress to the
+## internet unless you turn it on.
+##
+## Those are the controls that stop the attack that actually happens: a worker
+## reached by prompt injection through ingested data, using its own legitimate
+## access to exfiltrate. They work identically on every cluster.
+##
+## A sandboxed RuntimeClass (gvisor, Kata) is the rung ABOVE that: it protects
+## the node kernel from a worker that escapes its container, which needs a kernel
+## exploit on top of the injection. It is worth having, and it is deliberately
+## NOT the default here, because it behaves differently on every cluster (node
+## image, containerd version, runsc build) and a default we cannot test on your
+## nodes fails in ways that look like Langy being broken. Harden into it once,
+## on purpose, per the guide:
+##
+##   https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
 ##
 ##   langyagent:
-##     runtimeClassName: ""
-##     acceptUnsandboxedRuntime: true
+##     runtimeClassName: "gvisor"          # or your Kata class on AKS
+##     acceptUnsandboxedRuntime: false
+##
+## The install notes tell you which posture you got, and point at the guide when
+## your cluster already offers a sandboxed class you are not using.
 ##
 ## To not run Langy at all: langyagent.chartManaged: false removes the pod and
 ## every reference to it.
@@ -1670,11 +1684,11 @@ langyagent:
   ## @param langyagent.chartManaged [default: true] Deploy the Langy agent pod as part of this chart, wire the app and workers to it, and open the assistant to this install. Set false to run without the assistant; the pod and every reference to it are removed on the next upgrade.
   chartManaged: true
 
-  ## @param langyagent.runtimeClassName [string, default: "gvisor"] RuntimeClass for the agent pod. Any sandboxed class works (gvisor, a Kata class on AKS). Blank it only together with acceptUnsandboxedRuntime, on clusters that cannot offer one.
-  runtimeClassName: "gvisor"
+  ## @param langyagent.runtimeClassName [string, default: ""] RuntimeClass for the agent pod. Empty runs on the node's normal runtime, which works on any cluster. Set it to a sandboxed class to harden ("gvisor", or your Kata class on AKS) and drop acceptUnsandboxedRuntime to false alongside it. See the hardening guide linked above.
+  runtimeClassName: ""
 
-  ## @param langyagent.acceptUnsandboxedRuntime [default: false] Accept running LLM-driven shell without a pod-to-host sandbox. Required for a blank runtimeClassName, so an unsandboxed deploy is always a value the operator wrote down.
-  acceptUnsandboxedRuntime: false
+  ## @param langyagent.acceptUnsandboxedRuntime [default: true] Accept running the agent without a pod-to-host sandbox. Default true so the chart installs and works on any cluster. Setting it false without also setting runtimeClassName is refused at render time, so a cluster that has hardened cannot silently lose its sandbox.
+  acceptUnsandboxedRuntime: true
 
   ## @param langyagent.enableForAllUsers [default: true] Make Langy available to everyone in this install as soon as the agent is deployed. Set false to keep the rollout flag authoritative and open Langy to chosen projects/orgs from /ops/feature-flags instead — the staged path the hosted product uses.
   enableForAllUsers: true

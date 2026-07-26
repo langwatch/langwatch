@@ -79,23 +79,35 @@ dev's Personal Workspace at https://<your-host>/me .
 {{- if (index .Values "langyagent").chartManaged }}
   • Langy, the in-product assistant:
       kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name=langyagent
-{{- if (index .Values "langyagent").runtimeClassName }}
-    The pod is pinned to the "{{ (index .Values "langyagent").runtimeClassName }}" RuntimeClass. If the command
-    above lists NOTHING, your cluster does not define one: the pod is rejected
-    at admission, so no pod is ever created and the reason sits on the
-    Deployment instead:
+{{- $langyRtc := (index .Values "langyagent").runtimeClassName }}
+{{- if $langyRtc }}
+    Isolation: sandboxed. The pod is pinned to the "{{ $langyRtc }}" RuntimeClass.
+    If the command above lists NOTHING, your cluster does not define that class:
+    the pod is rejected at admission, so none is ever created and the reason
+    sits on the Deployment instead:
       kubectl -n {{ .Release.Namespace }} get deploy {{ .Release.Name }}-langyagent \
         -o jsonpath='{.status.conditions[?(@.type=="ReplicaFailure")].message}'
-    GKE ships the class managed (GKE Sandbox), on AKS point langyagent.runtimeClassName
-    at your Kata VM isolation class, on EKS install gVisor on the node group,
-    or accept running without the pod-to-host sandbox explicitly:
-      langyagent.runtimeClassName=""  langyagent.acceptUnsandboxedRuntime=true
     Everything else in the install keeps running either way.
 {{- else }}
-    ⚠ Running without a pod-to-host sandbox (no runtimeClassName). Workers
-    keep per-UID isolation and the NetworkPolicy. To harden, install a
-    gvisor RuntimeClass in the cluster and set:
-      langyagent.runtimeClassName=gvisor
+    Isolation: each conversation's worker runs under its own UID with its own
+    credentials, workers cannot read each other's, and the NetworkPolicy denies
+    egress to the internet{{ if (index .Values "langyagent").networkPolicy.allowExternalHttps }} (you have turned external HTTPS ON){{ end }}. The pod runs on the node's
+    normal runtime, so a worker that escapes its container faces the node
+    kernel. Hardening that last step is a sandboxed RuntimeClass:
+      https://docs.langwatch.ai/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+{{- /* Non-blocking hint: only when the cluster already offers a sandboxed class
+       that this install is not using. `lookup` is empty during `helm template`
+       and GitOps renders, so this stays silent there rather than guessing. */}}
+{{- $sandboxed := list }}
+{{- range (lookup "node.k8s.io/v1" "RuntimeClass" "" "").items }}
+{{- if or (eq .handler "runsc") (hasPrefix "kata" .handler) }}
+{{- $sandboxed = append $sandboxed .metadata.name }}
+{{- end }}
+{{- end }}
+{{- if $sandboxed }}
+    → This cluster already offers {{ join ", " $sandboxed }}. To use it:
+      langyagent.runtimeClassName={{ first $sandboxed }}  langyagent.acceptUnsandboxedRuntime=false
+{{- end }}
 {{- end }}
 {{- if (index .Values "langyagent").enableForAllUsers }}
     It is available to everyone in this install. Give it a model to talk to

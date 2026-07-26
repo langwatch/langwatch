@@ -38,6 +38,11 @@ gateway:
 langyagent:
   secrets:
     existingSecretName: "langwatch-secrets"
+# Worth hardening at this size: pin the agent to a sandboxed RuntimeClass once
+# your node group provides one. Left unset here so the profile installs on any
+# cluster. See docs/self-hosting/langy/setup#hardening-a-sandboxed-runtime
+#   runtimeClassName: "gvisor"
+#   acceptUnsandboxedRuntime: false
 
 # --- overlays/size-ha.yaml ---
 app:

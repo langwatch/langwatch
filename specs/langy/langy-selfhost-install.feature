@@ -93,28 +93,42 @@ Feature: Langy comes up with a self-hosted LangWatch install
   # The sandbox posture, on clusters that cannot offer one
   # ===========================================================================
 
-  # Langy runs LLM-written shell, so the sandboxed runtime is the posture we
-  # want everywhere. But hard-failing the whole install over it made the chart
-  # unusable on clusters without one. So the default keeps the sandbox pinned
-  # and degrades to a waiting pod instead: the install always succeeds, Langy
-  # stays dark until the operator either provides a sandboxed runtime or
-  # accepts running without one, out loud, in their values file.
-  Scenario: A default install keeps the sandbox pinned
-    Given a cluster with a sandboxed runtime available
+  # Langy runs LLM-written shell, so what bounds it must be on by default. The
+  # controls that bound the attack that actually happens do exactly that, at no
+  # cost and identically on every cluster: per-worker UID isolation, the
+  # per-worker password, and a NetworkPolicy with egress off.
+  #
+  # A sandboxed runtime is the rung above, guarding the node kernel against a
+  # worker that escapes its container. It is NOT the default, because it is the
+  # one control whose behaviour depends on the operator's node image, container
+  # runtime and sandbox build. A default nobody can test on their nodes fails in
+  # ways that read as "Langy is broken", so it is a step an operator takes on
+  # purpose, and the install tells them how.
+  Scenario: A default install runs the assistant on any cluster
+    Given a cluster with no sandboxed runtime available
     When the operator installs with default values
-    Then Langy installs and runs under the sandboxed runtime
-
-  Scenario: An operator whose cluster has no sandboxed runtime can still run Langy, deliberately
-    Given a cluster with no sandboxed runtime available
-    When the operator accepts the reduced isolation explicitly
     Then Langy installs and runs
-    And the acceptance is recorded in their own values, not buried in a default
+    And the isolation the install does have is stated back to the operator
+    And they are told where to read about hardening it further
 
-  Scenario: Leaving the sandbox out without saying so is still refused
-    Given a cluster with no sandboxed runtime available
-    When the operator blanks the runtime without accepting the reduced isolation
+  Scenario: An operator hardens the agent onto a sandboxed runtime
+    Given a cluster with a sandboxed runtime available
+    When the operator pins the agent to it
+    Then Langy installs and runs under that sandboxed runtime
+
+  Scenario: A cluster that has hardened cannot silently lose its sandbox
+    Given an operator has pinned the agent to a sandboxed runtime
+    When the sandbox is later blanked without accepting the reduced isolation
     Then the install refuses to render
     And the refusal explains both what is missing and how to accept it
+
+  # Nobody has to go looking for the upgrade if their cluster already offers it.
+  Scenario: An install on a cluster that already offers a sandbox is told so
+    Given a cluster that defines a sandboxed runtime class
+    And the operator has not pinned the agent to it
+    When the install completes
+    Then the notes name the class their cluster offers
+    And they still get a working assistant in the meantime
 
   # ===========================================================================
   # Watching Langy work, in the install that runs it
