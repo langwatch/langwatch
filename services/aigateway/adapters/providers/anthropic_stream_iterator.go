@@ -37,8 +37,27 @@ func (it *anthropicTranslatedStreamIterator) Chunk() []byte    { return it.curre
 func (it *anthropicTranslatedStreamIterator) Usage() domain.Usage {
 	return it.usage
 }
-func (it *anthropicTranslatedStreamIterator) Err() error   { return it.err }
-func (it *anthropicTranslatedStreamIterator) Close() error { return nil }
+func (it *anthropicTranslatedStreamIterator) Err() error { return it.err }
+
+// Close releases the Bifrost producer. Next stops reading as soon as the stream
+// terminates, on cancellation, on a provider error, or once the terminal frames
+// are queued, but the producer goroutine may still be parked mid-send. Leaving
+// it blocked on a channel nobody reads leaks a goroutine per abandoned request,
+// so the remainder is drained until the producer closes it. The drain runs in
+// the background because Close is on the request path and must not wait on an
+// upstream that is still streaming.
+func (it *anthropicTranslatedStreamIterator) Close() error {
+	if it.ch == nil {
+		return nil
+	}
+	ch := it.ch
+	it.ch = nil
+	go func() {
+		for range ch { //nolint:revive // draining to release the producer
+		}
+	}()
+	return nil
+}
 
 // emit queues the wire bytes for a batch of events.
 func (it *anthropicTranslatedStreamIterator) emit(events []*bfanthropic.AnthropicStreamEvent) {

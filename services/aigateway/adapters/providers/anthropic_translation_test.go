@@ -963,6 +963,45 @@ func TestAnthropicStreamFramer_StopForUnopenedBlock_LeavesNoHole(t *testing.T) {
 		"only the two real blocks may open, at contiguous indices")
 }
 
+// Next stops reading as soon as the stream terminates, so the Bifrost producer
+// can still be mid-send when the client goes away. Close must release it, or
+// every abandoned stream parks a goroutine forever on a channel nobody reads.
+//
+// Asserted on the contract directly rather than by counting goroutines: a live
+// router retains a varying number of pool and transport goroutines, so a count
+// is too noisy to distinguish a leak from normal churn.
+//
+// @scenario "A provider failure mid-stream reaches the client as an error frame"
+func TestMessagesTranslatedStream_Close_ReleasesTheProducer(t *testing.T) {
+	ch := make(chan *bfschemas.BifrostStreamChunk)
+	it := &anthropicTranslatedStreamIterator{
+		ch:     ch,
+		bfCtx:  bfschemas.NewBifrostContext(context.Background(), time.Time{}),
+		framer: newAnthropicStreamFramer("msg_test", "test-model"),
+	}
+
+	sent := make(chan struct{})
+	go func() {
+		defer close(sent)
+		ch <- &bfschemas.BifrostStreamChunk{}
+	}()
+
+	// Nobody is reading, so the producer is parked mid-send.
+	select {
+	case <-sent:
+		t.Fatal("the producer should still be blocked; the test cannot prove anything otherwise")
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	require.NoError(t, it.Close())
+
+	select {
+	case <-sent:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Close must drain the channel and release the producer, or the goroutine leaks")
+	}
+}
+
 // terminalStopReason pulls the stop_reason off the single message_delta.
 func terminalStopReason(t *testing.T, events []sseEvent) string {
 	t.Helper()
