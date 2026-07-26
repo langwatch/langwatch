@@ -231,6 +231,40 @@ def test_role_first_parallel_tool_calls_open_new_indexes_mid_stream():
     assert tool_calls[1]["function"]["arguments"] == '{"tz":"CET"}'
 
 
+def test_skipped_tool_index_placeholders_are_not_persisted():
+    outputs = accumulate(
+        [
+            chunk(
+                role="assistant",
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        id="call_0",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(
+                            name="get_weather", arguments="{}"
+                        ),
+                    )
+                ],
+            ),
+            chunk(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=2,
+                        id="call_2",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(
+                            name="get_time", arguments="{}"
+                        ),
+                    )
+                ]
+            ),
+        ]
+    )
+    tool_calls = outputs[0][0]["tool_calls"]
+    assert [t["id"] for t in tool_calls] == ["call_0", "call_2"]
+
+
 def test_late_role_delta_carrying_tool_calls_keeps_the_payload():
     outputs = accumulate(
         [

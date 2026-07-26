@@ -43,6 +43,7 @@ from openai import (
 
 from openai.types import Completion
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
+from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 
 
 class OpenAITracer:
@@ -387,12 +388,16 @@ class OpenAICompletionTracer:
         span.end()
 
 
-def _merge_tool_call_deltas(message: ChatMessage, tool_calls) -> None:
+def _merge_tool_call_deltas(
+    message: ChatMessage, tool_calls: List[ChoiceDeltaToolCall]
+) -> None:
     """Merge streamed tool-call deltas into a message by tool index.
 
     The list is grown to cover any index the stream introduces (parallel
     tool calls open index 1+ mid-stream), and each delta's id, type, name
-    and argument fragment are merged into its indexed entry.
+    and argument fragment are merged into its indexed entry. Placeholders
+    for indices the stream never fills are dropped by
+    _prune_blank_tool_calls before the span is persisted.
     """
     existing = message.get("tool_calls")
     if not existing:
@@ -416,6 +421,30 @@ def _merge_tool_call_deltas(message: ChatMessage, tool_calls) -> None:
             entry["function"]["arguments"] = (
                 entry["function"].get("arguments", "") + arguments
             )
+
+
+def _prune_blank_tool_calls(message: ChatMessage) -> None:
+    """Drop placeholder tool-call entries the stream never filled.
+
+    _merge_tool_call_deltas pads the list up to the highest index seen, so
+    a stream that skips an index leaves a fully blank entry behind; persist
+    only entries that carry any data.
+    """
+    tool_calls = message.get("tool_calls")
+    if not tool_calls:
+        return
+    kept = [
+        entry
+        for entry in tool_calls
+        if entry.get("id")
+        or entry.get("type")
+        or entry.get("function", {}).get("name")
+        or entry.get("function", {}).get("arguments")
+    ]
+    if kept:
+        message["tool_calls"] = kept
+    else:
+        del message["tool_calls"]
 
 
 class OpenAIChatCompletionTracer:
@@ -659,6 +688,9 @@ class OpenAIChatCompletionTracer:
                         chat_outputs[index][-1].get("content", "") or ""
                     ) + delta.content
 
+        for output in chat_outputs.values():
+            for message in output:
+                _prune_blank_tool_calls(message)
         OpenAIChatCompletionTracer.end_span(
             client=client,
             span=span,
