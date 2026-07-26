@@ -516,8 +516,10 @@ describe("refreshTelemetryWiringForLogin", () => {
 			(cliApi.listIngestionKeys as ReturnType<typeof vi.fn>).mockResolvedValue(
 				[],
 			);
-			(cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockImplementation(
-				async (_cfg: GovernanceConfig, sourceType: string) => ({
+			// vi.mocked keeps mintIngestionKey's real (async) signature, so the
+			// Promise-returning implementation typechecks and lints cleanly.
+			vi.mocked(cliApi.mintIngestionKey).mockImplementation(
+				async (_cfg, sourceType) => ({
 					token: `ik-lw-${sourceType.slice(0, 4)}000000000000_minted`,
 					prefix: `ik-lw-${sourceType.slice(0, 4)}`,
 					endpoint: CURRENT_ENDPOINT,
@@ -600,10 +602,8 @@ describe("refreshTelemetryWiringForLogin", () => {
 
 		describe("when the mint fails for one tool", () => {
 			it("skips that tool and still refreshes the others", async () => {
-				(
-					cliApi.mintIngestionKey as ReturnType<typeof vi.fn>
-				).mockImplementation(
-					async (_cfg: GovernanceConfig, sourceType: string) => {
+				vi.mocked(cliApi.mintIngestionKey).mockImplementation(
+					async (_cfg, sourceType) => {
 						if (sourceType === "claude_code") {
 							throw new Error("no personal workspace yet");
 						}
