@@ -170,7 +170,7 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
 
     @unit
     Scenario: the first emitted delta of a chat completion stream carries the assistant role
-      Given a chat completion stream whose upstream opening role chunk was consumed by the stream engine
+      Given a chat completion stream that would otherwise reach the client with no role on any delta
       When the gateway emits the stream
       Then the first delta of the stream carries "role":"assistant"
       And every later chunk of the stream is emitted unchanged
@@ -200,6 +200,12 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
       When the gateway emits the stream
       Then the usage-only chunk passes through with no choices invented
       And the [DONE] sentinel is unchanged
+
+    @unit
+    Scenario: a choice with no delta is not given one
+      Given a chat completion chunk whose choice carries a finish reason and no delta
+      When the gateway emits the stream
+      Then the chunk passes through without a delta object being invented
 
     @unit
     Scenario: OpenAI-compatible providers inherit the role repair

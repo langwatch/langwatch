@@ -66,8 +66,8 @@ func collectChatStream(t *testing.T, iter domain.StreamIterator) []chatChunkJSON
 	return chunks
 }
 
-// firstDeltaPerChoice returns the first chunk that carries a delta for the
-// given choice index, plus every later delta for it.
+// deltasForChoice returns every delta emitted for the given choice index, in
+// stream order.
 func deltasForChoice(chunks []chatChunkJSON, idx int) []map[string]any {
 	var out []map[string]any
 	for _, c := range chunks {
@@ -382,7 +382,7 @@ func TestChatStreamRole_TerminalChunks_PassThroughUntouched(t *testing.T) {
 // the delta of the first chunk per choice may gain a field, never the chunk
 // itself.
 //
-// @scenario "terminal chunks are not reshaped by the role repair"
+// @scenario "a choice with no delta is not given one"
 func TestChatStreamRole_ChoiceWithoutDelta_NotGivenOne(t *testing.T) {
 	ch := make(chan *bfschemas.BifrostStreamChunk, 1)
 	reason := "stop"
