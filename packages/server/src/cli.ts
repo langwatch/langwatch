@@ -13,7 +13,7 @@ import { openBrowser } from "./animation/open-browser.ts";
 import { resolvePortConflicts } from "./port-conflict/resolve.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { runPredeps } from "./predeps/runner.ts";
-import { captureUserEnv, scaffoldEnvFile } from "./shared/env.ts";
+import { captureUserEnv } from "./shared/env.ts";
 import { paths } from "./shared/paths.ts";
 import { detectPlatform } from "./shared/platform.ts";
 import { allocatePorts, PORT_BASE_DEFAULT } from "./shared/ports.ts";
@@ -51,15 +51,17 @@ async function loadRuntime(): Promise<RuntimeApi> {
 	}
 }
 
-function ensureEnvFile(
+/**
+ * Routed through `RuntimeApi.scaffoldEnv` rather than calling `shared/env.ts`
+ * directly, so the CLI stays behind the same contract `services/runtime.ts`
+ * implements (and the placeholder stands in for, before it exists).
+ */
+async function ensureEnvFile(
+	runtime: RuntimeApi,
 	ctx: RuntimeContext,
-	{ shouldReconcilePorts = false }: { shouldReconcilePorts?: boolean } = {},
-): { written: boolean; path: string; reconciledKeys: string[] } {
-	return scaffoldEnvFile({
-		ports: ctx.ports,
-		path: ctx.paths.envFile,
-		shouldReconcilePorts,
-	});
+	opts: { shouldReconcilePorts?: boolean } = {},
+): Promise<{ written: boolean; path: string; reconciledKeys: string[] }> {
+	return runtime.scaffoldEnv(ctx, opts);
 }
 
 const program = new Command();
@@ -147,7 +149,9 @@ program
 			userEnv: captureUserEnv(),
 		};
 
-		const envResult = ensureEnvFile(ctx, { shouldReconcilePorts: true });
+		const envResult = await ensureEnvFile(runtime, ctx, {
+			shouldReconcilePorts: true,
+		});
 		if (envResult.reconciledKeys.length > 0) {
 			console.log(
 				chalk.yellow(
@@ -277,7 +281,11 @@ program
 			version: VERSION,
 			userEnv: captureUserEnv(),
 		};
-		ensureEnvFile(ctx);
+		// No conflict resolution has run for this port table (unlike "start",
+		// which calls resolvePortConflicts first): base is just
+		// PORT_BASE_DEFAULT. Reconciling now would rewrite a real install's
+		// .env to that guess; leave existing port-bound URLs alone.
+		await ensureEnvFile(runtime, ctx, { shouldReconcilePorts: false });
 		await runtime.installServices(ctx);
 		console.log(
 			chalk.green("✓ install complete — run `npx @langwatch/server` to start"),

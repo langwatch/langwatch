@@ -1,5 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import type { PortAllocation } from "./ports.ts";
 
@@ -286,7 +292,12 @@ export function reconcileEnvFile(input: {
 		reconciledKeys.push(key);
 	}
 	if (reconciledKeys.length > 0) {
+		// { mode } on writeFileSync only applies when the OS creates a new
+		// file; rewriting an existing one leaves its current permissions
+		// untouched. The .env holds secrets, so chmod explicitly rather than
+		// trust whatever mode the file already had.
 		writeFileSync(input.path, lines.join("\n"), { mode: 0o600 });
+		chmodSync(input.path, 0o600);
 	}
 	return reconciledKeys;
 }

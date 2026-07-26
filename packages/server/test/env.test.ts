@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -200,6 +200,16 @@ describe("reconcileEnvFile", () => {
 			expect(readFileSync(envPath, "utf8")).toContain(
 				"REDIS_URL=redis://localhost:6561/0",
 			);
+		});
+	});
+
+	describe("when the existing file has looser permissions than 0600", () => {
+		it("tightens them back down on rewrite, since the file holds secrets", async () => {
+			const { envPath } = await scaffoldAt(5560);
+			chmodSync(envPath, 0o644);
+			reconcileEnvFile({ ports: allocatePorts(5580), path: envPath });
+			const mode = statSync(envPath).mode & 0o777;
+			expect(mode).toBe(0o600);
 		});
 	});
 });

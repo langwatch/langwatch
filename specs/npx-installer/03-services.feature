@@ -89,13 +89,44 @@ Feature: Service orchestration after pre-deps are installed
     And `runtime.events(ctx)` emits "log" events with "service" ∈ {postgres, redis, clickhouse, langwatch_nlp, langevals, ai-gateway, langwatch}
     And the CLI renders each log line to TTY with a stable prefix+color (langwatch=green, nlp=cyan, langevals=magenta, gateway=yellow, postgres=blue, redis=red, clickhouse=dim)
 
-  Scenario: A crashing service emits a "crashed" event and the CLI tears down
+  Scenario: A service that crashes after being healthy is restarted with backoff
     Given all services are running
-    When "redis" exits with code 137
+    And "workers" already reported healthy
+    When the "workers" process is killed with exit code 137 under memory pressure
+    Then the supervisor schedules a restart instead of giving up
+    And `runtime.events(ctx)` emits { type: "restarting", service: "workers", code: 137, attempt: 1 }
+    And the CLI prints "workers exited (code 137), restarting in 1s (attempt 1/3)"
+    And no "crashed" event is emitted for that exit
+    And after the backoff delay a fresh "workers" process is spawned with a new pidfile
+    And the BullMQ queues get their consumer back without a manual restart
+
+  Scenario: Repeated crashes back off and the budget is bounded
+    Given "workers" already reported healthy
+    When its process dies again right after each restart
+    Then the supervisor waits 1s before attempt 1, 5s before attempt 2, and 15s before attempt 3
+    And no further restart is attempted after attempt 3
+
+  Scenario: Staying up repays the restart budget
+    Given "workers" was restarted after a crash
+    When the new process stays up for the steady-state window
+    Then the restart counter resets
+    And a later crash is retried from attempt 1 again
+
+  Scenario: A crashed service with no restart budget left emits "crashed" and the CLI tears down
+    Given all services are running
+    And "redis" has used up its restart budget
+    When "redis" exits with code 137 once more
     Then `runtime.events(ctx)` emits { type: "crashed", service: "redis", code: 137 }
-    And the CLI prints "redis exited unexpectedly (code 137) — see ~/.langwatch/logs/redis.log"
+    And the CLI prints "redis crashed (exit 137), see ~/.langwatch/logs/redis.log"
     And the CLI calls `runtime.stopAll(handles)` to bring down everything else
     And the CLI exits with code 1
+
+  Scenario: A service that dies during initial boot is not restarted
+    Given "clickhouse" never reported healthy
+    When its process exits during boot
+    Then no restart is attempted
+    And `runtime.events(ctx)` emits { type: "crashed", service: "clickhouse" }
+    And the boot fails fast naming the service, as before
 
   Scenario: A service failing its health probe takes the already-started ones down with it
     Given the app tier starts several services at once

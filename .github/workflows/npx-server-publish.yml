@@ -223,11 +223,13 @@ jobs:
           )
           # Every workspace package in the checkout must ship: a missing one
           # leaves dangling pnpm links in the installed tree and the app dies
-          # with MODULE_NOT_FOUND at first boot — 3.6.0 shipped exactly that
+          # with MODULE_NOT_FOUND at first boot; 3.6.0 shipped exactly that
           # way (.npmignore still excluded langwatch/packages/ after runtime
-          # packages moved in). Derived from the directory listing so a new
-          # package is covered the day it appears.
-          for pkgdir in langwatch/packages/*/ packages/handled-error/ packages/langy/; do
+          # packages moved in). Both root packages/* and langwatch/packages/*
+          # are derived from a directory listing rather than named one by one,
+          # so a new package on either side is covered by this gate the day
+          # it appears, with nothing to remember to add here.
+          for pkgdir in langwatch/packages/*/ packages/*/; do
             pkgdir="${pkgdir%/}"
             [ -f "$pkgdir/package.json" ] || continue
             required+=("package/$pkgdir/package.json")

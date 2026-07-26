@@ -41,8 +41,8 @@ function busFor(ctx: RuntimeContext): EventBus {
 }
 
 const runtimeImpl: RuntimeApi = {
-	async scaffoldEnv(ctx) {
-		return scaffoldEnv(ctx);
+	async scaffoldEnv(ctx, opts) {
+		return scaffoldEnv(ctx, opts);
 	},
 
 	async installServices(ctx) {
