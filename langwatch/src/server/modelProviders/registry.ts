@@ -509,7 +509,10 @@ export function hasVariantSuffix(modelId: string): boolean {
  * Maps to the new registry format
  * Excludes models with variant suffixes (:free, :thinking, etc.)
  */
-export const allLitellmModels: Record<string, { mode: "chat" | "embedding" }> =
+export const allLitellmModels: Record<
+  string,
+  { mode: "chat" | "embedding" | "audio" }
+> =
   Object.fromEntries(
     Object.entries(llmModels.models)
       .filter(([id]) => !hasVariantSuffix(id))

@@ -232,6 +232,12 @@ export const ATTR_KEYS = {
     "gen_ai.usage.cache_creation.input_tokens",
   GEN_AI_USAGE_CACHED_INPUT_TOKENS: "gen_ai.usage.cached_input_tokens", // Mastra non-standard
 
+  // Audio usage measures the gateway emits: characters synthesized by a
+  // TTS call and seconds of audio transcribed by an STT call — the units
+  // character- and duration-priced audio models bill by.
+  GEN_AI_USAGE_INPUT_CHARS: "gen_ai.usage.input_chars",
+  GEN_AI_USAGE_AUDIO_SECONDS: "gen_ai.usage.audio_seconds",
+
   // Set by an extractor on a span whose token usage is a redundant copy of
   // another span's (e.g. codex emits one turn-rollup span AND a lower-level
   // response span carrying the SAME usage). The fold skips token/cost/cache

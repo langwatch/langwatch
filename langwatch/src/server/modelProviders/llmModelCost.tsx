@@ -22,6 +22,8 @@ const getImportedModelCosts = () => {
       outputCostPerToken: number;
       cacheReadCostPerToken?: number;
       cacheCreationCostPerToken?: number;
+      inputCostPerCharacter?: number;
+      inputCostPerSecond?: number;
     }
   > = {};
 
@@ -36,7 +38,9 @@ const getImportedModelCosts = () => {
     if (isCodexModel(modelId)) continue;
     if (
       model.pricing?.inputCostPerToken != null ||
-      model.pricing?.outputCostPerToken != null
+      model.pricing?.outputCostPerToken != null ||
+      model.pricing?.inputCostPerCharacter != null ||
+      model.pricing?.inputCostPerSecond != null
     ) {
       // Make vendor prefix optional in regex (e.g., both "gpt-4o" and "openai/gpt-4o" should match)
       const hasVendorPrefix = modelId.includes("/");
@@ -71,6 +75,8 @@ const getImportedModelCosts = () => {
         outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
         cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
         cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
+        inputCostPerCharacter: model.pricing.inputCostPerCharacter,
+        inputCostPerSecond: model.pricing.inputCostPerSecond,
       };
     }
   }
@@ -94,13 +100,18 @@ const getImportedModelCosts = () => {
         outputCostPerToken: model.outputCostPerToken,
         cacheReadCostPerToken: model.cacheReadCostPerToken,
         cacheCreationCostPerToken: model.cacheCreationCostPerToken,
+        inputCostPerCharacter: model.inputCostPerCharacter,
+        inputCostPerSecond: model.inputCostPerSecond,
       };
     });
 
   // Exclude models with no costs
   const paidModels = mergedModels.filter(
     (model) =>
-      model.inputCostPerToken != null || model.outputCostPerToken != null,
+      model.inputCostPerToken != null ||
+      model.outputCostPerToken != null ||
+      model.inputCostPerCharacter != null ||
+      model.inputCostPerSecond != null,
   );
 
   // Exclude some vendors (openrouter is already excluded as we're using their API)
@@ -129,6 +140,11 @@ export type MaybeStoredLLMModelCost = {
   // cache tokens fall back to the input rate (counted, just not discounted).
   cacheReadCostPerToken?: number;
   cacheCreationCostPerToken?: number;
+  // Audio rates: characters synthesized (TTS) and seconds transcribed
+  // (STT), matched against the gateway's gen_ai.usage.input_chars /
+  // gen_ai.usage.audio_seconds span attributes.
+  inputCostPerCharacter?: number;
+  inputCostPerSecond?: number;
   updatedAt?: Date;
   createdAt?: Date;
 };
@@ -154,6 +170,8 @@ export const getStaticModelCosts = (): MaybeStoredLLMModelCost[] => {
         outputCostPerToken: value.outputCostPerToken,
         cacheReadCostPerToken: value.cacheReadCostPerToken,
         cacheCreationCostPerToken: value.cacheCreationCostPerToken,
+        inputCostPerCharacter: value.inputCostPerCharacter,
+        inputCostPerSecond: value.inputCostPerSecond,
       }))
       // Sort by the matched model suffix, not raw registry key length,
       // because vendor prefixes are optional in the generated regex.
