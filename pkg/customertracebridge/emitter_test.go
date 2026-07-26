@@ -305,11 +305,52 @@ func TestEmitter_SpeechSpanIsNotSuppressedAsProbe(t *testing.T) {
 	case body := <-received:
 		// span reached the wire: not suppressed, and it carries the
 		// character count the cost pipeline prices TTS by.
-		require.Contains(t, string(body), AttrGenAIUsageInputChars,
-			"speech span must carry gen_ai.usage.input_chars")
+		require.Equal(t, int64(5), intAttrFromExport(t, body, AttrGenAIUsageInputChars),
+			"speech span must carry gen_ai.usage.input_chars with the synthesized count")
 	case <-time.After(3 * time.Second):
 		t.Fatal("speech span was suppressed by the zero-cost probe filter")
 	}
+}
+
+// intAttrFromExport unmarshals an OTLP export and returns the named int
+// attribute from the first span carrying it, failing the test if absent.
+func intAttrFromExport(t *testing.T, body []byte, key string) int64 {
+	t.Helper()
+	var req coltracepb.ExportTraceServiceRequest
+	require.NoError(t, proto.Unmarshal(body, &req))
+	for _, rs := range req.ResourceSpans {
+		for _, ss := range rs.ScopeSpans {
+			for _, span := range ss.Spans {
+				for _, attr := range span.Attributes {
+					if attr.GetKey() == key {
+						return attr.GetValue().GetIntValue()
+					}
+				}
+			}
+		}
+	}
+	t.Fatalf("attribute %s not found on any exported span", key)
+	return 0
+}
+
+// doubleAttrFromExport is intAttrFromExport's float twin.
+func doubleAttrFromExport(t *testing.T, body []byte, key string) float64 {
+	t.Helper()
+	var req coltracepb.ExportTraceServiceRequest
+	require.NoError(t, proto.Unmarshal(body, &req))
+	for _, rs := range req.ResourceSpans {
+		for _, ss := range rs.ScopeSpans {
+			for _, span := range ss.Spans {
+				for _, attr := range span.Attributes {
+					if attr.GetKey() == key {
+						return attr.GetValue().GetDoubleValue()
+					}
+				}
+			}
+		}
+	}
+	t.Fatalf("attribute %s not found on any exported span", key)
+	return 0
 }
 
 // @scenario "A transcription call lands as a trace with duration usage"
@@ -350,8 +391,8 @@ func TestEmitter_TranscriptionSpanCarriesAudioSeconds(t *testing.T) {
 
 	select {
 	case body := <-received:
-		require.Contains(t, string(body), AttrGenAIUsageAudioSeconds,
-			"transcription span must carry gen_ai.usage.audio_seconds")
+		require.InDelta(t, 4.2, doubleAttrFromExport(t, body, AttrGenAIUsageAudioSeconds), 1e-9,
+			"transcription span must carry gen_ai.usage.audio_seconds with the transcribed duration")
 	case <-time.After(3 * time.Second):
 		t.Fatal("transcription span did not reach the exporter")
 	}

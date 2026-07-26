@@ -1,56 +1,55 @@
 Feature: Audio model cost computation
-  TTS models bill per input character synthesized and STT models per second
-  of audio transcribed — units that carry no token usage at all. The gateway
-  records them on audio spans as gen_ai.usage.input_chars and
-  gen_ai.usage.audio_seconds, and the catalog's audio entries carry matching
-  inputCostPerCharacter / inputCostPerSecond rates in llmModels.overlay.json
-  (hand-curated: the OpenRouter price sync has no per-character or
-  per-second data, and it overwrites the base llmModels.json wholesale).
+  Speech synthesis is billed by how much text was spoken and transcription
+  by how much audio was heard, not by tokens. A customer running TTS or STT
+  through the gateway sees each call's real cost on its trace, computed
+  from the model catalog's audio rates. Audio rates are hand-curated: the
+  upstream price source only carries token prices.
 
   Background:
-    Given the model catalog carries audio entries for openai and elevenlabs
-    And the gateway stamps audio usage attributes on gen_ai.speech and gen_ai.transcription spans
+    Given the model catalog carries audio pricing for openai and elevenlabs models
+    And audio calls through the gateway land as traces with their usage recorded
 
-  Rule: Character- and second-priced usage produces a non-zero span cost
-
-    @unit
-    Scenario: a TTS span is priced from its character count
-      Given a span for model "elevenlabs/eleven_flash_v2" carrying gen_ai.usage.input_chars = 1000
-      And the span reports zero token usage
-      When the span cost is computed
-      Then the cost is 1000 times the model's per-character rate
+  Rule: Audio calls show their real cost, not zero
 
     @unit
-    Scenario: an STT span is priced from its transcribed seconds
-      Given a span for model "elevenlabs/scribe_v1" carrying gen_ai.usage.audio_seconds = 60
-      And the span reports zero token usage
-      When the span cost is computed
-      Then the cost is 60 times the model's per-second rate
+    Scenario: a text-to-speech call is costed by the characters it spoke
+      Given a text-to-speech call that synthesized 1000 characters
+      When its trace is processed
+      Then the span cost equals 1000 times the model's per-character rate
 
     @unit
-    Scenario: audio usage alone unlocks the registry lookup
-      Given a span with zero tokens and zero cache counts but positive audio usage
-      When the span cost is computed
-      Then the static registry is still consulted instead of short-circuiting to zero
+    Scenario: a transcription call is costed by the audio it heard
+      Given a transcription call that transcribed 60 seconds of audio
+      When its trace is processed
+      Then the span cost equals 60 times the model's per-second rate
 
     @unit
-    Scenario: estimateCost prices per-character and per-second rates
-      Given a registry entry carrying only inputCostPerCharacter or inputCostPerSecond
-      When estimateCost runs with inputCharacters or audioSeconds usage
-      Then it returns usage times rate instead of undefined
+    Scenario: an audio call with no token usage still gets a cost
+      Given an audio call reporting zero tokens but real audio usage
+      When its trace is processed
+      Then a non-zero cost is computed
+      And a call with no usage of any kind still costs nothing
+
+    @unit
+    Scenario: a model priced only by audio usage is never silently free
+      Given a catalog entry carrying only an audio rate and no token rates
+      When a cost estimate runs with audio usage
+      Then it produces usage times rate
+      And an entry with no rates at all reports that it cannot price the call
 
   Rule: Transcribe models stop borrowing chat-model token rates
 
     @unit
-    Scenario: gpt-4o-transcribe matches its own explicit entry, not gpt-4o's
-      Given the catalog carries an explicit "openai/gpt-4o-transcribe" entry priced per second
-      When a span for "openai/gpt-4o-transcribe" is matched against the registry
-      Then the explicit transcribe entry wins over the gpt-4o prefix match
+    Scenario: gpt-4o-transcribe bills at its own audio rate, not gpt-4o's chat rate
+      Given a transcription call on gpt-4o-transcribe that also reports token usage
+      When its trace is processed
+      Then the cost comes from the transcribe model's per-second rate
+      And none of it comes from gpt-4o's chat token rates
 
-  Rule: Audio catalog entries stay out of chat and embedding selectors
+  Rule: Audio models stay out of chat and embedding pickers
 
     @unit
-    Scenario: audio-mode models are not offered as chat models
-      Given the catalog's audio entries carry mode "audio"
-      When provider model options are listed for mode "chat"
-      Then no TTS or STT model appears in the list
+    Scenario: speech and transcription models are not offered as chat models
+      Given the catalog's audio entries
+      When a user picks a chat or embedding model for a provider
+      Then no speech or transcription model appears among the options

@@ -10,7 +10,7 @@ const SCRIBE_PER_SECOND = 6.111e-5;
 const TRANSCRIBE_PER_SECOND = 1e-4;
 
 describe("audio model cost", () => {
-  /** @scenario a TTS span is priced from its character count */
+  /** @scenario a text-to-speech call is costed by the characters it spoke */
   it("prices a TTS span from gen_ai.usage.input_chars", () => {
     const result = computeSpanCost({
       attrs: {
@@ -23,7 +23,7 @@ describe("audio model cost", () => {
     expect(result).toBeCloseTo(1000 * FLASH_PER_CHAR, 10);
   });
 
-  /** @scenario an STT span is priced from its transcribed seconds */
+  /** @scenario a transcription call is costed by the audio it heard */
   it("prices an STT span from gen_ai.usage.audio_seconds", () => {
     const result = computeSpanCost({
       attrs: {
@@ -36,7 +36,7 @@ describe("audio model cost", () => {
     expect(result).toBeCloseTo(60 * SCRIBE_PER_SECOND, 10);
   });
 
-  /** @scenario audio usage alone unlocks the registry lookup */
+  /** @scenario an audio call with no token usage still gets a cost */
   it("consults the registry when only audio usage is present, and not when nothing is", () => {
     const withAudio = computeSpanCost({
       attrs: {
@@ -58,7 +58,7 @@ describe("audio model cost", () => {
     expect(withNothing).toBe(0);
   });
 
-  /** @scenario estimateCost prices per-character and per-second rates */
+  /** @scenario a model priced only by audio usage is never silently free */
   it("estimateCost handles per-character and per-second entries", () => {
     const ttsEntry = {
       projectId: "",
@@ -93,7 +93,7 @@ describe("audio model cost", () => {
     ).toBeUndefined();
   });
 
-  /** @scenario gpt-4o-transcribe matches its own explicit entry, not gpt-4o's */
+  /** @scenario gpt-4o-transcribe bills at its own audio rate, not gpt-4o's chat rate */
   it("prices gpt-4o-transcribe per second even when token usage is reported", () => {
     const result = computeSpanCost({
       attrs: {
@@ -109,7 +109,7 @@ describe("audio model cost", () => {
     expect(result).toBeCloseTo(60 * TRANSCRIBE_PER_SECOND, 10);
   });
 
-  /** @scenario audio-mode models are not offered as chat models */
+  /** @scenario speech and transcription models are not offered as chat models */
   it("keeps audio entries out of chat and embedding selectors", () => {
     const elevenChat = getProviderModelOptions("elevenlabs", "chat");
     const elevenEmbedding = getProviderModelOptions("elevenlabs", "embedding");
