@@ -498,7 +498,13 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		return f.finish()
 
 	case bfanthropic.AnthropicStreamEventTypePing:
-		out = f.ensureStarted(out)
+		// A ping is a keepalive and carries nothing. Synthesizing a
+		// message_start for one would burn the real message_start still to
+		// come, along with its id and usage, so an early ping is simply
+		// dropped.
+		if !f.started {
+			return nil
+		}
 		return append(out, ev)
 
 	case bfanthropic.AnthropicStreamEventTypeError:
