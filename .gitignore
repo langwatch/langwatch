@@ -58,10 +58,11 @@ prompts/**
 **/.claude/projects/
 .claude/scheduled_tasks.lock
 .claude/skills/local-*/
-# Per-iter QA / dogfood notes are workspace-local. Durable proof
-# belongs in docs/ or specs/; transient transcripts and screenshots
-# stay untracked.
-.claude/qa-*/
+# Per-iter QA / dogfood notes, probes, and seed scripts are
+# workspace-local, in any package's .claude/ directory. Durable proof
+# belongs in docs/ or specs/; transient transcripts, screenshots, and
+# scripts stay untracked.
+**/.claude/qa-*
 
 # PR body draft checkpoints — coordinated through the agent channel
 # before any `gh pr edit`. Live PR body is the source of truth.

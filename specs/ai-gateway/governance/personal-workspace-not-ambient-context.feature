@@ -20,7 +20,7 @@ Feature: A personal workspace is never the ambient context for organization work
   Pairs with:
     - specs/ai-gateway/governance/workspace-switcher.feature (picking a context)
     - specs/ai-gateway/governance/personal-workspace-features.feature
-    - specs/model-providers/first-project-required.feature
+    - specs/model-providers/providers-without-a-project.feature
 
   Background:
     Given jane belongs to organization "ACME"
