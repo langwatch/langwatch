@@ -101,7 +101,7 @@ export async function resolveOffloadedTraces({
 }): Promise<ResolvedTraceSpans> {
   // Fast path: no span in this trace has any event ref — skip entirely.
   const anyHasRefs = normalizedSpans.some((span) =>
-    hasEventRefs(span.spanAttributes as Record<string, string>),
+    hasEventRefs(span.spanAttributes),
   );
 
   if (!anyHasRefs) {
@@ -118,7 +118,7 @@ export async function resolveOffloadedTraces({
   // returned even when a span's resolver throws an unexpected uncaught error.
   const spanSettlements = await Promise.allSettled(
     normalizedSpans.map(async (span) => {
-      const attrs = span.spanAttributes as Record<string, string>;
+      const attrs = span.spanAttributes;
       if (!hasEventRefs(attrs)) {
         return { span, resolvedCount: 0 };
       }
@@ -127,7 +127,7 @@ export async function resolveOffloadedTraces({
       const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
         parseSpanEventRefs(attrs);
 
-      // Eventref missing the embedded eventId — can't resolve. The reserved
+      // Eventref missing the embedded eventId can't resolve. The reserved
       // key is already stripped (kept out of cleanedAttrs) so the UI never
       // sees the namespace; the preview under the plain IO key stays in place.
       for (const attrKey of missingEventIdKeys) {
