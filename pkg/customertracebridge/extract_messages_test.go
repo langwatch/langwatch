@@ -10,6 +10,7 @@ package customertracebridge
 //     on every codex Path A trace.
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -196,4 +197,63 @@ func TestWalkSSEData_skipsDoneAndComments(t *testing.T) {
 		seen = append(seen, string(data))
 	})
 	assert.Equal(t, []string{`{"a":1}`, `{"a":2}`}, seen)
+}
+
+func TestExtractInputMessages_SpeechCarriesTTSText(t *testing.T) {
+	body := []byte(`{"model":"elevenlabs/eleven_flash_v2","voice":"nova","input":"Hello there, how can I help?"}`)
+	got := extractInputMessages(body, domain.RequestTypeSpeech)
+	want := `[{"role":"user","content":"Hello there, how can I help?"}]`
+	if got != want {
+		t.Fatalf("speech input = %q, want %q", got, want)
+	}
+}
+
+func TestExtractInputMessages_SpeechWithoutInputIsEmpty(t *testing.T) {
+	if got := extractInputMessages([]byte(`{"model":"x"}`), domain.RequestTypeSpeech); got != "" {
+		t.Fatalf("speech input without text = %q, want empty", got)
+	}
+}
+
+func TestExtractOutputMessages_TranscriptionCarriesTranscript(t *testing.T) {
+	body := []byte(`{"text":"The quick brown fox jumps over the lazy dog.","duration":2.3}`)
+	got := extractOutputMessages(body, domain.RequestTypeTranscription)
+	want := `[{"role":"assistant","content":"The quick brown fox jumps over the lazy dog."}]`
+	if got != want {
+		t.Fatalf("transcription output = %q, want %q", got, want)
+	}
+}
+
+func TestExtractOutputMessages_SpeechBinaryStaysEmpty(t *testing.T) {
+	if got := extractOutputMessages([]byte{0xff, 0xf3, 0x01, 0x02}, domain.RequestTypeSpeech); got != "" {
+		t.Fatalf("speech output = %q, want empty (binary audio)", got)
+	}
+}
+
+// Go's %q escaping is not JSON (a vertical tab becomes \v, which JSON
+// rejects); every message wrapper this file CONSTRUCTS must marshal through
+// encoding/json so control characters survive as parseable JSON. (The
+// default chat path returns the request's own `messages` JSON verbatim and
+// needs no re-encoding.)
+func TestExtractedMessagesAreValidJSONWithControlChars(t *testing.T) {
+	speech := []byte("{\"model\":\"m\",\"input\":\"line one\\u000bline two\"}")
+	in := extractInputMessages(speech, domain.RequestTypeSpeech)
+	if !json.Valid([]byte(in)) {
+		t.Fatalf("speech input with control char is not valid JSON: %s", in)
+	}
+
+	stt := []byte("{\"text\":\"tab\\u000bseparated\"}")
+	out := extractOutputMessages(stt, domain.RequestTypeTranscription)
+	if !json.Valid([]byte(out)) {
+		t.Fatalf("transcription output with control char is not valid JSON: %s", out)
+	}
+	var parsed []map[string]string
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(parsed) != 1 {
+		t.Fatalf("expected exactly one message, got %d: %s", len(parsed), out)
+	}
+	if parsed[0]["content"] != "tab\u000bseparated" {
+		t.Fatalf("content round-trip lost the control char: %q", parsed[0]["content"])
+	}
 }

@@ -34,7 +34,6 @@ import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
 import { type DrawerTab, useDrawerStore } from "../../stores/drawerStore";
 import {
-  abbreviateModel,
   formatDuration,
   SPAN_TYPE_COLORS,
 } from "../../utils/formatters";
@@ -539,7 +538,7 @@ function SpanTab({
 
         {span.type === "llm" && span.model != null && (
           <Text textStyle="2xs" color="fg.subtle">
-            {abbreviateModel(span.model)}
+            {(span.model)}
           </Text>
         )}
 

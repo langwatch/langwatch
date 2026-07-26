@@ -16,7 +16,6 @@ import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import { useTextTranslation } from "../../../hooks/useTextTranslation";
 import type { TraceListItem } from "../../../types/trace";
 import {
-  abbreviateModel,
   formatCost,
   formatDuration,
   formatRelativeTimeAgo,
@@ -119,12 +118,10 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
     assistantVisuals.displayRole === "user" ? "left" : "right";
   const UserIcon = userVisuals.Icon;
   const AssistantIcon = assistantVisuals.Icon;
-  // Model abbreviation belongs with the agent's response — i.e. whichever
-  // bubble carries `assistantText`. The fallback comes from the helper so
-  // it reads "Assistant" normally and "Agent" in scenario mode.
-  const assistantLabel = turn.models[0]
-    ? abbreviateModel(turn.models[0])
-    : assistantVisuals.bubbleLabel;
+  // The raw model id labels the agent's response — i.e. whichever bubble
+  // carries `assistantText`. The fallback comes from the helper so it
+  // reads "Assistant" normally and "Agent" in scenario mode.
+  const assistantLabel = turn.models[0] || assistantVisuals.bubbleLabel;
 
   return (
     <VStack align="stretch" gap={layout === "thread" ? 1 : 2}>

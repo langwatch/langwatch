@@ -190,39 +190,6 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${BYTE_UNITS[unitIndex]}`;
 }
 
-const MODEL_ABBREVIATIONS: ReadonlyArray<readonly [from: string, to: string]> =
-  [
-    ["gpt-4o-mini", "4o-mini"],
-    ["gpt-4o", "4o"],
-    ["gpt-5-mini", "5-mini"],
-    ["claude-sonnet-4-20250514", "sonnet-4"],
-    ["claude-haiku-4-5-20251001", "haiku-4.5"],
-    ["gemini-2.5-pro", "2.5-pro"],
-    ["text-embedding-3-small", "emb-3-sm"],
-  ];
-
-/**
- * Anthropic's context-window-variant marker on a raw model id, e.g.
- * `claude-opus-4-8[1m]` for the 1M-token beta. It's a wire-format detail, not
- * part of the model's identity, so it's dropped before display.
- */
-const CONTEXT_VARIANT_SUFFIX = /\[[^[\]]*\]$/;
-
-export function abbreviateModel(model: string): string {
-  const withoutVariant = model.replace(CONTEXT_VARIANT_SUFFIX, "");
-  const slash = withoutVariant.indexOf("/");
-  // Claude Code's native span reports a bare model id (no `anthropic/`
-  // prefix) — the abbreviation table still applies, there's just no
-  // provider segment to re-prepend.
-  const provider = slash < 0 ? null : withoutVariant.slice(0, slash);
-  const name = slash < 0 ? withoutVariant : withoutVariant.slice(slash + 1);
-  let shortName = name;
-  for (const [from, to] of MODEL_ABBREVIATIONS) {
-    shortName = shortName.replace(from, to);
-  }
-  return provider !== null ? `${provider}/${shortName}` : shortName;
-}
-
 export function formatWallClock(startMs: number, endMs: number): string {
   const diff = Math.max(0, endMs - startMs);
   const secs = Math.floor(diff / 1_000);

@@ -257,3 +257,97 @@ func TestEmitter_CustomerTraceNeverAdoptsInternalTrace(t *testing.T) {
 		require.NotContains(t, traceparent, internalTraceID)
 	})
 }
+
+// Audio and embeddings spans structurally never carry completion tokens, and
+// TTS has no extractable output at all, so the zero-cost probe suppression
+// must not eat them: a successful speech span must reach the wire.
+// @scenario "A TTS call lands as a trace with character usage"
+func TestEmitter_SpeechSpanIsNotSuppressedAsProbe(t *testing.T) {
+	received := make(chan []byte, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		select {
+		case received <- body:
+		default:
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	registry := NewRegistry()
+	require.NoError(t, registry.Set("proj-1", srv.URL, nil))
+
+	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{
+		Service: "langwatch-service-aigateway",
+		Version: "test",
+	})
+	e, err := NewEmitter(ctx, EmitterOptions{
+		Registry:     registry,
+		BatchTimeout: 50 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
+
+	// A successful TTS call: zero completion tokens, zero cost (no catalog
+	// pricing yet), binary response body so no extractable output.
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeSpeech)
+	e.EndSpan(spanCtx, domain.AITraceParams{
+		Model:        "gpt-4o-mini-tts",
+		RequestType:  domain.RequestTypeSpeech,
+		RequestBody:  []byte(`{"model":"gpt-4o-mini-tts","voice":"nova","input":"hello"}`),
+		ResponseBody: []byte{0xff, 0xf3, 0x00, 0x01},
+		Usage:        domain.Usage{InputChars: 5},
+	})
+	require.NoError(t, e.tp.ForceFlush(context.Background()))
+
+	select {
+	case <-received:
+		// span reached the wire: not suppressed
+	case <-time.After(3 * time.Second):
+		t.Fatal("speech span was suppressed by the zero-cost probe filter")
+	}
+}
+
+// The probe suppression itself must keep working for its actual target:
+// a zero-everything successful CHAT span stays off the wire.
+func TestEmitter_ZeroChatProbeStaysSuppressed(t *testing.T) {
+	received := make(chan []byte, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		select {
+		case received <- body:
+		default:
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	registry := NewRegistry()
+	require.NoError(t, registry.Set("proj-1", srv.URL, nil))
+
+	ctx := contexts.SetServiceInfo(context.Background(), contexts.ServiceInfo{
+		Service: "langwatch-service-aigateway",
+		Version: "test",
+	})
+	e, err := NewEmitter(ctx, EmitterOptions{
+		Registry:     registry,
+		BatchTimeout: 50 * time.Millisecond,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = e.Shutdown(context.Background()) })
+
+	spanCtx, _ := e.BeginSpan(ctx, "proj-1", domain.RequestTypeChat)
+	e.EndSpan(spanCtx, domain.AITraceParams{
+		Model:       "gpt-test",
+		RequestType: domain.RequestTypeChat,
+		Usage:       domain.Usage{},
+	})
+	require.NoError(t, e.tp.ForceFlush(context.Background()))
+
+	select {
+	case <-received:
+		t.Fatal("zero-everything chat probe span reached the wire, suppression regressed")
+	case <-time.After(500 * time.Millisecond):
+		// suppressed as intended
+	}
+}
