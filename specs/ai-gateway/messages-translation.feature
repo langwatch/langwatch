@@ -165,6 +165,13 @@ Feature: Anthropic Messages translation: reaching non-Anthropic providers from a
     Then any open content blocks are closed
     And the client receives a terminal error frame rather than a truncated stream
 
+  @bdd @messages-translation @unit
+  Scenario: Closing an abandoned stream releases the provider
+    Given the destination is a non-Anthropic provider
+    And the client goes away before the stream finishes
+    When the gateway closes the stream
+    Then the provider is released rather than left waiting to send
+
   # ==========================================================================
   # Non-goals: what this deliberately does not change
   # ==========================================================================

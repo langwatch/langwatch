@@ -7,12 +7,11 @@ import (
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 )
 
-// anthropicBlockTracker remembers what a content block was opened as, so a
-// block that has to be closed or re-opened defensively can be reconstructed.
+// anthropicBlockTracker records the kind a content block was opened as, which
+// is what decides whether an arriving delta belongs in it or needs a block of
+// its own.
 type anthropicBlockTracker struct {
-	toolID   string
-	toolName string
-	kind     bfanthropic.AnthropicContentBlockType
+	kind bfanthropic.AnthropicContentBlockType
 }
 
 // anthropicStreamFramer turns the loose event stream produced by Bifrost's
@@ -170,12 +169,6 @@ func (f *anthropicStreamFramer) openBlock(
 		block.Text = bfschemas.Ptr("")
 	}
 	tracker.kind = block.Type
-	if block.ID != nil {
-		tracker.toolID = *block.ID
-	}
-	if block.Name != nil {
-		tracker.toolName = *block.Name
-	}
 	f.noteBlockKind(tracker.kind)
 	f.openBlocks[idx] = tracker
 	return append(out, &bfanthropic.AnthropicStreamEvent{
@@ -249,17 +242,16 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		}
 		idx := f.dense(*ev.Index)
 		// A repeated start for a live block means the upstream never closed
-		// it; close it now so blocks never nest.
-		out = f.closeBlock(out, idx)
+		// it. Close it and give the new block its own index: reusing the index
+		// would emit start/stop/start for one index, and a client that
+		// accumulates by index would merge two distinct blocks into one.
+		if _, live := f.openBlocks[idx]; live {
+			out = f.closeBlock(out, idx)
+			idx = f.remap(*ev.Index)
+		}
 		tracker := &anthropicBlockTracker{}
 		if ev.ContentBlock != nil {
 			tracker.kind = ev.ContentBlock.Type
-			if ev.ContentBlock.ID != nil {
-				tracker.toolID = *ev.ContentBlock.ID
-			}
-			if ev.ContentBlock.Name != nil {
-				tracker.toolName = *ev.ContentBlock.Name
-			}
 			f.noteBlockKind(tracker.kind)
 		}
 		f.openBlocks[idx] = tracker
@@ -278,9 +270,7 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		// the model's private reasoning as the visible answer. When the kinds
 		// disagree, close the block and start the right one.
 		if want, known := blockKindForDelta(ev.Delta); known {
-			if tracker, isOpen := f.openBlocks[idx]; isOpen && tracker.kind != want &&
-				want != bfanthropic.AnthropicContentBlockTypeToolUse &&
-				tracker.kind != bfanthropic.AnthropicContentBlockTypeToolUse {
+			if tracker, isOpen := f.openBlocks[idx]; isOpen && tracker.kind != want {
 				out = f.closeBlock(out, idx)
 				idx = f.remap(*ev.Index)
 			}
@@ -333,7 +323,11 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		return append(out, ev)
 
 	case bfanthropic.AnthropicStreamEventTypeError:
+		// Close open blocks before terminating. finish() short-circuits once
+		// terminated is set, so anything still open here would never be closed
+		// by any later path and the client would hold a half-built block.
 		out = f.ensureStarted(out)
+		out = f.closeAllBlocks(out)
 		f.terminated = true
 		return append(out, ev)
 

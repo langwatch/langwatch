@@ -226,6 +226,7 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 		ch:     ch,
 		bfCtx:  bfCtx,
 		framer: newAnthropicStreamFramer("", modelForClient(req, model)),
+		logger: r.logger,
 	}, nil
 }
 

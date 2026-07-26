@@ -7,6 +7,7 @@ import (
 	"github.com/bytedance/sonic"
 	bfanthropic "github.com/maximhq/bifrost/core/providers/anthropic"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -21,6 +22,7 @@ type anthropicTranslatedStreamIterator struct {
 	bfCtx *bfschemas.BifrostContext
 
 	framer  *anthropicStreamFramer
+	logger  *zap.Logger
 	pending [][]byte
 	current []byte
 
@@ -62,9 +64,42 @@ func (it *anthropicTranslatedStreamIterator) Close() error {
 // emit queues the wire bytes for a batch of events.
 func (it *anthropicTranslatedStreamIterator) emit(events []*bfanthropic.AnthropicStreamEvent) {
 	for _, ev := range events {
-		if frame := anthropicSSEFrame(ev); len(frame) > 0 {
+		frame, err := anthropicSSEFrame(ev)
+		if err != nil {
+			// Dropping a frame silently is how a client ends up waiting
+			// forever with nothing in the logs to explain it, so record the
+			// event type. The type alone identifies the failure and carries
+			// no request payload.
+			if it.logger != nil {
+				it.logger.Error("anthropic stream frame dropped: marshal failed",
+					zap.String("event_type", string(ev.Type)),
+					zap.Error(err))
+			}
+			continue
+		}
+		if len(frame) > 0 {
 			it.pending = append(it.pending, frame)
 		}
+	}
+}
+
+// anthropicStopReasonForIncomplete maps a Responses `incomplete` terminal event
+// onto the Anthropic stop reason its detail actually describes.
+func anthropicStopReasonForIncomplete(resp *bfschemas.BifrostResponsesStreamResponse) bfanthropic.AnthropicStopReason {
+	reason := ""
+	if resp != nil && resp.Response != nil && resp.Response.IncompleteDetails != nil {
+		reason = resp.Response.IncompleteDetails.Reason
+	}
+	switch reason {
+	case "max_output_tokens", "max_tokens", "":
+		// Empty means the provider did not say; truncation is the
+		// overwhelmingly common cause and the one the chat-completions
+		// fallback always reports.
+		return bfanthropic.AnthropicStopReasonMaxTokens
+	case "content_filter":
+		return bfanthropic.AnthropicStopReasonRefusal
+	default:
+		return bfanthropic.AnthropicStopReasonRefusal
 	}
 }
 func (it *anthropicTranslatedStreamIterator) Next(ctx context.Context) bool {
@@ -144,7 +179,11 @@ func (it *anthropicTranslatedStreamIterator) consume(resp *bfschemas.BifrostResp
 	// comes. Map them onto a stop reason and close the message here.
 	switch resp.Type {
 	case bfschemas.ResponsesStreamResponseTypeIncomplete:
-		it.framer.setStopReason(bfanthropic.AnthropicStopReasonMaxTokens)
+		// `incomplete` covers more than truncation. Only a token-limit reason
+		// is max_tokens; a content filter stopped the turn for a different
+		// cause and reporting it as max_tokens would invite the client to
+		// continue a turn the provider refused.
+		it.framer.setStopReason(anthropicStopReasonForIncomplete(resp))
 		it.emit(it.framer.finish())
 		return
 	case bfschemas.ResponsesStreamResponseTypeFailed:
@@ -169,13 +208,13 @@ func (it *anthropicTranslatedStreamIterator) consume(resp *bfschemas.BifrostResp
 // anthropicSSEFrame serializes one Anthropic stream event into SSE wire bytes.
 // Anthropic names the event on the `event:` line as well as inside the JSON
 // payload, and clients read the former to pick a decoder.
-func anthropicSSEFrame(ev *bfanthropic.AnthropicStreamEvent) []byte {
+func anthropicSSEFrame(ev *bfanthropic.AnthropicStreamEvent) ([]byte, error) {
 	if ev == nil || ev.Type == "" {
-		return nil
+		return nil, nil
 	}
 	payload, err := sonic.Marshal(ev)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	out := make([]byte, 0, len(payload)+len(ev.Type)+16)
 	out = append(out, "event: "...)
@@ -183,5 +222,5 @@ func anthropicSSEFrame(ev *bfanthropic.AnthropicStreamEvent) []byte {
 	out = append(out, "\ndata: "...)
 	out = append(out, payload...)
 	out = append(out, "\n\n"...)
-	return out
+	return out, nil
 }

@@ -711,8 +711,13 @@ func TestMessagesTranslated_ThinkingBudget_BecomesPortableEffort(t *testing.T) {
 		"an absolute Anthropic token budget must not reach a provider with a different ceiling")
 	require.NotNil(t, bfReq.Params.Reasoning.Effort,
 		"the reasoning request must survive as a portable effort bucket, not be dropped")
-	assert.NotEmpty(t, *bfReq.Params.Reasoning.Effort,
-		"the effort bucket must actually name a level")
+	// The bucket is a ratio against the MODEL's output ceiling, not the
+	// request's max_tokens and not an absolute count, so 31999 against
+	// claude-sonnet-4-5's ceiling lands on medium. Measured, not assumed, and
+	// asserted exactly: a merely non-empty check would pass even if the
+	// builder wired a nonsense bucket.
+	assert.Equal(t, "medium", *bfReq.Params.Reasoning.Effort,
+		"a 31999-token budget is medium effort against this model's output ceiling")
 }
 
 // The bucketing itself, at the boundaries.
@@ -971,7 +976,7 @@ func TestAnthropicStreamFramer_StopForUnopenedBlock_LeavesNoHole(t *testing.T) {
 // router retains a varying number of pool and transport goroutines, so a count
 // is too noisy to distinguish a leak from normal churn.
 //
-// @scenario "A provider failure mid-stream reaches the client as an error frame"
+// @scenario "Closing an abandoned stream releases the provider"
 func TestMessagesTranslatedStream_Close_ReleasesTheProducer(t *testing.T) {
 	ch := make(chan *bfschemas.BifrostStreamChunk)
 	it := &anthropicTranslatedStreamIterator{
@@ -984,6 +989,9 @@ func TestMessagesTranslatedStream_Close_ReleasesTheProducer(t *testing.T) {
 	go func() {
 		defer close(sent)
 		ch <- &bfschemas.BifrostStreamChunk{}
+		// Closing lets Close's drainer finish rather than parking forever,
+		// which would leak the very goroutine this test is about.
+		close(ch)
 	}()
 
 	// Nobody is reading, so the producer is parked mid-send.
@@ -1016,4 +1024,174 @@ func terminalStopReason(t *testing.T, events []sseEvent) string {
 	}
 	t.Fatal("no message_delta found; the client never learns why the turn ended")
 	return ""
+}
+
+// pushAll drives a sequence of converter events through the framer and returns
+// everything it emitted, terminal frames included.
+func pushAll(f *anthropicStreamFramer, events ...*bfanthropic.AnthropicStreamEvent) []*bfanthropic.AnthropicStreamEvent {
+	var out []*bfanthropic.AnthropicStreamEvent
+	for _, ev := range events {
+		out = append(out, f.push(ev)...)
+	}
+	return append(out, f.finish()...)
+}
+
+func textDelta(idx int, s string) *bfanthropic.AnthropicStreamEvent {
+	return &bfanthropic.AnthropicStreamEvent{
+		Type:  bfanthropic.AnthropicStreamEventTypeContentBlockDelta,
+		Index: bfschemas.Ptr(idx),
+		Delta: &bfanthropic.AnthropicStreamDelta{Type: bfanthropic.AnthropicStreamDeltaTypeText, Text: bfschemas.Ptr(s)},
+	}
+}
+
+func blockStart(idx int, kind bfanthropic.AnthropicContentBlockType) *bfanthropic.AnthropicStreamEvent {
+	return &bfanthropic.AnthropicStreamEvent{
+		Type:         bfanthropic.AnthropicStreamEventTypeContentBlockStart,
+		Index:        bfschemas.Ptr(idx),
+		ContentBlock: &bfanthropic.AnthropicContentBlock{Type: kind, Text: bfschemas.Ptr("")},
+	}
+}
+
+// assertBlocksBalanced pins the invariant the whole framer exists to hold: no
+// block may be left open when the stream ends, whatever path ended it.
+func assertBlocksBalanced(t *testing.T, events []*bfanthropic.AnthropicStreamEvent) {
+	t.Helper()
+	open := map[int]bool{}
+	for _, ev := range events {
+		switch ev.Type {
+		case bfanthropic.AnthropicStreamEventTypeContentBlockStart:
+			require.NotNil(t, ev.Index)
+			open[*ev.Index] = true
+		case bfanthropic.AnthropicStreamEventTypeContentBlockStop:
+			require.NotNil(t, ev.Index)
+			open[*ev.Index] = false
+		default:
+			// Message-level and keepalive events do not open or close blocks.
+		}
+	}
+	for idx, stillOpen := range open {
+		assert.False(t, stillOpen,
+			"block %d was left open; the client keeps a half-built content_block forever", idx)
+	}
+}
+
+// An error event arriving from the converter terminates the framer. The
+// iterator's own BifrostError path closes open blocks first, but a converter
+// error took a different road and left them open, so the client held a
+// half-built block with no way to know the turn was over. Same hang class the
+// framer exists to prevent.
+//
+// @scenario "A provider failure mid-stream reaches the client as an error frame"
+func TestAnthropicStreamFramer_ConverterErrorEvent_ClosesOpenBlocks(t *testing.T) {
+	f := newAnthropicStreamFramer("msg_err", "test-model")
+
+	events := pushAll(f,
+		textDelta(0, "partial answer"),
+		&bfanthropic.AnthropicStreamEvent{
+			Type:  bfanthropic.AnthropicStreamEventTypeError,
+			Error: &bfanthropic.AnthropicStreamError{Type: "error", Message: "upstream exploded"},
+		},
+	)
+
+	assertBlocksBalanced(t, events)
+
+	// The error itself must still reach the client.
+	var sawError bool
+	for _, ev := range events {
+		if ev.Type == bfanthropic.AnthropicStreamEventTypeError {
+			sawError = true
+		}
+	}
+	assert.True(t, sawError, "the error event must still be forwarded")
+}
+
+// A repeated content_block_start for a live index means the upstream never
+// closed the first block. Reopening the same index emits start(0) stop(0)
+// start(0), and a client accumulating by index merges two distinct blocks into
+// one. The split needs its own index, exactly as the delta-mismatch path does.
+//
+// @scenario "Content block indices are contiguous from zero"
+func TestAnthropicStreamFramer_DuplicateBlockStart_SplitsToNewIndex(t *testing.T) {
+	f := newAnthropicStreamFramer("msg_dup", "test-model")
+
+	events := pushAll(f,
+		blockStart(0, bfanthropic.AnthropicContentBlockTypeText),
+		textDelta(0, "first block"),
+		// Upstream announces a second block at the same index without ever
+		// closing the first.
+		blockStart(0, bfanthropic.AnthropicContentBlockTypeText),
+		textDelta(0, "second block"),
+	)
+
+	assertBlocksBalanced(t, events)
+
+	var starts []int
+	for _, ev := range events {
+		if ev.Type == bfanthropic.AnthropicStreamEventTypeContentBlockStart {
+			starts = append(starts, *ev.Index)
+		}
+	}
+	require.Len(t, starts, 2, "two distinct blocks were announced")
+	assert.Equal(t, []int{0, 1}, starts,
+		"a re-opened block must take a fresh index; reusing it merges two blocks into one for the client")
+}
+
+// The kind-mismatch split carved out ToolUse in both directions, so a text
+// delta arriving at an open tool_use block stayed in the tool block. A
+// text_delta inside a tool_use block is malformed for a client that decodes
+// deltas by block type.
+//
+// @scenario "Every content block delta arrives inside a matching start and stop pair"
+func TestAnthropicStreamFramer_TextDeltaAfterToolBlock_SplitsOut(t *testing.T) {
+	f := newAnthropicStreamFramer("msg_tool", "test-model")
+
+	toolStart := &bfanthropic.AnthropicStreamEvent{
+		Type:  bfanthropic.AnthropicStreamEventTypeContentBlockStart,
+		Index: bfschemas.Ptr(0),
+		ContentBlock: &bfanthropic.AnthropicContentBlock{
+			Type:  bfanthropic.AnthropicContentBlockTypeToolUse,
+			ID:    bfschemas.Ptr("toolu_1"),
+			Name:  bfschemas.Ptr("Read"),
+			Input: []byte("{}"),
+		},
+	}
+	events := pushAll(f,
+		toolStart,
+		&bfanthropic.AnthropicStreamEvent{
+			Type:  bfanthropic.AnthropicStreamEventTypeContentBlockDelta,
+			Index: bfschemas.Ptr(0),
+			Delta: &bfanthropic.AnthropicStreamDelta{
+				Type:        bfanthropic.AnthropicStreamDeltaTypeInputJSON,
+				PartialJSON: bfschemas.Ptr(`{"p":1}`),
+			},
+		},
+		// Text arrives at the same upstream index while the tool block is open.
+		textDelta(0, "and here is the answer"),
+	)
+
+	assertBlocksBalanced(t, events)
+
+	// Map each emitted block index to the kind it was opened as, then check
+	// every delta landed in a block of the matching kind.
+	kind := map[int]bfanthropic.AnthropicContentBlockType{}
+	for _, ev := range events {
+		if ev.Type == bfanthropic.AnthropicStreamEventTypeContentBlockStart && ev.ContentBlock != nil {
+			kind[*ev.Index] = ev.ContentBlock.Type
+		}
+	}
+	for _, ev := range events {
+		if ev.Type != bfanthropic.AnthropicStreamEventTypeContentBlockDelta || ev.Delta == nil {
+			continue
+		}
+		switch ev.Delta.Type {
+		case bfanthropic.AnthropicStreamDeltaTypeText:
+			assert.Equal(t, bfanthropic.AnthropicContentBlockTypeText, kind[*ev.Index],
+				"a text delta must land in a text block, not a %s block", kind[*ev.Index])
+		case bfanthropic.AnthropicStreamDeltaTypeInputJSON:
+			assert.Equal(t, bfanthropic.AnthropicContentBlockTypeToolUse, kind[*ev.Index],
+				"tool arguments must stay in the tool_use block")
+		default:
+			// Other delta kinds are not exercised by this fixture.
+		}
+	}
 }
