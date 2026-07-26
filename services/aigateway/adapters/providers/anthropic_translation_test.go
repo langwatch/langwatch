@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -103,6 +104,8 @@ func assertValidAnthropicSequence(t *testing.T, events []sseEvent) {
 	require.NotEmpty(t, events, "a translated stream must produce events, never zero bytes")
 
 	types := eventTypes(events)
+	require.GreaterOrEqual(t, len(types), 3,
+		"the smallest valid union is message_start, message_delta, message_stop; got %v", types)
 	assert.Equal(t, "message_start", types[0],
 		"the union opens with message_start; anything else and the client cannot build the message")
 	assert.Equal(t, "message_stop", types[len(types)-1],
@@ -164,12 +167,18 @@ func assertValidAnthropicSequence(t *testing.T, events []sseEvent) {
 
 // chatSSEBackend serves a fixed OpenAI chat-completions SSE script and records
 // the request bodies it received.
-func chatSSEBackend(t *testing.T, script string) (*httptest.Server, *[]string) {
+func chatSSEBackend(t *testing.T, script string) (*httptest.Server, func() []string) {
 	t.Helper()
+	// The handler runs on its own goroutine and nothing about the response
+	// completing orders that write against the test goroutine's read, so the
+	// captured bodies need their own lock.
+	var mu sync.Mutex
 	var bodies []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
+		mu.Lock()
 		bodies = append(bodies, string(body))
+		mu.Unlock()
 		assert.Equal(t, "/v1/chat/completions", r.URL.Path,
 			"a translated /v1/messages request must reach the provider on its own route, never /v1/messages")
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -180,7 +189,11 @@ func chatSSEBackend(t *testing.T, script string) (*httptest.Server, *[]string) {
 		}
 	}))
 	t.Cleanup(srv.Close)
-	return srv, &bodies
+	return srv, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), bodies...)
+	}
 }
 
 func newTestRouter(t *testing.T) *BifrostRouter {
@@ -248,8 +261,9 @@ func TestMessagesTranslatedStream_TextAnswer_ProducesValidAnthropicUnion(t *test
 	assertValidAnthropicSequence(t, events)
 
 	// The provider must have received ITS OWN wire shape, not the Anthropic one.
-	require.Len(t, *bodies, 1)
-	outbound := (*bodies)[0]
+	captured := bodies()
+	require.Len(t, captured, 1)
+	outbound := captured[0]
 	assert.Contains(t, outbound, `"messages"`, "the chat-completions body carries messages")
 	assert.NotContains(t, outbound, `"max_tokens":1024`,
 		"Anthropic's mandatory max_tokens must not be forwarded verbatim; OpenAI rejects it as unsupported")
@@ -466,8 +480,10 @@ func TestMessagesTranslatedStream_UpstreamClosesEarly_ClientStillGetsTerminalFra
 	for _, e := range events {
 		switch e.Type {
 		case "content_block_start":
+			require.NotNil(t, e.Index, "content_block_start must carry an index")
 			open[*e.Index] = true
 		case "content_block_stop":
+			require.NotNil(t, e.Index, "content_block_stop must carry an index")
 			open[*e.Index] = false
 		}
 	}
@@ -548,8 +564,10 @@ func TestMessagesTranslatedStream_ProviderFailsMidStream_ClosesBlocksAndErrors(t
 	for _, e := range events {
 		switch e.Type {
 		case "content_block_start":
+			require.NotNil(t, e.Index, "content_block_start must carry an index")
 			open[*e.Index] = true
 		case "content_block_stop":
+			require.NotNil(t, e.Index, "content_block_stop must carry an index")
 			open[*e.Index] = false
 		}
 	}
@@ -602,6 +620,7 @@ func TestMessagesTranslatedStream_ReasoningModel_ThinkingStaysInItsOwnBlock(t *t
 			continue
 		}
 		if block, ok := e.Raw["content_block"].(map[string]any); ok {
+			require.NotNil(t, e.Index, "content_block_start must carry an index")
 			kind, _ := block["type"].(string)
 			blockKind[*e.Index] = kind
 		}
@@ -612,6 +631,7 @@ func TestMessagesTranslatedStream_ReasoningModel_ThinkingStaysInItsOwnBlock(t *t
 		}
 		delta, ok := e.Raw["delta"].(map[string]any)
 		require.True(t, ok)
+		require.NotNil(t, e.Index, "content_block_delta must carry an index")
 		if delta["type"] == "thinking_delta" {
 			assert.Equal(t, "thinking", blockKind[*e.Index],
 				"a thinking_delta must land in a thinking block, not a %s block", blockKind[*e.Index])
@@ -752,10 +772,13 @@ func TestMessagesTranslated_NonStreamingToolCall_ReportsToolUseStopReason(t *tes
 //
 // @scenario "Tool results sent back by the client reach the provider"
 func TestMessagesTranslated_ToolResultFromClient_ReachesProvider(t *testing.T) {
-	var outbound string
+	var mu sync.Mutex
+	var outboundBody string
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
-		outbound = string(body)
+		mu.Lock()
+		outboundBody = string(body)
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"c1","object":"chat.completion","created":1,"model":"local-model",` +
 			`"choices":[{"index":0,"message":{"role":"assistant","content":"done"},"finish_reason":"stop"}],` +
@@ -776,6 +799,9 @@ func TestMessagesTranslated_ToolResultFromClient_ReachesProvider(t *testing.T) {
 	_, err := router.Dispatch(context.Background(), messagesRequest(body), customEndpointCred(backend.URL))
 	require.NoError(t, err)
 
+	mu.Lock()
+	outbound := outboundBody
+	mu.Unlock()
 	require.NotEmpty(t, outbound, "the provider must have been called")
 	assert.Contains(t, outbound, "toolu_42",
 		"the tool call id must be preserved so the provider can pair the result with its call")
@@ -910,7 +936,6 @@ func TestAnthropicStreamFramer_StopForUnopenedBlock_LeavesNoHole(t *testing.T) {
 		emitted = append(emitted, framer.push(ev)...)
 	}
 
-	// Open and fill block 0.
 	push(&bfanthropic.AnthropicStreamEvent{
 		Type:  bfanthropic.AnthropicStreamEventTypeContentBlockDelta,
 		Index: bfschemas.Ptr(0),
@@ -919,7 +944,6 @@ func TestAnthropicStreamFramer_StopForUnopenedBlock_LeavesNoHole(t *testing.T) {
 	// A stray stop for an index that never opened, which upstreams do emit
 	// when their own bookkeeping is off.
 	push(&bfanthropic.AnthropicStreamEvent{Type: bfanthropic.AnthropicStreamEventTypeContentBlockStop, Index: bfschemas.Ptr(7)})
-	// A second real block.
 	push(&bfanthropic.AnthropicStreamEvent{
 		Type:  bfanthropic.AnthropicStreamEventTypeContentBlockDelta,
 		Index: bfschemas.Ptr(1),
@@ -927,21 +951,16 @@ func TestAnthropicStreamFramer_StopForUnopenedBlock_LeavesNoHole(t *testing.T) {
 	})
 	emitted = append(emitted, framer.finish()...)
 
-	started := map[int]bool{}
-	maxIndex := -1
+	var started []int
 	for _, ev := range emitted {
 		if ev.Type == bfanthropic.AnthropicStreamEventTypeContentBlockStart && ev.Index != nil {
-			started[*ev.Index] = true
-			if *ev.Index > maxIndex {
-				maxIndex = *ev.Index
-			}
+			started = append(started, *ev.Index)
 		}
 	}
-	require.GreaterOrEqual(t, maxIndex, 1, "both real blocks must open")
-	for i := 0; i <= maxIndex; i++ {
-		assert.True(t, started[i],
-			"index %d must have been opened; a stray stop must not reserve an index", i)
-	}
+	// Exactly the two real blocks, at 0 and 1. A phantom block reserved by the
+	// stray stop would show up here as an extra index or a gap.
+	assert.Equal(t, []int{0, 1}, started,
+		"only the two real blocks may open, at contiguous indices")
 }
 
 // terminalStopReason pulls the stop_reason off the single message_delta.
