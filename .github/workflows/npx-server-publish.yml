@@ -218,8 +218,11 @@ jobs:
             # repo root).
             "package/feature-map.json"
             # The app's prepare step imports the skills front-matter helper
-            # (scripts/generate-langy-skills.ts) when a tree rebuilds.
-            "package/skills/_lib/frontmatter.js"
+            # (scripts/generate-langy-skills.ts) when a tree rebuilds. The
+            # source is .ts (tsx resolves the .js import specifier back to
+            # it); the tarball never ships a compiled .js, so asserting .js
+            # here always failed even on a correctly packaged tarball.
+            "package/skills/_lib/frontmatter.ts"
           )
           # Every workspace package in the checkout must ship: a missing one
           # leaves dangling pnpm links in the installed tree and the app dies
@@ -232,6 +235,13 @@ jobs:
           for pkgdir in langwatch/packages/*/ packages/*/; do
             pkgdir="${pkgdir%/}"
             [ -f "$pkgdir/package.json" ] || continue
+            # packages/server is this CLI itself, not a workspace dependency
+            # the app imports (langwatch's pnpm-workspace.yaml lists .,
+            # packages/*, ../mcp-server, ../packages/handled-error,
+            # ../packages/langy — never packages/server). Its package.json
+            # is deliberately excluded from files[]; only dist/ + templates/
+            # ship, already covered by the cli.cjs required path above.
+            [ "$pkgdir" = "packages/server" ] && continue
             required+=("package/$pkgdir/package.json")
           done
           forbidden=(
