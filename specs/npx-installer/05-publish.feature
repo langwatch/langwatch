@@ -22,6 +22,27 @@ Feature: CI smoke + publish for `@langwatch/server`
       | ubuntu-22.04         |
       | ubuntu-22.04-arm     |
 
+  Scenario: Smoke boots the packed tarball, never the checkout
+    Given the smoke job packed the npm tarball
+    When it starts the server
+    Then the CLI it runs is the one extracted from that tarball
+    And the extraction is laid out like an npx install (node_modules/@langwatch/server)
+    And the app tree that boots is the tarball's contents, not the repository's
+    # A checkout boot masks packaging gaps: an over-broad .npmignore breaks
+    # only the released artifact, which no CI step would otherwise execute.
+
+  Scenario: The tarball ships every workspace package the app imports
+    When the publish job builds the tarball
+    Then for every workspace package directory in the checkout there is a package.json in the tarball
+    And the platform feature map ships at the tarball root
+    And a fresh install from the tarball resolves every @langwatch/* module at boot
+
+  Scenario: An install missing a workspace package fails at install time, not at boot
+    Given an app tree whose node_modules carries a link to a package that does not exist
+    When the installer prepares the app's dependencies
+    Then it fails naming the missing packages
+    And the message says the published artifact is the problem and where to report it
+
   Scenario: Smoke job uploads logs as artifact on failure
     Given a smoke job step fails
     Then "~/.langwatch/logs/" is uploaded as workflow artifact "logs-<runner>-<sha>.tar.gz"

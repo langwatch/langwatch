@@ -97,6 +97,15 @@ Feature: Service orchestration after pre-deps are installed
     And the CLI calls `runtime.stopAll(handles)` to bring down everything else
     And the CLI exits with code 1
 
+  Scenario: A service failing its health probe takes the already-started ones down with it
+    Given the app tier starts several services at once
+    When one of them never reports healthy
+    But its siblings started fine
+    Then the boot fails naming the unhealthy service
+    And every sibling that did start is stopped, none is left running
+    # A leaked sibling squats its port, so the NEXT run auto-shifts to a new
+    # slot and boots services the .env's URLs don't point at.
+
   Scenario: Ctrl+C cleanly stops every service
     Given all services are running
     When the user sends SIGINT to the CLI process
@@ -123,6 +132,20 @@ Feature: Service orchestration after pre-deps are installed
   Scenario: Explicit --port flag wins over auto-shift
     When the user runs `npx @langwatch/server --port 6660`
     Then port-base is 6660
+
+  Scenario: A run that lands on a different port slot updates the install's URLs
+    Given an install whose .env was scaffolded on the 5560 slot
+    And a stray process now holds one port of that slot
+    When the next run auto-shifts to 5570
+    Then the .env's service URLs point at the 5570 slot
+    And the CLI says which keys it updated
+    And the app reaches the data stores this run actually started
+
+  Scenario: A URL the user pointed elsewhere survives every port shift
+    Given the user replaced BASE_HOST with a LAN hostname in the .env
+    When a later run auto-shifts to a different port slot
+    Then BASE_HOST still carries the user's hostname
+    And only values still in their scaffolded localhost shape were updated
     And no auto-shift occurs even if 6660 is in use (instead, the CLI errors loudly)
 
   # =========================================================================
