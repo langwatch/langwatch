@@ -288,7 +288,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then the chunked content round-trips through Azure Blob
     And no code path dereferences an absent account key
 
-  @integration @unimplemented
+  @integration
   Scenario: The groupQueue durable blob tier works in a token-based mode
     Given the durable blob tier resolves an azure destination in a token-based mode
     When an oversized envelope is offloaded and later read back
