@@ -1,18 +1,12 @@
-import { Alert, Box, Field, Input, VStack } from "@chakra-ui/react";
-import React, { useEffect, useMemo } from "react";
+import { Box, Field, Input, VStack } from "@chakra-ui/react";
+import React, { useEffect } from "react";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import {
-  modelProviders as modelProvidersRegistry,
-  type MaybeStoredModelProvider,
-} from "../../server/modelProviders/registry";
+import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
-import {
-  getCredentialRepointNotice,
-  isApiKeyField,
-} from "../../utils/modelProviderHelpers";
+import { isApiKeyField } from "../../utils/modelProviderHelpers";
 import { SmallLabel } from "../SmallLabel";
 import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
 import { api } from "../../utils/api";
@@ -60,28 +54,11 @@ export const CredentialsSection = ({
     );
   const isManaged = managedProviderData?.managed ?? false;
 
-  const providerDefinition = modelProvidersRegistry[
-    provider.provider as keyof typeof modelProvidersRegistry
-  ] as { endpointKey?: string | undefined } | undefined;
-
   const requiredKeys = useRequiredCredentialKeys({
     providerKey: provider.provider,
     displayKeys: state.displayKeys,
     customKeys: state.customKeys,
   });
-
-  // A base-URL edit on a provider that already holds a credential hands
-  // that credential to a different host. The customer sees it here, at the
-  // moment they cause it, rather than after the next request.
-  const repointNotice = useMemo(
-    () =>
-      getCredentialRepointNotice({
-        endpointKey: providerDefinition?.endpointKey,
-        values: state.customKeys,
-        storedKeys: state.initialKeys,
-      }),
-    [providerDefinition?.endpointKey, state.customKeys, state.initialKeys],
-  );
 
   useEffect(() => {
     if (isManaged) {
@@ -109,69 +86,45 @@ export const CredentialsSection = ({
           const isOptional = !requiredKeys.has(key);
           const isPassword = isApiKeyField(key);
           const isInvalid = Boolean(fieldErrors[key]);
-          const showsRepointNotice =
-            !!repointNotice && key === providerDefinition?.endpointKey;
-          // Ties the notice to the input it belongs to, so focusing the
-          // field announces where the key is about to go.
-          const repointNoticeId = `${key}-repoint-notice`;
 
           return (
-            <React.Fragment key={key}>
-              <Field.Root
-                required={!isOptional}
-                invalid={isInvalid}
-                width="full"
-              >
-                <SmallLabel>
-                  {key}
-                  {!isOptional && <Field.RequiredIndicator />}
-                </SmallLabel>
-                <Box width="full">
-                  <Input
-                    value={state.customKeys[key] ?? ""}
-                    onChange={(e) => {
-                      actions.setCustomKey(key, e.target.value);
-                      if (fieldErrors[key]) {
-                        setFieldErrors((prev) => {
-                          const updated = { ...prev };
-                          delete updated[key];
-                          return updated;
-                        });
-                      }
-                      // Clear API key validation error when user modifies the field
-                      if (onApiKeyValidationClear && apiKeyValidationError) {
-                        onApiKeyValidationClear();
-                      }
-                    }}
-                    type={isPassword ? "password" : "text"}
-                    autoComplete="off"
-                    placeholder={isOptional ? "optional" : undefined}
-                    width="full"
-                    aria-describedby={
-                      showsRepointNotice ? repointNoticeId : undefined
+            <Field.Root
+              key={key}
+              required={!isOptional}
+              invalid={isInvalid}
+              width="full"
+            >
+              <SmallLabel>
+                {key}
+                {!isOptional && <Field.RequiredIndicator />}
+              </SmallLabel>
+              <Box width="full">
+                <Input
+                  value={state.customKeys[key] ?? ""}
+                  onChange={(e) => {
+                    actions.setCustomKey(key, e.target.value);
+                    if (fieldErrors[key]) {
+                      setFieldErrors((prev) => {
+                        const updated = { ...prev };
+                        delete updated[key];
+                        return updated;
+                      });
                     }
-                  />
-                </Box>
-                {fieldErrors[key] && (
-                  <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>
-                )}
-              </Field.Root>
-              {showsRepointNotice && (
-                <Alert.Root status="warning" size="sm" id={repointNoticeId}>
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>
-                      The saved API key follows this change
-                    </Alert.Title>
-                    <Alert.Description>
-                      {repointNotice.destinationHost
-                        ? `After you save, requests carry it to ${repointNotice.destinationHost}.`
-                        : "After you save, requests carry it to the provider's own endpoint."}
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
+                    // Clear API key validation error when user modifies the field
+                    if (onApiKeyValidationClear && apiKeyValidationError) {
+                      onApiKeyValidationClear();
+                    }
+                  }}
+                  type={isPassword ? "password" : "text"}
+                  autoComplete="off"
+                  placeholder={isOptional ? "optional" : undefined}
+                  width="full"
+                />
+              </Box>
+              {fieldErrors[key] && (
+                <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>
               )}
-            </React.Fragment>
+            </Field.Root>
           );
         })}
       </VStack>

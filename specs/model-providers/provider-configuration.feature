@@ -251,48 +251,22 @@ Feature: Model Provider Configuration
     Then the "GEMINI_API_KEY" field is marked required
     And no base URL field is offered
 
-  # Adding a base URL to a provider that already holds a key changes where
-  # that key goes. That edit looks like any other, so the drawer says so at
-  # the moment it is made.
+  # A stored base URL belongs to the customer like any other field: the
+  # drawer shows it as saved, and removing it is an ordinary edit. This
+  # pins a failure mode where emptying the field did not count as a change,
+  # so Save stayed disabled and the endpoint could never be taken off.
+  # Its sibling failure, an edit next to a masked key deleting that key, is
+  # pinned by "Preserve original API key when saving with masked
+  # placeholder" above.
 
   @integration
-  Scenario Outline: Adding a base URL warns where the saved API key will go
-    Given I have "<provider>" configured with a saved API key
-    When I open its model provider configuration drawer
-    And I enter "https://llm.acme.internal/v1" in the base URL field
-    Then I see a warning that requests carry the saved API key to "llm.acme.internal"
-    And the API key field is not marked required
-
-    Examples:
-      | provider  |
-      | openai    |
-      | anthropic |
-
-  @integration
-  Scenario Outline: Clearing the base URL warns that the saved API key goes back to the provider
+  Scenario Outline: Removing the base URL is a change that can be saved
     Given I have "<provider>" configured with a saved API key and base URL "https://llm.acme.internal/v1"
     When I open its model provider configuration drawer
-    And I clear the base URL field
-    Then I see a warning that requests carry the saved API key to the provider's own endpoint
-    And I can save the removal
+    Then the base URL field shows the stored value
+    When I clear the base URL field
+    Then I can save the removal
     And the saved API key is still on file afterwards
-
-    Examples:
-      | provider  |
-      | openai    |
-      | anthropic |
-
-  @integration
-  Scenario: Configuring a provider for the first time shows no warning
-    Given I open the model provider configuration drawer for "openai"
-    When I enter "https://llm.acme.internal/v1" in the base URL field
-    Then I see no warning about where the saved API key goes
-
-  @integration
-  Scenario Outline: Editing a provider without touching its base URL shows no warning
-    Given I have "<provider>" configured with a saved API key and base URL "https://llm.acme.internal/v1"
-    When I open its model provider configuration drawer
-    Then I see no warning about where the saved API key goes
 
     Examples:
       | provider  |

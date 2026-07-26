@@ -1,16 +1,17 @@
 /**
  * @vitest-environment jsdom
  *
- * The re-point warning in the model-provider drawer (#6173): pointing an
- * already-credentialed provider at a new base URL sends the saved key
- * somewhere new, so the drawer says where, at the moment of the edit. The
- * same walk covers the credential that a base-URL edit used to delete.
+ * Editing a provider that already holds a saved API key. Two failure modes
+ * found while walking this flow are pinned here: the drawer stripped the
+ * masked placeholder from the payload, so a base-URL edit deleted the
+ * stored key; and emptying the base URL did not count as a change, so a
+ * URL added by mistake could never be removed.
  *
  * Covers @integration scenarios from
  * specs/model-providers/provider-configuration.feature.
  *
  * Only the boundaries are stubbed (see the requiredness suite for why):
- * the drawer's own state flow is what decides when the notice appears.
+ * the drawer's own state flow is what shapes the save payload.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -142,7 +143,7 @@ const resetMocks = () => {
   mockValidateApiKey.mockResolvedValue(true);
 };
 
-describe("Feature: the drawer says where a base-URL edit sends the saved key", () => {
+describe("Feature: edits beside a saved credential leave that credential intact", () => {
   beforeEach(resetMocks);
 
   afterEach(() => {
@@ -152,38 +153,11 @@ describe("Feature: the drawer says where a base-URL edit sends the saved key", (
   describe.each(eitherOrProviders)(
     "given a saved $providerKey provider that already holds an API key",
     ({ providerKey, apiKey, baseUrl }) => {
-      const repointWarning = /requests carry it to/i;
       const rowId = `row-${providerKey}`;
 
       describe("when a base URL is added", () => {
-        /** @scenario Adding a base URL warns where the saved API key will go */
-        it("says the saved key starts going to that host", async () => {
-          primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
-          renderDrawer({ modelProviderId: rowId, providerKey });
-          const user = userEvent.setup();
-
-          expect(screen.queryByText(repointWarning)).toBeNull();
-
-          await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
-
-          await waitFor(() => {
-            expect(
-              screen.getByText(
-                "After you save, requests carry it to llm.acme.internal.",
-              ),
-            ).toBeInTheDocument();
-          });
-          expect(
-            screen.getByText("The saved API key follows this change"),
-          ).toBeInTheDocument();
-        });
-
-        /**
-         * The two fixes have to compose: the key is optional now (a base URL
-         * covers it) AND it is still on file, so it still travels.
-         */
-        /** @scenario Adding a base URL warns where the saved API key will go */
-        it("stops marking the API key required while still warning about it", async () => {
+        /** @scenario The API key stops being required once a base URL is entered */
+        it("stops marking the API key required once the base URL covers it", async () => {
           primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
           renderDrawer({ modelProviderId: rowId, providerKey });
           const user = userEvent.setup();
@@ -194,86 +168,10 @@ describe("Feature: the drawer says where a base-URL edit sends the saved key", (
           await waitFor(() => {
             expect(isMarkedRequired(apiKey)).toBe(false);
           });
-          expect(screen.getByText(repointWarning)).toBeInTheDocument();
-        });
-      });
-
-      describe("when the base URL it already had is cleared", () => {
-        const renderWithStoredBaseUrl = () => {
-          primeQueries([
-            keyedRow({
-              providerKey,
-              apiKey,
-              baseUrl,
-              storedBaseUrl: SELF_HOSTED_URL,
-            }),
-          ]);
-          renderDrawer({ modelProviderId: rowId, providerKey });
-          return userEvent.setup();
-        };
-
-        /** @scenario Clearing the base URL warns that the saved API key goes back to the provider */
-        it("says the saved key goes back to the provider's own endpoint", async () => {
-          const user = renderWithStoredBaseUrl();
-
-          await user.clear(inputFor(baseUrl));
-
-          await waitFor(() => {
-            expect(
-              screen.getByText(
-                "After you save, requests carry it to the provider's own endpoint.",
-              ),
-            ).toBeInTheDocument();
-          });
-        });
-
-        /**
-         * Emptying a field is a change like any other. Reading it as
-         * "nothing happened" left Save disabled, so a base URL added by
-         * mistake could never be taken off again.
-         */
-        /** @scenario Clearing the base URL warns that the saved API key goes back to the provider */
-        it("lets the customer save the removal", async () => {
-          const user = renderWithStoredBaseUrl();
-
-          await user.clear(inputFor(baseUrl));
-          const save = screen.getByRole("button", { name: /^save$/i });
-          await waitFor(() => expect(save).toBeEnabled());
-          await user.click(save);
-
-          await waitFor(() => {
-            expect(mockMutateAsync).toHaveBeenCalledTimes(1);
-          });
-          expect(mockMutateAsync).toHaveBeenCalledWith(
-            expect.objectContaining({
-              customKeys: {
-                [apiKey]: MASKED_KEY_PLACEHOLDER,
-                [baseUrl]: "",
-              },
-            }),
-          );
-        });
-      });
-
-      describe("when the drawer is opened and the base URL left alone", () => {
-        /** @scenario Editing a provider without touching its base URL shows no warning */
-        it("says nothing about where the key goes", () => {
-          primeQueries([
-            keyedRow({
-              providerKey,
-              apiKey,
-              baseUrl,
-              storedBaseUrl: SELF_HOSTED_URL,
-            }),
-          ]);
-          renderDrawer({ modelProviderId: rowId, providerKey });
-
-          expect(screen.queryByText(repointWarning)).toBeNull();
         });
       });
 
       describe("when the saved provider is edited and saved", () => {
-        /** @scenario Adding a base URL warns where the saved API key will go */
         it("leaves the provider's scope selection untouched", async () => {
           primeQueries([keyedRow({ providerKey, apiKey, baseUrl })]);
           renderDrawer({ modelProviderId: rowId, providerKey });
@@ -322,20 +220,57 @@ describe("Feature: the drawer says where a base-URL edit sends the saved key", (
           );
         });
       });
+
+      describe("when the base URL it already had is removed", () => {
+        const renderWithStoredBaseUrl = () => {
+          primeQueries([
+            keyedRow({
+              providerKey,
+              apiKey,
+              baseUrl,
+              storedBaseUrl: SELF_HOSTED_URL,
+            }),
+          ]);
+          renderDrawer({ modelProviderId: rowId, providerKey });
+          return userEvent.setup();
+        };
+
+        /** @scenario Removing the base URL is a change that can be saved */
+        it("shows the stored base URL in the field to begin with", async () => {
+          renderWithStoredBaseUrl();
+
+          await waitFor(() => {
+            expect(inputFor(baseUrl).value).toBe(SELF_HOSTED_URL);
+          });
+        });
+
+        /**
+         * Emptying a field is a change like any other. Reading it as
+         * "nothing happened" left Save disabled, so a base URL added by
+         * mistake could never be taken off again.
+         */
+        /** @scenario Removing the base URL is a change that can be saved */
+        it("lets the customer save the removal, keeping the key on file", async () => {
+          const user = renderWithStoredBaseUrl();
+
+          await user.clear(inputFor(baseUrl));
+          const save = screen.getByRole("button", { name: /^save$/i });
+          await waitFor(() => expect(save).toBeEnabled());
+          await user.click(save);
+
+          await waitFor(() => {
+            expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+          });
+          expect(mockMutateAsync).toHaveBeenCalledWith(
+            expect.objectContaining({
+              customKeys: {
+                [apiKey]: MASKED_KEY_PLACEHOLDER,
+                [baseUrl]: "",
+              },
+            }),
+          );
+        });
+      });
     },
   );
-
-  describe("given a provider being configured for the first time", () => {
-    /** @scenario Configuring a provider for the first time shows no warning */
-    it("says nothing about a saved key when a base URL is typed", async () => {
-      primeQueries([]);
-      renderDrawer({ modelProviderId: "new" });
-      const user = userEvent.setup();
-
-      await user.type(inputFor("OPENAI_API_KEY"), "sk-typed-just-now");
-      await user.type(inputFor("OPENAI_BASE_URL"), SELF_HOSTED_URL);
-
-      expect(screen.queryByText(/requests carry it to/i)).toBeNull();
-    });
-  });
 });
