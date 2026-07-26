@@ -101,10 +101,11 @@ func TestResolve_StaleEntry_ConfigFetchFailure_ServesStaleCredentials(t *testing
 	}
 }
 
-// The hard-cap tail of the same scenario: when the stale entry has burnt
-// its whole grace window and the config fetch still fails, the caller gets
-// the retryable auth_upstream_unavailable, not the ResolveKey nil error.
-// @scenario "config fetch fails during a stale-entry refresh -> stale credentials keep serving"
+// The hard-cap tail of the stale-refresh path: when the stale entry has
+// burnt its whole grace window and the config fetch still fails, the
+// caller gets the retryable auth_upstream_unavailable, not the ResolveKey
+// nil error. Unbound on purpose: the bound scenario above describes the
+// keep-serving outcome, and this test asserts the opposite tail of it.
 func TestResolve_StaleEntryAtHardCap_ConfigFetchFailure_FailsRetryable(t *testing.T) {
 	fetcher := &fakeConfigFetcher{
 		cfgErr: errors.New("config fetch returned 503"),
