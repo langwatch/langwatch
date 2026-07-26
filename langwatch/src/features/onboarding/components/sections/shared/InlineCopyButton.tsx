@@ -8,9 +8,12 @@ import { copyToClipboard } from "./copy-to-clipboard";
 export function InlineCopyButton({
   text,
   label,
+  onCopied,
 }: {
   text: string;
   label: string;
+  /** Called after a successful copy, e.g. to emit an analytics event. */
+  onCopied?: () => void;
 }): React.ReactElement {
   const [copied, setCopied] = useState(false);
 
@@ -22,6 +25,7 @@ export function InlineCopyButton({
     if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      onCopied?.();
     }
   }
 

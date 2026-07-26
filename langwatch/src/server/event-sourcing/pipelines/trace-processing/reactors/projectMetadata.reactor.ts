@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import { trackServerEvent } from "~/server/posthog";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -33,7 +34,9 @@ export interface ProjectMetadataReactorDeps {
  * Reactor that marks the project as having received its first message.
  *
  * Sets project.firstMessage = true, project.integrated (unless optimization_studio),
- * and detects the SDK language from span resource attributes.
+ * and detects the SDK language from span resource attributes. On the
+ * firstMessage transition it also tracks the `first_trace_integrated`
+ * analytics event against the org admin.
  *
  * Uses a long dedup TTL so we only hit the database once per project in a given window.
  */
@@ -127,6 +130,26 @@ export function createProjectMetadataReactor(
             language,
           },
         });
+
+        // First real trace for this project: track the integration
+        // milestone against the org admin (the same distinct_id posthog-js
+        // identifies that user with in the browser). Fired after the
+        // metadata write commits so a failed write retries the event on the
+        // project's next trace instead of dropping it.
+        if (!project.firstMessage) {
+          const { userId } = await deps.projects.resolveOrgAdmin(tenantId);
+          if (userId) {
+            trackServerEvent({
+              userId,
+              event: "first_trace_integrated",
+              properties: {
+                sdk_language: attrs["sdk.language"] ?? "unknown",
+                sdk_framework: attrs["langwatch.sdk.framework"] ?? "unknown",
+              },
+              projectId: tenantId,
+            });
+          }
+        }
       } catch (error) {
         logger.error(
           {

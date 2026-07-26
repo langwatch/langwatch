@@ -20,12 +20,12 @@ const DEFAULT_FLAGS_POLLING_INTERVAL_MS = 5 * 60 * 1000;
 //
 // Constructing the client with local evaluation starts that background poller
 // immediately, regardless of whether any flag is ever evaluated. So the client
-// is built lazily on first use rather than at module load: a process that only
-// reads SYSTEM flags (workers, the event-sourcing pipeline — those resolve from
-// postgres and never touch PostHog) imports this module but never calls
+// is built lazily on first use rather than at module load: a process that
+// resolves only SYSTEM flags from postgres imports this module but never calls
 // getPostHogInstance, so it never starts the poller and never burns the
-// feature-flags quota. The web/API process builds it on its first PostHog flag
-// evaluation or analytics capture.
+// feature-flags quota. Each process builds it on its first PostHog flag
+// evaluation or analytics capture (the web/API process early on; the trace
+// worker only once a first-trace milestone event fires).
 //
 // `undefined` = not yet initialized, `null` = initialized with no POSTHOG_KEY.
 let _posthogInstance: PostHog | null | undefined;
