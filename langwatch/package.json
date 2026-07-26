@@ -59,9 +59,6 @@
     "clickhouse:migrate": "sh -c 'if [ \"$SKIP_CLICKHOUSE_MIGRATE\" != \"true\" ]; then pnpm run task clickhouseMigrate; else echo \"Skipping ClickHouse migrations\"; fi'",
     "copy:langevals-types": "cp ../langevals/ts-integration/evaluators.generated.ts src/server/evaluations/evaluators.generated.ts",
     "tsc-watch": "tsc --noEmit --watch",
-    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
-    "test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts",
-    "test:e2e:codegen": "playwright codegen --load-storage=./e2e/auth.json http://localhost:5560/",
     "test:e2e:langevals-staging": "bash -c 'eval \"$(aws --profile ${AWS_PROFILE:-lw-dev} configure export-credentials --format env)\" && S3_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY S3_SESSION_TOKEN=$AWS_SESSION_TOKEN S3_BUCKET_NAME=${S3_BUCKET_NAME:-runtime-storage-dev} S3_REGION=${S3_REGION:-eu-central-1} LANGEVALS_E2E_ENABLED=1 LANGEVALS_STAGING_THRESHOLD_BYTES=200 EVAL_MAX_PAYLOAD_BYTES=20000000 TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES=200000000 vitest run src/server/langevals/__tests__/stagedFetch.e2e.test.ts --reporter verbose'",
     "licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\"",
     "generate:langy-skills": "tsx scripts/generate-langy-skills.ts"

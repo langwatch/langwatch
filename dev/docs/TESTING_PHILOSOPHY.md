@@ -108,18 +108,27 @@ Avoid overlap. Each level has a distinct purpose.
 
 | Level | Purpose | Mocking | Quantity |
 |-------|---------|---------|----------|
-| **E2E** | Catastrophic regression detection for stable core flows | None | 5-10 total (deprioritized) |
+| **E2E (browser)** | Catastrophic regression detection for stable core flows | None | 5-10 total (deprioritized) |
+| **E2E (headless)** | Real side effects across process boundaries — queues, delivery, spawned binaries | None | Grows with the product |
 | **Browser Verification** | Interactive feature validation during development | None | Per-feature, not persisted as tests |
 | **Integration** | Edge cases, error handling, component rendering | External boundaries only | As many as needed |
 | **Unit** | Pure logic, branches | Everything | As many as needed |
 
-### E2E Tests: Deprioritized
+### Browser E2E: Deprioritized
 
-E2E tests are expensive and brittle. The app's UI and API surface changes too fast for e2e tests to keep up — they break frequently and take too long to run, providing poor ROI.
+Browser E2E tests are expensive and brittle. The app's UI changes too fast for them to keep up — they break frequently and take too long to run, providing poor ROI.
 
 We maintain a **minimal stable suite** (5-10 tests) that covers core happy paths of established features — sign in, view traces, run an evaluation. These run on a schedule or before releases, not per PR.
 
-We do **not** generate E2E tests per feature. Interactive browser verification (`/browser-test`) provides development-time confidence without the maintenance burden. Integration and unit tests are the primary coverage mechanism. See [ADR-010](adr/010-e2e-testing-strategy.md) for the full rationale.
+We do **not** generate browser E2E tests per feature. Interactive browser verification (`/browser-test`) provides development-time confidence without the maintenance burden. See [ADR-010](adr/010-e2e-testing-strategy.md) for the full rationale.
+
+### Headless E2E: Not Capped
+
+The 5-10 cap bounds *browser* maintenance cost. Headless E2E carries none of it, so it is exempt and grows with the product.
+
+Reach for it when the behaviour only exists across a real boundary and a mocked test would just assert our model of that boundary: async queue dispatch and delivery (automations), an app↔service contract (nlpgo), a binary that mutates real files (the CLI's install/logout commands). Runs on every PR, fully parallel — see the ADR's headless-tier amendment for the four admission rules.
+
+If a mocked integration test can express the assertion honestly, write that instead. Headless E2E is for where mocks would lie.
 
 ### Language-Specific Patterns
 
@@ -173,7 +182,8 @@ The scenario title in the feature file should match the `it()` description in th
 | `@unit` | Pure logic test | Testing functions, utilities, transformations |
 | `@integration` | Component/boundary test | Testing rendering, API calls, DB queries |
 | `@regression` | Prevents a previously-fixed bug from recurring | Bug fix scenarios — must fail without the fix |
-| `@e2e` | Stable core flow (deprioritized) | Only for the 5-10 stable happy-path tests |
+| `@e2e` | Stable core flow (deprioritized) | Only for the 5-10 stable happy-path browser tests |
+| `@e2e-headless` | Real side effect across a process boundary | Queue dispatch/delivery, service contracts, spawned binaries — no browser |
 
 Bug-fix feature specs should use `@regression` (alongside `@unit` or `@integration` for pyramid level):
 
@@ -246,6 +256,11 @@ Apply in order. Stop at first match.
 ```text
 Is this a core happy path of a stable, established feature?
   -> @e2e (only if not already covered by the stable suite)
+
+Does the behaviour only exist across a real boundary — a queue actually
+draining, a webhook actually delivered, a binary actually writing a file —
+such that mocking the boundary would assert our model of it, not the thing?
+  -> @e2e-headless
 
 Is this testing UI elements exist? (form fields, buttons, layout)
   -> @integration
