@@ -1299,8 +1299,8 @@
         "header": "For agents",
         "items": [
           {
-            "label": "Report an issue: npx langwatch report",
-            "href": "https://langwatch.ai/docs/support#reporting-issues-from-coding-agents"
+            "label": "For agents: report an issue",
+            "href": "https://langwatch.ai/docs/support"
           }
         ]
       }

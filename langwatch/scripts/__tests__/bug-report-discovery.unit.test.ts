@@ -49,6 +49,30 @@ describe("agent report discovery notices", () => {
     });
   });
 
+  describe("given the docs footer", () => {
+    /** @scenario "The docs footer note for agents reads in full" */
+    it("keeps the label short enough and un-clipped by the theme", () => {
+      const config = JSON.parse(read("docs/docs.json")) as {
+        footer: { links: { items: { label: string; href: string }[] }[] };
+      };
+      const link = config.footer.links
+        .flatMap((group) => group.items)
+        .find((item) => item.label.includes("report an issue"));
+
+      expect(link, "the docs footer lost the agent report link").toBeDefined();
+      // The theme truncates footer labels at `max-w-36` (144px) from md up;
+      // style.css lifts that for this href, and the column it lives in is
+      // ~500px wide at 1440px, so the label has to stay well inside that.
+      expect(link!.label.length).toBeLessThanOrEqual(40);
+      // Mintlify strips the fragment from footer hrefs, so a `#section` deep
+      // link here silently lands on the page top. Keep the plain page URL.
+      expect(link!.href).not.toContain("#");
+      expect(read("docs/style.css")).toContain(
+        `footer a[href="${link!.href}"]`,
+      );
+    });
+  });
+
   describe("given the support documentation", () => {
     /** @scenario "The docs have a page documenting the report command" */
     it("documents the report modes and the redaction guarantees", () => {
