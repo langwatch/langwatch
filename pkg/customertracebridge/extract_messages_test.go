@@ -229,7 +229,6 @@ func TestExtractOutputMessages_SpeechBinaryStaysEmpty(t *testing.T) {
 	}
 }
 
-
 // Go's %q escaping is not JSON (a vertical tab becomes \v, which JSON
 // rejects); every extracted message must marshal through encoding/json so
 // control characters in transcripts survive as parseable JSON.
