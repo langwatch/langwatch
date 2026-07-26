@@ -203,7 +203,6 @@ export class ModelProviderRepository {
 
   async create(
     data: {
-      projectId: string;
       name: string;
       provider: string;
       enabled: boolean;
@@ -212,12 +211,13 @@ export class ModelProviderRepository {
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders?: { key: string; value: string }[];
       /**
-       * Scope grants for this credential. Required — every row must be
-       * accessible to at least one (scopeType, scopeId) pair. When the
-       * caller omits scopes, defaults to a single PROJECT entry pointing
-       * at `projectId`, matching the legacy iter-107 behavior.
+       * Scope grants for this credential. Every row must be accessible to
+       * at least one (scopeType, scopeId) pair, and they are what the
+       * organization anchor below is resolved from, so the caller decides
+       * them. The service defaults the legacy single-scope path to the
+       * project it wrote through.
        */
-      scopes?: ScopeInput[];
+      scopes: ScopeInput[];
       rateLimitRpm?: number | null;
       rateLimitTpm?: number | null;
       rateLimitRpd?: number | null;
@@ -228,10 +228,10 @@ export class ModelProviderRepository {
   ): Promise<ModelProviderWithScopes> {
     const client = tx ?? this.prisma;
     const encryptedKeys = this.encryptCustomKeys(data.customKeys ?? undefined);
-    const scopes =
-      data.scopes && data.scopes.length > 0
-        ? data.scopes
-        : [{ scopeType: "PROJECT" as const, scopeId: data.projectId }];
+    const { scopes } = data;
+    if (scopes.length === 0) {
+      throw new Error("Cannot create model provider: no scopes given");
+    }
 
     // Single-organization anchor (ADR-021): every scope this provider attaches
     // to must resolve to the same org. Resolve them all and reject a mixed or
@@ -293,7 +293,6 @@ export class ModelProviderRepository {
 
   async update(
     id: string,
-    projectId: string,
     data: {
       name?: string;
       enabled?: boolean;
@@ -380,7 +379,6 @@ export class ModelProviderRepository {
 
   async delete(
     id: string,
-    _projectId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProvider> {
     const client = tx ?? this.prisma;

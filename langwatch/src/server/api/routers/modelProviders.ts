@@ -1,6 +1,8 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   SCOPE_TIERS,
+  type ScopeAssignment,
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
 import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
@@ -26,11 +28,13 @@ import {
   setRoleAtScope,
   updateConfig,
 } from "../../modelProviders/modelDefaults.service";
+import { assertCanManageAllScopes } from "../../modelProviders/modelProvider.authz";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   checkOrganizationPermission,
   checkProjectPermission,
   hasProjectPermission,
+  type Permission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
@@ -53,6 +57,30 @@ export {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "./modelProviders.utils";
+
+/**
+ * Shared input shape for the provider write paths: name the tenant with
+ * either handle, and refuse a request that names neither. A create with
+ * no project also has to say where the credential lands, since there is
+ * no project to default the scope set from.
+ */
+const tenantAnchorSchema = {
+  projectId: z.string().optional(),
+  organizationId: z.string().optional(),
+};
+
+function requireTenantAnchor(
+  input: { projectId?: string; organizationId?: string },
+  ctx: z.RefinementCtx,
+) {
+  if (!input.projectId && !input.organizationId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Either projectId or organizationId is required.",
+      path: ["projectId"],
+    });
+  }
+}
 
 export const modelProviderRouter = createTRPCRouter({
   // tRPC responses land in the browser, so every query here must go
@@ -122,7 +150,7 @@ export const modelProviderRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().optional(),
-        projectId: z.string(),
+        ...tenantAnchorSchema,
         provider: z.string(),
         // Human-readable label shown in the settings list and the model
         // selector group headers. Defaults to the humanized provider name
@@ -161,15 +189,16 @@ export const modelProviderRouter = createTRPCRouter({
         rateLimitRpd: z.number().int().min(0).nullable().optional(),
         fallbackPriorityGlobal: z.number().int().nullable().optional(),
         providerConfig: z.object({}).passthrough().nullable().optional(),
-      }),
+      }).superRefine(requireTenantAnchor),
     )
-    .use(checkProjectPermission("project:update"))
+    .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
       const result = await service.updateModelProvider(
         {
           id: input.id,
           projectId: input.projectId,
+          organizationId: input.organizationId,
           provider: input.provider,
           name: input.name,
           enabled: input.enabled,
@@ -201,13 +230,15 @@ export const modelProviderRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(
-      z.object({
-        id: z.string().optional(),
-        projectId: z.string(),
-        provider: z.string(),
-      }),
+      z
+        .object({
+          id: z.string().optional(),
+          ...tenantAnchorSchema,
+          provider: z.string(),
+        })
+        .superRefine(requireTenantAnchor),
     )
-    .use(checkProjectPermission("project:delete"))
+    .use(checkProjectOrOrganizationPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
       return await service.deleteModelProvider(input, {
@@ -222,13 +253,19 @@ export const modelProviderRouter = createTRPCRouter({
    */
   validateApiKey: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        provider: z.string(),
-        customKeys: z.record(z.string()),
-      }),
+      z
+        .object({
+          ...tenantAnchorSchema,
+          provider: z.string(),
+          customKeys: z.record(z.string()),
+          // The scopes the credential is being set up for. Required on the
+          // no-project path, where they are what the probe is authorized
+          // against — see checkProviderValidationPermission.
+          scopes: z.array(scopeAssignmentSchema).min(1).optional(),
+        })
+        .superRefine(requireTenantAnchor),
     )
-    .use(checkProjectPermission("project:update"))
+    .use(checkProviderValidationPermission())
     .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
@@ -675,6 +712,100 @@ export const modelProviderRouter = createTRPCRouter({
       });
     }),
 });
+
+/**
+ * Tenant gate for a provider write that may arrive with either handle. A
+ * provider belongs to an organization and reaches the scopes attached to
+ * it, so a project is one valid way to name the tenant and the
+ * organization is the other — an organization on the agent-governance
+ * track has no project until it needs one, and organization scope is the
+ * default for a new credential.
+ *
+ * With a project, this is the unchanged project permission check. Without
+ * one, it falls back to organization membership, which establishes the
+ * caller belongs to the tenant they named and nothing more. What the
+ * caller may actually write is decided per scope by
+ * `assertCanManageAllScopes` in the service, which is where organization
+ * scope demands `organization:manage`, team demands `team:manage`, and
+ * project demands `project:manage`. Same division of labour as
+ * `scopeAwarePermissionMiddleware` below.
+ */
+function checkProjectOrOrganizationPermission(projectPermission: Permission) {
+  const projectCheck = checkProjectPermission(projectPermission);
+  const organizationCheck = checkOrganizationPermission("organization:view");
+  return async (params: {
+    ctx: any;
+    input: { projectId?: string; organizationId?: string };
+    next: () => any;
+  }) => {
+    if (params.input.projectId) {
+      return projectCheck({
+        ...params,
+        input: { ...params.input, projectId: params.input.projectId },
+      });
+    }
+    if (!params.input.organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Either a project or an organization is required.",
+      });
+    }
+    return organizationCheck({
+      ...params,
+      input: { ...params.input, organizationId: params.input.organizationId },
+    });
+  };
+}
+
+/**
+ * Tenant gate for the credential probe.
+ *
+ * Nothing downstream re-authorizes this one. The handler goes straight out
+ * to the provider with caller-supplied keys and, for the `custom` provider,
+ * a caller-supplied base URL, so whatever gate sits here IS the
+ * authorization rather than a coarse pre-filter. Organization membership
+ * would not do: `organization:view` is held by MEMBER and EXTERNAL, which
+ * would turn a read-only seat into an arbitrary outbound request from our
+ * servers.
+ *
+ * With a project this stays the pre-existing `project:update` check.
+ * Without one it runs the same per-scope check the provider writes use, so
+ * "may I probe a credential for this scope" is the same question, answered
+ * by the same code, as "may I store a credential at this scope".
+ */
+function checkProviderValidationPermission() {
+  const projectCheck = checkProjectPermission("project:update");
+  return async (params: {
+    ctx: any;
+    input: {
+      projectId?: string;
+      organizationId?: string;
+      scopes?: ScopeAssignment[];
+    };
+    next: () => any;
+  }) => {
+    if (params.input.projectId) {
+      return projectCheck({
+        ...params,
+        input: { ...params.input, projectId: params.input.projectId },
+      });
+    }
+    const scopes = params.input.scopes;
+    if (!scopes || scopes.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Validating a credential without a project needs the scopes it is being set up for.",
+      });
+    }
+    await assertCanManageAllScopes(
+      { prisma: params.ctx.prisma, session: params.ctx.session },
+      scopes,
+    );
+    params.ctx.permissionChecked = true;
+    return params.next();
+  };
+}
 
 /**
  * Permission middleware for the role/feature default writers. Each scope

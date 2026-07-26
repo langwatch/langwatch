@@ -10,7 +10,7 @@ Feature: Model Provider List Management
   #
   # The Background below assumes a project exists. The same page before the
   # organization has one lives in
-  # specs/model-providers/first-project-required.feature.
+  # specs/model-providers/providers-without-a-project.feature.
 
   Background:
     Given I am logged in

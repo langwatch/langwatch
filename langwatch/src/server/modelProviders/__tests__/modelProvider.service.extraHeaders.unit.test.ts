@@ -81,7 +81,6 @@ describe("ModelProviderService extraHeaders save path", () => {
 
       expect(repository.update).toHaveBeenCalledWith(
         "mp_custom",
-        "project_1",
         expect.objectContaining({
           extraHeaders: [
             { key: "Authorization", value: REAL_AUTH },
@@ -102,7 +101,6 @@ describe("ModelProviderService extraHeaders save path", () => {
 
       expect(repository.update).toHaveBeenCalledWith(
         "mp_custom",
-        "project_1",
         expect.objectContaining({
           extraHeaders: [
             { key: "X-Auth", value: REAL_AUTH },
@@ -126,7 +124,6 @@ describe("ModelProviderService extraHeaders save path", () => {
 
       expect(repository.update).toHaveBeenCalledWith(
         "mp_custom",
-        "project_1",
         expect.objectContaining({
           extraHeaders: [{ key: "Authorization", value: REAL_AUTH }],
         }),
@@ -146,7 +143,6 @@ describe("ModelProviderService extraHeaders save path", () => {
 
       expect(repository.update).toHaveBeenCalledWith(
         "mp_custom",
-        "project_1",
         expect.objectContaining({
           extraHeaders: [
             { key: "Authorization", value: REAL_AUTH },
@@ -167,7 +163,6 @@ describe("ModelProviderService extraHeaders save path", () => {
 
       expect(repository.update).toHaveBeenCalledWith(
         "mp_custom",
-        "project_1",
         expect.objectContaining({
           extraHeaders: [
             { key: "Authorization", value: "Bearer replaced-secret" },

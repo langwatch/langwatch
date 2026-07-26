@@ -4,11 +4,24 @@
  * Model Providers settings page for an organization that has no project
  * yet, alongside the ordinary path where one exists.
  *
- * Spec: specs/model-providers/first-project-required.feature
+ * A provider belongs to the organization and reaches the scopes attached
+ * to it, so every action on this page works with or without a project.
+ * The page used to disable adding, editing and deleting whenever there
+ * was no project and offer project creation as the way out, which was a
+ * dead end for the buyer whose organization was set up to track coding
+ * agents and therefore has no project at all.
+ *
+ * Spec: specs/model-providers/providers-without-a-project.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -113,7 +126,18 @@ vi.mock("~/components/settings/ScopeFilter", () => ({
 }));
 
 vi.mock("~/components/settings/ProviderScopeChips", () => ({
-  ProviderScopeChips: () => <div data-testid="provider-scope-chips" />,
+  ProviderScopeChips: ({
+    scopes,
+  }: {
+    scopes?: Array<{ scopeType: string; name?: string }>;
+  }) => (
+    <div
+      data-testid="provider-scope-chips"
+      data-scopes={(scopes ?? [])
+        .map((s) => `${s.scopeType}:${s.name ?? ""}`)
+        .join(",")}
+    />
+  ),
 }));
 
 vi.mock("~/components/ui/layouts/PageLayout", () => ({
@@ -234,60 +258,62 @@ describe("given the Model Providers settings page", () => {
 
   describe("given the organization has no project yet", () => {
     /** @scenario "Landing on Model Providers without a project" */
-    it("states that a project comes first, and offers to create one", () => {
+    it("invites adding a model provider rather than a project", () => {
       renderPage();
 
-      expect(screen.getByText("Create a project first")).toBeTruthy();
+      expect(screen.getByText("No model providers")).toBeTruthy();
       expect(
-        screen.getByText("Model providers are set up inside a project."),
+        screen.getByText("Add a model provider to get started"),
       ).toBeTruthy();
+      expect(screen.queryByText("Create a project first")).toBeNull();
       expect(
-        screen.getByTestId("empty-state-create-first-project"),
-      ).toBeTruthy();
+        screen.queryByTestId("empty-state-create-first-project"),
+      ).toBeNull();
     });
 
-    /** @scenario "Creating the first project from the Model Providers page" */
-    it("creates the first project in the shared team", () => {
-      renderPage();
-
-      fireEvent.click(screen.getByTestId("empty-state-create-first-project"));
-
-      expect(mockOpenDrawer).toHaveBeenCalledWith("createProject", {
-        organizationId: "org-1",
-        defaultTeamId: "team-1",
-      });
-    });
-
-    /** @scenario "Adding a model provider is unavailable, with the reason on it" */
-    it("blocks adding a model provider and says why", () => {
+    /** @scenario "The add action is available" */
+    it("offers adding a model provider, with no blocked reason on it", () => {
       renderPage();
 
       const addButton = screen.getByTestId("header-add-model-provider");
 
-      expect(addButton.hasAttribute("disabled")).toBe(true);
+      expect(addButton.hasAttribute("disabled")).toBe(false);
       expect(
         tooltipWith("Create a project first to add a model provider."),
+      ).toBeNull();
+    });
+
+    /** @scenario "Picking a provider opens its setup" */
+    it("opens a list of providers to pick from", () => {
+      renderPage();
+
+      expect(document.querySelector('[data-menu-item="openai"]')).toBeTruthy();
+      expect(
+        document.querySelector('[data-menu-item="anthropic"]'),
       ).toBeTruthy();
     });
 
-    /** @scenario "No provider list opens onto choices that do nothing" */
-    it("opens no provider list to pick from", () => {
+    /** @scenario "Picking a provider opens its setup" */
+    it("opens the setup for the provider picked, carrying the organization", () => {
       renderPage();
 
-      fireEvent.click(screen.getByTestId("header-add-model-provider"));
+      fireEvent.click(document.querySelector('[data-menu-item="openai"]')!);
 
-      expect(screen.queryByText("OpenAI")).toBeNull();
-      expect(screen.queryByText("Anthropic")).toBeNull();
-      expect(document.querySelector("[data-menu-item]")).toBeNull();
+      expect(mockOpenDrawer).toHaveBeenCalledWith("editModelProvider", {
+        projectId: undefined,
+        organizationId: "org-1",
+        providerKey: "openai",
+        modelProviderId: "new",
+      });
     });
 
-    /** @scenario "No provider list opens onto choices that do nothing" */
-    it("never opens the provider setup", () => {
+    /** @scenario "The add action is available" */
+    it("offers the same add action from the empty state itself", () => {
       renderPage();
 
-      fireEvent.click(screen.getByTestId("header-add-model-provider"));
+      const emptyStateAdd = screen.getByTestId("empty-state-add-model-provider");
 
-      expect(mockOpenDrawer).not.toHaveBeenCalled();
+      expect(emptyStateAdd.hasAttribute("disabled")).toBe(false);
     });
 
     describe("given a provider is already visible to the organization", () => {
@@ -295,52 +321,112 @@ describe("given the Model Providers settings page", () => {
         mockState.providers = [openaiRow];
       });
 
-      /** @scenario "Providers already visible to the organization cannot be edited or deleted" */
-      it("lists the provider", () => {
+      /** @scenario "The saved provider shows the organization it belongs to" */
+      it("lists the provider with its organization scope", () => {
         renderPage();
 
-        expect(screen.getByText("OpenAI")).toBeTruthy();
+        // Scoped to the table: "OpenAI" is also one of the choices in the
+        // add menu, which is mounted now that adding is available.
+        const table = within(screen.getByRole("table"));
+
+        expect(table.getByText("OpenAI")).toBeTruthy();
+        expect(
+          screen.getByTestId("provider-scope-chips").getAttribute("data-scopes"),
+        ).toBe("ORGANIZATION:ACME");
       });
 
-      /** @scenario "Providers already visible to the organization cannot be edited or deleted" */
-      it("blocks editing and deleting it, and says why", () => {
+      /** @scenario "Editing it" */
+      it("offers editing and deleting it", () => {
         renderPage();
 
-        expect(screen.queryByText("Edit Provider")).toBeNull();
-        expect(screen.queryByText("Delete Provider")).toBeNull();
+        expect(screen.getByText("Edit Provider")).toBeTruthy();
+        expect(screen.getByText("Delete Provider")).toBeTruthy();
         expect(
           tooltipWith("Create a project first to edit or delete providers."),
-        ).toBeTruthy();
+        ).toBeNull();
+      });
+
+      /** @scenario "Editing it" */
+      it("opens the setup for the row being edited, carrying the organization", () => {
+        renderPage();
+
+        fireEvent.click(screen.getByText("Edit Provider"));
+
+        expect(mockOpenDrawer).toHaveBeenCalledWith("editModelProvider", {
+          projectId: undefined,
+          organizationId: "org-1",
+          modelProviderId: "mp-1",
+          providerKey: "openai",
+        });
+      });
+
+      // Opening the confirm dialog is not the behaviour that matters. The
+      // delete is scoped by the tenant captured when the row was clicked,
+      // and nothing exercised that all the way to the mutation, so the
+      // scope could have been wrong or absent without a test noticing.
+      /** @scenario "Deleting it" */
+      it("deletes the row it was opened on, scoped to the organization", async () => {
+        renderPage();
+
+        fireEvent.click(screen.getByText("Delete Provider"));
+        expect(screen.getByText("Delete OpenAI?")).toBeTruthy();
+
+        fireEvent.click(screen.getByText("Delete"));
+
+        await vi.waitFor(() => {
+          expect(mockDeleteProvider).toHaveBeenCalledWith({
+            id: "mp-1",
+            projectId: undefined,
+            organizationId: "org-1",
+            provider: "openai",
+          });
+        });
       });
     });
   });
 
-  describe("given the user cannot create projects", () => {
+  describe("given the user cannot manage model providers", () => {
     beforeEach(() => {
-      mockState.permissions = {
-        "project:manage": true,
-        "project:create": false,
-      };
+      mockState.permissions = { "project:manage": false };
+      mockState.providers = [openaiRow];
     });
 
-    /** @scenario "A member who cannot create projects" */
-    it("still states that a project comes first", () => {
+    /** @scenario "Someone who cannot manage model providers" */
+    it("blocks adding a model provider and says why", () => {
       renderPage();
 
-      expect(screen.getByText("Create a project first")).toBeTruthy();
-    });
-
-    /** @scenario "A member who cannot create projects" */
-    it("blocks creating a project and says why", () => {
-      renderPage();
-
-      const createButton = screen.getByTestId(
-        "empty-state-create-first-project",
-      );
-
-      expect(createButton.hasAttribute("disabled")).toBe(true);
       expect(
-        tooltipWith("You need project create permissions to add a project."),
+        screen
+          .getByTestId("header-add-model-provider")
+          .hasAttribute("disabled"),
+      ).toBe(true);
+      expect(
+        tooltipWith(
+          "You need model provider manage permissions to add new providers.",
+        ),
+      ).toBeTruthy();
+    });
+
+    /** @scenario "Someone who cannot manage model providers" */
+    it("opens no provider list to pick from", () => {
+      renderPage();
+
+      fireEvent.click(screen.getByTestId("header-add-model-provider"));
+
+      expect(document.querySelector("[data-menu-item]")).toBeNull();
+      expect(mockOpenDrawer).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Someone who cannot manage model providers" */
+    it("blocks editing and deleting, and says why", () => {
+      renderPage();
+
+      expect(screen.queryByText("Edit Provider")).toBeNull();
+      expect(screen.queryByText("Delete Provider")).toBeNull();
+      expect(
+        tooltipWith(
+          "You need model provider manage permissions to edit or delete providers.",
+        ),
       ).toBeTruthy();
     });
   });
@@ -361,7 +447,6 @@ describe("given the Model Providers settings page", () => {
       expect(screen.queryByText("Create a project first")).toBeNull();
     });
 
-    /** @scenario "Adding a provider works once the project exists" */
     it("opens the setup for the provider picked", () => {
       renderPage();
 
@@ -401,10 +486,6 @@ describe("given the Model Providers settings page", () => {
         });
       });
 
-      // Opening the confirm dialog is not the behaviour that matters. The
-      // delete is scoped by the projectId captured when the row was clicked,
-      // and nothing exercised that all the way to the mutation, so the scope
-      // could have been wrong or absent without a test noticing.
       it("deletes the row it was opened on, scoped to the project", async () => {
         renderPage();
 
@@ -417,6 +498,7 @@ describe("given the Model Providers settings page", () => {
           expect(mockDeleteProvider).toHaveBeenCalledWith({
             id: "mp-1",
             projectId: "proj-1",
+            organizationId: "org-1",
             provider: "openai",
           });
         });

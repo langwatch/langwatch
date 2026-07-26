@@ -307,6 +307,8 @@ export const EditModelProviderForm = ({
     provider.provider,
     state.customKeys,
     projectId,
+    organization?.id,
+    state.scopes,
   );
 
   const handleSave = useCallback(async () => {
