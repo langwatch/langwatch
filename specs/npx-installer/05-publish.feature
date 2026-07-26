@@ -22,6 +22,26 @@ Feature: CI smoke + publish for `@langwatch/server`
       | ubuntu-22.04         |
       | ubuntu-22.04-arm     |
 
+  Scenario: Smoke proves the artifact npm users receive, never the checkout
+    Given the smoke job packed the npm tarball
+    When the smoke boots the server
+    Then everything that runs came from that tarball
+    And a file missing from the artifact fails the smoke even though the checkout has it
+    # A checkout boot masks packaging gaps: an over-broad exclusion breaks
+    # only the released artifact, which no CI step would otherwise execute.
+
+  Scenario: A fresh install from the published artifact boots with nothing missing
+    When a user installs from the published artifact
+    Then the server reaches healthy with every module the app imports present
+    And the publish job refuses to ship an artifact that would not
+
+  Scenario: An incomplete artifact fails at install time, not minutes later at boot
+    Given a published artifact missing packages the app needs
+    When the installer prepares the app
+    Then it fails during install, before any service starts
+    And the failure names the missing packages and says the artifact itself is at fault
+    And it points at the issue tracker instead of leaving the user to debug a bare module error
+
   Scenario: Smoke job uploads logs as artifact on failure
     Given a smoke job step fails
     Then "~/.langwatch/logs/" is uploaded as workflow artifact "logs-<runner>-<sha>.tar.gz"

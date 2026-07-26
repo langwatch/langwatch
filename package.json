@@ -33,11 +33,15 @@
   "files": [
     "packages/server/dist/",
     "packages/server/templates/",
+    "packages/handled-error/",
+    "packages/langy/",
     "langwatch/",
     "langevals/",
     "python-sdk/",
     "mcp-server/",
     "scripts/",
+    "skills/",
+    "feature-map.json",
     "README.md",
     "LICENSE.md"
   ],

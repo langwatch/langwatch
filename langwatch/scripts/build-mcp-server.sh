@@ -7,6 +7,21 @@
 set -eo pipefail
 
 printf 'building mcp server... '
+
+# The published @langwatch/server artifact ships mcp-server PRE-BUILT and
+# deliberately excludes its build config (see mcp-server/.npmignore): there
+# is nothing to build from, and the shipped dist is the thing to use. Only
+# a tree that carries the build config gets rebuilt.
+mcp_root="$(cd "$(dirname "$0")/../.." && pwd)/mcp-server"
+if [ ! -f "$mcp_root/tsup.config.ts" ]; then
+  if [ -f "$mcp_root/dist/create-mcp-server.js" ]; then
+    printf 'prebuilt in published artifact, skipping\n'
+    exit 0
+  fi
+  printf 'FAILED\n'
+  printf 'mcp-server has neither its build config nor a prebuilt dist — the artifact is incomplete (packaging bug in @langwatch/server).\n'
+  exit 1
+fi
 # process.stdout.write, not console.log: under `pnpm dev` concurrently sets
 # FORCE_COLOR, and console.log wraps numbers in ANSI colour codes even when
 # piped — which then get interpolated into the elapsed-time eval below.

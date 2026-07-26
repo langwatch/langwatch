@@ -213,7 +213,25 @@ jobs:
             # crashes loading "@langwatch/mcp-server/create-mcp-server".
             "package/mcp-server/package.json"
             "package/mcp-server/dist/create-mcp-server.js"
+            # Langy reads the platform feature map at runtime
+            # (langwatch/src/shared/langy/featureMap.ts imports it from the
+            # repo root).
+            "package/feature-map.json"
+            # The app's prepare step imports the skills front-matter helper
+            # (scripts/generate-langy-skills.ts) when a tree rebuilds.
+            "package/skills/_lib/frontmatter.js"
           )
+          # Every workspace package in the checkout must ship: a missing one
+          # leaves dangling pnpm links in the installed tree and the app dies
+          # with MODULE_NOT_FOUND at first boot — 3.6.0 shipped exactly that
+          # way (.npmignore still excluded langwatch/packages/ after runtime
+          # packages moved in). Derived from the directory listing so a new
+          # package is covered the day it appears.
+          for pkgdir in langwatch/packages/*/ packages/handled-error/ packages/langy/; do
+            pkgdir="${pkgdir%/}"
+            [ -f "$pkgdir/package.json" ] || continue
+            required+=("package/$pkgdir/package.json")
+          done
           forbidden=(
             "package/langwatch/node_modules"
             "package/langwatch/.next/cache"
