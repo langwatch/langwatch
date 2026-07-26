@@ -45,7 +45,6 @@ import { useFocusSectionStore } from "../../../stores/focusSectionStore";
 import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import {
-  abbreviateModel,
   formatAbsoluteTime,
   formatCost,
   formatDuration,
@@ -1189,7 +1188,7 @@ export const DrawerHeader = memo(function DrawerHeader({
               <Box display="inline-flex">
                 <MetricPill
                   label="Models"
-                  value={`${abbreviateModel(trace.models[0]!)}  +${
+                  value={`${(trace.models[0]!)}  +${
                     trace.models.length - 1
                   }`}
                 />
@@ -1198,7 +1197,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           ) : (
             <MetricPill
               label="Model"
-              value={abbreviateModel(trace.models[0]!)}
+              value={(trace.models[0]!)}
             />
           ))}
         {reasoningEffort && (

@@ -4,7 +4,6 @@ import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import type { DensityTokens } from "../../../../../hooks/useDensityTokens";
 import type { TraceListItem } from "../../../../../types/trace";
 import {
-  abbreviateModel,
   formatCost,
   formatDuration,
   formatRelativeTime,
@@ -112,7 +111,7 @@ const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({
             </MonoCell>
             {groupBy !== "model" && trace.models[0] && (
               <MonoCell flexShrink={0}>
-                {abbreviateModel(trace.models[0])}
+                {(trace.models[0])}
               </MonoCell>
             )}
             {trace.totalTokens > 0 && (

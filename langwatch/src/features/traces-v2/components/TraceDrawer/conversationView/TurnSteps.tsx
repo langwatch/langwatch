@@ -5,7 +5,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import { api } from "~/utils/api";
 import {
-  abbreviateModel,
   formatCost,
   formatDuration,
   formatTokens,
@@ -134,7 +133,7 @@ function selectSteps(spans: SpanDetail[]): Step[] {
         kind: isTool ? ("tool" as const) : ("model" as const),
         label: isTool
           ? asString(params.tool_name) ?? "Tool"
-          : abbreviateModel(span.model ?? "model"),
+          : (span.model ?? "model"),
         arg: isTool
           ? asString(params.full_command) ?? asString(params.file_path)
           : null,

@@ -14,7 +14,6 @@ import type { LangwatchSignalBucket } from "~/server/api/routers/tracesV2.schema
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import { useSpanPulseStore } from "../../../stores/spanPulseStore";
 import {
-  abbreviateModel,
   formatCost,
   formatDuration,
 } from "../../../utils/formatters";
@@ -471,7 +470,7 @@ export const TreeRow = memo(function TreeRow({
                   maxWidth="100%"
                   bg="bg.subtle"
                 >
-                  {isLlm ? abbreviateModel(span.model!) : span.toolName}
+                  {isLlm ? (span.model!) : span.toolName}
                 </Text>
               </HStack>
             )}

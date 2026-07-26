@@ -190,26 +190,6 @@ export function formatBytes(bytes: number): string {
   return `${value.toFixed(1)} ${BYTE_UNITS[unitIndex]}`;
 }
 
-/**
- * Anthropic's context-window-variant marker on a raw model id, e.g.
- * `claude-opus-4-8[1m]` for the 1M-token beta. It's a wire-format detail, not
- * part of the model's identity, so it's dropped before display. Scoped to
- * claude ids: a bracket suffix on any other provider's id is unknown
- * territory and stays untouched.
- */
-const ANTHROPIC_CONTEXT_VARIANT = /^((?:anthropic\/)?claude-[^[\]]+)\[[^[\]]*\]$/;
-
-/**
- * Display form of a model id. Model names are shown as-is (an id like
- * "gpt-5-mini" IS the name; shortening it to "5-mini" reads as a different
- * model); the only transform is dropping Anthropic's context-window-variant
- * suffix, which is wire-format metadata rather than identity.
- */
-export function abbreviateModel(model: string): string {
-  const match = ANTHROPIC_CONTEXT_VARIANT.exec(model);
-  return match ? match[1]! : model;
-}
-
 export function formatWallClock(startMs: number, endMs: number): string {
   const diff = Math.max(0, endMs - startMs);
   const secs = Math.floor(diff / 1_000);
