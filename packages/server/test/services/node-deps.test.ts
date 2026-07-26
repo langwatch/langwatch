@@ -1,7 +1,13 @@
-import { existsSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readlinkSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
 	assertWorkspaceLinksResolve,
@@ -139,6 +145,18 @@ describe("external member peer links", () => {
 			const appRoot = await makeAppTree();
 			linkExternalMemberPeers(appRoot);
 			expect(linkExternalMemberPeers(appRoot)).toEqual([]);
+		});
+
+		it("links relatively so the tree survives relocation", async () => {
+			// An absolute target would break the moment ~/.langwatch/app moves
+			// (a fresh install, a version bump); relative is what makes the
+			// symlink keep resolving after the whole tree is relocated.
+			const appRoot = await makeAppTree();
+			linkExternalMemberPeers(appRoot);
+			const target = readlinkSync(
+				join(appRoot, "packages", "langy", "node_modules", "zod"),
+			);
+			expect(isAbsolute(target)).toBe(false);
 		});
 	});
 

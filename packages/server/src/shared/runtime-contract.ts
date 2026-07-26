@@ -1,7 +1,7 @@
 // Contract module shared between the CLI flow (smith) and the runtime
 // implementation (julia). The CLI calls these functions; julia owns the
-// implementation in services/runtime.ts. Keep this file backward compatible
-// — adding fields is fine, removing or renaming is a coordinated change.
+// implementation in services/runtime.ts. Keep this file backward compatible:
+// adding fields is fine, removing or renaming is a coordinated change.
 
 import type { PredepResult } from "../predeps/runner.ts";
 import type { LangwatchPaths } from "../shared/paths.ts";
@@ -29,7 +29,7 @@ export type ServiceHandle = {
  * and to tee log lines to TTY (with stable per-service prefix + color).
  *
  * The stream stays open from the moment `events(ctx)` is called until
- * `stopAll(handles)` resolves. Multiple consumers are not supported — call
+ * `stopAll(handles)` resolves. Multiple consumers are not supported: call
  * `events(ctx)` exactly once per CLI run.
  */
 export type RuntimeEvent =
@@ -54,7 +54,10 @@ export type RuntimeEvent =
 	| { type: "stopped"; service: string };
 
 export type RuntimeApi = {
-	scaffoldEnv(ctx: RuntimeContext): Promise<{ written: boolean; path: string }>;
+	scaffoldEnv(
+		ctx: RuntimeContext,
+		opts?: { shouldReconcilePorts?: boolean },
+	): Promise<{ written: boolean; path: string; reconciledKeys: string[] }>;
 	installServices(ctx: RuntimeContext): Promise<void>;
 	startAll(ctx: RuntimeContext): Promise<ServiceHandle[]>;
 	waitForHealth(

@@ -82,6 +82,20 @@ function childAt(index: number): FakeChild {
 	return child;
 }
 
+/** rmSync can lose a benign race against a real log write still landing (see afterEach). */
+async function removeDirWithRetry(
+	path: string,
+	attemptsLeft = 5,
+): Promise<void> {
+	try {
+		rmSync(path, { recursive: true, force: true });
+	} catch (err) {
+		if (attemptsLeft <= 1) throw err;
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		await removeDirWithRetry(path, attemptsLeft - 1);
+	}
+}
+
 describe("supervise restart policy", () => {
 	let root: string;
 	let bus: EventBus;
@@ -118,9 +132,16 @@ describe("supervise restart policy", () => {
 		bus.tap((ev) => events.push(ev));
 	});
 
-	afterEach(() => {
+	afterEach(async () => {
 		vi.useRealTimers();
-		rmSync(root, { recursive: true, force: true });
+		// Every spawnAttempt() opens a real log-file write stream; fake-timer
+		// advances resolve the assertions long before that real, unfaked disk
+		// I/O necessarily finishes. Give it a moment before the recursive
+		// rmSync below, and retry rmSync itself, so a write that is still
+		// landing does not race the directory out from under it (ENOENT/
+		// ENOTEMPTY) and fail a later, unrelated test instead of this one.
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		await removeDirWithRetry(root);
 	});
 
 	describe("given a service that already reported healthy", () => {

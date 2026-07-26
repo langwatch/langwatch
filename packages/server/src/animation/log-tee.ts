@@ -61,7 +61,7 @@ export function renderEvent(ev: RuntimeEvent): string | null {
 		}
 		case "crashed":
 			return `${chalk.red("✗")} ${paint(ev.service)} ${chalk.red(
-				`crashed (exit ${ev.code}), see ${serviceLogPath(ev.service)}`,
+				`crashed (${exitCause(ev)}), see ${serviceLogPath(ev.service)}`,
 			)}`;
 		case "stopped":
 			return `${chalk.yellow("⏻")} ${paint(ev.service)} ${chalk.dim("stopped")}`;

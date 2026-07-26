@@ -89,6 +89,17 @@ describe("renderEvent", () => {
 			expect(out).toContain("clickhouse.log");
 			expect(out).toContain("see ");
 		});
+
+		it("names the signal when the child was killed rather than exiting", () => {
+			const out = renderEvent({
+				type: "crashed",
+				service: "clickhouse",
+				code: -1,
+				signal: "SIGKILL",
+			});
+			expect(out).toContain("crashed (signal SIGKILL)");
+			expect(out).not.toContain("exit -1");
+		});
 	});
 
 	describe("when given a stopped event", () => {
