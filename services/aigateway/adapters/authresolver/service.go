@@ -428,7 +428,11 @@ func (s *Service) resolveFresh(ctx context.Context, rawKey string, h [64]byte) (
 	if err != nil {
 		return nil, err
 	}
-	s.populateConfig(ctx, bundle)
+	if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+		// Cold miss: no stale entry to fall back on. Cache nothing — a
+		// bundle without its config is not a resolution result.
+		return nil, errConfigUnavailable(ctx, cfgErr)
+	}
 	s.storeL1(h, bundle)
 	if s.l2 != nil {
 		s.l2.Set(ctx, string(h[:]), bundle)
@@ -449,7 +453,14 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 
 	switch cls {
 	case classNone:
-		s.populateConfig(ctx, bundle)
+		if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+			// The control plane authenticated the key but could not hand
+			// over its provider config. Serving the fresh, config-less
+			// bundle would surface as no_provider_configured for an org
+			// whose keys are fine — treat it as a transport failure and
+			// serve the stale entry's known-good credentials instead.
+			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
+		}
 		s.storeL1(h, bundle)
 		if s.l2 != nil {
 			s.l2.Set(ctx, string(h[:]), bundle)
@@ -466,46 +477,77 @@ func (s *Service) refreshOrServeStale(ctx context.Context, rawKey string, h [64]
 		return nil, err
 
 	default:
-		newSoft, bumped := stale.bumpSoft(s.softBump)
-		if !bumped {
-			s.l1.Remove(h)
-			s.logger.Error("auth_cache_hard_evict",
-				zap.String("vk_id", vkID),
-				zap.String("reason", "hard_cap_exceeded"),
-				zap.Error(err),
-			)
-			return nil, err
-		}
-		s.logger.Warn("auth_cache_refresh_transport_failure",
-			zap.String("vk_id", vkID),
-			zap.Time("new_soft_expires_at", newSoft),
-			zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
-			zap.Error(err),
-		)
-		s.logger.Info("auth_cache_serve_stale",
-			zap.String("vk_id", vkID),
-			zap.Duration("stale_for", time.Since(staleBundle.ExpiresAt)),
-			zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
-			zap.String("refresh_error_class", cls.String()),
-		)
-		return staleBundle, nil
+		return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, err)
 	}
 }
 
+// serveStaleAfterFailure is the transport-failure tail of refreshOrServeStale:
+// bump the stale entry's soft expiry and keep serving it, or evict and fail
+// once the hard grace cap is exhausted. `cause` is what stopped the refresh —
+// a ResolveKey transport error or a config fetch failure after a good auth.
+func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale *entry, staleBundle *domain.Bundle, vkID string, hardExpiresAt time.Time, cls refreshErrorClass, cause error) (*domain.Bundle, error) {
+	newSoft, bumped := stale.bumpSoft(s.softBump)
+	if !bumped {
+		s.l1.Remove(h)
+		s.logger.Error("auth_cache_hard_evict",
+			zap.String("vk_id", vkID),
+			zap.String("reason", "hard_cap_exceeded"),
+			zap.Error(cause),
+		)
+		if cls == classNone {
+			return nil, errConfigUnavailable(ctx, cause)
+		}
+		return nil, cause
+	}
+	// classNone here means the auth succeeded and the CONFIG fetch failed;
+	// log that instead of a misleading "none" error class.
+	classLabel := cls.String()
+	if cls == classNone {
+		classLabel = "config_fetch_failed"
+	}
+	s.logger.Warn("auth_cache_refresh_transport_failure",
+		zap.String("vk_id", vkID),
+		zap.Time("new_soft_expires_at", newSoft),
+		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
+		zap.Error(cause),
+	)
+	s.logger.Info("auth_cache_serve_stale",
+		zap.String("vk_id", vkID),
+		zap.Duration("stale_for", time.Since(staleBundle.ExpiresAt)),
+		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
+		zap.String("refresh_error_class", classLabel),
+	)
+	return staleBundle, nil
+}
+
 // populateConfig eagerly fetches the bundle's config and merges it into the
-// bundle. Failure here is non-fatal — the bundle still serves with empty
-// config.Credentials, and downstream resolution will surface its own error.
-func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) {
+// bundle. A failure leaves the bundle without credentials, so callers must
+// not cache or serve the bundle as-is: dispatch would answer the terminal
+// no_provider_configured ("add a provider API key in Settings") for an org
+// whose keys are fine, and a cached config-less bundle keeps giving that
+// answer until it expires — on every node that shares the L2 cache.
+func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) error {
 	if bundle == nil {
-		return
+		return nil
 	}
 	cfg, err := s.configFetcher.FetchConfig(ctx, bundle.VirtualKeyID)
 	if err != nil {
 		s.logger.Warn("config_fetch_failed", zap.String("vk_id", bundle.VirtualKeyID), zap.Error(err))
-		return
+		return err
 	}
 	bundle.Config = cfg
 	bundle.Credentials = cfg.Credentials
+	return nil
+}
+
+// errConfigUnavailable is the fail-closed answer when the control plane
+// authenticated the key but could not hand over its provider config and no
+// stale entry exists to serve instead. Transport-class on purpose: the
+// client should retry, not go check its provider settings.
+func errConfigUnavailable(ctx context.Context, err error) error {
+	return herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+		"message": "control plane unavailable while loading this key's provider configuration — retry shortly",
+	}, err)
 }
 
 // Start launches the background refresh loop and (when configured) the
@@ -686,7 +728,14 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 
 	switch cls {
 	case classNone:
-		s.populateConfig(ctx, bundle)
+		if cfgErr := s.populateConfig(ctx, bundle); cfgErr != nil {
+			// Keep the existing entry serving its known-good credentials.
+			// Replacing it with a config-less bundle would proactively
+			// poison a perfectly healthy cache entry into answering
+			// no_provider_configured until expiry.
+			s.bumpEntryAfterTransportFailure(h, cfgErr)
+			return
+		}
 		s.storeL1(h, bundle)
 		if s.l2 != nil {
 			s.l2.Set(ctx, string(h[:]), bundle)
@@ -706,22 +755,30 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 		)
 
 	default:
-		e, ok := s.l1.Get(h)
-		if !ok {
-			return
-		}
-		newSoft, bumped := e.bumpSoft(s.softBump)
-		if !bumped {
-			return
-		}
-		_, _, hardExpiresAt := e.snapshot()
-		s.logger.Warn("auth_cache_refresh_transport_failure",
-			zap.String("vk_id", e.bundle.VirtualKeyID),
-			zap.Time("new_soft_expires_at", newSoft),
-			zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
-			zap.Error(err),
-		)
+		s.bumpEntryAfterTransportFailure(h, err)
 	}
+}
+
+// bumpEntryAfterTransportFailure extends the soft expiry of an existing L1
+// entry after a background refresh failed for transport-class reasons (the
+// resolve call itself, or the config fetch after a good auth), keeping the
+// entry serving instead of letting it lapse.
+func (s *Service) bumpEntryAfterTransportFailure(h [64]byte, cause error) {
+	e, ok := s.l1.Get(h)
+	if !ok {
+		return
+	}
+	newSoft, bumped := e.bumpSoft(s.softBump)
+	if !bumped {
+		return
+	}
+	_, _, hardExpiresAt := e.snapshot()
+	s.logger.Warn("auth_cache_refresh_transport_failure",
+		zap.String("vk_id", e.bundle.VirtualKeyID),
+		zap.Time("new_soft_expires_at", newSoft),
+		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
+		zap.Error(cause),
+	)
 }
 
 // refreshConfigBackground re-fetches only the bundle's config (not auth)
