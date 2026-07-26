@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	bfanthropic "github.com/maximhq/bifrost/core/providers/anthropic"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -815,6 +816,53 @@ func TestMessagesTranslatedStream_StopReasonMapping(t *testing.T) {
 			assert.Equal(t, tc.want, terminalStopReason(t, events),
 				"%s must translate to %s", tc.finishReason, tc.want)
 		})
+	}
+}
+
+// The framer must never reserve a block index it does not open. A stop for a
+// block that never started would otherwise burn an index and leave a permanent
+// hole in a sequence the client requires to be contiguous.
+//
+// @scenario "Content block indices are contiguous from zero"
+func TestAnthropicStreamFramer_StopForUnopenedBlock_LeavesNoHole(t *testing.T) {
+	framer := newAnthropicStreamFramer("msg_test", "test-model")
+
+	var emitted []*bfanthropic.AnthropicStreamEvent
+	push := func(ev *bfanthropic.AnthropicStreamEvent) {
+		emitted = append(emitted, framer.push(ev)...)
+	}
+
+	// Open and fill block 0.
+	push(&bfanthropic.AnthropicStreamEvent{
+		Type:  bfanthropic.AnthropicStreamEventTypeContentBlockDelta,
+		Index: bfschemas.Ptr(0),
+		Delta: &bfanthropic.AnthropicStreamDelta{Type: bfanthropic.AnthropicStreamDeltaTypeText, Text: bfschemas.Ptr("hi")},
+	})
+	// A stray stop for an index that never opened, which upstreams do emit
+	// when their own bookkeeping is off.
+	push(&bfanthropic.AnthropicStreamEvent{Type: bfanthropic.AnthropicStreamEventTypeContentBlockStop, Index: bfschemas.Ptr(7)})
+	// A second real block.
+	push(&bfanthropic.AnthropicStreamEvent{
+		Type:  bfanthropic.AnthropicStreamEventTypeContentBlockDelta,
+		Index: bfschemas.Ptr(1),
+		Delta: &bfanthropic.AnthropicStreamDelta{Type: bfanthropic.AnthropicStreamDeltaTypeText, Text: bfschemas.Ptr("there")},
+	})
+	emitted = append(emitted, framer.finish()...)
+
+	started := map[int]bool{}
+	maxIndex := -1
+	for _, ev := range emitted {
+		if ev.Type == bfanthropic.AnthropicStreamEventTypeContentBlockStart && ev.Index != nil {
+			started[*ev.Index] = true
+			if *ev.Index > maxIndex {
+				maxIndex = *ev.Index
+			}
+		}
+	}
+	require.GreaterOrEqual(t, maxIndex, 1, "both real blocks must open")
+	for i := 0; i <= maxIndex; i++ {
+		assert.True(t, started[i],
+			"index %d must have been opened; a stray stop must not reserve an index", i)
 	}
 }
 

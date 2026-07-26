@@ -476,7 +476,14 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		if ev.Index == nil {
 			ev.Index = bfschemas.Ptr(0)
 		}
-		idx := f.dense(*ev.Index)
+		// Only a block that actually opened can close. Resolving an unknown
+		// upstream index here would reserve a dense index that never opens,
+		// leaving a permanent hole in the sequence the client requires to be
+		// contiguous.
+		idx, mapped := f.denseIndex[*ev.Index]
+		if !mapped {
+			return out
+		}
 		return f.closeBlock(out, idx)
 
 	case bfanthropic.AnthropicStreamEventTypeMessageDelta:
