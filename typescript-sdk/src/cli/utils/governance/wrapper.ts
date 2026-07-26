@@ -403,6 +403,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			`${lwTag()} removed the langwatch telemetry env from ` +
 				`.claude/settings.local.json (the gateway captures this session).\n`,
 		);
+	} else if (pin?.action === "skipped") {
+		process.stderr.write(
+			`${lwTag()} left the OTLP env in .claude/settings.local.json alone, ` +
+				`it isn't langwatch-authored. Claude applies it on top of this ` +
+				`run's env, so telemetry may go elsewhere: remove those keys or ` +
+				`point them at ${modeResult.endpoint ?? "this login"}.\n`,
+		);
 	}
 
 	if (modeResult.mode === "gateway") {

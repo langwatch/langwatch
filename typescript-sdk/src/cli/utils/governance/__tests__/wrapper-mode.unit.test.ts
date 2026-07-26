@@ -20,6 +20,7 @@ vi.mock("../cli-api", async () => {
 	return {
 		...actual,
 		mintIngestionKey: vi.fn(),
+		listIngestionKeys: vi.fn(),
 	};
 });
 
@@ -163,6 +164,15 @@ describe("resolveWrapperMode", () => {
 
 		it("reuses the cached key rather than minting again when one is already stored", async () => {
 			const { resolveWrapperMode } = await import("../wrapper-mode.js");
+
+			// resolveLiveIngestionKey calls listIngestionKeys whenever a cached
+			// key is present; leaving it unmocked would make a REAL outbound
+			// request to http://app.example.com. Simulate an unreachable /
+			// older-server control plane so the offline-fallback branch
+			// (reuse the cache) fires deterministically, with no network I/O.
+			(cliApi.listIngestionKeys as ReturnType<typeof vi.fn>).mockRejectedValue(
+				new Error("offline (test)"),
+			);
 
 			const cfg = baseCfg({
 				default_personal_ingest_keys: {

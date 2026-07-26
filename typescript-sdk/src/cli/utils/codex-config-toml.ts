@@ -535,7 +535,28 @@ export function removeCodexGatewayBlock(
 export function removeCodexGatewayProfileFile(
 	profilePath: string = defaultCodexProfilePath(),
 ): boolean {
-	if (!fs.existsSync(profilePath)) return false;
+	if (!codexProfileFileIsLangwatchOwned(profilePath)) return false;
 	fs.rmSync(profilePath, { force: true });
 	return true;
+}
+
+/**
+ * Whether the file at `profilePath` looks like the profile body this CLI
+ * writes (`model_provider = "langwatch"`, the entire content of
+ * buildCodexGatewayProfileFile()) rather than some unrelated file a user
+ * happened to place at this distinctively-named path. The path name alone
+ * is a strong hint but not proof of ownership - this content check is what
+ * the logout scan and the remover itself gate listing/deletion on, so a
+ * non-owned file at the same path is never presented as removable or
+ * silently deleted.
+ */
+export function codexProfileFileIsLangwatchOwned(
+	profilePath: string = defaultCodexProfilePath(),
+): boolean {
+	try {
+		const content = fs.readFileSync(profilePath, "utf8");
+		return /model_provider\s*=\s*"langwatch"/.test(content);
+	} catch {
+		return false;
+	}
 }

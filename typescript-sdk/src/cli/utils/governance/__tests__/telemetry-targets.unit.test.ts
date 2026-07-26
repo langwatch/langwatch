@@ -184,6 +184,99 @@ describe("scanTelemetryTargets", () => {
 		});
 	});
 
+	describe("when settings.json carries the user's own OTLP wiring under the same key names", () => {
+		it("does not report the claude target as present, and remove() leaves it untouched", () => {
+			// OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_HEADERS are
+			// standard OpenTelemetry env var names — a user could plausibly
+			// point them at a collector of their own (Honeycomb here) under
+			// the exact same keys langwatch writes. Presence of the NAMES is
+			// not ownership; the scan must not offer this for removal.
+			const claude = appSettingsTargetFor("claude")!;
+			installAppEnv(claude, {
+				OTEL_EXPORTER_OTLP_ENDPOINT: "https://api.honeycomb.io",
+				OTEL_EXPORTER_OTLP_HEADERS: "x-honeycomb-team=abc",
+			});
+			const before = fs.readFileSync(claude.path, "utf8");
+
+			expect(
+				presentLabels().some((l) => l.startsWith("claude telemetry env")),
+			).toBe(false);
+
+			const target = scanTelemetryTargets().find((t) =>
+				t.label.startsWith("claude telemetry env"),
+			)!;
+			expect(target.remove()).toBe(false);
+			expect(fs.readFileSync(claude.path, "utf8")).toBe(before);
+		});
+	});
+
+	describe("when the project pin directory carries the user's own OTLP wiring", () => {
+		let cwdSpy: ReturnType<typeof vi.spyOn>;
+
+		beforeEach(() => {
+			const projectDir = path.join(tmpHome, "project");
+			fs.mkdirSync(projectDir, { recursive: true });
+			cwdSpy = vi
+				.spyOn(process, "cwd")
+				.mockReturnValue(projectDir) as ReturnType<typeof vi.spyOn>;
+			installAppEnv(claudeProjectSettingsTarget(projectDir), {
+				OTEL_EXPORTER_OTLP_ENDPOINT: "https://api.honeycomb.io",
+			});
+		});
+
+		afterEach(() => {
+			cwdSpy.mockRestore();
+		});
+
+		it("does not report the project pin as present, and remove() leaves it untouched", () => {
+			const pinPath = path.join(
+				tmpHome,
+				"project",
+				".claude",
+				"settings.local.json",
+			);
+			const before = fs.readFileSync(pinPath, "utf8");
+
+			expect(
+				presentLabels().some((l) =>
+					l.startsWith("claude project telemetry pin"),
+				),
+			).toBe(false);
+
+			const target = scanTelemetryTargets().find((t) =>
+				t.label.startsWith("claude project telemetry pin"),
+			)!;
+			expect(target.remove()).toBe(false);
+			expect(fs.readFileSync(pinPath, "utf8")).toBe(before);
+		});
+	});
+
+	describe("when an unrelated file happens to live at the codex profile path", () => {
+		it("does not report the codex profile target as present, and remove() leaves it untouched", () => {
+			// The path name (~/.codex/langwatch-gateway.config.toml) is
+			// distinctive but not proof of ownership on its own.
+			const profilePath = path.join(
+				tmpHome,
+				".codex",
+				"langwatch-gateway.config.toml",
+			);
+			fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+			fs.writeFileSync(profilePath, "# a file the user put here themselves\n");
+
+			expect(
+				presentLabels().some((l) =>
+					l.startsWith("codex langwatch profile file"),
+				),
+			).toBe(false);
+
+			const target = scanTelemetryTargets().find((t) =>
+				t.label.startsWith("codex langwatch profile file"),
+			)!;
+			expect(target.remove()).toBe(false);
+			expect(fs.existsSync(profilePath)).toBe(true);
+		});
+	});
+
 	describe("when a block lives in ~/.zshrc but $SHELL is bash", () => {
 		it("still finds it — the scan sweeps all shells", () => {
 			const prevShell = process.env.SHELL;

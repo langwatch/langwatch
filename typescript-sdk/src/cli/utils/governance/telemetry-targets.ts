@@ -22,11 +22,10 @@
  * session — the user asked it to "go and find it".
  */
 
-import * as fs from "node:fs";
-
 import {
 	codexHasGatewayBlock,
 	codexHasOtelBlock,
+	codexProfileFileIsLangwatchOwned,
 	defaultCodexConfigPath,
 	defaultCodexProfilePath,
 	displayCodexConfigPath,
@@ -36,6 +35,7 @@ import {
 } from "../codex-config-toml";
 import {
 	appEnvHasAnyVar,
+	appEnvValues,
 	appSettingsTargetFor,
 	claudeProjectSettingsTarget,
 	removeAppEnvVars,
@@ -50,7 +50,10 @@ import {
 	tildify,
 	toolMarkers,
 } from "./shell-rc";
-import { removeClaudeProjectTelemetryPin } from "./telemetry-refresh";
+import {
+	otelWiringLooksLangwatchAuthored,
+	removeClaudeProjectTelemetryPin,
+} from "./telemetry-refresh";
 
 export interface TelemetryTarget {
 	/** Human label for the confirm list + removal summary. */
@@ -74,25 +77,41 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 	const targets: TelemetryTarget[] = [];
 
 	// claude — OTEL keys inside ~/.claude/settings.json's `env` object.
+	// Target presence alone is not ownership: these are standard OTel env
+	// var NAMES (OTEL_EXPORTER_OTLP_ENDPOINT etc.) a user could plausibly
+	// have set themselves for an unrelated collector, so both listing and
+	// removal require the current VALUES to look langwatch-shaped, not just
+	// the key names to match.
 	const claudeTarget = appSettingsTargetFor("claude");
 	if (claudeTarget) {
 		const keys = telemetryEnvVarNames("claude");
+		const isClaudeEnvLangwatchOwned = () =>
+			otelWiringLooksLangwatchAuthored(appEnvValues(claudeTarget));
 		targets.push({
 			label: `claude telemetry env (${claudeTarget.displayPath})`,
-			present: appEnvHasAnyVar(claudeTarget, keys),
-			remove: () => removeAppEnvVars(claudeTarget, keys),
+			present:
+				appEnvHasAnyVar(claudeTarget, keys) && isClaudeEnvLangwatchOwned(),
+			remove: () =>
+				isClaudeEnvLangwatchOwned()
+					? removeAppEnvVars(claudeTarget, keys)
+					: false,
 		});
 	}
 
 	// claude — the project-level pin the wrapper maintains in the working
 	// directory (`$CWD/.claude/settings.local.json`). Logout can only see
 	// the CURRENT directory's pin; pins in other directories are re-synced
-	// or removed by the next `langwatch claude` run there.
+	// or removed by the next `langwatch claude` run there. Same provenance
+	// requirement as the global target above: `remove()` already gates on
+	// it (removeClaudeProjectTelemetryPin), so `present` must match or the
+	// confirm list would offer a target whose removal silently no-ops.
 	const cwd = process.cwd();
 	const claudePin = claudeProjectSettingsTarget(cwd);
 	targets.push({
 		label: `claude project telemetry pin (${claudePin.displayPath} in this directory)`,
-		present: appEnvHasAnyVar(claudePin, telemetryEnvVarNames("claude")),
+		present:
+			appEnvHasAnyVar(claudePin, telemetryEnvVarNames("claude")) &&
+			otelWiringLooksLangwatchAuthored(appEnvValues(claudePin)),
 		remove: () => removeClaudeProjectTelemetryPin({ cwd }),
 	});
 
@@ -108,10 +127,13 @@ export function scanTelemetryTargets(): TelemetryTarget[] {
 		present: codexHasGatewayBlock(codexConfig),
 		remove: () => removeCodexGatewayBlock(codexConfig),
 	});
+	// The distinctive path name alone is a strong hint but not proof of
+	// ownership; require the content to actually be the profile body this
+	// CLI writes before offering to delete whatever file lives there.
 	const codexProfile = defaultCodexProfilePath();
 	targets.push({
 		label: `codex langwatch profile file (${tildify(codexProfile)})`,
-		present: fs.existsSync(codexProfile),
+		present: codexProfileFileIsLangwatchOwned(codexProfile),
 		remove: () => removeCodexGatewayProfileFile(codexProfile),
 	});
 

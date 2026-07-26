@@ -106,8 +106,15 @@ beforeEach(() => {
 
 afterEach(() => {
 	cwdSpy.mockRestore();
-	process.env.HOME = origHome;
-	process.env.USERPROFILE = origUserprofile;
+	// Direct assignment of a possibly-undefined value coerces to the
+	// literal string "undefined" (Node stringifies every env write), which
+	// would leak a polluted HOME/USERPROFILE into every later test in this
+	// worker when the var was genuinely unset beforehand. Restore with the
+	// same check-then-delete-or-assign pattern as CODEX_HOME below.
+	if (origHome === undefined) delete process.env.HOME;
+	else process.env.HOME = origHome;
+	if (origUserprofile === undefined) delete process.env.USERPROFILE;
+	else process.env.USERPROFILE = origUserprofile;
 	if (origCodexHome === undefined) delete process.env.CODEX_HOME;
 	else process.env.CODEX_HOME = origCodexHome;
 	fs.rmSync(tmpHome, { recursive: true, force: true });

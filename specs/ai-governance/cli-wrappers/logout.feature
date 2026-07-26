@@ -63,15 +63,15 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       Then the `env` key is removed entirely
       And no empty `env: {}` is left behind
 
-    Scenario: the claude project telemetry pin in the current directory is removed
-      Given the working directory's .claude/settings.local.json carries the
-        langwatch telemetry pin written by `langwatch claude`
-      When the user runs `langwatch logout` from that directory
-      Then the langwatch keys are removed from the pin
-      And a pin file left empty is deleted
-      # Logout only sees the CURRENT directory's pin. Pins in other
-      # directories are re-synced or removed by the next `langwatch claude`
-      # run there.
+    Scenario: the current project's claude telemetry override is removed
+      Given the current project has a claude telemetry override from an
+        earlier session
+      When the user runs `langwatch logout` from that project
+      Then the project's claude telemetry override is removed
+      And unrelated project configuration is preserved
+      # Logout only sees the CURRENT project. Overrides left in other
+      # projects are re-synced or removed automatically the next time a
+      # wrapped claude session starts there.
 
     Scenario: the codex [otel] and gateway marker blocks are removed
       Given ~/.codex/config.toml carries the langwatch `[otel]` marker

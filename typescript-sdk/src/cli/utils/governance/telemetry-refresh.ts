@@ -135,7 +135,8 @@ export interface IngestionKeyResolution {
  * (hard-cut rotation also invalidates the cache) → mint fresh. If the
  * request rejects (offline / older server without this endpoint) →
  * offline-first fallback: reuse the cache so air-gapped / degraded
- * environments still work.
+ * environments still work, UNLESS the caller opted out via
+ * `allowOfflineFallback: false` (see the parameter doc below).
  *
  * Pure resolution - callers persist the minted key to the config cache
  * themselves.
@@ -143,9 +144,26 @@ export interface IngestionKeyResolution {
 export async function resolveLiveIngestionKey({
 	cfg,
 	sourceType,
+	allowOfflineFallback = true,
 }: {
 	cfg: GovernanceConfig;
 	sourceType: string;
+	/**
+	 * Whether a `listIngestionKeys()` failure falls back to reusing the
+	 * cached secret. Defaults to true: the per-run wrapper path wants a
+	 * disconnected device to keep working against the instance it already
+	 * has a key for (the #4755 offline-first behavior).
+	 *
+	 * The login-time wiring refresh (`refreshTelemetryWiringForLogin`) sets
+	 * this to false. It only reaches this resolver because the persisted
+	 * wiring's endpoint already differs from the login that just
+	 * completed, so the cached secret is presumptively bound to a
+	 * DIFFERENT instance. Falling back to it on a network hiccup would
+	 * pair the NEW endpoint with a token that was never valid there,
+	 * corrupting working wiring instead of leaving it alone - minting
+	 * fresh is the only outcome that can't reintroduce the #6202 hijack.
+	 */
+	allowOfflineFallback?: boolean;
 }): Promise<IngestionKeyResolution> {
 	const cached = cfg.default_personal_ingest_keys?.[sourceType];
 	if (cached?.secret) {
@@ -166,7 +184,9 @@ export async function resolveLiveIngestionKey({
 			// Network error / older server without the endpoint: reuse cache
 			// as-is (offline-first fallback - hard-cut rotation is a
 			// re-mint-kills-old invariant, so a genuinely revoked key will
-			// self-correct next time the device is online).
+			// self-correct next time the device is online) - unless the
+			// caller disabled that fallback.
+			cacheIsLive = allowOfflineFallback;
 		}
 		if (cacheIsLive) {
 			return {
@@ -464,7 +484,15 @@ export async function refreshTelemetryWiringForLogin(
 				// surfaces that on the next run rather than login guessing.
 				continue;
 			}
-			const key = await resolveLiveIngestionKey({ cfg, sourceType });
+			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
+			// This caller only gets here because the persisted endpoint
+			// already differs from the new login, so a network hiccup must
+			// mint fresh rather than reuse a secret bound to the old instance.
+			const key = await resolveLiveIngestionKey({
+				cfg,
+				sourceType,
+				allowOfflineFallback: false,
+			});
 			if (key.minted) {
 				cfg.default_personal_ingest_keys = {
 					...(cfg.default_personal_ingest_keys ?? {}),

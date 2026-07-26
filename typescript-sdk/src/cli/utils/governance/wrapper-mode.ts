@@ -50,6 +50,29 @@ import {
 
 export type WrapperMode = "gateway" | "ingestion";
 
+/**
+ * Run a synchronous telemetry-wiring refresh or removal, catching any
+ * error so a housekeeping failure can never crash the wrapped tool launch.
+ * `refreshClaudeUserTelemetryEnv`, `ensureClaudeProjectTelemetryPin`,
+ * `refreshScopedShellFunctions`, and `removeClaudeProjectTelemetryPin` all
+ * do unguarded synchronous fs writes; an EACCES/EROFS (a read-only home
+ * dir, a locked-down project directory, …) must not exit the whole
+ * `langwatch <tool>` invocation over what is meant to be best-effort
+ * telemetry housekeeping, same guarantee the login-time refresh already
+ * gives (`refreshTelemetryWiringForLogin` never fails the login on this).
+ * Warns to stderr and returns `fallback` on failure.
+ */
+function tryRefresh<T>(label: string, fn: () => T, fallback: T): T {
+	try {
+		return fn();
+	} catch (err) {
+		process.stderr.write(
+			`${lwTag()} couldn't refresh ${label} (best-effort, continuing): ${(err as Error).message}\n`,
+		);
+		return fallback;
+	}
+}
+
 export interface WrapperModeResult {
 	mode: WrapperMode;
 	/** Env additions to merge into the child process.env. */
@@ -216,7 +239,12 @@ export async function resolveWrapperMode(
 		let claudeProjectPin: { action: "removed"; path: string } | undefined;
 		if (tool === "claude") {
 			const cwd = process.cwd();
-			if (removeClaudeProjectTelemetryPin({ cwd })) {
+			const removed = tryRefresh(
+				"the claude project telemetry pin",
+				() => removeClaudeProjectTelemetryPin({ cwd }),
+				false,
+			);
+			if (removed) {
 				claudeProjectPin = {
 					action: "removed",
 					path: claudeProjectSettingsTarget(cwd).path,
@@ -304,14 +332,25 @@ export async function resolveWrapperMode(
 	const refreshedWiring: string[] = [];
 	let claudeProjectPin: ClaudeProjectPinResult | undefined;
 	if (tool === "claude") {
-		const label = refreshClaudeUserTelemetryEnv({ vars });
+		const label = tryRefresh(
+			"the claude telemetry env",
+			() => refreshClaudeUserTelemetryEnv({ vars }),
+			null,
+		);
 		if (label) refreshedWiring.push(label);
-		claudeProjectPin = ensureClaudeProjectTelemetryPin({
-			vars,
-			cwd: process.cwd(),
-		});
+		claudeProjectPin = tryRefresh(
+			"the claude project telemetry pin",
+			() => ensureClaudeProjectTelemetryPin({ vars, cwd: process.cwd() }),
+			undefined,
+		);
 	} else if (tool === "gemini" || tool === "opencode") {
-		refreshedWiring.push(...refreshScopedShellFunctions({ tool, vars }));
+		refreshedWiring.push(
+			...tryRefresh(
+				`the ${tool} scoped shell function`,
+				() => refreshScopedShellFunctions({ tool, vars }),
+				[] as string[],
+			),
+		);
 	}
 
 	let codexConfigPath: string | undefined;
