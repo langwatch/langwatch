@@ -314,6 +314,8 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
     OutputTokens: "",
     CacheReadTokens: "",
     CacheCreationTokens: "",
+    InputChars: "",
+    AudioSeconds: "",
     CustomInputRate: "",
     CustomOutputRate: "",
     CustomCacheReadRate: "",
@@ -612,6 +614,8 @@ describe("mapSpanSummaryRow", () => {
     OutputTokens: "",
     CacheReadTokens: "",
     CacheCreationTokens: "",
+    InputChars: "",
+    AudioSeconds: "",
     CustomInputRate: "",
     CustomOutputRate: "",
     CustomCacheReadRate: "",
@@ -665,6 +669,8 @@ describe("mapSpanSummaryRow", () => {
           OutputTokens: "abc",
           CacheReadTokens: "NaN",
           CacheCreationTokens: "",
+          InputChars: "",
+          AudioSeconds: "",
         }),
       );
       expect(result.inputTokens).toBeNull();
