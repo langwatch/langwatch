@@ -234,6 +234,14 @@ func TestMessagesTranslatedStream_TextAnswer_ProducesValidAnthropicUnion(t *test
 	iter, err := router.DispatchStream(context.Background(), messagesRequest(simpleMessagesBody), customEndpointCred(backend.URL))
 	require.NoError(t, err)
 
+	// The frames are already complete `event:/data:` pairs. The writer must be
+	// told so, or it wraps each one in a second `data: ...` envelope and the
+	// client sees nothing it can decode.
+	framer, ok := iter.(domain.RawFramer)
+	require.True(t, ok, "the translated iterator must advertise its own SSE framing")
+	assert.True(t, framer.RawFraming(),
+		"pre-framed Anthropic events must not be re-wrapped by the SSE writer")
+
 	events, streamErr := collectAnthropicStream(t, context.Background(), iter)
 	require.NoError(t, streamErr)
 	assertValidAnthropicSequence(t, events)
