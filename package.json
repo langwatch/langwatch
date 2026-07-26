@@ -40,6 +40,7 @@
     "python-sdk/",
     "mcp-server/",
     "scripts/",
+    "skills/",
     "feature-map.json",
     "README.md",
     "LICENSE.md"

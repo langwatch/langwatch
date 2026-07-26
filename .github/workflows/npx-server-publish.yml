@@ -217,6 +217,9 @@ jobs:
             # (langwatch/src/shared/langy/featureMap.ts imports it from the
             # repo root).
             "package/feature-map.json"
+            # The app's prepare step imports the skills front-matter helper
+            # (scripts/generate-langy-skills.ts) when a tree rebuilds.
+            "package/skills/_lib/frontmatter.js"
           )
           # Every workspace package in the checkout must ship: a missing one
           # leaves dangling pnpm links in the installed tree and the app dies
