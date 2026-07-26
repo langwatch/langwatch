@@ -104,3 +104,24 @@ Feature: Model Providers before the organization has its first project
       And I save it
       Then the whole save is refused
       And no provider is stored
+
+  # Checking a credential sends it to the address it belongs to, and for a
+  # custom provider the customer supplies that address. Nothing after this
+  # point re-checks who asked, so being allowed to check a credential has to
+  # mean the same thing as being allowed to store one: belonging to the
+  # organization is not enough, or anyone with a read-only seat could aim
+  # the check wherever they liked.
+  Rule: checking a credential is only for someone who could store it
+
+    @integration
+    Scenario: A read-only member cannot probe an arbitrary URL
+      Given I can only view my organization
+      When I ask to check a credential against an address I chose
+      Then I am refused
+      And nothing is sent to that address
+
+    @integration
+    Scenario: Checking a credential for a scope I can manage
+      Given I can manage model providers for my organization
+      When I ask to check a credential for my organization
+      Then the credential is checked

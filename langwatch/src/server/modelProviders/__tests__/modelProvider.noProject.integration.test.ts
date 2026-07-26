@@ -640,6 +640,7 @@ describe(
       // The gate has to let the legitimate case through, or the fix is just
       // a broken feature. An org admin reaches the probe, and the recorded
       // call proves it got as far as the network.
+      /** @scenario "Checking a credential for a scope I can manage" */
       it("lets an org admin through to the request", async () => {
         await expect(
           callerFor(adminUserId).modelProvider.validateApiKey({
