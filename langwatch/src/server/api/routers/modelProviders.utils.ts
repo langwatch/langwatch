@@ -18,6 +18,7 @@ import {
   type ParameterConstraints,
 } from "../../modelProviders/registry";
 import { parseWireValue } from "../../modelProviders/wireFormat";
+import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 
 /**
  * Normalises either wire format ("mp_abc/gpt-5" or "openai/gpt-5") into
@@ -249,16 +250,6 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
   }
 
   // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
-
-  const getSchemaShape = (schema: any) => {
-    if ("innerType" in schema) {
-      return schema.innerType().shape;
-    }
-    if ("shape" in schema) {
-      return schema.shape;
-    }
-    return {};
-  };
 
   return Object.fromEntries(
     Object.keys(getSchemaShape(providerDefinition.keysSchema))
