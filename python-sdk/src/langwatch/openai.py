@@ -550,6 +550,10 @@ class OpenAIChatCompletionTracer:
     ):
         # Accumulate deltas
         chat_outputs: Dict[int, List[ChatMessage]] = {}
+        # Choices whose current message was started without a role delta
+        # (role defaulted to "assistant"). A late role delta adopts that
+        # message instead of starting a second one.
+        synthesized_roles: Set[int] = set()
         usage = None
         for delta in deltas:
             if hasattr(delta, "usage") and delta.usage is not None:
@@ -557,12 +561,23 @@ class OpenAIChatCompletionTracer:
             for choice in delta.choices:
                 index = choice.index
                 delta = choice.delta
+                if delta.role and index in synthesized_roles:
+                    last_item = chat_outputs[index][-1]
+                    last_item["role"] = delta.role  # type: ignore
+                    if delta.content:
+                        last_item["content"] = (
+                            last_item.get("content", "") or ""
+                        ) + delta.content
+                    synthesized_roles.discard(index)
+                    continue
                 # Some OpenAI-compatible backends (the LangWatch AI Gateway
                 # among them) never send the role-carrying first delta that
                 # api.openai.com sends, so the first delta for a choice may
                 # already carry content or tool calls. Start the message on
                 # whichever delta arrives first.
                 if delta.role or index not in chat_outputs:
+                    if not delta.role:
+                        synthesized_roles.add(index)
                     chat_message: ChatMessage = {
                         "role": delta.role or "assistant",  # type: ignore
                         "content": delta.content,

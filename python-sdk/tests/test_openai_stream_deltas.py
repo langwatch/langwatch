@@ -132,3 +132,16 @@ def test_empty_first_delta_then_content():
     )
     assert outputs[0][0]["role"] == "assistant"
     assert outputs[0][0]["content"] == "Hi"
+
+
+def test_role_after_roleless_delta_stays_one_message():
+    outputs = accumulate(
+        [
+            chunk(content="Hello"),
+            chunk(role="assistant", content=" world"),
+            chunk(content="!"),
+        ]
+    )
+    assert len(outputs[0]) == 1
+    assert outputs[0][0]["role"] == "assistant"
+    assert outputs[0][0]["content"] == "Hello world!"

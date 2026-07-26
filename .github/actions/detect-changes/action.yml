@@ -54,13 +54,13 @@ inputs:
     default: force
 outputs:
   relevant:
-    description: "'true' if relevant paths changed, or if event is not a PR."
+    description: "'true' if relevant paths changed, or if the event is neither a PR nor a diff-mode push."
     value: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
   feature-parity:
-    description: "'true' if feature-parity-relevant paths changed, or if event is not a PR."
+    description: "'true' if feature-parity-relevant paths changed, or if the event is neither a PR nor a diff-mode push."
     value: ${{ steps.filter.outputs.feature-parity || steps.force.outputs.feature-parity }}
   lambda-image:
-    description: "'true' if Lambda-image-relevant paths changed, or if event is not a PR. Used by langwatch-nlp-ci's LWA-readiness job — covers Go-binary source + Dockerfile + entrypoint, which aren't matched by the Python-only `relevant` filter."
+    description: "'true' if Lambda-image-relevant paths changed, or if the event is neither a PR nor a diff-mode push. Used by langwatch-nlp-ci's LWA-readiness job — covers Go-binary source + Dockerfile + entrypoint, which aren't matched by the Python-only `relevant` filter."
     value: ${{ steps.filter.outputs.lambda-image || steps.force.outputs.lambda-image }}
 
 runs:
