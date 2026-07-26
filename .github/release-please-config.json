@@ -296,11 +296,6 @@
       ],
       "extra-files": [
         {
-          "type": "toml",
-          "path": "pyproject.toml",
-          "jsonpath": "$.project.version"
-        },
-        {
           "type": "yaml",
           "path": "charts/langwatch/Chart.yaml",
           "jsonpath": "$.version"
