@@ -32,12 +32,16 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the e2e
+          # step spends real LLM money, so it must not run on pushes or
+          # release PRs that touched nothing under python-sdk/. An SDK
+          # release PR still matches via python-sdk/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
               - 'python-sdk/**'
               - '!python-sdk/src/langwatch/__version__.py'
               - '.github/workflows/sdk-python-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   test:
     needs: changes

@@ -30,11 +30,16 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff + no release-please-manifest entry: the test
+          # and e2e steps spend real LLM money, so they must not run on
+          # pushes or release PRs that touched nothing under
+          # typescript-sdk/. An SDK release PR still matches via
+          # typescript-sdk/CHANGELOG.md.
+          push-strategy: diff
           filters: |
             relevant:
               - 'typescript-sdk/**'
               - '.github/workflows/sdk-javascript-ci.yml'
-              - '.github/.release-please-manifest.json'
 
   ci:
     needs: changes
