@@ -387,6 +387,37 @@ class OpenAICompletionTracer:
         span.end()
 
 
+def _merge_tool_call_deltas(message: ChatMessage, tool_calls) -> None:
+    """Merge streamed tool-call deltas into a message by tool index.
+
+    The list is grown to cover any index the stream introduces (parallel
+    tool calls open index 1+ mid-stream), and each delta's id, type, name
+    and argument fragment are merged into its indexed entry.
+    """
+    existing = message.get("tool_calls")
+    if not existing:
+        existing = []
+        message["tool_calls"] = existing
+    for tool in tool_calls:
+        while len(existing) <= tool.index:
+            existing.append(
+                {"id": "", "type": "", "function": {"name": "", "arguments": ""}}
+            )
+        entry = existing[tool.index]
+        if tool.id:
+            entry["id"] = tool.id
+        if tool.type:
+            entry["type"] = tool.type
+        name = safe_get(tool, "function", "name")
+        if name:
+            entry["function"]["name"] = name
+        arguments = safe_get(tool, "function", "arguments")
+        if arguments:
+            entry["function"]["arguments"] = (
+                entry["function"].get("arguments", "") + arguments
+            )
+
+
 class OpenAIChatCompletionTracer:
     trace: ContextTrace
     tracked_traces: Set[ContextTrace] = set()
@@ -587,33 +618,7 @@ class OpenAIChatCompletionTracer:
                                 "arguments": delta.function_call.arguments or "",
                             }
                     if delta.tool_calls:
-                        if "tool_calls" in last_item and last_item["tool_calls"]:
-                            for tool in delta.tool_calls:
-                                last_item["tool_calls"][tool.index]["function"][
-                                    "arguments"
-                                ] = last_item["tool_calls"][tool.index][
-                                    "function"
-                                ].get(
-                                    "arguments", ""
-                                ) + (
-                                    safe_get(tool, "function", "arguments") or ""
-                                )
-                        else:
-                            last_item["tool_calls"] = [
-                                {
-                                    "id": tool.id or "",
-                                    "type": tool.type or "",
-                                    "function": {
-                                        "name": safe_get(tool, "function", "name")
-                                        or "",
-                                        "arguments": safe_get(
-                                            tool, "function", "arguments"
-                                        )
-                                        or "",
-                                    },
-                                }
-                                for tool in delta.tool_calls
-                            ]
+                        _merge_tool_call_deltas(last_item, delta.tool_calls)
                     synthesized_roles.discard(index)
                     continue
                 # Some OpenAI-compatible backends (the LangWatch AI Gateway
@@ -634,18 +639,7 @@ class OpenAIChatCompletionTracer:
                             "arguments": delta.function_call.arguments or "",
                         }
                     if delta.tool_calls:
-                        chat_message["tool_calls"] = [
-                            {
-                                "id": tool.id or "",
-                                "type": tool.type or "",
-                                "function": {
-                                    "name": safe_get(tool, "function", "name") or "",
-                                    "arguments": safe_get(tool, "function", "arguments")
-                                    or "",
-                                },
-                            }
-                            for tool in delta.tool_calls
-                        ]
+                        _merge_tool_call_deltas(chat_message, delta.tool_calls)
                     if index not in chat_outputs:
                         chat_outputs[index] = []
                     chat_outputs[index].append(chat_message)
@@ -659,20 +653,7 @@ class OpenAIChatCompletionTracer:
                             delta.function_call.arguments or ""
                         )
                 elif delta.tool_calls:
-                    last_item = chat_outputs[index][-1]
-                    if (
-                        "tool_calls" in last_item
-                        and last_item["tool_calls"]
-                        and len(last_item["tool_calls"]) > 0
-                    ):
-                        for tool in delta.tool_calls:
-                            last_item["tool_calls"][tool.index]["function"][
-                                "arguments"
-                            ] = last_item["tool_calls"][tool.index]["function"].get(
-                                "arguments", ""
-                            ) + (
-                                safe_get(tool, "function", "arguments") or ""
-                            )
+                    _merge_tool_call_deltas(chat_outputs[index][-1], delta.tool_calls)
                 elif delta.content:
                     chat_outputs[index][-1]["content"] = (
                         chat_outputs[index][-1].get("content", "") or ""

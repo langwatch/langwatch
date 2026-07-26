@@ -147,6 +147,90 @@ def test_role_after_roleless_delta_stays_one_message():
     assert outputs[0][0]["content"] == "Hello world!"
 
 
+def test_late_role_delta_introducing_a_new_tool_index_grows_the_list():
+    outputs = accumulate(
+        [
+            chunk(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        id="call_0",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(
+                            name="get_weather", arguments='{"city":"Paris"}'
+                        ),
+                    )
+                ]
+            ),
+            chunk(
+                role="assistant",
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=1,
+                        id="call_1",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(
+                            name="get_time", arguments='{"tz":'
+                        ),
+                    )
+                ],
+            ),
+            chunk(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=1,
+                        function=ChoiceDeltaToolCallFunction(arguments='"CET"}'),
+                    )
+                ]
+            ),
+        ]
+    )
+    assert len(outputs[0]) == 1
+    tool_calls = outputs[0][0]["tool_calls"]
+    assert len(tool_calls) == 2
+    assert tool_calls[0]["id"] == "call_0"
+    assert tool_calls[0]["function"]["arguments"] == '{"city":"Paris"}'
+    assert tool_calls[1]["id"] == "call_1"
+    assert tool_calls[1]["function"]["name"] == "get_time"
+    assert tool_calls[1]["function"]["arguments"] == '{"tz":"CET"}'
+
+
+def test_role_first_parallel_tool_calls_open_new_indexes_mid_stream():
+    outputs = accumulate(
+        [
+            chunk(
+                role="assistant",
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        id="call_0",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(
+                            name="get_weather", arguments='{"city":"Paris"}'
+                        ),
+                    )
+                ],
+            ),
+            chunk(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=1,
+                        id="call_1",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(
+                            name="get_time", arguments='{"tz":"CET"}'
+                        ),
+                    )
+                ]
+            ),
+        ]
+    )
+    tool_calls = outputs[0][0]["tool_calls"]
+    assert len(tool_calls) == 2
+    assert tool_calls[1]["function"]["name"] == "get_time"
+    assert tool_calls[1]["function"]["arguments"] == '{"tz":"CET"}'
+
+
 def test_late_role_delta_carrying_tool_calls_keeps_the_payload():
     outputs = accumulate(
         [
