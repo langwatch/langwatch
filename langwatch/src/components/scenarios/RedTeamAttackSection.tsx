@@ -43,7 +43,7 @@ function LabelWithHelp({ label, help }: { label: string; help: string }) {
         {label}
       </Text>
       <Tooltip content={help}>
-        <Box color="fg.muted" display="flex" cursor="help">
+        <Box color="fg.muted" display="flex" cursor="pointer">
           <HelpCircle size={13} />
         </Box>
       </Tooltip>
@@ -72,7 +72,7 @@ export function RedTeamAttackSection({
       <HStack gap={1.5} align="center">
         <SectionHeader>Attack</SectionHeader>
         <Tooltip content={ATTACK_HELP}>
-          <Box color="fg.muted" display="flex" cursor="help" paddingBottom="2px">
+          <Box color="fg.muted" display="flex" cursor="pointer" paddingBottom="2px">
             <HelpCircle size={13} />
           </Box>
         </Tooltip>
@@ -126,7 +126,7 @@ export function RedTeamAttackSection({
                         <Box
                           color="fg.muted"
                           display="flex"
-                          cursor="help"
+                          cursor="pointer"
                           flexShrink={0}
                           marginStart="auto"
                         >
