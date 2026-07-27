@@ -943,9 +943,11 @@ func TestAnthropicStreamFramer_StopForUnopenedBlock_LeavesNoHole(t *testing.T) {
 
 	var started []int
 	for _, ev := range emitted {
-		if ev.Type == bfanthropic.AnthropicStreamEventTypeContentBlockStart && ev.Index != nil {
-			started = append(started, *ev.Index)
+		if ev.Type != bfanthropic.AnthropicStreamEventTypeContentBlockStart {
+			continue
 		}
+		require.NotNil(t, ev.Index, "content_block_start must carry an index")
+		started = append(started, *ev.Index)
 	}
 	// Exactly the two real blocks, at 0 and 1. A phantom block reserved by the
 	// stray stop would show up here as an extra index or a gap.
@@ -1112,9 +1114,11 @@ func TestAnthropicStreamFramer_DuplicateBlockStart_SplitsToNewIndex(t *testing.T
 
 	var starts []int
 	for _, ev := range events {
-		if ev.Type == bfanthropic.AnthropicStreamEventTypeContentBlockStart {
-			starts = append(starts, *ev.Index)
+		if ev.Type != bfanthropic.AnthropicStreamEventTypeContentBlockStart {
+			continue
 		}
+		require.NotNil(t, ev.Index, "content_block_start must carry an index")
+		starts = append(starts, *ev.Index)
 	}
 	require.Len(t, starts, 2, "two distinct blocks were announced")
 	assert.Equal(t, []int{0, 1}, starts,
