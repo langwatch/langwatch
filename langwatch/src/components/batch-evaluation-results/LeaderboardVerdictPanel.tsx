@@ -16,6 +16,7 @@ import type {
   CheaperAlternative,
   LeaderboardVerdict,
 } from "./computeLeaderboardVerdict";
+import { formatLeaderboardHeadline } from "./formatLeaderboardHeadline";
 
 export type LeaderboardVerdictPanelProps = {
   leaderboard: BTLeaderboard;
@@ -23,6 +24,8 @@ export type LeaderboardVerdictPanelProps = {
   cheaperAlternative: CheaperAlternative | null;
   variantNames: Record<string, string>;
   targetColors?: Record<string, string>;
+  /** Rendered under the headline — the optional written explanation. */
+  children?: React.ReactNode;
 };
 
 const nameOf = (
@@ -30,25 +33,33 @@ const nameOf = (
   variantNames: Record<string, string>,
 ): string => variantNames[variantId] ?? variantId;
 
-const formatCost = (value: number): string =>
-  value >= 0.01 ? `$${value.toFixed(2)}` : `$${value.toFixed(4)}`;
-
 export function LeaderboardVerdictPanel({
   leaderboard,
   verdict,
   cheaperAlternative,
   variantNames,
   targetColors,
+  children,
 }: LeaderboardVerdictPanelProps) {
   const tied = new Set(verdict.tiedIds);
 
+  // Computed, not generated, and shared verbatim with the compact card.
+  // Everything this sentence says is already a deterministic function of the
+  // scores and costs, so writing it with a model would buy fluency at the
+  // price of the one thing the leaderboard is for: not naming a winner the
+  // data cannot support.
+  const headline = formatLeaderboardHeadline({
+    verdict,
+    cheaperAlternative,
+    variantNames,
+  });
+
   return (
     <VStack align="stretch" gap={4}>
-      <Headline
-        verdict={verdict}
-        cheaperAlternative={cheaperAlternative}
-        variantNames={variantNames}
-      />
+      <Callout tone={headline.tone} heading={headline.heading}>
+        {headline.detail}
+      </Callout>
+      {children}
       <ScoreBars
         leaderboard={leaderboard}
         variantNames={variantNames}
@@ -57,67 +68,6 @@ export function LeaderboardVerdictPanel({
         showTieShading={verdict.kind === "tie-at-top"}
       />
     </VStack>
-  );
-}
-
-function Headline({
-  verdict,
-  cheaperAlternative,
-  variantNames,
-}: {
-  verdict: LeaderboardVerdict;
-  cheaperAlternative: CheaperAlternative | null;
-  variantNames: Record<string, string>;
-}) {
-  if (verdict.kind === "no-signal") {
-    return (
-      <Callout tone="neutral" heading="No ranking yet">
-        This run has not resolved enough head-to-head comparisons to place the
-        variants in an order. Run it over more rows.
-      </Callout>
-    );
-  }
-
-  if (verdict.kind === "clear-winner") {
-    return (
-      <Callout
-        tone="positive"
-        heading={`Ship ${nameOf(verdict.leaderId!, variantNames)}`}
-      >
-        It scores above every other variant by more than the run&apos;s own
-        margin of error, so the ranking is not a coin flip.
-      </Callout>
-    );
-  }
-
-  const tiedNames = verdict.tiedIds
-    .map((id) => nameOf(id, variantNames))
-    .join(" and ");
-
-  // A tie plus a price difference is not an inconclusive result — it is a
-  // decision, just made on cost instead of quality.
-  if (cheaperAlternative) {
-    return (
-      <Callout
-        tone="positive"
-        heading={`Ship ${nameOf(cheaperAlternative.variantId, variantNames)} — same quality, ${Math.round(
-          cheaperAlternative.savingRatio * 100,
-        )}% cheaper`}
-      >
-        {tiedNames} score too closely for this run to separate them, so quality
-        is not the deciding factor here. Cost is:{" "}
-        {formatCost(cheaperAlternative.cost)} vs{" "}
-        {formatCost(cheaperAlternative.leaderCost)} per row.
-      </Callout>
-    );
-  }
-
-  return (
-    <Callout tone="caution" heading="Too close to call">
-      {tiedNames} score within each other&apos;s margin of error, so this run
-      does not establish a winner between them. Decide on cost, latency, or
-      simplicity instead — or run more rows to separate them.
-    </Callout>
   );
 }
 

@@ -32,7 +32,12 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { buildPairwiseComparisons } from "./buildPairwiseComparisons";
 import { axisLabelProps, truncateLabel } from "./chartAxisLabels";
 import { computeBTLeaderboard } from "./computeBTLeaderboard";
-import { computeLeaderboardVerdict } from "./computeLeaderboardVerdict";
+import {
+  computeLeaderboardVerdict,
+  findCheaperTiedAlternative,
+} from "./computeLeaderboardVerdict";
+import { computeVariantMetrics } from "./computeVariantMetrics";
+import { formatLeaderboardHeadline } from "./formatLeaderboardHeadline";
 import type { BatchComparisonColumn, BatchResultRow } from "./types";
 import { VARIANT_COLORS } from "./WinRateChart";
 
@@ -45,6 +50,10 @@ export type ComparisonLeaderboardChartProps = {
   /** Matched to the sibling cost/latency/win-rate charts in ComparisonCharts. */
   chartHeight: number;
   targetColors?: Record<string, string>;
+  /** Model each target ran on, as recorded on the run. Forwarded to the drawer. */
+  modelByTargetId?: Record<string, string | null>;
+  /** Model that judged this comparison, as recorded on the run. */
+  judgeModel?: string | null;
 };
 
 export function ComparisonLeaderboardChart({
@@ -52,6 +61,8 @@ export function ComparisonLeaderboardChart({
   rows,
   chartHeight,
   targetColors,
+  modelByTargetId,
+  judgeModel,
 }: ComparisonLeaderboardChartProps) {
   const { openDrawer } = useDrawer();
 
@@ -93,18 +104,36 @@ export function ComparisonLeaderboardChart({
   // eyeball whether the tallest one is meaningfully ahead, which is exactly
   // the judgement the confidence intervals exist to make — and the tallest
   // bar is frequently NOT a winner the run can defend.
+  //
+  // Shares formatLeaderboardHeadline with the drawer rather than phrasing it
+  // again here. Two copies drift, and the card's copy had already lost the
+  // cheaper-tied-alternative case — so a run whose answer was "ship the one
+  // that costs 75% less" read as a flat "too close to call" until you opened
+  // the drawer.
+  const variantNames = useMemo(
+    () => Object.fromEntries(column.variants.map((v) => [v.id ?? "", v.name])),
+    [column.variants],
+  );
   const verdict = computeLeaderboardVerdict(leaderboard);
-  const verdictLabel = (() => {
-    const nameFor = (id: string) => nameById.get(id) ?? id;
-    if (verdict.kind === "no-signal") return null;
-    if (verdict.kind === "clear-winner") {
-      return { text: `Ship ${nameFor(verdict.leaderId!)}`, tone: "green.fg" };
-    }
-    return {
-      text: `Too close to call: ${verdict.tiedIds.map(nameFor).join(", ")}`,
-      tone: "orange.fg",
-    };
-  })();
+  const variantMetrics = useMemo(
+    () => computeVariantMetrics(variantIds, rows),
+    [variantIds, rows],
+  );
+  const cheaperAlternative = useMemo(
+    () => findCheaperTiedAlternative({ verdict, variantMetrics }),
+    [verdict, variantMetrics],
+  );
+  const headline = formatLeaderboardHeadline({
+    verdict,
+    cheaperAlternative,
+    variantNames,
+  });
+  const headlineColor =
+    headline.tone === "positive"
+      ? "green.fg"
+      : headline.tone === "caution"
+        ? "orange.fg"
+        : "fg.muted";
 
   const onExpand = () => {
     // Passed straight through openDrawer (not a separate setComplexProps
@@ -117,6 +146,8 @@ export function ComparisonLeaderboardChart({
       column,
       rows,
       targetColors,
+      modelByTargetId,
+      judgeModel,
     });
   };
 
@@ -161,18 +192,16 @@ export function ComparisonLeaderboardChart({
           <LuMaximize2 size={12} />
         </IconButton>
       </HStack>
-      {verdictLabel ? (
-        <Text
-          fontSize="2xs"
-          fontWeight="semibold"
-          color={verdictLabel.tone}
-          lineClamp={1}
-          marginBottom={1}
-          title={verdictLabel.text}
-        >
-          {verdictLabel.text}
-        </Text>
-      ) : null}
+      <Text
+        fontSize="2xs"
+        fontWeight="semibold"
+        color={headlineColor}
+        lineClamp={1}
+        marginBottom={1}
+        title={`${headline.heading} — ${headline.detail}`}
+      >
+        {headline.heading}
+      </Text>
       <ResponsiveContainer width="100%" height={chartHeight}>
         <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }}>
           <CartesianGrid

@@ -1669,6 +1669,23 @@ export const buildTargetMetadata = ({
         model = loadedPrompt.model;
       }
     }
+    // Evaluator targets — the judge. Recorded onto the run for the same
+    // reason a prompt target's model is: the evaluator's config can be
+    // edited afterwards, and reading it live would retroactively
+    // misattribute every historical run to whatever model is configured
+    // today. The leaderboard's self-preference check depends on knowing
+    // which model actually judged, so a wrong answer here is worse than
+    // none.
+    else if (t.type === "evaluator" && t.targetEvaluatorId) {
+      const settings = (
+        loadedEvaluators?.get(t.targetEvaluatorId)?.config as
+          | { settings?: { model?: unknown } }
+          | undefined
+      )?.settings;
+      if (typeof settings?.model === "string" && settings.model) {
+        model = settings.model;
+      }
+    }
 
     // Get name from loaded entity
     if (t.type === "prompt" && t.promptId) {

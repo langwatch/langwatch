@@ -488,7 +488,7 @@ export const transformBatchEvaluationData = (
  * exotic than that gets JSON-stringified so the cell still shows *something*
  * instead of "[object Object]".
  */
-const extractWinnerOutputText = (raw: unknown): string | null => {
+export const extractOutputText = (raw: unknown): string | null => {
   if (raw === null || raw === undefined) return null;
   if (typeof raw === "string") return raw;
   if (typeof raw !== "object") return String(raw);
@@ -775,7 +775,7 @@ const detectComparisonColumns = (
         winnerId,
         reasoning,
         winnerOutput: winnerCell
-          ? extractWinnerOutputText(winnerCell.output)
+          ? extractOutputText(winnerCell.output)
           : null,
         candidateIds,
         isUnresolved,

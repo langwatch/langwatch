@@ -336,6 +336,29 @@ export const ComparisonCharts = ({
     () => new Set((comparisonColumns ?? []).map((c) => c.evaluatorId)),
     [comparisonColumns],
   );
+
+  /**
+   * Which model each target ran on, and which model judged each comparison,
+   * as recorded on the run itself.
+   *
+   * The leaderboard's self-preference check asks whether the judge shares a
+   * model family with a candidate. Both halves have to come off the run
+   * rather than off live config: an evaluator or prompt edited after the
+   * fact would otherwise retroactively change what an old run reports about
+   * itself, which is exactly the kind of quiet misattribution this panel
+   * exists to prevent.
+   */
+  const modelsFromRun = useMemo(() => {
+    const modelByTargetId: Record<string, string | null> = {};
+    const judgeModelByEvaluatorId: Record<string, string | null> = {};
+    for (const target of comparisonData[0]?.data?.targetColumns ?? []) {
+      modelByTargetId[target.id] = target.model ?? null;
+      if (target.type === "evaluator" && target.evaluatorId) {
+        judgeModelByEvaluatorId[target.evaluatorId] = target.model ?? null;
+      }
+    }
+    return { modelByTargetId, judgeModelByEvaluatorId };
+  }, [comparisonData]);
   // Determine default visibility based on target count
   const shouldShowByDefault = useMemo(() => {
     if (defaultVisible !== undefined) return defaultVisible;
@@ -1427,6 +1450,12 @@ export const ComparisonCharts = ({
                       rows={comparisonRows ?? []}
                       chartHeight={chartHeight}
                       targetColors={targetColors}
+                      modelByTargetId={modelsFromRun.modelByTargetId}
+                      judgeModel={
+                        modelsFromRun.judgeModelByEvaluatorId[
+                          column.evaluatorId
+                        ] ?? null
+                      }
                     />
                   ),
               )}
