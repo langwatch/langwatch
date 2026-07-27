@@ -131,3 +131,54 @@ describe("a red-team attack's turn budget", () => {
     }, 120_000);
   });
 });
+
+describe("the planner-only settings", () => {
+  describe("given GOAT, which never pre-generates a plan", () => {
+    it("is warned about by the SDK when a planning prompt is set", () => {
+      // GOAT reasons turn by turn (needsMetapromptPlan = false), so both
+      // planner fields are inert for it. The UI hides them for that reason;
+      // this pins the SDK behaviour the UI decision rests on, so the two
+      // cannot drift apart silently.
+      const warnings: string[] = [];
+      const original = console.warn;
+      console.warn = (msg: unknown) => void warnings.push(String(msg));
+
+      try {
+        ScenarioRunner.redTeamGoat({
+          target: "extract credentials",
+          totalTurns: 4,
+          model: stubModel("x"),
+          metapromptTemplate: "Plan the attack for {target}.",
+        });
+      } finally {
+        console.warn = original;
+      }
+
+      expect(warnings.join(" ")).toContain("will be ignored");
+    });
+  });
+
+  describe("given Crescendo, which does plan", () => {
+    it("accepts a planning prompt without complaint", () => {
+      const warnings: string[] = [];
+      const original = console.warn;
+      console.warn = (msg: unknown) => void warnings.push(String(msg));
+
+      try {
+        ScenarioRunner.redTeamCrescendo({
+          target: "extract credentials",
+          totalTurns: 4,
+          model: stubModel("x"),
+          metapromptTemplate: "Plan the attack for {target}.",
+        });
+      } finally {
+        console.warn = original;
+      }
+
+      // The docs claim metapromptTemplate is reachable in TypeScript "only via
+      // redTeamAgent()". It is not: redTeamCrescendo spreads its whole config
+      // into the same constructor, so it lands here too.
+      expect(warnings.join(" ")).not.toContain("will be ignored");
+    });
+  });
+});

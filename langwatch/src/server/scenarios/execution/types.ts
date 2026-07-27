@@ -235,6 +235,17 @@ export const RedTeamConfigSchema = z.object({
   scoreResponses: z.boolean().optional(),
   /** Pattern-match hard refusals to skip the scorer and trigger a backtrack. */
   detectRefusals: z.boolean().optional(),
+  /**
+   * A ready-made phased plan. Skips the planner model call entirely. Crescendo
+   * only — GOAT never generates a plan, so the SDK ignores this for it.
+   */
+  attackPlan: z.string().optional(),
+  /**
+   * Overrides the prompt used to WRITE the plan (not the plan itself).
+   * Placeholders: {target}, {description}, {totalTurns}, {phase1End},
+   * {phase2End}, {phase3End}. Crescendo only, same reason as attackPlan.
+   */
+  metapromptTemplate: z.string().optional(),
   successScore: z.number().min(0).max(10).optional(),
   successConfirmTurns: z.number().int().min(1).optional(),
   injectionProbability: z.number().min(0).max(1).optional(),

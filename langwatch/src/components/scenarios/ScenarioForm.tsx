@@ -42,6 +42,8 @@ export const scenarioFormSchema = z.object({
     .object({
       scoreResponses: z.boolean().optional(),
       detectRefusals: z.boolean().optional(),
+      attackPlan: z.string().optional(),
+      metapromptTemplate: z.string().optional(),
       successScore: z.number().min(0).max(10).optional(),
       successConfirmTurns: z.number().int().min(1).optional(),
       injectionProbability: z.number().min(0).max(1).optional(),

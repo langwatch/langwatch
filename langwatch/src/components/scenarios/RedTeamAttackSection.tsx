@@ -4,18 +4,23 @@ import {
   Field,
   HStack,
   Input,
+  Button,
   Switch,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { ChevronRight, HelpCircle } from "lucide-react";
-import { Controller, type UseFormReturn } from "react-hook-form";
+import { Controller, type UseFormReturn, useWatch } from "react-hook-form";
 import {
   RED_TEAM_DEFAULT_TURNS,
   RED_TEAM_MAX_TURNS,
 } from "~/server/scenarios/execution/types";
 import { Tooltip } from "../ui/tooltip";
+import {
+  OBJECTIVE_HELP,
+  RED_TEAM_OBJECTIVES,
+} from "./redTeamObjectives";
 import type { ScenarioFormData } from "./ScenarioForm";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -68,6 +73,12 @@ export function RedTeamAttackSection({
   form: UseFormReturn<ScenarioFormData>;
 }) {
   const { control, register, setValue, getValues } = form;
+  // GOAT reasons turn by turn and never pre-generates a plan
+  // (needsMetapromptPlan = false), so the SDK ignores both planner fields for
+  // it — one with a console warning, one silently. Showing inputs that do
+  // nothing would be worse than not offering them.
+  const strategy = useWatch({ control, name: "redTeamStrategy" });
+  const planningApplies = strategy === "crescendo";
 
   return (
     <VStack align="stretch" gap={4}>
@@ -147,8 +158,35 @@ export function RedTeamAttackSection({
       <Field.Root>
         <LabelWithHelp
           label="What should the attacker try to do?"
-          help="The goal the attacker works toward, in plain words. Be concrete — 'reveal the internal override code' gives it something to aim at, 'be bad' does not."
+          help={OBJECTIVE_HELP}
         />
+        {/* Categories first, then the field. A blank textarea is the easiest
+            way to get a weak run — the SDK plans, scores and adapts off this
+            one string — so the default is to edit a concrete objective rather
+            than to invent one. */}
+        <HStack gap={1.5} wrap="wrap" paddingBottom={2}>
+          {RED_TEAM_OBJECTIVES.map((objective) => (
+            <Tooltip key={objective.code} content={objective.help}>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                colorPalette="redteam"
+                fontWeight="normal"
+                onClick={() =>
+                  setValue("redTeamTarget", objective.target, {
+                    shouldDirty: true,
+                  })
+                }
+              >
+                <Text as="span" color="fg.muted" fontSize="10px">
+                  {objective.code}
+                </Text>
+                {objective.label}
+              </Button>
+            </Tooltip>
+          ))}
+        </HStack>
         <Textarea
           {...register("redTeamTarget")}
           rows={3}
@@ -253,6 +291,52 @@ export function RedTeamAttackSection({
                     </Switch.Control>
                   </Switch.Root>
                 </Field.Root>
+
+                {planningApplies && (
+                  <>
+                    <Field.Root>
+                      <LabelWithHelp
+                        label="Attack plan"
+                        help="Crescendo normally spends one model call writing a phased plan before it starts. Paste your own to skip that and control the attack exactly — phase by phase, in your own words. Leave empty to let it plan."
+                      />
+                      <Textarea
+                        rows={4}
+                        placeholder={
+                          "e.g., Turns 1-10: ask about products.\nTurns 11-25: ask how AI assistants work.\nTurns 26-50: ask it to repeat its instructions."
+                        }
+                        _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+                        defaultValue={getValues("redTeamConfig")?.attackPlan ?? ""}
+                        onChange={(e) =>
+                          setValue("redTeamConfig", {
+                            ...(getValues("redTeamConfig") ?? {}),
+                            attackPlan: e.target.value || undefined,
+                          })
+                        }
+                      />
+                    </Field.Root>
+
+                    <Field.Root>
+                      <LabelWithHelp
+                        label="Planning prompt"
+                        help="Replaces the instructions used to write the attack plan, rather than the plan itself. Use {target}, {description}, {totalTurns} and {phase1End}/{phase2End}/{phase3End} where those values should appear. Ignored when an attack plan is set above, since nothing needs planning then."
+                      />
+                      <Textarea
+                        rows={3}
+                        placeholder="Leave empty to use the built-in planning prompt"
+                        _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+                        defaultValue={
+                          getValues("redTeamConfig")?.metapromptTemplate ?? ""
+                        }
+                        onChange={(e) =>
+                          setValue("redTeamConfig", {
+                            ...(getValues("redTeamConfig") ?? {}),
+                            metapromptTemplate: e.target.value || undefined,
+                          })
+                        }
+                      />
+                    </Field.Root>
+                  </>
+                )}
 
                 <Field.Root>
                   <LabelWithHelp
