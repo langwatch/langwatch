@@ -8280,6 +8280,9 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        redTeamStrategy: string | null;
+                        redTeamTarget: string | null;
+                        redTeamTotalTurns: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -8351,6 +8354,19 @@ export interface operations {
                     criteria?: string[];
                     /** @default [] */
                     labels?: string[];
+                    /** @enum {string|null} */
+                    redTeamStrategy?: "goat" | "crescendo" | null;
+                    redTeamTarget?: string | null;
+                    redTeamTotalTurns?: number | null;
+                    redTeamConfig?: {
+                        scoreResponses?: boolean;
+                        detectRefusals?: boolean;
+                        attackPlan?: string;
+                        metapromptTemplate?: string;
+                        successScore?: number;
+                        successConfirmTurns?: number;
+                        injectionProbability?: number;
+                    } | null;
                 };
             };
         };
@@ -8367,6 +8383,9 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        redTeamStrategy: string | null;
+                        redTeamTarget: string | null;
+                        redTeamTotalTurns: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -8445,6 +8464,9 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        redTeamStrategy: string | null;
+                        redTeamTarget: string | null;
+                        redTeamTotalTurns: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -8528,6 +8550,19 @@ export interface operations {
                     situation?: string;
                     criteria?: string[];
                     labels?: string[];
+                    /** @enum {string|null} */
+                    redTeamStrategy?: "goat" | "crescendo" | null;
+                    redTeamTarget?: string | null;
+                    redTeamTotalTurns?: number | null;
+                    redTeamConfig?: {
+                        scoreResponses?: boolean;
+                        detectRefusals?: boolean;
+                        attackPlan?: string;
+                        metapromptTemplate?: string;
+                        successScore?: number;
+                        successConfirmTurns?: number;
+                        injectionProbability?: number;
+                    } | null;
                 };
             };
         };
@@ -8544,6 +8579,9 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        redTeamStrategy: string | null;
+                        redTeamTarget: string | null;
+                        redTeamTotalTurns: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };

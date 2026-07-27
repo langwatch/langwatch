@@ -16,9 +16,12 @@ export interface RedTeamCliOptions {
   standard?: boolean;
 }
 
+/** The strategies the platform accepts, mirrored from the API contract. */
+export type RedTeamStrategyName = "crescendo" | "goat";
+
 /** The body fields the scenarios API takes. */
 export interface RedTeamBody {
-  redTeamStrategy?: string | null;
+  redTeamStrategy?: RedTeamStrategyName | null;
   redTeamTarget?: string | null;
   redTeamTotalTurns?: number | null;
   redTeamConfig?: {
@@ -28,6 +31,10 @@ export interface RedTeamBody {
 }
 
 export class RedTeamOptionError extends Error {}
+
+function isStrategy(value: string): value is RedTeamStrategyName {
+  return value === "crescendo" || value === "goat";
+}
 
 /**
  * Turns the flags into request body fields, or throws with something the user
@@ -55,7 +62,7 @@ export function toRedTeamBody(options: RedTeamCliOptions): RedTeamBody {
 
   if (options.redTeamStrategy !== undefined) {
     const strategy = options.redTeamStrategy.toLowerCase();
-    if (strategy !== "crescendo" && strategy !== "goat") {
+    if (!isStrategy(strategy)) {
       throw new RedTeamOptionError(
         `Unknown red-team strategy "${options.redTeamStrategy}". Use crescendo or goat.`,
       );

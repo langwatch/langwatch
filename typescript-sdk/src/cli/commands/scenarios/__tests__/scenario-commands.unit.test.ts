@@ -52,6 +52,10 @@ const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioRespon
   situation: "User attempts to log in with valid credentials",
   criteria: ["Responds with a welcome message", "Includes user name in greeting"],
   labels: ["auth", "happy-path"],
+  // The response always carries these; null is what "not a red team" looks like.
+  redTeamStrategy: null,
+  redTeamTarget: null,
+  redTeamTotalTurns: null,
   platformUrl: "https://app.langwatch.ai/proj-1/scenarios/scenario_abc123",
   ...overrides,
 });
