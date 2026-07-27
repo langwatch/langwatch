@@ -269,6 +269,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           void router.push("/settings/teams");
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           const refused =
             error instanceof TRPCClientError && error.data?.code === "FORBIDDEN";
           toaster.create({
