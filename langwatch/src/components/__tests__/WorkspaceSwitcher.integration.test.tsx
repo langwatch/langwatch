@@ -277,6 +277,68 @@ describe("WorkspaceSwitcher", () => {
     });
   });
 
+  describe("given a governance signup whose only shared team has no projects", () => {
+    const orgPersonal = {
+      kind: "personal" as const,
+      orgId: "org_acme",
+      orgName: "Acme",
+      orgSlug: "acme",
+      href: "/me",
+      label: "My Workspace",
+      subtitle: "Personal usage, personal budget",
+    };
+
+    /** @scenario A coding-usage signup can always create their first shared project from the workspace menu */
+    it("renders the empty shared team with its create-project button and routes the click", async () => {
+      const user = userEvent.setup();
+      const onCreateProjectForTeam = vi.fn();
+      renderSwitcher({
+        personals: [orgPersonal],
+        teams: [{ ...teamA, canCreateProject: true }],
+        projects: [],
+        current: { kind: "personal" },
+        onCreateProjectForTeam,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
+
+      const addButton = await screen.findByRole("button", {
+        name: /create project in acme engineering/i,
+      });
+      await user.click(addButton);
+
+      expect(onCreateProjectForTeam).toHaveBeenCalledWith({
+        teamId: "team_a",
+        orgId: "org_acme",
+      });
+    });
+
+    /** @scenario An empty team stays hidden from members who cannot create a project on it */
+    it("keeps hiding the empty team from viewers who cannot create a project on it", async () => {
+      const user = userEvent.setup();
+      renderSwitcher({
+        personals: [orgPersonal],
+        teams: [{ ...teamA, canCreateProject: false }],
+        projects: [],
+        current: { kind: "personal" },
+        onCreateProjectForTeam: vi.fn(),
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: /switch workspace/i }),
+      );
+      // The org header confirms the dropdown opened before we assert absence.
+      expect(await screen.findByText("Acme")).toBeInTheDocument();
+      expect(screen.queryByText("Acme Engineering")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /create project in/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("personal entry governance gate", () => {
     /** @scenario The personal entry is hidden when no organization enables governance */
     it("does not render the My Workspace entry when personal is omitted", async () => {
