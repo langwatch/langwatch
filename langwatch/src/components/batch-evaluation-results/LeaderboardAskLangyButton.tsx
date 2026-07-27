@@ -23,6 +23,7 @@ import { Button, Icon } from "@chakra-ui/react";
 import { LuSparkles } from "react-icons/lu";
 
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
+import { useShowLangy } from "~/features/langy/hooks/useShowLangy";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { buildLeaderboardLangyPrompt } from "./buildLeaderboardLangyPrompt";
 import type { BTLeaderboard } from "./computeBTLeaderboard";
@@ -65,14 +66,25 @@ export function LeaderboardAskLangyButton({
   variantNames,
   warnThreshold,
 }: LeaderboardAskLangyButtonProps) {
+  const showLangy = useShowLangy();
   const canAsk = useCanAskLangy();
   const askLangy = useLangyStore((s) => s.askLangy);
 
-  // `langy:create` is a different grant from `langy:view`, and a send
-  // without it comes back 403 — so a reader who cannot start a turn is not
-  // offered the door. The panel above still tells them everything the run
-  // established; only the conversation is unavailable.
-  if (!canAsk) return null;
+  // BOTH gates, and they are not the same question.
+  //
+  // `useShowLangy` is "does this workspace have Langy at all" — membership,
+  // `langy:view`, and the `release_langy_enabled` rollout flag, which is off
+  // by default. Without it this button rendered everywhere and did nothing
+  // when clicked: `askLangy` flips the store open, but the panel that reads
+  // that state is only mounted when Langy is visible, so the click was
+  // silently swallowed.
+  //
+  // `useCanAskLangy` is the separate WRITE grant (`langy:create`). A reader
+  // who can see Langy but not start a turn would get a 403 on send.
+  //
+  // Either one missing means no button. The result panel above still tells
+  // them everything the run established; only the conversation is gone.
+  if (!showLangy || !canAsk) return null;
 
   // Nothing to explain when the run produced no ranking. The sentence
   // directly above the button already says so in full.

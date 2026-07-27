@@ -44,6 +44,48 @@ import { VARIANT_COLORS } from "./WinRateChart";
 /** Compact card shows only this many bars before collapsing the rest into "+N more". */
 const MAX_COMPACT_BARS = 4;
 
+/**
+ * The score printed at the end of each bar.
+ *
+ * Hand-placed rather than `position="right"`, because recharts anchors that
+ * to a NEGATIVE bar's outer (left) end — which grows toward the category
+ * labels. The lowest-scoring variant is both the longest negative bar and
+ * the one with the widest label, so it collided with its own name and
+ * rendered as unreadable overlapping text ("…f184.51").
+ *
+ * One rule for both signs instead: sit just past the rect's right edge.
+ * For a positive bar that is its tip; for a negative bar it is the zero
+ * line, so the label always grows into the empty middle of the plot and can
+ * never reach the axis.
+ */
+function ScoreValueLabel(props: {
+  x?: number | string;
+  y?: number | string;
+  width?: number | string;
+  height?: number | string;
+  /** recharts' own RenderableText — number, string, null or false. */
+  value?: unknown;
+}) {
+  const { x, y, width, height, value } = props;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const left = Number(x ?? 0);
+  const barWidth = Number(width ?? 0);
+  const top = Number(y ?? 0);
+  const barHeight = Number(height ?? 0);
+
+  return (
+    <text
+      x={left + barWidth + 4}
+      y={top + barHeight / 2}
+      textAnchor="start"
+      dominantBaseline="central"
+      style={{ fontSize: 11, fill: "var(--chakra-colors-fg)" }}
+    >
+      {value.toFixed(2)}
+    </text>
+  );
+}
+
 export type ComparisonLeaderboardChartProps = {
   column: BatchComparisonColumn;
   rows: BatchResultRow[];
@@ -242,12 +284,7 @@ export function ComparisonLeaderboardChart({
             }
           />
           <Bar dataKey="score" name="BT score" radius={[0, 4, 4, 0]}>
-            <LabelList
-              dataKey="score"
-              position="right"
-              formatter={(v) => (typeof v === "number" ? v.toFixed(2) : String(v ?? ""))}
-              style={{ fontSize: 11, fill: "var(--chakra-colors-fg)" }}
-            />
+            <LabelList dataKey="score" content={ScoreValueLabel} />
             {chartData.map((d) => (
               <Cell key={d.key} fill={d.color} />
             ))}
