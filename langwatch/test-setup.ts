@@ -335,14 +335,14 @@ if (
   (globalThis.localStorage == null ||
     typeof globalThis.localStorage.setItem !== "function")
 ) {
-  const noopStorage: Storage = {
+  const noopStorage = {
     length: 0,
     clear: () => {},
     getItem: () => null,
     key: () => null,
     removeItem: () => {},
     setItem: () => {},
-  };
+  } satisfies Storage;
   Object.defineProperty(globalThis, "localStorage", {
     value: noopStorage,
     configurable: true,
