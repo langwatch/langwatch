@@ -218,7 +218,7 @@ describe("LicenseEnforcementRepository", () => {
       const result = await repository.getTeamCount(organizationId);
 
       expect(mockPrisma.team.count).toHaveBeenCalledWith({
-        where: { organizationId, isPersonal: false },
+        where: { organizationId, isPersonal: false, archivedAt: null },
       });
       expect(result).toBe(3);
     });

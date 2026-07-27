@@ -247,6 +247,17 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the owner still has a personal workspace
 
+  # Archiving a project frees its slot. A team that the whole product treats
+  # as gone but the allowance still charges for leaves a customer at the limit
+  # with nothing on screen to explain it.
+
+  @integration
+  Scenario: Archived teams do not count toward the team limit
+    Given the organization has 1 team
+    And the organization has 1 archived team
+    When I view the organization usage
+    Then the reported team count is 1
+
   # ============================================================================
   # UI: Click-then-Modal Pattern (All Resources)
   # ============================================================================

@@ -436,6 +436,44 @@ describe("given an organization with both personal and real workspaces", () => {
     });
   });
 
+  describe("when a real team has been archived", () => {
+    let archivedTeamId: string | undefined;
+
+    beforeAll(async () => {
+      const archived = await prisma.team.create({
+        data: {
+          name: "Archived Team",
+          slug: `--test-team-${testNamespace}-archived`,
+          organizationId,
+          archivedAt: new Date(),
+        },
+      });
+      archivedTeamId = archived.id;
+    });
+
+    afterAll(async () => {
+      if (archivedTeamId) {
+        await prisma.team.deleteMany({ where: { id: archivedTeamId } });
+      }
+    });
+
+    /** @scenario Archived teams do not count toward the team limit */
+    it("leaves it out of the team count, the way an archived project is", async () => {
+      await expect(repository.getTeamCount(organizationId)).resolves.toBe(
+        REAL_TEAMS,
+      );
+    });
+
+    /** @scenario Archived teams do not count toward the team limit */
+    it("frees the allowance the archived team was holding", async () => {
+      const service = enforcementFor(freePlanWith({ maxTeams: REAL_TEAMS + 1 }));
+
+      await expect(
+        service.checkLimit(organizationId, "teams"),
+      ).resolves.toMatchObject({ allowed: true, current: REAL_TEAMS });
+    });
+  });
+
   // Runs last: it adds a real project, which shifts the counts the
   // assertions above pin.
   describe("when a free organization still has real allowance left", () => {

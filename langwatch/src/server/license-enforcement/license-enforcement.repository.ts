@@ -148,16 +148,22 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts teams in organization, excluding personal ones.
+   * Counts active (non-archived) teams in organization, excluding personal
+   * ones.
    *
    * A personal team is provisioned for a user rather than requested by the
    * organization, so it never spends the team allowance.
    * See the "Personal Workspaces" scenarios in
    * specs/licensing/enforcement-resources.feature.
+   *
+   * Archival frees the slot, the same way it does for projects: an archived
+   * team is gone from every read path in the product, so a customer who
+   * archives one and still cannot create another has no way to tell what is
+   * holding the allowance.
    */
   async getTeamCount(organizationId: string): Promise<number> {
     return this.prisma.team.count({
-      where: { organizationId, isPersonal: false },
+      where: { organizationId, isPersonal: false, archivedAt: null },
     });
   }
 
