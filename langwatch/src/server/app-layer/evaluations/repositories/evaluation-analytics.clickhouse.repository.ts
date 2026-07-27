@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import {
   asNullableNumber,
   asNullableString,
@@ -136,7 +137,14 @@ export class EvaluationAnalyticsClickHouseRepository
         table: TABLE_NAME,
         values: [toClickHouseRecord(row, retentionDays, appliedEventIds)],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+        // Waits for the async-insert flush. This is the executor's live write
+        // path (`store.store()`), and under ADR-066 the very next delivery may
+        // read this row back on a Redis miss. Returning before the flush lets
+        // that read see the previous version, so the fold would resume from
+        // stale state and rewrite it with a higher UpdatedAt — silently
+        // dropping this batch's contributions and its applied-id watermark.
+        // Matches adopter #1 (coding-agent-session), which waits on both paths.
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.error(
@@ -300,9 +308,14 @@ function fromRecord(record: Record<string, unknown>): EvaluationAnalyticsRow {
     tenantId: String(record.TenantId ?? ""),
     evaluationId: String(record.EvaluationId ?? ""),
     version: String(record.Version ?? ""),
-    occurredAtMs: new Date(String(record.OccurredAt)).getTime(),
-    createdAtMs: new Date(String(record.CreatedAt)).getTime(),
-    updatedAtMs: new Date(String(record.UpdatedAt)).getTime(),
+    // DateTime64 columns MUST go through `parseClickHouseDateTimeMs`, never
+    // `new Date(str)`: ClickHouse emits them without a zone suffix and V8 reads
+    // a bare datetime as LOCAL time. `OccurredAt` doubles as this fold's
+    // out-of-order checkpoint (`LastEventOccurredAt`), so a machine-offset skew
+    // here silently mis-orders event application on any non-UTC host.
+    occurredAtMs: parseClickHouseDateTimeMs(String(record.OccurredAt)),
+    createdAtMs: parseClickHouseDateTimeMs(String(record.CreatedAt)),
+    updatedAtMs: parseClickHouseDateTimeMs(String(record.UpdatedAt)),
 
     evaluatorType: String(record.EvaluatorType ?? ""),
     evaluatorName: asNullableString(record.EvaluatorName),

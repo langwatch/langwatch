@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import {
   asNullableNumber,
   asNullableString,
@@ -157,7 +158,14 @@ export class TraceAnalyticsClickHouseRepository
         table: TABLE_NAME,
         values: [toClickHouseRecord(row, retentionDays, appliedEventIds)],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+        // Waits for the async-insert flush. This is the executor's live write
+        // path (`store.store()`), and under ADR-066 the very next delivery may
+        // read this row back on a Redis miss. Returning before the flush lets
+        // that read see the previous version, so the fold would resume from
+        // stale state and rewrite it with a higher UpdatedAt — silently
+        // dropping this batch's contributions and its applied-id watermark.
+        // Matches adopter #1 (coding-agent-session), which waits on both paths.
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
       logger.error(
@@ -305,15 +313,22 @@ export class TraceAnalyticsClickHouseRepository
  * UInt64 epoch-ms columns as strings, arrays/maps as themselves. A
  * pre-migration record simply omits the 00056 fields, so the parsers fall back
  * to the documented defaults (0 / empty / false).
+ *
+ * DateTime64 columns MUST go through `parseClickHouseDateTimeMs`, never
+ * `new Date(str)`: ClickHouse emits them without a zone suffix
+ * ("2026-07-24 12:00:00.123") and V8 reads a bare datetime as LOCAL time. On a
+ * non-UTC host that skews `occurredAt` by the machine's offset, and because the
+ * fold min()s it against each new span the skewed value wins and is written
+ * back — so the drift compounds on every cache miss rather than cancelling.
  */
 function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
   return {
     tenantId: String(record.TenantId ?? ""),
     traceId: String(record.TraceId ?? ""),
     version: String(record.Version ?? ""),
-    occurredAtMs: new Date(String(record.OccurredAt)).getTime(),
-    createdAtMs: new Date(String(record.CreatedAt)).getTime(),
-    updatedAtMs: new Date(String(record.UpdatedAt)).getTime(),
+    occurredAtMs: parseClickHouseDateTimeMs(String(record.OccurredAt)),
+    createdAtMs: parseClickHouseDateTimeMs(String(record.CreatedAt)),
+    updatedAtMs: parseClickHouseDateTimeMs(String(record.UpdatedAt)),
 
     traceName: String(record.TraceName ?? ""),
     topicId: asNullableString(record.TopicId),
