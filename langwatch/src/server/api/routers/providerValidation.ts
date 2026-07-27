@@ -70,14 +70,21 @@ const GEMINI_RESTRICTION_MESSAGE =
  * key-restriction problems that generating a new key will never fix, so they
  * get an explanation the customer can act on instead.
  *
+ * This provider is Google AI Studio, at generativelanguage.googleapis.com. A
+ * key minted in the Google Cloud console (Agent Platform, Vertex) reaches that
+ * host without the API enabled for it, so the refusals below are where a
+ * Google Cloud customer lands — and they need the Vertex AI provider, which
+ * takes a service account rather than a key. Saying so here is the only place
+ * they find out.
+ *
  * @see https://cloud.google.com/apis/design/errors
  */
 const GEMINI_REASON_MESSAGES: Record<string, string> = {
   API_KEY_INVALID: INVALID_KEY_MESSAGE,
   SERVICE_DISABLED:
-    "This key's Google Cloud project does not have the Generative Language API enabled. Enable it in the Google Cloud console, then try again.",
+    "This key's Google Cloud project does not have the Generative Language API enabled. Enable it in the Google Cloud console, or add this as a Vertex AI provider instead.",
   API_KEY_SERVICE_BLOCKED:
-    "This key's API restrictions exclude the Generative Language API. Allow it in the Google Cloud console, then try again.",
+    "This key's API restrictions exclude the Generative Language API. Allow it in the Google Cloud console, or add this as a Vertex AI provider instead.",
   API_KEY_HTTP_REFERRER_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
   API_KEY_IP_ADDRESS_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
   API_KEY_ANDROID_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,

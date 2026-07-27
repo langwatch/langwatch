@@ -365,6 +365,9 @@ describe("validateProviderApiKey", () => {
         expect(result.valid).toBe(false);
         expect(result.error).toContain("Generative Language API");
         expect(result.error).toContain("enable");
+        // A Google Cloud key cannot work against Google AI Studio at all, so
+        // the only real way out is the provider that takes a service account.
+        expect(result.error).toContain("Vertex AI");
         expect(result.error).not.toContain("Invalid API key");
       });
     });
@@ -387,6 +390,7 @@ describe("validateProviderApiKey", () => {
 
         expect(result.valid).toBe(false);
         expect(result.error).toContain("restriction");
+        expect(result.error).toContain("Vertex AI");
         expect(result.error).not.toContain("Invalid API key");
       });
     });
