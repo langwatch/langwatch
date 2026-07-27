@@ -59,7 +59,7 @@ const SoftWarnPercent = 80
 //
 // A provider-filtered budget constrains one vendor, not the request (contract
 // §4.6): breaching it never blocks here, it EXCLUDES that provider from the
-// request's candidate chain, and the dispatcher blocks — naming the budget —
+// request's candidate chain, and the dispatcher blocks (naming the budget)
 // only when the exclusions leave the chain empty. The exhausted filtered
 // budget still contributes its warning, because a request served by another
 // provider is exactly when the caller should hear that one vendor's allowance

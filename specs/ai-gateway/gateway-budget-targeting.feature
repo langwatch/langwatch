@@ -75,7 +75,7 @@ Feature: Gateway budget targeting
   # ────────────────────────────────────────────────────────────────────────────
   #
   # A budget answers two questions that are deliberately kept apart: WHO it
-  # constrains (organization, team, project, department, person, virtual key)
+  # constrains (organization, team, project, group, person, virtual key)
   # and WHICH provider's spend it counts. Keeping the provider orthogonal is
   # what makes "$50 a month on OpenAI for the platform team" one budget
   # instead of a new kind of scope for every vendor.
@@ -101,29 +101,29 @@ Feature: Gateway budget targeting
     # was never meant to see.
 
   @integration
-  Scenario: A department budget gives each member their own allowance
-    Given a department "engineering" with members alice and bob
-    And a budget on that department
+  Scenario: A group budget gives each member their own allowance
+    Given a group "engineering" with members alice and bob
+    And a budget on that group
     When alice's key is resolved
     Then the budget applies to alice with her own allowance
     And bob's spend does not count against it
-    # "People in this department each get this much" — one budget row, one
-    # bucket per member. A shared departmental pot is a team or project
+    # "People in this group each get this much": one budget row, one
+    # bucket per member. A shared pot for the group is a team or project
     # budget, which is a different question and already has an answer.
 
   @integration
-  Scenario: A department budget does not apply to a key with no person behind it
-    Given a budget on department "engineering"
+  Scenario: A group budget does not apply to a key with no person behind it
+    Given a budget on group "engineering"
     When a shared key that belongs to no one is resolved
-    Then the department budget does not apply to it
+    Then the group budget does not apply to it
     # There is nobody to charge the per-member allowance to. Silently
-    # charging it to the whole department would turn a per-person cap into a
+    # charging it to the whole group would turn a per-person cap into a
     # shared one the first time somebody made a service key.
 
   @integration
-  Scenario: Leaving a department drops that member's allowance on the next resolve
-    Given bob is in department "engineering" which has a budget
-    When bob leaves the department
+  Scenario: Leaving a group drops that member's allowance on the next resolve
+    Given bob is in group "engineering" which has a budget
+    When bob leaves the group
     Then the budget no longer applies to bob
     And it still applies to the members who remain
     # Membership is read when the key's configuration is resolved, so a
@@ -131,23 +131,23 @@ Feature: Gateway budget targeting
     # affected key to be edited.
 
   @integration
-  Scenario: A department budget cannot be created where members' spend cannot be told apart
+  Scenario: A group budget cannot be created where members' spend cannot be told apart
     Given a deployment that reads budget spend from the database fallback
-    When an admin creates a budget on department "engineering"
+    When an admin creates a budget on group "engineering"
     Then the budget is refused
-    And the refusal says department budgets need the spend ledger
+    And the refusal says group budgets need the spend ledger
     # The fallback keeps one running spend figure per budget row. A
-    # department budget is one bucket per member; squeezed into one figure
-    # it would cap each member at what the whole department spent together,
+    # group budget is one bucket per member; squeezed into one figure
+    # it would cap each member at what the whole group spent together,
     # which is a different promise than the one on the label. A control
     # that cannot mean what it says is refused rather than created.
 
   @integration
   Scenario: The gateway is told each budget's provider filter and per-member bucket
-    Given a key covered by a provider-filtered budget and a department budget
+    Given a key covered by a provider-filtered budget and a group budget
     When its configuration is materialised for the gateway
     Then each budget carries the provider it counts, or nothing if it counts all
-    And the department budget arrives as this member's own bucket
+    And the group budget arrives as this member's own bucket
     # The gateway enforces from what it is told. A filter the bundle omits is
     # a filter that does not exist at request time.
 

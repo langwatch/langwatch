@@ -75,7 +75,7 @@ func TestBudgetWireCarriesProviderFilterAndMemberBucket(t *testing.T) {
 	dept := cfg.Budget.Scopes[2]
 	assert.Equal(t, "group", dept.Scope)
 	assert.Equal(t, "grp_eng:user_a", dept.ScopeID,
-		"a department budget arrives as this member's own bucket")
+		"a group budget arrives as this member's own bucket")
 	assert.Equal(t, "user_a", dept.PrincipalID)
 }
 
@@ -136,7 +136,7 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 		`routing_mode: routingModeToWire(vk.routingMode)`,
 	} {
 		if !strings.Contains(src, needle) {
-			t.Errorf("config.materialiser.ts no longer emits %q — the bundle contract has drifted", needle)
+			t.Errorf("config.materialiser.ts no longer emits %q: the bundle contract has drifted", needle)
 		}
 	}
 	// routing_mode none must arrive with a one-attempt fallback budget so
@@ -149,7 +149,7 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 // Bucket ids are computed control-plane-side; the gateway carries them
 // verbatim. Pin the two separators so neither side can change one alone:
 // "|provider:" splits a provider filter into its own bucket, ":" joins a
-// department bucket as <groupId>:<userId>.
+// group bucket as <groupId>:<userId>.
 func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 	src := readControlPlaneSource(t, "src", "server", "gateway", "budgetResolution.service.ts")
 
@@ -157,10 +157,10 @@ func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 		t.Error("budgetResolution.service.ts changed the provider bucket separator")
 	}
 	if !strings.Contains(src, "`${groupId}:${principalUserId}`") {
-		t.Error("budgetResolution.service.ts changed the department bucket key shape")
+		t.Error("budgetResolution.service.ts changed the group bucket key shape")
 	}
 	// A dispatch with no reported provider must debit unfiltered budgets
-	// only — attribution by guess mis-bills a governance control.
+	// only: attribution by guess mis-bills a governance control.
 	if !strings.Contains(src, "if (!budget.providerKey) return true") {
 		t.Error("budgetAppliesToProvider no longer treats unfiltered budgets as match-all")
 	}
@@ -169,7 +169,7 @@ func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 // The debit attribution seam: the gateway stamps the dispatched provider on
 // the customer span; the control plane's accumulation allowlist and the
 // trace-fold reactor read the same key. If either side renames it,
-// provider-filtered budgets stop accruing — silently, because every request
+// provider-filtered budgets stop accruing, and the failure is silent: every request
 // still succeeds. This test makes the drift loud.
 func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 	require.Equal(t, "langwatch.model_provider_id", customertracebridge.AttrModelProviderID,
@@ -179,7 +179,7 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 		"src", "server", "event-sourcing", "pipelines", "trace-processing",
 		"projections", "services", "trace-attribute-accumulation.service.ts")
 	if !strings.Contains(accumulation, `"`+customertracebridge.AttrModelProviderID+`"`) {
-		t.Error("the accumulation allowlist dropped langwatch.model_provider_id — the fold will never see the provider")
+		t.Error("the accumulation allowlist dropped langwatch.model_provider_id, so the fold will never see the provider")
 	}
 
 	reactor := readControlPlaneSource(t, "ee", "governance", "reactors", "gatewayBudgetSync.reactor.ts")

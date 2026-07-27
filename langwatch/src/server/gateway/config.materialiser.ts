@@ -105,7 +105,7 @@ export type GatewayConfigPayload = {
   models_allowed: string[] | null;
   /**
    * Explicit provider allowlist. `null` means every provider the key can
-   * reach through its scope graph, now and in the future — the semantic a
+   * reach through its scope graph, now and in the future, the semantic a
    * key gets when its creator ticks "All providers", so a provider added
    * next month is usable without editing the key. A list narrows to those
    * ModelProvider ids; `providers[]` is already filtered to match, and the
@@ -148,7 +148,7 @@ export type GatewayConfigPayload = {
     /**
      * The bucket spend accumulates under. Equal to the budget's target for
      * every scope except "group", where it is `<groupId>:<userId>` so each
-     * member of a department gets their own allowance.
+     * member of a group gets their own allowance.
      */
     scope_id: string;
     /** Only set for "group": the member this bucket belongs to. */
@@ -372,7 +372,7 @@ export class GatewayConfigMaterialiser {
       // bundle enforces this key's buckets, so the figure must be the
       // bucket's own: a GROUP budget read from the raw row would prefix-sum
       // every member's bucket, and the gateway would then cap each member
-      // at what the whole department spent together.
+      // at what the whole group spent together.
       const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
         tenantIds,
         budgets.map((r) => ({

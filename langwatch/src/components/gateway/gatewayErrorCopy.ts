@@ -26,7 +26,7 @@ const ERROR_COPY: Array<{ code: string; copy: string }> = [
   },
   {
     code: "group_budget_requires_clickhouse",
-    copy: "Department budgets track spend per member, which this deployment cannot do yet: it needs the ClickHouse spend ledger.",
+    copy: "Group budgets track spend per member, which this deployment cannot do yet: it needs the ClickHouse spend ledger.",
   },
   {
     code: "provider_not_in_organization",

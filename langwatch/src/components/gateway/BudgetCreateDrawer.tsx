@@ -54,7 +54,7 @@ const KIND_OPTIONS: Array<{
     label: "Organization",
     icon: <Building2 size={14} aria-hidden />,
   },
-  { kind: "GROUP", label: "Department", icon: <Boxes size={14} aria-hidden /> },
+  { kind: "GROUP", label: "Group", icon: <Boxes size={14} aria-hidden /> },
   { kind: "TEAM", label: "Team", icon: <Users size={14} aria-hidden /> },
   { kind: "PROJECT", label: "Project", icon: <Folder size={14} aria-hidden /> },
   { kind: "PRINCIPAL", label: "Member", icon: <User size={14} aria-hidden /> },
@@ -91,8 +91,9 @@ export function BudgetCreateDrawer({
     },
   );
   // GROUP budgets target Group rows (the entity SCIM provisions and
-  // GroupMembership fans budgets out over), not the org-chart
-  // Department table, which has no gateway budget scope.
+  // GroupMembership fans budgets out over) and say "Group" like the rest
+  // of the product; the org-chart Department table is a different entity
+  // with no gateway budget scope.
   const groupsQuery = api.gatewayBudgets.groupTargets.useQuery(
     { organizationId: orgId },
     {
@@ -301,7 +302,7 @@ export function BudgetCreateDrawer({
               <Field.Label>
                 Applies to
                 <FieldInfoTooltip
-                  description="What the budget covers. Budgets stack: a request is checked against every budget that applies to it (organization + department + team + project + member + virtual key), and any one in breach blocks or warns per its on-breach action. A department budget gives each member their own allowance rather than one shared pot."
+                  description="What the budget covers. Budgets stack: a request is checked against every budget that applies to it (organization + group + team + project + member + virtual key), and any one in breach blocks or warns per its on-breach action. A group budget gives each member their own allowance rather than one shared pot."
                   docHref="/ai-gateway/budgets#scopes"
                   testId="budget-applies-to-info"
                 />
@@ -361,12 +362,12 @@ export function BudgetCreateDrawer({
               )}
               {scopeKind === "GROUP" && (
                 <Text fontSize="xs" color="fg.muted" marginTop={1}>
-                  Each member of the department gets this limit individually.
+                  Each member of the group gets this limit individually.
                 </Text>
               )}
               {scopeKind === "GROUP" && groupsQuery.isError && (
                 <Text fontSize="xs" color="red.600" marginTop={1}>
-                  Departments could not be loaded.
+                  Groups could not be loaded.
                 </Text>
               )}
             </Field.Root>
@@ -409,7 +410,7 @@ export function BudgetCreateDrawer({
                 <Field.Label>
                   Window
                   <FieldInfoTooltip
-                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule in the budget's timezone. 'total' never resets, which suits burn-down budgets on a fixed-fund project."
+                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule in UTC. 'total' never resets, which suits burn-down budgets on a fixed-fund project."
                     docHref="/ai-gateway/budgets#windows"
                   />
                 </Field.Label>

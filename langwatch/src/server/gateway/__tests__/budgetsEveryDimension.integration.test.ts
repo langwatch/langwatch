@@ -4,7 +4,7 @@
  * Budgets on every dimension, against real Postgres + real ClickHouse.
  *
  * Covers the control-plane half of the initiative: which budgets apply to a
- * key (including per-member department budgets and provider filters), how
+ * key (including per-member group budgets and provider filters), how
  * their spend is kept apart in the ledger, what the gateway bundle carries,
  * and the key create / revoke invariants around a key's own budget.
  *
@@ -47,7 +47,7 @@ const VK_SHARED_ID = `vk_nxn_shared_${suffix}`;
 const BUDGET_GROUP_ID = `bdg-nxn-group-${suffix}`;
 const BUDGET_PROJECT_ALL_ID = `bdg-nxn-proj-all-${suffix}`;
 const BUDGET_PROJECT_OPENAI_ID = `bdg-nxn-proj-openai-${suffix}`;
-// A second tenant whose department must not be budgetable from ORG_ID.
+// A second tenant whose group must not be budgetable from ORG_ID.
 const FOREIGN_ORG_ID = `org-nxn-foreign-${suffix}`;
 const FOREIGN_GROUP_ID = `grp-nxn-foreign-${suffix}`;
 
@@ -75,7 +75,7 @@ async function seedProviders() {
   }
 }
 
-describe("budgets on every dimension — real PG + real CH", () => {
+describe("budgets on every dimension (real PG + real CH)", () => {
   beforeAll(async () => {
     await startTestContainers();
 
@@ -232,8 +232,8 @@ describe("budgets on every dimension — real PG + real CH", () => {
     await stopTestContainers();
   }, 120_000);
 
-  describe("department budgets are per member", () => {
-    /** @scenario "A department budget gives each member their own allowance" */
+  describe("group budgets are per member", () => {
+    /** @scenario "A group budget gives each member their own allowance" */
     it("resolves a GROUP budget into that member's own bucket", async () => {
       const resolved = await resolveApplicableBudgets(prisma, {
         organizationId: ORG_ID,
@@ -249,7 +249,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(group!.groupId).toBe(GROUP_ID);
     });
 
-    /** @scenario "A department budget does not apply to a key with no person behind it" */
+    /** @scenario "A group budget does not apply to a key with no person behind it" */
     it("skips GROUP budgets for a key with no principal", async () => {
       const resolved = await resolveApplicableBudgets(prisma, {
         organizationId: ORG_ID,
@@ -261,7 +261,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(resolved.map((r) => r.budget.id)).not.toContain(BUDGET_GROUP_ID);
     });
 
-    /** @scenario "Leaving a department drops that member's allowance on the next resolve" */
+    /** @scenario "Leaving a group drops that member's allowance on the next resolve" */
     it("stops resolving the budget once the member leaves the group", async () => {
       await prisma.groupMembership.create({
         data: { userId: OTHER_USER_ID, groupId: GROUP_ID },
@@ -285,13 +285,13 @@ describe("budgets on every dimension — real PG + real CH", () => {
     });
   });
 
-  describe("creating a department budget", () => {
-    /** @scenario "A department budget cannot be created where members' spend cannot be told apart" */
+  describe("creating a group budget", () => {
+    /** @scenario "A group budget cannot be created where members' spend cannot be told apart" */
     it("refuses GROUP creation when no ClickHouse spend path is wired", async () => {
       // The same detection check() uses to pick ClickHouse over the PG
       // fallback: the repo the service was constructed with. Without it,
       // per-member buckets collapse into the single spentUsd figure and
-      // every member would be capped at the department's combined spend.
+      // every member would be capped at the group's combined spend.
       const service = GatewayBudgetService.create(prisma);
       await expect(
         service.create({
@@ -329,7 +329,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(row.scopeId).toBe(GROUP_ID);
 
       // The created budget rides the per-member cascade like any other
-      // department budget.
+      // group budget.
       const resolved = await resolveApplicableBudgets(prisma, {
         organizationId: ORG_ID,
         virtualKeyId: VK_PERSONAL_ID,
@@ -340,7 +340,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(bucket!.bucketScopeId).toBe(`${GROUP_ID}:${USER_ID}`);
     });
 
-    it("refuses a department from another organization", async () => {
+    it("refuses a group from another organization", async () => {
       await prisma.organization.create({
         data: {
           id: FOREIGN_ORG_ID,
@@ -387,7 +387,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(budgetAppliesToProvider(openAiOnly, MP_OPENAI_ID)).toBe(true);
       expect(budgetAppliesToProvider(openAiOnly, MP_ANTHROPIC_ID)).toBe(false);
       // Unknown dispatch: an unfiltered budget still counts it, a filtered
-      // one must not — attributing it would be a guess.
+      // one must not: attributing it would be a guess.
       expect(budgetAppliesToProvider(openAiOnly, null)).toBe(false);
       expect(budgetAppliesToProvider(everything, null)).toBe(true);
       expect(budgetAppliesToProvider(everything, MP_ANTHROPIC_ID)).toBe(true);
@@ -414,7 +414,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       const unfiltered = resolved.find(
         (r) => r.budget.id === BUDGET_PROJECT_ALL_ID,
       )!;
-      // Same target, different bucket — otherwise each would report the
+      // Same target, different bucket: otherwise each would report the
       // other's spend.
       expect(filtered.bucketScopeId).not.toBe(unfiltered.bucketScopeId);
 
@@ -485,8 +485,8 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(bundle.providers_allowed).toBeNull();
     });
 
-    /** @scenario "A department budget gives each member their own allowance" */
-    it("ships the member's own bucket spend, not the department total", async () => {
+    /** @scenario "A group budget gives each member their own allowance" */
+    it("ships the member's own bucket spend, not the group total", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
       const chRepo = new GatewayBudgetClickHouseRepository(
@@ -528,7 +528,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       const groupBudget = bundle.budgets.find((b) => b.id === BUDGET_GROUP_ID);
       // The gateway enforces spent >= limit on exactly this bucket. Reading
       // the raw budget row here would prefix-sum every member and cap this
-      // member at what the whole department spent together — the shared pot
+      // member at what the whole group spent together, the shared pot
       // the per-member design exists to rule out.
       expect(groupBudget?.spent_micro_usd).toBe(10_000_000);
     });

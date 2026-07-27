@@ -2,7 +2,7 @@
  * The one resolver: which gateway budgets constrain a given request, key,
  * or draft key.
  *
- * Every surface that needs "what budgets apply here" reads this — the
+ * Every surface that needs "what budgets apply here" reads this: the
  * config materialiser baking the bundle, the trace-fold reactor deciding
  * where to attribute spend, the pre-request `budget.check`, and the VK
  * drawer's "already applies" list. They used to hand-mirror the same OR
@@ -12,9 +12,9 @@
  * Two things make the result richer than "a row from GatewayBudget":
  *
  *   - GROUP budgets are per member. One row means "everyone in this
- *     department gets this much, each"; it resolves to one bucket per
- *     (budget, member). A request only ever has one member — the
- *     principal — so a request-time resolve yields at most one bucket per
+ *     group gets this much, each"; it resolves to one bucket per
+ *     (budget, member). A request only ever has one member, the
+ *     principal, so a request-time resolve yields at most one bucket per
  *     GROUP budget, keyed `<groupId>:<userId>` so members never share a
  *     pot. Membership is read live, so joining or leaving a group takes
  *     effect on the next materialisation.
@@ -80,7 +80,7 @@ export async function resolveApplicableBudgets(
 
   // GROUP budgets only enforce through a member. A key with no principal
   // (a shared org/team/project key) has nobody to charge the per-member
-  // bucket to, so department budgets do not apply to it at all.
+  // bucket to, so group budgets do not apply to it at all.
   let groupIds: string[] = [];
   if (target.principalUserId) {
     ors.push({ scopeType: "PRINCIPAL", scopeId: target.principalUserId });
@@ -127,7 +127,7 @@ export async function resolveApplicableBudgets(
 /**
  * The ledger buckets spend by (Scope, ScopeId), so anything that must
  * accrue separately has to be separate in that key. Two budgets on the
- * same target — one counting everything, one counting only OpenAI — would
+ * same target, one counting everything and one counting only OpenAI, would
  * otherwise share a bucket and each report the other's spend. The provider
  * filter therefore rides the bucket id.
  */
@@ -144,7 +144,7 @@ const PROVIDER_BUCKET_SEPARATOR = "|provider:";
 
 /**
  * Group ids the user belongs to within this organization. Scoped to the
- * org so a user in several orgs never drags another org's department
+ * org so a user in several orgs never drags another org's group
  * budget into this one's cascade.
  */
 async function memberGroupIds(
@@ -161,7 +161,7 @@ async function memberGroupIds(
 
 /**
  * Per-member bucket key for a GROUP budget. Group ids are nanoids and
- * user ids are cuids — neither contains a colon — so the pair round-trips
+ * user ids are cuids, neither contains a colon, so the pair round-trips
  * unambiguously through the ledger's ScopeId column.
  */
 export function groupBucketScopeId(
@@ -175,7 +175,7 @@ export function groupBucketScopeId(
  * Whether a budget counts spend dispatched to `providerKey`. An unfiltered
  * budget (providerKey null) counts everything; a filtered one counts only
  * its own provider. A dispatch with no reported provider matches only
- * unfiltered budgets — attributing it to a provider-filtered budget would
+ * unfiltered budgets: attributing it to a provider-filtered budget would
  * be a guess, and guessing here silently mis-bills a governance control.
  */
 export function budgetAppliesToProvider(

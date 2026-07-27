@@ -1,5 +1,5 @@
 /**
- * "Already applies" — the budgets that will constrain a key, answered for
+ * "Already applies": the budgets that will constrain a key, answered for
  * a key that may not exist yet.
  *
  * The create drawer has to show this before anything is saved, so the
@@ -34,7 +34,7 @@ export type ApplicableBudget = {
   name: string;
   scopeType: string;
   scopeId: string;
-  /** Human label for the target, e.g. the team or department name. */
+  /** Human label for the target, e.g. the team or group name. */
   scopeLabel: string;
   window: string;
   limitUsd: string;
@@ -47,7 +47,7 @@ export type ApplicableBudget = {
   /** Display name for `providerKey`, so the list can say "OpenAI only". */
   providerLabel: string | null;
   /**
-   * True when the budget is per member of a department rather than a
+   * True when the budget is per member of a group rather than a
    * shared pot, which changes what its limit means to the person reading.
    */
   perMember: boolean;

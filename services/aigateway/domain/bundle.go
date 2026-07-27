@@ -225,7 +225,7 @@ type BudgetScope struct {
 	Scope string `json:"scope"`
 	// ScopeID is the bucket spend accumulates under. Equal to the budget's
 	// target for every scope except "group", where it is "<groupId>:<userId>"
-	// so each department member gets their own allowance; provider-filtered
+	// so each group member gets their own allowance; provider-filtered
 	// budgets additionally suffix "|provider:<modelProviderId>". The control
 	// plane computes it; the gateway only reports it back.
 	ScopeID string `json:"scope_id"`

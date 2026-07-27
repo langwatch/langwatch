@@ -94,10 +94,10 @@ func TestPrecheck_UnfilteredBlockStillWinsOverExclusions(t *testing.T) {
 	assert.Equal(t, "gb_org", decision.BlockedBy.ID)
 }
 
-// A department (GROUP) budget arrives as one bucket per member, with the
+// A group (GROUP-scoped) budget arrives as one bucket per member, with the
 // key's principal already resolved by the control plane. Each bucket
 // enforces alone: the member whose bucket is spent is blocked while another
-// member of the same department, same budget row, keeps going.
+// member of the same group, same budget row, keeps going.
 func TestPrecheck_GroupBucketsEnforcePerMember(t *testing.T) {
 	spent := bundleWithScopes(domain.BudgetScope{
 		ID: "gb_dept", Scope: "group", ScopeID: "grp_eng:user_a", PrincipalID: "user_a",

@@ -72,7 +72,7 @@ func Budget(precheck BudgetPrecheckFunc, logger *zap.Logger) Interceptor {
 
 // BudgetBreachError builds the 402 a request rejected on budget receives,
 // naming the budget that ran out so the caller knows WHICH allowance to raise
-// rather than guessing among org, team, project, key, person and department
+// rather than guessing among org, team, project, key, person and group
 // budgets. Used by the budget interceptor for plain blocks and by the
 // dispatcher when provider-filtered exclusions empty the candidate chain:
 // one constructor so the two paths stay the same error. Avoids credit/billing
@@ -151,7 +151,7 @@ func budgetScopeNoun(scope string) string {
 	case "principal":
 		return "personal"
 	case "group":
-		return "department member"
+		return "group member"
 	default:
 		return scope
 	}

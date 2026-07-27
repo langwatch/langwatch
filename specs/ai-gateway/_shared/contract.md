@@ -229,20 +229,20 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
   "model_aliases": { "gpt-4o": "azure/my-deployment", "claude": "anthropic/claude-haiku-4-5-20251001" },
   "models_allowed": ["gpt-5-mini", "claude-haiku-*", "gemini-2.5-flash"],
   /* Provider allowlist. `null` means every provider the key reaches through
-     its scope graph, INCLUDING providers added after the key was created —
+     its scope graph, INCLUDING providers added after the key was created;
      that is what the drawer's "All providers" persists, and `providers[]`
      above is already filtered to match. A list narrows to those
      ModelProvider ids; it is never empty. */
   "providers_allowed": null,
   /* How the key behaves when its provider fails.
-       none          — no failover. `fallback.max_attempts` is pinned to 1,
+       none          - no failover. `fallback.max_attempts` is pinned to 1,
                        so a gateway that does not yet read this field still
                        behaves correctly. Default for keys created after the
                        routing-mode split.
-       fallback_all  — walk every eligible provider in `fallback.chain`.
+       fallback_all  - walk every eligible provider in `fallback.chain`.
                        Keys created before the split are migrated to this,
                        so their behaviour is unchanged.
-       policy        — ordering and rules come from the linked RoutingPolicy. */
+       policy        - ordering and rules come from the linked RoutingPolicy. */
   "routing_mode": "none",
   "cache": { "mode": "respect|force|disable", "ttl_s": 3600 },
   "guardrails": {
@@ -297,7 +297,7 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
       "window": "month", "limit_usd": 5000.00,
       "spent_usd": 3210.00, "remaining_usd": 1790.00, "resets_at": "2026-05-01T00:00:00Z",
       "on_breach": "warn" },
-    /* A department budget is per member: one budget row materialises one
+    /* A group budget is per member: one budget row materialises one
        bucket per member, so `scope_id` is `<groupId>:<userId>` and
        `principal_id` names the member. Two members never share a pot. */
     { "scope": "group", "scope_id": "grp_01HZ...:user_01HZ...", "principal_id": "user_01HZ...",
@@ -381,10 +381,10 @@ the OTel trace the gateway already emits for every request. The flow:
    cost from the pricing catalog (matching on `gen_ai.request.model` +
    per-project custom costs) and stamps it onto the span.
 3. The `gatewayBudgetSync` reactor reads the enriched span, resolves the
-   applicable budgets (VK, project, team, org, principal and department
+   applicable budgets (VK, project, team, org, principal and group
    scopes), and writes one row per applicable budget to the ClickHouse table
    `gateway_budget_ledger_events`, keyed by `(TenantId, BudgetId, GatewayRequestId)`.
-   Each row stamps `ProviderKey` — the provider the request was dispatched
+   Each row stamps `ProviderKey`, the provider the request was dispatched
    to, read from `langwatch.model_provider_id` on the span. A budget with a
    provider filter is only debited when that provider matches; a dispatch
    with no reported provider debits unfiltered budgets only, because
@@ -410,19 +410,19 @@ must accrue separately is separate in `ScopeId`:
 |---|---|
 | Plain | the target id |
 | Provider-filtered | `<targetId>\|provider:<modelProviderId>` |
-| Department (per member) | `<groupId>:<userId>` |
-| Department, provider-filtered | `<groupId>:<userId>\|provider:<modelProviderId>` |
+| Group (per member) | `<groupId>:<userId>` |
+| Group, provider-filtered | `<groupId>:<userId>\|provider:<modelProviderId>` |
 
-Two budgets on the same target — one counting everything, one counting one
-provider — would otherwise share a bucket and each report the other's spend.
+Two budgets on the same target, one counting everything and one counting one
+provider, would otherwise share a bucket and each report the other's spend.
 The control plane computes these keys in `budgetResolution.service.ts`; the
 gateway does not need to construct them, it receives them as `scope_id`.
 
-**Department (GROUP) budgets require the ClickHouse spend path.** On deploys
+**Group (GROUP-scoped) budgets require the ClickHouse spend path.** On deploys
 without ClickHouse, `budget.check` falls back to the single Postgres
 `GatewayBudget.spentUsd` column, one running figure per budget row. Per-member
 buckets cannot be represented there: the fallback would enforce each member
-against the whole department's combined spend. `GatewayBudgetService.create`
+against the whole group's combined spend. `GatewayBudgetService.create`
 therefore refuses GROUP budgets with `group_budget_requires_clickhouse` when
 no ClickHouse spend repository is wired (the same detection `check()` uses to
 pick ClickHouse over the Postgres fallback). The other scope types keep
@@ -441,7 +441,7 @@ those, which is exactly the hole the refusal stops new keys from entering.
 table's "Spent this month" column and the Usage tab) is NOT read from this
 ledger. The ledger is per budget: it holds nothing for a key nobody capped,
 and one row per budget for a key covered several times. Those surfaces read
-`trace_summaries` — the enriched per-trace cost — keyed on
+`trace_summaries`, the enriched per-trace cost, keyed on
 `langwatch.virtual_key_id`, deduped per trace. The ledger remains the source
 for budget enforcement and for a budget's own debit list.
 
@@ -571,7 +571,7 @@ All errors OpenAI-compatible:
 - `X-LangWatch-Model: gpt-5-mini` — resolved provider model.
 - `X-LangWatch-Cache: hit|miss|bypass|force` — cache outcome as observed by the gateway. (`force` is v1.1 — deferred with 400 cache_override_not_implemented in v1; header value matches the internal `Kind` enum in `services/gateway/internal/cacheoverride`.)
 - `X-LangWatch-Cache-Mode: respect|disable` — echoes the cache-override mode that was applied to the request (independent of upstream outcome). Emitted on every `/v1/messages` response.
-- `X-LangWatch-Budget-Warning: <scope>:<pct>` — optional, emitted on soft-cap breaches (can repeat). A provider-filtered budget qualifies the scope segment as `<scope>/<model_provider_id>` (e.g. `project/mp_01HZ:95`) so the warning names WHICH budget is running out; the percentage always sits after the only colon, so `split(":")` keeps parsing.
+- `X-LangWatch-Budget-Warning: <scope>:<pct>`: optional, emitted on soft-cap breaches (can repeat). A provider-filtered budget qualifies the scope segment as `<scope>/<model_provider_id>` (e.g. `project/mp_01HZ:95`) so the warning names WHICH budget is running out; the percentage always sits after the only colon, so `split(":")` keeps parsing.
 - `X-LangWatch-Fallback-Count: <n>` — number of fallbacks attempted before success (0 when primary succeeded).
 
 ---

@@ -71,7 +71,7 @@ export type ScopeSpend = {
  * budget's target: a provider-filtered budget and a per-member GROUP
  * allowance each accrue under their own key (see `bucketScopeIdFor` /
  * `groupBucketScopeId`). `match: "prefix"` sums every bucket under the
- * key, which is how a GROUP budget reports what a whole department has
+ * key, which is how a GROUP budget reports what a whole group has
  * spent when no single member is in context.
  */
 export type BudgetSpendTarget = {
@@ -264,9 +264,9 @@ export class GatewayBudgetClickHouseRepository {
    * own current period, across every tenant given.
    *
    * A target's `scopeId` is the ledger bucket, so a provider-filtered
-   * budget reads only its provider's spend and a per-member department
-   * allowance reads only that member's — the same keys the fold writes.
-   * `match: "prefix"` is how a department budget totals all its members
+   * budget reads only its provider's spend and a per-member group
+   * allowance reads only that member's, the same keys the fold writes.
+   * `match: "prefix"` is how a group budget totals all its members
    * when no single member is in context.
    */
   async getSpendForTargetsAcrossTenants(

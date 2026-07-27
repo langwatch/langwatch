@@ -177,7 +177,7 @@ func TestDispatch_UnfilteredBreachStillBlocksOutright(t *testing.T) {
 	assert.Contains(t, e.Meta["message"], "project")
 }
 
-// A department (GROUP) budget arrives as one bucket per member, principal
+// A group (GROUP-scoped) budget arrives as one bucket per member, principal
 // already resolved into the bundle. The member whose bucket is spent is
 // blocked; a different member on the same budget row keeps working, because
 // the buckets are independent.

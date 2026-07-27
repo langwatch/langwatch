@@ -134,7 +134,7 @@ function BudgetsPage() {
                 <EmptyState.Title>No budgets yet</EmptyState.Title>
                 <EmptyState.Description>
                   Budgets enforce a spend ceiling on any dimension:
-                  organization, department, team, project, member, or virtual
+                  organization, group, team, project, member, or virtual
                   key; each optionally limited to a single provider. Create
                   one to start governing cost.
                 </EmptyState.Description>
@@ -259,7 +259,7 @@ function BudgetsPage() {
                             </Text>
                           </HStack>
                         ) : b.scopeType === "GROUP" ? (
-                          // A department budget is one allowance per member;
+                          // A group budget is one allowance per member;
                           // the only number the list can total is everyone's
                           // spend together, so it is labelled as exactly
                           // that. Per-member standing lives on the detail
@@ -273,7 +273,7 @@ function BudgetsPage() {
                               <Text fontWeight="medium">
                                 {formatBudgetUsd(spent)}
                               </Text>
-                              <Text color="fg.muted">department total</Text>
+                              <Text color="fg.muted">group total</Text>
                             </HStack>
                             <Text fontSize="2xs" color="fg.muted">
                               {formatBudgetUsd(limit)} per member
@@ -453,7 +453,7 @@ function ScopeCell({
 }) {
   const kindLabel =
     scopeType === "GROUP"
-      ? "department"
+      ? "group"
       : scopeType.toLowerCase().replace("_", " ");
   const vkHref =
     scopeTarget?.kind === "VIRTUAL_KEY"
@@ -464,7 +464,7 @@ function ScopeCell({
       <HStack gap={1}>
         <Badge colorPalette="gray">{kindLabel}</Badge>
         {scopeType === "GROUP" && (
-          <Tooltip content="Each member of the department gets this limit individually.">
+          <Tooltip content="Each member of the group gets this limit individually.">
             <Badge
               colorPalette="cyan"
               variant="subtle"

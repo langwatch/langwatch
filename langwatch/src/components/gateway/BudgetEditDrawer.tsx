@@ -141,7 +141,7 @@ export function BudgetEditDrawer({
               <Field.Label>Applies to</Field.Label>
               <Text fontSize="sm" color="fg.muted">
                 {budget?.scopeType === "GROUP"
-                  ? "department"
+                  ? "group"
                   : budget?.scopeType.toLowerCase().replace("_", " ")}
                 {budget?.scopeTarget?.name ? `, ${budget.scopeTarget.name}` : ""}
                 {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""}{" "}
@@ -149,7 +149,7 @@ export function BudgetEditDrawer({
               </Text>
               {budget?.scopeType === "GROUP" && (
                 <Field.HelperText>
-                  Each member of the department gets this limit individually.
+                  Each member of the group gets this limit individually.
                 </Field.HelperText>
               )}
             </Field.Root>

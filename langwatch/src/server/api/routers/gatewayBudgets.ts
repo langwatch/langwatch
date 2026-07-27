@@ -41,7 +41,7 @@ const scopeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("PROJECT"), projectId: z.string() }),
   z.object({ kind: z.literal("VIRTUAL_KEY"), virtualKeyId: z.string() }),
   z.object({ kind: z.literal("PRINCIPAL"), principalUserId: z.string() }),
-  // Per-member department budgets. Creation is service-guarded: it needs
+  // Per-member group budgets. Creation is service-guarded: it needs
   // the ClickHouse spend path (group_budget_requires_clickhouse otherwise).
   z.object({ kind: z.literal("GROUP"), groupId: z.string() }),
 ]);
@@ -157,7 +157,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     }),
 
   /**
-   * The departments a budget can target, for whoever may create budgets.
+   * The groups a budget can target, for whoever may create budgets.
    * `group.listAll` exposes role-binding maps and demands
    * organization:manage; a budget creator only needs names and sizes, so
    * this stays gated by the same permission as the create it serves.
