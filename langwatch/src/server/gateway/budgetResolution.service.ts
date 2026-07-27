@@ -140,7 +140,7 @@ export function bucketScopeIdFor(
     : baseScopeId;
 }
 
-const PROVIDER_BUCKET_SEPARATOR = "|provider:";
+export const PROVIDER_BUCKET_SEPARATOR = "|provider:";
 
 /**
  * Group ids the user belongs to within this organization. Scoped to the

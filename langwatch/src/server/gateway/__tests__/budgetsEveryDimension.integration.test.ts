@@ -192,6 +192,23 @@ describe("budgets on every dimension (real PG + real CH)", () => {
   }, 120_000);
 
   afterAll(async () => {
+    // The CH rows are tenant-isolated by the nanoid project id, but the
+    // shared container should not accrue a suite's worth of debits per
+    // run. The totals table is a materialized-view target, so the source
+    // delete does not cascade; both need the sweep.
+    const ch = getTestClickHouseClient();
+    if (ch) {
+      await ch.command({
+        query:
+          "DELETE FROM gateway_budget_ledger_events WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: PROJECT_ID },
+      });
+      await ch.command({
+        query:
+          "DELETE FROM gateway_budget_scope_totals WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: PROJECT_ID },
+      });
+    }
     if (createdVirtualKeyIds.length > 0) {
       await prisma.gatewayBudget.deleteMany({
         where: {
@@ -549,6 +566,73 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       // member at what the whole group spent together, the shared pot
       // the per-member design exists to rule out.
       expect(groupBudget?.spent_micro_usd).toBe(10_000_000);
+    });
+
+    /** @scenario "A group budget can count a single provider" */
+    it("keeps a provider-filtered group budget and its unfiltered sibling out of each other's totals", async () => {
+      const ch = getTestClickHouseClient();
+      expect(ch).not.toBeNull();
+      const chRepo = new GatewayBudgetClickHouseRepository(
+        async () => ch as ClickHouseClient,
+      );
+
+      const filteredBudgetId = `gb-nxn-grp-openai-${suffix}`;
+      const filteredBudget = await prisma.gatewayBudget.create({
+        data: {
+          id: filteredBudgetId,
+          name: `Engineering per-member OpenAI ${suffix}`,
+          organizationId: ORG_ID,
+          scopeType: "GROUP",
+          scopeId: GROUP_ID,
+          providerKey: MP_OPENAI_ID,
+          window: "MONTH",
+          limitUsd: "20.00",
+          onBreach: "BLOCK",
+          createdById: USER_ID,
+          resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      // The filtered budget's member bucket carries the provider suffix
+      // BETWEEN nothing and AFTER the member id, the shape resolution
+      // writes: group:member|provider:mp. A plain group-prefix read can
+      // never match it, and an unanchored one would count it twice.
+      await chRepo.insertDebit([
+        {
+          tenantId: PROJECT_ID,
+          budgetId: filteredBudgetId,
+          scope: "GROUP" as const,
+          scopeId: `${GROUP_ID}:${USER_ID}|provider:${MP_OPENAI_ID}`,
+          window: "MONTH" as const,
+          virtualKeyId: VK_PERSONAL_ID,
+          providerKey: MP_OPENAI_ID,
+          gatewayRequestId: `req-${suffix}-grp-openai`,
+          amountUsd: "2.0000",
+          tokensInput: 10,
+          tokensOutput: 5,
+          tokensCacheRead: 0,
+          tokensCacheWrite: 0,
+          model: "gpt-5-mini",
+          status: "SUCCESS" as const,
+          occurredAt: new Date(),
+        },
+      ]);
+
+      const unfilteredBudget = await prisma.gatewayBudget.findUniqueOrThrow({
+        where: { id: BUDGET_GROUP_ID },
+      });
+      const spends = await chRepo.getSpendForBudgetsAcrossTenants(
+        [PROJECT_ID],
+        [unfilteredBudget, filteredBudget],
+      );
+      const byId = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
+
+      // The filtered budget reads its own member buckets, not $0.
+      expect(Number(byId.get(filteredBudgetId))).toBeCloseTo(2, 4);
+      // The unfiltered sibling reads only suffix-less buckets: the two
+      // members' 10 + 30 from the previous test, without absorbing the
+      // filtered budget's 2.
+      expect(Number(byId.get(BUDGET_GROUP_ID))).toBeCloseTo(40, 4);
     });
 
     /** @scenario "A key with no fallback is dispatched at most once" */

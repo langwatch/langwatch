@@ -210,7 +210,8 @@ describe("virtual key spend (real PG + real CH)", () => {
     const ch = getTestClickHouseClient();
     if (ch) {
       await ch.command({
-        query: `DELETE FROM trace_summaries WHERE TenantId = '${PROJECT_ID}'`,
+        query: "DELETE FROM trace_summaries WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: PROJECT_ID },
       });
     }
     await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });

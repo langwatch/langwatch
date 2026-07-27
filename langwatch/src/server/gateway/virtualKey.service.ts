@@ -77,7 +77,6 @@ function isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
 export type VirtualKeyBudgetInput = {
   limitUsd: string;
   window: "DAY" | "WEEK" | "MONTH";
-  timezone?: string | null;
   onBreach?: "BLOCK" | "WARN";
   name?: string;
 };
@@ -318,7 +317,13 @@ export class VirtualKeyService {
     const nextRoutingPolicyId =
       input.routingPolicyId !== undefined
         ? input.routingPolicyId
-        : existing.routingPolicyId;
+        : input.routingMode !== undefined && input.routingMode !== "POLICY"
+          ? // An explicit switch away from POLICY retires the stored
+            // reference rather than tripping the pairing check below: the
+            // caller stated the whole routing decision, and keeping the
+            // old id would reject an update that is not contradictory.
+            null
+          : existing.routingPolicyId;
     const routingMode =
       input.routingMode !== undefined ||
       input.routingPolicyId !== undefined
@@ -584,7 +589,10 @@ export class VirtualKeyService {
       window: budget.window,
       limitUsd: budget.limitUsd,
       onBreach: budget.onBreach ?? ("BLOCK" as const),
-      timezone: budget.timezone ?? null,
+      // No timezone knob: enforcement computes resets in UTC only
+      // (budgetWindow.ts), so accepting one here would store a setting
+      // that changes nothing.
+      timezone: null,
     };
 
     const row = existing

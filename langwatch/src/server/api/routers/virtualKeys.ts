@@ -64,7 +64,6 @@ const budgetInputSchema = z.object({
       message: "limitUsd must be greater than zero",
     }),
   window: z.enum(["DAY", "WEEK", "MONTH"]),
-  timezone: z.string().nullable().optional(),
   onBreach: z.enum(["BLOCK", "WARN"]).optional(),
   name: z.string().min(1).max(128).optional(),
 });
@@ -331,6 +330,22 @@ export const virtualKeysRouter = createTRPCRouter({
     )
     .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
+      // The caller must belong to the organization they are asking
+      // about: every value this returns (budget names, limits, spend,
+      // a principal's name) is org-internal, and nothing upstream
+      // checks the session against input.organizationId.
+      const callerMembership = await ctx.prisma.organizationUser.findUnique({
+        where: {
+          userId_organizationId: {
+            userId: ctx.session.user.id,
+            organizationId: input.organizationId,
+          },
+        },
+        select: { role: true },
+      });
+      if (!callerMembership) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
       await assertScopesBelongToOrg(
         ctx.prisma,
         input.organizationId,

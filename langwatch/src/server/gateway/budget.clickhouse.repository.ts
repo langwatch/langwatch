@@ -27,7 +27,10 @@ import type {
   GatewayBudgetWindow,
 } from "@prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { bucketScopeIdFor } from "./budgetResolution.service";
+import {
+  bucketScopeIdFor,
+  PROVIDER_BUCKET_SEPARATOR,
+} from "./budgetResolution.service";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -80,6 +83,14 @@ export type BudgetSpendTarget = {
   scopeId: string;
   window: GatewayBudgetWindow;
   match?: "exact" | "prefix";
+  /**
+   * Only meaningful with `match: "prefix"`. A string anchors the bucket's
+   * provider suffix (`|provider:<key>`) so a provider-filtered group
+   * budget matches its own buckets; null/undefined requires the bucket to
+   * carry NO provider suffix, so an unfiltered group budget does not
+   * absorb a filtered sibling's buckets on the same group.
+   */
+  bucketSuffix?: string | null;
 };
 
 /**
@@ -89,16 +100,30 @@ export type BudgetSpendTarget = {
 export function spendTargetsForBudgets(
   budgets: GatewayBudget[],
 ): BudgetSpendTarget[] {
-  return budgets.map((b) => ({
-    budgetId: b.id,
-    scope: b.scopeType,
-    scopeId: bucketScopeIdFor(
-      b,
-      b.scopeType === "GROUP" ? `${b.scopeId}:` : b.scopeId,
-    ),
-    window: b.window,
-    match: b.scopeType === "GROUP" ? ("prefix" as const) : ("exact" as const),
-  }));
+  return budgets.map((b) =>
+    b.scopeType === "GROUP"
+      ? {
+          budgetId: b.id,
+          scope: b.scopeType,
+          // The member id sits between the group prefix and the provider
+          // suffix, so a provider-filtered group budget cannot be a plain
+          // prefix target: the prefix is the bare group, and the provider
+          // filter anchors the suffix instead.
+          scopeId: `${b.scopeId}:`,
+          window: b.window,
+          match: "prefix" as const,
+          bucketSuffix: b.providerKey
+            ? `${PROVIDER_BUCKET_SEPARATOR}${b.providerKey}`
+            : null,
+        }
+      : {
+          budgetId: b.id,
+          scope: b.scopeType,
+          scopeId: bucketScopeIdFor(b, b.scopeId),
+          window: b.window,
+          match: "exact" as const,
+        },
+  );
 }
 
 /**
@@ -292,11 +317,14 @@ export class GatewayBudgetClickHouseRepository {
       // stitched back onto its budget after. Prefix targets are grouped
       // and summed per target rather than per bucket.
       const scopeFilter = targetsForWindow
-        .map((t, i) =>
-          t.match === "prefix"
-            ? `(Scope = {scope${i}:String} AND startsWith(ScopeId, {scopeId${i}:String}))`
-            : `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`,
-        )
+        .map((t, i) => {
+          if (t.match !== "prefix") {
+            return `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`;
+          }
+          return t.bucketSuffix
+            ? `(Scope = {scope${i}:String} AND startsWith(ScopeId, {scopeId${i}:String}) AND endsWith(ScopeId, {suffix${i}:String}))`
+            : `(Scope = {scope${i}:String} AND startsWith(ScopeId, {scopeId${i}:String}) AND position(ScopeId, {sep:String}) = 0)`;
+        })
         .join(" OR ");
       const tenantPlaceholders = tenantIds
         .map((_, i) => `{tenant${i}:String}`)
@@ -308,9 +336,12 @@ export class GatewayBudgetClickHouseRepository {
       for (let i = 0; i < tenantIds.length; i++) {
         params[`tenant${i}`] = tenantIds[i]!;
       }
+      params.sep = PROVIDER_BUCKET_SEPARATOR;
       for (let i = 0; i < targetsForWindow.length; i++) {
         params[`scope${i}`] = scopeToClickHouse(targetsForWindow[i]!.scope);
         params[`scopeId${i}`] = targetsForWindow[i]!.scopeId;
+        const suffix = targetsForWindow[i]!.bucketSuffix;
+        if (suffix) params[`suffix${i}`] = suffix;
       }
 
       try {
@@ -343,7 +374,10 @@ export class GatewayBudgetClickHouseRepository {
               (r) =>
                 r.Scope === scope &&
                 (t.match === "prefix"
-                  ? r.ScopeId.startsWith(t.scopeId)
+                  ? r.ScopeId.startsWith(t.scopeId) &&
+                    (t.bucketSuffix
+                      ? r.ScopeId.endsWith(t.bucketSuffix)
+                      : !r.ScopeId.includes(PROVIDER_BUCKET_SEPARATOR))
                   : r.ScopeId === t.scopeId),
             )
             .reduce((sum, r) => sum + (Number.parseFloat(r.SpentUSD) || 0), 0);
