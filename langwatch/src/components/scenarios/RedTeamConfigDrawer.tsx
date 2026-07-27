@@ -126,14 +126,14 @@ export function RedTeamConfigDrawer({
           <VStack align="stretch" gap={6}>
             <Box
               borderWidth="1px"
-              borderColor="orange.200"
-              bg="orange.50"
-              _dark={{ bg: "orange.950", borderColor: "orange.900" }}
+              borderColor="colorPalette.emphasized"
+              bg="colorPalette.subtle"
+              colorPalette="redteam"
               borderRadius="md"
               padding={3}
             >
               <HStack gap={2} align="start">
-                <Box paddingTop="2px" color="orange.600">
+                <Box paddingTop="2px" color="colorPalette.fg">
                   <ShieldAlert size={16} />
                 </Box>
                 <Text textStyle="sm" color="fg.muted">
@@ -159,12 +159,16 @@ export function RedTeamConfigDrawer({
                     borderRadius="md"
                     padding={3}
                     borderColor={
-                      strategy === option.value ? "orange.400" : "border.muted"
+                      strategy === option.value
+                        ? "colorPalette.solid"
+                        : "border.muted"
                     }
-                    bg={strategy === option.value ? "orange.50" : undefined}
-                    _dark={{
-                      bg: strategy === option.value ? "orange.950" : undefined,
-                    }}
+                    colorPalette="redteam"
+                    bg={
+                      strategy === option.value
+                        ? "colorPalette.subtle"
+                        : undefined
+                    }
                     onClick={() => setStrategy(option.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -286,7 +290,7 @@ export function RedTeamConfigDrawer({
 
         <Drawer.Footer borderTopWidth="1px">
           <Button
-            colorPalette="orange"
+            colorPalette="redteam"
             onClick={handleSave}
             disabled={targetInvalid || turnsInvalid}
           >

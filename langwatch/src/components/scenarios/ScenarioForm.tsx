@@ -95,7 +95,7 @@ function ScenarioTypeSelector({
         <Button
           size="sm"
           variant={isRedTeam ? "solid" : "outline"}
-          colorPalette={isRedTeam ? "orange" : undefined}
+          colorPalette={isRedTeam ? "redteam" : undefined}
           onClick={onSelectRedTeam}
           flex={1}
         >

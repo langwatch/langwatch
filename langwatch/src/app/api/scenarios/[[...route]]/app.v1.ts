@@ -3,6 +3,11 @@ import type { Scenario } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
+import {
+  RED_TEAM_MAX_TURNS,
+  RedTeamConfigSchema,
+  RedTeamStrategySchema,
+} from "~/server/scenarios/execution/types";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -18,12 +23,27 @@ const logger = createLogger("langwatch:api:scenarios");
 
 const getService = () => ScenarioService.create(prisma);
 
+/**
+ * Optional adversarial configuration, mirroring the tRPC surface so a
+ * red-team scenario can be created over the API and not only in the UI.
+ * A null/absent strategy means a standard scenario.
+ */
+const redTeamFields = {
+  redTeamStrategy: RedTeamStrategySchema.nullish(),
+  redTeamTarget: z.string().min(1).nullish(),
+  redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
+  redTeamConfig: RedTeamConfigSchema.nullish(),
+};
+
 const scenarioResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+  redTeamStrategy: z.string().nullable(),
+  redTeamTarget: z.string().nullable(),
+  redTeamTotalTurns: z.number().nullable(),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
@@ -35,6 +55,7 @@ const createScenarioSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()).optional().default([]),
   labels: z.array(z.string()).optional().default([]),
+  ...redTeamFields,
 });
 
 const updateScenarioSchema = z.object({
@@ -42,6 +63,7 @@ const updateScenarioSchema = z.object({
   situation: z.string().optional(),
   criteria: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
+  ...redTeamFields,
 });
 
 function toScenarioResponse(scenario: Scenario) {
@@ -51,6 +73,9 @@ function toScenarioResponse(scenario: Scenario) {
     situation: scenario.situation,
     criteria: scenario.criteria,
     labels: scenario.labels,
+    redTeamStrategy: scenario.redTeamStrategy,
+    redTeamTarget: scenario.redTeamTarget,
+    redTeamTotalTurns: scenario.redTeamTotalTurns,
   };
 }
 

@@ -148,6 +148,22 @@ const appConfig = defineConfig({
           },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
+        // Red team: adversarial, not destructive. Deliberately NOT the alert
+        // red used for delete/archive — this is a legitimate tool you choose,
+        // so it reads as a deep oxblood rather than a stop sign. Desaturated
+        // and darkened in light mode so it sits heavy instead of shouting;
+        // lifted in dark mode so it stays legible against a dark surface
+        // without glowing.
+        redteam: {
+          solid: { value: { _light: "#9B1C2E", _dark: "#C0304A" } },
+          hover: { value: { _light: "#7F1626", _dark: "#D14257" } },
+          contrast: { value: "#FFFFFF" },
+          subtle: { value: { _light: "#FDF2F4", _dark: "#3B0D15" } },
+          muted: { value: { _light: "#F7DDE1", _dark: "#511320" } },
+          emphasized: { value: { _light: "#C0304A", _dark: "#7F1626" } },
+          fg: { value: { _light: "#7F1626", _dark: "#F0A9B4" } },
+          focusRing: { value: "#9B1C2E" },
+        },
         orange: {
           solid: { value: "#ED8926" },
           hover: {
