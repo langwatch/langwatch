@@ -182,10 +182,13 @@ export class GatewayBudgetClickHouseRepository {
   async getSpendForBudgets(
     tenantId: string,
     budgets: GatewayBudget[],
+    // The instant the read is anchored to. Injectable so a test that wrote
+    // a debit at a known time can read the same period deterministically
+    // instead of racing the wall clock across a MINUTE or HOUR boundary.
+    now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
     if (budgets.length === 0) return [];
 
-    const now = new Date();
     const byWindow = new Map<GatewayBudgetWindow, GatewayBudget[]>();
     for (const b of budgets) {
       const list = byWindow.get(b.window) ?? [];

@@ -108,6 +108,11 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
       return client;
     });
 
+    // One pinned instant for every debit and for the read below. The
+    // reader computes the current period from the instant it is handed;
+    // deriving both sides from the same value keeps a run that spans a
+    // MINUTE or HOUR boundary from reading a later period than it wrote.
+    const occurredAt = new Date();
     for (const budget of budgets) {
       await repo.insertDebit([
         {
@@ -126,12 +131,12 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
           model: "gpt-5-mini",
           durationMs: 120,
           status: "SUCCESS",
-          occurredAt: new Date(),
+          occurredAt,
         },
       ]);
     }
 
-    const spend = await repo.getSpendForBudgets(TENANT_ID, budgets);
+    const spend = await repo.getSpendForBudgets(TENANT_ID, budgets, occurredAt);
     spendByBudgetId = new Map(spend.map((s) => [s.budgetId, s.spentUsd]));
   }, 120_000);
 
@@ -165,6 +170,86 @@ describe("given a debit recorded against a budget in ClickHouse", () => {
         expect(spent).toBeGreaterThanOrEqual(
           Number.parseFloat(LIMIT_USD),
         );
+      },
+    );
+  });
+
+  describe("when the ClickHouse server does not run in UTC", () => {
+    // The ledger's OccurredAt carries no timezone, so the view's period
+    // truncation follows the server timezone unless the view pins one,
+    // while currentPeriodStart always computes UTC boundaries. Setting
+    // session_timezone on the insert evaluates the materialised view's
+    // SELECT exactly as a server whose default timezone is
+    // America/Sao_Paulo would, without needing a second ClickHouse.
+    // Sao Paulo midnight is 03:00 UTC, so an unpinned toStartOfDay /
+    // toStartOfWeek / toStartOfMonth lands three hours away from every
+    // period the reader asks for. MINUTE and HOUR stay aligned on any
+    // whole-hour offset, so only the three date-boundary windows can
+    // discriminate.
+    const TZ_WINDOWS: GatewayBudgetWindow[] = ["DAY", "WEEK", "MONTH"];
+    // Distinct scope ids: the rollup groups by (TenantId, Scope, ScopeId,
+    // Window, PeriodStart), so sharing the outer fixture's scope id would
+    // let these reads find the outer debit's UTC bucket and pass without
+    // exercising the timezone seam at all.
+    const tzBudgets = TZ_WINDOWS.map((window) => ({
+      ...budgetFor(window),
+      id: `bdg-tz-${window}-${suffix}`,
+      scopeId: `proj-tz-${window}-${suffix}`,
+    }));
+
+    const tzOccurredAt = new Date();
+
+    beforeAll(async () => {
+      const client = await getClickHouseClientForProject(TENANT_ID);
+      const occurredAt = tzOccurredAt.getTime();
+      await client!.insert({
+        table: "gateway_budget_ledger_events",
+        values: tzBudgets.map((budget) => ({
+          TenantId: TENANT_ID,
+          BudgetId: budget.id,
+          Scope: "project",
+          ScopeId: budget.scopeId,
+          // windowToClickHouse passes the enum through unchanged.
+          Window: budget.window,
+          VirtualKeyId: `vk_${suffix}`,
+          ProviderCredentialId: "",
+          GatewayRequestId: `grq_tz_${budget.window}_${suffix}`,
+          AmountUSD: DEBIT_USD,
+          TokensInput: 300,
+          TokensOutput: 150,
+          TokensCacheRead: 0,
+          TokensCacheWrite: 0,
+          Model: "gpt-5-mini",
+          ProviderSlot: "",
+          DurationMS: 120,
+          Status: "success",
+          OccurredAt: occurredAt,
+          EventTimestamp: occurredAt,
+        })),
+        format: "JSONEachRow",
+        // Synchronous insert: the materialised view's SELECT then runs in
+        // this session, under this session_timezone, exactly as it would
+        // on a server whose default timezone is America/Sao_Paulo. An
+        // async insert is flushed by a background thread that carries the
+        // server defaults instead, which would defeat the simulation.
+        clickhouse_settings: {
+          session_timezone: "America/Sao_Paulo",
+        },
+      });
+    }, 120_000);
+
+    /** @scenario "Spend stays visible when the ClickHouse server does not run in UTC" */
+    it.each(TZ_WINDOWS)(
+      "still reports non-zero spend on a %s budget",
+      async (window) => {
+        const budget = tzBudgets.find((b) => b.window === window)!;
+        const spend = await repo.getSpendForBudgets(
+          TENANT_ID,
+          [budget],
+          tzOccurredAt,
+        );
+
+        expect(Number.parseFloat(spend[0]!.spentUsd)).toBeGreaterThan(0);
       },
     );
   });

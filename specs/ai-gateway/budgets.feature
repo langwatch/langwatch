@@ -218,6 +218,20 @@ Feature: AI Gateway — Budgets
       | month  |
       | total  |
 
+  # The ledger's OccurredAt column carries no timezone, so the rollup's
+  # period truncation follows the ClickHouse server timezone unless the
+  # view pins one. The reader always computes period starts in UTC. On a
+  # server whose default timezone is not UTC, an unpinned view buckets
+  # DAY, WEEK, and MONTH spend at local midnight while the reader asks
+  # for UTC midnight: the same never-readable-bucket failure, reachable
+  # by deployment configuration instead of code drift.
+  @integration
+  Scenario: Spend stays visible when the ClickHouse server does not run in UTC
+    Given a ClickHouse server whose default timezone is not UTC
+    And a budget for each of the day, week, and month windows
+    When spend is recorded against each budget
+    Then each budget reports non-zero spend
+
   @integration
   Scenario: A blocking budget blocks once its recorded spend passes the limit
     Given project "gateway-demo" has a blocking budget of $0.0001 for today
