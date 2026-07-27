@@ -188,7 +188,7 @@ describe("Feature: a refused API key is not a dead end", () => {
     });
 
     describe("when they save a second time", () => {
-      /** @scenario Saving anyway does not probe the provider again */
+      /** @scenario Saving anyway keeps the credential I entered */
       it("saves the key without probing again", async () => {
         mockValidateApiKey.mockResolvedValue(false);
         renderDrawer();
@@ -212,7 +212,7 @@ describe("Feature: a refused API key is not a dead end", () => {
     });
 
     describe("when they correct the key instead of overriding", () => {
-      /** @scenario Correcting a refused key probes it again */
+      /** @scenario Correcting a refused key has it checked again */
       it("probes the corrected key rather than trusting the refusal", async () => {
         mockValidateApiKey.mockResolvedValue(false);
         renderDrawer();

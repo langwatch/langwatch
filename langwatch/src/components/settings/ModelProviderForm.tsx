@@ -332,6 +332,13 @@ export const EditModelProviderForm = ({
   const [refusedCredentials, setRefusedCredentials] = useState<string | null>(
     null,
   );
+
+  // The component instance survives the drawer being reopened on a different
+  // provider row, so the refusal has to be cleared with it — same reason the
+  // advanced draft above is reset on providerId.
+  useEffect(() => {
+    setRefusedCredentials(null);
+  }, [providerId]);
   // Editing any credential re-arms the probe, so a corrected key is checked
   // again rather than saved on the strength of the previous refusal.
   const canSaveWithoutProbe = refusedCredentials === credentialsFingerprint;

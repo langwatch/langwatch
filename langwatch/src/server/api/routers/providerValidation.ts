@@ -82,9 +82,9 @@ const GEMINI_RESTRICTION_MESSAGE =
 const GEMINI_REASON_MESSAGES: Record<string, string> = {
   API_KEY_INVALID: INVALID_KEY_MESSAGE,
   SERVICE_DISABLED:
-    "This key's Google Cloud project does not have the Generative Language API enabled. Enable it in the Google Cloud console, or add this as a Vertex AI provider instead.",
+    "This key's Google Cloud project does not have the Generative Language API enabled. Enable it in the Google Cloud console, or configure a separate Vertex AI provider with service-account credentials.",
   API_KEY_SERVICE_BLOCKED:
-    "This key's API restrictions exclude the Generative Language API. Allow it in the Google Cloud console, or add this as a Vertex AI provider instead.",
+    "This key's API restrictions exclude the Generative Language API. Allow it in the Google Cloud console, or configure a separate Vertex AI provider with service-account credentials.",
   API_KEY_HTTP_REFERRER_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
   API_KEY_IP_ADDRESS_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
   API_KEY_ANDROID_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
@@ -192,10 +192,13 @@ async function readUpstreamRefusal(
  * @param context - Which provider was probed, and with which key
  * @returns ValidationResult with error message
  */
-async function handleHttpError(
-  response: Response,
-  context: ProbeContext,
-): Promise<RankedFailure> {
+async function handleHttpError({
+  response,
+  context,
+}: {
+  response: Response;
+  context: ProbeContext;
+}): Promise<RankedFailure> {
   const { message, reason } = await readUpstreamRefusal(
     response,
     context.apiKey,
@@ -251,6 +254,13 @@ type ProbeContext = {
   hasConfigurableEndpoint: boolean;
 };
 
+/**
+ * How long a single shape gets to answer. The probe runs on a tRPC request
+ * thread against a host the customer can supply, and without a deadline a
+ * black-holed endpoint pins that thread until undici gives up minutes later.
+ */
+const PROBE_TIMEOUT_MS = 10_000;
+
 /** The request that proves a key works: list the provider's models. */
 type ProbeRequest = { url: string; headers: Record<string, string> };
 
@@ -273,12 +283,17 @@ type ProbeRequest = { url: string; headers: Record<string, string> };
  * provider whose auth is unambiguous keeps a single entry; adding a shape is
  * appending to its list.
  */
-function buildProbeCandidates(
-  strategy: AuthStrategy,
-  apiKey: string,
-  baseUrl: string,
-  defaultBaseUrl: string,
-): ProbeRequest[] {
+function buildProbeCandidates({
+  strategy,
+  apiKey,
+  baseUrl,
+  defaultBaseUrl,
+}: {
+  strategy: AuthStrategy;
+  apiKey: string;
+  baseUrl: string;
+  defaultBaseUrl: string;
+}): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -381,10 +396,13 @@ function mostInformativeFailure(failures: RankedFailure[]): ValidationResult {
  * @param context - Which provider is being probed, and with which key
  * @returns Promise resolving to validation result
  */
-async function runProbeChain(
-  candidates: ProbeRequest[],
-  context: ProbeContext,
-): Promise<ValidationResult> {
+async function runProbeChain({
+  candidates,
+  context,
+}: {
+  candidates: ProbeRequest[];
+  context: ProbeContext;
+}): Promise<ValidationResult> {
   const failures: RankedFailure[] = [];
 
   for (const candidate of candidates) {
@@ -392,15 +410,25 @@ async function runProbeChain(
       const response = await fetch(candidate.url, {
         method: "GET",
         headers: candidate.headers,
+        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
       });
 
       if (response.ok) {
         return { valid: true };
       }
 
-      failures.push(await handleHttpError(response, context));
+      const failure = await handleHttpError({ response, context });
+      failures.push(failure);
+
+      // The provider has positively identified the key as wrong. Asking the
+      // remaining shapes cannot change that answer, and each one is another
+      // outbound request on this request thread.
+      if (failure.rank === FAILURE_RANK.definitive) {
+        break;
+      }
     } catch {
-      // The request never landed, so this says nothing about the key itself.
+      // The request never landed — timed out or refused — so this says
+      // nothing about the key itself.
       failures.push({
         valid: false,
         error: context.hasConfigurableEndpoint
@@ -550,12 +578,17 @@ export async function validateProviderApiKey(
     return { valid: true };
   }
 
-  return runProbeChain(
-    buildProbeCandidates(authStrategy, apiKey, baseUrl, defaultBaseUrl),
-    {
+  return runProbeChain({
+    candidates: buildProbeCandidates({
+      strategy: authStrategy,
+      apiKey,
+      baseUrl,
+      defaultBaseUrl,
+    }),
+    context: {
       provider,
       apiKey,
       hasConfigurableEndpoint: !!endpointField,
     },
-  );
+  });
 }

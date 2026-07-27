@@ -161,12 +161,14 @@ describe("Feature: the drawer says where each credential comes from", () => {
    * quietly drift back to "your Gemini API key".
    */
   describe("given the customer holds a Google Cloud key", () => {
-    it("names the API their key has to be allowed to call", () => {
-      const description =
-        geminiEntry?.fieldMetadata?.GEMINI_API_KEY?.description ?? "";
+    describe("when they read the credential field", () => {
+      it("names the API their key has to be allowed to call", () => {
+        const description =
+          geminiEntry?.fieldMetadata?.GEMINI_API_KEY?.description ?? "";
 
-      expect(description).toContain("Generative Language API");
-      expect(description).toContain("Vertex AI");
+        expect(description).toContain("Generative Language API");
+        expect(description).toContain("Vertex AI");
+      });
     });
   });
 });

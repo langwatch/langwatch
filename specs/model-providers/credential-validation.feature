@@ -212,9 +212,9 @@ Feature: Credential Validation
     Then validation is skipped instead of probing a relative URL
     And no misleading network-connection error is shown
 
-  # A rejected key is a dead end for the customer: the drawer refuses to save
-  # until the probe passes. So the message has to name the real cause, or the
-  # customer regenerates a working key over and over and gets nowhere.
+  # A refused key holds the save back on the first attempt, so the message has
+  # to name the real cause — otherwise the customer regenerates a working key
+  # over and over. Saving anyway is available once the reason has been read.
 
   @unit
   Scenario: Gemini reports a disabled Generative Language API, not a bad key
@@ -296,7 +296,7 @@ Feature: Credential Validation
   Scenario: Probing stops at the first shape that answers
     Given the first auth shape accepts the key
     When I call validateProviderApiKey for it
-    Then no further shapes are tried
+    Then the key is valid without asking the remaining shapes
 
   @unit
   Scenario: A provider with one documented auth shape is probed once
@@ -316,18 +316,18 @@ Feature: Credential Validation
     And the button offers to save anyway
 
   @integration
-  Scenario: Saving anyway does not probe the provider again
+  Scenario: Saving anyway keeps the credential I entered
     Given the provider refused the API key I entered
     When I click "Save anyway"
-    Then the provider is saved
-    And the provider is not probed a second time
+    Then the provider is saved with that key
+    And I am not interrupted by the refusal again
 
   @integration
-  Scenario: Correcting a refused key probes it again
+  Scenario: Correcting a refused key has it checked again
     Given the provider refused the API key I entered
     When I change the API key
     Then the button offers to save
-    And saving probes the corrected key
+    And the corrected key is accepted on its own merits
 
   @unit
   Scenario: A provider server error is not reported as a bad key

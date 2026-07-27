@@ -9,6 +9,10 @@ global.fetch = mockFetch;
 describe("validateProviderApiKey", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Not just clearAllMocks: that leaves unconsumed one-shot responses
+    // queued, so a test whose probing stops early leaks the remainder into
+    // whichever test runs next.
+    mockFetch.mockReset();
   });
 
   afterEach(() => {
@@ -365,8 +369,10 @@ describe("validateProviderApiKey", () => {
         expect(result.valid).toBe(false);
         expect(result.error).toContain("Generative Language API");
         expect(result.error).toContain("enable");
-        // A Google Cloud key cannot work against Google AI Studio at all, so
-        // the only real way out is the provider that takes a service account.
+        // With the Generative Language API disabled on the project, this key
+        // cannot answer here until it is enabled — and the alternative is a
+        // separate Vertex AI provider, which takes a service account rather
+        // than this key.
         expect(result.error).toContain("Vertex AI");
         expect(result.error).not.toContain("Invalid API key");
       });
@@ -532,8 +538,15 @@ describe("validateProviderApiKey", () => {
       });
 
       it("surfaces the ElevenLabs message", async () => {
+        // Deliberately unlike INVALID_KEY_MESSAGE: a message that merely
+        // repeats our own fallback wording would pass even if the detail
+        // were never read, which is the one branch this covers.
         respondWith(401, {
-          detail: { status: "invalid_api_key", message: "Invalid API key" },
+          detail: {
+            status: "invalid_api_key",
+            message:
+              "The xi-api-key you supplied is not associated with a workspace",
+          },
         });
 
         const result = await validateProviderApiKey("elevenlabs", {
@@ -541,7 +554,7 @@ describe("validateProviderApiKey", () => {
         });
 
         expect(result.valid).toBe(false);
-        expect(result.error).toContain("Invalid API key");
+        expect(result.error).toContain("not associated with a workspace");
       });
 
       /** @scenario A provider server error is not reported as a bad key */
@@ -717,11 +730,14 @@ describe("validateProviderApiKey", () => {
             error: { code: 400, message: "Please pass a valid API key" },
           }),
       };
+      // Vague first, so the walk continues and both answers are in hand when
+      // one has to be chosen — the definitive verdict must win regardless of
+      // which shape happened to produce it.
       mockFetch
+        .mockResolvedValueOnce(vague)
         .mockResolvedValueOnce(canonical)
         .mockResolvedValueOnce(canonical)
-        .mockResolvedValueOnce(canonical)
-        .mockResolvedValueOnce(vague);
+        .mockResolvedValueOnce(canonical);
 
       const result = await validateProviderApiKey("gemini", {
         GEMINI_API_KEY: "AIzaSyPlainlyInvalid",
@@ -730,6 +746,33 @@ describe("validateProviderApiKey", () => {
       expect(result.error).toBe(
         "Invalid API key. Please check your API key and try again.",
       );
+    });
+
+    /**
+     * The provider has already settled it. Asking the remaining shapes cannot
+     * change the answer and each one is another outbound request on the
+     * request thread — which is also what stopped the vaguer sentence from
+     * being reached in the first place.
+     */
+    it("stops asking once the provider calls the key invalid", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: {
+              message: "API key not valid. Please pass a valid API key.",
+              details: [{ reason: "API_KEY_INVALID", domain: "googleapis.com" }],
+            },
+          }),
+      });
+
+      const result = await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: "AIzaSyPlainlyInvalid",
+      });
+
+      expect(result.valid).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it("reports the actionable refusal once every shape has failed", async () => {
