@@ -2,7 +2,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import type { Permission } from "~/server/api/rbac";
+import { type Permission, teamRoleHasPermission } from "~/server/api/rbac";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -648,14 +648,30 @@ export class ApiKeyService {
     scope: CreatorScope;
     permissions: string[];
   }): Promise<void> {
+    // Resolved once for the whole request, not per permission. The mint path
+    // that calls this (Langy's per-turn session key) passes ~23 permissions
+    // inside a 5-second interactive transaction, and langyApiKey.ts records
+    // what per-permission queries did to it once already: the fan-out starved
+    // the connection pool and aborted the transaction. Two queries, flat.
+    const legacyRole = await this.resolveLegacyCeilingRole({
+      prisma,
+      ceilingUserId,
+      organizationId,
+      scope,
+    });
+
     for (const perm of permissions) {
-      const userHas = await checkRoleBindingPermission({
-        prisma,
-        principal: { type: "user", id: ceilingUserId },
-        organizationId,
-        scope,
-        permission: perm as Permission,
-      });
+      const userHas =
+        (await checkRoleBindingPermission({
+          prisma,
+          principal: { type: "user", id: ceilingUserId },
+          organizationId,
+          scope,
+          permission: perm as Permission,
+        })) ||
+        (legacyRole !== null &&
+          teamRoleHasPermission(legacyRole, perm as Permission));
+
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
           `Cannot grant permission "${perm}" — exceeds your own access`,
@@ -663,6 +679,65 @@ export class ApiKeyService {
         );
       }
     }
+  }
+
+  /**
+   * The ceiling user's legacy TeamUser role, or null when it does not apply.
+   *
+   * `checkRoleBindingPermission` reports RoleBindings and nothing else, on
+   * purpose — its own suite pins that ("TeamUser fallback is handled by
+   * checkPermissionFromBindings, not this resolver"). The tRPC path layers the
+   * legacy fallback on top of it; this ceiling never did, and that asymmetry
+   * was the bug: a user whose access comes from legacy membership passed every
+   * authorization check, was measured by `batchProjectPermissions` as holding
+   * permissions, and was then refused those same permissions here as
+   * "exceeds your own access".
+   *
+   * It was not theoretical. Langy mints a per-turn key mirroring the caller's
+   * permissions, so on any workspace still on legacy membership every turn
+   * died with an opaque `api_key_scope_violation` and no route to a fix.
+   *
+   * Same gate as `loadScopeResolution`: only a user with NO RoleBindings
+   * anywhere in the org falls back, so a migrated user's legacy row can never
+   * stack on top of their real binding. Org-scoped keys are excluded — an
+   * org-wide grant is not something a team role should be able to reach.
+   */
+  private async resolveLegacyCeilingRole({
+    prisma,
+    ceilingUserId,
+    organizationId,
+    scope,
+  }: {
+    prisma: PrismaClient;
+    ceilingUserId: string;
+    organizationId: string;
+    scope: CreatorScope;
+  }): Promise<TeamUserRole | null> {
+    if (scope.type === "org") return null;
+    const teamId = scope.type === "project" ? scope.teamId : scope.id;
+
+    const bindingCount = await prisma.roleBinding.count({
+      where: { organizationId, userId: ceilingUserId },
+    });
+    if (bindingCount > 0) return null;
+
+    const teamUser = await prisma.teamUser.findFirst({
+      where: {
+        userId: ceilingUserId,
+        teamId,
+        // A TeamUser row outlives removal from the organization, so fail closed
+        // on current membership exactly like the binding queries do.
+        user: { orgMemberships: { some: { organizationId } } },
+      },
+      select: { role: true },
+    });
+
+    // A CUSTOM legacy role carries its permissions on an assigned role rather
+    // than the enum, which `teamRoleHasPermission` cannot answer — leave those
+    // to the binding path rather than guessing at a grant.
+    return teamUser && teamUser.role !== TeamUserRole.CUSTOM
+      ? teamUser.role
+      : null;
   }
 
   private async assertBuiltinRoleWithinCeiling({
