@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
 import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
@@ -247,13 +247,26 @@ function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
   );
 }
 
+/** One channel as the picker shows it: the ID is stored, the name is read. */
+function channelOption(channel: {
+  id: string;
+  name: string;
+  isPrivate?: boolean;
+}) {
+  return {
+    value: channel.id,
+    label: `${channel.isPrivate ? "🔒 " : "#"}${channel.name}`,
+  };
+}
+
 /**
  * Channel field: a typeable combobox. Manual entry always works (type a name or
  * paste an ID); once a token is present the channel list is fetched
  * AUTOMATICALLY and drops in as filterable suggestions. Picking a suggestion
  * stores the channel ID (what `chat.postMessage` wants), while free typing is
- * kept verbatim so a custom / not-yet-listed channel still works. A missing
- * scope degrades to a hint, never a hard error.
+ * kept verbatim so a custom / not-yet-listed channel still works — committed
+ * when the author leaves the field, not on every keystroke. A missing scope
+ * degrades to a hint, never a hard error.
  */
 function SlackChannelField({
   projectId,
@@ -313,14 +326,45 @@ function SlackChannelField({
     value: string;
   }>({ initialItems: [], filter: contains });
   useEffect(() => {
-    set(
-      (channelData ?? []).map((c) => ({
-        value: c.id,
-        label: `${c.isPrivate ? "🔒 " : "#"}${c.name}`,
-      })),
-    );
+    set((channelData ?? []).map(channelOption));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelData]);
+
+  // The channel actually PICKED from the list — deliberately NOT
+  // `slice.channelId`, which also holds free-typed text. The combobox rewrites
+  // its own input to the selected item's label every time its `value` changes,
+  // so feeding half-typed text back as `value` wiped the box on every
+  // keystroke: the search never got past one character, and any channel that
+  // needed a longer search was unreachable.
+  const [selectedId, setSelectedId] = useState("");
+  // Once the author starts typing, the field is theirs — nothing below may
+  // reach in and rewrite what they are searching for.
+  const authorTyped = useRef(false);
+
+  // Text typed but not yet committed to the slice. A ref, not state, and
+  // deliberately NOT written through on every keystroke: writing the slice
+  // re-renders this whole form, and the combobox resyncs the input element
+  // from a PASSIVE effect, so the resync lands a render late and overwrites
+  // characters typed in between — "#adhoc" arrives as "#ahc". The search stays
+  // live on every keystroke; only the commit waits for the author to finish.
+  const pendingText = useRef<string | null>(null);
+  const commitTypedChannel = () => {
+    const typed = pendingText.current;
+    pendingText.current = null;
+    if (typed !== null && typed !== slice.channelId) {
+      onChange({ ...slice, channelId: typed });
+    }
+  };
+
+  // A saved automation stores the channel ID, so the box would read "C0123…".
+  // Promoting it to a real selection once the list can resolve it lets the
+  // combobox fill in the channel NAME, which is what the author recognises.
+  useEffect(() => {
+    if (authorTyped.current) return;
+    const stored = (channelData ?? []).find((c) => c.id === slice.channelId);
+    if (stored) setSelectedId(stored.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelData, slice.channelId]);
 
   const canLoad =
     typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
@@ -361,16 +405,24 @@ function SlackChannelField({
         width="full"
         allowCustomValue
         openOnClick
-        value={slice.channelId ? [slice.channelId] : []}
-        onValueChange={(details) =>
-          onChange({ ...slice, channelId: details.value[0] ?? "" })
-        }
+        value={selectedId ? [selectedId] : []}
+        // The stored channel shows through immediately — as its ID at first,
+        // upgraded to its name by the effect above once the list resolves it.
+        defaultInputValue={slice.channelId}
+        onValueChange={(details) => {
+          // A pick beats whatever was half-typed, and stores the ID rather
+          // than the "#name" label the author sees.
+          pendingText.current = null;
+          setSelectedId(details.value[0] ?? "");
+          onChange({ ...slice, channelId: details.value[0] ?? "" });
+        }}
         onInputValueChange={(details) => {
-          filter(details.inputValue);
-          // Immediate free entry (paste an ID / type a name). A real pick is
-          // handled by onValueChange so we keep the channel ID, not its label.
+          startTransition(() => filter(details.inputValue));
+          // Free entry (paste an ID / type a name that isn't listed) is held
+          // until the author leaves the field — see `commitTypedChannel`.
           if (details.reason === "input-change") {
-            onChange({ ...slice, channelId: details.inputValue });
+            authorTyped.current = true;
+            pendingText.current = details.inputValue;
           }
         }}
         onOpenChange={(details) => {
@@ -382,6 +434,10 @@ function SlackChannelField({
             placeholder={
               list.isPending ? "Loading channels…" : "#alerts or C0123…"
             }
+            onBlur={commitTypedChannel}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") commitTypedChannel();
+            }}
           />
           <Combobox.IndicatorGroup>
             {list.isPending ? <Spinner size="xs" /> : null}
