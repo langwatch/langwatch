@@ -552,6 +552,8 @@ function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
       return "virtual_key";
     case "PRINCIPAL":
       return "principal";
+    case "GROUP":
+      return "group";
   }
 }
 

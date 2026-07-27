@@ -2190,12 +2190,19 @@ enum GatewayProviderHealthStatus {
   CIRCUIT_OPEN
 }
 
+// GROUP is a per-member tier: one GROUP budget materialises one
+// enforcement bucket per (budget, member), so "everyone in Engineering
+// gets $50/month" is one row, not one row per person. The bucket rides
+// the PRINCIPAL cascade machinery — the ledger stamps the member's user
+// id and the bucket key is `<groupId>:<userId>`. There is no aggregate
+// flavour: a shared pot across a department is a TEAM/PROJECT budget.
 enum GatewayBudgetScopeType {
   ORGANIZATION
   TEAM
   PROJECT
   VIRTUAL_KEY
   PRINCIPAL
+  GROUP
 }
 
 enum GatewayBudgetWindow {
@@ -2328,6 +2335,13 @@ model VirtualKey {
   routingPolicyId String?
   routingPolicy   RoutingPolicy? @relation("VirtualKeyRoutingPolicy", fields: [routingPolicyId], references: [id], onDelete: SetNull)
 
+  // Explicit routing behaviour. Split out of "routingPolicyId is null"
+  // so "no fallback" is representable at all: the old implicit default
+  // was fallback-across-everything-eligible, which quietly re-routes a
+  // request (and its data) to another vendor. POLICY requires
+  // routingPolicyId; NONE / FALLBACK_ALL require it to be null.
+  routingMode VirtualKeyRoutingMode @default(NONE)
+
   @@unique([hashedSecret])
   @@index([organizationId])
   @@index([displayPrefix])
@@ -2336,6 +2350,23 @@ model VirtualKey {
   @@index([revision])
   @@index([routingPolicyId])
   @@index([organizationId, purpose])
+}
+
+// How a key behaves when the provider serving the requested model fails.
+//
+//   NONE          - no failover. The chain is exactly the provider that
+//                   serves the requested model; a provider outage surfaces
+//                   as an error instead of silently re-routing spend and
+//                   data to a different vendor. Default for new keys.
+//   FALLBACK_ALL  - try every eligible provider in priority order. This is
+//                   what a null routingPolicyId used to mean implicitly,
+//                   so existing keys migrate onto it and behave exactly as
+//                   before.
+//   POLICY        - ordering + rules come from the linked RoutingPolicy.
+enum VirtualKeyRoutingMode {
+  NONE
+  FALLBACK_ALL
+  POLICY
 }
 
 // VirtualKeyScope - N-scope access for VirtualKey, mirrors
@@ -2949,6 +2980,15 @@ model GatewayBudget {
   scopeType      GatewayBudgetScopeType
   scopeId        String
 
+  // Provider filter, orthogonal to the target: null = every provider the
+  // key can reach; set = the budget only counts and only constrains spend
+  // dispatched to that provider. This is what makes the targeting matrix
+  // n x n ("$50/month on OpenAI for the platform team") without adding a
+  // scope type per provider. Holds a `ModelProvider.id` (the row id, not
+  // the provider type key): it survives renames and is the same identity
+  // the gateway keys credentials on, so chain filtering is an id compare.
+  providerKey String?
+
   name        String
   description String?
   window      GatewayBudgetWindow
@@ -2973,6 +3013,7 @@ model GatewayBudget {
 
   @@index([organizationId])
   @@index([scopeType, scopeId])
+  @@index([scopeType, scopeId, providerKey])
   @@index([resetsAt])
 }
 
@@ -2987,6 +3028,12 @@ model GatewayBudgetLedger {
   // at the MP directly. Column kept nullable for ledger rows whose
   // resolving provider has since been deleted (audit-only state).
   modelProviderId String?
+
+  // The provider the request was actually dispatched to, stamped on every
+  // debit so a provider-filtered budget accumulates only its own spend.
+  // Same identity as GatewayBudget.providerKey (a ModelProvider row id).
+  // Null when the dispatching gateway did not report one.
+  providerKey String?
 
   // Idempotency key - ULID produced by the gateway per request. Dedup for 24h.
   gatewayRequestId String

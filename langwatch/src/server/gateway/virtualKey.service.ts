@@ -11,13 +11,21 @@
  * `scopeResolver.ts`); the service does not own a per-VK provider chain.
  */
 
-import type { Prisma, PrismaClient, VirtualKey } from "@prisma/client";
+import type {
+  GatewayBudget,
+  Prisma,
+  PrismaClient,
+  VirtualKey,
+  VirtualKeyRoutingMode,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
+import { nextResetAt } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
+import { eligibleModelProvidersForVk } from "./scopeResolver";
 import {
   defaultVirtualKeyConfig,
   type GuardrailAttachment,
@@ -56,12 +64,31 @@ function isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
   return vk.purpose !== "USER";
 }
 
+/**
+ * The budget a key carries on itself, managed from the key's own drawer.
+ * A key-targeted `GatewayBudget` is created in the same transaction as the
+ * key, so a key can never exist for a moment with the cap its creator
+ * asked for missing. `null` on update removes the cap (by archiving, never
+ * deleting — the ledger behind it is spend history).
+ */
+export type VirtualKeyBudgetInput = {
+  limitUsd: string;
+  window: "DAY" | "WEEK" | "MONTH";
+  timezone?: string | null;
+  onBreach?: "BLOCK" | "WARN";
+  name?: string;
+};
+
 export type CreateVirtualKeyInput = {
   organizationId: string;
   name: string;
   description?: string | null;
   principalUserId?: string | null;
   actorUserId: string;
+  /** Optional cap created alongside the key, targeted at the key. */
+  budget?: VirtualKeyBudgetInput | null;
+  /** Defaults to NONE — a new key does not silently fail over. */
+  routingMode?: VirtualKeyRoutingMode;
   /**
    * Visibility set: every (scopeType, scopeId) the VK is reachable from.
    * At least one entry is required. Caller is responsible for asserting
@@ -92,7 +119,13 @@ export type UpdateVirtualKeyInput = {
   description?: string | null;
   scopes?: ScopeInput[];
   routingPolicyId?: string | null;
+  routingMode?: VirtualKeyRoutingMode;
   config?: Partial<VirtualKeyConfig>;
+  /**
+   * Undefined leaves the key's budget alone; a value creates or updates
+   * it; null archives it.
+   */
+  budget?: VirtualKeyBudgetInput | null;
 };
 
 export type RotateVirtualKeyInput = {
@@ -189,6 +222,11 @@ export class VirtualKeyService {
         input.organizationId,
       );
     }
+    const routingMode = resolveRoutingMode(
+      input.routingMode,
+      input.routingPolicyId ?? null,
+    );
+    assertProvidersAllowedShape(input.config?.providersAllowed);
 
     const id = this.nextVirtualKeyId();
 
@@ -206,10 +244,18 @@ export class VirtualKeyService {
           createdById: input.actorUserId,
           scopes: input.scopes,
           routingPolicyId: input.routingPolicyId ?? null,
+          routingMode,
           purpose: input.purpose,
         },
         tx,
       );
+      await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
+      if (input.budget) {
+        await this.upsertKeyBudget(
+          { virtualKey: vk, budget: input.budget, actorUserId: input.actorUserId },
+          tx,
+        );
+      }
       await this.changeEvents.append(
         {
           organizationId: input.organizationId,
@@ -265,6 +311,19 @@ export class VirtualKeyService {
         input.organizationId,
       );
     }
+    const nextRoutingPolicyId =
+      input.routingPolicyId !== undefined
+        ? input.routingPolicyId
+        : existing.routingPolicyId;
+    const routingMode =
+      input.routingMode !== undefined ||
+      input.routingPolicyId !== undefined
+        ? resolveRoutingMode(
+            input.routingMode ?? existing.routingMode,
+            nextRoutingPolicyId,
+          )
+        : existing.routingMode;
+    assertProvidersAllowedShape(input.config?.providersAllowed);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (input.scopes) {
@@ -286,10 +345,32 @@ export class VirtualKeyService {
           ...(input.routingPolicyId !== undefined
             ? { routingPolicyId: input.routingPolicyId }
             : {}),
+          routingMode,
           revision: { increment: 1n },
         },
         include: { scopes: true },
       });
+
+      await this.assertProvidersAllowedReachable(
+        vk,
+        config.providersAllowed,
+        tx,
+      );
+
+      if (input.budget !== undefined) {
+        if (input.budget) {
+          await this.upsertKeyBudget(
+            {
+              virtualKey: vk,
+              budget: input.budget,
+              actorUserId: input.actorUserId,
+            },
+            tx,
+          );
+        } else {
+          await this.archiveKeyBudgets(vk, input.actorUserId, tx);
+        }
+      }
 
       await this.changeEvents.append(
         {
@@ -413,6 +494,12 @@ export class VirtualKeyService {
         input.actorUserId,
         tx,
       );
+      // A dead key's cap is retired, not deleted: the ledger rows behind
+      // it are the spend record, and an admin asking "what did this key
+      // cost us before we killed it" needs the budget row to read them
+      // against. Archiving also stops the budget from showing up as an
+      // active control that nothing can ever spend against.
+      await this.archiveKeyBudgets(vk, input.actorUserId, tx);
       await this.changeEvents.append(
         {
           organizationId: input.organizationId,
@@ -462,6 +549,156 @@ export class VirtualKeyService {
     return existing;
   }
 
+  /**
+   * Create or update the budget targeted at this key. Runs inside the
+   * caller's transaction so a key and the cap its creator asked for land
+   * together or not at all: a key that exists for even a moment without
+   * its cap is a key that can spend without one.
+   */
+  private async upsertKeyBudget(
+    args: {
+      virtualKey: VirtualKey;
+      budget: VirtualKeyBudgetInput;
+      actorUserId: string;
+    },
+    tx: Prisma.TransactionClient,
+  ): Promise<GatewayBudget> {
+    const { virtualKey: vk, budget, actorUserId } = args;
+    const existing = await tx.gatewayBudget.findFirst({
+      where: {
+        organizationId: vk.organizationId,
+        scopeType: "VIRTUAL_KEY",
+        scopeId: vk.id,
+        providerKey: null,
+        archivedAt: null,
+      },
+    });
+
+    const data = {
+      name: budget.name ?? `${vk.name} budget`,
+      window: budget.window,
+      limitUsd: budget.limitUsd,
+      onBreach: budget.onBreach ?? ("BLOCK" as const),
+      timezone: budget.timezone ?? null,
+    };
+
+    const row = existing
+      ? await tx.gatewayBudget.update({
+          where: { id: existing.id },
+          data: {
+            ...data,
+            // Changing the window changes what "this period" means, so the
+            // reset instant has to be recomputed with it.
+            ...(existing.window !== budget.window
+              ? { resetsAt: nextResetAt(budget.window) }
+              : {}),
+          },
+        })
+      : await tx.gatewayBudget.create({
+          data: {
+            ...data,
+            organizationId: vk.organizationId,
+            scopeType: "VIRTUAL_KEY",
+            scopeId: vk.id,
+            createdById: actorUserId,
+            resetsAt: nextResetAt(budget.window),
+          },
+        });
+
+    await this.changeEvents.append(
+      {
+        organizationId: vk.organizationId,
+        kind: existing ? "BUDGET_UPDATED" : "BUDGET_CREATED",
+        budgetId: row.id,
+        virtualKeyId: vk.id,
+      },
+      tx,
+    );
+    await this.auditLog.append(
+      {
+        organizationId: vk.organizationId,
+        projectId: null,
+        actorUserId,
+        action: existing
+          ? "gateway.budget.updated"
+          : "gateway.budget.created",
+        targetKind: "budget",
+        targetId: row.id,
+        ...(existing ? { before: serializeRowForAudit(existing) } : {}),
+        after: serializeRowForAudit(row),
+      },
+      tx,
+    );
+    return row;
+  }
+
+  /** Archive every active budget targeted at this key. */
+  private async archiveKeyBudgets(
+    vk: VirtualKey,
+    actorUserId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const budgets = await tx.gatewayBudget.findMany({
+      where: {
+        organizationId: vk.organizationId,
+        scopeType: "VIRTUAL_KEY",
+        scopeId: vk.id,
+        archivedAt: null,
+      },
+    });
+    for (const budget of budgets) {
+      const archived = await tx.gatewayBudget.update({
+        where: { id: budget.id },
+        data: { archivedAt: new Date() },
+      });
+      await this.changeEvents.append(
+        {
+          organizationId: vk.organizationId,
+          kind: "BUDGET_DELETED",
+          budgetId: archived.id,
+          virtualKeyId: vk.id,
+        },
+        tx,
+      );
+      await this.auditLog.append(
+        {
+          organizationId: vk.organizationId,
+          projectId: null,
+          actorUserId,
+          action: "gateway.budget.deleted",
+          targetKind: "budget",
+          targetId: archived.id,
+          before: serializeRowForAudit(budget),
+          after: serializeRowForAudit(archived),
+        },
+        tx,
+      );
+    }
+  }
+
+  /**
+   * An explicit provider allowlist may only name providers the key can
+   * actually reach through its scope graph. Without this a key could be
+   * saved pointing at another team's provider row and the mistake would
+   * only surface as an unexplained "model not available" at dispatch.
+   */
+  private async assertProvidersAllowedReachable(
+    vk: VirtualKeyWithScopes,
+    providersAllowed: string[] | null,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    if (!providersAllowed) return;
+    const eligible = await eligibleModelProvidersForVk(this.prisma, vk, tx);
+    const eligibleIds = new Set(eligible.map((mp) => mp.id));
+    const unreachable = providersAllowed.filter((id) => !eligibleIds.has(id));
+    if (unreachable.length > 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `providers_not_in_scope: ${unreachable.join(", ")}`,
+      });
+    }
+  }
+
   private async assertRoutingPolicyBelongsToOrg(
     routingPolicyId: string,
     organizationId: string,
@@ -487,6 +724,51 @@ export class VirtualKeyService {
 
   private nextVirtualKeyId(): string {
     return `vk_${randomBytes(16).toString("base64url")}`;
+  }
+}
+
+/**
+ * Reconcile the requested routing mode with the policy reference. The two
+ * are one decision expressed in two columns, so the pairing is enforced
+ * here rather than trusted from every caller: POLICY without a policy id
+ * would silently route as if no policy existed, and NONE with a policy id
+ * would leave a dangling reference that a later edit could resurrect.
+ */
+function resolveRoutingMode(
+  requested: VirtualKeyRoutingMode | undefined,
+  routingPolicyId: string | null,
+): VirtualKeyRoutingMode {
+  const mode = requested ?? (routingPolicyId ? "POLICY" : "NONE");
+  if (mode === "POLICY" && !routingPolicyId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "routing_policy_required: routingMode POLICY needs a routingPolicyId",
+    });
+  }
+  if (mode !== "POLICY" && routingPolicyId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `routing_policy_conflict: routingMode ${mode} cannot carry a routingPolicyId`,
+    });
+  }
+  return mode;
+}
+
+/**
+ * "No providers selected" is never a valid saved state. Absence means
+ * every provider in scope; an empty list would mean a key that can serve
+ * nothing, which is always a mis-click rather than an intent.
+ */
+function assertProvidersAllowedShape(
+  providersAllowed: string[] | null | undefined,
+): void {
+  if (providersAllowed === undefined || providersAllowed === null) return;
+  if (providersAllowed.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "providers_allowed_empty: select at least one provider, or allow all providers",
+    });
   }
 }
 

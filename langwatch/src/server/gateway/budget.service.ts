@@ -91,7 +91,15 @@ export type BudgetScopeTarget =
       secondary: string | null;
       projectSlug: string | null;
     }
-  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null };
+  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
+  | {
+      kind: "GROUP";
+      id: string;
+      name: string;
+      secondary: string | null;
+      /** Members the per-member allowance currently applies to. */
+      memberCount: number;
+    };
 
 export type BudgetLedgerLine = {
   id: string;
@@ -440,6 +448,10 @@ export class GatewayBudgetService {
         // future iteration teaches the repo to fan out across projects.
         return null;
       case "PRINCIPAL":
+      case "GROUP":
+        // Principal and per-member department buckets span every project
+        // the person works in, so there is no single CH tenant to read
+        // their recent ledger from.
         return null;
     }
   }
@@ -518,6 +530,19 @@ export class GatewayBudgetService {
           id: budget.scopeId,
           name: user?.name ?? user?.email ?? budget.scopeId,
           secondary: user?.email ?? null,
+        };
+      }
+      case "GROUP": {
+        const group = await this.prisma.group.findUnique({
+          where: { id: budget.scopeId },
+          select: { name: true, slug: true, _count: { select: { members: true } } },
+        });
+        return {
+          kind: "GROUP",
+          id: budget.scopeId,
+          name: group?.name ?? budget.scopeId,
+          secondary: group?.slug ?? null,
+          memberCount: group?._count.members ?? 0,
         };
       }
     }

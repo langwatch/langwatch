@@ -441,7 +441,14 @@ type ScopeTarget =
       secondary: string | null;
       projectSlug: string | null;
     }
-  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null };
+  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
+  | {
+      kind: "GROUP";
+      id: string;
+      name: string;
+      secondary: string | null;
+      memberCount: number;
+    };
 
 function ScopeBadge({
   target,

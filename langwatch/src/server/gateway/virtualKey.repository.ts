@@ -11,6 +11,7 @@ import type {
   Prisma,
   PrismaClient,
   VirtualKey,
+  VirtualKeyRoutingMode,
   VirtualKeyScope,
   VirtualKeyScopeType,
 } from "@prisma/client";
@@ -51,6 +52,11 @@ export type CreateVirtualKeyData = {
    */
   scopes: ScopeInput[];
   routingPolicyId?: string | null;
+  /**
+   * Routing behaviour. Defaults to the column default (NONE — no
+   * failover) when the caller does not state one.
+   */
+  routingMode?: VirtualKeyRoutingMode;
   /**
    * USER (default) for keys created via the gateway UI / API; LANGY when
    * auto-provisioned by `langyVirtualKey.provisionLangyVirtualKey` for the
@@ -196,6 +202,7 @@ export class VirtualKeyRepository {
         config: data.config,
         createdById: data.createdById,
         routingPolicyId: data.routingPolicyId ?? null,
+        ...(data.routingMode ? { routingMode: data.routingMode } : {}),
         purpose: data.purpose ?? "USER",
         revision: 1n,
         scopes: {
