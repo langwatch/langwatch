@@ -41,6 +41,11 @@ function makeScenario(
     judgeModel: null,
     lastUpdatedById: null,
     archivedAt: null,
+    // A standard scenario: null strategy is what makes it not a red team.
+    redTeamStrategy: null,
+    redTeamTarget: null,
+    redTeamTotalTurns: null,
+    redTeamConfig: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
