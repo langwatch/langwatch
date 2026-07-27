@@ -45,7 +45,7 @@ Who can see and manage the key, and where its traces and costs land:
 
 - **Project** (default): the key belongs to one project, and the drawer states the consequence inline: "Traces and costs land in `<project>`".
 - **Personal**: your own key. Traces and costs land in your personal workspace, and your per-member and principal budgets apply to it.
-- **Team** / **Organization** (for roles that can create shared keys): shared keys valid across the team or the whole org. A shared key still needs one project for its traces and costs to land in, and the drawer requires that choice before it lets you create the key: spend that lands nowhere could not be capped by any budget. API callers that omit the destination fall back to the org's governance project.
+- **Team** / **Organization** (for roles that can create shared keys): shared keys valid across the team or the whole org. A shared key still needs one project for its traces and costs to land in, and the drawer requires that choice before it lets you create the key: spend that lands nowhere could not be capped by any budget. The destination is stored as the key's `trace_project_id`, not as a scope: it decides where traces land and nothing else, so administering that project grants no visibility into the key and no right to change it. API callers that omit the destination fall back to the org's governance project.
 
 Ownership decides which budgets the key inherits and which providers it can reach; changing it re-resolves both live in the drawer.
 
@@ -55,7 +55,7 @@ A dollar amount and a period (`per day`, `per week`, `per month`). Leave it empt
 
 Creating the key with a budget creates both in one transaction, so the key never exists without the cap its creator asked for. Clearing the field later, or revoking the key, archives the budget instead of deleting it: its ledger stays as the audit trail of what the key cost.
 
-Under the field, **Inherited budgets** lists every budget that already constrains the draft key, each with its limit, period, and current spend. A provider-filtered budget is badged with which provider it counts ("OpenAI only") and a per-member group budget is badged "per member". The list is resolved by the same code the gateway enforces from, so it cannot promise a constraint that will not apply or miss one that will. Group budgets appear only when the draft key carries a person (personal ownership); a shared service key has no member to charge a per-member allowance to.
+Under the field, **Inherited budgets** lists every budget that already constrains the draft key, each with its limit, period, and current spend. A provider-filtered budget is badged with which provider it counts ("OpenAI only") and a per-member group budget is badged "per member". The list is resolved by the same code the gateway enforces from, so it cannot promise a constraint that will not apply or miss one that will. Group budgets appear only when the draft key carries a principal, the person behind the key; personal ownership is the usual way a draft gains one, but any key with a principal qualifies. A shared service key has no member to charge a per-member allowance to.
 
 ### Provider access
 
@@ -75,7 +75,7 @@ What happens when the provider serving a request fails:
 
 Click **Create**. The full secret is revealed exactly once with a **Copy** button and a confirmation checkbox that must be checked before dismissing. After dismiss, the secret is gone for good.
 
-The keys list shows a **Spent this month** column for every key, read from the same cost data the Usage tab reports, and clicking it opens Usage pre-filtered to that key over the past 30 days, so the number you click and the page you land on agree.
+The keys list shows a **Spent this month** column for every key, read from the same cost data the Usage tab reports. Clicking it opens Usage on its **This month** preset, pre-filtered to that key: the same UTC month-to-date window the column is computed over, so the number you click and the page you land on agree.
 
 ## VK detail page
 

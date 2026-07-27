@@ -123,7 +123,7 @@ func TestConfigWireProvidersAllowedAndRoutingMode(t *testing.T) {
 }
 
 // The other half of the bundle contract lives in the control plane's
-// materialiser. Reading it here keeps a TypeScript-side rename from
+// materializer module. Reading it here keeps a TypeScript-side rename from
 // silently stripping the provider filter (or the routing mode) off the
 // wire while the UI keeps displaying both as active.
 func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
@@ -164,7 +164,7 @@ func TestControlPlaneBucketSeparatorsAreStable(t *testing.T) {
 	}
 	// A dispatch with no reported provider must debit unfiltered budgets
 	// only: attribution by guess mis-bills a governance control.
-	if !strings.Contains(src, "if (!budget.providerKey) return true") {
+	if !regexp.MustCompile(`if\s*\(\s*!budget\.providerKey\s*\)\s*(\{\s*)?return\s+true`).MatchString(src) {
 		t.Error("budgetAppliesToProvider no longer treats unfiltered budgets as match-all")
 	}
 }
@@ -192,15 +192,15 @@ func TestSpanAttributeContractForProviderAttribution(t *testing.T) {
 }
 
 // providersAllowed semantics must agree between the two read paths: the
-// control plane normalises an empty list back to null (allow all) so a
+// control plane normalizes an empty list back to null (allow all) so a
 // malformed stored row degrades instead of taking the key offline, and the
 // Go side treats an empty slice the same way.
-func TestProvidersAllowedEmptyListNormalisation(t *testing.T) {
+func TestProvidersAllowedEmptyListNormalization(t *testing.T) {
 	src := readControlPlaneSource(t, "src", "server", "gateway", "virtualKey.config.ts")
-	if !strings.Contains(src, "v && v.length > 0 ? v : null") {
-		t.Error("virtualKey.config.ts no longer normalises an empty providersAllowed to null")
+	if !regexp.MustCompile(`v\s*&&\s*v\.length\s*>\s*0\s*\?\s*v\s*:\s*null`).MatchString(src) {
+		t.Error("virtualKey.config.ts no longer normalizes an empty providersAllowed to null")
 	}
 
 	assert.True(t, domain.BundleConfig{ProvidersAllowed: []string{}}.AllowsProvider("mp_any"),
-		"an empty allowlist must mean all, matching the control plane's normalisation")
+		"an empty allowlist must mean all, matching the control plane's normalization")
 }

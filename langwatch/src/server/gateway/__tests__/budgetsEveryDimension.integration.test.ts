@@ -568,7 +568,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(groupBudget?.spent_micro_usd).toBe(10_000_000);
     });
 
-    /** @scenario "A group budget can count a single provider" */
+    /** @scenario "Two budgets on the same target with different provider filters do not share spend" */
     it("keeps a provider-filtered group budget and its unfiltered sibling out of each other's totals", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();

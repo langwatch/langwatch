@@ -32,7 +32,10 @@ export const EMPTY_BUDGET: VirtualKeyBudgetValue = {
 function formatLimit(limitUsd: string): string {
   const n = Number.parseFloat(limitUsd);
   if (!Number.isFinite(n)) return limitUsd;
-  return Number.isInteger(n) ? `${n}` : n.toFixed(2);
+  // Whole dollars stay bare ("Max $30/day"); fractional caps go through
+  // the shared budget formatter so a $0.005 cap does not round up to the
+  // doubled "Max $0.01/day". The annotation supplies its own dollar sign.
+  return Number.isInteger(n) ? `${n}` : formatBudgetUsd(n).replace(/^\$/, "");
 }
 
 /**
@@ -86,6 +89,7 @@ export function VirtualKeyBudgetSection({
   onChange,
   organizationId,
   scopes,
+  traceProjectId,
   principalUserId,
   virtualKeyId,
 }: {
@@ -94,6 +98,8 @@ export function VirtualKeyBudgetSection({
   organizationId: string;
   /** The draft key's scopes; these decide which budgets already apply. */
   scopes: ScopeTriadEntry[];
+  /** Explicit trace destination of org- and team-owned drafts. */
+  traceProjectId?: string | null;
   principalUserId?: string | null;
   /** Set in the edit drawer so its own key-targeted budget is not listed twice. */
   virtualKeyId?: string | null;
@@ -161,6 +167,7 @@ export function VirtualKeyBudgetSection({
       <ApplicableBudgetsList
         organizationId={organizationId}
         scopes={scopes}
+        traceProjectId={traceProjectId}
         principalUserId={principalUserId}
         virtualKeyId={virtualKeyId}
       />
@@ -176,11 +183,13 @@ export function VirtualKeyBudgetSection({
 function ApplicableBudgetsList({
   organizationId,
   scopes,
+  traceProjectId,
   principalUserId,
   virtualKeyId,
 }: {
   organizationId: string;
   scopes: ScopeTriadEntry[];
+  traceProjectId?: string | null;
   principalUserId?: string | null;
   virtualKeyId?: string | null;
 }) {
@@ -188,14 +197,18 @@ function ApplicableBudgetsList({
     {
       organizationId,
       scopes,
+      traceProjectId: traceProjectId ?? null,
       principalUserId: principalUserId ?? null,
       virtualKeyId: virtualKeyId ?? null,
     },
     { enabled: !!organizationId && scopes.length > 0 },
   );
 
+  // Only the drawer-managed budget hides from this list (it IS the field
+  // above); an independently created key-targeted cap is an inherited
+  // constraint like any other and must stay visible.
   const rows = (query.data ?? []).filter(
-    (b) => !(b.scopeType === "VIRTUAL_KEY" && b.scopeId === virtualKeyId),
+    (b) => !(virtualKeyId && b.managedByVirtualKeyId === virtualKeyId),
   );
   if (rows.length === 0) return null;
 

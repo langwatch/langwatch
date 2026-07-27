@@ -2297,6 +2297,12 @@ model VirtualKey {
   principalUserId String?
   principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
+  // Where this key's traces and costs land, for keys whose access scopes
+  // do not name a single project (org- and team-owned keys). Deliberately
+  // NOT a VirtualKeyScope row: scope rows grant access and visibility,
+  // and the trace destination must grant neither.
+  traceProjectId String?
+
   // Slim config blob - per-key state only. The "gateway-config bundle"
   // that the gateway reads via /internal/gateway/config/:vk_id is now
   // materialised on-read from the scope graph (eligible ModelProviders
@@ -3011,8 +3017,16 @@ model GatewayBudget {
 
   ledgerEntries GatewayBudgetLedger[]
 
+  // Set when this budget row is the one the virtual-key drawer's budget
+  // field manages (created with the key or through its edit drawer).
+  // Clearing the drawer field archives ONLY this row; budgets created
+  // independently on the Budgets page keep their own lifecycle and their
+  // own delete permission.
+  managedByVirtualKeyId String?
+
   @@index([organizationId])
   @@index([scopeType, scopeId, providerKey])
+  @@index([managedByVirtualKeyId])
   @@index([resetsAt])
 }
 

@@ -481,6 +481,14 @@ function ScopeBadge({
           {target.secondary}
         </Code>
       )}
+      {target.kind === "GROUP" && (
+        <Text fontSize="xs" color="fg.muted">
+          {target.memberCount === 1
+            ? "1 member"
+            : `${target.memberCount} members`}
+          , each with their own allowance
+        </Text>
+      )}
     </HStack>
   );
 }

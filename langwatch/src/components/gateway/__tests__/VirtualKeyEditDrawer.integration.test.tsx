@@ -39,6 +39,7 @@ type ApplicableBudget = {
   providerKey: string | null;
   providerLabel: string | null;
   isPerMember: boolean;
+  managedByVirtualKeyId: string | null;
 };
 
 const { updateMutateAsync, applicableBudgetsData } = vi.hoisted(() => ({
@@ -180,6 +181,9 @@ const ownBudgetRow = (
   providerKey: null,
   providerLabel: null,
   isPerMember: false,
+  // The row the drawer's own field manages; the seeding effect finds it
+  // by this linkage, never by shape.
+  managedByVirtualKeyId: VK_ID,
   ...overrides,
 });
 
@@ -254,6 +258,7 @@ describe("given the edit drawer for an existing key", () => {
           window: "MONTH",
           limitUsd: "1000",
           timezone: null,
+          managedByVirtualKeyId: null,
         }),
       ];
       renderDrawer();

@@ -41,7 +41,9 @@ const ERROR_COPY: Array<{ code: string; copy: string }> = [
 export function humanizeGatewayError(error: unknown, fallback: string): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
   for (const { code, copy } of ERROR_COPY) {
-    if (message.startsWith(code)) return copy;
+    // The server's shape is `code: prose`; anchoring the delimiter keeps
+    // a code from matching inside an unrelated longer code.
+    if (message === code || message.startsWith(`${code}:`)) return copy;
   }
   // Anything unmapped is internal text (a Prisma invocation dump, a
   // network error), not something to render in a drawer. The caller's

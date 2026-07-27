@@ -51,6 +51,8 @@ export type CreateVirtualKeyData = {
    * least one entry is required.
    */
   scopes: ScopeInput[];
+  /** Explicit trace destination; grants no access (not a scope row). */
+  traceProjectId?: string | null;
   routingPolicyId?: string | null;
   /**
    * Routing behaviour. Defaults to the column default (NONE: no
@@ -199,6 +201,7 @@ export class VirtualKeyRepository {
         hashedSecret: data.hashedSecret,
         displayPrefix: data.displayPrefix,
         principalUserId: data.principalUserId ?? null,
+        traceProjectId: data.traceProjectId ?? null,
         config: data.config,
         createdById: data.createdById,
         routingPolicyId: data.routingPolicyId ?? null,

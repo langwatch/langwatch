@@ -88,7 +88,16 @@ export function VirtualKeyRoutingSection({
           <Radio value="FALLBACK_ALL" data-testid="vk-routing-fallback-all">
             <Text fontSize="sm">Fall back to all eligible providers</Text>
           </Radio>
-          {policies.map((p) => (
+          {(value.mode === "POLICY" &&
+          value.policyId &&
+          !policies.some((p) => p.id === value.policyId)
+            ? // The stored policy is not in the list (still loading, or
+              // deleted since). Render it anyway: a radio group with a
+              // selection that matches no radio reads as "no routing",
+              // while the key would still submit POLICY.
+              [...policies, { id: value.policyId, name: "Current policy" }]
+            : policies
+          ).map((p) => (
             <Radio
               key={p.id}
               value={`POLICY:${p.id}`}

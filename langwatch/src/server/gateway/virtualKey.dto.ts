@@ -28,6 +28,8 @@ export type VirtualKeyCamelDto = {
   purpose: "user" | "langy";
   displayPrefix: string;
   principalUserId: string | null;
+  /** Explicit trace destination; grants no access to the key. */
+  traceProjectId: string | null;
   principalUser: { name: string | null; email: string | null } | null;
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
@@ -49,6 +51,7 @@ export type VirtualKeySnakeDto = {
   purpose: "user" | "langy";
   display_prefix: string;
   principal_user_id: string | null;
+  trace_project_id: string | null;
   scopes: Array<{ scope_type: string; scope_id: string }>;
   routing_policy_id: string | null;
   routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
@@ -72,6 +75,7 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     purpose: vk.purpose === "LANGY" ? "langy" : "user",
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
+    traceProjectId: vk.traceProjectId ?? null,
     principalUser: vk.principalUser
       ? { name: vk.principalUser.name, email: vk.principalUser.email }
       : null,
@@ -109,6 +113,7 @@ export function toVirtualKeySnakeDto(
     purpose: base.purpose,
     display_prefix: base.displayPrefix,
     principal_user_id: base.principalUserId,
+    trace_project_id: base.traceProjectId,
     scopes: base.scopes.map((s) => ({
       scope_type: s.scopeType,
       scope_id: s.scopeId,

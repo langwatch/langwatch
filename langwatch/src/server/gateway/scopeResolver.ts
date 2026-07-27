@@ -45,6 +45,12 @@ import type {
 export type TraceProjectInput = {
   organizationId: string;
   scopes: ScopeInput[];
+  /**
+   * The explicit destination an org- or team-owned key carries. Stored
+   * apart from the access scopes because scope rows grant visibility and
+   * operate rights, and the trace destination must grant neither.
+   */
+  traceProjectId?: string | null;
 };
 
 export type EligibleModelProvider = ModelProvider;
@@ -184,6 +190,20 @@ export async function resolveTraceProject(
   tx?: Prisma.TransactionClient,
 ): Promise<{ id: string; teamId: string; apiKey: string } | null> {
   const client = tx ?? prisma;
+  // Resolution order: (1) the explicit trace destination, (2) a unique
+  // PROJECT access scope, (3) the org's governance project. The explicit
+  // column wins because it is the one the key's creator chose; the org
+  // pin on the lookup keeps a stray id from landing traces cross-tenant.
+  if (vk.traceProjectId) {
+    const explicit = await client.project.findFirst({
+      where: {
+        id: vk.traceProjectId,
+        team: { organizationId: vk.organizationId },
+      },
+      select: { id: true, teamId: true, apiKey: true },
+    });
+    if (explicit) return explicit;
+  }
   const projectScopes = vk.scopes.filter((s) => s.scopeType === "PROJECT");
   if (projectScopes.length === 1) {
     const proj = await client.project.findUnique({

@@ -19,7 +19,9 @@ import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 
 import {
+  buildScopeHierarchy,
   firstEligibleDefaultModel,
+  resolveEligible,
   type OrgModelProvider,
 } from "./eligibleModelProviders";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
@@ -39,6 +41,7 @@ import {
 import {
   ownershipIncompleteReason,
   ownershipToScopes,
+  ownershipTraceProjectId,
   VirtualKeyOwnershipSection,
   type VirtualKeyOwnership,
 } from "./VirtualKeyOwnershipSection";
@@ -54,11 +57,6 @@ import {
   VirtualKeyRoutingSection,
   type VirtualKeyRoutingValue,
 } from "./VirtualKeyRoutingSection";
-import {
-  buildScopeHierarchy,
-  resolveEligible,
-} from "./eligibleModelProviders";
-
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;
   open: boolean;
@@ -250,6 +248,7 @@ export function VirtualKeyCreateDrawer({
             ? (session.data?.user?.id ?? null)
             : null,
         scopes,
+        traceProjectId: ownershipTraceProjectId(ownership),
         routingMode: routing.mode,
         routingPolicyId: routing.mode === "POLICY" ? routing.policyId : null,
         budget: budget.limitUsd.trim()

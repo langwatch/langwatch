@@ -15,7 +15,10 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { resolveProviderLabels } from "~/server/gateway/providerLabels";
+import {
+  providerLabelFor,
+  resolveProviderLabels,
+} from "~/server/gateway/providerLabels";
 
 import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -76,7 +79,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         budgets,
         input.organizationId,
       );
-      const providerLabels = await resolveProviderLabels(ctx.prisma, budgets);
+      const providerLabels = await resolveProviderLabels({ prisma: ctx.prisma, budgets });
       return {
         spendAvailable,
         budgets: budgets.map((b) => ({
@@ -84,9 +87,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           spendAvailable,
           unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
           scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
-          providerLabel: b.providerKey
-            ? (providerLabels.get(b.providerKey) ?? b.providerKey)
-            : null,
+          providerLabel: providerLabelFor(providerLabels, b.providerKey),
         })),
       };
     }),
@@ -107,7 +108,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         budgets,
         project?.team.organizationId ?? null,
       );
-      const providerLabels = await resolveProviderLabels(ctx.prisma, budgets);
+      const providerLabels = await resolveProviderLabels({ prisma: ctx.prisma, budgets });
       return {
         spendAvailable,
         budgets: budgets.map((b) => ({
@@ -115,9 +116,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           spendAvailable,
           unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
           scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
-          providerLabel: b.providerKey
-            ? (providerLabels.get(b.providerKey) ?? b.providerKey)
-            : null,
+          providerLabel: providerLabelFor(providerLabels, b.providerKey),
         })),
       };
     }),
@@ -132,18 +131,19 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       if (!detail) {
         throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
       }
-      const providerLabels = await resolveProviderLabels(ctx.prisma, [
-        detail.budget,
-      ]);
+      const providerLabels = await resolveProviderLabels({
+        prisma: ctx.prisma,
+        budgets: [detail.budget],
+      });
       return {
         ...toDto(detail.budget),
         spendAvailable: detail.spendAvailable,
         unreachableByAnyKey: detail.unreachableByAnyKey,
         scopeTarget: detail.scopeTarget,
-        providerLabel: detail.budget.providerKey
-          ? (providerLabels.get(detail.budget.providerKey) ??
-            detail.budget.providerKey)
-          : null,
+        providerLabel: providerLabelFor(
+          providerLabels,
+          detail.budget.providerKey,
+        ),
         recentLedger: detail.recentLedger.map((l) => ({
           id: l.id,
           virtualKeyId: l.virtualKeyId,
@@ -325,9 +325,11 @@ async function resolveScopeTargetsBatch(
           select: { id: true, name: true, email: true },
         })
       : Promise.resolve([]),
-    ids.GROUP?.size
+    ids.GROUP?.size && organizationId
       ? prisma.group.findMany({
-          where: { id: { in: [...ids.GROUP!] } },
+          // Same tenant pin as the VIRTUAL_KEY branch: a stray scopeId
+          // must not surface another organization's group name.
+          where: { id: { in: [...ids.GROUP!] }, organizationId },
           select: {
             id: true,
             name: true,

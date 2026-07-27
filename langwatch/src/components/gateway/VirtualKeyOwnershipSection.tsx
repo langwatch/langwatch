@@ -47,8 +47,10 @@ export type OwnershipContext = {
 /**
  * The scope rows a chosen ownership persists as, or null while the choice
  * is incomplete (e.g. org ownership with no trace project picked yet).
- * Org- and team-owned keys carry their trace project as an explicit
- * PROJECT scope, which is the row `resolveTraceProject` lands traces on.
+ * The scopes are ACCESS rows only: an org- or team-owned key's trace
+ * destination rides `traceProjectId` (see `ownershipTraceProjectId`),
+ * never a scope row, because scope rows grant visibility and operate
+ * rights and the trace destination must grant neither.
  */
 export function ownershipToScopes(
   value: VirtualKeyOwnership,
@@ -65,18 +67,31 @@ export function ownershipToScopes(
         : null;
     case "TEAM":
       return value.teamId && value.traceProjectId
-        ? [
-            { scopeType: "TEAM", scopeId: value.teamId },
-            { scopeType: "PROJECT", scopeId: value.traceProjectId },
-          ]
+        ? [{ scopeType: "TEAM", scopeId: value.teamId }]
         : null;
     case "ORGANIZATION":
       return value.traceProjectId
-        ? [
-            { scopeType: "ORGANIZATION", scopeId: ctx.organizationId },
-            { scopeType: "PROJECT", scopeId: value.traceProjectId },
-          ]
+        ? [{ scopeType: "ORGANIZATION", scopeId: ctx.organizationId }]
         : null;
+  }
+}
+
+/**
+ * The explicit trace destination the ownership carries, when it is a
+ * separate decision from the access scope. Project- and personal-owned
+ * keys return null: their single PROJECT access scope IS the
+ * destination, and duplicating it would create a value that can drift.
+ */
+export function ownershipTraceProjectId(
+  value: VirtualKeyOwnership,
+): string | null {
+  switch (value.kind) {
+    case "PROJECT":
+    case "PERSONAL":
+      return null;
+    case "TEAM":
+    case "ORGANIZATION":
+      return value.traceProjectId;
   }
 }
 

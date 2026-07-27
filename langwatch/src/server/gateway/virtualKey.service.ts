@@ -98,6 +98,11 @@ export type CreateVirtualKeyInput = {
    */
   scopes: ScopeInput[];
   /**
+   * Explicit trace destination for org- and team-owned keys. NOT a scope:
+   * it grants no visibility and no operate rights on the key.
+   */
+  traceProjectId?: string | null;
+  /**
    * Optional RoutingPolicy reference. When set, the policy is the
    * authoritative ordering for the VK's eligible-MP chain at request
    * time. Policy must belong to `organizationId`.
@@ -120,6 +125,7 @@ export type UpdateVirtualKeyInput = {
   name?: string;
   description?: string | null;
   scopes?: ScopeInput[];
+  traceProjectId?: string | null;
   routingPolicyId?: string | null;
   routingMode?: VirtualKeyRoutingMode;
   config?: Partial<VirtualKeyConfig>;
@@ -245,6 +251,7 @@ export class VirtualKeyService {
           config: config as Prisma.InputJsonValue,
           createdById: input.actorUserId,
           scopes: input.scopes,
+          traceProjectId: input.traceProjectId ?? null,
           routingPolicyId: input.routingPolicyId ?? null,
           routingMode,
           purpose: input.purpose,
@@ -353,6 +360,9 @@ export class VirtualKeyService {
           config: config as Prisma.InputJsonValue,
           ...(input.routingPolicyId !== undefined
             ? { routingPolicyId: input.routingPolicyId }
+            : {}),
+          ...(input.traceProjectId !== undefined
+            ? { traceProjectId: input.traceProjectId }
             : {}),
           routingMode,
           revision: { increment: 1n },
@@ -574,12 +584,14 @@ export class VirtualKeyService {
     tx: Prisma.TransactionClient,
   ): Promise<GatewayBudget> {
     const { virtualKey: vk, budget, actorUserId } = args;
+    // The drawer manages exactly one budget row, identified by explicit
+    // linkage rather than by shape: matching on target/window would also
+    // catch caps created independently on the Budgets page, whose
+    // lifecycle (and delete permission) is not the drawer's to touch.
     const existing = await tx.gatewayBudget.findFirst({
       where: {
         organizationId: vk.organizationId,
-        scopeType: "VIRTUAL_KEY",
-        scopeId: vk.id,
-        providerKey: null,
+        managedByVirtualKeyId: vk.id,
         archivedAt: null,
       },
     });
@@ -613,6 +625,7 @@ export class VirtualKeyService {
             organizationId: vk.organizationId,
             scopeType: "VIRTUAL_KEY",
             scopeId: vk.id,
+            managedByVirtualKeyId: vk.id,
             createdById: actorUserId,
             resetsAt: nextResetAt(budget.window),
           },
@@ -645,7 +658,13 @@ export class VirtualKeyService {
     return row;
   }
 
-  /** Archive every active budget targeted at this key. */
+  /**
+   * Archive the drawer-managed budget of this key, and only that one.
+   * Budgets created independently on the Budgets page also target the
+   * key, but their lifecycle carries its own permission
+   * (gatewayBudgets:delete); archiving them from a key update would let
+   * virtualKeys:update silently remove an admin's enforcement control.
+   */
   private async archiveKeyBudgets(
     vk: VirtualKey,
     actorUserId: string,
@@ -654,8 +673,7 @@ export class VirtualKeyService {
     const budgets = await tx.gatewayBudget.findMany({
       where: {
         organizationId: vk.organizationId,
-        scopeType: "VIRTUAL_KEY",
-        scopeId: vk.id,
+        managedByVirtualKeyId: vk.id,
         archivedAt: null,
       },
     });

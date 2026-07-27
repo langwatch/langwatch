@@ -27,12 +27,12 @@ type Call struct {
 	Request *domain.Request
 	Meta    *MetaAccumulator
 
-	// BudgetExcludedProviders lists providers the budget interceptor removed
-	// from this request's candidate chain: each one's provider-filtered
-	// blocking budget is out of money, so dispatch treats the provider like
-	// an unavailable one (contract §4.6). The terminal dispatch subtracts
-	// them and blocks, naming the excluding budget, only when nothing is
-	// left to dispatch to.
+	// BudgetExcludedProviders records the providers whose provider-filtered
+	// blocking budgets are out of money. The interceptor only records them
+	// here; terminal dispatch is what subtracts them from the candidate
+	// chain, treats each like an unavailable provider (contract §4.6), and
+	// blocks, naming an excluding budget, only when nothing is left to
+	// dispatch to.
 	BudgetExcludedProviders []domain.ExcludedProvider
 }
 

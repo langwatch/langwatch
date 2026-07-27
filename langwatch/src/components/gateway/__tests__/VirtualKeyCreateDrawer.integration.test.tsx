@@ -38,6 +38,7 @@ type ApplicableBudget = {
   providerKey: string | null;
   providerLabel: string | null;
   isPerMember: boolean;
+  managedByVirtualKeyId: string | null;
 };
 
 const {
@@ -306,6 +307,7 @@ describe("given the new-virtual-key drawer", () => {
           providerKey: null,
           providerLabel: null,
           isPerMember: false,
+          managedByVirtualKeyId: null,
         },
         {
           id: "budget-project",
@@ -321,6 +323,7 @@ describe("given the new-virtual-key drawer", () => {
           providerKey: "mp-openai",
           providerLabel: "OpenAI",
           isPerMember: false,
+          managedByVirtualKeyId: null,
         },
         {
           id: "budget-dept",
@@ -336,6 +339,7 @@ describe("given the new-virtual-key drawer", () => {
           providerKey: null,
           providerLabel: null,
           isPerMember: true,
+          managedByVirtualKeyId: null,
         },
       ];
       renderDrawer();

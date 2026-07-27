@@ -27,6 +27,8 @@ export type DraftVirtualKey = {
   /** Null while the key is still a draft in the drawer. */
   virtualKeyId: string | null;
   scopes: ScopeInput[];
+  /** Explicit trace destination for org- and team-owned drafts. */
+  traceProjectId: string | null;
   principalUserId: string | null;
 };
 
@@ -52,6 +54,13 @@ export type ApplicableBudget = {
    * shared pot, which changes what its limit means to the person reading.
    */
   isPerMember: boolean;
+  /**
+   * Set when this row is the budget a key's drawer field manages. The
+   * edit drawer seeds its field from this row and hides it from the
+   * inherited list; independently created key-targeted budgets show as
+   * inherited constraints like any other.
+   */
+  managedByVirtualKeyId: string | null;
 };
 
 export async function resolveApplicableBudgetsForDraftKey(
@@ -67,6 +76,7 @@ export async function resolveApplicableBudgetsForDraftKey(
       scopeType: s.scopeType,
       scopeId: s.scopeId,
     })),
+    traceProjectId: draft.traceProjectId,
   });
 
   const resolved = await resolveApplicableBudgets(prisma, {
@@ -82,10 +92,10 @@ export async function resolveApplicableBudgetsForDraftKey(
   const [spentByBudgetId, labels, providerLabels] = await Promise.all([
     loadSpend(prisma, draft, resolved, chRepo),
     loadScopeLabels(prisma, resolved),
-    resolveProviderLabels(
+    resolveProviderLabels({
       prisma,
-      resolved.map((r) => r.budget),
-    ),
+      budgets: resolved.map((r) => r.budget),
+    }),
   ]);
 
   // bucketScopeId stays internal: it is where spend accrues, not the
@@ -106,6 +116,7 @@ export async function resolveApplicableBudgetsForDraftKey(
       ? (providerLabels.get(budget.providerKey) ?? budget.providerKey)
       : null,
     isPerMember: budget.scopeType === "GROUP",
+    managedByVirtualKeyId: budget.managedByVirtualKeyId,
   }));
 }
 

@@ -129,7 +129,9 @@ func translateWalkError(ctx context.Context, err error) error {
 //  3. Budget exclusions: providers whose provider-filtered blocking budgets
 //     are out of money are treated like unavailable providers (contract
 //     §4.6). If they empty the chain, the request is refused with the
-//     budget error naming the budget that emptied it.
+//     budget error naming one of the excluding budgets (the last one
+//     iterated; with several simultaneous exclusions any of them is an
+//     accurate answer to "why was nothing dispatchable").
 func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain.Credential, error) {
 	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
 	if len(creds) == 0 {

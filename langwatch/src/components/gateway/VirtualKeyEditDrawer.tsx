@@ -61,6 +61,7 @@ type VirtualKeyDetail = {
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
   routingMode?: "NONE" | "FALLBACK_ALL" | "POLICY";
+  traceProjectId?: string | null;
   principalUserId?: string | null;
   principalUser?: { name: string | null; email: string | null } | null;
   config: {
@@ -106,6 +107,7 @@ export function VirtualKeyEditDrawer({
   const [tagsCsv, setTagsCsv] = useState<string>("");
   const [budget, setBudget] = useState<VirtualKeyBudgetValue>(EMPTY_BUDGET);
   const [budgetLoaded, setBudgetLoaded] = useState(false);
+  const [isBudgetDirty, setIsBudgetDirty] = useState(false);
   const [hadManagedBudget, setHadManagedBudget] = useState(false);
   const [providerAccess, setProviderAccess] =
     useState<ProviderAccessValue>(ALL_PROVIDERS);
@@ -144,6 +146,7 @@ export function VirtualKeyEditDrawer({
     );
     setBudget(EMPTY_BUDGET);
     setBudgetLoaded(false);
+    setIsBudgetDirty(false);
     setHadManagedBudget(false);
   }, [vk]);
 
@@ -179,18 +182,21 @@ export function VirtualKeyEditDrawer({
     {
       organizationId,
       scopes: vk?.scopes ?? [],
+      traceProjectId: vk?.traceProjectId ?? null,
       principalUserId: vk?.principalUserId ?? null,
       virtualKeyId: vk?.id ?? null,
     },
     { enabled: !!vk && !!organizationId && (vk?.scopes.length ?? 0) > 0 },
   );
   useEffect(() => {
-    if (!vk || budgetLoaded || !applicableQuery.data) return;
+    // The stored value seeds the field only while the person has not
+    // typed: applicableBudgets resolves labels and ClickHouse spend, so
+    // it can land AFTER an edit began, and seeding then would silently
+    // replace what was typed with what was stored.
+    if (!vk || budgetLoaded || isBudgetDirty || !applicableQuery.data) return;
     const own = applicableQuery.data.find(
       (b) =>
-        b.scopeType === "VIRTUAL_KEY" &&
-        b.scopeId === vk.id &&
-        MANAGED_WINDOWS.has(b.window),
+        b.managedByVirtualKeyId === vk.id && MANAGED_WINDOWS.has(b.window),
     );
     if (own) {
       const limit = Number.parseFloat(own.limitUsd);
@@ -201,7 +207,7 @@ export function VirtualKeyEditDrawer({
       setHadManagedBudget(true);
     }
     setBudgetLoaded(true);
-  }, [vk, budgetLoaded, applicableQuery.data]);
+  }, [vk, budgetLoaded, isBudgetDirty, applicableQuery.data]);
 
   const updateMutation = api.virtualKeys.update.useMutation({
     onSuccess: async () => {
@@ -379,9 +385,13 @@ export function VirtualKeyEditDrawer({
                 <Separator />
                 <VirtualKeyBudgetSection
                   value={budget}
-                  onChange={setBudget}
+                  onChange={(next) => {
+                    setIsBudgetDirty(true);
+                    setBudget(next);
+                  }}
                   organizationId={organizationId}
                   scopes={vk.scopes}
+                  traceProjectId={vk.traceProjectId ?? null}
                   principalUserId={vk.principalUserId ?? null}
                   virtualKeyId={vk.id}
                 />
