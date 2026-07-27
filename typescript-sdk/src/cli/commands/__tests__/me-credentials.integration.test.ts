@@ -45,7 +45,6 @@ let personalProjectCalls = 0;
 let refreshCalls = 0;
 let lastSearchAuth: string | null = null;
 let lastMonitorsAuth: string | null = null;
-let rejectAccessToken: string | null = null;
 /** When true the device session is revoked server-side: the session-
  * authenticated endpoints AND refresh all 401, exactly as they would after a
  * /me/devices revocation dropped the Redis tokens. */
@@ -131,11 +130,7 @@ beforeAll(async () => {
 
       if (url.startsWith("/api/auth/cli/personal-project")) {
         personalProjectCalls++;
-        if (
-          sessionRevoked ||
-          auth !== "Bearer lw_at_valid" ||
-          rejectAccessToken === "lw_at_valid"
-        ) {
+        if (sessionRevoked || auth !== "Bearer lw_at_valid") {
           json(401, { error: "unauthorized" });
           return;
         }
@@ -157,7 +152,6 @@ beforeAll(async () => {
           json(401, { error: "invalid_grant" });
           return;
         }
-        rejectAccessToken = null;
         json(200, {
           access_token: "lw_at_valid",
           token_type: "Bearer",
@@ -235,7 +229,6 @@ beforeEach(() => {
   refreshCalls = 0;
   lastSearchAuth = null;
   lastMonitorsAuth = null;
-  rejectAccessToken = null;
   sessionRevoked = false;
 });
 

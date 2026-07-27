@@ -60,6 +60,16 @@ export function noticeStatePath(): string {
   return path.join(path.dirname(configPath()), "notice-state.json");
 }
 
+/**
+ * Local dedup fingerprint, NOT a password verifier. The state file maps a
+ * fingerprint of the credential to "when was the notice last shown" / "which
+ * project name did it resolve to", purely so the raw key never has to be
+ * written to disk twice. Nothing ever verifies a credential against this
+ * value, and the input is a high-entropy machine-generated API key (not a
+ * human password), so a fast hash is the correct tool; a slow KDF here would
+ * only tax every CLI startup. The file itself is 0600 beside config.json,
+ * which already holds the raw key.
+ */
 function hashCredential(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
