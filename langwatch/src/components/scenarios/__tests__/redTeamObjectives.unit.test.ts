@@ -67,44 +67,34 @@ describe("the red-team objective catalogue", () => {
     });
   });
 
-  describe("given a safety harm, which has no public numbering", () => {
-    it("carries no code rather than an invented one", () => {
-      const safety = RED_TEAM_OBJECTIVE_GROUPS.find(
-        (g) => g.label === "Safety",
-      );
-
-      expect(safety).toBeDefined();
-      for (const objective of safety!.objectives) {
-        expect(objective.code).toBeUndefined();
-      }
-    });
-  });
-
-  describe("given the groups", () => {
-    it("names a source for the ones taken from a standard", () => {
+  describe("given the group headings", () => {
+    it("names what goes wrong, not which standard it came from", () => {
+      // The person writing the test is asking what could break, not which
+      // OWASP category they are in. A heading naming a taxonomy would make
+      // them translate before they could choose.
       for (const group of RED_TEAM_OBJECTIVE_GROUPS) {
-        const hasCodes = codesOf(group.objectives).length > 0;
-
-        expect(hasCodes ? !!group.source : group.source === undefined).toBe(
-          true,
-        );
+        expect(group.label).not.toMatch(/OWASP|LLM|ASI|Top 10/i);
       }
     });
 
-    it("covers all three of security, agentic and safety", () => {
-      // The groups are what tell someone red teaming is more than one thing.
-      const labels = RED_TEAM_OBJECTIVE_GROUPS.map((g) => g.label);
+    it("groups by outcome, so one heading can hold both taxonomies", () => {
+      // The two standards cut the same failures differently; grouping by
+      // outcome is what lets an LLM and an ASI entry sit together.
+      const mixed = RED_TEAM_OBJECTIVE_GROUPS.some((group) => {
+        const prefixes = new Set(
+          codesOf(group.objectives).map((c) => c.slice(0, 3)),
+        );
+        return prefixes.size > 1;
+      });
 
-      expect(labels).toContain("Security");
-      expect(labels).toContain("Agentic");
-      expect(labels).toContain("Safety");
+      expect(mixed).toBe(true);
     });
 
     it("stays short enough to scan", () => {
       // A picker is only useful while it can be read. Past roughly twenty rows
       // it is a document, and the answer would be search rather than more rows.
       expect(RED_TEAM_OBJECTIVES.length).toBeLessThanOrEqual(20);
-      expect(RED_TEAM_OBJECTIVE_GROUPS.length).toBeLessThanOrEqual(4);
+      expect(RED_TEAM_OBJECTIVE_GROUPS.length).toBeLessThanOrEqual(5);
     });
   });
 

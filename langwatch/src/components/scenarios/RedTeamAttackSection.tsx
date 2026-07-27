@@ -178,6 +178,12 @@ export function RedTeamAttackSection({
               alignSelf="flex-start"
               marginBottom={2}
               aria-haspopup="menu"
+              // The drawer sets colorPalette="redteam", which every descendant
+              // inherits — so without this the picker's hover and focus states
+              // come out red. Red is reserved for what marks the scenario as an
+              // attack (the drawer edge, the type button, the chosen strategy);
+              // a list of things to pick from is not one of those.
+              colorPalette="gray"
             >
               Start from a category
               <ChevronDown size={13} />
@@ -192,18 +198,10 @@ export function RedTeamAttackSection({
             maxHeight="380px"
             overflowY="auto"
             padding={1}
+            colorPalette="gray"
           >
             {RED_TEAM_OBJECTIVE_GROUPS.map((group) => (
-              <Menu.ItemGroup
-                key={group.label}
-                // title is typed as a string here, so the attribution rides
-                // along in the heading rather than as a separate muted span.
-                title={
-                  group.source
-                    ? `${group.label} — ${group.source}`
-                    : group.label
-                }
-              >
+              <Menu.ItemGroup key={group.label} title={group.label}>
                 {group.objectives.map((objective) => (
                   <Menu.Item
                     key={objective.label}
@@ -215,21 +213,22 @@ export function RedTeamAttackSection({
                       })
                     }
                   >
-                    <VStack align="stretch" gap={0}>
-                      <HStack gap={2} align="baseline">
+                    <VStack align="stretch" gap={0} width="full">
+                      <HStack gap={3} align="baseline" width="full">
+                        <Text textStyle="sm" fontWeight="medium">
+                          {objective.label}
+                        </Text>
                         {objective.code ? (
                           <Text
                             textStyle="xs"
-                            color="fg.muted"
+                            color="fg.subtle"
                             fontFamily="mono"
                             flexShrink={0}
+                            marginStart="auto"
                           >
                             {objective.code}
                           </Text>
                         ) : null}
-                        <Text textStyle="sm" fontWeight="medium">
-                          {objective.label}
-                        </Text>
                       </HStack>
                       <Text textStyle="xs" color="fg.muted">
                         {objective.summary}
