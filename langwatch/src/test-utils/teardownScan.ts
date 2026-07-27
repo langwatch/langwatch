@@ -11,10 +11,10 @@ import ts from "typescript";
  * at the callback boundary. Module-level `const` ids (ksuids generated at
  * import time) cannot be undefined and pass.
  *
- * Consumed by `scripts/check-test-teardown.ts` (the CI gate) and by its
- * own unit test, which is what keeps the rule demonstrably firing: a
- * gate whose rule is only exercised in CI config is the #6169 failure
- * mode, a checker nobody notices has stopped checking.
+ * Enforced from `__tests__/teardownScan.unit.test.ts`, which pins the rule
+ * on snippets and then runs it over every test file in the repository, so
+ * the check rides the ordinary unit shards instead of a gate nobody
+ * notices has stopped checking (#6169).
  *
  * Spec: specs/setup/test-teardown-safety.feature
  */

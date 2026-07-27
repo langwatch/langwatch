@@ -1,16 +1,46 @@
 /**
- * Pins the teardown-safety rule itself, so the CI gate in
- * scripts/check-test-teardown.ts cannot quietly stop checking: if the
- * scanner regresses to finding nothing, these fail. That is the #6169
- * lesson, gates that report success while verifying nothing.
+ * The teardown-safety rule and its enforcement.
+ *
+ * The snippet cases pin the rule itself, so it cannot regress to finding
+ * nothing; the last case runs it over every test file in the repository,
+ * which is what actually keeps the dangerous form out. Both ride the
+ * ordinary unit shards, so there is no gate that can quietly stop
+ * checking (#6169).
  *
  * Spec: specs/setup/test-teardown-safety.feature
  */
+import { readFileSync, readdirSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { scanTestSourceForUnsafeDeleteMany } from "../teardownScan";
 
 function scan(sourceText: string) {
   return scanTestSourceForUnsafeDeleteMany("virtual.test.ts", sourceText);
+}
+
+/** langwatch/, from src/test-utils/__tests__/. */
+const LANGWATCH_ROOT = resolve(__dirname, "../../..");
+
+/** Same roots vitest collects test files from. */
+const TEST_ROOTS = ["src", "ee", "packages"];
+
+const TEST_FILE_PATTERN = /\.(test|spec)\.(c|m)?[jt]sx?$/;
+
+function collectTestFiles(root: string): string[] {
+  const collected: string[] = [];
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const full = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (TEST_FILE_PATTERN.test(entry.name)) {
+        collected.push(full);
+      }
+    }
+  };
+  walk(root);
+  return collected;
 }
 
 describe("scanTestSourceForUnsafeDeleteMany", () => {
@@ -141,6 +171,46 @@ describe("scanTestSourceForUnsafeDeleteMany", () => {
       expect(violations).toEqual([
         expect.objectContaining({ variable: "orgId", model: "organization" }),
       ]);
+    });
+  });
+
+  describe("given every test file in the repository", () => {
+    it("finds none of them deleting by a reassignable id", () => {
+      const offenders: string[] = [];
+
+      for (const root of TEST_ROOTS) {
+        const files = collectTestFiles(resolve(LANGWATCH_ROOT, root));
+
+        // A root that yields nothing means the walk lost the tree and this
+        // case would pass while checking zero files.
+        expect(
+          files.length,
+          `no test files found under ${root}/, so nothing was scanned`,
+        ).toBeGreaterThan(0);
+
+        for (const file of files) {
+          const sourceText = readFileSync(file, "utf8");
+          if (!sourceText.includes("deleteMany")) continue;
+
+          for (const violation of scanTestSourceForUnsafeDeleteMany(
+            file,
+            sourceText,
+          )) {
+            offenders.push(
+              `${relative(LANGWATCH_ROOT, file)}:${violation.line} ` +
+                `${violation.model}.deleteMany filtered by "${violation.variable}": ` +
+                violation.reason,
+            );
+          }
+        }
+      }
+
+      expect(
+        offenders,
+        "Route these teardowns through cleanupTestRows " +
+          "(src/test-utils/cleanupTestRows.ts), or filter by a module-level " +
+          "const id, which cannot be undefined (#6219).",
+      ).toEqual([]);
     });
   });
 });
