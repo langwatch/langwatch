@@ -651,6 +651,11 @@ describe(
       // The gate has to let the legitimate case through, or the fix is just
       // a broken feature. An org admin reaches the probe, and the recorded
       // call proves it got as far as the network.
+      //
+      // The host is unreachable by design, so the probe raises rather than
+      // returning a verdict on the key — reaching *that* failure is the proof
+      // the gate let this caller through, since a refused caller is turned
+      // back on permissions before any request is made.
       /** @scenario "Checking a credential for a scope I can manage" */
       it("lets an org admin through to the request", async () => {
         await expect(
@@ -663,7 +668,7 @@ describe(
             },
             scopes: [{ scopeType: "ORGANIZATION", scopeId: orgId }],
           }),
-        ).resolves.toEqual(expect.objectContaining({ valid: false }));
+        ).rejects.toThrow(/Could not reach the provider/);
 
         expect(fetchCalls.length).toBeGreaterThan(0);
       });
