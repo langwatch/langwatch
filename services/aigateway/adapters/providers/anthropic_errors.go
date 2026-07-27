@@ -9,15 +9,15 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// anthropicErrorType maps an HTTP status onto the error `type` string
-// Anthropic's API documents. Claude Code and the Anthropic SDKs switch on this
-// value to decide retryable-vs-terminal, so a translated-lane failure has to
-// name itself in their vocabulary rather than leaking gateway jargon.
 // anthropicStatusOverloaded is Anthropic's own overload status. It is outside
 // the net/http constants, and the SDKs retry on it, so a 529 relayed from an
 // Anthropic-hosted destination must keep its retryable name.
 const anthropicStatusOverloaded = 529
 
+// anthropicErrorType maps an HTTP status onto the error `type` string
+// Anthropic's API documents. Claude Code and the Anthropic SDKs switch on this
+// value to decide retryable-vs-terminal, so a translated-lane failure has to
+// name itself in their vocabulary rather than leaking gateway jargon.
 func anthropicErrorType(status int) string {
 	switch status {
 	case http.StatusBadRequest:

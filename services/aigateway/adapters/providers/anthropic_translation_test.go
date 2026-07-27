@@ -879,6 +879,7 @@ func TestAnthropicErrorType_UsesAnthropicVocabulary(t *testing.T) {
 		http.StatusRequestEntityTooLarge: "request_too_large",
 		http.StatusTooManyRequests:       "rate_limit_error",
 		http.StatusServiceUnavailable:    "overloaded_error",
+		anthropicStatusOverloaded:        "overloaded_error",
 		http.StatusInternalServerError:   "api_error",
 		http.StatusBadGateway:            "api_error",
 	}
@@ -1176,6 +1177,7 @@ func TestAnthropicStreamFramer_TextDeltaAfterToolBlock_SplitsOut(t *testing.T) {
 	kind := map[int]bfanthropic.AnthropicContentBlockType{}
 	for _, ev := range events {
 		if ev.Type == bfanthropic.AnthropicStreamEventTypeContentBlockStart && ev.ContentBlock != nil {
+			require.NotNil(t, ev.Index, "content_block_start must carry an index")
 			kind[*ev.Index] = ev.ContentBlock.Type
 		}
 	}
@@ -1183,6 +1185,7 @@ func TestAnthropicStreamFramer_TextDeltaAfterToolBlock_SplitsOut(t *testing.T) {
 		if ev.Type != bfanthropic.AnthropicStreamEventTypeContentBlockDelta || ev.Delta == nil {
 			continue
 		}
+		require.NotNil(t, ev.Index, "content_block_delta must carry an index")
 		switch ev.Delta.Type {
 		case bfanthropic.AnthropicStreamDeltaTypeText:
 			assert.Equal(t, bfanthropic.AnthropicContentBlockTypeText, kind[*ev.Index],

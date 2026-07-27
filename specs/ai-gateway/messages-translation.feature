@@ -166,6 +166,13 @@ Feature: Anthropic Messages translation: reaching non-Anthropic providers from a
     And the client receives a terminal error frame rather than a truncated stream
 
   @bdd @messages-translation @unit
+  Scenario: A managed-Bedrock private endpoint is honored on the translated lane
+    Given a Bedrock credential configured with a private runtime endpoint
+    When the client sends a /v1/messages request
+    Then the request is dispatched through the private endpoint, never the public Bedrock host
+    And an invalid private endpoint fails closed with an actionable error
+
+  @bdd @messages-translation @unit
   Scenario: Closing an abandoned stream releases the provider
     Given the destination is a non-Anthropic provider
     And the client goes away before the stream finishes

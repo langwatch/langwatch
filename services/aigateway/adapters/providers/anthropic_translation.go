@@ -158,6 +158,17 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
 	}
 
+	// Managed Bedrock with a private runtime endpoint must not reach the
+	// public Bedrock host: the customer's IAM policy is commonly conditioned
+	// on the VPCE, and even when it is not, they configured private
+	// networking on purpose. Bifrost signs over the public host, so this
+	// dispatch goes through the pinned aws-sdk client instead.
+	if endpoint, epErr := bedrockVPCEEndpoint(cred); epErr != nil {
+		return nil, anthropicUpstreamError(http.StatusBadRequest, epErr.Error())
+	} else if endpoint != "" {
+		return r.dispatchMessagesTranslatedBedrockVPCE(ctx, bfCtx, bfReq, model, cred, endpoint)
+	}
+
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
 	if berr != nil {
 		return nil, anthropicErrorFromBifrost(berr)
@@ -166,6 +177,27 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 		return nil, anthropicUpstreamError(http.StatusBadGateway, "provider returned no response")
 	}
 
+	body, err := assembleAnthropicMessageBody(bfCtx, resp, model)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.Response{
+		Body:       body,
+		StatusCode: http.StatusOK,
+		Usage:      extractResponsesUsage(resp),
+	}, nil
+}
+
+// assembleAnthropicMessageBody turns a Bifrost Responses result into the
+// Anthropic message envelope a /v1/messages client decodes: id, model, the
+// assistant role, content blocks, stop reason and usage. Shared by the Bifrost
+// and Bedrock-VPCE translated lanes so the envelope rules live once.
+func assembleAnthropicMessageBody(
+	bfCtx *bfschemas.BifrostContext,
+	resp *bfschemas.BifrostResponsesResponse,
+	model string,
+) ([]byte, error) {
 	anthResp := bfanthropic.ToAnthropicResponsesResponse(bfCtx, resp)
 	if anthResp == nil {
 		return nil, anthropicUpstreamError(http.StatusBadGateway, "provider response could not be translated")
@@ -191,12 +223,7 @@ func (r *BifrostRouter) dispatchMessagesTranslated(
 	if marshalErr != nil {
 		return nil, anthropicUpstreamError(http.StatusBadGateway, "provider response could not be encoded")
 	}
-
-	return &domain.Response{
-		Body:       body,
-		StatusCode: http.StatusOK,
-		Usage:      extractResponsesUsage(resp),
-	}, nil
+	return body, nil
 }
 
 // dispatchMessagesTranslatedStream is the streaming sibling. Bifrost's
@@ -215,6 +242,13 @@ func (r *BifrostRouter) dispatchMessagesTranslatedStream(
 	bfReq, err := buildMessagesResponsesRequest(bfCtx, req, provider, model)
 	if err != nil {
 		return nil, anthropicUpstreamError(http.StatusBadRequest, err.Error())
+	}
+
+	// Same endpoint pinning as the non-streaming lane above.
+	if endpoint, epErr := bedrockVPCEEndpoint(cred); epErr != nil {
+		return nil, anthropicUpstreamError(http.StatusBadRequest, epErr.Error())
+	} else if endpoint != "" {
+		return r.dispatchMessagesTranslatedBedrockVPCEStream(ctx, bfCtx, bfReq, req, model, cred, endpoint)
 	}
 
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)

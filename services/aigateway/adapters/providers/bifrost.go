@@ -175,12 +175,12 @@ func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred do
 // + un-normalizes the response back to OpenAI shape.
 //
 // For /v1/messages (RequestTypeMessages) the inbound body is already
-// provider-native (Anthropic /v1/messages shape). Running it through
-// the OpenAI parser would silently drop Anthropic-specific fields like
-// `thinking`, so we opt into Bifrost's raw-forward mode and let it
-// passthrough. Downstream VKs for `/v1/messages` are expected to route
-// to an Anthropic-family provider; sending it to OpenAI is a caller
-// error and Bifrost/OpenAI will reject accordingly.
+// provider-native (Anthropic /v1/messages shape). Destinations that speak
+// the Anthropic wire format keep Bifrost's raw-forward mode so the bytes
+// pass through untouched; every other destination is translated through
+// the neutral Responses request (see anthropic_translation.go), because
+// forwarding an Anthropic body verbatim hands the provider JSON it
+// cannot parse.
 func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
@@ -240,11 +240,11 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// client with BaseEndpoint pinned to that VPCE, so the request is
 	// SigV4-signed for and sent to that host instead of the public AWS
 	// endpoint. Without this, the customer's VPCE-conditioned IAM policy
-	// rejects the InvokeModel with a 403. Gated to RequestTypeChat only:
-	// /v1/messages must stay on the raw-forward path below (routing
-	// Anthropic-native bodies through Converse would drop messages-only
-	// fields like `thinking`); embeddings/responses/passthrough are handled
-	// above. A no-op for Bedrock credentials without a runtime endpoint.
+	// rejects the InvokeModel with a 403. Gated to RequestTypeChat here:
+	// /v1/messages took the translated lane above, which runs its own VPCE
+	// intercept (anthropic_bedrock_vpce.go); embeddings/responses/passthrough
+	// are handled above. A no-op for Bedrock credentials without a runtime
+	// endpoint.
 	if req.Type == domain.RequestTypeChat {
 		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
 			return nil, err
@@ -537,9 +537,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 
 	// Managed-Bedrock with a per-request runtime endpoint streams through the
 	// official Bedrock ConverseStream API over the customer's VPC endpoint —
-	// same rationale as the non-streaming Dispatch intercept above, and gated
-	// to RequestTypeChat for the same reason (/v1/messages stays raw-forward).
-	// A no-op for Bedrock credentials without a runtime endpoint.
+	// same rationale as the non-streaming Dispatch intercept above. Gated to
+	// RequestTypeChat because /v1/messages took its own lanes above, each
+	// with its own VPCE handling. A no-op for Bedrock credentials without a
+	// runtime endpoint.
 	if req.Type == domain.RequestTypeChat {
 		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
 			return nil, err
