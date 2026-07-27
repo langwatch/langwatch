@@ -20,7 +20,7 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "../ui/tooltip";
 import {
   OBJECTIVE_HELP,
-  RED_TEAM_OBJECTIVES,
+  RED_TEAM_OBJECTIVE_GROUPS,
 } from "./redTeamObjectives";
 import type { ScenarioFormData } from "./ScenarioForm";
 import { SectionHeader } from "./ui/SectionHeader";
@@ -183,37 +183,61 @@ export function RedTeamAttackSection({
               <ChevronDown size={13} />
             </Button>
           </Menu.Trigger>
-          <Menu.Content minWidth="340px" padding={1}>
-            {RED_TEAM_OBJECTIVES.map((objective) => (
-              <Menu.Item
-                key={objective.code}
-                value={objective.code}
-                paddingY={2}
-                onClick={() =>
-                  setValue("redTeamTarget", objective.target, {
-                    shouldDirty: true,
-                  })
+          {/* Grouped and scrollable rather than trimmed. The three headings
+              are the only place the product says what red teaming is for, so
+              cutting to one shorter list would quietly narrow that to
+              "security". A capped height keeps it browsable. */}
+          <Menu.Content
+            minWidth="360px"
+            maxHeight="380px"
+            overflowY="auto"
+            padding={1}
+          >
+            {RED_TEAM_OBJECTIVE_GROUPS.map((group) => (
+              <Menu.ItemGroup
+                key={group.label}
+                // title is typed as a string here, so the attribution rides
+                // along in the heading rather than as a separate muted span.
+                title={
+                  group.source
+                    ? `${group.label} — ${group.source}`
+                    : group.label
                 }
               >
-                <VStack align="stretch" gap={0.5}>
-                  <HStack gap={2} align="baseline">
-                    <Text
-                      textStyle="xs"
-                      color="fg.muted"
-                      fontFamily="mono"
-                      flexShrink={0}
-                    >
-                      {objective.code}
-                    </Text>
-                    <Text textStyle="sm" fontWeight="medium">
-                      {objective.label}
-                    </Text>
-                  </HStack>
-                  <Text textStyle="xs" color="fg.muted">
-                    {objective.summary}
-                  </Text>
-                </VStack>
-              </Menu.Item>
+                {group.objectives.map((objective) => (
+                  <Menu.Item
+                    key={objective.label}
+                    value={objective.code ?? objective.label}
+                    paddingY={1.5}
+                    onClick={() =>
+                      setValue("redTeamTarget", objective.target, {
+                        shouldDirty: true,
+                      })
+                    }
+                  >
+                    <VStack align="stretch" gap={0}>
+                      <HStack gap={2} align="baseline">
+                        {objective.code ? (
+                          <Text
+                            textStyle="xs"
+                            color="fg.muted"
+                            fontFamily="mono"
+                            flexShrink={0}
+                          >
+                            {objective.code}
+                          </Text>
+                        ) : null}
+                        <Text textStyle="sm" fontWeight="medium">
+                          {objective.label}
+                        </Text>
+                      </HStack>
+                      <Text textStyle="xs" color="fg.muted">
+                        {objective.summary}
+                      </Text>
+                    </VStack>
+                  </Menu.Item>
+                ))}
+              </Menu.ItemGroup>
             ))}
           </Menu.Content>
         </Menu.Root>
