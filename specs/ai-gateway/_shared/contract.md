@@ -454,13 +454,29 @@ providers are known):
 - A breached provider-filtered budget removes that provider from the
   candidate chain, exactly like provider unavailability.
 - If candidates remain, the request is served by one of them and no
-  budget error is returned.
+  budget error is returned. The exhausted filtered budget still rides
+  `X-LangWatch-Budget-Warning` (provider-qualified, §5) so the caller
+  hears why the routing changed.
 - If the chain empties, the request is blocked with `budget_exceeded`,
   naming the budget that emptied it.
 - With `routing_mode: "none"` the chain is length one, so this degenerates
   to a plain block.
 
 Unfiltered budgets are unchanged: a breach blocks the request outright.
+
+Every `budget_exceeded` envelope names its budget in `error.meta`:
+`budget_id`, `budget_scope`, `budget_window`, plus `budget_provider` (the
+ModelProvider id) when the block came from a provider-filtered budget
+emptying the chain. The message states the scope and window in words, so an
+agent client rendering only `message` still tells the user which allowance
+to raise.
+
+Two enforcement guarantees are the gateway's own, independent of what the
+control plane materialises (defense in depth against a stale or hand-crafted
+bundle): a request can never dispatch to a provider outside
+`providers_allowed`, even when the credential chain still carries one, and
+`routing_mode: "none"` pins the attempt budget to 1 at bundle decode even if
+`fallback.max_attempts` disagrees.
 
 ### 4.6 `POST /api/internal/gateway/guardrail/check`
 
@@ -555,7 +571,7 @@ All errors OpenAI-compatible:
 - `X-LangWatch-Model: gpt-5-mini` — resolved provider model.
 - `X-LangWatch-Cache: hit|miss|bypass|force` — cache outcome as observed by the gateway. (`force` is v1.1 — deferred with 400 cache_override_not_implemented in v1; header value matches the internal `Kind` enum in `services/gateway/internal/cacheoverride`.)
 - `X-LangWatch-Cache-Mode: respect|disable` — echoes the cache-override mode that was applied to the request (independent of upstream outcome). Emitted on every `/v1/messages` response.
-- `X-LangWatch-Budget-Warning: <scope>:<pct>` — optional, emitted on soft-cap breaches (can repeat).
+- `X-LangWatch-Budget-Warning: <scope>:<pct>` — optional, emitted on soft-cap breaches (can repeat). A provider-filtered budget qualifies the scope segment as `<scope>/<model_provider_id>` (e.g. `project/mp_01HZ:95`) so the warning names WHICH budget is running out; the percentage always sits after the only colon, so `split(":")` keeps parsing.
 - `X-LangWatch-Fallback-Count: <n>` — number of fallbacks attempted before success (0 when primary succeeded).
 
 ---
@@ -811,3 +827,4 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
   2. **Cache-rules full stack (§6 extended)** — Lane B iter 38 (2ef1dbd42): `GatewayCacheRule` PG model + service + tRPC + RBAC + audit + multitenancy exemption. Lane B iter 39 (bb9c8ebe8): `config.materialiser.bundleFor(orgId)` emits cache-rules into the VK bundle pre-sorted priority DESC, enabled=true, archived=null. Lane B iter 40 (73552f964): `/gateway/cache-rules` list + create/edit drawers + matcher summary + colour-coded action badges + precedence copy + inline enable toggle + archive from row menu. Matcher shape `{vk_id?, vk_tags?, vk_prefix?, principal_id?, model?, request_metadata?}` + action shape `{mode: respect|force|disable, ttl?, salt?}` wire-locked. `GatewayChangeEvent` emits on every write so /changes long-poll triggers bundle refresh ≤30s. BDD spec `cache-control-rules.feature` §§1–7 cover precedence / matchers / actions / hot-path / observability / RBAC / UI — 29 scenarios total. Go evaluator (`internal/cacherules/eval.go`) still in Lane A's queue; when it lands it reads `bundle.cache_rules` linearly → first-match-wins → emits `langwatch.cache.rule_id` + `gateway_cache_rule_hits_total` per spec §5.
   3. **Helm chart lw-dev smoke (§11 self-hosting)** — Lane A iter 44: ECR push + `helm upgrade --install gateway-smoke ./charts/gateway` on lw-dev EKS; pod Running, /healthz 200 with `X-LangWatch-Gateway-Version` + `X-LangWatch-Request-Id` headers present. /readyz 503 is expected until the langwatch-app Deployment gets `LW_GATEWAY_INTERNAL_SECRET` via local `terraform apply` on lw-dev (mirroring the `infra-env-development.yaml` CI pipeline). rchaves clarification logged: validate-on-lw-dev-before-merge, prod apply stays CI-only via saas PR merge.
   - No wire contract changes on §§3–5 (VK format, auth, endpoints, /api/internal/gateway/*). Permission names updated: §9 RBAC adds `gatewayCacheRules` resource with `:view / :create / :update / :delete / :manage` (default MEMBER = view-only; ADMIN = full CRUD + :manage).
+- **v0.1.5 (2026-07-27)** Gateway enforcement for budgets on every dimension (Wave 2 of the n x n budgets work; bundle fields landed in Wave 1). §4.6 is now live in the Go gateway: a breached provider-filtered blocking budget removes its provider from the candidate chain at dispatch, an emptied chain blocks with `budget_exceeded` naming the budget (`error.meta.budget_id` / `budget_scope` / `budget_window` / `budget_provider`), and the exhausted vendor rides the §5 warning header with a provider-qualified scope segment (`<scope>/<model_provider_id>:<pct>`). The gateway stamps `langwatch.model_provider_id` (ModelProvider row id of the dispatched credential) on every customer span, which is what lets §4.5 step 3 attribute debits to provider-filtered buckets. Defense in depth added gateway-side: dispatch refuses providers outside `providers_allowed` even when a stale bundle chain still carries them, and `routing_mode: "none"` re-pins `max_attempts` to 1 at bundle decode. GROUP buckets enforce as materialised (one per member, principal resolved by the control plane); no gateway-side bucket construction. Contract tests in `services/aigateway/adapters/controlplane/budgets_contract_test.go` pin both sides of the bundle fields, the bucket separators, and the span attribute read path.

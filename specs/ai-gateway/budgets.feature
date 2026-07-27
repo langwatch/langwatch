@@ -272,7 +272,7 @@ Feature: AI Gateway — Budgets
   # request is served, and only when nothing is left does it fail — naming
   # the budget that emptied the list.
 
-  @integration @unimplemented
+  @integration
   Scenario: A breached provider-filtered budget takes that provider out of the running
     Given a key that can reach two providers
     And a blocking budget on one of them that is over its limit
@@ -280,14 +280,14 @@ Feature: AI Gateway — Budgets
     Then the request is served by the other provider
     And no budget-exceeded error is returned
 
-  @integration @unimplemented
+  @integration
   Scenario: A request with nowhere left to go is refused and says why
     Given a key whose only usable provider has a breached blocking budget
     When a request arrives
     Then the request is refused for going over budget
     And the refusal names the budget that ran out
 
-  @integration @unimplemented
+  @integration
   Scenario: A warning-only provider budget lets the provider keep serving
     Given a key that can reach one provider
     And a warning budget on that provider that is over its limit

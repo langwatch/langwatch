@@ -172,3 +172,13 @@ Feature: Model → provider routing via VK config
     Scenario: A key cannot be saved with no providers at all
       When a key is saved allowing no providers
       Then the save is refused
+
+    @integration
+    Scenario: A provider outside the key's allowlist is refused even if a stale chain offers it
+      Given a key allowed to use exactly one provider
+      But a configuration bundle whose credential chain still carries another provider
+      When a request arrives that would fall back onto the other provider
+      Then the gateway does not dispatch to it
+      # The materialised chain already respects the allowlist; this is the
+      # dispatch-side check that keeps a stale or hand-crafted bundle from
+      # turning a narrowing the UI displays as active into a decoration.

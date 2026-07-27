@@ -124,6 +124,7 @@ func (discardMetrics) RecordFallback(_, _ string)                         {}
 func (discardMetrics) SetCircuitState(_ string, _ int)                    {}
 func (discardMetrics) RecordCacheOutcome(_ domain.Usage)                  {}
 func (discardMetrics) RecordCacheRuleHit(_, _ string)                     {}
+func (discardMetrics) RecordBudgetBlock(_ string)                         {}
 func (discardMetrics) SetRequestLabels(_ context.Context, _, _ string)    {}
 func (discardMetrics) ModelLabel(_ domain.BundleConfig, model string) string {
 	return model
