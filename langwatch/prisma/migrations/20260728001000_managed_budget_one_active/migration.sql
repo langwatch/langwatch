@@ -26,5 +26,10 @@ CREATE UNIQUE INDEX "GatewayBudget_managed_one_active_key"
   ON "GatewayBudget"("managedByVirtualKeyId")
   WHERE "archivedAt" IS NULL AND "managedByVirtualKeyId" IS NOT NULL;
 
--- Down: (reversible, uncomment and run manually to roll back)
+-- IRREVERSIBLE: the defensive dedupe above archives duplicate active
+-- managed rows in place, and afterwards they are indistinguishable from
+-- rows archived before this migration, so no down step can restore
+-- them. The linked create path never produces duplicates, so on a
+-- healthy database the dedupe is a no-op and the only effective change
+-- is the index, which does reverse:
 -- DROP INDEX "GatewayBudget_managed_one_active_key";
