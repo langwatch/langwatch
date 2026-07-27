@@ -225,4 +225,52 @@ describe("seedPlatformIngestionTemplates with no platform defaults", () => {
       }
     }
   });
+
+  /** @scenario An existing platform claude-cowork template is archived by the seeder */
+  it("archives every unarchived platform row for a retired slug, duplicates included", async () => {
+    // (organizationId, slug) has no unique backing when organizationId is
+    // NULL (Postgres treats NULL as not-equal-to-NULL), so duplicate
+    // platform rows for the same retired slug can exist. The retirement
+    // sweep must catch ALL of them in a single seeder run, not one per run.
+    const makeRow = () =>
+      prisma.ingestionTemplate.create({
+        data: {
+          organizationId: null,
+          slug: "claude_cowork",
+          sourceType: "claude_cowork",
+          displayName: "Claude cowork",
+          description: "duplicate legacy platform default",
+          iconAsset: "preset:claude_cowork",
+          credentialSchema: null,
+          ottlRules: "",
+          platformPublished: true,
+          enabled: true,
+        },
+      });
+    const first = await makeRow();
+    const second = await makeRow();
+
+    try {
+      const result = await seedPlatformIngestionTemplates(prisma);
+      expect(result.created).toBe(0);
+      expect(result.updated).toBe(0);
+
+      // Final state is the contract (not the archived counter: the rows
+      // are global, and a concurrently seeding suite may have archived
+      // some first) - after one seeder run, NO active platform cowork
+      // row remains, not even the duplicate beyond the first.
+      const rows = await prisma.ingestionTemplate.findMany({
+        where: { id: { in: [first.id, second.id] } },
+      });
+      expect(rows).toHaveLength(2);
+      for (const rowAfter of rows) {
+        expect(rowAfter.archivedAt).not.toBeNull();
+        expect(rowAfter.enabled).toBe(false);
+      }
+    } finally {
+      await prisma.ingestionTemplate.deleteMany({
+        where: { id: { in: [first.id, second.id] } },
+      });
+    }
+  });
 });

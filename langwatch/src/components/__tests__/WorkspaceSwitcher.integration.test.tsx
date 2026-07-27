@@ -266,9 +266,7 @@ describe("WorkspaceSwitcher", () => {
       expect(screen.queryByText("Create project")).not.toBeInTheDocument();
 
       await user.hover(addButton);
-      expect(
-        await screen.findByText("Create project"),
-      ).toBeInTheDocument();
+      expect(await screen.findByText("Create project")).toBeInTheDocument();
 
       await user.unhover(addButton);
       await waitFor(() => {
@@ -288,54 +286,58 @@ describe("WorkspaceSwitcher", () => {
       subtitle: "Personal usage, personal budget",
     };
 
-    /** @scenario A coding-usage signup can always create their first shared project from the workspace menu */
-    it("renders the empty shared team with its create-project button and routes the click", async () => {
-      const user = userEvent.setup();
-      const onCreateProjectForTeam = vi.fn();
-      renderSwitcher({
-        personals: [orgPersonal],
-        teams: [{ ...teamA, canCreateProject: true }],
-        projects: [],
-        current: { kind: "personal" },
-        onCreateProjectForTeam,
-      });
+    describe("when the viewer can create a project on the team", () => {
+      /** @scenario A coding-usage signup can always create their first shared project from the workspace menu */
+      it("renders the empty shared team with its create-project button and routes the click", async () => {
+        const user = userEvent.setup();
+        const onCreateProjectForTeam = vi.fn();
+        renderSwitcher({
+          personals: [orgPersonal],
+          teams: [{ ...teamA, canCreateProject: true }],
+          projects: [],
+          current: { kind: "personal" },
+          onCreateProjectForTeam,
+        });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
-      expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
+        await user.click(
+          screen.getByRole("button", { name: /switch workspace/i }),
+        );
+        expect(await screen.findByText("Acme Engineering")).toBeInTheDocument();
 
-      const addButton = await screen.findByRole("button", {
-        name: /create project in acme engineering/i,
-      });
-      await user.click(addButton);
+        const addButton = await screen.findByRole("button", {
+          name: /create project in acme engineering/i,
+        });
+        await user.click(addButton);
 
-      expect(onCreateProjectForTeam).toHaveBeenCalledWith({
-        teamId: "team_a",
-        orgId: "org_acme",
+        expect(onCreateProjectForTeam).toHaveBeenCalledWith({
+          teamId: "team_a",
+          orgId: "org_acme",
+        });
       });
     });
 
-    /** @scenario An empty team stays hidden from members who cannot create a project on it */
-    it("keeps hiding the empty team from viewers who cannot create a project on it", async () => {
-      const user = userEvent.setup();
-      renderSwitcher({
-        personals: [orgPersonal],
-        teams: [{ ...teamA, canCreateProject: false }],
-        projects: [],
-        current: { kind: "personal" },
-        onCreateProjectForTeam: vi.fn(),
-      });
+    describe("when the viewer cannot create a project on the team", () => {
+      /** @scenario An empty team stays hidden from members who cannot create a project on it */
+      it("keeps hiding the empty team from viewers who cannot create a project on it", async () => {
+        const user = userEvent.setup();
+        renderSwitcher({
+          personals: [orgPersonal],
+          teams: [{ ...teamA, canCreateProject: false }],
+          projects: [],
+          current: { kind: "personal" },
+          onCreateProjectForTeam: vi.fn(),
+        });
 
-      await user.click(
-        screen.getByRole("button", { name: /switch workspace/i }),
-      );
-      // The org header confirms the dropdown opened before we assert absence.
-      expect(await screen.findByText("Acme")).toBeInTheDocument();
-      expect(screen.queryByText("Acme Engineering")).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /create project in/i }),
-      ).not.toBeInTheDocument();
+        await user.click(
+          screen.getByRole("button", { name: /switch workspace/i }),
+        );
+        // The org header confirms the dropdown opened before we assert absence.
+        expect(await screen.findByText("Acme")).toBeInTheDocument();
+        expect(screen.queryByText("Acme Engineering")).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", { name: /create project in/i }),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 

@@ -203,7 +203,7 @@ describe("resolveWrapperPath", () => {
         const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
           .calls[0]![0] as {
           message: string;
-          choices: Array<{ title: string; value: string }>;
+          choices: Array<{ title: string; value: string; description?: string }>;
           initial: number;
         };
         expect(promptArg.message).toBe("How should `langwatch claude` run?");
@@ -214,6 +214,13 @@ describe("resolveWrapperPath", () => {
         const titles = promptArg.choices.map((c) => c.title).join(" | ");
         expect(titles).toContain("Using a Claude subscription");
         expect(titles).toContain("Using an API key");
+        // The secondary line carries the explanation, at the prompt boundary.
+        expect(promptArg.choices[0]!.description).toBe(
+          "keep your own plan, send only telemetry to LangWatch",
+        );
+        expect(promptArg.choices[1]!.description).toBe(
+          "route calls through LangWatch with a virtual key, billed per token",
+        );
         // Remembered for next time.
         expect(save).toHaveBeenCalledTimes(1);
         const persisted = save.mock.calls[0]![0] as GovernanceConfig;

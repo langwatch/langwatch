@@ -55,7 +55,7 @@ describe("<AiToolsPortal /> curated-empty fallback", () => {
     cleanup();
   });
 
-  describe("when every entry is archived or disabled and the viewer can manage the catalog", () => {
+  describe("when the catalog query returns no enabled tools and the viewer can manage the catalog", () => {
     beforeEach(() => {
       mockCanManage = true;
     });
@@ -81,7 +81,7 @@ describe("<AiToolsPortal /> curated-empty fallback", () => {
     });
   });
 
-  describe("when every entry is archived or disabled and the viewer is a member", () => {
+  describe("when the catalog query returns no enabled tools and the viewer is a member", () => {
     beforeEach(() => {
       mockCanManage = false;
     });

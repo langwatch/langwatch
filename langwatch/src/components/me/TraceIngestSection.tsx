@@ -116,11 +116,15 @@ export function TraceIngestSection() {
 
   // No templates, no section: the platform ships no defaults, so most
   // orgs have nothing to install here. Rendering nothing (not even
-  // load skeletons) until the list resolves with at least one template
-  // keeps /me from flashing a section that then disappears. Installed
+  // load skeletons) while the list is in flight keeps /me from flashing
+  // a section that then disappears, and only a SUCCESSFUL empty list
+  // hides the section for good. A failed list is NOT an empty catalog:
+  // it falls through to the normal render (heading, grid, raw-OTLP
+  // fallback card) rather than silently hiding the section. Installed
   // sources keep ingesting regardless: the receiver keys on the
   // IngestionSource, not on a listed template.
-  if (templates.length === 0) return null;
+  if (!templatesQuery.isSuccess && !templatesQuery.isError) return null;
+  if (templatesQuery.isSuccess && templates.length === 0) return null;
   const openTemplate = openSlug
     ? templates.find((t) => t.slug === openSlug) ?? null
     : null;

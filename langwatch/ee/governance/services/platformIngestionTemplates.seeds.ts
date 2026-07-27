@@ -137,20 +137,18 @@ export async function seedPlatformIngestionTemplates(
     }
   }
 
-  // Archive retired slugs (idempotent — already-archived rows stay
-  // archived; missing rows skip cleanly).
+  // Archive retired slugs (idempotent: already-archived rows stay
+  // archived; missing rows skip cleanly). updateMany sweeps EVERY
+  // unarchived platform row for the slug in one pass: (organizationId,
+  // slug) has no unique backing when organizationId is NULL (Postgres
+  // treats NULL as not-equal-to-NULL), so duplicate platform rows can
+  // exist and all of them must retire together.
   for (const slug of RETIRED_PLATFORM_TEMPLATE_SLUGS) {
-    const stale = await prisma.ingestionTemplate.findFirst({
+    const stale = await prisma.ingestionTemplate.updateMany({
       where: { organizationId: null, slug, archivedAt: null },
-      select: { id: true },
+      data: { archivedAt: new Date(), enabled: false },
     });
-    if (stale) {
-      await prisma.ingestionTemplate.update({
-        where: { id: stale.id },
-        data: { archivedAt: new Date(), enabled: false },
-      });
-      archived++;
-    }
+    archived += stale.count;
   }
 
   return { created, updated, archived };

@@ -27,20 +27,20 @@ Feature: Long-context [1m] model id cost matching
 
   @bdd @trace-processing @model-cost @unit
   Scenario: A [1m] long-context model id resolves the base model's registry pricing
-    Given the pricing registry has an entry for "anthropic/claude-opus-5"
-    When the cost for model "claude-opus-5[1m]" is matched
-    Then the "anthropic/claude-opus-5" registry entry is returned
-    And its rates equal the base entry's standard rates
+    Given Claude Opus 5 is a priced model on the platform
+    When a trace reports its model as "claude-opus-5[1m]"
+    Then the trace is priced as Claude Opus 5
+    And at the same standard per-token rates as traffic without the suffix
 
   @bdd @trace-processing @model-cost @cache-telemetry @unit
   Scenario: A Claude Code span on claude-opus-5[1m] with cache traffic gets a nonzero cost
-    Given an LLM span reporting model "claude-opus-5[1m]" with cache read and cache write tokens
-    When the span cost is computed
-    Then the cost is nonzero
-    And cache reads bill at the registry cache-read rate and cache writes at the cache-write rate
+    Given a Claude Code turn on "claude-opus-5[1m]" that mostly reads and writes prompt cache
+    When the turn's trace is processed
+    Then the trace shows a nonzero cost
+    And the cached share is billed at Claude's cache read and cache write prices, not the fresh-input price
 
   @bdd @trace-processing @model-cost @unit
   Scenario: The [1m] suffix resolves registry pricing across the Claude model family
-    Given the pricing registry has entries for the current Claude models
-    When costs for "claude-sonnet-4-5[1m]" and "anthropic/claude-opus-5[1m]" are matched
-    Then each resolves its base model's registry entry
+    Given the platform prices the current Claude models
+    When traces report "claude-sonnet-4-5[1m]" or "anthropic/claude-opus-5[1m]"
+    Then each is priced as its base model

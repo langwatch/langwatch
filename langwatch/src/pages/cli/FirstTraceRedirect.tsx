@@ -21,6 +21,7 @@ import { useSession } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { findPersonalProject } from "~/utils/personalProject";
 
 export const FIRST_TRACE_POLL_INTERVAL_MS = 3_000;
 export const FIRST_TRACE_POLL_TIMEOUT_MS = 10 * 60_000;
@@ -30,73 +31,81 @@ const REDIRECT_DELAY_MS = 1_200;
  * Pure polling policy: the query runs only while there is a project to watch
  * and nothing has concluded the watch (redirect underway, timeout reached, or
  * the project already had traces). The refetch interval additionally requires
- * that we have confirmed the never-synced state and that the tab is visible,
- * so a hidden tab or an already-synced project never ticks the network.
+ * a visible tab, plus either a confirmed never-synced state or no result yet,
+ * so a failed initial read keeps retrying until the timeout instead of
+ * stalling, while a hidden tab or an already-synced project never ticks the
+ * network.
  */
 export function resolveFirstTracePolling({
   hasProject,
-  redirecting,
-  timedOut,
-  alreadyHadTraces,
-  sawNeverSynced,
+  hasResult,
+  isRedirecting,
+  isTimedOut,
+  hasPriorTraces,
+  hasSeenNeverSynced,
   isVisible,
 }: {
   hasProject: boolean;
-  redirecting: boolean;
-  timedOut: boolean;
-  alreadyHadTraces: boolean;
-  sawNeverSynced: boolean;
+  hasResult: boolean;
+  isRedirecting: boolean;
+  isTimedOut: boolean;
+  hasPriorTraces: boolean;
+  hasSeenNeverSynced: boolean;
   isVisible: boolean;
 }): { enabled: boolean; refetchInterval: number | false } {
-  const enabled = hasProject && !redirecting && !timedOut && !alreadyHadTraces;
+  const enabled =
+    hasProject && !isRedirecting && !isTimedOut && !hasPriorTraces;
   const refetchInterval =
-    enabled && sawNeverSynced && isVisible ? FIRST_TRACE_POLL_INTERVAL_MS : false;
+    enabled && isVisible && (hasSeenNeverSynced || !hasResult)
+      ? FIRST_TRACE_POLL_INTERVAL_MS
+      : false;
   return { enabled, refetchInterval };
 }
 
-export function FirstTraceRedirect() {
-  const router = useRouter();
-  const { data: session } = useSession();
-  const { organizations } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
-
-  // Same resolution PersonalSidebar uses: the personal team owned by the
-  // signed-in user carries exactly one personal project.
-  const personalProject = useMemo(() => {
-    const userId = session?.user?.id;
-    if (!userId || !organizations) return null;
-    for (const org of organizations) {
-      for (const team of org.teams ?? []) {
-        if (team.isPersonal && team.ownerUserId === userId) {
-          const project = team.projects?.[0];
-          if (project) return { id: project.id, slug: project.slug };
-        }
-      }
-    }
-    return null;
-  }, [organizations, session?.user?.id]);
-
+function useDocumentVisible(): boolean {
   const [isVisible, setIsVisible] = useState<boolean>(
     typeof document === "undefined"
       ? true
       : document.visibilityState === "visible",
   );
-  const [timedOut, setTimedOut] = useState(false);
-  const [sawNeverSynced, setSawNeverSynced] = useState(false);
-  const [alreadyHadTraces, setAlreadyHadTraces] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
-
   useEffect(() => {
     const onVisibility = () =>
       setIsVisible(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
+  return isVisible;
+}
+
+type FirstTraceWatchState = "hidden" | "waiting" | "redirecting";
+
+/**
+ * Watches the personal project's first-trace flag and drives the redirect.
+ * "waiting" is the confirmed never-synced poll, "redirecting" the brief
+ * announcement before navigation; "hidden" covers every case that keeps the
+ * current close-this-tab behavior.
+ */
+function useFirstTraceWatch(): FirstTraceWatchState {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const { organizations } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const personalProject = useMemo(
+    () => findPersonalProject(organizations, session?.user?.id),
+    [organizations, session?.user?.id],
+  );
+
+  const isVisible = useDocumentVisible();
+  const [hasResult, setHasResult] = useState(false);
+  const [isTimedOut, setIsTimedOut] = useState(false);
+  const [hasSeenNeverSynced, setHasSeenNeverSynced] = useState(false);
+  const [hasPriorTraces, setHasPriorTraces] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(
-      () => setTimedOut(true),
+      () => setIsTimedOut(true),
       FIRST_TRACE_POLL_TIMEOUT_MS,
     );
     return () => clearTimeout(timeout);
@@ -104,10 +113,11 @@ export function FirstTraceRedirect() {
 
   const polling = resolveFirstTracePolling({
     hasProject: !!personalProject?.id,
-    redirecting,
-    timedOut,
-    alreadyHadTraces,
-    sawNeverSynced,
+    hasResult,
+    isRedirecting,
+    isTimedOut,
+    hasPriorTraces,
+    hasSeenNeverSynced,
     isVisible,
   });
 
@@ -123,31 +133,39 @@ export function FirstTraceRedirect() {
   useEffect(() => {
     const firstMessage = hasFirstMessage.data?.firstMessage;
     if (firstMessage === undefined) return;
+    if (!hasResult) setHasResult(true);
     if (!firstMessage) {
-      if (!sawNeverSynced) setSawNeverSynced(true);
+      if (!hasSeenNeverSynced) setHasSeenNeverSynced(true);
       return;
     }
     // Users whose project already had traces keep the current behavior; only
     // a false -> true transition observed on this page triggers the redirect.
-    if (!sawNeverSynced) {
-      setAlreadyHadTraces(true);
+    if (!hasSeenNeverSynced) {
+      setHasPriorTraces(true);
       return;
     }
-    if (!redirecting) setRedirecting(true);
-  }, [hasFirstMessage.data, sawNeverSynced, redirecting]);
+    if (!isRedirecting) setIsRedirecting(true);
+  }, [hasFirstMessage.data, hasResult, hasSeenNeverSynced, isRedirecting]);
 
   useEffect(() => {
-    if (!redirecting || !personalProject?.slug) return;
+    if (!isRedirecting || !personalProject?.slug) return;
     const slug = personalProject.slug;
     const timeout = setTimeout(() => {
       void router.push(`/${slug}/traces`);
     }, REDIRECT_DELAY_MS);
     return () => clearTimeout(timeout);
-  }, [redirecting, personalProject?.slug, router]);
+  }, [isRedirecting, personalProject?.slug, router]);
 
-  if (!personalProject || alreadyHadTraces || timedOut) return null;
+  if (!personalProject || hasPriorTraces || isTimedOut) return "hidden";
+  if (isRedirecting) return "redirecting";
+  if (hasSeenNeverSynced) return "waiting";
+  return "hidden";
+}
 
-  if (redirecting) {
+export function FirstTraceRedirect() {
+  const watchState = useFirstTraceWatch();
+
+  if (watchState === "redirecting") {
     return (
       <HStack gap={2} role="status" aria-live="polite">
         <Icon as={CheckCircle2} boxSize={4} color="green.fg" />
@@ -158,7 +176,7 @@ export function FirstTraceRedirect() {
     );
   }
 
-  if (sawNeverSynced) {
+  if (watchState === "waiting") {
     return (
       <HStack gap={2} role="status" aria-live="polite">
         <Spinner size="sm" color="orange.400" />

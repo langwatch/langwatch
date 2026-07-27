@@ -29,7 +29,7 @@ const CODING_ASSISTANT_SLUGS = [
 ] as const;
 
 describe("PLATFORM_INGESTION_TEMPLATES", () => {
-  describe("given the platform seed input", () => {
+  describe("when the platform seed input is inspected", () => {
     /** @scenario The platform default template set ships no claude-cowork */
     it("ships no default template rows at all", () => {
       expect(PLATFORM_INGESTION_TEMPLATES).toEqual([]);
@@ -44,7 +44,7 @@ describe("PLATFORM_INGESTION_TEMPLATES", () => {
     });
   });
 
-  describe("given a dev DB that may hold rows from an earlier seed run", () => {
+  describe("when a dev DB still holds rows from an earlier seed run", () => {
     it("retires every coding-assistant slug so stale rows get archived", () => {
       for (const codingSlug of CODING_ASSISTANT_SLUGS) {
         expect(RETIRED_PLATFORM_TEMPLATE_SLUGS).toContain(codingSlug);

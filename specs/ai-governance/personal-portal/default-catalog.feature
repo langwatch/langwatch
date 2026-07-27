@@ -26,55 +26,56 @@ Feature: AI Tools Portal - Default catalog provisioning
         hiccup) gets the catalog on its first portal load
 
   Background:
-    Given a brand-new organization with zero AiToolEntry rows
+    Given a brand-new organization whose catalog has never had a single entry
 
   @integration
   Scenario: A fresh organization gets the full standard catalog with no admin action
-    When the default catalog is ensured for the organization
-    Then all 8 standard tiles exist on the organization's catalog
-    And each tile is org-scoped and enabled
-    And each tile carries the starter pack's verbatim slug, icon, and config
+    When the standard tools are provisioned for the organization
+    Then the organization's catalog shows all 8 standard tiles
+    And each tile is available to the whole organization and enabled
+    And each tile matches its starter-pack original, so a later
+        starter-pack import recognises it instead of duplicating it
     And no admin performed any catalog action
 
   @integration
   Scenario: Default catalog provisioning is idempotent across repeated calls
-    Given the default catalog was already ensured for the organization
-    When the default catalog is ensured again
-    Then no new rows are created and the catalog still has exactly 8 tiles
+    Given the organization already received the standard catalog
+    When provisioning runs again for the organization
+    Then no new tiles appear and the catalog still has exactly 8 tiles
 
   @integration
   Scenario: An organization whose admin archived or disabled every entry is not re-seeded
-    Given the organization has only archived or disabled AiToolEntry rows
-    When the default catalog is ensured for the organization
-    Then no rows are created
+    Given the organization's admin archived or disabled every catalog entry
+    When provisioning runs for the organization
+    Then no tiles are added
     And the admin's curated-empty catalog is preserved
     # This is what keeps the portal empty state meaningful: it can only
     # ever be the result of deliberate admin curation, never a fresh org.
 
   @integration
   Scenario: Concurrent provisioning attempts create exactly one catalog
-    When two provisioning calls race for the same organization
-    Then exactly one call seeds and the catalog ends with exactly 8 tiles
+    When two provisioning attempts race for the same organization
+    Then the catalog ends with exactly 8 tiles and no duplicates
     # There is no unique constraint on (organizationId, slug); a
     # transaction-scoped per-org advisory lock serialises provisioners.
 
   @integration
   Scenario: A member's first portal load of a zero-row organization returns the provisioned catalog
     Given a MEMBER of the brand-new organization
-    When the member's client calls aiTools.list for the first time
-    Then the list returns the 8 standard tiles, all enabled
-    And the /me portal therefore renders tile sections, never the empty state
+    When the member opens their /me portal for the first time
+    Then the portal shows the 8 standard tiles, all enabled
+    And the member sees tile sections, never the empty state
 
   @unit
   Scenario: The platform default template set ships no claude-cowork
-    When the platform IngestionTemplate seed input is inspected
-    Then it contains no template rows at all
-    And "claude_cowork" is listed among the retired platform template slugs
+    When the platform's built-in template set is inspected
+    Then it offers no templates at all
+    And "claude_cowork" is marked as retired
 
   @integration
   Scenario: An existing platform claude-cowork template is archived by the seeder
-    Given a platform-published IngestionTemplate row with slug "claude_cowork" exists
-    When the platform IngestionTemplate seeder runs
-    Then the claude-cowork row is archived and disabled
-    And no new platform template rows are created
-    And installed claude-cowork IngestionSources keep ingesting unaffected
+    Given a platform-published "claude_cowork" template left over from an earlier release
+    When the platform template catalog is synced
+    Then every platform copy of the claude-cowork template is archived and disabled
+    And no new platform templates appear
+    And tools already connected through claude-cowork keep ingesting unaffected

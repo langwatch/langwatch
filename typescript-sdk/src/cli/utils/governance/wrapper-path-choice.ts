@@ -186,15 +186,18 @@ export function gatewayChoiceDescription(): string {
  * Tools without a well-known subscription (opencode is a bring-your-own
  * client) fall back to a neutral "your own <tool> plan".
  */
-const OTLP_TITLE_BY_TOOL: Record<string, string> = {
+const OTLP_TITLE_BY_TOOL = {
   claude: "Using a Claude subscription",
   codex: "Using a ChatGPT subscription",
   gemini: "Using a Gemini subscription",
   cursor: "Using a Cursor subscription",
-};
+} as const satisfies Record<string, string>;
 
 export function otlpChoiceTitle(tool: string): string {
-  return OTLP_TITLE_BY_TOOL[tool] ?? `Using your own ${tool} plan`;
+  if (tool in OTLP_TITLE_BY_TOOL) {
+    return OTLP_TITLE_BY_TOOL[tool as keyof typeof OTLP_TITLE_BY_TOOL];
+  }
+  return `Using your own ${tool} plan`;
 }
 
 export function otlpChoiceDescription(): string {

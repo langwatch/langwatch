@@ -37,10 +37,10 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     And user "jane@acme.com" has a personal project "personal-jane"
     And the platform's coding assistants (claude_code, codex, cursor, gemini, opencode)
         are set up by `langwatch <tool>` and are NOT ingestion templates
-    And the platform ships NO default IngestionTemplate rows
-        (claude_cowork is retired; the seeder archives any existing platform
-        row for a retired slug, and installed cowork IngestionSources keep
-        ingesting because the receiver keys on the source, not the template)
+    And the platform ships NO built-in templates
+        (claude-cowork is retired: it no longer appears in any org's
+        catalog, even where an earlier release had offered it, and tools
+        already connected through it keep ingesting uninterrupted)
     And the platform-template seed does NOT include any coding-assistant slug
         (claude_code / codex / cursor / gemini / opencode are never seeded)
     And a client-side **discovery card** "raw_otlp_advanced" renders alongside the
@@ -57,22 +57,24 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
 
   @bdd @ingestion-templates @catalog @user-visibility
   Scenario: User sees only non-coding-assistant templates on /me Trace Ingest
-    Given org "acme" has authored an IngestionTemplate "acme-router"
+    Given org "acme" has authored a template "Acme router"
     When jane navigates to "/me" and scrolls to the "Trace Ingest" section
-    Then she sees a tile-grid with exactly these items:
-      | tile slug         | label                   | source                      |
-      | acme-router       | "Acme router"           | api.ingestionTemplates.list |
-      | raw_otlp_advanced | "Raw OTLP (advanced)"   | client-side discovery card  |
-    And the install tile is sourced from `api.ingestionTemplates.list`
-    And the raw_otlp_advanced card is rendered client-side (no server query)
+    Then she sees a tile-grid with exactly these tiles:
+      | tile              | label                 |
+      | acme-router       | "Acme router"         |
+      | raw_otlp_advanced | "Raw OTLP (advanced)" |
     And NO tile is shown for claude_code, codex, cursor, gemini, or opencode
         (those are coding-assistant tiles on the AiToolsPortal, not ingestion templates)
     And the raw_otlp_advanced card is visually distinct from the install tiles
         (e.g. dashed border + subtle background per Lane-B Iter 2)
-    But when the org has no IngestionTemplate rows at all
-    Then the whole Trace Ingest section is hidden (no heading, no grid,
-        no raw_otlp_advanced card; the personal OTLP endpoint stays
-        reachable via /me/configure)
+
+  @bdd @ingestion-templates @catalog @empty-catalog
+  Scenario: Trace Ingest section is hidden when the org has no templates
+    Given org "acme" has not authored any templates
+    When jane navigates to "/me"
+    Then no "Trace Ingest" section renders: no heading, no grid, and no
+        raw_otlp_advanced card
+    And the personal OTLP endpoint stays reachable via /me/configure
 
   @bdd @ingestion-templates @catalog @coding-assistant-not-a-template
   Scenario: A platform coding assistant never appears as an ingestion template
@@ -86,7 +88,7 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
 
   @bdd @ingestion-templates @catalog @copy-disambiguation
   Scenario: Catalog copy distinguishes auto-shape vs raw OTLP
-    Given org "acme" has authored an IngestionTemplate "Acme router"
+    Given org "acme" has authored a template "Acme router"
     When jane opens the install drawer for the acme-router tile
     Then the drawer headline reads "Connect Acme router, auto-shaped"
     And the subcopy contains "Traces normalized into gen_ai.* canonical. Cost/tokens/model populated automatically."
@@ -104,7 +106,7 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   Scenario: Platform-published templates (organizationId IS NULL) are visible to every org
     Given org "beta-corp" has not authored any IngestionTemplate rows
     When user "lisa@beta-corp.com" navigates to her /me Trace Ingest
-    Then she sees any platform-published rows (organizationId IS NULL) that exist
+    Then she sees any templates the platform has published for every org
     And since the platform currently ships none, her Trace Ingest section is hidden
 
   @bdd @ingestion-templates @catalog @cross-org-isolation
