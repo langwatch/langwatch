@@ -88,15 +88,12 @@ Feature: Langy in-product AI assistant — baseline (v1)
     When I navigate to any "/[project]/*" route in project "demo"
     Then the Langy handle is not visible
 
-  # An install with no demo project configured (every self-host) leaves
-  # DEMO_PROJECT_SLUG undefined. Comparing it against an equally unresolved
-  # project, on any route where project context hasn't loaded yet, must not
-  # read as a match, hiding the handle for a rollout that already applies.
-  Scenario: An unresolved project is not mistaken for the demo project
+  # Nothing about the active project is known yet while it is still loading,
+  # so nothing about it can be compared against. That must not be treated as
+  # a reason to hide the handle for a rollout that already applies.
+  Scenario: The handle stays visible while the active project is still loading
     Given Langy has been rolled out to my organization
-    And no demo project is configured on this install
-    And the active project has not resolved yet
-    When I navigate to any "/[project]/*" route
+    When I navigate to any "/[project]/*" route before its project finishes loading
     Then the Langy handle is visible
 
   # ============================================================================

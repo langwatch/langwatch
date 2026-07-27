@@ -33,7 +33,7 @@ const LOCAL_DOCS_URL = "http://localhost:3000";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
 
 /**
- * `hostname` and `isDev` are exposed as optional arguments so unit tests
+ * `hostname` and `isDev` are exposed as optional overrides so unit tests
  * can pin the branch without mutating `window.location` (jsdom locks the
  * slot with a non-configurable accessor) or the build-time `import.meta.env`
  * constant. Production callers omit both and the helper reads
@@ -46,7 +46,10 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
  * ever evaluated inside the same `typeof window !== "undefined"` branch as
  * `window.location`, so the server path never touches it.
  */
-export function getDocsBaseUrl(hostname?: string, isDev?: boolean): string {
+export function getDocsBaseUrl({
+  hostname,
+  isDev,
+}: { hostname?: string; isDev?: boolean } = {}): string {
   const inBrowser = typeof window !== "undefined";
   const resolvedHostname = hostname ?? (inBrowser ? window.location.hostname : undefined);
   const resolvedIsDev = isDev ?? (inBrowser ? import.meta.env.DEV : false);

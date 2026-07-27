@@ -138,7 +138,7 @@ describe("useShowLangy", () => {
     });
   });
 
-  describe("given no demo project is configured (every self-host) and the project has not resolved yet", () => {
+  describe("given the active project has not resolved yet", () => {
     beforeEach(() => {
       context.project = undefined;
       context.demoProjectSlug = undefined;
@@ -148,7 +148,7 @@ describe("useShowLangy", () => {
     // not read as "this is the demo project". An install with no demo
     // project configured hits exactly this on any route whose project
     // hasn't resolved yet, and did not deserve to lose Langy for it.
-    /** @scenario An unresolved project is not mistaken for the demo project */
+    /** @scenario The handle stays visible while the active project is still loading */
     it("does not treat the unresolved project as the demo project", () => {
       gate.rule = { organizationId: "org-1" };
 

@@ -69,11 +69,11 @@ export function useLangyVisibility(): LangyVisibility {
   const user = session?.user;
   // The server refuses Langy on the demo project outright, so rendering the
   // panel there would only produce a chat where every send 403s. Requires
-  // BOTH sides present: an install with no demo project configured (every
-  // self-host) leaves DEMO_PROJECT_SLUG undefined, and `===` against an
-  // equally-undefined `project?.slug` (any route that hasn't resolved a
-  // project yet) would otherwise read as a match and hide Langy for a user
-  // who was never anywhere near the demo project.
+  // BOTH sides present: an install with no demo project configured leaves
+  // DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
+  // `project?.slug` (any route that hasn't resolved a project yet) would
+  // otherwise read as a match and hide Langy for a user who was never
+  // anywhere near the demo project.
   const isDemoProject =
     !!publicEnv.data?.DEMO_PROJECT_SLUG &&
     publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;

@@ -4,26 +4,20 @@ Feature: Docs links resolve to a reachable destination
   So that I am not sent to a local development server that only exists on a
   contributor's own machine
 
-  # `docsUrl()` links to a locally-running Mintlify instance on
-  # http://localhost:3000 when the app itself is served from localhost, so a
-  # contributor iterating on both the app and the docs in the same monorepo
-  # checkout gets an in-sync round trip instead of punching out to
-  # production. A packaged self-hosted server (npx @langwatch/server, a
-  # Docker image, a Helm chart) is ALSO served from localhost or another
-  # non-production hostname, but never has Mintlify running alongside it, so
-  # the same hostname check sent every "Install guide" / "CLI reference" /
-  # docs link on those installs to a dead http://localhost:3000.
+  # Contributors iterating on the app and its docs in the same monorepo
+  # checkout get an in-sync local round trip. Everyone else, most of all a
+  # packaged self-hosted install (npx @langwatch/server, a Docker image, a
+  # Helm chart), needs every onboarding documentation link to reach real,
+  # working documentation instead.
 
   @unit
-  Scenario: A contributor's local dev server links to the local docs server
-    Given the app is served from "localhost"
-    And the running build is a development build
-    When a docs link is resolved
-    Then it points at "http://localhost:3000"
+  Scenario: A contributor's local checkout links to their own local docs
+    Given a contributor is running the app from their own local checkout
+    When they open an onboarding documentation link
+    Then it opens their local documentation
 
   @unit
-  Scenario: A packaged self-hosted server on localhost links to production docs
-    Given the app is served from "localhost"
-    And the running build is a production build
-    When a docs link is resolved
-    Then it points at "https://docs.langwatch.ai"
+  Scenario: A packaged self-hosted install links to real documentation
+    Given the app is a packaged self-hosted install
+    When a user opens an onboarding documentation link
+    Then it opens the real, reachable documentation
