@@ -144,6 +144,23 @@ func TestMonitor_PublicDetailNeverCarriesTheProbeError(t *testing.T) {
 	}
 }
 
+// A half-wired monitor fails closed. With no Pinger nothing can ever
+// refresh the verdict, so it must go unhealthy at the tolerance rather
+// than pin the public status page green forever.
+func TestMonitor_WithoutAPingerFailsClosed(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(1_700_000_000, 0)}
+	m := New(Options{Now: clock.Now})
+
+	ok, _ := m.ControlPlane()
+	require.True(t, ok, "the boot grace window still applies")
+
+	clock.Advance(DefaultUnhealthyAfter + time.Second)
+
+	ok, detail := m.ControlPlane()
+	assert.False(t, ok)
+	assert.Contains(t, detail, "unreachable")
+}
+
 // The loop probes on its own clock and Stop halts it. The endpoint's
 // no-fan-out property depends on the ticker being the only probe driver.
 func TestMonitor_ProbesOnItsOwnClockAndStops(t *testing.T) {

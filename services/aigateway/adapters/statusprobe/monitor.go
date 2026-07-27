@@ -55,6 +55,11 @@ const (
 
 // Options configures a Monitor.
 type Options struct {
+	// Pinger performs the probe. A nil Pinger disables probing, which the
+	// verdict then reads as a sustained outage once the tolerance elapses:
+	// a monitor with no way to reach the control plane has no grounds to
+	// call the gateway healthy, so this fails closed rather than pinning
+	// the status page green on a half-wired deployment.
 	Pinger Pinger
 	Logger *zap.Logger
 	// Interval between background probes. 0 uses DefaultInterval.
