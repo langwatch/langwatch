@@ -20,10 +20,16 @@ import { useMemo, useState } from "react";
 import { buildPairwiseComparisons } from "./batch-evaluation-results/buildPairwiseComparisons";
 import { computeBTLeaderboard } from "./batch-evaluation-results/computeBTLeaderboard";
 import {
+  computeJudgeIndependence,
+  computeVerbosityProfile,
+} from "./batch-evaluation-results/computeJudgeBiasChecks";
+import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
 } from "./batch-evaluation-results/computeLeaderboardVerdict";
+import { computeSampleAdequacy } from "./batch-evaluation-results/computeSampleAdequacy";
 import { computeVariantMetrics } from "./batch-evaluation-results/computeVariantMetrics";
+import { LeaderboardExplainPanel } from "./batch-evaluation-results/LeaderboardExplainPanel";
 import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import { LeaderboardTrustPanel } from "./batch-evaluation-results/LeaderboardTrustPanel";
 import { LeaderboardVerdictPanel } from "./batch-evaluation-results/LeaderboardVerdictPanel";
@@ -38,6 +44,10 @@ export type ComparisonLeaderboardDrawerProps = {
   column: BatchComparisonColumn;
   rows: BatchResultRow[];
   targetColors?: Record<string, string>;
+  /** Model each target ran on, as recorded on the run. */
+  modelByTargetId?: Record<string, string | null>;
+  /** Model that judged this comparison, as recorded on the run. */
+  judgeModel?: string | null;
 };
 
 /** Matchups per variant below which Bradley-Terry scores are unstable. */
@@ -47,6 +57,8 @@ export function ComparisonLeaderboardDrawer({
   column,
   rows,
   targetColors,
+  modelByTargetId,
+  judgeModel,
 }: ComparisonLeaderboardDrawerProps) {
   const { closeDrawer } = useDrawer();
   const [selectedPair, setSelectedPair] = useState<{
@@ -82,10 +94,36 @@ export function ComparisonLeaderboardDrawer({
     [verdict, variantMetrics],
   );
 
+  const sampleAdequacy = useMemo(
+    () => computeSampleAdequacy(leaderboard),
+    [leaderboard],
+  );
+  const verbosity = useMemo(
+    () =>
+      computeVerbosityProfile({
+        variantIds,
+        rows,
+        leaderId: verdict.leaderId,
+      }),
+    [variantIds, rows, verdict.leaderId],
+  );
+  const judgeIndependence = useMemo(
+    () =>
+      computeJudgeIndependence({
+        judgeModel: judgeModel ?? null,
+        modelByVariant: Object.fromEntries(
+          variantIds.map((id) => [id, modelByTargetId?.[id] ?? null]),
+        ),
+      }),
+    [judgeModel, modelByTargetId, variantIds],
+  );
+
   const trustHasProblem =
     leaderboard.minMatchups < WARN_THRESHOLD ||
     leaderboard.hasDegenerate ||
-    !leaderboard.didConverge;
+    !leaderboard.didConverge ||
+    judgeIndependence.sharedFamilyVariantIds.length > 0 ||
+    (sampleAdequacy.totalPairs > 0 && sampleAdequacy.separatedPairs === 0);
 
   // Every row where `winnerId` beat `opponentId` directly — the judge's own
   // reasoning text, filtered down to exactly the matchup the user clicked.
@@ -123,7 +161,23 @@ export function ComparisonLeaderboardDrawer({
                 cheaperAlternative={cheaperAlternative}
                 variantNames={variantNames}
                 targetColors={targetColors}
-              />
+              >
+                {/* Strictly additive, and deliberately below the computed
+                    sentence rather than in place of it. If the generated
+                    prose and the verdict ever disagree, the verdict is the
+                    one still on screen. */}
+                <LeaderboardExplainPanel
+                  leaderboard={leaderboard}
+                  verdict={verdict}
+                  cheaperAlternative={cheaperAlternative}
+                  sampleAdequacy={sampleAdequacy}
+                  verbosity={verbosity}
+                  judgeIndependence={judgeIndependence}
+                  variantMetrics={variantMetrics}
+                  variantNames={variantNames}
+                  warnThreshold={WARN_THRESHOLD}
+                />
+              </LeaderboardVerdictPanel>
             </LeaderboardStep>
 
             <LeaderboardStep
@@ -135,6 +189,10 @@ export function ComparisonLeaderboardDrawer({
               <LeaderboardTrustPanel
                 leaderboard={leaderboard}
                 warnThreshold={WARN_THRESHOLD}
+                sampleAdequacy={sampleAdequacy}
+                verbosity={verbosity}
+                judgeIndependence={judgeIndependence}
+                variantNames={variantNames}
               />
             </LeaderboardStep>
 

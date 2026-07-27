@@ -79,6 +79,7 @@ import { teamRouter } from "./routers/team";
 import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
+import { leaderboardExplanationRouter } from "./routers/leaderboardExplanation";
 import { translateRouter } from "./routers/translate";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
@@ -126,6 +127,7 @@ const coreRouters = {
   dataRetention: dataRetentionRouter,
   emailSuppression: emailSuppressionRouter,
   dataPrivacy: dataPrivacyRouter,
+  leaderboardExplanation: leaderboardExplanationRouter,
   translate: translateRouter,
   workflow: workflowRouter,
   optimization: optimizationRouter,
