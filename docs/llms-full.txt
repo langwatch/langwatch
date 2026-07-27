@@ -10645,7 +10645,7 @@ The gateway exposes three HTTP endpoints for Kubernetes probes plus one public s
 | `/healthz` | Kubernetes `livenessProbe`             | The Go process is responsive (no registered checks fail)            |
 | `/readyz`  | Kubernetes `readinessProbe` + LB       | The pod is not draining                                             |
 | `/startupz`| Kubernetes `startupProbe`              | Startup is marked complete, then mirrors `/readyz`                  |
-| `/health`  | Your status page / uptime monitor      | The process is up and the control plane is reachable                |
+| `/health`  | Your status page / uptime monitor      | The process is up and the control plane has answered within the last 60s |
 | `/metrics` | Prometheus                              | Always, counter + histogram surface (see [Observability](/ai-gateway/observability)) |
 
 The three probes are in-cluster signals. `/health` is the one meant to be reachable from outside; the chart publishes it through the ingress and leaves the rest internal.

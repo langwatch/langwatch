@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -57,6 +58,29 @@ func (p *statusPinger) Health(context.Context) error {
 	return nil
 }
 
+// healthyMonitor returns a monitor that is healthy because a probe really
+// succeeded, not because it was just constructed. Fresh construction also
+// reads healthy (the boot grace window), but using that as the healthy
+// fixture would mean these tests never exercise a successful probe and
+// would keep passing if probing broke entirely.
+func healthyMonitor(t *testing.T) *statusprobe.Monitor {
+	t.Helper()
+	pinger := &statusPinger{}
+	mon := statusprobe.New(statusprobe.Options{Pinger: pinger, Interval: time.Millisecond})
+	t.Cleanup(mon.Stop)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	mon.Start(ctx)
+	require.Eventually(t, func() bool {
+		return pinger.calls.Load() >= 1
+	}, 2*time.Second, time.Millisecond, "the monitor should have completed a probe")
+
+	ok, _ := mon.ControlPlane()
+	require.True(t, ok, "a successful probe must read healthy")
+	return mon
+}
+
 func buildRouterWithStatus(status StatusReporter, opts ...app.Option) http.Handler {
 	reg := health.New("test")
 	reg.MarkStarted()
@@ -85,10 +109,7 @@ type statusBody struct {
 
 // @scenario "healthy gateway reports ok with a component breakdown"
 func TestHealthEndpoint_HealthyReportsComponents(t *testing.T) {
-	// A real monitor, fresh from construction: last successful contact is
-	// "now", which is exactly the state after a recent successful probe.
-	mon := statusprobe.New(statusprobe.Options{})
-	router := buildRouterWithStatus(mon)
+	router := buildRouterWithStatus(healthyMonitor(t))
 
 	rec, body := getHealth(t, router)
 
@@ -119,8 +140,7 @@ func TestHealthEndpoint_ProviderOutageStays200(t *testing.T) {
 			}
 		},
 	}
-	mon := statusprobe.New(statusprobe.Options{})
-	router := buildRouterWithStatus(mon, app.WithAuth(auth), app.WithProviders(provider))
+	router := buildRouterWithStatus(healthyMonitor(t), app.WithAuth(auth), app.WithProviders(provider))
 
 	// The provider outage is user-visible on the dispatch path...
 	for range 3 {
@@ -232,8 +252,7 @@ func TestHealthEndpoint_BodyIsPublicSafe(t *testing.T) {
 // @scenario "HEAD polls get the same verdict as GET"
 func TestHealthEndpoint_HeadMatchesGet(t *testing.T) {
 	t.Run("healthy", func(t *testing.T) {
-		mon := statusprobe.New(statusprobe.Options{})
-		router := buildRouterWithStatus(mon)
+		router := buildRouterWithStatus(healthyMonitor(t))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/health", nil))
 		assert.Equal(t, http.StatusOK, rec.Code)
@@ -250,11 +269,40 @@ func TestHealthEndpoint_HeadMatchesGet(t *testing.T) {
 	})
 }
 
+// @scenario "HEAD polls get the same verdict as GET"
+// Over a real server rather than a recorder, because that is where the
+// difference shows. net/http discards the body of a HEAD response while
+// still reporting the Content-Length the GET would have carried, which is
+// what RFC 9110 asks for. Guarding the encode with `r.Method == HEAD`
+// looks tidier and is worse: measured against a real server it drops
+// Content-Length entirely and adds `Connection: close`, so a status
+// monitor polling with HEAD would pay a fresh handshake every time.
+func TestHealthEndpoint_HeadOnTheWireHasNoBodyButKeepsContentLength(t *testing.T) {
+	srv := httptest.NewServer(buildRouterWithStatus(healthyMonitor(t)))
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodHead, srv.URL+"/health", nil)
+	require.NoError(t, err)
+	resp, err := srv.Client().Do(req)
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Empty(t, body, "HEAD must not carry a body on the wire")
+	assert.Positive(t, resp.ContentLength, "HEAD must still report the length GET would have sent")
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
+	assert.NotEqual(t, "close", resp.Header.Get("Connection"), "HEAD polls should reuse the connection")
+}
+
 // The chart publishes /health as an Exact ingress path, which bounds the
 // path but not the method. The method guarantee lives here, so the chart
 // comment that says so stays true.
 func TestHealthEndpoint_RejectsOtherMethods(t *testing.T) {
-	router := buildRouterWithStatus(statusprobe.New(statusprobe.Options{}))
+	router := buildRouterWithStatus(healthyMonitor(t))
 
 	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
 		rec := httptest.NewRecorder()
