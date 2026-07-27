@@ -5,6 +5,10 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { getApp } from "~/server/app-layer/app";
+import {
+  PERSONAL_TEAM_ARCHIVE_REFUSAL,
+  PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
+} from "~/server/app-layer/teams/team.service";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   assertEnterprisePlan,
@@ -236,8 +240,7 @@ export const teamRouter = createTRPCRouter({
         if (!keepsProvisionedMembership) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message:
-              "Personal workspace teams have exactly one member: their owner. Create a shared team to collaborate with others.",
+            message: PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
           });
         }
       }
@@ -540,8 +543,7 @@ export const teamRouter = createTRPCRouter({
       if (team.isPersonal) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message:
-            "Personal workspace teams cannot be archived. They are provisioned per member and disappear with the member's access to the organization.",
+          message: PERSONAL_TEAM_ARCHIVE_REFUSAL,
         });
       }
 

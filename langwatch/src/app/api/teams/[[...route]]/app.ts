@@ -8,6 +8,8 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import {
+  PERSONAL_TEAM_MEMBERSHIP_REFUSAL,
+  PersonalTeamProtectedError,
   TeamNotFoundError,
   type TeamRestService,
 } from "~/server/app-layer/teams/team.service";
@@ -17,7 +19,11 @@ import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { TeamServiceMiddlewareVariables } from "../../middleware/team-service";
 import { teamServiceMiddleware } from "../../middleware/team-service";
-import { BadRequestError, NotFoundError } from "../../shared/errors";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+} from "../../shared/errors";
 import { handleTeamError } from "./error-handler";
 
 patchZodOpenapi();
@@ -197,6 +203,9 @@ secured
         if (error instanceof TeamNotFoundError) {
           throw new NotFoundError("Team not found");
         }
+        if (error instanceof PersonalTeamProtectedError) {
+          throw new ForbiddenError(error.message);
+        }
         throw error;
       }
 
@@ -262,6 +271,11 @@ secured
 
       const team = await service.getById({ id, organizationId: organization.id });
       if (!team) throw new NotFoundError("Team not found");
+      // A personal team holds exactly its owner, which is why plan limits
+      // exempt it. A second member turns it into a shared team nothing counts.
+      if (team.isPersonal) {
+        throw new ForbiddenError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+      }
 
       const orgMember = await prisma.organizationUser.findFirst({
         where: { organizationId: organization.id, userId: body.userId },
@@ -310,6 +324,11 @@ secured
 
       const team = await service.getById({ id, organizationId: organization.id });
       if (!team) throw new NotFoundError("Team not found");
+      // Removing the one member of a personal team strips its owner of access
+      // to their own workspace, which nothing puts back.
+      if (team.isPersonal) {
+        throw new ForbiddenError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+      }
 
       const binding = await prisma.roleBinding.findFirst({
         where: {

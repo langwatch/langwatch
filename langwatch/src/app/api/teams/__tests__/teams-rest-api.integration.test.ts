@@ -345,6 +345,115 @@ describe("Feature: Teams REST API", () => {
     });
   });
 
+  describe("Personal workspaces", () => {
+    let personalTeamId: string | undefined;
+    let colleagueUserId: string | undefined;
+
+    beforeAll(async () => {
+      const colleague = await prisma.user.create({
+        data: {
+          name: "Colleague",
+          email: `colleague-${ns}@example.com`,
+        },
+      });
+      colleagueUserId = colleague.id;
+      await prisma.organizationUser.create({
+        data: {
+          userId: colleague.id,
+          organizationId: testOrganization.id,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+
+      const personalTeam = await prisma.team.create({
+        data: {
+          name: "Owner's Workspace",
+          slug: `--personal-${ns}`,
+          organizationId: testOrganization.id,
+          isPersonal: true,
+          ownerUserId: userId,
+        },
+      });
+      personalTeamId = personalTeam.id;
+
+      await prisma.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: testOrganization.id,
+          userId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: personalTeam.id,
+        },
+      });
+    });
+
+    afterAll(async () => {
+      // The organization membership holds a required relation to the user, so
+      // it goes first. The suite-wide teardown below sweeps the organization
+      // rows, but it runs after this one.
+      if (colleagueUserId) {
+        await prisma.organizationUser.deleteMany({
+          where: {
+            organizationId: testOrganization.id,
+            userId: colleagueUserId,
+          },
+        });
+        await prisma.user.deleteMany({ where: { id: colleagueUserId } });
+      }
+    });
+
+    /** @scenario Refuses to archive a personal team */
+    it("refuses to archive a personal team and leaves it unarchived", async () => {
+      const res = await api.delete(`/api/teams/${personalTeamId!}`);
+      expect(res.status).toBe(403);
+
+      const team = await prisma.team.findUnique({
+        where: { id: personalTeamId! },
+        select: { archivedAt: true },
+      });
+      expect(team?.archivedAt).toBeNull();
+    });
+
+    /** @scenario Refuses to add a member to a personal team */
+    it("refuses to add a member and leaves the owner alone on it", async () => {
+      const res = await api.post(`/api/teams/${personalTeamId!}/members`, {
+        userId: colleagueUserId!,
+        role: TeamUserRole.MEMBER,
+      });
+      expect(res.status).toBe(403);
+
+      const bindings = await prisma.roleBinding.findMany({
+        where: {
+          organizationId: testOrganization.id,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: personalTeamId!,
+        },
+        select: { userId: true },
+      });
+      expect(bindings).toEqual([{ userId }]);
+    });
+
+    /** @scenario Refuses to remove a member from a personal team */
+    it("refuses to remove the owner and leaves their binding in place", async () => {
+      const res = await api.delete(
+        `/api/teams/${personalTeamId!}/members/${userId}`,
+      );
+      expect(res.status).toBe(403);
+
+      const binding = await prisma.roleBinding.findFirst({
+        where: {
+          organizationId: testOrganization.id,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: personalTeamId!,
+          userId,
+        },
+        select: { role: true },
+      });
+      expect(binding?.role).toBe(TeamUserRole.ADMIN);
+    });
+  });
+
   describe("Permission denial", () => {
     let viewerKeyToken: string;
 
