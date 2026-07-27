@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -227,14 +228,33 @@ func TestRouter_BudgetWarning_ListsEveryScopeOverTheThreshold(t *testing.T) {
 	assert.Equal(t, "organization:84,virtual_key:99", resp.Header.Get(budgetWarningHeader))
 }
 
-// recordingProvider serves every request and records which credential each
-// dispatch used, so chain-filtering tests can assert who was dialed off a
-// real HTTP round trip.
-func recordingProvider(dialed *[]string) app.ProviderRouter {
+// dialRecorder records which credential each dispatch used, so
+// chain-filtering tests can assert who was dialed off a real HTTP round
+// trip. dispatchFn runs on the server goroutine while the test goroutine
+// reads the result, so the recording is mutex-guarded and read through a
+// snapshot accessor rather than a raw slice.
+type dialRecorder struct {
+	mu     sync.Mutex
+	dialed []string
+}
+
+func (r *dialRecorder) record(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.dialed = append(r.dialed, id)
+}
+
+func (r *dialRecorder) snapshot() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.dialed...)
+}
+
+func recordingProvider(rec *dialRecorder) app.ProviderRouter {
 	return &mockStreamProvider{
 		mockProvider: mockProvider{
 			dispatchFn: func(_ context.Context, _ *domain.Request, cred domain.Credential) (*domain.Response, error) {
-				*dialed = append(*dialed, cred.ID)
+				rec.record(cred.ID)
 				return successResponse(), nil
 			},
 		},
@@ -246,7 +266,7 @@ func recordingProvider(dialed *[]string) app.ProviderRouter {
 // vendor is skipped, and the warning header names the filtered budget so the
 // caller hears WHY the routing changed (contract §4.6).
 func TestRouter_FilteredBudget_BreachedProviderIsRoutedAround(t *testing.T) {
-	var dialed []string
+	rec := &dialRecorder{}
 	bundle := testBundle()
 	bundle.Credentials = []domain.Credential{
 		{ID: "mp_primary", ProviderID: domain.ProviderOpenAI, APIKey: "sk-1"},
@@ -258,12 +278,12 @@ func TestRouter_FilteredBudget_BreachedProviderIsRoutedAround(t *testing.T) {
 		ProviderKey: "mp_primary", Window: "day",
 		LimitMicroUSD: 25_000_000, SpentMicroUSD: 25_000_000, OnBreach: "block",
 	}}
-	srv := budgetServer(t, bundle, 0, recordingProvider(&dialed))
+	srv := budgetServer(t, bundle, 0, recordingProvider(rec))
 
 	resp := chatCall(t, srv, false)
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, []string{"mp_secondary"}, dialed)
+	assert.Equal(t, []string{"mp_secondary"}, rec.snapshot())
 	assert.Equal(t, "virtual_key/mp_primary:100", resp.Header.Get(budgetWarningHeader))
 }
 

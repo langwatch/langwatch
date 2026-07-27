@@ -15,7 +15,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import {
@@ -232,7 +232,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     await stopTestContainers();
   }, 120_000);
 
-  describe("group budgets are per member", () => {
+  describe("given a GROUP budget on a group with members", () => {
     /** @scenario "A group budget gives each member their own allowance" */
     it("resolves a GROUP budget into that member's own bucket", async () => {
       const resolved = await resolveApplicableBudgets(prisma, {
@@ -285,7 +285,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     });
   });
 
-  describe("creating a group budget", () => {
+  describe("when creating a group budget", () => {
     /** @scenario "A group budget cannot be created where members' spend cannot be told apart" */
     it("refuses GROUP creation when no ClickHouse spend path is wired", async () => {
       // The same detection check() uses to pick ClickHouse over the PG
@@ -374,7 +374,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     });
   });
 
-  describe("provider-filtered budgets", () => {
+  describe("given a budget filtered to a single provider", () => {
     /** @scenario "A provider-filtered budget only counts spend sent to that provider" */
     it("matches only the provider it names", async () => {
       const openAiOnly = await prisma.gatewayBudget.findUniqueOrThrow({
@@ -456,7 +456,25 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     });
   });
 
-  describe("the gateway bundle", () => {
+  describe("when the gateway bundle materialises for a key", () => {
+    // Restores run in afterEach, not at test tails: an assertion that
+    // throws mid-test must not leak a mutated seed key or a leftover
+    // provider into the next test's world and fail it for an unrelated
+    // reason.
+    afterEach(async () => {
+      await prisma.virtualKey.update({
+        where: { id: VK_PERSONAL_ID },
+        data: { routingMode: "NONE" },
+      });
+      await prisma.virtualKey.update({
+        where: { id: VK_SHARED_ID },
+        data: { config: {} },
+      });
+      await prisma.modelProvider.deleteMany({
+        where: { id: `mp-nxn-late-${suffix}` },
+      });
+    });
+
     /** @scenario "The gateway is told each budget's provider filter and per-member bucket" */
     it("ships provider_key, the group bucket and routing_mode", async () => {
       const repo = new VirtualKeyRepository(prisma);
@@ -555,10 +573,6 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(fallbackBundle.routing_mode).toBe("fallback_all");
       expect(fallbackBundle.fallback.max_attempts).toBeGreaterThan(1);
 
-      await prisma.virtualKey.update({
-        where: { id: VK_PERSONAL_ID },
-        data: { routingMode: "NONE" },
-      });
     });
 
     /** @scenario "An explicit provider list narrows what the key can reach" */
@@ -587,10 +601,6 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       expect(narrowedBundle.providers_allowed).toEqual([MP_OPENAI_ID]);
       expect(narrowedBundle.providers.map((p) => p.id)).toEqual([MP_OPENAI_ID]);
 
-      await prisma.virtualKey.update({
-        where: { id: VK_SHARED_ID },
-        data: { config: {} },
-      });
     });
 
     /** @scenario "Allowing all providers keeps future providers included" */
@@ -630,15 +640,10 @@ describe("budgets on every dimension (real PG + real CH)", () => {
         lateProviderId,
       );
 
-      await prisma.virtualKey.update({
-        where: { id: VK_SHARED_ID },
-        data: { config: {} },
-      });
-      await prisma.modelProvider.deleteMany({ where: { id: lateProviderId } });
     });
   });
 
-  describe("a key's own budget", () => {
+  describe("given a budget attached to the key itself", () => {
     /** @scenario "Creating a key with a budget creates both or neither" */
     it("creates the key and its budget in one transaction", async () => {
       const service = VirtualKeyService.create(prisma);
@@ -735,7 +740,7 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     });
   });
 
-  describe("key configuration rules", () => {
+  describe("when configuring a key's routing and providers", () => {
     /** @scenario "A key cannot be pointed at a provider it cannot reach" */
     /** @scenario "A key cannot name a provider outside its reach" */
     it("rejects a provider allowlist outside the key's scope graph", async () => {

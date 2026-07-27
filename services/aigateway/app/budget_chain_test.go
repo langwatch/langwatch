@@ -400,16 +400,10 @@ func TestDispatchStream_FilteredBreachRoutesAroundTheProvider(t *testing.T) {
 }
 
 // stubIterator is a minimal StreamIterator for chain tests.
-type stubIterator struct{ done bool }
+type stubIterator struct{}
 
-func (s *stubIterator) Next(context.Context) bool {
-	if s.done {
-		return false
-	}
-	s.done = true
-	return false
-}
-func (s *stubIterator) Chunk() []byte       { return nil }
-func (s *stubIterator) Usage() domain.Usage { return domain.Usage{} }
-func (s *stubIterator) Err() error          { return nil }
-func (s *stubIterator) Close() error        { return nil }
+func (s *stubIterator) Next(context.Context) bool { return false }
+func (s *stubIterator) Chunk() []byte             { return nil }
+func (s *stubIterator) Usage() domain.Usage       { return domain.Usage{} }
+func (s *stubIterator) Err() error                { return nil }
+func (s *stubIterator) Close() error              { return nil }

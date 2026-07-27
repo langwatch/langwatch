@@ -68,6 +68,8 @@ export type VirtualKeyUsageSummary = {
   }>;
 };
 
+const RECENT_DEBITS_LIMIT = 20;
+
 export class GatewayUsageService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -130,12 +132,14 @@ export class GatewayUsageService {
     // No VirtualKey predicate: the traces themselves say which key spent
     // in this project. Filtering by "keys with a PROJECT scope row here"
     // is what hid org- and team-scoped keys, whose traffic lands in this
-    // project's ledger all the same.
-    const traces = await this.spendRepo.gatewayTraces({
+    // project's ledger all the same. The aggregation itself happens in
+    // ClickHouse: the buckets are keys x models x days, so a busy
+    // project's window never streams per-trace rows into this process.
+    const buckets = await this.spendRepo.usageBuckets({
       tenantIds: [projectId],
       window,
     });
-    if (traces.length === 0) return emptySummary();
+    if (buckets.length === 0) return emptySummary();
 
     const byVk = new Map<
       string,
@@ -150,18 +154,19 @@ export class GatewayUsageService {
       { totalUsd: Prisma.Decimal; requests: number }
     >();
     let totalUsd = new Prisma.Decimal(0);
+    let totalRequests = 0;
     let blockedRequests = 0;
 
-    for (const trace of traces) {
-      totalUsd = totalUsd.plus(trace.costUsd);
-      if (trace.blockedByGuardrail) blockedRequests += 1;
-      bumpBucket(byVk, trace.virtualKeyId, trace.costUsd);
-      bumpBucket(byModel, trace.models[0] ?? "unknown", trace.costUsd);
-      bumpBucket(byDay, utcDay(trace.occurredAt), trace.costUsd);
+    for (const bucket of buckets) {
+      totalUsd = totalUsd.plus(bucket.totalUsd);
+      totalRequests += bucket.requests;
+      blockedRequests += bucket.blockedRequests;
+      bumpBucket(byVk, bucket.virtualKeyId, bucket.totalUsd, bucket.requests);
+      bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
+      bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
     }
 
     const vkMeta = await this.loadVirtualKeyMeta([...byVk.keys()]);
-    const totalRequests = traces.length;
 
     return {
       totalUsd: totalUsd.toFixed(6),
@@ -203,11 +208,21 @@ export class GatewayUsageService {
     );
     if (!visible) return emptyVkSummary();
 
-    const traces = await this.spendRepo.gatewayTraces({
-      tenantIds: [projectId],
-      window,
-      virtualKeyIds: [virtualKeyId],
-    });
+    // Slices aggregate in ClickHouse; only the 20-row recent list pulls
+    // raw traces, and that pull carries its own LIMIT.
+    const [buckets, recentTraces] = await Promise.all([
+      this.spendRepo.usageBuckets({
+        tenantIds: [projectId],
+        window,
+        virtualKeyIds: [virtualKeyId],
+      }),
+      this.spendRepo.gatewayTraces({
+        tenantIds: [projectId],
+        window,
+        virtualKeyIds: [virtualKeyId],
+        limit: RECENT_DEBITS_LIMIT,
+      }),
+    ]);
 
     const byModel = new Map<
       string,
@@ -218,27 +233,29 @@ export class GatewayUsageService {
       { totalUsd: Prisma.Decimal; requests: number }
     >();
     let totalUsd = new Prisma.Decimal(0);
+    let totalRequests = 0;
     let blockedRequests = 0;
 
-    for (const trace of traces) {
-      totalUsd = totalUsd.plus(trace.costUsd);
-      if (trace.blockedByGuardrail) blockedRequests += 1;
-      bumpBucket(byModel, trace.models[0] ?? "unknown", trace.costUsd);
-      bumpBucket(byDay, utcDay(trace.occurredAt), trace.costUsd);
+    for (const bucket of buckets) {
+      totalUsd = totalUsd.plus(bucket.totalUsd);
+      totalRequests += bucket.requests;
+      blockedRequests += bucket.blockedRequests;
+      bumpBucket(byModel, bucket.model, bucket.totalUsd, bucket.requests);
+      bumpBucket(byDay, bucket.day, bucket.totalUsd, bucket.requests);
     }
 
     return {
       totalUsd: totalUsd.toFixed(6),
-      totalRequests: traces.length,
+      totalRequests,
       blockedRequests,
-      avgUsdPerRequest: averagePerRequest(totalUsd, traces.length),
+      avgUsdPerRequest: averagePerRequest(totalUsd, totalRequests),
       byModel: topEntries(byModel).map(([model, { totalUsd, requests }]) => ({
         model,
         totalUsd: totalUsd.toFixed(6),
         requests,
       })),
       byDay: sortedDays(byDay),
-      recentDebits: traces.slice(0, 20).map((trace) => ({
+      recentDebits: recentTraces.map((trace) => ({
         id: trace.traceId,
         occurredAt: trace.occurredAt.toISOString(),
         model: trace.models[0] ?? "unknown",
@@ -304,10 +321,6 @@ export class GatewayUsageService {
   }
 }
 
-function utcDay(at: Date): string {
-  return at.toISOString().slice(0, 10);
-}
-
 function averagePerRequest(
   totalUsd: Prisma.Decimal,
   requests: number,
@@ -320,7 +333,10 @@ function topEntries(
   limit = 10,
 ): Array<[string, { totalUsd: Prisma.Decimal; requests: number }]> {
   return [...map.entries()]
-    .sort((a, b) => (b[1].totalUsd.gt(a[1].totalUsd) ? 1 : -1))
+    .sort(
+      (a, b) =>
+        b[1].totalUsd.comparedTo(a[1].totalUsd) || a[0].localeCompare(b[0]),
+    )
     .slice(0, limit);
 }
 
@@ -340,13 +356,14 @@ function bumpBucket(
   map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
   key: string,
   amount: Prisma.Decimal | string,
+  requests: number,
 ) {
   const existing = map.get(key);
   if (existing) {
     existing.totalUsd = existing.totalUsd.plus(amount);
-    existing.requests += 1;
+    existing.requests += requests;
   } else {
-    map.set(key, { totalUsd: new Prisma.Decimal(amount), requests: 1 });
+    map.set(key, { totalUsd: new Prisma.Decimal(amount), requests });
   }
 }
 

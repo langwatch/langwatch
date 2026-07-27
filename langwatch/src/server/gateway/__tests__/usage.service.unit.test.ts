@@ -1,9 +1,10 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
 import { GatewayUsageService } from "../usage.service";
 import type {
   GatewayTraceRow,
+  GatewayUsageBucket,
   GatewayVirtualKeySpendRepository,
 } from "../virtualKeySpend.clickhouse.repository";
 
@@ -50,15 +51,53 @@ function mockSpendRepo(
     hasError: false,
     blockedByGuardrail: t.blockedByGuardrail ?? false,
   }));
+  // The mock derives buckets from the same stub traces the raw query
+  // serves, mirroring what ClickHouse's GROUP BY produces, so the suite
+  // exercises the service fold over both shapes without a database.
+  const bucketsFor = (subset: GatewayTraceRow[]): GatewayUsageBucket[] => {
+    const byKey = new Map<string, GatewayUsageBucket>();
+    for (const r of subset) {
+      const model = r.models[0] ?? "unknown";
+      const day = r.occurredAt.toISOString().slice(0, 10);
+      const key = `${r.virtualKeyId}|${model}|${day}`;
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.totalUsd = new Prisma.Decimal(existing.totalUsd)
+          .plus(r.costUsd)
+          .toString();
+        existing.requests += 1;
+        existing.blockedRequests += r.blockedByGuardrail ? 1 : 0;
+      } else {
+        byKey.set(key, {
+          virtualKeyId: r.virtualKeyId,
+          model,
+          day,
+          totalUsd: r.costUsd,
+          requests: 1,
+          blockedRequests: r.blockedByGuardrail ? 1 : 0,
+        });
+      }
+    }
+    return [...byKey.values()];
+  };
+  const filtered = (virtualKeyIds?: string[]) =>
+    virtualKeyIds
+      ? rows.filter((r) => virtualKeyIds.includes(r.virtualKeyId))
+      : rows;
   return {
+    usageBuckets: async ({ virtualKeyIds }: { virtualKeyIds?: string[] }) =>
+      bucketsFor(filtered(virtualKeyIds)),
     gatewayTraces: async ({
       virtualKeyIds,
+      limit,
     }: {
       virtualKeyIds?: string[];
+      limit: number;
     }) =>
-      virtualKeyIds
-        ? rows.filter((r) => virtualKeyIds.includes(r.virtualKeyId))
-        : rows,
+      filtered(virtualKeyIds)
+        .slice()
+        .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+        .slice(0, limit),
     spendByVirtualKey: async () => [],
   } as unknown as GatewayVirtualKeySpendRepository;
 }
@@ -160,7 +199,7 @@ describe("GatewayUsageService.summary", () => {
     });
   });
 
-  describe("blocked-by-guardrail tally", () => {
+  describe("when a request is blocked by a guardrail", () => {
     it("counts blocked requests separately from totalRequests", async () => {
       const result = await service(
         [{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }],
@@ -183,7 +222,7 @@ describe("GatewayUsageService.summary", () => {
     });
   });
 
-  describe("avgUsdPerRequest", () => {
+  describe("when computing avgUsdPerRequest", () => {
     it("is exactly 0 when there are no requests", async () => {
       const result = await service(
         [{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }],

@@ -108,6 +108,20 @@ func budgetBreachMessage(budget domain.BudgetScope) string {
 		return "Your organization's AI gateway spending limit has been reached. Contact your LangWatch admin to raise it."
 	}
 	target := budgetScopeNoun(budget.Scope)
+	// A scope without a window would render "(per )"; drop the clause
+	// rather than print an empty placeholder in customer-facing copy.
+	if budget.Window == "" {
+		if budget.ProviderKey != "" {
+			return fmt.Sprintf(
+				"The %s spending limit covering provider %s has been reached, and no other provider can serve this request. Contact your LangWatch admin to raise it.",
+				target, budget.ProviderKey,
+			)
+		}
+		return fmt.Sprintf(
+			"The %s spending limit for this request has been reached. Contact your LangWatch admin to raise it.",
+			target,
+		)
+	}
 	if budget.ProviderKey != "" {
 		return fmt.Sprintf(
 			"The %s spending limit (per %s) covering provider %s has been reached, and no other provider can serve this request. Contact your LangWatch admin to raise it.",
@@ -121,9 +135,11 @@ func budgetBreachMessage(budget domain.BudgetScope) string {
 }
 
 func budgetBreachTips(budget domain.BudgetScope) []string {
-	raise := "Contact your LangWatch admin to raise the " + budgetScopeNoun(budget.Scope) + " spending limit"
+	var raise string
 	if budget.Scope == "" {
 		raise = "Contact your LangWatch admin to raise the organization's spending limit"
+	} else {
+		raise = "Contact your LangWatch admin to raise the " + budgetScopeNoun(budget.Scope) + " spending limit"
 	}
 	if budget.ProviderKey != "" {
 		return []string{

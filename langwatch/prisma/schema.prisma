@@ -3012,7 +3012,6 @@ model GatewayBudget {
   ledgerEntries GatewayBudgetLedger[]
 
   @@index([organizationId])
-  @@index([scopeType, scopeId])
   @@index([scopeType, scopeId, providerKey])
   @@index([resetsAt])
 }

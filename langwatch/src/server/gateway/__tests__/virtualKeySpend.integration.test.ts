@@ -205,6 +205,14 @@ describe("virtual key spend (real PG + real CH)", () => {
   }, 120_000);
 
   afterAll(async () => {
+    // The CH rows are tenant-isolated by the nanoid project id, but the
+    // shared container should not accrue a suite's worth of rows per run.
+    const ch = getTestClickHouseClient();
+    if (ch) {
+      await ch.command({
+        query: `DELETE FROM trace_summaries WHERE TenantId = '${PROJECT_ID}'`,
+      });
+    }
     await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.virtualKey.deleteMany({
       where: { id: { in: [VK_UNBUDGETED_ID, VK_BUDGETED_ID] } },
@@ -258,7 +266,9 @@ describe("virtual key spend (real PG + real CH)", () => {
   /** @scenario "The window start is inclusive and the window end is exclusive" */
   it("keeps the boundaries half-open so a request is counted exactly once", async () => {
     const ch = getTestClickHouseClient()!;
-    const anchor = new Date("2026-03-15T12:00:00.000Z");
+    // Outside every rolling window this suite queries, derived from the
+    // clock rather than the calendar so it cannot rot into one.
+    const anchor = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
     await insertGatewayTrace({
       ch,
       traceId: `trace-boundary-${suffix}`,
@@ -285,7 +295,7 @@ describe("virtual key spend (real PG + real CH)", () => {
   it("counts a trace once when its projection is written twice", async () => {
     const ch = getTestClickHouseClient()!;
     const traceId = `trace-reprojected-${suffix}`;
-    const anchor = new Date("2026-02-10T09:00:00.000Z");
+    const anchor = new Date(Date.now() - 390 * 24 * 60 * 60 * 1000);
     // The same trace, projected twice before the engine merges the parts:
     // an early row with a partial cost and a later, correct one. Summing
     // both would over-report; taking the earlier one would under-report.

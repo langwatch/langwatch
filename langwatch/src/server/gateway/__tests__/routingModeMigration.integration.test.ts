@@ -58,13 +58,25 @@ const MIGRATION_FILE = join(
  */
 function backfillStatements(): string[] {
   const sql = readFileSync(MIGRATION_FILE, "utf8");
+  // Whole statements, not lines: a reformatted multi-line UPDATE must
+  // arrive intact rather than truncated to its first line.
   const statements = sql
-    .split("\n")
-    .filter((line) => line.trim().startsWith("UPDATE \"VirtualKey\""));
+    .split(";")
+    .map((statement) => statement.replace(/^\s*--.*$/gm, "").trim())
+    .filter((statement) => statement.startsWith('UPDATE "VirtualKey"'));
   if (statements.length !== 2) {
     throw new Error(
       `expected the migration to carry exactly two VirtualKey backfill statements, found ${statements.length}`,
     );
+  }
+  // The shipped statements are deliberately blanket: the one-shot
+  // backfill addresses every pre-migration row. The tenant-scoped
+  // narrowing below is a property of the replay only.
+  if (!statements[0]!.endsWith('WHERE "routingPolicyId" IS NULL')) {
+    throw new Error("first backfill statement changed shape");
+  }
+  if (!statements[1]!.endsWith('WHERE "routingPolicyId" IS NOT NULL')) {
+    throw new Error("second backfill statement changed shape");
   }
   return statements;
 }
@@ -206,7 +218,13 @@ describe("keys that predate the routing choice keep falling back against real PG
         });
 
         for (const statement of statements) {
-          await tx.$executeRawUnsafe(statement);
+          // Same statements, narrowed to this test's synthetic rows: the
+          // blanket WHERE would take a row lock on every matching
+          // VirtualKey in the shared test database until the rollback,
+          // blocking any concurrently running suite.
+          await tx.$executeRawUnsafe(
+            `${statement} AND "id" IN ('${legacyNullPolicyId}', '${legacyPolicyId}')`,
+          );
         }
 
         const nullPolicyRow = await tx.virtualKey.findUniqueOrThrow({

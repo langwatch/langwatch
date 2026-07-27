@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -141,7 +142,9 @@ func TestControlPlaneMaterialiserEmitsTheBudgetContract(t *testing.T) {
 	}
 	// routing_mode none must arrive with a one-attempt fallback budget so
 	// gateways that predate the field still behave correctly (contract §4.2).
-	if !strings.Contains(src, `vk.routingMode === "NONE" ? 1`) {
+	// Whitespace-tolerant: a formatter may break this expression across
+	// lines without breaking the contract it expresses.
+	if !regexp.MustCompile(`vk\.routingMode\s*===\s*"NONE"\s*\?\s*1`).MatchString(src) {
 		t.Error("config.materialiser.ts no longer pins max_attempts to 1 for routing mode NONE")
 	}
 }

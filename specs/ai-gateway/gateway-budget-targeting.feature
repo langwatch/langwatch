@@ -6,7 +6,8 @@ Feature: Gateway budget targeting
   # Background
   #
   # A gateway budget applies at one scope: an organization, a team, a
-  # project, a virtual key, or a principal. Historically the target was
+  # project, a group, a virtual key, or a principal. Historically the
+  # target was
   # recorded in two places that had to be kept in lock-step (a canonical
   # scope plus a parallel set of typed columns guarded by a database CHECK
   # constraint), which created room for the two to disagree.
@@ -15,9 +16,9 @@ Feature: Gateway budget targeting
   # one organization. The duplicate typed columns, their cascade foreign
   # keys, and the CHECK constraint are removed; cleanup when a scoping
   # entity is deleted moves to the service layer. Budgets keep their own
-  # five-tier set (organization, team, project, virtual key, principal);
-  # those extra tiers are budget-only and are not part of the shared
-  # three-tier scope contract. Budgets have no real production usage yet,
+  # six-tier set (organization, team, project, group, virtual key,
+  # principal); those extra tiers are budget-only and are not part of the
+  # shared three-tier scope contract. Budgets have no real production usage yet,
   # so the change can be aggressive.
 
   Background:

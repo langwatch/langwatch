@@ -24,8 +24,8 @@ import { createLogger } from "@langwatch/observability";
 
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
-const TRACE_SUMMARIES_TABLE = "trace_summaries" as const;
-const VK_ATTRIBUTE = "langwatch.virtual_key_id" as const;
+const TRACE_SUMMARIES_TABLE = "trace_summaries";
+const VK_ATTRIBUTE = "langwatch.virtual_key_id";
 
 const logger = createLogger("langwatch:gateway:virtual-key-spend-repository");
 
@@ -130,18 +130,18 @@ export class GatewayVirtualKeySpendRepository {
   }
 
   /**
-   * Every gateway trace in the window, one row per trace, deduped. The
-   * caller aggregates: the row count here is bounded by a page's window
-   * and the slices the Usage tab shows (per key, per model, per day, and
-   * the recent list) all have to agree with each other, which they only
-   * do when they are folded from one pull rather than four queries that
-   * can each round differently.
+   * The Usage tab's slices (per key, per model, per day, totals, blocked
+   * count), aggregated inside ClickHouse over the deduped traces. One
+   * grouped query keeps every slice consistent with the others while the
+   * result stays bounded by keys x models x days, not by traffic: a busy
+   * project's 90-day window is millions of traces but only a page of
+   * buckets.
    */
-  async gatewayTraces(args: {
+  async usageBuckets(args: {
     tenantIds: string[];
     window: SpendWindow;
     virtualKeyIds?: string[];
-  }): Promise<GatewayTraceRow[]> {
+  }): Promise<GatewayUsageBucket[]> {
     const { tenantIds, window, virtualKeyIds } = args;
     if (tenantIds.length === 0) return [];
     if (virtualKeyIds && virtualKeyIds.length === 0) return [];
@@ -150,6 +150,105 @@ export class GatewayVirtualKeySpendRepository {
       vkAttr: VK_ATTRIBUTE,
       fromMs: window.fromDate.getTime(),
       toMs: window.toDate.getTime(),
+    };
+    const tenantPlaceholders = tenantIds
+      .map((id, i) => {
+        params[`tenant${i}`] = id;
+        return `{tenant${i}:String}`;
+      })
+      .join(",");
+    const vkFilter = virtualKeyIds
+      ? `AND Attributes[{vkAttr:String}] IN (${virtualKeyIds
+          .map((id, i) => {
+            params[`vk${i}`] = id;
+            return `{vk${i}:String}`;
+          })
+          .join(",")})`
+      : `AND Attributes[{vkAttr:String}] != ''`;
+
+    try {
+      const client = await this.resolveClient(tenantIds[0]!);
+      const result = await client.query({
+        query: `
+          SELECT
+            VirtualKeyId AS virtualKeyId,
+            Model AS model,
+            Day AS day,
+            toString(sum(TraceCost)) AS totalUsd,
+            count() AS requests,
+            countIf(Blocked) AS blockedRequests
+          FROM (
+            SELECT
+              TenantId,
+              TraceId,
+              argMax(Attributes[{vkAttr:String}], UpdatedAt) AS VirtualKeyId,
+              argMax(coalesce(TotalCost, 0), UpdatedAt) AS TraceCost,
+              if(
+                length(argMax(Models, UpdatedAt)) = 0,
+                'unknown',
+                arrayElement(argMax(Models, UpdatedAt), 1)
+              ) AS Model,
+              formatDateTime(argMax(OccurredAt, UpdatedAt), '%Y-%m-%d', 'UTC') AS Day,
+              argMax(BlockedByGuardrail, UpdatedAt) AS Blocked
+            FROM ${TRACE_SUMMARIES_TABLE}
+            WHERE TenantId IN (${tenantPlaceholders})
+              AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+              AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
+              ${vkFilter}
+            GROUP BY TenantId, TraceId
+          )
+          GROUP BY VirtualKeyId, Model, Day
+        `,
+        query_params: params,
+        format: "JSONEachRow",
+      });
+      type Row = {
+        virtualKeyId: string;
+        model: string;
+        day: string;
+        totalUsd: string;
+        requests: number | string;
+        blockedRequests: number | string;
+      };
+      const rows = (await result.json()) as Row[];
+      return rows.map((r) => ({
+        virtualKeyId: r.virtualKeyId,
+        model: r.model,
+        day: r.day,
+        totalUsd: r.totalUsd,
+        requests: Number(r.requests) || 0,
+        blockedRequests: Number(r.blockedRequests) || 0,
+      }));
+    } catch (error) {
+      logger.error(
+        { tenantIds, error },
+        "failed to aggregate gateway usage from trace summaries",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * The most recent gateway traces in the window, one row per trace,
+   * deduped, newest first. `limit` is required: this is the query for a
+   * "recent debits" list, and an unbounded pull of raw traces into Node
+   * is exactly what `usageBuckets` exists to avoid.
+   */
+  async gatewayTraces(args: {
+    tenantIds: string[];
+    window: SpendWindow;
+    virtualKeyIds?: string[];
+    limit: number;
+  }): Promise<GatewayTraceRow[]> {
+    const { tenantIds, window, virtualKeyIds, limit } = args;
+    if (tenantIds.length === 0) return [];
+    if (virtualKeyIds && virtualKeyIds.length === 0) return [];
+
+    const params: Record<string, string | number> = {
+      vkAttr: VK_ATTRIBUTE,
+      fromMs: window.fromDate.getTime(),
+      toMs: window.toDate.getTime(),
+      limit: Math.max(1, Math.floor(limit)),
     };
     const tenantPlaceholders = tenantIds
       .map((id, i) => {
@@ -202,6 +301,7 @@ export class GatewayVirtualKeySpendRepository {
             GROUP BY TenantId, TraceId
           )
           ORDER BY occurredAtMs DESC
+          LIMIT {limit:UInt32}
         `,
         query_params: params,
         format: "JSONEachRow",
@@ -240,6 +340,16 @@ export class GatewayVirtualKeySpendRepository {
     }
   }
 }
+
+export type GatewayUsageBucket = {
+  virtualKeyId: string;
+  model: string;
+  /** UTC calendar day, YYYY-MM-DD. */
+  day: string;
+  totalUsd: string;
+  requests: number;
+  blockedRequests: number;
+};
 
 export type GatewayTraceRow = {
   traceId: string;
