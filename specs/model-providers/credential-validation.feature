@@ -211,3 +211,60 @@ Feature: Credential Validation
     When I call validateProviderApiKey for it
     Then validation is skipped instead of probing a relative URL
     And no misleading network-connection error is shown
+
+  # A rejected key is a dead end for the customer: the drawer refuses to save
+  # until the probe passes. So the message has to name the real cause, or the
+  # customer regenerates a working key over and over and gets nowhere.
+
+  @unit
+  Scenario: Gemini reports a disabled Generative Language API, not a bad key
+    Given a Gemini key created in the Google Cloud console
+    And the Generative Language API is not enabled on that project
+    When I call validateProviderApiKey for it
+    Then I am told to enable the Generative Language API
+    And I am not told the API key is invalid
+
+  @unit
+  Scenario: Gemini reports a key restricted away from the API, not a bad key
+    Given a Gemini key whose API restrictions exclude the Generative Language API
+    When I call validateProviderApiKey for it
+    Then I am told the key's restrictions exclude the API
+    And I am not told the API key is invalid
+
+  @unit
+  Scenario: Gemini reports a key restricted to other callers, not a bad key
+    Given a Gemini key carrying a referrer, IP, or app restriction
+    When I call validateProviderApiKey for it
+    Then I am told the key's restrictions block the request
+    And I am not told the API key is invalid
+
+  @unit
+  Scenario: Gemini reports a genuinely invalid key as invalid
+    Given a Gemini key that Google reports as API_KEY_INVALID
+    When I call validateProviderApiKey for it
+    Then I am told the API key is invalid
+
+  @unit
+  Scenario: A refusal carries the provider's own explanation
+    Given a provider rejects the key with an explanation in the response body
+    When I call validateProviderApiKey for it
+    Then the explanation is included in the error I see
+
+  @unit
+  Scenario: A refusal with no readable explanation falls back to the generic message
+    Given a provider rejects the key with a body that cannot be read or parsed
+    When I call validateProviderApiKey for it
+    Then I am told the API key is invalid
+
+  @unit
+  Scenario: A refusal never repeats the submitted API key
+    Given a provider echoes the submitted API key back in its explanation
+    When I call validateProviderApiKey for it
+    Then the key is hidden from the error I see
+
+  @unit
+  Scenario: A provider server error is not reported as a bad key
+    Given a provider returns a server error
+    When I call validateProviderApiKey for it
+    Then I am told validation failed with the status code
+    And I am not told the API key is invalid

@@ -55,178 +55,255 @@ function buildModelsEndpointUrl(
   return normalized.endsWith("/models") ? normalized : `${normalized}/models`;
 }
 
+const INVALID_KEY_MESSAGE =
+  "Invalid API key. Please check your API key and try again.";
+
+/** Longest upstream explanation we pass through to the customer. */
+const MAX_UPSTREAM_DETAIL_LENGTH = 300;
+
+const GEMINI_RESTRICTION_MESSAGE =
+  "This key's restrictions block this request. Allow it in the Google Cloud console, then try again.";
+
 /**
- * Handles HTTP response errors and returns appropriate error messages.
+ * Google answers a refused key with a machine-readable `reason`, and only
+ * `API_KEY_INVALID` actually means the key is wrong. The rest are project or
+ * key-restriction problems that generating a new key will never fix, so they
+ * get an explanation the customer can act on instead.
  *
- * @param response - The fetch Response object
- * @returns ValidationResult with error message
+ * @see https://cloud.google.com/apis/design/errors
  */
-function handleHttpError(response: Response): ValidationResult {
-  if (response.status === 401 || response.status === 403) {
-    return {
-      valid: false,
-      error: "Invalid API key. Please check your API key and try again.",
-    };
+const GEMINI_REASON_MESSAGES: Record<string, string> = {
+  API_KEY_INVALID: INVALID_KEY_MESSAGE,
+  SERVICE_DISABLED:
+    "This key's Google Cloud project does not have the Generative Language API enabled. Enable it in the Google Cloud console, then try again.",
+  API_KEY_SERVICE_BLOCKED:
+    "This key's API restrictions exclude the Generative Language API. Allow it in the Google Cloud console, then try again.",
+  API_KEY_HTTP_REFERRER_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
+  API_KEY_IP_ADDRESS_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
+  API_KEY_ANDROID_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
+  API_KEY_IOS_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
+};
+
+/** The refusal as the provider described it, once we can read it. */
+type UpstreamRefusal = { message?: string; reason?: string };
+
+/**
+ * Pulls the human-readable message out of the error shapes our providers
+ * actually return. Google, OpenAI and Anthropic all nest it under `error`;
+ * ElevenLabs uses `detail`.
+ */
+function extractUpstreamMessage(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+
+  const { error, message, detail } = body as Record<string, unknown>;
+
+  const candidates = [
+    (error as Record<string, unknown> | undefined)?.message,
+    error,
+    message,
+    (detail as Record<string, unknown> | undefined)?.message,
+    detail,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
   }
+
+  return undefined;
+}
+
+/** Reads Google's `google.rpc.ErrorInfo` reason out of `error.details[]`. */
+function extractUpstreamReason(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+
+  const error = (body as Record<string, unknown>).error;
+  if (typeof error !== "object" || error === null) return undefined;
+
+  const details = (error as Record<string, unknown>).details;
+  if (!Array.isArray(details)) return undefined;
+
+  for (const detail of details) {
+    const reason = (detail as Record<string, unknown> | null)?.reason;
+    if (typeof reason === "string" && reason.trim()) return reason.trim();
+  }
+
+  return undefined;
+}
+
+/**
+ * Strips the submitted key out of text we are about to show or log. Gemini
+ * carries the key in the query string, and providers echo the offending
+ * request back often enough that this cannot be left to chance.
+ */
+function redactApiKey(text: string, apiKey: string): string {
+  if (apiKey.length < 8) return text;
+
+  return text.split(apiKey).join("[redacted]");
+}
+
+/**
+ * Reads the provider's own explanation for a refusal. Never throws: an
+ * unreadable body just means we fall back to the generic message.
+ */
+async function readUpstreamRefusal(
+  response: Response,
+  apiKey: string,
+): Promise<UpstreamRefusal> {
+  let raw: string;
+  try {
+    raw = await response.text();
+  } catch {
+    return {};
+  }
+
+  if (!raw?.trim()) return {};
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+
+  const message = extractUpstreamMessage(parsed);
+
   return {
-    valid: false,
-    error: `API validation failed (${response.status}). Please check your credentials.`,
+    message: message
+      ? redactApiKey(message, apiKey).slice(0, MAX_UPSTREAM_DETAIL_LENGTH)
+      : undefined,
+    reason: extractUpstreamReason(parsed),
   };
 }
 
 /**
- * Validates using Bearer token authentication (OpenAI-compatible).
+ * Turns an HTTP failure into a message the customer can act on, preferring
+ * the provider's own explanation over our guess about what went wrong.
  *
- * @param apiKey - The API key to validate
- * @param baseUrl - The user-provided base URL
- * @param defaultBaseUrl - The default base URL for the provider
- * @returns Promise resolving to validation result
+ * @param response - The fetch Response object
+ * @param context - Which provider was probed, and with which key
+ * @returns ValidationResult with error message
  */
-async function validateWithBearerToken(
+async function handleHttpError(
+  response: Response,
+  context: ProbeContext,
+): Promise<ValidationResult> {
+  const { message, reason } = await readUpstreamRefusal(
+    response,
+    context.apiKey,
+  );
+
+  const knownReason = reason ? GEMINI_REASON_MESSAGES[reason] : undefined;
+  if (context.provider === "gemini" && knownReason) {
+    return { valid: false, error: knownReason };
+  }
+
+  // Gemini reports a rejected key as 400, every other provider as 401/403.
+  const isAuthFailure =
+    response.status === 401 ||
+    response.status === 403 ||
+    (context.provider === "gemini" && response.status === 400);
+
+  if (isAuthFailure) {
+    return {
+      valid: false,
+      error: message ? `${INVALID_KEY_MESSAGE} ${message}` : INVALID_KEY_MESSAGE,
+    };
+  }
+
+  return {
+    valid: false,
+    error: message
+      ? `API validation failed (${response.status}). ${message}`
+      : `API validation failed (${response.status}). Please check your credentials.`,
+  };
+}
+
+/**
+ * Identifies the probe in flight, so a refusal can be explained in terms of
+ * the provider the customer is actually configuring.
+ */
+type ProbeContext = {
+  /** Registry key, e.g. "openai" or "gemini" */
+  provider: string;
+  /** The key being checked, so it can be kept out of error messages */
+  apiKey: string;
+  /** Whether the customer can point this provider at their own URL */
+  hasConfigurableEndpoint: boolean;
+};
+
+/** The request that proves a key works: list the provider's models. */
+type ProbeRequest = { url: string; headers: Record<string, string> };
+
+/**
+ * Builds the models request for an auth strategy. Every provider is probed
+ * the same way; only where the credential rides differs.
+ */
+function buildProbeRequest(
+  strategy: AuthStrategy,
   apiKey: string,
   baseUrl: string,
   defaultBaseUrl: string,
-): Promise<ValidationResult> {
+): ProbeRequest {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
 
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      return handleHttpError(response);
-    }
-
-    return { valid: true };
-  } catch {
-    return {
-      valid: false,
-      error:
-        "Failed to validate API key. Please check your network connection and base URL.",
-    };
+  switch (strategy) {
+    case "anthropic":
+      return {
+        url,
+        headers: {
+          ...headers,
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+      };
+    case "elevenlabs":
+      return { url, headers: { ...headers, "xi-api-key": apiKey } };
+    case "gemini":
+      // Gemini takes the key as a query parameter, not a header.
+      return { url: `${url}?key=${encodeURIComponent(apiKey)}`, headers };
+    case "bearer":
+    default:
+      return {
+        url,
+        headers: { ...headers, Authorization: `Bearer ${apiKey}` },
+      };
   }
 }
 
 /**
- * Validates using Anthropic's x-api-key header authentication.
+ * Asks the provider to list its models and reports what came back.
  *
- * @param apiKey - The API key to validate
- * @param baseUrl - The user-provided base URL (may be empty)
- * @param defaultBaseUrl - The default base URL for Anthropic
+ * @param request - The URL and headers to probe with
+ * @param context - Which provider is being probed, and with which key
  * @returns Promise resolving to validation result
  */
-async function validateWithAnthropicAuth(
-  apiKey: string,
-  baseUrl: string,
-  defaultBaseUrl: string,
+async function runProbe(
+  request: ProbeRequest,
+  context: ProbeContext,
 ): Promise<ValidationResult> {
-  const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
-
   try {
-    const response = await fetch(url, {
+    const response = await fetch(request.url, {
       method: "GET",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
+      headers: request.headers,
     });
 
     if (!response.ok) {
-      return handleHttpError(response);
+      return await handleHttpError(response, context);
     }
 
     return { valid: true };
   } catch {
+    // The request never landed, so this says nothing about the key itself.
     return {
       valid: false,
-      error:
-        "Failed to validate API key. Please check your network connection.",
-    };
-  }
-}
-
-/**
- * Validates using ElevenLabs' xi-api-key header authentication.
- *
- * @param apiKey - The API key to validate
- * @param baseUrl - The user-provided base URL (may be empty)
- * @param defaultBaseUrl - The default base URL for ElevenLabs
- * @returns Promise resolving to validation result
- */
-async function validateWithElevenLabsAuth(
-  apiKey: string,
-  baseUrl: string,
-  defaultBaseUrl: string,
-): Promise<ValidationResult> {
-  const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "xi-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      return handleHttpError(response);
-    }
-
-    return { valid: true };
-  } catch {
-    return {
-      valid: false,
-      error:
-        "Failed to validate API key. Please check your network connection.",
-    };
-  }
-}
-
-/**
- * Validates using Gemini's query parameter authentication.
- *
- * @param apiKey - The API key to validate
- * @param defaultBaseUrl - The default base URL for Gemini
- * @returns Promise resolving to validation result
- */
-async function validateWithGeminiAuth(
-  apiKey: string,
-  defaultBaseUrl: string,
-): Promise<ValidationResult> {
-  const url = `${defaultBaseUrl}/models?key=${encodeURIComponent(apiKey)}`;
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      // Gemini returns 400 for invalid keys
-      if (response.status === 400 || response.status === 403) {
-        return {
-          valid: false,
-          error: "Invalid API key. Please check your API key and try again.",
-        };
-      }
-      return handleHttpError(response);
-    }
-
-    return { valid: true };
-  } catch {
-    return {
-      valid: false,
-      error:
-        "Failed to validate API key. Please check your network connection.",
+      error: context.hasConfigurableEndpoint
+        ? "Failed to validate API key. Please check your network connection and base URL."
+        : "Failed to validate API key. Please check your network connection.",
     };
   }
 }
@@ -367,16 +444,12 @@ export async function validateProviderApiKey(
     return { valid: true };
   }
 
-  switch (authStrategy) {
-    case "bearer":
-      return validateWithBearerToken(apiKey, baseUrl, defaultBaseUrl);
-    case "anthropic":
-      return validateWithAnthropicAuth(apiKey, baseUrl, defaultBaseUrl);
-    case "gemini":
-      return validateWithGeminiAuth(apiKey, defaultBaseUrl);
-    case "elevenlabs":
-      return validateWithElevenLabsAuth(apiKey, baseUrl, defaultBaseUrl);
-    default:
-      return { valid: true };
-  }
+  return runProbe(
+    buildProbeRequest(authStrategy, apiKey, baseUrl, defaultBaseUrl),
+    {
+      provider,
+      apiKey,
+      hasConfigurableEndpoint: !!endpointField,
+    },
+  );
 }

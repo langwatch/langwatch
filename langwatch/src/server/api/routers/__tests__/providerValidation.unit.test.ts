@@ -313,6 +313,237 @@ describe("validateProviderApiKey", () => {
     });
   });
 
+  describe("when the provider explains why it refused the key", () => {
+    /**
+     * Google returns a machine-readable `reason` in `error.details[]`. Only
+     * API_KEY_INVALID actually means the key is wrong; the rest are project
+     * or restriction problems that regenerating the key will never fix.
+     */
+    const googleError = (
+      status: number,
+      reason: string,
+      message: string,
+    ): unknown => ({
+      error: {
+        code: status,
+        message,
+        status: status === 400 ? "INVALID_ARGUMENT" : "PERMISSION_DENIED",
+        details: [
+          {
+            "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+            reason,
+            domain: "googleapis.com",
+          },
+        ],
+      },
+    });
+
+    const respondWith = (status: number, body: unknown) => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status,
+        text: async () => JSON.stringify(body),
+      });
+    };
+
+    describe("given the Generative Language API is disabled on the project", () => {
+      /** @scenario "Gemini reports a disabled Generative Language API, not a bad key" */
+      it("tells the customer to enable the API instead of blaming the key", async () => {
+        respondWith(
+          403,
+          googleError(
+            403,
+            "SERVICE_DISABLED",
+            "Generative Language API has not been used in project 12345 before or it is disabled.",
+          ),
+        );
+
+        const result = await validateProviderApiKey("gemini", {
+          GEMINI_API_KEY: "AIzaSyValidKeyFromGoogleCloudConsole",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("Generative Language API");
+        expect(result.error).toContain("enable");
+        expect(result.error).not.toContain("Invalid API key");
+      });
+    });
+
+    describe("given the key's API restrictions exclude Gemini", () => {
+      /** @scenario "Gemini reports a key restricted away from the API, not a bad key" */
+      it("points at the restriction instead of blaming the key", async () => {
+        respondWith(
+          403,
+          googleError(
+            403,
+            "API_KEY_SERVICE_BLOCKED",
+            "Requests to this API generativelanguage.googleapis.com method are blocked.",
+          ),
+        );
+
+        const result = await validateProviderApiKey("gemini", {
+          GEMINI_API_KEY: "AIzaSyRestrictedKey",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("restriction");
+        expect(result.error).not.toContain("Invalid API key");
+      });
+    });
+
+    describe("given the key is locked to other callers", () => {
+      /** @scenario "Gemini reports a key restricted to other callers, not a bad key" */
+      it.each([
+        "API_KEY_HTTP_REFERRER_BLOCKED",
+        "API_KEY_IP_ADDRESS_BLOCKED",
+        "API_KEY_ANDROID_APP_BLOCKED",
+        "API_KEY_IOS_APP_BLOCKED",
+      ])("explains the restriction for %s", async (reason) => {
+        respondWith(403, googleError(403, reason, "Requests are blocked."));
+
+        const result = await validateProviderApiKey("gemini", {
+          GEMINI_API_KEY: "AIzaSyRestrictedKey",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("restriction");
+        expect(result.error).not.toContain("Invalid API key");
+      });
+    });
+
+    describe("given the key really is wrong", () => {
+      /** @scenario "Gemini reports a genuinely invalid key as invalid" */
+      it("still reports an invalid key", async () => {
+        respondWith(
+          400,
+          googleError(
+            400,
+            "API_KEY_INVALID",
+            "API key not valid. Please pass a valid API key.",
+          ),
+        );
+
+        const result = await validateProviderApiKey("gemini", {
+          GEMINI_API_KEY: "not-a-real-key",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("Invalid API key");
+      });
+    });
+
+    describe("given a non-Gemini provider explains the refusal", () => {
+      /** @scenario "A refusal carries the provider's own explanation" */
+      it("surfaces the OpenAI message", async () => {
+        respondWith(401, {
+          error: {
+            message: "Incorrect API key provided. You can find your API key at",
+            type: "invalid_request_error",
+          },
+        });
+
+        const result = await validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-wrong",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("Incorrect API key provided");
+      });
+
+      it("surfaces the Anthropic message", async () => {
+        respondWith(401, {
+          type: "error",
+          error: { type: "authentication_error", message: "invalid x-api-key" },
+        });
+
+        const result = await validateProviderApiKey("anthropic", {
+          ANTHROPIC_API_KEY: "sk-ant-wrong",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("invalid x-api-key");
+      });
+
+      it("surfaces the ElevenLabs message", async () => {
+        respondWith(401, {
+          detail: { status: "invalid_api_key", message: "Invalid API key" },
+        });
+
+        const result = await validateProviderApiKey("elevenlabs", {
+          ELEVENLABS_API_KEY: "sk_wrong",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("Invalid API key");
+      });
+
+      it("keeps the status code when the provider is failing", async () => {
+        respondWith(500, { error: { message: "upstream is on fire" } });
+
+        const result = await validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-valid",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("API validation failed (500)");
+        expect(result.error).toContain("upstream is on fire");
+        expect(result.error).not.toContain("Invalid API key");
+      });
+    });
+
+    describe("given the refusal has no readable explanation", () => {
+      /** @scenario "A refusal with no readable explanation falls back to the generic message" */
+      it("falls back to the invalid key message when the body is not JSON", async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          text: async () => "<html>Gateway error</html>",
+        });
+
+        const result = await validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-wrong",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("Invalid API key");
+      });
+
+      it("falls back when the body cannot be read at all", async () => {
+        mockFetch.mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          text: async () => {
+            throw new Error("body already consumed");
+          },
+        });
+
+        const result = await validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-wrong",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("Invalid API key");
+      });
+    });
+
+    describe("given the provider echoes the submitted key back", () => {
+      /** @scenario "A refusal never repeats the submitted API key" */
+      it("hides the key from the message shown to the customer", async () => {
+        const apiKey = "AIzaSySuperSecretKeyValue123456789";
+        respondWith(400, {
+          error: { message: `API key not valid: ${apiKey} was rejected` },
+        });
+
+        const result = await validateProviderApiKey("gemini", {
+          GEMINI_API_KEY: apiKey,
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).not.toContain(apiKey);
+      });
+    });
+  });
+
   describe("Custom provider validation", () => {
     it("skips validation when no API key and no base URL", async () => {
       const result = await validateProviderApiKey("custom", {
