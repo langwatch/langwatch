@@ -33,6 +33,21 @@ describe("useRollingWindow", () => {
     );
   });
 
+  it("anchors the mtd range at the start of the current UTC month and keeps rolling", async () => {
+    const { result } = renderHook(() => useRollingWindow("mtd"));
+    expect(result.current.fromIso).toBe("2026-07-01T00:00:00.000Z");
+    expect(result.current.toIso).toBe("2026-07-27T10:00:00.000Z");
+
+    // Crossing a month boundary re-anchors: this month, not last month.
+    await act(async () => {
+      vi.setSystemTime(new Date("2026-08-02T09:00:00.000Z"));
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current.fromIso).toBe("2026-08-01T00:00:00.000Z");
+    // advanceTimersByTime also advanced the mocked clock by the minute.
+    expect(result.current.toIso).toBe("2026-08-02T09:01:00.000Z");
+  });
+
   /** @scenario "The window keeps its length as it rolls" */
   it("keeps the window the requested number of days wide", () => {
     const { result } = renderHook(() => useRollingWindow(7));
