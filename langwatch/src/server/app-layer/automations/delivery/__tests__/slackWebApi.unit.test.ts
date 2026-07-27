@@ -105,13 +105,15 @@ describe("postSlackChatMessage", () => {
 function channelPage({
   ids,
   nextCursor,
+  public = true,
 }: {
   ids: string[];
   nextCursor?: string;
+  public?: boolean;
 }) {
   return {
     ok: true,
-    channels: ids.map((id) => ({ id, name: id.toLowerCase(), is_private: false })),
+    channels: ids.map((id) => ({ id, name: id.toLowerCase(), is_private: !public })),
     response_metadata: nextCursor ? { next_cursor: nextCursor } : {},
   };
 }
@@ -221,6 +223,7 @@ describe("listSlackChannels", () => {
 
       expect(mockedSend.mock.calls.length).toBeLessThanOrEqual(10);
       expect(result.channels.length).toBe(mockedSend.mock.calls.length);
+      expect(result.partial).toBe(true);
     });
 
     it("keeps the pages it already gathered when a later page fails", async () => {
@@ -254,16 +257,34 @@ describe("listSlackChannels", () => {
     });
   });
 
+  it("marks the listing complete when both public and private are reachable", async () => {
+      mockedSend
+        .mockResolvedValueOnce({
+          responseHeaders: {},
+          status: 200,
+          body: JSON.stringify(
+            channelPage({ ids: ["C1"], nextCursor: undefined, public: true }),
+          ),
+        });
+
+      const result = await listSlackChannels("xoxb-test");
+
+      expect(result.error).toBeNull();
+      expect(result.partial).toBe(false);
+    });
+
   describe("when the scope is missing", () => {
     it("surfaces the error only when even public-only is refused", async () => {
       // Both the public+private attempt and the public-only retry are refused —
       // the app is missing channels:read entirely.
       respond(200, { ok: false, error: "missing_scope" });
       const result = await listSlackChannels("xoxb-test");
-      expect(result).toEqual({ channels: [], error: "missing_scope" });
+      expect(result.channels).toEqual([]);
+      expect(result.error).toBe("missing_scope");
+      expect(result.partial).toBe(false);
     });
 
-    it("falls back to public channels when only groups:read is missing", async () => {
+    it("falls back to public channels when only groups:read is missing and marks the listing partial", async () => {
       // First (public+private) is refused for lack of groups:read; the retry
       // asks for public channels only, which channels:read alone can serve.
       mockedSend
@@ -285,6 +306,7 @@ describe("listSlackChannels", () => {
 
       expect(result.error).toBeNull();
       expect(result.channels.map((c) => c.id)).toEqual(["C1"]);
+      expect(result.partial).toBe(true);
       expect(bodyParams(0).get("types")).toBe(
         "public_channel,private_channel",
       );
@@ -297,10 +319,10 @@ describe("listSlackChannels", () => {
       mockedSend.mockRejectedValue(
         new DispatchError({ message: "timeout", retryable: true }),
       );
-      expect(await listSlackChannels("xoxb-test")).toEqual({
-        channels: [],
-        error: "request_failed",
-      });
+      const result = await listSlackChannels("xoxb-test");
+      expect(result.channels).toEqual([]);
+      expect(result.error).toBe("request_failed");
+      expect(result.partial).toBe(false);
     });
   });
 });
