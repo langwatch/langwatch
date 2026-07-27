@@ -62,10 +62,32 @@ vi.mock("~/server/dataplane-s3", () => ({
 import { maybeAzureDriver } from "../stored-objects-factory";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
 
+const INJECTED_WORKLOAD_IDENTITY_VARS = [
+  "AZURE_CLIENT_ID",
+  "AZURE_TENANT_ID",
+  "AZURE_FEDERATED_TOKEN_FILE",
+] as const;
+
+/**
+ * Snapshot taken once at module load: these are real process.env entries the
+ * platform injects, so a developer running on a machine that already has them
+ * — or another suite that set them — must get them back exactly as they were.
+ * Deleting is not restoring.
+ */
+const originalWorkloadIdentityEnv = Object.fromEntries(
+  INJECTED_WORKLOAD_IDENTITY_VARS.map((key) => [key, process.env[key]]),
+);
+
 function clearInjectedWorkloadIdentityEnv() {
-  delete process.env.AZURE_CLIENT_ID;
-  delete process.env.AZURE_TENANT_ID;
-  delete process.env.AZURE_FEDERATED_TOKEN_FILE;
+  for (const key of INJECTED_WORKLOAD_IDENTITY_VARS) delete process.env[key];
+}
+
+function restoreInjectedWorkloadIdentityEnv() {
+  for (const key of INJECTED_WORKLOAD_IDENTITY_VARS) {
+    const original = originalWorkloadIdentityEnv[key];
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  }
 }
 
 function resetEnv() {
@@ -96,7 +118,7 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
   // These are real process.env values, not the mocked module env, so leaving
   // them set after the last test bleeds into any suite sharing this worker.
   afterEach(() => {
-    clearInjectedWorkloadIdentityEnv();
+    restoreInjectedWorkloadIdentityEnv();
   });
 
   describe.each([
