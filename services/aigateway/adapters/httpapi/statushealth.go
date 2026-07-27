@@ -6,8 +6,8 @@ import (
 )
 
 // StatusReporter answers the dependency section of the public GET /health
-// status-page endpoint. Implemented by statusprobe.Monitor; nil leaves the
-// response with the process-level component only.
+// status-page endpoint. Implemented by statusprobe.Monitor; nil reports the
+// control plane as unconfigured, which is a degraded verdict.
 type StatusReporter interface {
 	// ControlPlane reports the cached control-plane verdict. The detail is
 	// written verbatim into the public response body, so implementations
@@ -38,17 +38,20 @@ type statusResponse struct {
 // pulls a draining pod out of the load balancer, so by the time a public
 // poll could observe it the pod is gone from rotation; reporting it here
 // would flap the status page on every routine rollout.
+//
+// A nil reporter fails closed, matching statusprobe's behavior with no
+// Pinger: a gateway that cannot observe its control plane has no grounds
+// to call itself healthy, and answering 200 would pin the public status
+// page green on a half-wired deployment. Every response therefore carries
+// both components, so the shape does not change with the wiring.
 func statusHandler(status StatusReporter) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
-		checks := map[string]string{"gateway": "ok"}
-		healthy := true
+		ok, detail := false, "not configured"
 		if status != nil {
-			ok, detail := status.ControlPlane()
-			if !ok {
-				healthy = false
-			}
-			checks["control_plane"] = detail
+			ok, detail = status.ControlPlane()
 		}
+		checks := map[string]string{"gateway": "ok", "control_plane": detail}
+		healthy := ok
 
 		code := http.StatusOK
 		word := "ok"

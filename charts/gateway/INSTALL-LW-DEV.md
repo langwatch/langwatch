@@ -158,8 +158,9 @@ curl -sSf http://localhost:5563/readyz | jq .
 # /health: public status-page verdict, process + control-plane connectivity.
 # 200 with {"status":"ok"} when the signed probe to
 # /api/internal/gateway/health has succeeded within the last 60s; 503 with
-# {"status":"degraded"} on a sustained control-plane outage.
-curl -sSf http://localhost:5563/health | jq .
+# {"status":"degraded"} on a sustained control-plane outage. No -f here:
+# it would swallow the degraded body, which is the half worth reading.
+curl -sS http://localhost:5563/health | jq .
 
 # /v1/models — 401 without auth, 200 with a valid VK
 curl -si http://localhost:5563/v1/models
@@ -219,7 +220,7 @@ kubectl -n langwatch delete pdb gateway-smoke-langwatch-gateway --ignore-not-fou
 - **ImagePullBackOff**: EKS node role needs ECR pull permission. The `lw-dev` cluster's node role already has `AmazonEC2ContainerRegistryReadOnly` attached; if a new node group lacks it, `kubectl describe pod` will show the auth error and the fix is to extend the role policy.
 - **CrashLoopBackOff with `LW_GATEWAY_INTERNAL_SECRET is required`**: step 2 secret is missing or the env var key in the Secret doesn't match `secrets.internalSecretKey` (default `LW_GATEWAY_INTERNAL_SECRET`).
 - **401 `invalid_api_key` on every /v1/* request**: INTERNAL_SECRET on the gateway side doesn't match the control plane's. Re-run step 2 and roll both deploys.
-- **503 on `/health` with `control_plane: unreachable for Ns`**: the gateway's background probe can't reach the app's `/api/internal/gateway/health` (or the shared INTERNAL_SECRET mismatches, which 401s the probe). Check `kubectl -n langwatch get svc` shows the app Service the ConfigMap's control-plane URL points at, and see the `statusprobe_control_plane_unreachable` log line for the real dial error. `/readyz` stays 200 through this on purpose: pulling pods from the LB on a control-plane blip would kill the warm-cache traffic that still serves fine.
+- **503 on `/health` with `control_plane: unreachable for Ns`**: the gateway's background probe can't reach the app's `/api/internal/gateway/health` (or the shared INTERNAL_SECRET mismatches, which 401s the probe). Check `kubectl -n langwatch get svc` shows the app Service the ConfigMap's control-plane URL points at, and see the `statusprobe_control_plane_unreachable` log line for the underlying probe failure. `/readyz` stays 200 through this on purpose: pulling pods from the LB on a control-plane blip would kill the warm-cache traffic that still serves fine.
 
 ## Not covered
 

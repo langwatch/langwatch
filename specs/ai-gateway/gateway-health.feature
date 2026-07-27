@@ -40,12 +40,15 @@ Feature: Gateway status-page health endpoint
       And the response JSON has "status" == "ok"
 
     @unit
-    Scenario: status polls never fan out to providers or the control plane
-      Given the background monitor is not ticking
+    Scenario: polling the status endpoint puts no load on anything else
+      Given a status page free to poll as hard as it likes
       When I GET "/health" 50 times
       Then every response is 200
-      And no model provider dispatch was triggered
-      And no control-plane probe was triggered by the polls
+      And no model provider was called
+      And the control plane was not called
+      # Poll rate and the cost of answering are unrelated. On a public
+      # unauthenticated endpoint, anything else is an amplification and a
+      # bill someone else gets to write.
 
   Rule: The verdict covers the dependencies LangWatch owns
 
@@ -104,12 +107,14 @@ Feature: Gateway status-page health endpoint
     # is what catches it.
 
     @unit
-    Scenario: the connectivity probe is HMAC-signed like every internal call
+    Scenario: a mismatched internal secret shows up as a control-plane failure
+      Given the gateway and the control plane hold different internal secrets
       When the gateway probes the control plane
-      Then the request is GET "/api/internal/gateway/health"
-      And it carries the X-LangWatch-Gateway-Signature and timestamp headers
-      And a 200 marks the probe successful
-      And a non-200 marks the probe failed
+      Then the control plane refuses the probe
+      And the gateway records the probe as failed
+      # The whole reason the probe rides the signed channel. An unsigned
+      # liveness ping would report green while every virtual-key resolve
+      # is being refused.
 
     @integration
     Scenario: control plane answers the gateway's signed health probe

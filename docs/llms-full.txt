@@ -10730,7 +10730,7 @@ GET /startupz
 { "status": "ok", "version": "git-a1412a4", "uptime_s": 12.48 }
 ```
 
-There is no blocking bootstrap step today: the gateway marks itself started as soon as its dependencies are constructed, so `/startupz` goes 200 within the first probe interval and the `starting` state is only ever observed if the process dies during construction. The auth cache warms organically on the first request per virtual key; an unwarmed gateway costs a cold-cache request one extra control-plane round trip, which is the correct behavior for a fresh deployment. The chart's generous failure threshold is headroom kept for a future bootstrap-pull, not a window the gateway currently uses.
+There is no blocking bootstrap step today: `MarkStarted` is called while dependencies are being constructed, which finishes before the HTTP listener opens, so `/startupz` is already 200 on the first request it can possibly receive and the `starting` state is unobservable over HTTP. The auth cache warms organically on the first request per virtual key; an unwarmed gateway costs a cold-cache request one extra control-plane round trip, which is the correct behavior for a fresh deployment. The chart's generous failure threshold is headroom kept for a future bootstrap-pull, not a window the gateway currently uses.
 
 ```yaml
 startupProbe:
@@ -10744,7 +10744,7 @@ Once `/startupz` first returns 200, Kubernetes stops calling it; readiness + liv
 
 ## `/health` (public status endpoint)
 
-This is the endpoint to point a status page or uptime monitor at. Plain HTTP monitor semantics: 200 healthy, 503 not. `HEAD` is answered identically to `GET`, and responses carry `Cache-Control: no-store` so a CDN cannot serve a stale verdict.
+This is the endpoint to point a status page or uptime monitor at. Plain HTTP monitor semantics: 200 healthy, 503 not. `HEAD` returns the same status and headers with no body, as HTTP requires, so a monitor that probes with `HEAD` reads the same verdict. Responses carry `Cache-Control: no-store` so a CDN cannot serve a stale verdict. Any other method is 405: the ingress publishes the path, the gateway bounds the methods.
 
 ```
 GET /health
@@ -10836,8 +10836,8 @@ On alert:
 | Symptom                                                         | Likely cause                                           | First step                                                         |
 |-----------------------------------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------|
 | `/healthz` 200, `/v1/chat/completions` returns 500 `auth_upstream_unavailable` | Gateway can't reach control plane (`LW_GATEWAY_BASE_URL` wrong/missing) | Check the env var on the pod; confirm Service, DNS resolves       |
-| `/health` 503 with `control_plane: unreachable for Ns`           | Control plane down, unroutable, or the shared internal secret does not match (a mismatch 401s the probe and reads the same) | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods, then check the Service and DNS. The `statusprobe_control_plane_unreachable` log line carries the real dial error |
-| `/health` 503 while completions still succeed                    | Expected during a control-plane outage longer than 60 s: warm keys keep serving from the auth cache, cold ones do not | Nothing to do on the gateway; fix the control plane. `/readyz` stays 200 on purpose so warm traffic keeps flowing |
+| `/health` 503 with `control_plane: unreachable for Ns`           | Control plane down, unroutable, or the shared internal secret does not match (a mismatch 401s the probe and reads the same) | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods, then check the Service and DNS. The `statusprobe_control_plane_unreachable` log line carries the underlying probe failure |
+| `/health` 503 while completions still succeed                    | Expected during a control-plane outage longer than 60 s: warm keys keep serving from the auth cache, cold ones do not | Confirm it is a real outage and not a secret mismatch (row above, which reads identically), then fix whichever side is wrong. `/readyz` stays 200 on purpose so warm traffic keeps flowing |
 | `/readyz` flips to 503 mid-life                                  | Pod received `SIGTERM` (rolling deploy, eviction, OOMKill) | `kubectl describe pod` for the termination reason                   |
 | 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Add a `preStop: sleep 3` lifecycle hook (see Graceful shutdown above) |
 

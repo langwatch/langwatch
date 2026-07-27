@@ -138,7 +138,7 @@ func TestHealthEndpoint_ProviderOutageStays200(t *testing.T) {
 	assert.Equal(t, "ok", body.Checks["control_plane"])
 }
 
-// @scenario "status polls never fan out to providers or the control plane"
+// @scenario "polling the status endpoint puts no load on anything else"
 // The monitor is built but never started: its ticker is the only thing
 // allowed to probe, so with no ticker running, any probe observed here
 // would have been triggered by a public poll, an amplification bug.
@@ -250,16 +250,29 @@ func TestHealthEndpoint_HeadMatchesGet(t *testing.T) {
 	})
 }
 
-// Without a reporter wired (nil Status), the endpoint still answers with
-// the process-level component so a partially wired deployment fails open
-// rather than 404ing the monitor.
-func TestHealthEndpoint_NilReporterServesProcessComponent(t *testing.T) {
+// The chart publishes /health as an Exact ingress path, which bounds the
+// path but not the method. The method guarantee lives here, so the chart
+// comment that says so stays true.
+func TestHealthEndpoint_RejectsOtherMethods(t *testing.T) {
+	router := buildRouterWithStatus(statusprobe.New(statusprobe.Options{}))
+
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(method, "/health", nil))
+		assert.Equal(t, http.StatusMethodNotAllowed, rec.Code, "%s /health", method)
+	}
+}
+
+// Without a reporter wired (nil Status), the endpoint answers rather than
+// 404ing the monitor, but it fails closed: a gateway that cannot observe
+// its control plane must not pin the public status page green.
+func TestHealthEndpoint_NilReporterFailsClosed(t *testing.T) {
 	router := buildRouter()
 
 	rec, body := getHealth(t, router)
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "ok", body.Status)
-	assert.Equal(t, map[string]string{"gateway": "ok"}, body.Checks)
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Equal(t, "degraded", body.Status)
+	assert.Equal(t, map[string]string{"gateway": "ok", "control_plane": "not configured"}, body.Checks)
 }
 
 func mapKeys(m map[string]any) []string {

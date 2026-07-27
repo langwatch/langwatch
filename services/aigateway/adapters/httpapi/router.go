@@ -68,8 +68,10 @@ type RouterDeps struct {
 	// heartbeating entirely.
 	HeartbeatInterval time.Duration
 	// Status backs the public GET /health status-page endpoint
-	// (specs/ai-gateway/gateway-health.feature). Optional; when nil the
-	// endpoint reports the process-level component only.
+	// (specs/ai-gateway/gateway-health.feature). Optional in the type so a
+	// router can be built without it, but a nil reporter makes /health
+	// answer 503: a gateway that cannot observe its control plane must not
+	// report itself healthy to a public status page.
 	Status StatusReporter
 }
 

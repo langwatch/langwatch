@@ -28,7 +28,7 @@ func healthTestClient(t *testing.T, srv *httptest.Server, secret string) *Client
 	})
 }
 
-// @scenario "the connectivity probe is HMAC-signed like every internal call"
+// @scenario "a mismatched internal secret shows up as a control-plane failure"
 // The server side recomputes the signature over the same canonical string
 // the control plane's verifier uses (METHOD\nPATH\nTS\nhex(sha256(body))),
 // so a drift in how Health signs its empty-body GET fails here before it
@@ -64,6 +64,10 @@ func TestClientHealth_SendsSignedGet(t *testing.T) {
 	assert.True(t, sigOK, "probe must carry a valid HMAC signature over the canonical string")
 }
 
+// @scenario "a mismatched internal secret shows up as a control-plane failure"
+// 401 is the secret-mismatch case specifically: the control plane is up and
+// answering, it just refuses this gateway. It must read as a failed probe,
+// not as a reachable control plane.
 func TestClientHealth_Non200IsFailure(t *testing.T) {
 	for _, status := range []int{http.StatusUnauthorized, http.StatusInternalServerError, http.StatusServiceUnavailable} {
 		t.Run(fmt.Sprintf("status_%d", status), func(t *testing.T) {
