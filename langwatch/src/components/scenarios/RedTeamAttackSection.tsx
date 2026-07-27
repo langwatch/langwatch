@@ -8,8 +8,9 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ShieldAlert } from "lucide-react";
+import { HelpCircle } from "lucide-react";
 import { Controller, type UseFormReturn } from "react-hook-form";
+import { Tooltip } from "../ui/tooltip";
 import type { ScenarioFormData } from "./ScenarioForm";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -17,19 +18,38 @@ export const RED_TEAM_STRATEGIES = [
   {
     value: "crescendo" as const,
     label: "Crescendo",
-    description:
-      "Warms up, then escalates gradually across turns instead of asking outright.",
+    description: "Warms up, then escalates gradually across turns.",
+    help: "Opens with harmless questions and escalates a little each turn, so the agent is asked for something slightly worse than it just agreed to. Good default: it finds agents that hold on a direct ask but drift under gradual pressure.",
   },
   {
     value: "goat" as const,
     label: "GOAT",
-    description:
-      "Picks a fresh angle every turn based on how the agent responds. Better against agents that hold firm.",
+    description: "Picks a fresh angle every turn.",
+    help: "Chooses a different technique each turn based on how the agent replied — roleplay, hypotheticals, authority, splitting the request. Better against agents that hold firm against a single escalating line, and costs more because it reasons about each turn.",
   },
 ];
 
 export const RED_TEAM_DEFAULT_TURNS = 30;
 export const RED_TEAM_MAX_TURNS = 50;
+
+const ATTACK_HELP =
+  "A simulated attacker drives the conversation instead of a cooperative user, trying to make your agent do something it should refuse. The criteria below are what it must fail to achieve — they are how the run is judged. Only run this against agents you own or have permission to test.";
+
+/** Label with an (i) that carries the full explanation, per copywriting.md. */
+function LabelWithHelp({ label, help }: { label: string; help: string }) {
+  return (
+    <HStack gap={1.5} align="center">
+      <Text textStyle="sm" fontWeight="medium">
+        {label}
+      </Text>
+      <Tooltip content={help}>
+        <Box color="fg.muted" display="flex" cursor="help">
+          <HelpCircle size={13} />
+        </Box>
+      </Tooltip>
+    </HStack>
+  );
+}
 
 /**
  * The attack configuration, inline in the scenario editor.
@@ -45,35 +65,18 @@ export function RedTeamAttackSection({
 }: {
   form: UseFormReturn<ScenarioFormData>;
 }) {
-  const { control, register, setValue } = form;
+  const { control, register, setValue, getValues } = form;
 
   return (
     <VStack align="stretch" gap={4}>
-      <VStack align="stretch" gap={1}>
+      <HStack gap={1.5} align="center">
         <SectionHeader>Attack</SectionHeader>
-        <Text fontSize="13px" color="fg.muted">
-          A simulated attacker drives the conversation instead of a cooperative
-          user, trying to make your agent do something it should refuse.
-        </Text>
-      </VStack>
-
-      <Box
-        colorPalette="redteam"
-        borderWidth="1px"
-        borderColor="colorPalette.emphasized"
-        bg="colorPalette.subtle"
-        borderRadius="md"
-        padding={3}
-      >
-        <HStack gap={2} align="start">
-          <Box paddingTop="2px" color="colorPalette.fg">
-            <ShieldAlert size={16} />
+        <Tooltip content={ATTACK_HELP}>
+          <Box color="fg.muted" display="flex" cursor="help" paddingBottom="2px">
+            <HelpCircle size={13} />
           </Box>
-          <Text textStyle="sm" color="fg.muted">
-            Only run this against agents you own or have permission to test.
-          </Text>
-        </HStack>
-      </Box>
+        </Tooltip>
+      </HStack>
 
       <VStack align="stretch" gap={2}>
         <Text textStyle="sm" fontWeight="medium">
@@ -84,51 +87,66 @@ export function RedTeamAttackSection({
           name="redTeamStrategy"
           render={({ field }) => (
             <VStack align="stretch" gap={2}>
-              {RED_TEAM_STRATEGIES.map((option) => (
-                <Box
-                  key={option.value}
-                  role="button"
-                  tabIndex={0}
-                  cursor="pointer"
-                  colorPalette="redteam"
-                  borderWidth="1px"
-                  borderRadius="md"
-                  padding={3}
-                  borderColor={
-                    field.value === option.value
-                      ? "colorPalette.solid"
-                      : "border.muted"
-                  }
-                  bg={
-                    field.value === option.value
-                      ? "colorPalette.subtle"
-                      : undefined
-                  }
-                  onClick={() => field.onChange(option.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      field.onChange(option.value);
+              {RED_TEAM_STRATEGIES.map((option) => {
+                const selected = field.value === option.value;
+                return (
+                  <Box
+                    key={option.value}
+                    role="button"
+                    tabIndex={0}
+                    cursor="pointer"
+                    colorPalette="redteam"
+                    borderWidth="1px"
+                    borderRadius="md"
+                    paddingX={3}
+                    paddingY={2.5}
+                    borderColor={selected ? "colorPalette.solid" : "border.muted"}
+                    // Ring only — the fill made the whole card read as an
+                    // alert. Selection should outline the choice, not repaint it.
+                    boxShadow={
+                      selected ? "0 0 0 3px var(--chakra-colors-color-palette-subtle)" : undefined
                     }
-                  }}
-                >
-                  <Text textStyle="sm" fontWeight="medium">
-                    {option.label}
-                  </Text>
-                  <Text textStyle="xs" color="fg.muted">
-                    {option.description}
-                  </Text>
-                </Box>
-              ))}
+                    transition="border-color 120ms ease, box-shadow 120ms ease"
+                    onClick={() => field.onChange(option.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        field.onChange(option.value);
+                      }
+                    }}
+                  >
+                    <HStack gap={1.5} align="center" minWidth={0}>
+                      <Text textStyle="sm" fontWeight="medium" flexShrink={0}>
+                        {option.label}
+                      </Text>
+                      <Text textStyle="xs" color="fg.muted" truncate>
+                        {option.description}
+                      </Text>
+                      <Tooltip content={option.help}>
+                        <Box
+                          color="fg.muted"
+                          display="flex"
+                          cursor="help"
+                          flexShrink={0}
+                          marginStart="auto"
+                        >
+                          <HelpCircle size={13} />
+                        </Box>
+                      </Tooltip>
+                    </HStack>
+                  </Box>
+                );
+              })}
             </VStack>
           )}
         />
       </VStack>
 
       <Field.Root>
-        <Text textStyle="sm" fontWeight="medium">
-          What should the attacker try to do?
-        </Text>
+        <LabelWithHelp
+          label="What should the attacker try to do?"
+          help="The goal the attacker works toward, in plain words. Be concrete — 'reveal the internal override code' gives it something to aim at, 'be bad' does not."
+        />
         <Textarea
           {...register("redTeamTarget")}
           rows={3}
@@ -138,9 +156,10 @@ export function RedTeamAttackSection({
       </Field.Root>
 
       <Field.Root>
-        <Text textStyle="sm" fontWeight="medium">
-          Turns
-        </Text>
+        <LabelWithHelp
+          label="Turns"
+          help={`How many attempts the attacker gets. More turns find more, and cost more — every turn is a model call on both sides. Up to ${RED_TEAM_MAX_TURNS}.`}
+        />
         <Input
           type="number"
           min={1}
@@ -150,10 +169,6 @@ export function RedTeamAttackSection({
             setValueAs: (v) => (v === "" || v === null ? null : Number(v)),
           })}
         />
-        <Text textStyle="xs" color="fg.muted">
-          How many attempts the attacker gets. More turns find more, and cost
-          more.
-        </Text>
       </Field.Root>
 
       <Accordion.Root collapsible>
@@ -168,19 +183,20 @@ export function RedTeamAttackSection({
             <Accordion.ItemBody>
               <VStack align="stretch" gap={4} paddingTop={2}>
                 <Field.Root>
-                  <Text textStyle="sm">Stop early at score</Text>
+                  <LabelWithHelp
+                    label="Stop early at score"
+                    help="Each turn is scored 0-10 for how close the attacker is to its goal. Once it reaches this score the run stops — the weakness is already proven and further turns just cost money. Leave empty to use the default of 9."
+                  />
                   <Input
                     type="number"
                     min={0}
                     max={10}
                     width="120px"
                     placeholder="9"
-                    defaultValue={
-                      form.getValues("redTeamConfig")?.successScore ?? ""
-                    }
+                    defaultValue={getValues("redTeamConfig")?.successScore ?? ""}
                     onChange={(e) =>
                       setValue("redTeamConfig", {
-                        ...(form.getValues("redTeamConfig") ?? {}),
+                        ...(getValues("redTeamConfig") ?? {}),
                         successScore:
                           e.target.value === ""
                             ? undefined
@@ -188,13 +204,13 @@ export function RedTeamAttackSection({
                       })
                     }
                   />
-                  <Text textStyle="xs" color="fg.muted">
-                    Stop once the attacker is this close to succeeding.
-                  </Text>
                 </Field.Root>
 
                 <Field.Root>
-                  <Text textStyle="sm">Obfuscation</Text>
+                  <LabelWithHelp
+                    label="Obfuscation"
+                    help="Chance per turn that the attacker disguises its message (base64, leetspeak, splitting words) to slip past filters that match on plain text. 0 sends everything in the clear; 1 disguises every turn. Leave empty for 0."
+                  />
                   <Input
                     type="number"
                     min={0}
@@ -203,11 +219,11 @@ export function RedTeamAttackSection({
                     width="120px"
                     placeholder="0"
                     defaultValue={
-                      form.getValues("redTeamConfig")?.injectionProbability ?? ""
+                      getValues("redTeamConfig")?.injectionProbability ?? ""
                     }
                     onChange={(e) =>
                       setValue("redTeamConfig", {
-                        ...(form.getValues("redTeamConfig") ?? {}),
+                        ...(getValues("redTeamConfig") ?? {}),
                         injectionProbability:
                           e.target.value === ""
                             ? undefined
@@ -215,9 +231,6 @@ export function RedTeamAttackSection({
                       })
                     }
                   />
-                  <Text textStyle="xs" color="fg.muted">
-                    How often to disguise messages, between 0 and 1.
-                  </Text>
                 </Field.Root>
               </VStack>
             </Accordion.ItemBody>

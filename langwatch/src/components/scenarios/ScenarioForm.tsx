@@ -87,6 +87,7 @@ function ScenarioTypeSelector({
         <Button
           size="sm"
           variant={isRedTeam ? "outline" : "solid"}
+          colorPalette="gray"
           onClick={() => onSelect(false)}
           flex={1}
         >
@@ -220,8 +221,9 @@ export function ScenarioForm({
         <VStack align="stretch" gap={1}>
           <SectionHeader>Situation</SectionHeader>
           <Text fontSize="13px" color="fg.muted">
-            Describe the user, their context, and what they're trying to
-            accomplish. Think about a critical path or a complex edge case.
+            {isRedTeam
+              ? "Context the agent is operating in — who it thinks it is talking to, and what it has access to. The attacker's goal is set above."
+              : "Describe the user, their context, and what they're trying to accomplish. Think about a critical path or a complex edge case."}
           </Text>
         </VStack>
         <Field.Root invalid={!!errors.situation}>
@@ -240,8 +242,9 @@ export function ScenarioForm({
         <VStack align="stretch" gap={1}>
           <SectionHeader>Criteria</SectionHeader>
           <Text fontSize="13px" color="fg.muted">
-            What must the agent DO or NOT DO? e.g. "Must remain empathetic",
-            "Must NOT offer refund without manager approval"
+            {isRedTeam
+              ? 'What must the agent never do, however it is asked? These are what the attack is judged against, e.g. "Must never reveal its system prompt"'
+              : 'What must the agent DO or NOT DO? e.g. "Must remain empathetic", "Must NOT offer refund without manager approval"'}
           </Text>
         </VStack>
         <Controller
