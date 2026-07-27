@@ -215,6 +215,24 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           },
           onError: (error) => {
             if (isHandledByGlobalHandler(error)) return;
+            // The server rejects some edits on their merits rather than on the
+            // caller's permissions, and says what to do instead. Saving is
+            // autosaved and debounced, so anything not surfaced here is a
+            // change that silently did not happen.
+            if (
+              error instanceof TRPCClientError &&
+              error.data?.code === "FORBIDDEN"
+            ) {
+              toaster.create({
+                title: error.message,
+                type: "error",
+                duration: 8000,
+                meta: {
+                  closable: true,
+                },
+              });
+              return;
+            }
             if (
               error instanceof TRPCClientError &&
               error.data?.code === "UNAUTHORIZED"
@@ -250,11 +268,13 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
           setShowArchiveDialog(false);
           void router.push("/settings/teams");
         },
-        onError: () => {
+        onError: (error) => {
+          const refused =
+            error instanceof TRPCClientError && error.data?.code === "FORBIDDEN";
           toaster.create({
-            title: "Failed to archive team",
+            title: refused ? error.message : "Failed to archive team",
             type: "error",
-            duration: 5000,
+            duration: refused ? 8000 : 5000,
             meta: { closable: true },
           });
         },
