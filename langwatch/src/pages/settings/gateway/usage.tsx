@@ -26,6 +26,7 @@ import {
 } from "recharts";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
+import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -249,7 +250,7 @@ function GatewayUsagePage() {
               <HStack gap={4} align="stretch">
                 <StatTile
                   label="Total spend"
-                  value={`$${Number(data.totalUsd).toFixed(2)}`}
+                  value={formatBudgetUsd(data.totalUsd)}
                 />
                 <StatTile
                   label="Requests"
@@ -297,7 +298,7 @@ function GatewayUsagePage() {
                           </Text>
                         </Table.Cell>
                         <Table.Cell>
-                          ${Number(row.totalUsd).toFixed(2)}
+                          {formatBudgetUsd(row.totalUsd)}
                         </Table.Cell>
                         <Table.Cell>{row.requests}</Table.Cell>
                       </Table.Row>
@@ -326,7 +327,7 @@ function GatewayUsagePage() {
                           </Text>
                         </Table.Cell>
                         <Table.Cell>
-                          ${Number(row.totalUsd).toFixed(2)}
+                          {formatBudgetUsd(row.totalUsd)}
                         </Table.Cell>
                         <Table.Cell>{row.requests}</Table.Cell>
                       </Table.Row>
