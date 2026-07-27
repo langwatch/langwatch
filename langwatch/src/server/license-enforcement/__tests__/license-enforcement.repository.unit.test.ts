@@ -195,7 +195,7 @@ describe("LicenseEnforcementRepository", () => {
         where: {
           team: { organizationId },
           archivedAt: null,
-          isPersonal: false,
+          NOT: { AND: [{ isPersonal: true }, { team: { isPersonal: true } }] },
         },
       });
       expect(result).toBe(4);

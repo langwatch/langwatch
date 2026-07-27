@@ -139,3 +139,10 @@ Feature: Project Limit Enforcement with License
     When I move that project into the personal team
     Then the request fails with FORBIDDEN
     And the reported project count is unchanged
+
+  Scenario: A project counts unless its own flag and its team both call it personal
+    Given the organization has 2 projects
+    And the organization has 1 project marked personal inside a shared team
+    And the organization has 1 project not marked personal inside a personal team
+    When I view the organization usage
+    Then the reported project count is 4

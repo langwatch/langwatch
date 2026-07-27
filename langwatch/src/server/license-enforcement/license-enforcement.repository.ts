@@ -129,10 +129,21 @@ export class LicenseEnforcementRepository
    * pays, so it never spends the project allowance bought for real work.
    * See the "Personal Workspaces" scenarios in
    * specs/licensing/enforcement-projects.feature.
+   *
+   * Exemption needs both flags to agree: `Project.isPersonal` is a
+   * denormalized mirror of `Team.isPersonal`, and a project only lives in a
+   * personal workspace when its own flag and its team's flag both say so. A
+   * project whose flags disagree is not a personal workspace, so it counts.
+   * Counting is the fail-closed side: the alternative hands an organization
+   * an uncounted project by flipping one flag out of two.
    */
   async getProjectCount(organizationId: string): Promise<number> {
     return this.prisma.project.count({
-      where: { team: { organizationId }, archivedAt: null, isPersonal: false },
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+        NOT: { AND: [{ isPersonal: true }, { team: { isPersonal: true } }] },
+      },
     });
   }
 
