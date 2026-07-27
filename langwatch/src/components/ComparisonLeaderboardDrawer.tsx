@@ -154,6 +154,19 @@ export function ComparisonLeaderboardDrawer({
               index={1}
               title="Which one should you ship?"
               subtitle="The ranking, and whether the run actually separates them."
+              help={
+                <>
+                  Each variant gets a score from every head-to-head verdict the
+                  judge gave, weighted by how strong its opponents were — so
+                  beating a good variant counts for more than beating a weak
+                  one. The score is chess-rating style: 0 is average for this
+                  group, and it is the GAP that means something, not the number.
+                  A 400-point gap is roughly 10:1 odds; 0 is a coin flip. The
+                  shaded band behind each bar is where the score could
+                  plausibly sit — when two bands overlap, this run cannot tell
+                  those two apart, whatever their bars look like.
+                </>
+              }
             >
               <LeaderboardVerdictPanel
                 leaderboard={leaderboard}
@@ -185,6 +198,17 @@ export function ComparisonLeaderboardDrawer({
               index={2}
               title="Can you trust that?"
               subtitle="What this run does and does not support."
+              help={
+                <>
+                  Every check is reported either way, so a silent panel means
+                  the check passed rather than that it was never run. Ticks are
+                  fine, amber is a real problem worth acting on, and grey is a
+                  measurement for you to judge — like how much longer the
+                  leading variant&apos;s answers were, which matters because
+                  judges tend to favour longer answers whether or not they are
+                  better.
+                </>
+              }
               hasProblem={trustHasProblem}
             >
               <LeaderboardTrustPanel
@@ -201,6 +225,15 @@ export function ComparisonLeaderboardDrawer({
               index={3}
               title="What is it costing you, and why did it win?"
               subtitle="Trade-offs, head-to-head detail, and the judge's own reasoning."
+              help={
+                <>
+                  Cost and latency are shown next to quality, never blended
+                  into it — a single &quot;best overall&quot; number would hide
+                  the trade-off you are actually making. The grid below counts
+                  how often each variant beat each other one; click any cell to
+                  read the judge&apos;s own words for those rows.
+                </>
+              }
             >
               <VStack align="stretch" gap={4}>
                 <ParetoScatterChart
