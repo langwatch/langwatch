@@ -1,6 +1,8 @@
 import { on } from "node:events";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { builtInPresets } from "~/components/ops/foundry/presets";
+import type { SpanConfig } from "~/components/ops/foundry/types";
 import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
@@ -31,6 +33,35 @@ import {
 } from "~/server/featureFlag/rules";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
 import { connection } from "~/server/redis";
+
+/**
+ * One span of a Foundry preset as `listFoundryPresets` reports it. Carries the
+ * shape only — no message bodies, no attributes, nothing that would put a
+ * scenario's sample content on a phone.
+ */
+interface OpsFoundrySpan {
+  name: string;
+  type: string;
+  durationMs: number;
+  status: string;
+  model: string | null;
+  children: OpsFoundrySpan[];
+}
+
+function toOpsFoundrySpan(span: SpanConfig): OpsFoundrySpan {
+  return {
+    name: span.name,
+    type: span.type,
+    durationMs: span.durationMs,
+    status: span.status,
+    model: span.llm?.requestModel ?? null,
+    children: (span.children ?? []).map(toOpsFoundrySpan),
+  };
+}
+
+function countFoundrySpans(total: number, span: OpsFoundrySpan): number {
+  return span.children.reduce(countFoundrySpans, total + 1);
+}
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -217,6 +248,76 @@ export const opsRouter = createTRPCRouter({
       const ops = requireOps();
       return ops.queues.getGroupJobs(input);
     }),
+
+  /**
+   * The same page as `getGroupJobs`, with each job's payload reduced to its
+   * shape: the top-level keys and the serialized size, never the contents.
+   *
+   * This exists for the mobile client. A desk operator debugging a stuck group
+   * needs the payload and `getGroupJobs` gives it to them; a phone does not —
+   * the payload is customer content, nobody reads a JSON blob on a phone
+   * screen, and the device is far more likely to be lost than a laptop. The
+   * keys and the size answer "what kind of job is stuck here and how big is
+   * it", which is the question a phone is actually being asked.
+   *
+   * A separate procedure rather than a flag on the existing one: a boolean that
+   * decides whether customer data crosses the wire is the wrong thing to be able
+   * to get wrong by omission.
+   */
+  getGroupJobSummaries: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        groupId: z.string(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      const result = await ops.queues.getGroupJobs(input);
+      return {
+        ...result,
+        jobs: result.jobs.map((job) => ({
+          jobId: job.jobId,
+          score: job.score,
+          payloadKeys: job.data ? Object.keys(job.data).sort() : [],
+          payloadBytes: job.data
+            ? Buffer.byteLength(JSON.stringify(job.data), "utf8")
+            : 0,
+        })),
+      };
+    }),
+
+  /**
+   * The Foundry's built-in preset catalog, flattened to what a reader needs to
+   * understand the trace each preset would generate.
+   *
+   * The web Foundry imports `builtInPresets` directly — it is a client-side
+   * workbench and the presets are compiled into the bundle. A separate app
+   * cannot reach into this app's component tree, so the catalog is served here
+   * instead of being restated on the other side, which would drift the moment
+   * anyone edits a scenario.
+   *
+   * Read-only by construction: there is no procedure that emits a trace, and a
+   * preset carries no way to send one.
+   */
+  listFoundryPresets: protectedProcedure.use(opsViewPermission).query(() => {
+    return {
+      presets: builtInPresets.map((preset) => {
+        const spans = preset.config.spans.map(toOpsFoundrySpan);
+        return {
+          id: preset.id,
+          name: preset.name,
+          description: preset.description,
+          serviceName: preset.config.resourceAttributes["service.name"] ?? null,
+          spanCount: spans.reduce(countFoundrySpans, 0),
+          spans,
+        };
+      }),
+    };
+  }),
 
   unblockGroup: protectedProcedure
     .use(opsManagePermission)

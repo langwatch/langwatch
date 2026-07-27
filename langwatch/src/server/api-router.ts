@@ -56,8 +56,8 @@ import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as langyInternalApp } from "./routes/langy-internal";
 import { app as langyRelayApp } from "./routes/langy-relay";
 import { app as miscApp } from "./routes/misc";
+import { app as mobileTrpcApp } from "./routes/mobile-trpc";
 import { app as opsApp } from "./routes/ops";
-import { app as opsMobileApp } from "./routes/ops-mobile";
 import { app as otelApp } from "./routes/otel";
 import { app as playgroundApp } from "./routes/playground";
 import { app as rumApp } from "./routes/rum";
@@ -174,7 +174,7 @@ export function createApiRouter() {
   api.route("/", healthApp);
   api.route("/", miscApp);
   api.route("/", opsApp);
-  api.route("/", opsMobileApp); // /api/ops/mobile/* — JSON ops surface for the iOS client
+  api.route("/", mobileTrpcApp); // /api/mobile/trpc/* — device-token tRPC mount for the mobile app
   api.route("/", sseApp);
   api.route("/", tracesLegacyApp);
   api.route("/", trpcApp);

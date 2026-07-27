@@ -1,0 +1,56 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+
+    // Mirrors `langwatch/tsconfig.tsgo.json` for the portion of the graph the
+    // router type drags in. TypeScript checks those sources under THIS config,
+    // so anything that differs from the app's own settings shows up as an error
+    // in a file this project does not own.
+    "target": "es2020",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+
+      // The router type comes from the app itself, so a screen is typed off the
+      // real procedure and a server-side change that would break it breaks the
+      // typecheck instead. These mirror `langwatch/tsconfig.json` so the server
+      // files resolve their own imports when TypeScript walks into them; the
+      // import is type-only, so Metro never sees any of it.
+      "~/*": ["../langwatch/src/*"],
+      "@ee/*": ["../langwatch/ee/*"],
+      "@app/*": ["../langwatch/src/server/app-layer/*"],
+      "@trpc-internal/parser": [
+        "../langwatch/node_modules/@trpc/server/dist/core/parser"
+      ],
+      "@trpc-internal/utils": [
+        "../langwatch/node_modules/@trpc/server/dist/core/internals/utils"
+      ],
+      "zod/lib/helpers/errorUtil": [
+        "../langwatch/node_modules/zod/lib/helpers/errorUtil"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+
+    // The app's ambient declarations. Without them the server files TypeScript
+    // walks into cannot resolve their `?raw` imports, and this project reports
+    // errors in files it does not own.
+    "../langwatch/src/augmentations.d.ts",
+    "../langwatch/src/vite-env.d.ts"
+  ],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,39 @@
+{
+  "name": "langwatch-ops-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo start --ios",
+    "android": "expo start --android",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
+    "@tanstack/react-query": "^4.44.0",
+    "@trpc/client": "^10.45.4",
+    "@trpc/react-query": "^10.45.4",
+    "expo": "^57.0.8",
+    "expo-constants": "^57.0.7",
+    "expo-linking": "^57.0.4",
+    "expo-router": "^57.0.8",
+    "expo-secure-store": "^57.0.1",
+    "expo-status-bar": "^57.0.1",
+    "expo-web-browser": "^57.0.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-native": "^0.86.0",
+    "react-native-safe-area-context": "^5.8.0",
+    "react-native-screens": "^4.26.2",
+    "superjson": "^2.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.2.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
+  }
+}

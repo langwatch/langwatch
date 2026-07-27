@@ -1,0 +1,8 @@
+# `mobile/` is its own workspace root, the same way `langwatch/` is.
+#
+# Treating it as a peer of the root workspace would install React Native's React
+# alongside the app's, which is the double-install the root
+# `pnpm-workspace.yaml` already refuses for `langwatch/`. Run `pnpm install`
+# from inside this directory.
+packages:
+  - .

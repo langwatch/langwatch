@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "LangWatch Ops",
+    "slug": "langwatch-ops",
+    "version": "1.0.0",
+    "scheme": "langwatch-ops",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "ai.langwatch.ops",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "ai.langwatch.ops",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
