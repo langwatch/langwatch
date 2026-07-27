@@ -59,7 +59,7 @@ const redisBlobs = {
 
 beforeAll(async () => {
   azurite = await startAzurite();
-  await ensureAzuriteContainer(azurite, CONTAINER);
+  await ensureAzuriteContainer({ azurite, container: CONTAINER });
   driver = new AzureBlobDriver({
     mode: "sharedKey",
     accountName: azurite.accountName,
