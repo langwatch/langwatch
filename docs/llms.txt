@@ -436,7 +436,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Post-install checklist](https://langwatch.ai/docs/ai-gateway/self-hosting/post-install-checklist.md): What to do after `helm install` to get personal keys, the AI Gateway, and the unified `langwatch` CLI working end-to-end.
 - [Config](https://langwatch.ai/docs/ai-gateway/self-hosting/config.md): Environment variables and configuration for self-hosted LangWatch AI Gateway deployments.
 - [DNS and TLS](https://langwatch.ai/docs/ai-gateway/self-hosting/dns-and-tls.md): Point a public hostname at the AI Gateway, AWS ELB, NLB + Cloudflare + cert-manager.
-- [Health Checks](https://langwatch.ai/docs/ai-gateway/self-hosting/health-checks.md): Liveness, readiness, and startup probes for the LangWatch AI Gateway.
+- [Health Checks](https://langwatch.ai/docs/ai-gateway/self-hosting/health-checks.md): Kubernetes probes and the public status endpoint for the LangWatch AI Gateway.
 - [Scaling](https://langwatch.ai/docs/ai-gateway/self-hosting/scaling.md): Horizontal scaling, autoscaling, capacity, and benchmarks for the LangWatch AI Gateway.
 
 ## Cookbooks

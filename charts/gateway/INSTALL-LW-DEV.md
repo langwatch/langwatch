@@ -152,10 +152,10 @@ curl -sSf http://localhost:5563/healthz | jq .
 # /startupz — 200 once MarkStarted; 503 before
 curl -sSf http://localhost:5563/startupz | jq .
 
-# /readyz — 200 unless the pod is draining (deliberately dependency-free)
+# /readyz: 200 unless the pod is draining (deliberately dependency-free)
 curl -sSf http://localhost:5563/readyz | jq .
 
-# /health — public status-page verdict: process + control-plane connectivity.
+# /health: public status-page verdict, process + control-plane connectivity.
 # 200 with {"status":"ok"} when the signed probe to
 # /api/internal/gateway/health has succeeded within the last 60s; 503 with
 # {"status":"degraded"} on a sustained control-plane outage.
