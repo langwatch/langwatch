@@ -130,7 +130,7 @@
     "@opentelemetry/semantic-conventions": "^1.41.1",
     "@paper-design/shaders-react": "^0.0.76",
     "@prisma/client": "5.7.1",
-    "@react-email/components": "^0.0.42",
+    "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
     "@sendgrid/mail": "^8.1.6",
     "@slack/webhook": "^7.1.0",
