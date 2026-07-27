@@ -28,6 +28,9 @@ export function useModelProviderApiKeyValidation(
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
   const utils = api.useContext();
+  // Sends the key in a request body rather than a URL. See the procedure.
+  const validateApiKeyMutation = api.modelProvider.validateApiKey.useMutation();
+  const { mutateAsync: validateApiKey } = validateApiKeyMutation;
 
   const validate = useCallback(async (): Promise<boolean> => {
     // The probe reads nothing from storage — it sends the typed keys
@@ -42,7 +45,7 @@ export function useModelProviderApiKeyValidation(
     setValidationError(undefined);
 
     try {
-      const result = await utils.modelProvider.validateApiKey.fetch({
+      const result = await validateApiKey({
         projectId,
         organizationId,
         provider,
@@ -72,7 +75,7 @@ export function useModelProviderApiKeyValidation(
     provider,
     customKeys,
     scopes,
-    utils.modelProvider.validateApiKey,
+    validateApiKey,
   ]);
 
   /**
