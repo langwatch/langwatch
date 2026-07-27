@@ -3,8 +3,9 @@ import {
   Box,
   Field,
   HStack,
-  Input,
   Button,
+  Input,
+  SimpleGrid,
   Switch,
   Text,
   Textarea,
@@ -164,7 +165,10 @@ export function RedTeamAttackSection({
             way to get a weak run — the SDK plans, scores and adapts off this
             one string — so the default is to edit a concrete objective rather
             than to invent one. */}
-        <HStack gap={1.5} wrap="wrap" paddingBottom={2}>
+        {/* A real grid, not a wrapped row: the labels are different lengths,
+            so flex-wrap left ragged right edges and an uneven last line.
+            Equal tracks make the seven read as one block you scan down. */}
+        <SimpleGrid minChildWidth="150px" gap={1.5} paddingBottom={2} width="full">
           {RED_TEAM_OBJECTIVES.map((objective) => (
             <Tooltip key={objective.code} content={objective.help}>
               <Button
@@ -173,6 +177,10 @@ export function RedTeamAttackSection({
                 size="xs"
                 colorPalette="redteam"
                 fontWeight="normal"
+                width="full"
+                justifyContent="flex-start"
+                gap={1.5}
+                paddingInline={2}
                 onClick={() =>
                   setValue("redTeamTarget", objective.target, {
                     shouldDirty: true,
@@ -186,7 +194,7 @@ export function RedTeamAttackSection({
               </Button>
             </Tooltip>
           ))}
-        </HStack>
+        </SimpleGrid>
         <Textarea
           {...register("redTeamTarget")}
           rows={3}
