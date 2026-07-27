@@ -349,6 +349,21 @@ Feature: AI Gateway — Budgets
     When spend is read before the two writes have been merged
     Then the trace counts once, at the corrected cost
 
+  @unit
+  Scenario: A usage page left open keeps asking for a window that ends now
+    Given the usage page is open showing the last 30 days
+    When a day passes without the page being reloaded
+    Then the window it asks for still ends now
+    # A window frozen at page load is how a dashboard left open overnight
+    # ends up a day behind: the spend arrived, the page just stopped asking
+    # for it.
+
+  @unit
+  Scenario: The window keeps its length as it rolls
+    Given the usage page is showing the last 7 days
+    When the window rolls forward
+    Then it is still 7 days wide
+
   @integration
   Scenario: Spend is reported per key with its own daily and model split
     Given a key with traffic across models

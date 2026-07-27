@@ -31,6 +31,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Tooltip as UITooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRollingWindow } from "~/hooks/useRollingWindow";
 import { api } from "~/utils/api";
 
 const PRESETS: Array<{ label: string; days: number }> = [
@@ -44,11 +45,7 @@ function GatewayUsagePage() {
   const { project } = useOrganizationTeamProject();
   const [days, setDays] = useState(30);
 
-  const { fromIso, toIso } = useMemo(() => {
-    const to = new Date();
-    const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
-    return { fromIso: from.toISOString(), toIso: to.toISOString() };
-  }, [days]);
+  const { fromIso, toIso } = useRollingWindow(days);
 
   const summaryQuery = api.gatewayUsage.summary.useQuery(
     { projectId: project?.id ?? "", fromDate: fromIso, toDate: toIso },
