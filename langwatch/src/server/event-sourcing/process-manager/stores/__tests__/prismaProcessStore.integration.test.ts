@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import type { JsonValue } from "../../json";
 import type { ProcessRef } from "../../processManager.types";
 import { PrismaProcessStore } from "../prismaProcessStore";
@@ -76,9 +77,11 @@ async function clean(): Promise<void> {
     processName: { in: [processName, `${processName}-other`] },
     projectId: { in: ["project-1", "project-2"] },
   };
-  await prisma.processManagerOutbox.deleteMany({ where });
-  await prisma.processManagerInbox.deleteMany({ where });
-  await prisma.processManagerInstance.deleteMany({ where });
+  await cleanupTestRows(prisma, [
+    ["processManagerOutbox", where],
+    ["processManagerInbox", where],
+    ["processManagerInstance", where],
+  ]);
 }
 
 describe("PrismaProcessStore", () => {

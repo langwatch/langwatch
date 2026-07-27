@@ -21,6 +21,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   cleanupTestData,
   getTestClickHouseClient,
@@ -140,15 +141,11 @@ describe("PersonalUsageService spend rollups", () => {
   afterAll(async () => {
     if (!ch) return;
     await cleanupTestData(tenantId);
-    await prisma.project
-      .deleteMany({ where: { team: { organizationId: orgId } } })
-      .catch(() => undefined);
-    await prisma.team
-      .deleteMany({ where: { organizationId: orgId } })
-      .catch(() => undefined);
-    await prisma.organization
-      .deleteMany({ where: { id: orgId } })
-      .catch(() => undefined);
+    await cleanupTestRows(prisma, [
+      ["project", { team: { organizationId: orgId } }],
+      ["team", { organizationId: orgId }],
+      ["organization", { id: orgId }],
+    ]);
   });
 
   describe("given a bundled trace and a billed trace", () => {

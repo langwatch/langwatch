@@ -39,6 +39,7 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -150,32 +151,21 @@ describe("governance routers — RBAC enforcement", () => {
   });
 
   afterAll(async () => {
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.teamUser
-      .deleteMany({
-        where: { team: { slug: { startsWith: `--gov-team-${ns}` } } },
-      })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({ where: { slug: { startsWith: `--gov-team-${ns}` } } })
-      .catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { slug: `--gov-${ns}` } })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: {
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["teamUser", { team: { organizationId } }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { slug: `--gov-${ns}` }],
+      [
+        "user",
+        {
           email: {
             in: [`gov-admin-${ns}@example.com`, `gov-member-${ns}@example.com`],
           },
         },
-      })
-      .catch(() => {});
+      ],
+    ]);
   });
 
   function callerFor(userId: string) {

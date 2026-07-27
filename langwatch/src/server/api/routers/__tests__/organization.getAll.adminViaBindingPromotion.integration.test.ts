@@ -21,6 +21,7 @@
  * RBAC model unification in this PR.
  */
 
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -123,16 +124,13 @@ describe("organization.getAll — admin-via-binding promotion of legacy role", (
 
   afterAll(async () => {
     await resetApp();
-    const safeDelete = async (fn: () => Promise<unknown>) => {
-      try {
-        await fn();
-      } catch {
-        /* noop */
-      }
-    };
-    await safeDelete(() =>
-      prisma.user.deleteMany({
-        where: {
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
+      [
+        "user",
+        {
           email: {
             in: [
               `admin-promote-${testNamespace}@test.com`,
@@ -140,19 +138,8 @@ describe("organization.getAll — admin-via-binding promotion of legacy role", (
             ],
           },
         },
-      }),
-    );
-    if (organizationId) {
-      await safeDelete(() =>
-        prisma.roleBinding.deleteMany({ where: { organizationId } }),
-      );
-      await safeDelete(() =>
-        prisma.organizationUser.deleteMany({ where: { organizationId } }),
-      );
-      await safeDelete(() =>
-        prisma.organization.deleteMany({ where: { id: organizationId } }),
-      );
-    }
+      ],
+    ]);
   });
 
   describe("given a user with stale OrganizationUser.role=MEMBER + fresh ORG-scoped ADMIN RoleBinding", () => {

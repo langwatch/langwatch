@@ -33,6 +33,7 @@ import type {
 } from "../../../../optimization_studio/types/dsl";
 import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -138,13 +139,13 @@ describe.skipIf(isTestcontainersOnly)(
         where: { projectId },
         data: { currentVersionId: null, latestVersionId: null },
       });
-      await prisma.workflowVersion.deleteMany({ where: { projectId } });
-      await prisma.workflow.deleteMany({ where: { projectId } });
-      await prisma.modelDefaultConfig.deleteMany({
-        where: { organizationId },
-      });
-      await prisma.teamUser.deleteMany({ where: { teamId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
+      await cleanupTestRows(prisma, [
+        ["workflowVersion", { projectId }],
+        ["workflow", { projectId }],
+        ["modelDefaultConfig", { organizationId }],
+        ["teamUser", { teamId }],
+        ["organizationUser", { organizationId }],
+      ]);
       await prisma.project.delete({ where: { id: projectId } });
       await prisma.team.delete({ where: { id: teamId } });
       await prisma.organization.delete({ where: { id: organizationId } });

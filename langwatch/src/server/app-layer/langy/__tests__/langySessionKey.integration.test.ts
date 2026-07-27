@@ -18,6 +18,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { prisma } from "../../../db";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
@@ -131,26 +132,16 @@ describe.skipIf(isTestcontainersOnly)(
 
     afterAll(async () => {
       // RoleBinding → ApiKey is onDelete: Restrict, so bindings must go first.
-      await prisma.roleBinding
-        .deleteMany({ where: { organizationId } })
-        .catch(() => {});
-      await prisma.apiKey
-        .deleteMany({ where: { organizationId } })
-        .catch(() => {});
-      await prisma.customRole
-        .deleteMany({ where: { organizationId } })
-        .catch(() => {});
-      await prisma.project.deleteMany({ where: { teamId } }).catch(() => {});
-      await prisma.organizationUser
-        .deleteMany({ where: { organizationId } })
-        .catch(() => {});
-      await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-      await prisma.user
-        .deleteMany({ where: { id: { in: [editorUserId, noAccessUserId] } } })
-        .catch(() => {});
-      await prisma.organization
-        .deleteMany({ where: { id: organizationId } })
-        .catch(() => {});
+      await cleanupTestRows(prisma, [
+        ["roleBinding", { organizationId }],
+        ["apiKey", { organizationId }],
+        ["customRole", { organizationId }],
+        ["project", { teamId }],
+        ["organizationUser", { organizationId }],
+        ["team", { id: teamId }],
+        ["user", { id: { in: [editorUserId, noAccessUserId] } }],
+        ["organization", { id: organizationId }],
+      ]);
     });
 
     async function findSessionKeys(userId: string) {

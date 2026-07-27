@@ -9,6 +9,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -105,15 +106,10 @@ describe("Feature: Dataset REST API", () => {
   });
 
   afterEach(async () => {
-    // Guard: skip cleanup if beforeEach failed before creating test data
-    if (!testProjectId) return;
-
-    await prisma.datasetRecord.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.dataset.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [
+      ["datasetRecord", { projectId: testProjectId }],
+      ["dataset", { projectId: testProjectId }],
+    ]);
     await prisma.project.delete({
       where: { id: testProjectId },
     });

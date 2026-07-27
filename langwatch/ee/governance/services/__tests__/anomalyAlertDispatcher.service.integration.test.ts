@@ -30,6 +30,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 import {
   AnomalyAlertDispatcherService,
@@ -48,15 +49,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.anomalyAlert
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.anomalyRule
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { slug: `--c3-${ns}` } })
-    .catch(() => {});
+  await cleanupTestRows(prisma, [
+    ["anomalyAlert", { organizationId }],
+    ["anomalyRule", { organizationId }],
+    ["organization", { slug: `--c3-${ns}` }],
+  ]);
 });
 
 async function seedRuleAndAlert({

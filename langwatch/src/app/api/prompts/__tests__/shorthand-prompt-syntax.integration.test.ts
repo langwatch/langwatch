@@ -2,6 +2,7 @@ import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
@@ -101,23 +102,16 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
   });
 
   afterEach(async () => {
-    await prisma.promptTagAssignment.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.llmPromptConfigVersion.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.llmPromptConfig.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.modelDefaultConfigScope.deleteMany({
-      where: { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
-    });
-    if (testDefaultConfigId) {
-      await prisma.modelDefaultConfig.deleteMany({
-        where: { id: testDefaultConfigId },
-      });
-    }
+    await cleanupTestRows(prisma, [
+      ["promptTagAssignment", { projectId: testProjectId }],
+      ["llmPromptConfigVersion", { projectId: testProjectId }],
+      ["llmPromptConfig", { projectId: testProjectId }],
+      [
+        "modelDefaultConfigScope",
+        { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+      ],
+      ["modelDefaultConfig", { id: testDefaultConfigId }],
+    ]);
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
     await prisma.promptTag.deleteMany({

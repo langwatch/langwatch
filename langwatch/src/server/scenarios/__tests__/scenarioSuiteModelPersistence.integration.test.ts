@@ -14,6 +14,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../db";
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { SuiteRepository } from "../../suites/suite.repository";
 import { ScenarioService } from "../scenario.service";
 
@@ -54,19 +55,13 @@ describe.skipIf(isTestcontainersOnly)(
     });
 
     afterAll(async () => {
-      await prisma.scenario
-        .deleteMany({ where: { projectId } })
-        .catch(() => {});
-      await prisma.simulationSuite
-        .deleteMany({ where: { projectId } })
-        .catch(() => {});
-      await prisma.project
-        .deleteMany({ where: { id: projectId } })
-        .catch(() => {});
-      await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-      await prisma.organization
-        .deleteMany({ where: { id: organizationId } })
-        .catch(() => {});
+      await cleanupTestRows(prisma, [
+        ["scenario", { projectId }],
+        ["simulationSuite", { projectId }],
+        ["project", { id: projectId }],
+        ["team", { id: teamId }],
+        ["organization", { id: organizationId }],
+      ]);
     });
 
     describe("given a scenario", () => {

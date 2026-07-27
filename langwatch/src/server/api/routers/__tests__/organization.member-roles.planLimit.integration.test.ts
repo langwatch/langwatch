@@ -27,6 +27,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
 import { LICENSE_LIMIT_ERRORS } from "../../../license-enforcement/license-limit-guard";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -161,28 +162,12 @@ describe.skipIf(isTestcontainersOnly)(
 
     afterAll(async () => {
       // Clean up in reverse creation order
-      await prisma.teamUser
-        .deleteMany({
-          where: {
-            team: { slug: `--test-team-${testNamespace}` },
-          },
-        })
-        .catch(() => {});
-      await prisma.customRole
-        .deleteMany({
-          where: { organizationId },
-        })
-        .catch(() => {});
-      await prisma.team
-        .deleteMany({
-          where: { slug: `--test-team-${testNamespace}` },
-        })
-        .catch(() => {});
-      await prisma.organizationUser
-        .deleteMany({
-          where: { organizationId },
-        })
-        .catch(() => {});
+      await cleanupTestRows(prisma, [
+        ["teamUser", { team: { slug: `--test-team-${testNamespace}` } }],
+        ["customRole", { organizationId }],
+        ["team", { slug: `--test-team-${testNamespace}` }],
+        ["organizationUser", { organizationId }],
+      ]);
       await prisma.organization
         .delete({ where: { id: organizationId } })
         .catch(() => {});

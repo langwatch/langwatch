@@ -21,6 +21,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prepareLitellmParams } from "../../api/routers/modelProviders.utils";
 import { setupModelEnv } from "../../app-layer/evaluations/evaluation-execution.factories";
 import { prisma } from "../../db";
@@ -80,24 +81,26 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
   });
 
   afterAll(async () => {
-    await prisma.modelProvider.deleteMany({
-      where: {
-        OR: [
-          { scopes: { some: { scopeType: "PROJECT", scopeId: projectId } } },
-          {
-            scopes: {
-              some: { scopeType: "ORGANIZATION", scopeId: organizationId },
-            },
+    await cleanupTestRows(prisma, [
+      [
+        "modelProvider",
+        { scopes: { some: { scopeType: "PROJECT", scopeId: projectId } } },
+      ],
+      [
+        "modelProvider",
+        {
+          scopes: {
+            some: { scopeType: "ORGANIZATION", scopeId: organizationId },
           },
-        ],
-      },
-    });
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.user.deleteMany({ where: { id: orgAdminUserId } });
-    await prisma.project.deleteMany({ where: { id: projectId } });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+        },
+      ],
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["user", { id: orgAdminUserId }],
+      ["project", { id: projectId }],
+      ["team", { id: teamId }],
+      ["organization", { id: organizationId }],
+    ]);
   });
 
   function service() {
@@ -305,7 +308,7 @@ describe("Runtime provider-row selection follows the model (real DB)", () => {
     });
 
     afterAll(async () => {
-      await prisma.project.deleteMany({ where: { id: otherProjectId } });
+      await cleanupTestRows(prisma, [["project", { id: otherProjectId }]]);
     });
 
     /** @scenario A row's unrelated project scope does not inflate its specificity */

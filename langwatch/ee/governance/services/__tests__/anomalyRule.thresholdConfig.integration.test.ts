@@ -38,6 +38,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
@@ -97,27 +98,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.anomalyRule
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.roleBinding
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.teamUser
-    .deleteMany({ where: { team: { slug: { startsWith: `--tcfg-team-` } } } })
-    .catch(() => {});
-  await prisma.organizationUser
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { slug: { startsWith: `--tcfg-team-` } } })
-    .catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { slug: `--tcfg-${ns}` } })
-    .catch(() => {});
-  await prisma.user
-    .deleteMany({ where: { email: `tcfg-admin-${ns}@example.com` } })
-    .catch(() => {});
+  await cleanupTestRows(prisma, [
+    ["anomalyRule", { organizationId }],
+    ["roleBinding", { organizationId }],
+    ["teamUser", { team: { organizationId } }],
+    ["organizationUser", { organizationId }],
+    ["team", { organizationId }],
+    ["organization", { slug: `--tcfg-${ns}` }],
+    ["user", { email: `tcfg-admin-${ns}@example.com` }],
+  ]);
 });
 
 function callerFor(userId: string) {

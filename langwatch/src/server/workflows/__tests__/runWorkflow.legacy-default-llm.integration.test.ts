@@ -26,6 +26,7 @@ import type {
   Workflow,
 } from "../../../optimization_studio/types/dsl";
 import { prisma } from "../../db";
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { runWorkflow } from "../runWorkflow";
 
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
@@ -200,9 +201,11 @@ describe.skipIf(isTestcontainersOnly)(
           publishedId: null,
         },
       });
-      await prisma.workflowVersion.deleteMany({ where: { projectId } });
-      await prisma.workflow.deleteMany({ where: { projectId } });
-      await prisma.modelProvider.deleteMany({ where: { organizationId } });
+      await cleanupTestRows(prisma, [
+        ["workflowVersion", { projectId }],
+        ["workflow", { projectId }],
+        ["modelProvider", { organizationId }],
+      ]);
       await prisma.project.delete({ where: { id: projectId } });
       await prisma.team.delete({ where: { id: teamId } });
       await prisma.organization.delete({ where: { id: organizationId } });

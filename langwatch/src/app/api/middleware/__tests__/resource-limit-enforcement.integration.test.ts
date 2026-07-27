@@ -9,6 +9,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app as graphsApp } from "../../graphs/[[...route]]/app";
 import { app as monitorsApp } from "../../monitors/[[...route]]/app";
@@ -75,18 +76,14 @@ describe("Feature: REST API resource limit enforcement parity", () => {
   });
 
   afterEach(async () => {
-    if (!testProjectId) return;
-
-    await prisma.trigger.deleteMany({ where: { projectId: testProjectId } });
-    await prisma.monitor.deleteMany({ where: { projectId: testProjectId } });
-    await prisma.customGraph.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.simulationSuite.deleteMany({
-      where: { projectId: testProjectId },
-    });
-    await prisma.experiment.deleteMany({ where: { projectId: testProjectId } });
-    await prisma.scenario.deleteMany({ where: { projectId: testProjectId } });
+    await cleanupTestRows(prisma, [
+      ["trigger", { projectId: testProjectId }],
+      ["monitor", { projectId: testProjectId }],
+      ["customGraph", { projectId: testProjectId }],
+      ["simulationSuite", { projectId: testProjectId }],
+      ["experiment", { projectId: testProjectId }],
+      ["scenario", { projectId: testProjectId }],
+    ]);
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
     await prisma.organization.delete({ where: { id: testOrganization.id } });

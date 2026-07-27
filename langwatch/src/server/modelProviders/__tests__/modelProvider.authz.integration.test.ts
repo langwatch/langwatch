@@ -21,6 +21,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { ModelProviderScopeForbiddenError } from "../errors";
 import { ModelProviderService } from "../modelProvider.service";
@@ -188,39 +189,27 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     afterAll(async () => {
       // Order matters: providers (scopes cascade via onDelete: Cascade)
       // → teamUser/orgUser → team/project → user → org.
-      // Multi-tenancy protection requires projectId in the WHERE clause,
-      // so we scope by projectId (safer than the slug-pattern anyway).
-      const projectIds = [projectAId, projectBId].filter(Boolean);
-      await prisma.roleBinding
-        .deleteMany({ where: { organizationId } })
-        .catch(() => {});
-      await prisma.modelProvider
-        .deleteMany({
-          where: {
+      await cleanupTestRows(prisma, [
+        ["roleBinding", { organizationId }],
+        [
+          "modelProvider",
+          {
             scopes: {
-              some: { scopeType: "PROJECT", scopeId: { in: projectIds } },
+              some: {
+                scopeType: "PROJECT",
+                scopeId: { in: [projectAId, projectBId] },
+              },
             },
           },
-        })
-        .catch(() => {});
-      await prisma.teamUser
-        .deleteMany({ where: { team: { slug: { startsWith: `--team-` } } } })
-        .catch(() => {});
-      await prisma.organizationUser
-        .deleteMany({ where: { organization: { slug: `--test-${ns}` } } })
-        .catch(() => {});
-      await prisma.project
-        .deleteMany({ where: { slug: { startsWith: `--proj-` } } })
-        .catch(() => {});
-      await prisma.team
-        .deleteMany({ where: { slug: { startsWith: `--team-` } } })
-        .catch(() => {});
-      await prisma.organization
-        .deleteMany({ where: { slug: `--test-${ns}` } })
-        .catch(() => {});
-      await prisma.user
-        .deleteMany({
-          where: {
+        ],
+        ["teamUser", { team: { organizationId } }],
+        ["organizationUser", { organization: { slug: `--test-${ns}` } }],
+        ["project", { team: { organizationId } }],
+        ["team", { organizationId }],
+        ["organization", { slug: `--test-${ns}` }],
+        [
+          "user",
+          {
             email: {
               in: [
                 `org-admin-${ns}@example.com`,
@@ -230,8 +219,8 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
               ],
             },
           },
-        })
-        .catch(() => {});
+        ],
+      ]);
     });
 
     function ctxFor(userId: string) {

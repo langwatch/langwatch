@@ -42,6 +42,10 @@ import {
   PlanProviderService,
 } from "../../app-layer/subscription/plan-provider";
 import { prisma } from "../../db";
+import {
+  cleanupTestRows,
+  requireAssigned,
+} from "../../../test-utils/cleanupTestRows";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 import { LicenseEnforcementService } from "../license-enforcement.service";
 import {
@@ -225,37 +229,29 @@ describe("given an organization with both personal and real workspaces", () => {
   });
 
   afterAll(async () => {
-    const fixtureProjects = { team: { organizationId } };
-    await prisma.projectSecret
-      .deleteMany({ where: { project: fixtureProjects } })
-      .catch(() => {});
-    await prisma.project.deleteMany({ where: fixtureProjects }).catch(() => {});
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.teamUser
-      .deleteMany({
+    // ProjectSecret's tenancy guard demands literal project ids, so they
+    // are collected first, anchored so a broken setup cannot widen the
+    // findMany into every project in the database.
+    const projectIds = (
+      await prisma.project.findMany({
         where: {
-          team: { slug: { startsWith: `--test-team-${testNamespace}` } },
+          team: {
+            organizationId: requireAssigned(organizationId, "organizationId"),
+          },
         },
+        select: { id: true },
       })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({
-        where: { slug: { startsWith: `--test-team-${testNamespace}` } },
-      })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { slug: `--test-org-${testNamespace}` } })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: { email: { startsWith: `test-${testNamespace}-` } },
-      })
-      .catch(() => {});
+    ).map((project) => project.id);
+    await cleanupTestRows(prisma, [
+      ["projectSecret", { projectId: { in: projectIds } }],
+      ["project", { team: { organizationId } }],
+      ["roleBinding", { organizationId }],
+      ["teamUser", { team: { organizationId } }],
+      ["team", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { slug: `--test-org-${testNamespace}` }],
+      ["user", { email: { startsWith: `test-${testNamespace}-` } }],
+    ]);
   });
 
   describe("when counting resources for plan enforcement", () => {

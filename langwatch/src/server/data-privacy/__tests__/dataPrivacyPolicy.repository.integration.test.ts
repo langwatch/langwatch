@@ -10,6 +10,7 @@ import type { Department, Project, Team, User } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestProject } from "../../../utils/testUtils";
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { DataPrivacyPolicyRepository } from "../dataPrivacyPolicy.repository";
 
@@ -88,7 +89,9 @@ describe("DataPrivacyPolicyRepository integration", () => {
   });
 
   afterAll(async () => {
-    await prisma.dataPrivacyPolicy.deleteMany({ where: { organizationId } });
+    await cleanupTestRows(prisma, [
+      ["dataPrivacyPolicy", { organizationId }],
+    ]);
     await prisma.project.delete({ where: { id: personalProject.id } });
     await prisma.team.delete({
       where: { id: personalTeam.id, organizationId },
@@ -152,9 +155,9 @@ describe("DataPrivacyPolicyRepository integration", () => {
   describe("given rules upserted at several tiers of the project's chain", () => {
     describe("when the chain is fetched, a rule is updated, and a rule is deleted", () => {
       it("roundtrips upsert, chain read, update-in-place, and delete", async () => {
-        await prisma.dataPrivacyPolicy.deleteMany({
-          where: { organizationId },
-        });
+        await cleanupTestRows(prisma, [
+          ["dataPrivacyPolicy", { organizationId }],
+        ]);
 
         await repository.upsertForScope({
           organizationId,
@@ -234,17 +237,17 @@ describe("DataPrivacyPolicyRepository integration", () => {
           false,
         );
 
-        await prisma.dataPrivacyPolicy.deleteMany({
-          where: { organizationId },
-        });
+        await cleanupTestRows(prisma, [
+          ["dataPrivacyPolicy", { organizationId }],
+        ]);
       });
     });
 
     describe("when a stored rule's config no longer parses", () => {
       it("skips the invalid row and returns the valid ones", async () => {
-        await prisma.dataPrivacyPolicy.deleteMany({
-          where: { organizationId },
-        });
+        await cleanupTestRows(prisma, [
+          ["dataPrivacyPolicy", { organizationId }],
+        ]);
 
         await prisma.dataPrivacyPolicy.create({
           data: {
@@ -273,9 +276,9 @@ describe("DataPrivacyPolicyRepository integration", () => {
           config: { pii: { level: "disabled" } },
         });
 
-        await prisma.dataPrivacyPolicy.deleteMany({
-          where: { organizationId },
-        });
+        await cleanupTestRows(prisma, [
+          ["dataPrivacyPolicy", { organizationId }],
+        ]);
       });
     });
   });

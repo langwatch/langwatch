@@ -191,8 +191,8 @@ describe("LicenseHandler Integration", () => {
       expect(status.maxMembers).toBe(BASE_LICENSE.plan.maxMembers);
 
       // Cleanup member
-      await prisma.organizationUser.deleteMany({
-        where: { organizationId, userId: user.id },
+      await prisma.organizationUser.delete({
+        where: { userId_organizationId: { userId: user.id, organizationId } },
       });
       await prisma.user.delete({ where: { id: user.id } });
     });

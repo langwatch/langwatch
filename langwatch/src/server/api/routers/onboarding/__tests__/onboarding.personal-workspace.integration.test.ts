@@ -22,6 +22,7 @@
 import { STARTER_PACK_TILES } from "@ee/governance/services/aiToolEntry.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
@@ -112,13 +113,15 @@ describe("onboarding.initializeOrganization personal workspace", () => {
           where: { projectId: { in: projectIds } },
         });
       }
-      await prisma.project.deleteMany({ where: { team: { organizationId } } });
-      await prisma.aiToolEntry.deleteMany({ where: { organizationId } });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.teamUser.deleteMany({ where: { team: { organizationId } } });
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
+      await cleanupTestRows(prisma, [
+        ["project", { team: { organizationId } }],
+        ["aiToolEntry", { organizationId }],
+        ["roleBinding", { organizationId }],
+        ["teamUser", { team: { organizationId } }],
+        ["team", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["organization", { id: organizationId }],
+      ]);
     }
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     await resetApp();

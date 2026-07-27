@@ -17,6 +17,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
@@ -163,19 +164,13 @@ describe("Feature: base key in the organizations payload", () => {
 
   afterAll(async () => {
     await resetApp();
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
-    await prisma.teamUser
-      .deleteMany({ where: { team: { organizationId } } })
-      .catch(() => {});
-    await prisma.project
-      .deleteMany({ where: { team: { organizationId } } })
-      .catch(() => {});
-    await prisma.team.deleteMany({ where: { organizationId } }).catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { organizationId } })
-      .catch(() => {});
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["teamUser", { team: { organizationId } }],
+      ["project", { team: { organizationId } }],
+      ["team", { organizationId }],
+      ["organizationUser", { organizationId }],
+    ]);
     await prisma.organization
       .delete({ where: { id: organizationId } })
       .catch(() => {});

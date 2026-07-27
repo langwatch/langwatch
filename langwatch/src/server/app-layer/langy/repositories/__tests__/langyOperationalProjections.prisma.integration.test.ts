@@ -1,3 +1,4 @@
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -147,9 +148,11 @@ async function projectConversationAndMessage(
 
 afterEach(async () => {
   const where = { projectId: { in: projectIds } };
-  await prisma.langyMessageProjection.deleteMany({ where });
-  await prisma.langyConversationTurnProjection.deleteMany({ where });
-  await prisma.langyConversationProjection.deleteMany({ where });
+  await cleanupTestRows(prisma, [
+    ["langyMessageProjection", where],
+    ["langyConversationTurnProjection", where],
+    ["langyConversationProjection", where],
+  ]);
 });
 
 describe("Langy operational projections with Postgres", () => {

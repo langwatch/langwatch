@@ -15,6 +15,7 @@
  * `enrichTeamWithRoleBindings` in `organization.service.ts`.
  */
 
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -131,39 +132,14 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
   afterAll(async () => {
     await resetApp();
 
-    // Cleanup is best-effort: if beforeAll threw partway through, some of these
-    // IDs may be undefined, so wrap each call to avoid masking the real failure.
-    const safeDelete = async (fn: () => Promise<unknown>) => {
-      try {
-        await fn();
-      } catch {
-        /* noop */
-      }
-    };
-
-    // Email-based cleanup first — doesn't rely on any other ID.
-    await safeDelete(() =>
-      prisma.user.deleteMany({
-        where: { email: `enrich-member-${testNamespace}@test.com` },
-      }),
-    );
-    if (organizationId) {
-      await safeDelete(() =>
-        prisma.roleBinding.deleteMany({ where: { organizationId } }),
-      );
-      await safeDelete(() =>
-        prisma.organizationUser.deleteMany({ where: { organizationId } }),
-      );
-      await safeDelete(() =>
-        prisma.team.deleteMany({ where: { organizationId } }),
-      );
-      await safeDelete(() =>
-        prisma.organization.deleteMany({ where: { id: organizationId } }),
-      );
-    }
-    if (teamId) {
-      await safeDelete(() => prisma.teamUser.deleteMany({ where: { teamId } }));
-    }
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["teamUser", { teamId }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { email: `enrich-member-${testNamespace}@test.com` }],
+    ]);
   });
 
   describe("given a user with ORG- and TEAM-scoped RoleBindings but no TeamUser row", () => {

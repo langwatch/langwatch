@@ -22,6 +22,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../modelProvider.service";
@@ -91,21 +92,18 @@ describe.skipIf(!hasDatabase || !hasCredentialsSecret)(
     });
 
     afterAll(async () => {
-      // A half-finished beforeAll leaves these undefined, and Prisma drops
-      // undefined predicates rather than matching nothing — so bail out
-      // instead of deleting by an unfiltered `where`.
-      if (!projectId || !organizationId) return;
-      await prisma.modelProvider.deleteMany({
-        where: {
-          scopes: { some: { scopeType: "PROJECT", scopeId: projectId } },
-        },
-      });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.user.deleteMany({ where: { id: orgAdminUserId } });
-      await prisma.project.deleteMany({ where: { id: projectId } });
-      await prisma.team.deleteMany({ where: { id: teamId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
+      await cleanupTestRows(prisma, [
+        [
+          "modelProvider",
+          { scopes: { some: { scopeType: "PROJECT", scopeId: projectId } } },
+        ],
+        ["roleBinding", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["user", { id: orgAdminUserId }],
+        ["project", { id: projectId }],
+        ["team", { id: teamId }],
+        ["organization", { id: organizationId }],
+      ]);
     });
 
     function service() {

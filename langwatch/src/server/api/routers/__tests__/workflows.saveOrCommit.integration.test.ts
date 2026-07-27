@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getTestUser } from "~/utils/testUtils";
@@ -34,18 +35,24 @@ describe("saveOrCommitWorkflowVersion", () => {
   });
 
   afterAll(async () => {
-    await prisma.workflow
-      .update({
-        where: { id: workflowId, projectId },
-        data: { latestVersionId: null, currentVersionId: null },
-      })
-      .catch(() => {});
-    await prisma.workflowVersion
-      .deleteMany({ where: { workflowId, projectId } })
-      .catch(() => {});
-    await prisma.workflow
-      .delete({ where: { id: workflowId, projectId } })
-      .catch(() => {});
+    const wid = requireAssigned(workflowId, "workflowId");
+    const pid = requireAssigned(projectId, "projectId");
+    // Version rows form a parent chain under onDelete: Restrict, which
+    // Postgres checks per row, so the chain must be broken before a
+    // one-shot delete; and the workflow's version pointers must be
+    // detached before the versions go.
+    await prisma.workflow.update({
+      where: { id: wid, projectId: pid },
+      data: { latestVersionId: null, currentVersionId: null },
+    });
+    await prisma.workflowVersion.updateMany({
+      where: { workflowId: wid, projectId: pid },
+      data: { parentId: null },
+    });
+    await cleanupTestRows(prisma, [
+      ["workflowVersion", { workflowId: wid, projectId: pid }],
+      ["workflow", { id: wid, projectId: pid }],
+    ]);
   });
 
   const getCtx = () => ({
