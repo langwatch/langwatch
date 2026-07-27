@@ -5,18 +5,18 @@ import {
   HStack,
   Button,
   Input,
-  SimpleGrid,
   Switch,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronRight, HelpCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
 import { Controller, type UseFormReturn, useWatch } from "react-hook-form";
 import {
   RED_TEAM_DEFAULT_TURNS,
   RED_TEAM_MAX_TURNS,
 } from "~/server/scenarios/execution/types";
+import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "../ui/tooltip";
 import {
   OBJECTIVE_HELP,
@@ -165,39 +165,58 @@ export function RedTeamAttackSection({
             way to get a weak run — the SDK plans, scores and adapts off this
             one string — so the default is to edit a concrete objective rather
             than to invent one. */}
-        {/* A real grid, not a wrapped row: the labels are different lengths,
-            so flex-wrap left ragged right edges and an uneven last line.
-            Equal tracks make the seven read as one block you scan down. */}
-        <SimpleGrid minChildWidth="150px" gap={1.5} paddingBottom={2} width="full">
-          {RED_TEAM_OBJECTIVES.map((objective) => (
-            <Tooltip key={objective.code} content={objective.help}>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                colorPalette="redteam"
-                fontWeight="normal"
-                /* 11px rather than the size-xs default of 12: the longest
-                   labels reach the chip border in a 3-column track otherwise. */
-                fontSize="11px"
-                width="full"
-                justifyContent="flex-start"
-                gap={1.5}
-                paddingInline={2}
+        {/* One menu rather than a row of seven buttons: the buttons read as
+            a wall competing with the field they exist to fill, and the longest
+            labels clipped once the drawer narrowed. A menu also has room for
+            what each category actually means, which a chip never did. */}
+        <Menu.Root positioning={{ placement: "bottom-start", gutter: 4 }}>
+          <Menu.Trigger asChild>
+            <Button
+              variant="outline"
+              size="xs"
+              fontWeight="normal"
+              alignSelf="flex-start"
+              marginBottom={2}
+              aria-haspopup="menu"
+            >
+              Start from a category
+              <ChevronDown size={13} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content minWidth="340px" padding={1}>
+            {RED_TEAM_OBJECTIVES.map((objective) => (
+              <Menu.Item
+                key={objective.code}
+                value={objective.code}
+                paddingY={2}
                 onClick={() =>
                   setValue("redTeamTarget", objective.target, {
                     shouldDirty: true,
                   })
                 }
               >
-                <Text as="span" color="fg.muted" fontSize="10px">
-                  {objective.code}
-                </Text>
-                {objective.label}
-              </Button>
-            </Tooltip>
-          ))}
-        </SimpleGrid>
+                <VStack align="stretch" gap={0.5}>
+                  <HStack gap={2} align="baseline">
+                    <Text
+                      textStyle="xs"
+                      color="fg.muted"
+                      fontFamily="mono"
+                      flexShrink={0}
+                    >
+                      {objective.code}
+                    </Text>
+                    <Text textStyle="sm" fontWeight="medium">
+                      {objective.label}
+                    </Text>
+                  </HStack>
+                  <Text textStyle="xs" color="fg.muted">
+                    {objective.summary}
+                  </Text>
+                </VStack>
+              </Menu.Item>
+            ))}
+          </Menu.Content>
+        </Menu.Root>
         <Textarea
           {...register("redTeamTarget")}
           rows={3}

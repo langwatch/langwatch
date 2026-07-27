@@ -63,10 +63,13 @@ describe("the red-team objective catalogue", () => {
       }
     });
 
-    it("explains what the category means in its own help text", () => {
+    it("explains what the category means in one line", () => {
+      // The menu shows this under the label, so it has to say something and
+      // has to stay short enough not to wrap the row into a paragraph.
       for (const objective of RED_TEAM_OBJECTIVES) {
-        expect(objective.help).toContain(objective.code);
         expect(objective.label.length).toBeGreaterThan(0);
+        expect(objective.summary.length).toBeGreaterThan(20);
+        expect(objective.summary.length).toBeLessThan(70);
       }
     });
   });
