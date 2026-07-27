@@ -197,7 +197,6 @@ export function VirtualKeyEditDrawer({
       setBudget({
         limitUsd: Number.isFinite(limit) ? String(limit) : own.limitUsd,
         window: own.window as VirtualKeyBudgetWindow,
-        timezone: own.timezone,
       });
       setHadManagedBudget(true);
     }
@@ -272,7 +271,6 @@ export function VirtualKeyEditDrawer({
           ? {
               limitUsd: trimmedLimit,
               window: budget.window,
-              timezone: budget.timezone,
             }
           : hadManagedBudget
             ? null

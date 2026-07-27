@@ -228,7 +228,9 @@ describe("given the edit drawer for an existing key", () => {
   });
 
   describe("when the key carries a budget", () => {
-    it("prefills the field, the period and the timezone from the key's own budget", async () => {
+    it("prefills the field and the period, and states the UTC reset regardless of any stored timezone", async () => {
+      // The row carries a timezone (settable over the API), but resets
+      // are computed in UTC only, so the annotation must not promise it.
       applicableBudgetsData.rows = [ownBudgetRow()];
       renderDrawer();
 
@@ -238,7 +240,7 @@ describe("given the edit drawer for an existing key", () => {
       expect(screen.getByTestId("vk-budget-window")).toHaveValue("DAY");
       expect(
         screen.getByTestId("vk-budget-annotation").textContent,
-      ).toBe("Max $5/day, resets 00:00 Europe/Amsterdam");
+      ).toBe("Max $5/day, resets 00:00 UTC");
     });
 
     it("does not list the key's own budget under already-applies", async () => {

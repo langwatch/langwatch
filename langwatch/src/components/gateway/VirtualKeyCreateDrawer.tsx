@@ -250,7 +250,6 @@ export function VirtualKeyCreateDrawer({
           ? {
               limitUsd: budget.limitUsd.trim(),
               window: budget.window,
-              timezone: budget.timezone,
             }
           : null,
         config: {

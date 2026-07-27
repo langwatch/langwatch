@@ -1,4 +1,4 @@
-Feature: AI Gateway — Creating a virtual key
+Feature: AI Gateway virtual key creation
   As someone handing out access to models
   I want to say who the key belongs to, what it may spend, what it may reach,
   and what happens when a provider fails
@@ -96,10 +96,15 @@ Feature: AI Gateway — Creating a virtual key
   Scenario: A filled budget states its limit, its period and when it resets
     When I set a limit of $30 per day
     Then the drawer states the maximum and the time the period resets
-    And it names the timezone that reset happens in
+    And it says that reset happens in UTC
+    And it offers no timezone choice
     # The reset time is the one piece of copy on this form that is worth
     # spelling out: "resets at midnight" is a different promise in each
     # timezone, and the wrong assumption is only discovered by being billed.
+    # Resets are computed in UTC only (budgetWindow.ts); a timezone picker
+    # would display a promise enforcement does not keep. The control comes
+    # back with the budgets.feature "windows honor org-configured timezone"
+    # scenario, which is still unimplemented.
 
   @integration
   Scenario: Removing a key's budget from the drawer archives it
@@ -124,7 +129,7 @@ Feature: AI Gateway — Creating a virtual key
     When I create a key owned by project "web-app"
     Then the drawer lists both budgets with their limit, period and current spend
     And a budget that counts one provider only says which
-    And a per-member department budget says that its limit is per person
+    And a per-member group budget says that its limit is per person
     # Resolved by the same code that decides what the gateway enforces, so
     # the list cannot promise a constraint that will not apply, or miss one
     # that will.

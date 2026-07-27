@@ -234,7 +234,7 @@ describe("given the new-virtual-key drawer", () => {
 
   describe("when a limit of $30 per day is set", () => {
     /** @scenario A filled budget states its limit, its period and when it resets */
-    it("states the maximum, the reset time and its timezone", async () => {
+    it("states the maximum and the UTC reset time", async () => {
       renderDrawer();
 
       await userEvent.type(screen.getByTestId("vk-budget-limit"), "30");
@@ -244,19 +244,20 @@ describe("given the new-virtual-key drawer", () => {
       ).toBe("Max $30/day, resets 00:00 UTC");
     });
 
-    it("names the customized timezone in the annotation and persists it", async () => {
+    it("offers no timezone choice, because resets are computed in UTC only", async () => {
+      // budgetWindow.ts computes every reset in UTC. A timezone picker
+      // here would display a promise enforcement does not keep; the
+      // control returns when resets honor a configured timezone.
       renderDrawer();
 
       await userEvent.type(screen.getByTestId("vk-budget-limit"), "30");
-      await userEvent.click(screen.getByTestId("vk-budget-customize-reset"));
-      await userEvent.selectOptions(
-        screen.getByTestId("vk-budget-timezone"),
-        "Europe/Amsterdam",
-      );
 
       expect(
-        screen.getByTestId("vk-budget-annotation").textContent,
-      ).toBe("Max $30/day, resets 00:00 Europe/Amsterdam");
+        screen.queryByTestId("vk-budget-customize-reset"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("vk-budget-timezone"),
+      ).not.toBeInTheDocument();
 
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await submit();
@@ -265,7 +266,6 @@ describe("given the new-virtual-key drawer", () => {
       expect(lastCreateInput().budget).toEqual({
         limitUsd: "30",
         window: "DAY",
-        timezone: "Europe/Amsterdam",
       });
     });
 
@@ -284,7 +284,6 @@ describe("given the new-virtual-key drawer", () => {
       expect(lastCreateInput().budget).toEqual({
         limitUsd: "30",
         window: "WEEK",
-        timezone: null,
       });
     });
   });

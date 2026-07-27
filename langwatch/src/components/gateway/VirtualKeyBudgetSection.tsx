@@ -1,7 +1,6 @@
 import {
   Badge,
   Box,
-  Button,
   HStack,
   Input,
   NativeSelect,
@@ -9,7 +8,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
 
 import { SmallLabel } from "../SmallLabel";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
@@ -24,20 +22,11 @@ export type VirtualKeyBudgetValue = {
   /** Empty string = no budget on this key. */
   limitUsd: string;
   window: VirtualKeyBudgetWindow;
-  /** Null = the default reset timezone (UTC). */
-  timezone: string | null;
 };
 
 export const EMPTY_BUDGET: VirtualKeyBudgetValue = {
   limitUsd: "",
   window: "DAY",
-  timezone: null,
-};
-
-const WINDOW_WORD: Record<VirtualKeyBudgetWindow, string> = {
-  DAY: "day",
-  WEEK: "week",
-  MONTH: "month",
 };
 
 function formatLimit(limitUsd: string): string {
@@ -50,19 +39,20 @@ function formatLimit(limitUsd: string): string {
  * The one deliberately visible line on this form. "Resets at midnight" is
  * a different promise in each timezone, and the wrong assumption is only
  * discovered by being billed; so the reset instant and its timezone are
- * spelled out instead of tucked behind a tooltip.
+ * spelled out instead of tucked behind a tooltip. Enforcement computes
+ * resets in UTC only (budgetWindow.ts), so the copy always says UTC; the
+ * drawer offers a timezone choice again once enforcement honors one.
  */
 export function budgetAnnotation(value: VirtualKeyBudgetValue): string {
   if (!value.limitUsd.trim()) return "No max spending for this key";
-  const tz = value.timezone ?? "UTC";
   const limit = formatLimit(value.limitUsd);
   switch (value.window) {
     case "DAY":
-      return `Max $${limit}/day, resets 00:00 ${tz}`;
+      return `Max $${limit}/day, resets 00:00 UTC`;
     case "WEEK":
-      return `Max $${limit}/week, resets Monday 00:00 ${tz}`;
+      return `Max $${limit}/week, resets Monday 00:00 UTC`;
     case "MONTH":
-      return `Max $${limit}/month, resets on the 1st 00:00 ${tz}`;
+      return `Max $${limit}/month, resets on the 1st 00:00 UTC`;
   }
 }
 
@@ -78,28 +68,10 @@ export function budgetInvalidReason(
   return null;
 }
 
-function timezoneOptions(): string[] {
-  try {
-    if (typeof Intl.supportedValuesOf === "function") {
-      return Intl.supportedValuesOf("timeZone");
-    }
-  } catch {
-    // Fall through to the minimal list.
-  }
-  return [
-    "UTC",
-    "America/New_York",
-    "America/Los_Angeles",
-    "Europe/Amsterdam",
-    "Europe/London",
-    "Asia/Tokyo",
-  ];
-}
-
 /**
  * Budget field for the virtual-key drawers: a dollar amount, a period,
- * the visible reset annotation, an expandable timezone override, and the
- * list of budgets that already constrain this key.
+ * the visible reset annotation, and the list of budgets that already
+ * constrain this key.
  */
 export function VirtualKeyBudgetSection({
   value,
@@ -118,9 +90,6 @@ export function VirtualKeyBudgetSection({
   /** Set in the edit drawer so its own key-targeted budget is not listed twice. */
   virtualKeyId?: string | null;
 }) {
-  const [customizeOpen, setCustomizeOpen] = useState(false);
-  const zones = useMemo(timezoneOptions, []);
-
   return (
     <VStack align="start" width="full" gap={1.5}>
       <HStack gap={1} alignItems="center">
@@ -173,55 +142,13 @@ export function VirtualKeyBudgetSection({
           </NativeSelect.Field>
         </NativeSelect.Root>
       </HStack>
-      <HStack gap={1.5} alignItems="baseline">
-        <Text
-          fontSize="xs"
-          color={value.limitUsd.trim() ? "fg" : "fg.muted"}
-          data-testid="vk-budget-annotation"
-        >
-          {budgetAnnotation(value)}
-        </Text>
-        {value.limitUsd.trim() && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="2xs"
-            color="fg.muted"
-            fontSize="xs"
-            height="auto"
-            paddingX={1}
-            paddingY={0}
-            onClick={() => setCustomizeOpen((open) => !open)}
-            data-testid="vk-budget-customize-reset"
-          >
-            Customize
-          </Button>
-        )}
-      </HStack>
-      {value.limitUsd.trim() && customizeOpen && (
-        <NativeSelect.Root size="sm" maxWidth="340px">
-          <NativeSelect.Field
-            value={value.timezone ?? ""}
-            aria-label="Reset timezone"
-            data-testid="vk-budget-timezone"
-            onChange={(e) =>
-              onChange({
-                ...value,
-                timezone: e.target.value || null,
-              })
-            }
-          >
-            <option value="">UTC (default)</option>
-            {zones
-              .filter((z) => z !== "UTC")
-              .map((z) => (
-                <option key={z} value={z}>
-                  {z}
-                </option>
-              ))}
-          </NativeSelect.Field>
-        </NativeSelect.Root>
-      )}
+      <Text
+        fontSize="xs"
+        color={value.limitUsd.trim() ? "fg" : "fg.muted"}
+        data-testid="vk-budget-annotation"
+      >
+        {budgetAnnotation(value)}
+      </Text>
 
       <ApplicableBudgetsList
         organizationId={organizationId}
