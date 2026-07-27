@@ -208,5 +208,3 @@ deployed rule for the correction to contradict.
 off"; and both "24h lifecycle policy" statements. Azure Blob and the local
 filesystem are now first-class spool destinations. The fail-open-on-write and
 read-must-not-degrade rules are unchanged.
-
-<!-- ci-trigger: force workflows to fire on this head -->
