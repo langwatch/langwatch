@@ -1,3 +1,4 @@
+import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -59,6 +60,27 @@ export const onboardingRouter = createTRPCRouter({
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Failed to create organization",
+          });
+        }
+
+        // Every new org gets the standard AI tool catalog at creation, for
+        // every intent: the /me portal must render tiles on its very first
+        // load instead of the "no tools yet" empty state.
+        //
+        // Non-fatal by design, same contract as the personal-workspace
+        // ensure below: a failure here must not cost the user the
+        // organization they just created, and the aiTools.list read path
+        // lazily provisions the same set on first portal load anyway.
+        try {
+          await AiToolEntryService.create(ctx.prisma).ensureDefaultCatalog({
+            organizationId: orgResult.organization.id,
+          });
+        } catch (error) {
+          captureException(toError(error), {
+            extra: {
+              origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
+              organizationId: orgResult.organization.id,
+            },
           });
         }
 

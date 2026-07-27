@@ -511,6 +511,79 @@ describe("aiToolsRouter integration", () => {
     });
   });
 
+  describe("list auto-provisioning", () => {
+    // Hermetic fresh org: the suite org accumulates tiles from sibling
+    // tests (and gets auto-provisioned by their list calls), so pinning
+    // the exact default set needs a clean slate.
+    /** @scenario A member's first portal load of a zero-row organization returns the provisioned catalog */
+    it("provisions the standard catalog on a fresh org's very first list", async () => {
+      const fresh = `autoprov-${nanoid(8)}`;
+      const org = await prisma.organization.create({
+        data: { name: `Autoprov ${fresh}`, slug: `--ait-ap-${fresh}` },
+      });
+      const member = await prisma.user.create({
+        data: {
+          name: "Autoprov Member",
+          email: `ait-autoprov-${fresh}@example.com`,
+        },
+      });
+      await prisma.organizationUser.create({
+        data: {
+          userId: member.id,
+          organizationId: org.id,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: org.id,
+          userId: member.id,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: org.id,
+        },
+      });
+
+      try {
+        // No admin ever touched this org's catalog: the first list call
+        // itself provisions the standard set, so the portal's
+        // totalEnabled===0 empty state is unreachable for fresh orgs.
+        const list = await callerFor(member.id).aiTools.list({
+          organizationId: org.id,
+        });
+        expect(list.map((e) => e.slug).sort()).toEqual([
+          "anthropic",
+          "bedrock",
+          "claude-code",
+          "codex",
+          "gemini",
+          "google",
+          "openai",
+          "opencode",
+        ]);
+        expect(list.every((e) => e.enabled)).toBe(true);
+
+        // Second read is a plain read: nothing re-seeds or duplicates.
+        const again = await callerFor(member.id).aiTools.list({
+          organizationId: org.id,
+        });
+        expect(again).toHaveLength(8);
+      } finally {
+        await prisma.aiToolEntry.deleteMany({
+          where: { organizationId: org.id },
+        });
+        await prisma.roleBinding.deleteMany({
+          where: { organizationId: org.id },
+        });
+        await prisma.organizationUser.deleteMany({
+          where: { organizationId: org.id },
+        });
+        await prisma.organization.deleteMany({ where: { id: org.id } });
+        await prisma.user.deleteMany({ where: { id: member.id } });
+      }
+    });
+  });
+
   describe("Per-type config validation", () => {
     it("rejects coding_assistant entries missing setupCommand with BAD_REQUEST", async () => {
       await expect(
