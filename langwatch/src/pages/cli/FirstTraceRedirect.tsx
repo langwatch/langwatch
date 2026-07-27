@@ -62,6 +62,30 @@ export function resolveFirstTracePolling({
   return { enabled, refetchInterval };
 }
 
+/**
+ * Pure transition policy for a first-trace read landing: confirm the
+ * never-synced state, mark prior traces (which keeps the current behavior),
+ * or start the redirect. A response that lands after the watch timed out
+ * must not start a redirect, however late the network was.
+ */
+export function resolveFirstTraceTransition({
+  firstMessage,
+  hasSeenNeverSynced,
+  isTimedOut,
+}: {
+  firstMessage: boolean | undefined;
+  hasSeenNeverSynced: boolean;
+  isTimedOut: boolean;
+}): "none" | "confirm-never-synced" | "mark-prior-traces" | "redirect" {
+  if (firstMessage === undefined) return "none";
+  if (!firstMessage) {
+    return hasSeenNeverSynced ? "none" : "confirm-never-synced";
+  }
+  if (!hasSeenNeverSynced) return "mark-prior-traces";
+  if (isTimedOut) return "none";
+  return "redirect";
+}
+
 function useDocumentVisible(): boolean {
   const [isVisible, setIsVisible] = useState<boolean>(
     typeof document === "undefined"
@@ -92,7 +116,8 @@ function useFirstTraceWatch(): FirstTraceWatchState {
     redirectToOnboarding: false,
   });
   const personalProject = useMemo(
-    () => findPersonalProject(organizations, session?.user?.id),
+    () =>
+      findPersonalProject({ organizations, userId: session?.user?.id }),
     [organizations, session?.user?.id],
   );
 
@@ -132,20 +157,25 @@ function useFirstTraceWatch(): FirstTraceWatchState {
 
   useEffect(() => {
     const firstMessage = hasFirstMessage.data?.firstMessage;
-    if (firstMessage === undefined) return;
-    if (!hasResult) setHasResult(true);
-    if (!firstMessage) {
-      if (!hasSeenNeverSynced) setHasSeenNeverSynced(true);
-      return;
-    }
+    if (firstMessage !== undefined && !hasResult) setHasResult(true);
     // Users whose project already had traces keep the current behavior; only
-    // a false -> true transition observed on this page triggers the redirect.
-    if (!hasSeenNeverSynced) {
-      setHasPriorTraces(true);
-      return;
-    }
-    if (!isRedirecting) setIsRedirecting(true);
-  }, [hasFirstMessage.data, hasResult, hasSeenNeverSynced, isRedirecting]);
+    // a false -> true transition observed on this page, before the timeout,
+    // triggers the redirect.
+    const transition = resolveFirstTraceTransition({
+      firstMessage,
+      hasSeenNeverSynced,
+      isTimedOut,
+    });
+    if (transition === "confirm-never-synced") setHasSeenNeverSynced(true);
+    if (transition === "mark-prior-traces") setHasPriorTraces(true);
+    if (transition === "redirect" && !isRedirecting) setIsRedirecting(true);
+  }, [
+    hasFirstMessage.data,
+    hasResult,
+    hasSeenNeverSynced,
+    isRedirecting,
+    isTimedOut,
+  ]);
 
   useEffect(() => {
     if (!isRedirecting || !personalProject?.slug) return;

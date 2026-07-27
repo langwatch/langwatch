@@ -194,7 +194,10 @@ const OTLP_TITLE_BY_TOOL = {
 } as const satisfies Record<string, string>;
 
 export function otlpChoiceTitle(tool: string): string {
-  if (tool in OTLP_TITLE_BY_TOOL) {
+  // Own-property check (not `in`) so inherited names like "toString" take
+  // the fallback path. hasOwnProperty.call keeps the SDK's pre-ES2022 lib
+  // target happy where Object.hasOwn does not typecheck.
+  if (Object.prototype.hasOwnProperty.call(OTLP_TITLE_BY_TOOL, tool)) {
     return OTLP_TITLE_BY_TOOL[tool as keyof typeof OTLP_TITLE_BY_TOOL];
   }
   return `Using your own ${tool} plan`;

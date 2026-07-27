@@ -59,7 +59,11 @@ export const PersonalSidebar = React.memo(function PersonalSidebar({
     redirectToProjectOnboarding: false,
   });
   const personalProject = useMemo(
-    () => findPersonalProject(organizations, session.data?.user?.id),
+    () =>
+      findPersonalProject({
+        organizations,
+        userId: session.data?.user?.id,
+      }),
     [organizations, session.data?.user?.id],
   );
   const personalProjectSlug = personalProject?.slug ?? null;

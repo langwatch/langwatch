@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   FIRST_TRACE_POLL_INTERVAL_MS,
   resolveFirstTracePolling,
+  resolveFirstTraceTransition,
 } from "../FirstTraceRedirect";
 
 const base = {
@@ -12,7 +13,7 @@ const base = {
   hasPriorTraces: false,
   hasSeenNeverSynced: true,
   isVisible: true,
-};
+} as const;
 
 describe("resolveFirstTracePolling", () => {
   describe("when the never-synced state is confirmed", () => {
@@ -82,6 +83,62 @@ describe("resolveFirstTracePolling", () => {
           isTimedOut: true,
         }),
       ).toEqual({ enabled: false, refetchInterval: false });
+    });
+  });
+});
+
+describe("resolveFirstTraceTransition", () => {
+  describe("when reads land before the timeout", () => {
+    /** @scenario "First-trace polling only runs while the page is visible and stops at the timeout" */
+    it("confirms never-synced once, keeps prior-trace projects on the current behavior, and redirects on the flip", () => {
+      expect(
+        resolveFirstTraceTransition({
+          firstMessage: false,
+          hasSeenNeverSynced: false,
+          isTimedOut: false,
+        }),
+      ).toBe("confirm-never-synced");
+      expect(
+        resolveFirstTraceTransition({
+          firstMessage: false,
+          hasSeenNeverSynced: true,
+          isTimedOut: false,
+        }),
+      ).toBe("none");
+      expect(
+        resolveFirstTraceTransition({
+          firstMessage: true,
+          hasSeenNeverSynced: false,
+          isTimedOut: false,
+        }),
+      ).toBe("mark-prior-traces");
+      expect(
+        resolveFirstTraceTransition({
+          firstMessage: true,
+          hasSeenNeverSynced: true,
+          isTimedOut: false,
+        }),
+      ).toBe("redirect");
+      expect(
+        resolveFirstTraceTransition({
+          firstMessage: undefined,
+          hasSeenNeverSynced: false,
+          isTimedOut: false,
+        }),
+      ).toBe("none");
+    });
+  });
+
+  describe("when a read lands after the watch timed out", () => {
+    /** @scenario "First-trace polling only runs while the page is visible and stops at the timeout" */
+    it("never starts a redirect, however late the response was", () => {
+      expect(
+        resolveFirstTraceTransition({
+          firstMessage: true,
+          hasSeenNeverSynced: true,
+          isTimedOut: true,
+        }),
+      ).toBe("none");
     });
   });
 });

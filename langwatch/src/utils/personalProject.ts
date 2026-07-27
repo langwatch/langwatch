@@ -4,7 +4,10 @@
  * project. Shared by PersonalSidebar (personal nav links) and the /cli/auth
  * first-trace watcher, so the traversal lives in one place.
  */
-export function findPersonalProject(
+export function findPersonalProject({
+  organizations,
+  userId,
+}: {
   organizations:
     | Array<{
         teams?: Array<{
@@ -13,9 +16,9 @@ export function findPersonalProject(
           projects?: Array<{ id: string; slug: string }> | null;
         }> | null;
       }>
-    | undefined,
-  userId: string | null | undefined,
-): { id: string; slug: string } | null {
+    | undefined;
+  userId: string | null | undefined;
+}): { id: string; slug: string } | null {
   if (!userId || !organizations) return null;
   for (const org of organizations) {
     for (const team of org.teams ?? []) {

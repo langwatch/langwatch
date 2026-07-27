@@ -247,10 +247,14 @@ describe("seedPlatformIngestionTemplates with no platform defaults", () => {
           enabled: true,
         },
       });
-    const first = await makeRow();
-    const second = await makeRow();
-
+    // Collect ids as rows are created so a failure between the two creates
+    // still leaves the finally with the exact rows to delete (the in-array
+    // filter stays safe when only one, or neither, was created).
+    const createdIds: string[] = [];
     try {
+      createdIds.push((await makeRow()).id);
+      createdIds.push((await makeRow()).id);
+
       const result = await seedPlatformIngestionTemplates(prisma);
       expect(result.created).toBe(0);
       expect(result.updated).toBe(0);
@@ -260,7 +264,7 @@ describe("seedPlatformIngestionTemplates with no platform defaults", () => {
       // some first) - after one seeder run, NO active platform cowork
       // row remains, not even the duplicate beyond the first.
       const rows = await prisma.ingestionTemplate.findMany({
-        where: { id: { in: [first.id, second.id] } },
+        where: { id: { in: createdIds } },
       });
       expect(rows).toHaveLength(2);
       for (const rowAfter of rows) {
@@ -269,7 +273,7 @@ describe("seedPlatformIngestionTemplates with no platform defaults", () => {
       }
     } finally {
       await prisma.ingestionTemplate.deleteMany({
-        where: { id: { in: [first.id, second.id] } },
+        where: { id: { in: createdIds } },
       });
     }
   });
