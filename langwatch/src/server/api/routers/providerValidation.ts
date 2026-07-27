@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
+import { HandledError } from "@langwatch/handled-error";
 import { providerDefaultBaseUrls } from "../../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { ModelProviderRepository } from "../../modelProviders/modelProvider.repository";
@@ -90,6 +91,41 @@ const GEMINI_REASON_MESSAGES: Record<string, string> = {
   API_KEY_ANDROID_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
   API_KEY_IOS_APP_BLOCKED: GEMINI_RESTRICTION_MESSAGE,
 };
+
+/**
+ * The probe never reached the provider, so nothing was learned about the key.
+ *
+ * This is a genuine failure rather than a validation result: a refused key is
+ * an answer, an unreachable provider is the absence of one. Raising it as a
+ * handled error puts it on the same channel as every other failure — a stable
+ * `code`, a `fault` that says whose problem it is, and tips — instead of a
+ * bare sentence assembled at the call site.
+ */
+export class ProviderUnreachableError extends HandledError {
+  constructor({
+    provider,
+    hasConfigurableEndpoint,
+  }: {
+    provider: string;
+    hasConfigurableEndpoint: boolean;
+  }) {
+    super(
+      "provider_unreachable",
+      "Could not reach the provider to check this API key.",
+      {
+        fault: "provider",
+        httpStatus: 502,
+        meta: { provider },
+        tips: hasConfigurableEndpoint
+          ? [
+              "Check your network connection.",
+              "Check the base URL is correct and reachable.",
+            ]
+          : ["Check your network connection."],
+      },
+    );
+  }
+}
 
 /** The refusal as the provider described it, once we can read it. */
 type UpstreamRefusal = { message?: string; reason?: string };
@@ -372,18 +408,17 @@ const FAILURE_RANK = {
 type RankedFailure = ValidationResult & { rank: number };
 
 /** Picks the refusal worth showing, keeping the first of equally useful ones. */
-function mostInformativeFailure(failures: RankedFailure[]): ValidationResult {
-  const best = failures.reduce<RankedFailure | undefined>(
-    (chosen, failure) =>
-      chosen === undefined || failure.rank < chosen.rank ? failure : chosen,
-    undefined,
+function mostInformativeFailure(
+  failures: RankedFailure[],
+): RankedFailure {
+  return failures.reduce<RankedFailure>(
+    (chosen, failure) => (failure.rank < chosen.rank ? failure : chosen),
+    failures[0] ?? {
+      valid: false,
+      error: INVALID_KEY_MESSAGE,
+      rank: FAILURE_RANK.generic,
+    },
   );
-
-  if (!best) return { valid: false, error: INVALID_KEY_MESSAGE };
-
-  const { rank: _rank, ...result } = best;
-
-  return result;
 }
 
 /**
@@ -431,15 +466,24 @@ async function runProbeChain({
       // nothing about the key itself.
       failures.push({
         valid: false,
-        error: context.hasConfigurableEndpoint
-          ? "Failed to validate API key. Please check your network connection and base URL."
-          : "Failed to validate API key. Please check your network connection.",
+        error: "Could not reach the provider to check this API key.",
         rank: FAILURE_RANK.unreachable,
       });
     }
   }
 
-  return mostInformativeFailure(failures);
+  const { rank, ...result } = mostInformativeFailure(failures);
+
+  // Nothing answered, so there is no verdict on the key to report — only a
+  // failure to have asked.
+  if (rank === FAILURE_RANK.unreachable) {
+    throw new ProviderUnreachableError({
+      provider: context.provider,
+      hasConfigurableEndpoint: context.hasConfigurableEndpoint,
+    });
+  }
+
+  return result;
 }
 
 /**

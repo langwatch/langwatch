@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
-import { validateProviderApiKey } from "../providerValidation";
+import {
+  ProviderUnreachableError,
+  validateProviderApiKey,
+} from "../providerValidation";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -110,15 +113,17 @@ describe("validateProviderApiKey", () => {
       expect(result.error).not.toContain("network");
     });
 
-    it("reports a network error only when the fetch itself fails", async () => {
-      mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    it("raises an unreachable-provider error only when the fetch itself fails", async () => {
+      mockFetch.mockRejectedValue(new Error("ECONNREFUSED"));
 
-      const result = await validateProviderApiKey("elevenlabs", {
-        ELEVENLABS_API_KEY: "sk_test",
-      });
-
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain("network");
+      // A refused key is an answer; an unreachable provider is the absence of
+      // one, so it travels the handled-error channel rather than posing as a
+      // verdict on the key.
+      await expect(
+        validateProviderApiKey("elevenlabs", {
+          ELEVENLABS_API_KEY: "sk_test",
+        }),
+      ).rejects.toBeInstanceOf(ProviderUnreachableError);
     });
   });
 
@@ -199,15 +204,29 @@ describe("validateProviderApiKey", () => {
       expect(result.error).toContain("API validation failed (500)");
     });
 
-    it("returns error on network failure", async () => {
-      mockFetch.mockRejectedValueOnce(new Error("Network error"));
+    it("raises an unreachable-provider error on network failure", async () => {
+      mockFetch.mockRejectedValue(new Error("Network error"));
 
-      const result = await validateProviderApiKey("openai", {
-        OPENAI_API_KEY: "sk-valid-key",
+      await expect(
+        validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-valid-key",
+        }),
+      ).rejects.toMatchObject({
+        code: "provider_unreachable",
+        fault: "provider",
       });
+    });
 
-      expect(result.valid).toBe(false);
-      expect(result.error).toContain("Failed to validate API key");
+    it("tells a provider with a custom endpoint to check the base URL too", async () => {
+      mockFetch.mockRejectedValue(new Error("Network error"));
+
+      await expect(
+        validateProviderApiKey("openai", {
+          OPENAI_API_KEY: "sk-valid-key",
+        }),
+      ).rejects.toMatchObject({
+        tips: expect.arrayContaining([expect.stringContaining("base URL")]),
+      });
     });
 
     it("uses custom base URL when provided", async () => {
