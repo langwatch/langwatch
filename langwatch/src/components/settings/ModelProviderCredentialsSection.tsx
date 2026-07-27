@@ -6,6 +6,7 @@ import type {
 } from "../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
+import { modelProviderRegistry } from "../../features/onboarding/regions/model-providers/registry";
 import { isApiKeyField } from "../../utils/modelProviderHelpers";
 import { SmallLabel } from "../SmallLabel";
 import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
@@ -53,6 +54,19 @@ export const CredentialsSection = ({
       { enabled: !!organizationId },
     );
   const isManaged = managedProviderData?.managed ?? false;
+
+  // Every provider already carries a sentence explaining where its
+  // credential comes from; the drawer just never showed it, so customers
+  // saw a bare env-var name and had to guess which key was wanted. Keyed by
+  // the backend provider, since a few entries name themselves differently
+  // there (open_ai_azure -> azure).
+  const fieldMetadata = React.useMemo(
+    () =>
+      modelProviderRegistry.find(
+        (entry) => entry.backendModelProviderKey === provider.provider,
+      )?.fieldMetadata,
+    [provider.provider],
+  );
 
   const requiredKeys = useRequiredCredentialKeys({
     providerKey: provider.provider,
@@ -121,6 +135,11 @@ export const CredentialsSection = ({
                   width="full"
                 />
               </Box>
+              {fieldMetadata?.[key]?.description && (
+                <Field.HelperText>
+                  {fieldMetadata[key]!.description}
+                </Field.HelperText>
+              )}
               {fieldErrors[key] && (
                 <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>
               )}
