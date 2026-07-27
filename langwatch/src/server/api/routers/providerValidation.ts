@@ -183,7 +183,13 @@ function extractUpstreamReason(body: unknown): string | undefined {
 function redactApiKey(text: string, apiKey: string): string {
   if (apiKey.length < 8) return text;
 
-  return text.split(apiKey).join("[redacted]");
+  const encoded = encodeURIComponent(apiKey);
+  const forms = encoded === apiKey ? [apiKey] : [apiKey, encoded];
+
+  return forms.reduce(
+    (redacted, form) => redacted.split(form).join("[redacted]"),
+    text,
+  );
 }
 
 /**
@@ -291,11 +297,15 @@ type ProbeContext = {
 };
 
 /**
- * How long a single shape gets to answer. The probe runs on a tRPC request
- * thread against a host the customer can supply, and without a deadline a
- * black-holed endpoint pins that thread until undici gives up minutes later.
+ * How long the whole walk gets to find an answer.
+ *
+ * The budget is shared across every shape rather than granted to each, because
+ * a per-shape timeout multiplies: four shapes at ten seconds each would let one
+ * black-holed host hold a tRPC request thread for forty. The customer supplies
+ * the host for any provider with an endpoint of its own, so this is the only
+ * thing bounding it — undici's own default gives up minutes later.
  */
-const PROBE_TIMEOUT_MS = 10_000;
+const PROBE_BUDGET_MS = 10_000;
 
 /** The request that proves a key works: list the provider's models. */
 type ProbeRequest = { url: string; headers: Record<string, string> };
@@ -440,12 +450,29 @@ async function runProbeChain({
 }): Promise<ValidationResult> {
   const failures: RankedFailure[] = [];
 
+  // One deadline for the walk, not one per shape — see PROBE_BUDGET_MS. The
+  // same signal goes to every request, so time already spent is time the
+  // remaining shapes do not get.
+  const deadline = AbortSignal.timeout(PROBE_BUDGET_MS);
+
+  /** The request never landed, so this says nothing about the key itself. */
+  const unreachable = (): RankedFailure => ({
+    valid: false,
+    error: "Could not reach the provider to check this API key.",
+    rank: FAILURE_RANK.unreachable,
+  });
+
   for (const candidate of candidates) {
+    if (deadline.aborted) {
+      failures.push(unreachable());
+      break;
+    }
+
     try {
       const response = await fetch(candidate.url, {
         method: "GET",
         headers: candidate.headers,
-        signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        signal: deadline,
       });
 
       if (response.ok) {
@@ -462,13 +489,7 @@ async function runProbeChain({
         break;
       }
     } catch {
-      // The request never landed — timed out or refused — so this says
-      // nothing about the key itself.
-      failures.push({
-        valid: false,
-        error: "Could not reach the provider to check this API key.",
-        rank: FAILURE_RANK.unreachable,
-      });
+      failures.push(unreachable());
     }
   }
 

@@ -709,6 +709,28 @@ describe("validateProviderApiKey", () => {
     });
 
     /** @scenario Probing stops at the first shape that answers */
+    /**
+     * A timeout per shape multiplies: four shapes at ten seconds each would
+     * let one black-holed host hold a request thread for forty. Sharing the
+     * signal is what makes the budget a ceiling on the walk rather than on
+     * each step of it.
+     */
+    it("gives the whole walk one deadline rather than one per shape", async () => {
+      mockFetch.mockResolvedValue(refuse(403, "API_KEY_SERVICE_BLOCKED"));
+
+      await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: "AIzaSyRefusedEverywhere",
+      });
+
+      const signals = mockFetch.mock.calls.map(
+        (call) => (call[1] as { signal?: AbortSignal }).signal,
+      );
+
+      expect(signals.length).toBeGreaterThan(1);
+      expect(signals.every((signal) => signal !== undefined)).toBe(true);
+      expect(new Set(signals).size).toBe(1);
+    });
+
     it("stops at the first shape that answers", async () => {
       mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
@@ -816,6 +838,37 @@ describe("validateProviderApiKey", () => {
 
       expect(result.valid).toBe(false);
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the provider quotes the request back", () => {
+    /**
+     * Gemini carries the key in a query string, so a provider echoing the
+     * request it rejected can hand back the percent-encoded form rather than
+     * the key as typed. Matching only the literal would walk straight past it.
+     */
+    it("hides the key even when it comes back percent-encoded", async () => {
+      const apiKey = "AIzaSy+Secret/Key=With+Specials";
+      const encoded = encodeURIComponent(apiKey);
+
+      expect(encoded).not.toBe(apiKey);
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: { message: `rejected request to /models?key=${encoded}` },
+          }),
+      });
+
+      const result = await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: apiKey,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).not.toContain(encoded);
+      expect(result.error).not.toContain(apiKey);
     });
   });
 

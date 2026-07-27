@@ -28,9 +28,10 @@ export function useModelProviderApiKeyValidation(
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
   const utils = api.useContext();
-  // Sends the key in a request body rather than a URL. See the procedure.
-  const validateApiKeyMutation = api.modelProvider.validateApiKey.useMutation();
-  const { mutateAsync: validateApiKey } = validateApiKeyMutation;
+  // A mutation, so the key travels in a request body rather than encoded into
+  // a URL. See the procedure for why that matters.
+  const { mutateAsync: validateApiKey } =
+    api.modelProvider.validateApiKey.useMutation();
 
   const validate = useCallback(async (): Promise<boolean> => {
     // The probe reads nothing from storage — it sends the typed keys

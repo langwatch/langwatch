@@ -97,6 +97,7 @@ export const CredentialsSection = ({
           // Requiredness is derived from the provider's own schema against
           // the values entered so far, so a field that a base URL makes
           // optional loses its marker the moment that URL is typed.
+          const description = fieldMetadata?.[key]?.description;
           const isOptional = !requiredKeys.has(key);
           const isPassword = isApiKeyField(key);
           const isInvalid = Boolean(fieldErrors[key]);
@@ -135,10 +136,8 @@ export const CredentialsSection = ({
                   width="full"
                 />
               </Box>
-              {fieldMetadata?.[key]?.description && (
-                <Field.HelperText>
-                  {fieldMetadata[key]!.description}
-                </Field.HelperText>
+              {description && (
+                <Field.HelperText>{description}</Field.HelperText>
               )}
               {fieldErrors[key] && (
                 <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>

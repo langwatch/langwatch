@@ -263,7 +263,16 @@ Feature: Credential Validation
     Then the key is hidden from the error I see
 
   # tRPC sends queries as GET with their input in the URL, and the input here
-  # is the customer's API key.
+  # is the customer's API key. Mutations are audit-logged with their input, so
+  # the two have to move together or the key just changes hiding place.
+
+  @unit
+  Scenario: A credential is never persisted to the audit trail
+    Given a recorded action carrying provider credentials
+    When it is written to the audit trail
+    Then the credential values are not stored
+    And which credentials were set is still recorded
+
 
   @unit
   Scenario: The API key is never sent in a URL

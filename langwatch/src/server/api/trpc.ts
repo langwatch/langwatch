@@ -445,6 +445,35 @@ function isAuditLogExempt(path: string): boolean {
   return AUDIT_LOG_EXEMPT_PATH_PREFIXES.some((p) => path.startsWith(p));
 }
 
+/**
+ * Strips credential values out of what the audit trail persists.
+ *
+ * `auditLog` stores `args` verbatim, and `customKeys` carries provider API
+ * keys as typed — on every model-provider write, and now on the credential
+ * probe too, since that had to become a mutation to keep the key out of a
+ * URL. A secret in a durable, queryable table is worse than one in a request
+ * line, so the values go. The field names stay, because "which credentials
+ * were set" is the part of the record worth having.
+ */
+export function redactAuditArgs(input: unknown): unknown {
+  if (typeof input !== "object" || input === null) return input;
+
+  const record = input as Record<string, unknown>;
+  const customKeys = record.customKeys;
+
+  if (typeof customKeys !== "object" || customKeys === null) return input;
+
+  return {
+    ...record,
+    customKeys: Object.fromEntries(
+      Object.keys(customKeys as Record<string, unknown>).map((name) => [
+        name,
+        "[redacted]",
+      ]),
+    ),
+  };
+}
+
 const auditLogMutations = t.middleware(
   async ({ ctx, next, type, path, input }) => {
     if (type !== "mutation" || !ctx.session?.user || isAuditLogExempt(path)) {
@@ -460,7 +489,7 @@ const auditLogMutations = t.middleware(
       organizationId: (input as any)?.organizationId,
       projectId: (input as any)?.projectId,
       action: path,
-      args: input,
+      args: redactAuditArgs(input),
       error: !result.ok ? result.error : undefined,
       req: ctx.req,
       targetKind: target.targetKind,

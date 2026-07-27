@@ -341,6 +341,11 @@ export const EditModelProviderForm = ({
   }, [providerId]);
   // Editing any credential re-arms the probe, so a corrected key is checked
   // again rather than saved on the strength of the previous refusal.
+  //
+  // Comparing fingerprints rather than holding a boolean is what makes that
+  // safe while a probe is still in flight: the refusal records the credentials
+  // it was actually about, so a key edited mid-probe does not inherit the old
+  // key's verdict and slip through unprobed.
   const canSaveWithoutProbe = refusedCredentials === credentialsFingerprint;
 
   const handleSave = useCallback(async () => {
