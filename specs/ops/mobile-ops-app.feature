@@ -9,8 +9,12 @@ Feature: LangWatch Ops mobile app
   off the real procedures and a server-side change that would break a screen
   breaks the typecheck instead.
 
-  It monitors. The single action it can take is the payload store cleanup sweep,
-  and even that is trialled first.
+  It monitors, and it acts. Every ops mutation is a procedure on the same router,
+  so the app can unblock, drain, redrive, replay and reclaim from a phone. What
+  keeps that safe is not withholding the actions, it is the shape of each one:
+  a preview where the blast radius is unknown, a canary where a handful can be
+  tried first, and a typed confirmation where the work is destroyed rather than
+  moved.
 
   # ---------------------------------------------------------------------------
   # Signing in
@@ -147,11 +151,137 @@ Feature: LangWatch Ops mobile app
     Then each job shows its size and the top-level keys of its payload
     And no payload contents are shown or fetched
 
+  # ---------------------------------------------------------------------------
+  # Acting on a queue
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Actions are offered only when they would do something
+    Given a group that is not blocked
+    Then unblocking it is not offered
+    Given a queue with nothing dead-lettered
+    Then replaying its dead letters is not offered
+
   @manual
-  Scenario: Paused keys and tenants are shown as state, not as controls
+  Scenario: Every action lives behind one trigger per row
+    Given a list of groups
+    Then each row carries a single actions trigger
+    And opening it lists the actions available for that row
+    And a destructive action is marked as destructive
+
+  @manual
+  Scenario: Unblocking a group takes one confirmation
+    Given a blocked group
+    When the operator unblocks it
+    Then they are asked to confirm
+    And on confirming, the group is unblocked
+    And the app reports whether it had in fact been blocked
+
+  @manual
+  Scenario: Draining a group destroys work and says so
+    Given a blocked group with queued jobs
+    When the operator drains it
+    Then the confirmation says the jobs are discarded and cannot be recovered
+    And the action stays disabled until the confirmation word is typed
+    And on running, the app reports how many jobs were discarded
+
+  @manual
+  Scenario: A blocked job can be retried on its own
+    Given a blocked group with several queued jobs
+    When the operator retries one job
+    Then only that job is retried
+
+  @manual
+  Scenario: A group can be moved to the dead letter queue
+    Given a blocked group
+    When the operator moves it to dead letters
+    Then the app reports how many jobs were moved
+
+  # ---------------------------------------------------------------------------
+  # Acting on a whole queue
+  # ---------------------------------------------------------------------------
+
+  @manual
+  Scenario: A handful can be tried before the whole queue
+    Given a queue with many blocked groups
+    Then the operator can unblock a small sample first
+    And the app reports which groups it unblocked
+    So that a fix can be proven before it is applied to everything
+
+  @manual
+  Scenario: A sweeping action previews its blast radius first
+    Given a queue with many blocked groups
+    When the operator chooses to drain all of them
+    Then the app first shows how many groups would be affected
+    And it breaks that down by pipeline and by error
+    And only then does it offer to run
+
+  @manual
+  Scenario: A preview that finds nothing does not offer to run
+    Given a queue with nothing blocked
+    When the operator previews draining all blocked groups
+    Then the app says there is nothing to drain
+    And no destructive action is offered
+
+  @manual
+  Scenario: Moving every blocked group to dead letters is confirmed by typing
+    Given a queue with blocked groups
+    When the operator moves them all to dead letters
+    Then the preview is shown first
+    And the action stays disabled until the confirmation word is typed
+
+  # ---------------------------------------------------------------------------
+  # Dead letters
+  # ---------------------------------------------------------------------------
+
+  @manual
+  Scenario: A dead-lettered group can be replayed
+    Given a dead-lettered group
+    When the operator replays it
+    Then the app reports how many jobs were replayed
+
+  @manual
+  Scenario: A queue's dead letters can be replayed together
+    Given a queue with several dead-lettered groups
+    When the operator replays them all
+    Then the app reports how many groups and jobs were replayed
+
+  # ---------------------------------------------------------------------------
+  # Pauses and tenants
+  # ---------------------------------------------------------------------------
+
+  @manual
+  Scenario: A paused pipeline or tenant can be unpaused from its row
     Given a paused pipeline key and a paused tenant
     When the operator opens the queue
-    Then both are listed as read-only state
+    Then each carries an action to unpause it
+    And unpausing takes one confirmation
+
+  @manual
+  Scenario: A tenant's backlog can be drained
+    Given a paused tenant with a backlog
+    When the operator drains that tenant
+    Then the confirmation says the jobs are discarded and cannot be recovered
+    And the action stays disabled until the confirmation word is typed
+    And on running, the app reports how many groups and jobs were discarded
+
+  @manual
+  Scenario: Pausing something new is not offered
+    When the operator looks for a way to pause a tenant that is not already paused
+    Then no such control exists
+    Because naming a tenant or pipeline key by hand on a phone invites a typo
+      that pauses the wrong thing
+
+  # ---------------------------------------------------------------------------
+  # Anomalies
+  # ---------------------------------------------------------------------------
+
+  @manual
+  Scenario: An anomaly can be acknowledged
+    Given an active anomaly
+    When the operator dismisses it
+    Then it stops being listed
+    And the app says the detector may surface it again if the condition persists
 
   # ---------------------------------------------------------------------------
   # Dead letters, errors and anomalies
@@ -222,6 +352,19 @@ Feature: LangWatch Ops mobile app
     And it never shows the payload
 
   @manual
+  Scenario: A single payload can be deleted
+    Given a payload nothing holds a lease on
+    When the operator deletes it
+    Then the action stays disabled until the confirmation word is typed
+    And the confirmation says the deletion is silent at the queue level
+    And on running, the app reports whether it was deleted
+
+  @unit
+  Scenario: Deleting a payload something still holds is not offered
+    Given a payload with a live lease
+    Then no delete action is offered for it
+
+  @manual
   Scenario: A reclaim is trialled before it is run
     Given the operator wants to reclaim space
     When they run a trial sweep
@@ -238,10 +381,16 @@ Feature: LangWatch Ops mobile app
     And it reports what was actually reclaimed
 
   @unit
-  Scenario: The reclaim action stays disabled until the confirmation matches exactly
-    Given the reclaim sheet is open
-    When the typed text differs in any character or in case
-    Then the reclaim action is disabled
+  Scenario: A confirmation word must match exactly
+    Given any action that requires a typed confirmation
+    When the typed text differs in any character, in case, or by whitespace
+    Then the action is disabled
+
+  @manual
+  Scenario: An action reports what it did, not merely that it ran
+    Given any completed action
+    Then the app states the counts the server returned
+    And a failed action shows the reason it failed
 
   # ---------------------------------------------------------------------------
   # Projection replay
@@ -274,6 +423,8 @@ Feature: LangWatch Ops mobile app
   Scenario: The app cannot start a replay
     When the operator looks at any projection screen
     Then there is no control that starts or cancels a replay
+    Because a replay is chosen with the event log open in front of you, and the
+      projection screens exist here to answer "is one running", not to begin one
 
   # ---------------------------------------------------------------------------
   # Behaviour under failure

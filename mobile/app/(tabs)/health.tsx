@@ -1,6 +1,10 @@
 import { Text, View } from "react-native";
 
 import { trpc } from "@/api/trpc";
+import {
+  AnomalyRowActions,
+  DeadLetterRowActions,
+} from "@/features/actions/rows";
 import { formatCount, formatRate, formatRelativeMs } from "@/lib/format";
 import { multipleOfBaseline } from "@/lib/ops";
 import {
@@ -38,7 +42,7 @@ export default function HealthScreen() {
     <Screen onRefresh={refresh} refreshing={anomalies.isRefetching}>
       <Section
         title="Anomalies"
-        footer="Hard tier first. Dismissing an anomaly happens in the web console."
+        footer="Hard tier first. Dismissing one acknowledges it; the next check will flag it again if the rate stays where it is."
       >
         <QueryState query={anomalies}>
           {({ anomalies: list }) =>
@@ -79,6 +83,7 @@ export default function HealthScreen() {
                                 anomaly.tier === "hard" ? "critical" : "warning"
                               }
                             />
+                            <AnomalyRowActions tenantId={anomaly.tenantId} />
                           </View>
                           <Text style={{ color: theme.textMuted, fontSize: 12 }}>
                             {`${formatRate(anomaly.currentRate)}/s against a ${formatRate(
@@ -140,6 +145,10 @@ export default function HealthScreen() {
                           <Text style={{ color: theme.textMuted, fontSize: 12 }}>
                             {formatCount(group.jobCount)} jobs
                           </Text>
+                          <DeadLetterRowActions
+                            queueName={group.queueName}
+                            groupId={group.groupId}
+                          />
                         </View>
                         {group.error ? (
                           <Text
@@ -169,8 +178,7 @@ export default function HealthScreen() {
                           fontSize: 10,
                         }}
                       >
-                        {group.errorStack ??
-                          "Replaying from the dead letter queue happens in the web console."}
+                        {group.errorStack ?? "No stack was recorded for this failure."}
                       </Text>
                     }
                   />

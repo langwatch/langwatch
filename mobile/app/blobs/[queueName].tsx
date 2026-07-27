@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 import { trpc } from "@/api/trpc";
+import { BlobRowActions } from "@/features/actions/rows";
 import { formatBytes, formatCount, formatDuration, formatRelativeMs } from "@/lib/format";
 import {
   BLOB_SORTS,
@@ -192,6 +193,7 @@ export default function BlobListScreen() {
                               text={blob.sweepOutcome}
                               severity={sweepOutcomeSeverity(blob.sweepOutcome)}
                             />
+                            <BlobRowActions blob={blob} />
                           </View>
                         </View>
                       }
@@ -230,7 +232,7 @@ export default function BlobListScreen() {
           </QueryState>
         </Section>
 
-        <Section footer="Deleting a single payload is only possible from the web console. This app can run the sweep, which decides by rule rather than by hand." />
+        <Section footer="A payload nothing holds a lease on can be deleted from its row. The sweep on the Storage screen does the same by rule rather than by hand." />
       </Screen>
     </>
   );

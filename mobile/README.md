@@ -5,8 +5,10 @@ queues, dead letters, anomalies, scheduler, the Foundry, the payload store and
 projection replay — for when the operator has a phone and not a laptop. Targets
 iOS; Android falls out of the same source.
 
-It **monitors**. The only action it can take is the payload store cleanup sweep,
-and even that is trialled first. See "What it deliberately cannot do".
+It monitors **and it acts**: unblock, drain, redrive, replay, unpause, dismiss
+and reclaim, all through the same procedures the web console calls. What keeps
+that safe on a phone is the shape of each action rather than withholding it —
+see "Acting on a queue".
 
 Specs: [`specs/ops/mobile-ops-app.feature`](../specs/ops/mobile-ops-app.feature)
 and [`specs/ops/mobile-ops-api.feature`](../specs/ops/mobile-ops-api.feature).
@@ -93,7 +95,7 @@ Under [haven](../tools/thuishaven/README.md) the app is at
 | Tab | Content |
 | --- | --- |
 | **Overview** | Blocked, parked and drifting counters first; then throughput, latency and per-phase metrics; then Redis and process pressure; then clustered top errors. Refreshes every 10s while in front. |
-| **Queues** | Queues ranked by trouble rather than by name, drilling into groups and then into a group's queued jobs. Paused keys and paused tenants appear as read-only state. |
+| **Queues** | Queues ranked by trouble rather than by name, drilling into groups and then into a group's queued jobs. Paused keys and tenants are listed with their own actions. |
 | **Health** | Anomalies (hard tier first), every dead-lettered group across all queues, and blocked groups clustered by error. Rows expand in place. |
 | **Storage** | Per-queue sampled totals, then a blob listing orderable by largest / stalest / unreferenced / longest-lapsed-lease and filterable to one project. Plus the sweep. |
 | **More** | Scheduler, the Foundry preset catalog, projection replay, settings. |
@@ -102,35 +104,60 @@ Every ranked blob listing reports how many payloads it examined and whether the
 order is a best-of-sample — a keyspace of millions cannot be globally sorted
 inside a request, and the screen says so rather than implying a true top-N.
 
-## The one write: the cleanup sweep
+## Acting on a queue
 
-Storage → *Run a cleanup sweep*.
+Every acted-on row carries a single trailing `⋯`; queues and groups carry the
+same trigger in their screen header. The pattern and its rules are documented in
+[`dev/docs/best_practices/mobile-row-actions.md`](../dev/docs/best_practices/mobile-row-actions.md);
+the catalog itself is `src/lib/actions.ts`, which is pure data and unit tested.
 
-The trial and the real sweep are the same `ops.runBlobCleanup` procedure with
-`dryRun` flipped, so the tally you approve is the tally the sweep produced and
-not an estimate arrived at some other way. The trial reports what would be
-reclaimed, repaired and left pending, per queue. Only then does the reclaim
-appear, and it stays disabled until you type `RECLAIM` exactly — no trimming, no
-case folding. The server checks the same literal, so the typing makes the act
-deliberate rather than being the security boundary.
+| Where | Actions |
+| --- | --- |
+| Group row, group screen | Unblock · Move to dead letters · Drain |
+| Job row (blocked group) | Retry this job |
+| Queue header | Unblock 5 first · Redrive 5 first · Unblock every group · Move every blocked group to dead letters · Replay every dead letter |
+| Dead letter row | Replay |
+| Anomaly row | Dismiss |
+| Paused pipeline / tenant row | Unpause · Drain this project |
+| Payload row | Delete payload |
+| Storage screen | Cleanup sweep — trial, then reclaim |
 
-## What it deliberately cannot do
+Three guardrails, picked by what is at risk:
 
-The procedures exist on the router (it is the same `opsRouter`) and are gated by
-`ops:manage` as always — but this app offers no control that calls one:
+- **A plain confirmation** when the action is reversible — unblock, unpause,
+  replay, move to dead letters. The work still exists afterwards.
+- **A preview** when the blast radius is not visible from the row you tapped.
+  Anything named "all" shows how many groups it would affect, broken down by
+  pipeline and by error, and withholds the run button when it finds nothing.
+- **A typed word** when the work is destroyed rather than moved: `DISCARD` to
+  drain, `DELETE` to remove a payload, `RECLAIM` to sweep. Exact match — no
+  trimming, no case folding — and a different word per family so muscle memory
+  from the last confirmation does not carry over.
 
-- unblock, drain, redrive, or move groups to and from the dead letter queue
-- pause or unpause a pipeline key or a tenant
-- start or cancel a projection replay
-- write a feature flag
-- delete a single payload
-- emit a trace from a Foundry preset
+Canaries sit *above* the sweeping actions. Unblocking or redriving five names
+the five it touched, so a fix can be proven before it is applied to everything.
 
-A phone in a pocket is the wrong place to hold a control that redrives a queue or
-rebuilds a projection. Job payloads are withheld for the same reason: the group
-screen calls `ops.getGroupJobSummaries`, which reports a job's size and the
-top-level keys of its payload and never its contents. `ops.getGroupJobs`, which
-returns the payloads, is what the web console uses.
+Every action reports what it did from the counts the server returned — "Discarded
+412 jobs", not "Done" — and the sheet stays open so you can read it.
+
+Nothing here is a mobile-only write path: each one is the procedure the web
+console calls, runs its own `ops:manage` check, and lands in the audit trail
+attributed to your account.
+
+## Still only in the web console
+
+- **Starting or cancelling a projection replay.** It is chosen with the event log
+  open in front of you; these screens answer "is one running", not "begin one".
+- **Pausing a tenant or pipeline that is not already paused.** It means typing an
+  identifier, and a typo on a phone keyboard pauses the wrong thing. Unpausing
+  something already listed is offered.
+- **Feature flags.**
+- **Draining a whole queue.** The server has no such mutation — clearing a queue
+  means moving it to dead letters, where the work still exists.
+- **Reading a job's payload.** The group screen calls
+  `ops.getGroupJobSummaries`, which reports a job's size and the top-level keys
+  of its payload and never its contents. `ops.getGroupJobs`, which returns the
+  payloads, is what the web console uses.
 
 ## Layout
 
@@ -146,6 +173,7 @@ mobile/
   src/
     api/trpc.ts              typed client, auth'd fetch, error copy
     auth/                    device flow, session store, provider, sign-in
+    features/actions/       row triggers, the action sheet, mutation binding
     features/SweepSheet.tsx  trial then reclaim
     lib/                     pure logic — parsing, formatting, ordering, gates
     ui/                      theme and primitives

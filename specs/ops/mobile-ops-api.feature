@@ -19,7 +19,11 @@ Feature: Mobile ops API
 
   Scoping the ROUTER is not scoping the PERMISSIONS: every procedure still runs
   its own `ops:view` / `ops:manage` check, so a non-operator holding a valid
-  token is refused exactly as they would be on the web.
+  token is refused exactly as they would be on the web. Nor is it scoping the
+  VERBS — the mount serves the ops namespace whole, mutations included, so the
+  app can unblock, drain, redrive, replay and reclaim through the same
+  procedures the web console calls. What keeps a phone safe is the shape of each
+  action in the client, not a second permission model here.
 
   # ---------------------------------------------------------------------------
   # Authentication
@@ -145,12 +149,33 @@ Feature: Mobile ops API
     And no second copy of the presets exists to drift
 
   # ---------------------------------------------------------------------------
-  # What stays out of reach
+  # Mutations
   # ---------------------------------------------------------------------------
 
-  @manual
-  Scenario: Destructive ops procedures remain gated by their own permissions
+  @integration
+  Scenario: A mutation runs under the caller's own ops permission
     Given an operator holding a device token
     When they call a procedure that mutates a queue
     Then the procedure's own ops:manage check decides, exactly as on the web
-    And the mobile client offers no control that calls one
+
+  @integration
+  Scenario: A mutation from a non-operator is refused
+    Given a token for an account that is not a platform operator
+    When they call a procedure that mutates a queue
+    Then the call is refused as forbidden
+    And nothing is mutated
+
+  @integration
+  Scenario: Every mutation is attributed to the operator who made it
+    Given an operator holding a device token
+    When they run any mutation on this mount
+    Then the audit trail records it against their account
+    And the record is indistinguishable in kind from the same action taken on the web
+
+  @integration
+  Scenario: A destructive payload-store action still needs its typed confirmation
+    Given an operator holding a device token
+    When they run a real sweep or delete a payload without the confirmation
+    Then the call is refused
+    Because the server checks the confirmation itself, so a client that skipped
+      its own prompt gains nothing

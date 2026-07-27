@@ -3,6 +3,12 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Text, View } from "react-native";
 
 import { trpc } from "@/api/trpc";
+import {
+  GroupRowActions,
+  PausedKeyRowActions,
+  PausedTenantRowActions,
+  QueueActionsButton,
+} from "@/features/actions/rows";
 import { formatCount, formatDuration } from "@/lib/format";
 import { orderGroups } from "@/lib/ops";
 import {
@@ -16,10 +22,13 @@ import {
 import { useTheme } from "@/ui/theme";
 
 /**
- * One queue: its groups, and the pauses currently applied to it.
+ * One queue: its groups, the pauses applied to it, and what can be done about
+ * both.
  *
- * Everything here is read-only — unblocking, draining and redriving stay on the
- * web console, where the operator has the room to see what they are about to do.
+ * Queue-wide actions live in the header; per-group actions live in each row's
+ * trailing trigger. The sweeping ones preview their blast radius first and the
+ * canaries sit above them, so trying five is always easier to reach than doing
+ * all of them.
  */
 export default function QueueDetailScreen() {
   const theme = useTheme();
@@ -31,6 +40,10 @@ export default function QueueDetailScreen() {
   const queueName = params.queueName;
 
   const groups = trpc.ops.listGroups.useQuery({ queueName, page: 1, pageSize: 50 });
+  // The header actions need the queue's own counts to know what to offer, and
+  // the list this screen came from is not in scope here.
+  const queues = trpc.ops.listQueues.useQuery();
+  const queue = queues.data?.find((candidate) => candidate.name === queueName);
   const pausedKeys = trpc.ops.listPausedKeys.useQuery({ queueName });
   const pausedTenants = trpc.ops.listPausedTenants.useQuery({ queueName });
 
@@ -50,7 +63,12 @@ export default function QueueDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: params.displayName ?? queueName }} />
+      <Stack.Screen
+        options={{
+          title: params.displayName ?? queueName,
+          headerRight: queue ? () => <QueueActionsButton queue={queue} /> : undefined,
+        }}
+      />
       <Screen onRefresh={refresh} refreshing={groups.isRefetching}>
         <Section
           title="Groups"
@@ -107,6 +125,7 @@ export default function QueueDetailScreen() {
                           ) : group.hasActiveJob ? (
                             <Pill text="active" />
                           ) : null}
+                          <GroupRowActions queueName={queueName} group={group} />
                           <Ionicons
                             name="chevron-forward"
                             size={14}
@@ -136,7 +155,7 @@ export default function QueueDetailScreen() {
         {paused.length > 0 ? (
           <Section
             title="Paused"
-            footer="Pausing and unpausing happen in the web console."
+            footer="Pausing something new is not offered here: naming a tenant or pipeline key by hand on a phone invites a typo that pauses the wrong thing."
           >
             {paused.map((entry, index) => (
               <Row key={`${entry.kind}:${entry.value}`} last={index === paused.length - 1}>
@@ -147,12 +166,28 @@ export default function QueueDetailScreen() {
                     color={theme.textMuted}
                   />
                   <Text
-                    style={{ color: theme.text, fontFamily: "Menlo", fontSize: 12 }}
+                    style={{
+                      color: theme.text,
+                      fontFamily: "Menlo",
+                      fontSize: 12,
+                      flex: 1,
+                    }}
                     numberOfLines={1}
                     ellipsizeMode="middle"
                   >
                     {entry.value}
                   </Text>
+                  {entry.kind === "key" ? (
+                    <PausedKeyRowActions
+                      queueName={queueName}
+                      pausedKey={entry.value}
+                    />
+                  ) : (
+                    <PausedTenantRowActions
+                      queueName={queueName}
+                      tenantId={entry.value}
+                    />
+                  )}
                 </View>
               </Row>
             ))}

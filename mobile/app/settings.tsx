@@ -72,12 +72,18 @@ export default function SettingsScreen() {
         </Section>
 
         <Section title="What this app can do">
+          <Row>
+            <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 18 }}>
+              You can unblock, drain, redrive and replay from here, and reclaim
+              stored payloads. Anything that discards work asks you to type a
+              confirmation first, and anything that acts on a whole queue shows
+              you what it would affect before it runs.
+            </Text>
+          </Row>
           <Row last>
             <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 18 }}>
-              This app monitors. The only action it can take is the payload store
-              cleanup sweep, and that is trialled before it runs. Unblocking
-              queues, redriving dead letters, pausing tenants, flipping feature
-              flags and starting projection replays all stay in the web console.
+              Starting a projection replay, pausing something that is not already
+              paused, and changing feature flags stay in the web console.
             </Text>
           </Row>
         </Section>

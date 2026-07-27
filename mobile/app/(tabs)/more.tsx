@@ -31,12 +31,12 @@ export default function MoreScreen() {
         <LinkRow title="Settings" icon="settings-outline" href="/settings" last />
       </Section>
 
-      <Section title="What this app can do">
+      <Section title="Acting from here">
         <Row last>
           <Text style={{ color: theme.textMuted, fontSize: 13, lineHeight: 18 }}>
-            This app monitors. Unblocking queues, redriving dead letters, pausing
-            tenants, flipping feature flags and starting projection replays all
-            stay in the web console.
+            Queues, groups, dead letters, anomalies and stored payloads each
+            carry their own actions — look for the ⋯ on a row, or in the header
+            of a queue or group.
           </Text>
         </Row>
       </Section>

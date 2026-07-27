@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { Text, View } from "react-native";
 
 import { trpc } from "@/api/trpc";
+import { GroupRowActions, JobRowActions } from "@/features/actions/rows";
 import {
   formatBytes,
   formatCount,
@@ -38,9 +39,28 @@ export default function GroupDetailScreen() {
     pageSize: 20,
   });
 
+  // Narrowed once: both the header action and the per-job retry need to know
+  // whether the group is blocked, and neither can read it from a job row.
+  const groupSummary = group.data
+    ? {
+        groupId: group.data.groupId,
+        isBlocked: group.data.isBlocked,
+        pendingJobs: group.data.pendingJobs,
+      }
+    : null;
+
   return (
     <>
-      <Stack.Screen options={{ title: "Group" }} />
+      <Stack.Screen
+        options={{
+          title: "Group",
+          headerRight: groupSummary
+            ? () => (
+                <GroupRowActions queueName={queueName} group={groupSummary} />
+              )
+            : undefined,
+        }}
+      />
       <Screen
         onRefresh={() => {
           void group.refetch();
@@ -165,6 +185,13 @@ export default function GroupDetailScreen() {
                           <Text style={{ color: theme.textMuted, fontSize: 12 }}>
                             {formatBytes(job.payloadBytes)}
                           </Text>
+                          {groupSummary ? (
+                            <JobRowActions
+                              queueName={queueName}
+                              group={groupSummary}
+                              jobId={job.jobId}
+                            />
+                          ) : null}
                         </View>
                         {job.payloadKeys.length > 0 ? (
                           <Text

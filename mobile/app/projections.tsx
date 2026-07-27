@@ -83,7 +83,7 @@ export default function ProjectionsScreen() {
 
         <Section
           title="History"
-          footer="Starting and cancelling a replay happen in the web console."
+          footer="Starting and cancelling a replay stay in the web console — a replay is chosen with the event log open in front of you."
         >
           <QueryState query={history}>
             {(runs) =>
