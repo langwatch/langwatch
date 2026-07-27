@@ -544,6 +544,7 @@ describe("validateProviderApiKey", () => {
         expect(result.error).toContain("Invalid API key");
       });
 
+      /** @scenario A provider server error is not reported as a bad key */
       it("keeps the status code when the provider is failing", async () => {
         respondWith(500, { error: { message: "upstream is on fire" } });
 
@@ -633,6 +634,7 @@ describe("validateProviderApiKey", () => {
      * unusable once every shape has refused it — anything less reports our
      * own narrow guess as the customer's problem.
      */
+    /** @scenario A key any supported auth shape accepts is valid */
     it("accepts a key the first shapes refuse but a later one answers", async () => {
       mockFetch
         .mockResolvedValueOnce(refuse(403, "API_KEY_SERVICE_BLOCKED"))
@@ -648,6 +650,7 @@ describe("validateProviderApiKey", () => {
       expect(mockFetch).toHaveBeenCalledTimes(4);
     });
 
+    /** @scenario Every auth shape the provider supports is tried */
     it("tries the query, header and OpenAI-compatible shapes", async () => {
       mockFetch.mockResolvedValue(refuse(403, "API_KEY_SERVICE_BLOCKED"));
 
@@ -673,6 +676,7 @@ describe("validateProviderApiKey", () => {
       ).toBe(true);
     });
 
+    /** @scenario Probing stops at the first shape that answers */
     it("stops at the first shape that answers", async () => {
       mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
@@ -682,6 +686,50 @@ describe("validateProviderApiKey", () => {
 
       expect(result).toEqual({ valid: true });
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * Found end to end, not by a mock. Asked about a plainly invalid key the
+     * primary endpoints return Google's canonical API_KEY_INVALID, while the
+     * OpenAI-compatible surface answers "Please pass a valid API key" with no
+     * reason at all. Preferring whichever refusal merely differed from our own
+     * wording picked that vaguer one and appended it, producing "Invalid API
+     * key. Please check your API key and try again. Please pass a valid API
+     * key" against a live key.
+     */
+    it("prefers the provider's verdict over a vaguer fallback message", async () => {
+      const canonical = {
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: {
+              message: "API key not valid. Please pass a valid API key.",
+              details: [{ reason: "API_KEY_INVALID", domain: "googleapis.com" }],
+            },
+          }),
+      };
+      const vague = {
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: { code: 400, message: "Please pass a valid API key" },
+          }),
+      };
+      mockFetch
+        .mockResolvedValueOnce(canonical)
+        .mockResolvedValueOnce(canonical)
+        .mockResolvedValueOnce(canonical)
+        .mockResolvedValueOnce(vague);
+
+      const result = await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: "AIzaSyPlainlyInvalid",
+      });
+
+      expect(result.error).toBe(
+        "Invalid API key. Please check your API key and try again.",
+      );
     });
 
     it("reports the actionable refusal once every shape has failed", async () => {
@@ -696,6 +744,7 @@ describe("validateProviderApiKey", () => {
       expect(result.error).not.toContain("Invalid API key");
     });
 
+    /** @scenario A provider with one documented auth shape is probed once */
     it("leaves a provider with one documented auth shape probed once", async () => {
       mockFetch.mockResolvedValue({ ok: false, status: 401 });
 

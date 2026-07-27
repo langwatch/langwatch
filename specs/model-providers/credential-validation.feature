@@ -262,6 +262,16 @@ Feature: Credential Validation
     When I call validateProviderApiKey for it
     Then the key is hidden from the error I see
 
+  # tRPC sends queries as GET with their input in the URL, and the input here
+  # is the customer's API key.
+
+  @unit
+  Scenario: The API key is never sent in a URL
+    Given a key to check
+    When validation runs
+    Then the key travels in the request body
+    And the key is never placed in a URL
+
   # A credential is not tied to one URL. Google issues Gemini keys from AI
   # Studio, the Cloud console and Agent Platform, and the same key answers on
   # a query parameter, on a header, and on the OpenAI-compatible surface.

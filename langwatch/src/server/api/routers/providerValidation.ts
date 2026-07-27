@@ -195,7 +195,7 @@ async function readUpstreamRefusal(
 async function handleHttpError(
   response: Response,
   context: ProbeContext,
-): Promise<ValidationResult> {
+): Promise<RankedFailure> {
   const { message, reason } = await readUpstreamRefusal(
     response,
     context.apiKey,
@@ -203,7 +203,16 @@ async function handleHttpError(
 
   const knownReason = reason ? GEMINI_REASON_MESSAGES[reason] : undefined;
   if (context.provider === "gemini" && knownReason) {
-    return { valid: false, error: knownReason };
+    return {
+      valid: false,
+      error: knownReason,
+      // Only a reason naming something else is worth outranking the
+      // provider's own verdict that the key itself is wrong.
+      rank:
+        knownReason === INVALID_KEY_MESSAGE
+          ? FAILURE_RANK.definitive
+          : FAILURE_RANK.actionable,
+    };
   }
 
   // Gemini reports a rejected key as 400, every other provider as 401/403.
@@ -216,6 +225,7 @@ async function handleHttpError(
     return {
       valid: false,
       error: message ? `${INVALID_KEY_MESSAGE} ${message}` : INVALID_KEY_MESSAGE,
+      rank: message ? FAILURE_RANK.explained : FAILURE_RANK.generic,
     };
   }
 
@@ -224,6 +234,7 @@ async function handleHttpError(
     error: message
       ? `API validation failed (${response.status}). ${message}`
       : `API validation failed (${response.status}). Please check your credentials.`,
+    rank: FAILURE_RANK.explained,
   };
 }
 
@@ -320,22 +331,44 @@ function buildProbeCandidates(
 }
 
 /**
- * Picks the refusal worth showing. A mapped reason names something the
- * customer can change, so it beats a bare "invalid key" from a shape that
- * was never going to work for them.
+ * How useful a refusal is to the customer, lowest first.
+ *
+ * Ranking matters because the shapes do not answer equally well. Asked about
+ * a plainly invalid key, the primary endpoints return Google's canonical
+ * `API_KEY_INVALID`, while the OpenAI-compatible surface answers with a
+ * vaguer "Please pass a valid API key" and no reason at all. Preferring
+ * whichever refusal merely differs from our own wording picks that vaguer
+ * one and appends it to the canonical sentence, which reads worse than
+ * saying nothing.
  */
-function mostInformativeFailure(failures: ValidationResult[]): ValidationResult {
-  const actionable = failures.find(
-    (failure) =>
-      failure.error &&
-      failure.error !== INVALID_KEY_MESSAGE &&
-      !failure.error.startsWith("Failed to validate"),
+const FAILURE_RANK = {
+  /** A mapped reason naming something the customer can change. */
+  actionable: 0,
+  /** The provider positively identified the key as invalid. */
+  definitive: 1,
+  /** An auth failure carrying the provider's own explanation. */
+  explained: 2,
+  /** An auth failure with nothing to add. */
+  generic: 3,
+  /** We never got an answer, so this says nothing about the key. */
+  unreachable: 4,
+} as const;
+
+type RankedFailure = ValidationResult & { rank: number };
+
+/** Picks the refusal worth showing, keeping the first of equally useful ones. */
+function mostInformativeFailure(failures: RankedFailure[]): ValidationResult {
+  const best = failures.reduce<RankedFailure | undefined>(
+    (chosen, failure) =>
+      chosen === undefined || failure.rank < chosen.rank ? failure : chosen,
+    undefined,
   );
 
-  return (
-    actionable ??
-    failures[0] ?? { valid: false, error: INVALID_KEY_MESSAGE }
-  );
+  if (!best) return { valid: false, error: INVALID_KEY_MESSAGE };
+
+  const { rank: _rank, ...result } = best;
+
+  return result;
 }
 
 /**
@@ -352,7 +385,7 @@ async function runProbeChain(
   candidates: ProbeRequest[],
   context: ProbeContext,
 ): Promise<ValidationResult> {
-  const failures: ValidationResult[] = [];
+  const failures: RankedFailure[] = [];
 
   for (const candidate of candidates) {
     try {
@@ -373,6 +406,7 @@ async function runProbeChain(
         error: context.hasConfigurableEndpoint
           ? "Failed to validate API key. Please check your network connection and base URL."
           : "Failed to validate API key. Please check your network connection.",
+        rank: FAILURE_RANK.unreachable,
       });
     }
   }
