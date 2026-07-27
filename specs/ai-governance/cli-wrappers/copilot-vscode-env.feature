@@ -75,6 +75,20 @@ Feature: `langwatch code` captures VS Code Copilot Chat via a scoped shell funct
       Then VS Code Copilot Chat exports telemetry to LangWatch
       And other shell children do not inherit the OTLP env
 
+  Rule: the ingest token never leaks into VS Code integrated terminals
+
+    @unit
+    Scenario: Setting up code clears the telemetry env from VS Code integrated terminals
+      Given `langwatch code` persisted the scoped `code()` function
+      Then VS Code settings unset every telemetry key for integrated terminals
+      And the extension host still receives the env at launch
+
+    @integration @unimplemented
+    Scenario: Logout removes the VS Code integrated-terminal telemetry clear
+      Given the VS Code integrated-terminal telemetry clear is installed
+      When the user runs `langwatch logout`
+      Then the telemetry clear is removed from VS Code settings
+
   Rule: the VS Code key is distinct and minted for copilot_vscode
 
     @integration
