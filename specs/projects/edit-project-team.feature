@@ -110,6 +110,29 @@ Feature: Edit project name and team
     When I call ProjectService.update without teamId
     Then the project's teamId remains "Engineering"
 
+  # A personal workspace is one member's private space, exempt from the plan
+  # allowance and made of exactly one team and one project. Moving a project
+  # across that boundary settles the exemption by flag alone and leaves the
+  # personal team without the project its provisioning looks for. The REST API
+  # reaches this service directly, so the boundary is held here rather than in
+  # the tRPC router alone.
+
+  @unit
+  Scenario: ProjectService.update refuses to move a personal project out of its workspace
+    Given a personal project in a personal team
+    And team "Analytics" in the same organization
+    When I call ProjectService.update with teamId of "Analytics"
+    Then the service refuses the move
+    And the project's teamId is unchanged
+
+  @unit
+  Scenario: ProjectService.update refuses to move a project into a personal workspace
+    Given a project in team "Engineering"
+    And a personal team in the same organization
+    When I call ProjectService.update with teamId of the personal team
+    Then the service refuses the move
+    And the project's teamId is unchanged
+
   # ── RBAC inheritance ─────────────────────────────────────────────────────────
 
   @unit @unimplemented

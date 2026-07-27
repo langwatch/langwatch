@@ -10,6 +10,7 @@ import {
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import {
   DestinationTeamNotFoundError,
+  PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
   type ProjectService,
   ProjectSlugConflictError,
@@ -22,7 +23,11 @@ import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
 import type { ProjectServiceMiddlewareVariables } from "../../middleware/project-service";
 import { projectServiceMiddleware } from "../../middleware/project-service";
-import { BadRequestError, NotFoundError } from "../../shared/errors";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+} from "../../shared/errors";
 import { handleProjectError } from "./error-handler";
 
 patchZodOpenapi();
@@ -223,6 +228,9 @@ secured.access(requires("project:update")).patch(
       }
       if (error instanceof DestinationTeamNotFoundError) {
         throw new BadRequestError(error.message);
+      }
+      if (error instanceof PersonalWorkspaceBoundaryError) {
+        throw new ForbiddenError(error.message);
       }
       throw error;
     }

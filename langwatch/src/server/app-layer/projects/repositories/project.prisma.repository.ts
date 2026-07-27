@@ -215,10 +215,10 @@ export class PrismaProjectRepository implements ProjectRepository {
   }: {
     teamId: string;
     organizationId: string;
-  }): Promise<{ id: string } | null> {
+  }): Promise<{ id: string; isPersonal: boolean } | null> {
     return this.prisma.team.findFirst({
       where: { id: teamId, organizationId, archivedAt: null },
-      select: { id: true },
+      select: { id: true, isPersonal: true },
     });
   }
 

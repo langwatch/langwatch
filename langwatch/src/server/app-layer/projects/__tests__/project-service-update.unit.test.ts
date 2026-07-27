@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   DestinationTeamNotFoundError,
+  PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
   ProjectService,
 } from "../project.service";
@@ -10,6 +11,7 @@ function createMockRepo() {
   const repo = new NullProjectRepository();
   vi.spyOn(repo, "update");
   vi.spyOn(repo, "findActiveTeamInOrganization");
+  vi.spyOn(repo, "getById");
   return repo;
 }
 
@@ -44,7 +46,10 @@ describe("ProjectService.update", () => {
       /** @scenario ProjectService.update changes teamId with same-org validation */
       /** @scenario tRPC project.update accepts optional teamId */
       it("updates the project with new teamId", async () => {
-        vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({ id: "t2" });
+        vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({
+          id: "t2",
+          isPersonal: false,
+        });
         const fakeProject = { id: "p1", name: "Bot", teamId: "t2" };
         vi.mocked(repo.update).mockResolvedValue(fakeProject as any);
 
@@ -113,6 +118,79 @@ describe("ProjectService.update", () => {
           }),
         ).rejects.toThrow(DestinationTeamNotFoundError);
       });
+    });
+  });
+
+  describe("when the move crosses the personal workspace boundary", () => {
+    /** @scenario ProjectService.update refuses to move a personal project out of its workspace */
+    it("refuses to move a personal project into a shared team", async () => {
+      vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({
+        id: "shared",
+        isPersonal: false,
+      });
+      vi.mocked(repo.getById).mockResolvedValue({
+        id: "p1",
+        teamId: "personal",
+        isPersonal: true,
+      } as any);
+
+      await expect(
+        service.update({
+          id: "p1",
+          organizationId: "org1",
+          data: { teamId: "shared" },
+        }),
+      ).rejects.toThrow(PersonalWorkspaceBoundaryError);
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario ProjectService.update refuses to move a project into a personal workspace */
+    it("refuses to move a shared project into a personal team", async () => {
+      vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({
+        id: "personal",
+        isPersonal: true,
+      });
+      vi.mocked(repo.getById).mockResolvedValue({
+        id: "p1",
+        teamId: "shared",
+        isPersonal: false,
+      } as any);
+
+      await expect(
+        service.update({
+          id: "p1",
+          organizationId: "org1",
+          data: { teamId: "personal" },
+        }),
+      ).rejects.toThrow(PersonalWorkspaceBoundaryError);
+
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it("still allows a rename that names the team the project is already in", async () => {
+      vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({
+        id: "personal",
+        isPersonal: true,
+      });
+      vi.mocked(repo.getById).mockResolvedValue({
+        id: "p1",
+        teamId: "personal",
+        isPersonal: true,
+      } as any);
+      vi.mocked(repo.update).mockResolvedValue({
+        id: "p1",
+        name: "My Workspace",
+        teamId: "personal",
+      } as any);
+
+      await expect(
+        service.update({
+          id: "p1",
+          organizationId: "org1",
+          data: { name: "My Workspace", teamId: "personal" },
+        }),
+      ).resolves.toMatchObject({ name: "My Workspace" });
     });
   });
 

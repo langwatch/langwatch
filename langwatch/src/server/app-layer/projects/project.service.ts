@@ -51,6 +51,10 @@ export class DestinationTeamNotFoundError extends Error {
   name = "DestinationTeamNotFoundError" as const;
 }
 
+export class PersonalWorkspaceBoundaryError extends Error {
+  name = "PersonalWorkspaceBoundaryError" as const;
+}
+
 export interface CreateProjectParams {
   organizationId: string;
   userId?: string | null;
@@ -159,6 +163,28 @@ export class ProjectService {
         throw new DestinationTeamNotFoundError(
           "Destination team not found, is archived, or belongs to a different organization",
         );
+      }
+
+      // Personal workspaces sit outside team moves in both directions.
+      // `Project.isPersonal` is a denormalized mirror of `Team.isPersonal`
+      // that plan-limit counting and trace ingest read without a join, so a
+      // move across the personal boundary either hands the organization a
+      // project no limit counts, or strands a shared project inside one
+      // member's private space. It also leaves the personal team without the
+      // single project `PersonalWorkspaceService.ensure()` looks for, which
+      // breaks that user's workspace permanently.
+      const current = await this.repo.getById(id);
+      if (current && current.teamId !== data.teamId) {
+        if (current.isPersonal) {
+          throw new PersonalWorkspaceBoundaryError(
+            "Personal workspace projects cannot be moved to another team. Create a project in the destination team instead.",
+          );
+        }
+        if (team.isPersonal) {
+          throw new PersonalWorkspaceBoundaryError(
+            "Projects cannot be moved into a personal workspace. Personal workspaces hold only their owner's personal project.",
+          );
+        }
       }
     }
 
