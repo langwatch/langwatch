@@ -407,6 +407,21 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.endpoint.secretKeyRef [object] Secret ref for a custom Azure Blob endpoint.
           secretKeyRef: { name: "", key: "" }
+        # Sovereign clouds (Azure Government, Azure China) issue tokens from a
+        # different identity authority and may use a different storage
+        # audience. Required alongside a non-public endpoint in any
+        # identity-based authMode — the app refuses to guess, because asking
+        # the public-cloud issuer for a sovereign token fails confusingly.
+        ## @param app.dataplane.providers.azureBlob.authorityHost.value [string] Entra authority host for sovereign clouds.
+        authorityHost:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.authorityHost.secretKeyRef [object] Secret ref for the identity authority host.
+          secretKeyRef: { name: "", key: "" }
+        ## @param app.dataplane.providers.azureBlob.tokenAudience.value [string] Storage token audience override for sovereign clouds.
+        tokenAudience:
+          value: ""
+          ## @param app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef [object] Secret ref for the storage token audience.
+          secretKeyRef: { name: "", key: "" }
 
       # Migration aid: when provider is azureBlob, the chart still emits the
       # S3 read config below if it is populated, so legacy s3:// objects

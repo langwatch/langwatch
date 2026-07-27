@@ -53924,6 +53924,8 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `global.serviceAccount.create` / `.name` / `.annotations` | ServiceAccount the cloud identity binds to (also enables AWS IRSA) |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.providers.azureBlob.authorityHost.value` | `AZURE_BLOB_AUTHORITY_HOST` — required alongside a sovereign endpoint in a token-based mode |
+| `app.dataplane.providers.azureBlob.tokenAudience.value` | `AZURE_BLOB_TOKEN_AUDIENCE` — sovereign storage audience override |
 | `app.dataplane.legacyS3ReadBucket` | `S3_BUCKET_NAME` — set during an S3→Azure migration so pre-migration objects stay readable; leave empty on a greenfield Azure install |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
