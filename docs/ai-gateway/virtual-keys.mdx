@@ -43,7 +43,7 @@ Under **AI Gateway → Virtual Keys** click **New virtual key**. The drawer walk
 
 Who can see and manage the key, and where its traces and costs land:
 
-- **Project** (default): the key belongs to one project, and the drawer states the consequence inline: "Traces and costs land in <project>".
+- **Project** (default): the key belongs to one project, and the drawer states the consequence inline: "Traces and costs land in `<project>`".
 - **Personal**: your own key. Traces and costs land in your personal workspace, and your per-member and principal budgets apply to it.
 - **Team** / **Organization** (for roles that can create shared keys): shared keys valid across the team or the whole org. A shared key still needs one project for its traces and costs to land in, and the drawer requires that choice before it lets you create the key: spend that lands nowhere could not be capped by any budget. API callers that omit the destination fall back to the org's governance project.
 
