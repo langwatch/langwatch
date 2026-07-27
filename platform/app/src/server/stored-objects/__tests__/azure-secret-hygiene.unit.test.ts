@@ -13,7 +13,7 @@
  * is "someone added an error path that forgot to redact", which only an
  * end-to-end assertion on the thrown message can catch.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/env.mjs", () => ({ env: { S3_BUCKET_NAME: "" } }));
 
