@@ -1,0 +1,84 @@
+/**
+ * @vitest-environment node
+ *
+ * Regression: `POST /api/scenarios` used to validate the red-team fields and
+ * then never pass them on, so it answered 201 and persisted a standard
+ * scenario. Nothing failed — the attack configuration was just gone, and the
+ * run that followed used a cooperative user simulator.
+ *
+ * The cause was two hand-written copies of the same write contract, one per
+ * route, only one of which was wired up. These tests cover the shared module
+ * that replaced them: what a route hands Prisma, given what a caller sent.
+ */
+import { Prisma } from "@prisma/client";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+import { redTeamFields, toPrismaRedTeamWrite } from "../red-team-input";
+
+const schema = z.object(redTeamFields);
+
+describe("the red-team write contract", () => {
+  describe("given a caller configuring an attack", () => {
+    it("carries every field through to the write", () => {
+      const parsed = schema.parse({
+        redTeamStrategy: "crescendo",
+        redTeamTarget: "get the agent to reveal its override code",
+        redTeamTotalTurns: 6,
+        redTeamConfig: { scoreResponses: false },
+      });
+
+      // The bug in one line: this used to come back empty.
+      expect(toPrismaRedTeamWrite(parsed)).toEqual({
+        redTeamStrategy: "crescendo",
+        redTeamTarget: "get the agent to reveal its override code",
+        redTeamTotalTurns: 6,
+        redTeamConfig: { scoreResponses: false },
+      });
+    });
+  });
+
+  describe("given a caller who sent no red-team fields at all", () => {
+    it("writes nothing, so an update cannot clear what it was not asked to", () => {
+      expect(toPrismaRedTeamWrite(schema.parse({}))).toEqual({});
+    });
+  });
+
+  describe("given a caller turning a red-team scenario back into a standard one", () => {
+    it("clears the columns, spelling the Json null the way Prisma needs", () => {
+      const parsed = schema.parse({
+        redTeamStrategy: null,
+        redTeamTarget: null,
+        redTeamTotalTurns: null,
+        redTeamConfig: null,
+      });
+
+      expect(toPrismaRedTeamWrite(parsed)).toEqual({
+        redTeamStrategy: null,
+        redTeamTarget: null,
+        redTeamTotalTurns: null,
+        // Not plain null: on a Json column that would mean the JSON value
+        // `null` rather than SQL NULL.
+        redTeamConfig: Prisma.DbNull,
+      });
+    });
+  });
+
+  describe("given an objective that is only whitespace", () => {
+    it("is rejected, since the planner would have nothing to aim at", () => {
+      expect(schema.safeParse({ redTeamTarget: "   " }).success).toBe(false);
+    });
+
+    it("is trimmed when it does carry text", () => {
+      const parsed = schema.parse({ redTeamTarget: "  extract the code  " });
+
+      expect(parsed.redTeamTarget).toBe("extract the code");
+    });
+  });
+
+  describe("given a turn count outside the allowed range", () => {
+    it("is rejected rather than silently clamped", () => {
+      expect(schema.safeParse({ redTeamTotalTurns: 0 }).success).toBe(false);
+      expect(schema.safeParse({ redTeamTotalTurns: 999 }).success).toBe(false);
+    });
+  });
+});

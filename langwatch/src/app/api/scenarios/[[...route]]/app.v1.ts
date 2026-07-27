@@ -4,10 +4,9 @@ import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import {
-  RED_TEAM_MAX_TURNS,
-  RedTeamConfigSchema,
-  RedTeamStrategySchema,
-} from "~/server/scenarios/execution/types";
+  redTeamFields,
+  toPrismaRedTeamWrite,
+} from "~/server/scenarios/red-team-input";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -28,12 +27,6 @@ const getService = () => ScenarioService.create(prisma);
  * red-team scenario can be created over the API and not only in the UI.
  * A null/absent strategy means a standard scenario.
  */
-const redTeamFields = {
-  redTeamStrategy: RedTeamStrategySchema.nullish(),
-  redTeamTarget: z.string().min(1).nullish(),
-  redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
-  redTeamConfig: RedTeamConfigSchema.nullish(),
-};
 
 const scenarioResponseSchema = z.object({
   id: z.string(),
@@ -204,6 +197,7 @@ export function registerScenarioRoutes(
         situation: body.situation,
         criteria: body.criteria,
         labels: body.labels,
+        ...toPrismaRedTeamWrite(body),
       });
 
       return c.json(
@@ -265,6 +259,7 @@ export function registerScenarioRoutes(
         ...(body.situation !== undefined && { situation: body.situation }),
         ...(body.criteria !== undefined && { criteria: body.criteria }),
         ...(body.labels !== undefined && { labels: body.labels }),
+        ...toPrismaRedTeamWrite(body),
       });
 
       return c.json({

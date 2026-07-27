@@ -6,13 +6,13 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
-import { Prisma } from "@prisma/client";
 import {
-  RED_TEAM_MAX_TURNS,
   type RedTeamConfig,
-  RedTeamConfigSchema,
-  RedTeamStrategySchema,
 } from "~/server/scenarios/execution/types";
+import {
+  redTeamFields,
+  toPrismaRedTeamConfig,
+} from "~/server/scenarios/red-team-input";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { checkProjectPermission } from "../../rbac";
@@ -25,31 +25,6 @@ const logger = createLogger("langwatch:api:scenarios:crud");
  * strategy and an objective; the objective is what the attacker is trying to
  * make the agent do, so a strategy without one has nothing to pursue.
  */
-const redTeamFields = {
-  redTeamStrategy: RedTeamStrategySchema.nullish(),
-  redTeamTarget: z.string().min(1).nullish(),
-  redTeamTotalTurns: z
-    .number()
-    .int()
-    .min(1)
-    .max(RED_TEAM_MAX_TURNS)
-    .nullish(),
-  redTeamConfig: RedTeamConfigSchema.nullish(),
-};
-
-/**
- * Prisma distinguishes "SQL NULL" from "JSON null" on a Json column, so an
- * explicit null has to be spelled `Prisma.DbNull` rather than passed straight
- * through. Omitting the key entirely (undefined) leaves the column untouched.
- */
-function toPrismaRedTeamConfig(
-  value: RedTeamConfig | null | undefined,
-): { redTeamConfig?: Prisma.InputJsonValue | typeof Prisma.DbNull } {
-  if (value === undefined) return {};
-  if (value === null) return { redTeamConfig: Prisma.DbNull };
-  return { redTeamConfig: value };
-}
-
 const createScenarioSchema = projectSchema.extend({
   name: z.string().min(1),
   situation: z.string(),
