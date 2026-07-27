@@ -103,7 +103,7 @@ function usageService(): GatewayUsageService {
   );
 }
 
-describe("virtual key spend — real PG + real CH", () => {
+describe("virtual key spend (real PG + real CH)", () => {
   beforeAll(async () => {
     await startTestContainers();
 

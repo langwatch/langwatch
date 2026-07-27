@@ -53,7 +53,7 @@ export type CreateVirtualKeyData = {
   scopes: ScopeInput[];
   routingPolicyId?: string | null;
   /**
-   * Routing behaviour. Defaults to the column default (NONE — no
+   * Routing behaviour. Defaults to the column default (NONE: no
    * failover) when the caller does not state one.
    */
   routingMode?: VirtualKeyRoutingMode;

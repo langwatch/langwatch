@@ -5,7 +5,7 @@
  * gatewayBudgetSync.reactor.ts).
  *
  * Selection of "which budgets apply" lives in
- * `budgetResolution.service.ts` and nowhere else — this repository is a
+ * `budgetResolution.service.ts` and nowhere else: this repository is a
  * thin pass-through so callers that only want the rows keep working while
  * callers that need per-member buckets (GROUP) or the provider filter read
  * the resolver directly.

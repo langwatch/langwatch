@@ -2,7 +2,7 @@
 -- +goose ENVSUB ON
 
 -- ============================================================================
--- gateway_budget_ledger_events.ProviderKey — the provider a debit was
+-- gateway_budget_ledger_events.ProviderKey: the provider a debit was
 -- actually dispatched to.
 --
 -- A budget can now carry a provider filter ("$50/month, OpenAI only"). Which

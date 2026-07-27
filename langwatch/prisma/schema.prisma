@@ -2193,7 +2193,7 @@ enum GatewayProviderHealthStatus {
 // GROUP is a per-member tier: one GROUP budget materialises one
 // enforcement bucket per (budget, member), so "everyone in Engineering
 // gets $50/month" is one row, not one row per person. The bucket rides
-// the PRINCIPAL cascade machinery — the ledger stamps the member's user
+// the PRINCIPAL cascade machinery: the ledger stamps the member's user
 // id and the bucket key is `<groupId>:<userId>`. There is no aggregate
 // flavour: a shared pot across a department is a TEAM/PROJECT budget.
 enum GatewayBudgetScopeType {

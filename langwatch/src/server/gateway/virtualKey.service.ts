@@ -72,7 +72,7 @@ function isProductManaged(vk: Pick<VirtualKey, "purpose">): boolean {
  * A key-targeted `GatewayBudget` is created in the same transaction as the
  * key, so a key can never exist for a moment with the cap its creator
  * asked for missing. `null` on update removes the cap (by archiving, never
- * deleting — the ledger behind it is spend history).
+ * deleting: the ledger behind it is spend history).
  */
 export type VirtualKeyBudgetInput = {
   limitUsd: string;
@@ -90,7 +90,7 @@ export type CreateVirtualKeyInput = {
   actorUserId: string;
   /** Optional cap created alongside the key, targeted at the key. */
   budget?: VirtualKeyBudgetInput | null;
-  /** Defaults to NONE — a new key does not silently fail over. */
+  /** Defaults to NONE: a new key does not silently fail over. */
   routingMode?: VirtualKeyRoutingMode;
   /**
    * Visibility set: every (scopeType, scopeId) the VK is reachable from.

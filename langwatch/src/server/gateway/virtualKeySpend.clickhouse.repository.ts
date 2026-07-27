@@ -49,7 +49,7 @@ export class GatewayVirtualKeySpendRepository {
    * Spend per key over a window, summed across the given project tenants.
    *
    * Tenants are plural because a key's traces land in whichever project
-   * resolved as its trace destination — for org- and team-scoped keys that
+   * resolved as its trace destination: for org- and team-scoped keys that
    * is the org's governance project, not the project an admin happens to
    * be looking at. Reading a single tenant is how those keys came to show
    * nothing at all.

@@ -12,7 +12,7 @@ import (
 // The dispatched provider's ModelProvider row id must land on the customer
 // span as langwatch.model_provider_id: the control plane's trace fold reads
 // exactly that key to decide which provider-filtered budgets a debit belongs
-// to. Without it those budgets never accrue — silently, because every request
+// to. Without it those budgets never accrue, and the failure is silent: every request
 // still succeeds. recordSpanForParams comes from emitter_error_suppress_test.go.
 //
 // Spec: specs/ai-gateway/budgets.feature ("Spend is attributed to the

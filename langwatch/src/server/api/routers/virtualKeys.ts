@@ -52,7 +52,7 @@ const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
 
 /**
  * The cap a key carries on itself. Only the calendar windows a person
- * reasons about in a drawer — a per-minute cap on one key is an ops knob,
+ * reasons about in a drawer: a per-minute cap on one key is an ops knob,
  * not a spending decision, and belongs on the budgets page.
  */
 const budgetInputSchema = z.object({
@@ -299,7 +299,7 @@ export const virtualKeysRouter = createTRPCRouter({
     }),
 
   /**
-   * Every budget that would constrain this key — the "already applies"
+   * Every budget that would constrain this key: the "already applies"
    * list under the budget field in the create / edit drawer. Takes a draft
    * (the scopes the creator has picked, no key row yet) so the list is
    * answerable before the key exists.

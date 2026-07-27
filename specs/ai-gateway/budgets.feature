@@ -269,7 +269,7 @@ Feature: AI Gateway — Budgets
   # what is dispatched to that provider. Because it constrains one vendor
   # rather than the whole request, a breach removes that vendor from the
   # candidates rather than refusing the call: with somewhere else to go the
-  # request is served, and only when nothing is left does it fail — naming
+  # request is served, and only when nothing is left does it fail, naming
   # the budget that emptied the list.
 
   @integration
@@ -312,7 +312,7 @@ Feature: AI Gateway — Budgets
   # ledger. The ledger exists per budget: it is written once per applicable
   # budget, and not at all for a key nobody has capped. Reading a key's spend
   # from it reported $0.00 for every uncapped key and multiplied the spend of
-  # every key covered more than once — and those are exactly the numbers the
+  # every key covered more than once, and those are exactly the numbers the
   # keys table shows and the Usage tab has to agree with.
 
   @integration

@@ -41,7 +41,7 @@ const GOV_PROJECT_ID = `proj-vktp-gov-${suffix}`;
 
 const USER_ID = `usr-vktp-${suffix}`;
 
-describe("virtual keys must have a home for their traces — real PG", () => {
+describe("virtual keys must have a home for their traces (real PG)", () => {
   beforeAll(async () => {
     await startTestContainers();
 

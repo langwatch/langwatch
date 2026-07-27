@@ -1,8 +1,8 @@
 /**
  * Aggregate read-side queries for the AI Gateway usage surfaces.
  *
- * Spend comes from `trace_summaries` — the enriched per-trace cost the rest
- * of the product bills and reports from — keyed on the
+ * Spend comes from `trace_summaries`, the enriched per-trace cost the rest
+ * of the product bills and reports from, keyed on the
  * `langwatch.virtual_key_id` attribute the gateway stamps on every span.
  *
  * It used to come from `gateway_budget_ledger_events`, which is written
@@ -189,7 +189,7 @@ export class GatewayUsageService {
 
     // Tenancy: only a key the project can actually see. A key is visible
     // to a project when it is scoped there, or when it is scoped wider
-    // (team / org) over that project — the same reach that decides where
+    // (team / org) over that project: the same reach that decides where
     // its traces land.
     const visible = await this.isVirtualKeyVisibleToProject(
       projectId,
