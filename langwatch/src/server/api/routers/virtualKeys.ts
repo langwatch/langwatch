@@ -21,7 +21,10 @@ import type { PrismaClient } from "@prisma/client";
 
 import type { Session } from "~/server/auth";
 
+import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
+import { GatewayUsageService } from "~/server/gateway/usage.service";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import {
   parseVirtualKeyConfig,
   virtualKeyConfigSchema,
@@ -33,6 +36,10 @@ import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 import { authorizeInResolver, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
+  budgetSpendRepoOrUndefined,
+  spendRepoOrUndefined,
+} from "./gatewayUsage";
+import {
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
   isVisibleToMembership,
@@ -40,6 +47,21 @@ import {
 } from "~/server/gateway/virtualKey.authz";
 
 const scopeInputSchema = scopeAssignmentSchema;
+
+const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
+
+/**
+ * The cap a key carries on itself. Only the calendar windows a person
+ * reasons about in a drawer — a per-minute cap on one key is an ops knob,
+ * not a spending decision, and belongs on the budgets page.
+ */
+const budgetInputSchema = z.object({
+  limitUsd: z.string().min(1),
+  window: z.enum(["DAY", "WEEK", "MONTH"]),
+  timezone: z.string().nullable().optional(),
+  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
+  name: z.string().min(1).max(128).optional(),
+});
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
 
@@ -236,6 +258,80 @@ export const virtualKeysRouter = createTRPCRouter({
       return toVirtualKeyCamelDto(vk);
     }),
 
+  /**
+   * Spend per key for the current calendar month, for the keys the caller
+   * can see. Reads the cost path (`trace_summaries`), the same source the
+   * Usage tab reads, so the number in the table matches the page a click
+   * on it lands on.
+   */
+  spendThisMonth: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(authorizeInResolver)
+    .query(async ({ ctx, input }) => {
+      const membership = await loadMembershipSet(
+        ctx.prisma,
+        input.organizationId,
+        ctx.session.user.id,
+      );
+      const service = VirtualKeyService.create(ctx.prisma);
+      const keys = (await service.getAll(input.organizationId)).filter((vk) =>
+        isVisibleToMembership(membership, vk.scopes),
+      );
+      const now = new Date();
+      const usage = GatewayUsageService.create(
+        ctx.prisma,
+        undefined,
+        spendRepoOrUndefined(),
+      );
+      const spend = await usage.spendByVirtualKey({
+        organizationId: input.organizationId,
+        virtualKeyIds: keys.map((k) => k.id),
+        window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
+      });
+      // Every visible key gets a row. A key that has not spent reports
+      // zero rather than being absent, so the column renders $0.00 instead
+      // of an ambiguous blank.
+      return keys.map((k) => ({
+        virtualKeyId: k.id,
+        spentUsd: spend.get(k.id)?.spentUsd ?? "0",
+        requests: spend.get(k.id)?.requests ?? 0,
+      }));
+    }),
+
+  /**
+   * Every budget that would constrain this key — the "already applies"
+   * list under the budget field in the create / edit drawer. Takes a draft
+   * (the scopes the creator has picked, no key row yet) so the list is
+   * answerable before the key exists.
+   */
+  applicableBudgets: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        virtualKeyId: z.string().nullable().optional(),
+        scopes: z.array(scopeInputSchema).min(1),
+        principalUserId: z.string().nullable().optional(),
+      }),
+    )
+    .use(authorizeInResolver)
+    .query(async ({ ctx, input }) => {
+      await assertScopesBelongToOrg(
+        ctx.prisma,
+        input.organizationId,
+        input.scopes,
+      );
+      return resolveApplicableBudgetsForDraftKey(
+        ctx.prisma,
+        {
+          organizationId: input.organizationId,
+          virtualKeyId: input.virtualKeyId ?? null,
+          scopes: input.scopes,
+          principalUserId: input.principalUserId ?? null,
+        },
+        budgetSpendRepoOrUndefined(),
+      );
+    }),
+
   create: protectedProcedure
     .input(
       z.object({
@@ -245,6 +341,8 @@ export const virtualKeysRouter = createTRPCRouter({
         principalUserId: z.string().nullable().optional(),
         scopes: z.array(scopeInputSchema).min(1),
         routingPolicyId: z.string().nullable().optional(),
+        routingMode: routingModeSchema.optional(),
+        budget: budgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
@@ -282,6 +380,8 @@ export const virtualKeysRouter = createTRPCRouter({
         principalUserId: input.principalUserId ?? null,
         scopes: input.scopes,
         routingPolicyId: input.routingPolicyId ?? null,
+        routingMode: input.routingMode,
+        budget: input.budget ?? null,
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
@@ -297,6 +397,8 @@ export const virtualKeysRouter = createTRPCRouter({
         description: z.string().nullable().optional(),
         scopes: z.array(scopeInputSchema).min(1).optional(),
         routingPolicyId: z.string().nullable().optional(),
+        routingMode: routingModeSchema.optional(),
+        budget: budgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
@@ -357,6 +459,8 @@ export const virtualKeysRouter = createTRPCRouter({
         description: input.description,
         scopes: input.scopes,
         routingPolicyId: input.routingPolicyId,
+        routingMode: input.routingMode,
+        budget: input.budget,
         config: input.config,
         actorUserId: ctx.session.user.id,
       });
