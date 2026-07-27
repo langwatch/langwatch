@@ -262,6 +262,38 @@ Feature: Credential Validation
     When I call validateProviderApiKey for it
     Then the key is hidden from the error I see
 
+  # A credential is not tied to one URL. Google issues Gemini keys from AI
+  # Studio, the Cloud console and Agent Platform, and the same key answers on
+  # a query parameter, on a header, and on the OpenAI-compatible surface.
+  # Probing one shape reported our own narrow guess as the customer's problem.
+
+  @unit
+  Scenario: A key any supported auth shape accepts is valid
+    Given the first auth shapes refuse the key
+    And a later auth shape accepts it
+    When I call validateProviderApiKey for it
+    Then the key is valid
+
+  @unit
+  Scenario: Every auth shape the provider supports is tried
+    Given a Gemini key that every shape refuses
+    When I call validateProviderApiKey for it
+    Then the key is tried as a query parameter
+    And the key is tried as a header
+    And the key is tried against the OpenAI-compatible surface
+
+  @unit
+  Scenario: Probing stops at the first shape that answers
+    Given the first auth shape accepts the key
+    When I call validateProviderApiKey for it
+    Then no further shapes are tried
+
+  @unit
+  Scenario: A provider with one documented auth shape is probed once
+    Given an OpenAI key that is refused
+    When I call validateProviderApiKey for it
+    Then only the documented shape is tried
+
   # The probe runs from our servers. A key restricted to the customer's own
   # network, a provider outage, or a key that has not finished propagating all
   # look exactly like a bad key, so a refusal cannot be the end of the road.

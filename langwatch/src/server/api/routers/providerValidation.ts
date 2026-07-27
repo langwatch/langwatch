@@ -247,12 +247,27 @@ type ProbeRequest = { url: string; headers: Record<string, string> };
  * Builds the models request for an auth strategy. Every provider is probed
  * the same way; only where the credential rides differs.
  */
-function buildProbeRequest(
+/**
+ * Every way a provider's credential can legitimately prove itself.
+ *
+ * A credential is not tied to one URL. Google alone issues keys from AI
+ * Studio, the Cloud console and Agent Platform, and the same key answers on
+ * `?key=`, on the `x-goog-api-key` header and on the OpenAI-compatible
+ * surface — each of which is a different API with its own enablement. Probing
+ * a single hardcoded shape turned "we did not ask the right way" into
+ * "your key is invalid", which is the wrong conclusion and not one the
+ * customer can act on.
+ *
+ * The shapes below are the ones verified to answer 200 for a live key. A
+ * provider whose auth is unambiguous keeps a single entry; adding a shape is
+ * appending to its list.
+ */
+function buildProbeCandidates(
   strategy: AuthStrategy,
   apiKey: string,
   baseUrl: string,
   defaultBaseUrl: string,
-): ProbeRequest {
+): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -260,59 +275,109 @@ function buildProbeRequest(
 
   switch (strategy) {
     case "anthropic":
-      return {
-        url,
-        headers: {
-          ...headers,
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+      return [
+        {
+          url,
+          headers: {
+            ...headers,
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
         },
-      };
+      ];
     case "elevenlabs":
-      return { url, headers: { ...headers, "xi-api-key": apiKey } };
-    case "gemini":
-      // Gemini takes the key as a query parameter, not a header.
-      return { url: `${url}?key=${encodeURIComponent(apiKey)}`, headers };
+      return [{ url, headers: { ...headers, "xi-api-key": apiKey } }];
+    case "gemini": {
+      // The registry pins one API version; the others live beside it on the
+      // same host, so derive the root rather than hardcoding a second URL.
+      const root = (baseUrl || defaultBaseUrl)
+        .replace(/\/$/, "")
+        .replace(/\/v1(beta)?(\/models)?$/, "");
+      const key = encodeURIComponent(apiKey);
+
+      return [
+        { url: `${root}/v1/models?key=${key}`, headers },
+        { url: `${root}/v1beta/models?key=${key}`, headers },
+        {
+          url: `${root}/v1/models`,
+          headers: { ...headers, "x-goog-api-key": apiKey },
+        },
+        {
+          url: `${root}/v1beta/openai/models`,
+          headers: { ...headers, Authorization: `Bearer ${apiKey}` },
+        },
+      ];
+    }
     case "bearer":
     default:
-      return {
-        url,
-        headers: { ...headers, Authorization: `Bearer ${apiKey}` },
-      };
+      return [
+        {
+          url,
+          headers: { ...headers, Authorization: `Bearer ${apiKey}` },
+        },
+      ];
   }
 }
 
 /**
- * Asks the provider to list its models and reports what came back.
+ * Picks the refusal worth showing. A mapped reason names something the
+ * customer can change, so it beats a bare "invalid key" from a shape that
+ * was never going to work for them.
+ */
+function mostInformativeFailure(failures: ValidationResult[]): ValidationResult {
+  const actionable = failures.find(
+    (failure) =>
+      failure.error &&
+      failure.error !== INVALID_KEY_MESSAGE &&
+      !failure.error.startsWith("Failed to validate"),
+  );
+
+  return (
+    actionable ??
+    failures[0] ?? { valid: false, error: INVALID_KEY_MESSAGE }
+  );
+}
+
+/**
+ * Asks the provider to list its models, trying each way the credential could
+ * legitimately authenticate. One shape answering is proof the key works, so
+ * the chain stops there; only when every shape has been refused is the key
+ * reported as unusable.
  *
- * @param request - The URL and headers to probe with
+ * @param candidates - The auth shapes to try, in preference order
  * @param context - Which provider is being probed, and with which key
  * @returns Promise resolving to validation result
  */
-async function runProbe(
-  request: ProbeRequest,
+async function runProbeChain(
+  candidates: ProbeRequest[],
   context: ProbeContext,
 ): Promise<ValidationResult> {
-  try {
-    const response = await fetch(request.url, {
-      method: "GET",
-      headers: request.headers,
-    });
+  const failures: ValidationResult[] = [];
 
-    if (!response.ok) {
-      return await handleHttpError(response, context);
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(candidate.url, {
+        method: "GET",
+        headers: candidate.headers,
+      });
+
+      if (response.ok) {
+        return { valid: true };
+      }
+
+      failures.push(await handleHttpError(response, context));
+    } catch {
+      // The request never landed, so this says nothing about the key itself.
+      failures.push({
+        valid: false,
+        error: context.hasConfigurableEndpoint
+          ? "Failed to validate API key. Please check your network connection and base URL."
+          : "Failed to validate API key. Please check your network connection.",
+      });
     }
-
-    return { valid: true };
-  } catch {
-    // The request never landed, so this says nothing about the key itself.
-    return {
-      valid: false,
-      error: context.hasConfigurableEndpoint
-        ? "Failed to validate API key. Please check your network connection and base URL."
-        : "Failed to validate API key. Please check your network connection.",
-    };
   }
+
+  return mostInformativeFailure(failures);
 }
 
 /**
@@ -451,8 +516,8 @@ export async function validateProviderApiKey(
     return { valid: true };
   }
 
-  return runProbe(
-    buildProbeRequest(authStrategy, apiKey, baseUrl, defaultBaseUrl),
+  return runProbeChain(
+    buildProbeCandidates(authStrategy, apiKey, baseUrl, defaultBaseUrl),
     {
       provider,
       apiKey,

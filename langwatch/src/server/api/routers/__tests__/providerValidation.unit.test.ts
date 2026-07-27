@@ -611,6 +611,103 @@ describe("validateProviderApiKey", () => {
     });
   });
 
+  describe("when a credential answers on more than one auth shape", () => {
+    const refuse = (status: number, reason?: string) => ({
+      ok: false,
+      status,
+      text: async () =>
+        JSON.stringify({
+          error: {
+            code: status,
+            message: "blocked",
+            ...(reason
+              ? { details: [{ reason, domain: "googleapis.com" }] }
+              : {}),
+          },
+        }),
+    });
+
+    /**
+     * Google issues Gemini keys from AI Studio, the Cloud console and Agent
+     * Platform, and they do not all answer the same way. A key is only
+     * unusable once every shape has refused it — anything less reports our
+     * own narrow guess as the customer's problem.
+     */
+    it("accepts a key the first shapes refuse but a later one answers", async () => {
+      mockFetch
+        .mockResolvedValueOnce(refuse(403, "API_KEY_SERVICE_BLOCKED"))
+        .mockResolvedValueOnce(refuse(403, "API_KEY_SERVICE_BLOCKED"))
+        .mockResolvedValueOnce(refuse(403, "API_KEY_SERVICE_BLOCKED"))
+        .mockResolvedValueOnce({ ok: true, status: 200 });
+
+      const result = await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: "AIzaSyKeyThatOnlyTheOpenAiSurfaceAccepts",
+      });
+
+      expect(result).toEqual({ valid: true });
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+    });
+
+    it("tries the query, header and OpenAI-compatible shapes", async () => {
+      mockFetch.mockResolvedValue(refuse(403, "API_KEY_SERVICE_BLOCKED"));
+
+      await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: "AIzaSyRefusedEverywhere",
+      });
+
+      const urls = mockFetch.mock.calls.map((call) => String(call[0]));
+      const headers = mockFetch.mock.calls.map(
+        (call) => (call[1] as { headers: Record<string, string> }).headers,
+      );
+
+      expect(urls.some((url) => url.includes("/v1/models?key="))).toBe(true);
+      expect(urls.some((url) => url.includes("/v1beta/models?key="))).toBe(
+        true,
+      );
+      expect(urls.some((url) => url.includes("/v1beta/openai/models"))).toBe(
+        true,
+      );
+      expect(headers.some((h) => "x-goog-api-key" in h)).toBe(true);
+      expect(
+        headers.some((h) => h.Authorization?.startsWith("Bearer ")),
+      ).toBe(true);
+    });
+
+    it("stops at the first shape that answers", async () => {
+      mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+      const result = await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: "AIzaSyAcceptedImmediately",
+      });
+
+      expect(result).toEqual({ valid: true });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports the actionable refusal once every shape has failed", async () => {
+      mockFetch.mockResolvedValue(refuse(403, "SERVICE_DISABLED"));
+
+      const result = await validateProviderApiKey("gemini", {
+        GEMINI_API_KEY: "AIzaSyRefusedEverywhere",
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain("Generative Language API");
+      expect(result.error).not.toContain("Invalid API key");
+    });
+
+    it("leaves a provider with one documented auth shape probed once", async () => {
+      mockFetch.mockResolvedValue({ ok: false, status: 401 });
+
+      const result = await validateProviderApiKey("openai", {
+        OPENAI_API_KEY: "sk-wrong",
+      });
+
+      expect(result.valid).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("Custom provider validation", () => {
     it("skips validation when no API key and no base URL", async () => {
       const result = await validateProviderApiKey("custom", {
