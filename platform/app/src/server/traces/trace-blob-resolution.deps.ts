@@ -6,7 +6,21 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { createS3Client } from "~/server/storage";
+import type { SpoolStorage } from "~/server/app-layer/traces/blob-store.service";
+import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
+import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import type { BlobResolutionDeps } from "./trace.service";
+
+/**
+ * Production spool storage: the same `stored-objects` registry and destination
+ * resolver every other byte-writing surface uses, so the trace spool honours a
+ * deployment's Azure / S3 / local-filesystem choice instead of assuming S3
+ * (langwatch/langwatch-saas#800).
+ */
+const defaultSpoolStorage: SpoolStorage = {
+  objectStoreFor: (projectId: string) => createStorageRegistry({ projectId }),
+  resolveDestination: resolveProjectStorageDestination,
+};
 
 /**
  * Builds the ADR-022 blob-resolution dependencies ({@link BlobResolutionDeps})
@@ -59,6 +73,7 @@ export function buildTraceBlobResolutionDeps(overrides?: {
     blobStore: new BlobStore(
       createS3Client,
       clickhouseEnabled ? resolveClickHouseClient : undefined,
+      defaultSpoolStorage,
     ),
     ioExtractionService: new TraceIOExtractionService(),
   };

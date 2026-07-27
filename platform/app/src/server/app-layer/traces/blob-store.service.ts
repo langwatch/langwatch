@@ -5,12 +5,45 @@ import {
   type S3Client,
 } from "@aws-sdk/client-s3";
 import { Ksuid } from "@langwatch/ksuid";
+import type { Readable } from "node:stream";
 import { z } from "zod";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { mintUriForDestination } from "~/server/stored-objects/uri";
+import { streamToBuffer } from "~/utils/streamToBuffer";
 
 export interface S3ClientResolution {
   s3Client: S3Client;
   s3Bucket: string;
+}
+
+/**
+ * Cap on a spool object read. The spool holds one over-threshold command, and
+ * `capOversizedAttributes` already bounds a span well below this — the cap
+ * exists so a tampered or corrupt object cannot OOM the worker, not to enforce
+ * a product limit.
+ */
+export const MAX_SPOOL_BYTES = 50 * 1024 * 1024;
+
+/**
+ * The slice of the stored-objects registry the spool needs. Declared here
+ * rather than imported so this module depends on a shape, not on the registry
+ * class — the registry satisfies it structurally.
+ */
+export interface SpoolObjectStore {
+  put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
+  get(uri: string): Promise<Readable>;
+  delete(uri: string): Promise<void>;
+}
+
+/**
+ * Destination-agnostic storage for the trace spool, injected so `BlobStore`
+ * carries no env coupling and the tests run without infrastructure.
+ */
+export interface SpoolStorage {
+  /** Per-project so BYOC tenants resolve their own bucket and credentials. */
+  objectStoreFor(projectId: string): SpoolObjectStore;
+  resolveDestination(projectId: string): Promise<ProjectStorageDestination>;
 }
 
 /**
@@ -128,40 +161,118 @@ const eventPayloadSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Transient spool S3 key shape (single source of truth)
+// Transient spool object path (single source of truth)
 // ---------------------------------------------------------------------------
 
-/** Prefix for all transient spool object keys. */
-const SPOOL_KEY_PREFIX = "trace-blobs/spool";
-/** Leading "/"-segment count of SPOOL_KEY_PREFIX, so the decode index tracks the prefix. */
-const SPOOL_PREFIX_SEGMENTS = SPOOL_KEY_PREFIX.split("/").length;
-
-/** Builds a transient spool object key. The ONLY place the key shape is encoded. */
-function buildSpoolKey(
-  projectId: string,
-  traceId: string,
-  spanId: string,
-): string {
-  return `${SPOOL_KEY_PREFIX}/${projectId}/${traceId}/${spanId}`;
-}
-
 /**
- * Extracts the projectId from a spool key produced by {@link buildSpoolKey}.
- * Indexes off SPOOL_PREFIX_SEGMENTS so a change to the prefix can't silently
- * desync the encode (`putSpool`) and decode (`getSpool`/`deleteSpool`) paths.
+ * Prefix for all transient spool objects, kept at the TOP of the object path
+ * (above the tenant segment) so a bucket/container lifecycle rule can match it
+ * with a plain prefix filter. S3 lifecycle prefix filters cannot wildcard a
+ * leading tenant segment, so `{projectId}/trace-blobs/spool/…` would be
+ * unexpirable and orphans would accumulate forever. Do not reorder.
  */
-function projectIdFromSpoolKey(spoolRef: string): string {
-  return spoolRef.split("/")[SPOOL_PREFIX_SEGMENTS] ?? "";
+const SPOOL_KEY_PREFIX = "trace-blobs/spool";
+
+/**
+ * Marker carried by a spooled command instead of a storage path.
+ *
+ * The v1 format put the raw object key in the command and the read path parsed
+ * the tenant id back out of that string to pick a bucket — so whoever could
+ * influence the queue message could steer a read at another tenant's object.
+ * v2 carries no location at all: `getSpool`/`deleteSpool` re-derive it from the
+ * command's own trusted `tenantId` + span ids, exactly as `putSpool` derived it
+ * (the same discipline `TieredBlobStore`'s `BlobRef` follows — ADR-030 §5).
+ */
+export const SPOOL_REF_V2 = "spool:v2";
+
+/**
+ * Builds the transient spool object path. The ONLY place the shape is encoded.
+ *
+ * Segments are percent-encoded: OTLP ids arrive as opaque strings and the
+ * base64 alphabet includes `/`, which would otherwise inject extra path
+ * segments (and, for a leading-`/` id, escape the spool prefix entirely).
+ */
+function buildSpoolObjectPath({
+  projectId,
+  traceId,
+  spanId,
+}: {
+  projectId: string;
+  traceId: string;
+  spanId: string;
+}): string {
+  return [
+    SPOOL_KEY_PREFIX,
+    encodeURIComponent(projectId),
+    encodeURIComponent(traceId),
+    encodeURIComponent(spanId),
+  ].join("/");
 }
 
 /**
- * Provides transient S3 spool operations (ADR-022 write path) and event_log
+ * True when `spoolRef` has the shape of a v1 reference — a raw S3 key minted
+ * before this deployment. Commands already queued when the new code rolls out
+ * still carry these, so both formats must resolve for one release.
+ *
+ * Matched by prefix rather than by "not v2": treating every unrecognised string
+ * as a v1 key would send it to the raw bucket+key read below, which is the very
+ * dereference this change exists to remove. An unrecognised reference instead
+ * falls through to the v2 path, where the location is derived and the reference
+ * ignored.
+ *
+ * TODO(#800): drop the v1 branch one release after this ships — by then no
+ * in-flight command can still carry a v1 ref (the spool's own lifecycle
+ * expiry is 3 days).
+ */
+function isLegacySpoolRef(spoolRef: string): boolean {
+  return spoolRef.startsWith(`${SPOOL_KEY_PREFIX}/`);
+}
+
+/**
+ * Extracts the projectId segment from a v1 spool key.
+ *
+ * The caller must check it against the command's authenticated tenant before
+ * dereferencing — see {@link assertLegacySpoolKeyBelongsTo}.
+ */
+function projectIdFromLegacySpoolKey(spoolRef: string): string {
+  return spoolRef.split("/")[SPOOL_KEY_PREFIX.split("/").length] ?? "";
+}
+
+/**
+ * Refuses a v1 key whose tenant segment is not the tenant the command was
+ * authenticated as.
+ *
+ * The v1 format is the one place a location still travels inside the command,
+ * so it is the one place a tampered reference could still steer a read. Pinning
+ * it to the command's own tenant keeps the compatibility window from reopening
+ * the hole the v2 format closes.
+ */
+function assertLegacySpoolKeyBelongsTo(
+  spoolRef: string,
+  projectId: string,
+): void {
+  const keyProjectId = projectIdFromLegacySpoolKey(spoolRef);
+  if (keyProjectId !== projectId) {
+    throw new Error(
+      `Refusing to read spool object: reference names tenant "${keyProjectId}" but the command is authenticated as "${projectId}".`,
+    );
+  }
+}
+
+/**
+ * Provides transient spool operations (ADR-022 write path) and event_log
  * read operations (ADR-022 read path).
  *
- * Spool: a per-span transient S3 object used to carry over-threshold command
+ * Spool: a per-span transient object used to carry over-threshold command
  * payloads from the edge to the command worker. Eagerly deleted after the
  * event_log INSERT succeeds; 3-day lifecycle policy as safety net for orphans
  * (3 days covers weekend incidents that need catch-up time).
+ *
+ * Spool writes go through the shared `stored-objects` layer, so the spool
+ * lands wherever the project's storage destination points — S3, Azure Blob, or
+ * the local filesystem. It used to speak the AWS SDK directly, which made it
+ * the one byte-writing surface that silently ignored a deployment's Azure
+ * configuration (langwatch/langwatch-saas#800).
  *
  * Event log: the durable source of truth. `getFromEventLog` performs a
  * SELECT on `event_log` keyed by (TenantId, AggregateType, AggregateId,
@@ -170,16 +281,52 @@ function projectIdFromSpoolKey(spoolRef: string): string {
  */
 export class BlobStore {
   /**
-   * @param resolveS3Client - Resolver for per-org S3 client + bucket.
+   * @param resolveS3Client - Resolver for per-org S3 client + bucket. Used ONLY
+   *   to read back v1 spool refs written before this deployment; every new
+   *   write goes through `objectStoreFor`.
    * @param resolveClickHouseClient - Optional per-tenant ClickHouseClient resolver for ADR-022
    *   event_log reads. When provided, `getFromEventLog` resolves the correct client for the
    *   given tenantId (supporting multi-cluster tenants). When absent, `getFromEventLog` throws
    *   "ClickHouseClient not configured".
+   * @param spoolStorage - The destination-agnostic object store the spool
+   *   writes to, injected so this class stays free of env coupling and the
+   *   tests exercise it without infrastructure. When absent, spool writes
+   *   throw — `maybeSpool` is fail-open, so ingestion degrades to inline
+   *   payloads rather than breaking.
    */
   constructor(
     private readonly resolveS3Client: S3ClientResolver,
     private readonly resolveClickHouseClient?: ClickHouseClientResolver,
+    private readonly spoolStorage?: SpoolStorage,
   ) {}
+
+  /**
+   * Re-derives the spool object's URI from server-trusted inputs. Never reads a
+   * location out of the command.
+   */
+  private async mintSpoolUri({
+    projectId,
+    traceId,
+    spanId,
+  }: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+  }): Promise<{ uri: string; objectStore: SpoolObjectStore }> {
+    if (!this.spoolStorage) {
+      throw new Error(
+        "BlobStore has no spool storage configured — cannot resolve the trace spool destination.",
+      );
+    }
+    const destination = await this.spoolStorage.resolveDestination(projectId);
+    return {
+      uri: mintUriForDestination({
+        destination,
+        objectPath: buildSpoolObjectPath({ projectId, traceId, spanId }),
+      }),
+      objectStore: this.spoolStorage.objectStoreFor(projectId),
+    };
+  }
 
   /**
    * Fetches a field value from the event_log ClickHouse table (ADR-022 read path).
@@ -335,20 +482,55 @@ export class BlobStore {
   }
 
   /**
-   * Fetches the full span body from a transient S3 spool object.
+   * Fetches the full span body from the transient spool object.
    * Called by the command worker when a command carries a `spoolRef`.
    *
-   * The spool key is the raw S3 object key (no bucket prefix). The S3 bucket is
-   * resolved via the key's projectId segment (decoded by `projectIdFromSpoolKey`).
+   * The object's location is re-derived from `projectId` / `traceId` / `spanId`
+   * — all read from the command itself, which the queue authenticated — rather
+   * than from `spoolRef`. A tampered reference therefore cannot redirect this
+   * read at another tenant's bytes; the worst it can do is name a v1 format and
+   * miss.
    *
-   * @param spoolRef - The spool reference string (S3 key) returned by `putSpool`.
+   * NOT fail-open, deliberately: the edge cleared `span.attributes` before
+   * spooling, so returning nothing here would write an empty span to
+   * `event_log` — permanent, silent loss in the sole source of truth. Throwing
+   * lets the command retry.
+   *
    * @returns The raw body buffer as stored by `putSpool`.
-   * @throws {Error} If S3 returns a response with no body — surfaced here so the
-   *   failure is legible rather than an opaque downstream parse error on an empty buffer.
-   * @throws The underlying S3 error if the object does not exist or access fails.
+   * @throws {Error} If the object is absent, unreadable, or exceeds
+   *   {@link MAX_SPOOL_BYTES}.
    */
-  async getSpool(spoolRef: string): Promise<Buffer> {
-    const projectId = projectIdFromSpoolKey(spoolRef);
+  async getSpool({
+    spoolRef,
+    projectId,
+    traceId,
+    spanId,
+  }: {
+    spoolRef: string;
+    projectId: string;
+    traceId: string;
+    spanId: string;
+  }): Promise<Buffer> {
+    if (isLegacySpoolRef(spoolRef)) {
+      assertLegacySpoolKeyBelongsTo(spoolRef, projectId);
+      return this.getLegacySpool(spoolRef, projectId);
+    }
+    const { uri, objectStore } = await this.mintSpoolUri({
+      projectId,
+      traceId,
+      spanId,
+    });
+    return streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
+  }
+
+  /**
+   * v1 read path: the reference IS the S3 key. Retained for one release so
+   * commands queued across the deploy still resolve. See {@link isLegacySpoolRef}.
+   */
+  private async getLegacySpool(
+    spoolRef: string,
+    projectId: string,
+  ): Promise<Buffer> {
     const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
     const { Body } = await s3Client.send(
       new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
@@ -363,12 +545,15 @@ export class BlobStore {
   }
 
   /**
-   * Writes a transient S3 spool object for an over-threshold command payload.
-   * Returns the spool reference string (the S3 key) that the command will carry.
+   * Writes the transient spool object for an over-threshold command payload and
+   * returns the reference the command will carry.
    *
-   * Key shape: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` — transient,
-   * eagerly DELETEd after event_log INSERT succeeds. Bucket MUST have a 3-day
-   * lifecycle policy as a safety net for orphans (covers weekend incidents).
+   * The object lands at whichever backend the project's storage destination
+   * names. Object path: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` —
+   * transient, eagerly deleted after the event_log INSERT succeeds. The
+   * bucket/container MUST have a 3-day lifecycle rule on the
+   * `trace-blobs/spool/` prefix as the safety net for orphans (3 days covers
+   * weekend incidents that need catch-up time).
    */
   async putSpool({
     projectId,
@@ -381,34 +566,48 @@ export class BlobStore {
     spanId: string;
     body: Buffer;
   }): Promise<string> {
-    const key = buildSpoolKey(projectId, traceId, spanId);
-    const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: s3Bucket,
-        Key: key,
-        Body: body,
-        ContentType: "application/octet-stream",
-      }),
-    );
-    return key;
+    const { uri, objectStore } = await this.mintSpoolUri({
+      projectId,
+      traceId,
+      spanId,
+    });
+    await objectStore.put(uri, body, "application/octet-stream");
+    return SPOOL_REF_V2;
   }
 
   /**
-   * Best-effort deletion of a transient S3 spool object.
-   * Called after event_log INSERT succeeds. Errors are swallowed — the 3-day lifecycle
-   * policy is the safety net for orphans. Returns void in all cases.
+   * Best-effort deletion of the transient spool object.
+   * Called after the event_log INSERT succeeds. Errors are swallowed — the
+   * 3-day lifecycle rule is the safety net for orphans. Returns void in all cases.
    *
-   * @param spoolRef - The spool reference string returned by `putSpool`.
    * @throws Never — all errors are swallowed internally.
    */
-  async deleteSpool(spoolRef: string): Promise<void> {
+  async deleteSpool({
+    spoolRef,
+    projectId,
+    traceId,
+    spanId,
+  }: {
+    spoolRef: string;
+    projectId: string;
+    traceId: string;
+    spanId: string;
+  }): Promise<void> {
     try {
-      const projectId = projectIdFromSpoolKey(spoolRef);
-      const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-      await s3Client.send(
-        new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
-      );
+      if (isLegacySpoolRef(spoolRef)) {
+        assertLegacySpoolKeyBelongsTo(spoolRef, projectId);
+        const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
+        await s3Client.send(
+          new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
+        );
+        return;
+      }
+      const { uri, objectStore } = await this.mintSpoolUri({
+        projectId,
+        traceId,
+        spanId,
+      });
+      await objectStore.delete(uri);
     } catch {
       // Best-effort — swallow all errors; lifecycle policy is the safety net.
     }

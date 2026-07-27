@@ -160,4 +160,44 @@ LEAN BOUNDARIES  (what stays small at each hop)
 - Any user-visible enumeration of `stored_spans.SpanAttributes` keys MUST exclude `langwatch.reserved.*`. (Survived from ADR-021.)
 - `event_log` retention drives the durability ceiling for "show full" reads. There is no longer a separate S3 retention to coordinate.
 
+## Amendment: the spool is backend-agnostic (langwatch/langwatch-saas#800)
+
+This ADR was written when S3 was the only object store LangWatch could write to,
+so it says "S3 spool" throughout. That is no longer accurate, and taking it
+literally is what kept the spool hardcoded to the AWS SDK long after every other
+byte-writing surface had moved behind the shared `stored-objects` layer. Read
+every "S3" above as "the deployment's object store".
+
+**What changed.** `BlobStore` no longer builds an S3 client for the spool. It
+resolves the project's storage destination through
+`resolveProjectStorageDestination` and writes through the `stored-objects`
+`StorageRegistry`, exactly as the GroupQueue durable blob tier does (ADR-030).
+The spool therefore lands in Azure Blob, S3, or the local filesystem according
+to how the deployment is configured. `mintUriForDestination`
+(`stored-objects/uri.ts`) is now the single destination → URI mapping; the three
+copies of that switch that used to exist are gone.
+
+**The object path is unchanged**: `trace-blobs/spool/{projectId}/{traceId}/{spanId}`,
+with the prefix deliberately kept ABOVE the tenant segment. An S3 lifecycle
+prefix filter cannot wildcard a leading tenant segment, so moving the prefix
+below it would make orphan spools unexpirable. Existing lifecycle rules keep
+working untouched.
+
+**The reference no longer carries a location.** A spooled command used to carry
+the raw object key, and the read path parsed the tenant id back out of that
+string to choose a bucket — so a tampered queue message could steer a read at
+another tenant's object. Commands now carry the opaque marker `spool:v2` and the
+worker re-derives the location from the command's own authenticated `tenantId`
+and span ids. This is the same discipline `BlobRef` follows in ADR-030 §5.
+
+For one release the worker still accepts a v1 raw key, so commands queued across
+the deploy resolve; a v1 key whose tenant segment does not match the command's
+authenticated tenant is refused rather than dereferenced.
+
+**Superseded above:** "'No S3 equivalent' means no object storage at all" and
+"deployments with no object storage should leave `release_trace_blob_offload`
+off". Azure Blob and the local filesystem are now first-class spool
+destinations. The fail-open-on-write and read-must-not-degrade rules are
+unchanged.
+
 <!-- ci-trigger: force workflows to fire on this head -->
