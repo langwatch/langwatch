@@ -24,13 +24,9 @@ async function resolveClient(projectId: string) {
   return client;
 }
 
-function chRepoOrUndefined() {
+export function chRepoOrUndefined() {
   if (!isClickHouseEnabled()) return undefined;
   return new GatewayBudgetClickHouseRepository(resolveClient);
-}
-
-export function budgetSpendRepoOrUndefined() {
-  return chRepoOrUndefined();
 }
 
 export function spendRepoOrUndefined() {
@@ -49,11 +45,11 @@ export const gatewayUsageRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("gatewayUsage:view"))
     .query(async ({ ctx, input }) => {
-      const service = GatewayUsageService.create(
-        ctx.prisma,
-        chRepoOrUndefined(),
-        spendRepoOrUndefined(),
-      );
+      const service = GatewayUsageService.create({
+        prisma: ctx.prisma,
+        chRepo: chRepoOrUndefined(),
+        spendRepo: spendRepoOrUndefined(),
+      });
       return service.summary(input.projectId, {
         fromDate: new Date(input.fromDate),
         toDate: new Date(input.toDate),
@@ -71,11 +67,11 @@ export const gatewayUsageRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("virtualKeys:view"))
     .query(async ({ ctx, input }) => {
-      const service = GatewayUsageService.create(
-        ctx.prisma,
-        chRepoOrUndefined(),
-        spendRepoOrUndefined(),
-      );
+      const service = GatewayUsageService.create({
+        prisma: ctx.prisma,
+        chRepo: chRepoOrUndefined(),
+        spendRepo: spendRepoOrUndefined(),
+      });
       return service.summaryForVirtualKey(
         input.projectId,
         input.virtualKeyId,

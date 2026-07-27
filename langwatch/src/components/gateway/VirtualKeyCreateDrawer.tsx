@@ -219,6 +219,12 @@ export function VirtualKeyCreateDrawer({
     if (ownershipReason) return ownershipReason;
     const budgetReason = budgetInvalidReason(budget);
     if (budgetReason) return budgetReason;
+    // An explicit provider selection cannot be validated against a list
+    // that has not arrived; creating now would persist an allowlist
+    // filtered against nothing.
+    if (orgProvidersQuery.isLoading) {
+      return "Loading providers…";
+    }
     const providerReason = providerAccessInvalidReason(
       providerAccess,
       eligible,

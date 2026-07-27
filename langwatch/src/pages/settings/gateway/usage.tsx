@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  chakra,
   EmptyState,
   HStack,
   Heading,
@@ -37,11 +38,12 @@ import { useRollingWindow } from "~/hooks/useRollingWindow";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
-const PRESETS: Array<{ label: string; days: number }> = [
+const PRESETS: Array<{ label: string; days: number | "mtd" }> = [
   { label: "Last 24h", days: 1 },
   { label: "Last 7 days", days: 7 },
   { label: "Last 30 days", days: 30 },
   { label: "Last 90 days", days: 90 },
+  { label: "This month", days: "mtd" },
 ];
 
 function GatewayUsagePage() {
@@ -51,10 +53,11 @@ function GatewayUsagePage() {
   // Range and key filter live in the URL, so the deep link from the
   // virtual-keys table ("Spent this month" click-through) survives a
   // refresh and can be shared as-is.
-  const days = (() => {
+  const days = ((): number | "mtd" => {
     const raw = Array.isArray(router.query.days)
       ? router.query.days[0]
       : router.query.days;
+    if (raw === "mtd") return "mtd";
     const parsed = raw ? Number.parseInt(raw, 10) : NaN;
     return PRESETS.some((p) => p.days === parsed) ? parsed : 30;
   })();
@@ -62,7 +65,7 @@ function GatewayUsagePage() {
     (Array.isArray(router.query.vk) ? router.query.vk[0] : router.query.vk) ??
     null;
 
-  const setDays = (next: number) => {
+  const setDays = (next: number | "mtd") => {
     void router.push({
       pathname: router.pathname,
       query: { ...router.query, days: next.toString() },
@@ -88,13 +91,12 @@ function GatewayUsagePage() {
     },
     { enabled: !!project?.id && !!virtualKeyId },
   );
-  const keysQuery = api.virtualKeys.list.useQuery(
-    { organizationId: organization?.id ?? "" },
+  const keyQuery = api.virtualKeys.get.useQuery(
+    { organizationId: organization?.id ?? "", id: virtualKeyId ?? "" },
     { enabled: !!organization?.id && !!virtualKeyId },
   );
   const filteredKeyName = virtualKeyId
-    ? (keysQuery.data?.find((k) => k.id === virtualKeyId)?.name ??
-      virtualKeyId)
+    ? (keyQuery.data?.name ?? virtualKeyId)
     : null;
 
   const activeQuery = virtualKeyId ? vkSummaryQuery : summaryQuery;
@@ -155,7 +157,7 @@ function GatewayUsagePage() {
       "download",
       `gateway_usage_${project?.slug ?? "project"}${
         virtualKeyId ? `_${virtualKeyId}` : ""
-      }_${days}d_${stamp}.csv`,
+      }_${days === "mtd" ? "mtd" : `${days}d`}_${stamp}.csv`,
     );
     document.body.appendChild(link);
     link.click();
@@ -177,15 +179,15 @@ function GatewayUsagePage() {
             >
               <HStack gap={1}>
                 <Text>Key: {filteredKeyName}</Text>
-                <Box
-                  as="button"
+                <chakra.button
+                  type="button"
                   aria-label="Clear key filter"
                   onClick={clearKeyFilter}
                   cursor="pointer"
                   display="inline-flex"
                 >
                   <X size={12} />
-                </Box>
+                </chakra.button>
               </HStack>
             </Badge>
           )}

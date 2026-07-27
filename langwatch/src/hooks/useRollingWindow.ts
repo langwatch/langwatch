@@ -10,7 +10,10 @@ import { useEffect, useMemo, useState } from "react";
  * cadence, and quantising it to the minute keeps the query key stable
  * enough that this is a refetch a minute rather than one a render.
  */
-export function useRollingWindow(days: number, refreshMs = 60_000) {
+export function useRollingWindow(
+  range: number | "mtd",
+  refreshMs = 60_000,
+) {
   const [tick, setTick] = useState(() => quantiseToMinute(Date.now()));
 
   useEffect(() => {
@@ -23,9 +26,16 @@ export function useRollingWindow(days: number, refreshMs = 60_000) {
 
   return useMemo(() => {
     const to = new Date(tick);
-    const from = new Date(tick - days * 24 * 60 * 60 * 1000);
+    // "mtd" anchors to the start of the current UTC month and keeps
+    // advancing across a month boundary: it is the window the keys
+    // table's "Spent this month" column is computed over, so the
+    // click-through lands on the same total.
+    const from =
+      range === "mtd"
+        ? new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), 1))
+        : new Date(tick - range * 24 * 60 * 60 * 1000);
     return { fromIso: from.toISOString(), toIso: to.toISOString() };
-  }, [days, tick]);
+  }, [range, tick]);
 }
 
 function quantiseToMinute(ms: number): number {

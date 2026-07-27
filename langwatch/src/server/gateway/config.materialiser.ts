@@ -395,10 +395,12 @@ export class GatewayConfigMaterialiser {
 
   /**
    * Every budget that applies to this VK. ORG-scope + VK-scope always
-   * apply. TEAM/PROJECT-scope apply only when a trace project resolves
-   * (single-project-scope VK or governance fallback). Delegates to the
-   * shared resolver so the bundle can never disagree with what the
-   * request-time check and the trace fold pick.
+   * apply; TEAM/PROJECT-scope only when a trace project resolves
+   * (single-project-scope VK or governance fallback); PRINCIPAL and
+   * per-member GROUP only when the key carries a principal. The scope
+   * semantics live in the shared resolver, which the request-time check
+   * and the trace fold also call, so the bundle can never disagree with
+   * what they pick.
    */
   private async applicableBudgets(
     vk: VirtualKey,

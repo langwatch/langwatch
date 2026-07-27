@@ -96,11 +96,11 @@ async function insertGatewayTrace(args: {
 function usageService(): GatewayUsageService {
   const ch = getTestClickHouseClient();
   if (!ch) throw new Error("test ClickHouse client not available");
-  return GatewayUsageService.create(
+  return GatewayUsageService.create({
     prisma,
-    undefined,
-    new GatewayVirtualKeySpendRepository(async () => ch),
-  );
+    chRepo: undefined,
+    spendRepo: new GatewayVirtualKeySpendRepository(async () => ch),
+  });
 }
 
 describe("virtual key spend (real PG + real CH)", () => {

@@ -15,6 +15,7 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { resolveProviderLabels } from "~/server/gateway/providerLabels";
 
 import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -427,27 +428,4 @@ function toDto(b: import("@prisma/client").GatewayBudget) {
     archivedAt: b.archivedAt?.toISOString() ?? null,
     createdAt: b.createdAt.toISOString(),
   };
-}
-
-/**
- * Display names for the ModelProvider rows referenced by provider-filtered
- * budgets, so a filter renders as "OpenAI only" instead of a row id.
- */
-async function resolveProviderLabels(
-  prisma: import("@prisma/client").PrismaClient,
-  budgets: Array<{ providerKey: string | null }>,
-): Promise<Map<string, string>> {
-  const ids = [
-    ...new Set(
-      budgets
-        .map((b) => b.providerKey)
-        .filter((k): k is string => Boolean(k)),
-    ),
-  ];
-  if (ids.length === 0) return new Map();
-  const rows = await prisma.modelProvider.findMany({
-    where: { id: { in: ids } },
-    select: { id: true, name: true, provider: true },
-  });
-  return new Map(rows.map((r) => [r.id, r.name || r.provider]));
 }

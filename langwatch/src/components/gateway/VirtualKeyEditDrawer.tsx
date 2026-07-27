@@ -237,15 +237,18 @@ export function VirtualKeyEditDrawer({
     if (!name) return "Name is required.";
     const budgetReason = budgetInvalidReason(budget);
     if (budgetReason) return budgetReason;
-    // Until providers resolve we cannot tell a valid narrow list from an
-    // empty one; let the save through and the server validate.
-    if (!orgProvidersQuery.isLoading) {
-      const providerReason = providerAccessInvalidReason(
-        providerAccess,
-        eligible,
-      );
-      if (providerReason) return providerReason;
+    // Until providers resolve, an explicit selection cannot be told
+    // apart from an empty one, and submitting would filter the picked
+    // ids against an empty eligible set and persist an empty allowlist.
+    // Hold the save until the list is real.
+    if (orgProvidersQuery.isLoading) {
+      return "Loading providers…";
     }
+    const providerReason = providerAccessInvalidReason(
+      providerAccess,
+      eligible,
+    );
+    if (providerReason) return providerReason;
     return null;
   })();
 

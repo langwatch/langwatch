@@ -18,6 +18,7 @@ import {
   type BudgetSpendTarget,
 } from "./budget.clickhouse.repository";
 import { resolveApplicableBudgets } from "./budgetResolution.service";
+import { resolveProviderLabels } from "./providerLabels";
 import { resolveTraceProject } from "./scopeResolver";
 import type { ScopeInput } from "./virtualKey.repository";
 
@@ -50,7 +51,7 @@ export type ApplicableBudget = {
    * True when the budget is per member of a group rather than a
    * shared pot, which changes what its limit means to the person reading.
    */
-  perMember: boolean;
+  isPerMember: boolean;
 };
 
 export async function resolveApplicableBudgetsForDraftKey(
@@ -66,7 +67,7 @@ export async function resolveApplicableBudgetsForDraftKey(
       scopeType: s.scopeType,
       scopeId: s.scopeId,
     })),
-  } as Parameters<typeof resolveTraceProject>[1]);
+  });
 
   const resolved = await resolveApplicableBudgets(prisma, {
     organizationId: draft.organizationId,
@@ -77,9 +78,15 @@ export async function resolveApplicableBudgetsForDraftKey(
   });
   if (resolved.length === 0) return [];
 
-  const spentByBudgetId = await loadSpend(prisma, draft, resolved, chRepo);
-  const labels = await loadScopeLabels(prisma, resolved);
-  const providerLabels = await loadProviderLabels(prisma, resolved);
+  // Independent lookups on an interactive path: run them together.
+  const [spentByBudgetId, labels, providerLabels] = await Promise.all([
+    loadSpend(prisma, draft, resolved, chRepo),
+    loadScopeLabels(prisma, resolved),
+    resolveProviderLabels(
+      prisma,
+      resolved.map((r) => r.budget),
+    ),
+  ]);
 
   // bucketScopeId stays internal: it is where spend accrues, not the
   // budget's target, and a UI showing "<group>:<user>" would read as one.
@@ -98,7 +105,7 @@ export async function resolveApplicableBudgetsForDraftKey(
     providerLabel: budget.providerKey
       ? (providerLabels.get(budget.providerKey) ?? budget.providerKey)
       : null,
-    perMember: budget.scopeType === "GROUP",
+    isPerMember: budget.scopeType === "GROUP",
   }));
 }
 
@@ -201,21 +208,4 @@ async function loadScopeLabels(
   return labels;
 }
 
-async function loadProviderLabels(
-  prisma: PrismaClient,
-  resolved: Awaited<ReturnType<typeof resolveApplicableBudgets>>,
-): Promise<Map<string, string>> {
-  const providerKeys = [
-    ...new Set(
-      resolved
-        .map((r) => r.budget.providerKey)
-        .filter((k): k is string => Boolean(k)),
-    ),
-  ];
-  if (providerKeys.length === 0) return new Map();
-  const rows = await prisma.modelProvider.findMany({
-    where: { id: { in: providerKeys } },
-    select: { id: true, provider: true, name: true },
-  });
-  return new Map(rows.map((r) => [r.id, r.name || r.provider]));
-}
+

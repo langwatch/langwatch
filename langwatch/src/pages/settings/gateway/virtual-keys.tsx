@@ -83,8 +83,11 @@ function VirtualKeysPage() {
     { enabled: !!orgId },
   );
   // Current-calendar-month spend per visible key, read from the same
-  // cost path the Usage tab reads so the click-through lands on numbers
-  // that agree with the one clicked.
+  // cost path the Usage tab reads. The click-through deep-links Usage's
+  // "This month" preset, the same UTC month-to-date window this column
+  // is computed over, so both surfaces show the same total. On a fetch
+  // error the cell shows n/a: an unread ledger must not render as a
+  // confident $0.00.
   const spendQuery = api.virtualKeys.spendThisMonth.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId },
@@ -416,9 +419,9 @@ function VirtualKeysPage() {
                               cursor="default"
                             >
                               <Link
-                                href={`/settings/gateway/usage?vk=${vk.id}&days=30`}
+                                href={`/settings/gateway/usage?vk=${vk.id}&days=mtd`}
                                 data-testid={`vk-spend-${vk.id}`}
-                                aria-label={`Usage for ${vk.name}, past 30 days`}
+                                aria-label={`Usage for ${vk.name}, this month`}
                               >
                                 <Text
                                   fontSize="sm"
@@ -435,9 +438,11 @@ function VirtualKeysPage() {
                                 >
                                   {spendQuery.isLoading
                                     ? "…"
-                                    : formatBudgetUsd(
-                                        spendByKeyId.get(vk.id) ?? "0",
-                                      )}
+                                    : spendQuery.isError
+                                      ? "n/a"
+                                      : formatBudgetUsd(
+                                          spendByKeyId.get(vk.id) ?? "0",
+                                        )}
                                 </Text>
                               </Link>
                             </Table.Cell>

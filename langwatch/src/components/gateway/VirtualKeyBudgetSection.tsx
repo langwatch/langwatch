@@ -56,12 +56,20 @@ export function budgetAnnotation(value: VirtualKeyBudgetValue): string {
   }
 }
 
-/** Positive number or empty; anything else blocks save. */
+/**
+ * Positive decimal or empty; anything else blocks save. The regex, not
+ * parseFloat alone, is what rejects partial parses like "10abc": the
+ * whole trimmed string must be the number.
+ */
 export function budgetInvalidReason(
   value: VirtualKeyBudgetValue,
 ): string | null {
-  if (!value.limitUsd.trim()) return null;
-  const n = Number.parseFloat(value.limitUsd);
+  const trimmed = value.limitUsd.trim();
+  if (!trimmed) return null;
+  if (!/^\d+(\.\d+)?$/.test(trimmed)) {
+    return "Budget must be a positive amount.";
+  }
+  const n = Number.parseFloat(trimmed);
   if (!Number.isFinite(n) || n <= 0) {
     return "Budget must be a positive amount.";
   }
@@ -230,7 +238,7 @@ function ApplicableBudgetsList({
               {b.providerLabel} only
             </Badge>
           )}
-          {b.perMember && (
+          {b.isPerMember && (
             <Badge variant="subtle" colorPalette="cyan" fontSize="2xs">
               per member
             </Badge>

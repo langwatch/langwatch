@@ -75,12 +75,18 @@ export class GatewayUsageService {
     private readonly spendRepo?: GatewayVirtualKeySpendRepository,
   ) {}
 
-  static create(
-    prisma: PrismaClient,
-    chRepo?: GatewayBudgetClickHouseRepository,
-    spendRepo?: GatewayVirtualKeySpendRepository,
-  ): GatewayUsageService {
-    return new GatewayUsageService(prisma, chRepo, spendRepo);
+  /**
+   * Both repos are required keys with optional values: a deploy without
+   * ClickHouse passes `undefined` explicitly and gets empty summaries by
+   * configuration, while a caller that forgets the dependency fails to
+   * compile instead of silently reporting $0.00.
+   */
+  static create(args: {
+    prisma: PrismaClient;
+    chRepo: GatewayBudgetClickHouseRepository | undefined;
+    spendRepo: GatewayVirtualKeySpendRepository | undefined;
+  }): GatewayUsageService {
+    return new GatewayUsageService(args.prisma, args.chRepo, args.spendRepo);
   }
 
   /**

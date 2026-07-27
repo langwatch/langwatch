@@ -38,7 +38,7 @@ type ApplicableBudget = {
   timezone: string | null;
   providerKey: string | null;
   providerLabel: string | null;
-  perMember: boolean;
+  isPerMember: boolean;
 };
 
 const { updateMutateAsync, applicableBudgetsData } = vi.hoisted(() => ({
@@ -179,7 +179,7 @@ const ownBudgetRow = (
   timezone: "Europe/Amsterdam",
   providerKey: null,
   providerLabel: null,
-  perMember: false,
+  isPerMember: false,
   ...overrides,
 });
 

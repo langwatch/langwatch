@@ -31,7 +31,21 @@ import type {
   Team,
 } from "@prisma/client";
 
-import type { VirtualKeyWithScopes } from "./virtualKey.repository";
+import type {
+  ScopeInput,
+  VirtualKeyWithScopes,
+} from "./virtualKey.repository";
+
+/**
+ * The two fields trace-project resolution actually reads. Narrower than
+ * `VirtualKeyWithScopes` so a drawer draft (no key row yet) satisfies it
+ * structurally; if resolution ever needs another field of the key, the
+ * draft call sites stop compiling instead of silently passing undefined.
+ */
+export type TraceProjectInput = {
+  organizationId: string;
+  scopes: ScopeInput[];
+};
 
 export type EligibleModelProvider = ModelProvider;
 
@@ -166,7 +180,7 @@ function parseModelProviderIds(raw: unknown): string[] {
  */
 export async function resolveTraceProject(
   prisma: PrismaClient,
-  vk: VirtualKeyWithScopes,
+  vk: TraceProjectInput,
   tx?: Prisma.TransactionClient,
 ): Promise<{ id: string; teamId: string; apiKey: string } | null> {
   const client = tx ?? prisma;

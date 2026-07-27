@@ -35,10 +35,7 @@ import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
 
 import { authorizeInResolver, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
-  budgetSpendRepoOrUndefined,
-  spendRepoOrUndefined,
-} from "./gatewayUsage";
+import { chRepoOrUndefined, spendRepoOrUndefined } from "./gatewayUsage";
 import {
   assertCanManageAllScopes,
   assertCanOperateOnAnyScope,
@@ -56,7 +53,16 @@ const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
  * not a spending decision, and belongs on the budgets page.
  */
 const budgetInputSchema = z.object({
-  limitUsd: z.string().min(1),
+  // A whole decimal number of dollars, strictly positive. String rather
+  // than number to survive JSON round-trips without float drift; the
+  // regex rejects partial parses ("10abs"), signs, and bare dots.
+  limitUsd: z
+    .string()
+    .trim()
+    .regex(/^\d+(\.\d+)?$/, "limitUsd must be a decimal number")
+    .refine((v) => Number.parseFloat(v) > 0, {
+      message: "limitUsd must be greater than zero",
+    }),
   window: z.enum(["DAY", "WEEK", "MONTH"]),
   timezone: z.string().nullable().optional(),
   onBreach: z.enum(["BLOCK", "WARN"]).optional(),
@@ -268,6 +274,16 @@ export const virtualKeysRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(authorizeInResolver)
     .query(async ({ ctx, input }) => {
+      // Without the ClickHouse spend source there is no number to report.
+      // Failing loudly lets the column render "unavailable" instead of a
+      // confident $0.00 that cannot be told apart from a zero-spend key.
+      const spendRepo = spendRepoOrUndefined();
+      if (!spendRepo) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "spend_source_unavailable",
+        });
+      }
       const membership = await loadMembershipSet(
         ctx.prisma,
         input.organizationId,
@@ -278,19 +294,19 @@ export const virtualKeysRouter = createTRPCRouter({
         isVisibleToMembership(membership, vk.scopes),
       );
       const now = new Date();
-      const usage = GatewayUsageService.create(
-        ctx.prisma,
-        undefined,
-        spendRepoOrUndefined(),
-      );
+      const usage = GatewayUsageService.create({
+        prisma: ctx.prisma,
+        chRepo: undefined,
+        spendRepo,
+      });
       const spend = await usage.spendByVirtualKey({
         organizationId: input.organizationId,
         virtualKeyIds: keys.map((k) => k.id),
         window: { fromDate: startOfCurrentMonthUTC(now), toDate: now },
       });
-      // Every visible key gets a row. A key that has not spent reports
-      // zero rather than being absent, so the column renders $0.00 instead
-      // of an ambiguous blank.
+      // Every visible key gets a row. With the spend source present, a
+      // missing entry means the key genuinely spent nothing, so zero is
+      // the honest render rather than an ambiguous blank.
       return keys.map((k) => ({
         virtualKeyId: k.id,
         spentUsd: spend.get(k.id)?.spentUsd ?? "0",
@@ -320,6 +336,38 @@ export const virtualKeysRouter = createTRPCRouter({
         input.organizationId,
         input.scopes,
       );
+      // Both ids are caller-supplied and the resolver answers with the
+      // target's budgets, spend, and (for a principal) their name. Pin
+      // each one to the caller's organization before resolving anything,
+      // mirroring the PRINCIPAL guard on the budget create path.
+      if (input.principalUserId) {
+        const membership = await ctx.prisma.organizationUser.findFirst({
+          where: {
+            organizationId: input.organizationId,
+            userId: input.principalUserId,
+          },
+          select: { userId: true },
+        });
+        if (!membership) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "principalUserId is not a member of this organization.",
+          });
+        }
+      }
+      if (input.virtualKeyId) {
+        const vk = await ctx.prisma.virtualKey.findFirst({
+          where: {
+            id: input.virtualKeyId,
+            organizationId: input.organizationId,
+          },
+          select: { id: true },
+        });
+        if (!vk) {
+          throw new TRPCError({ code: "NOT_FOUND" });
+        }
+      }
       return resolveApplicableBudgetsForDraftKey(
         ctx.prisma,
         {
@@ -328,7 +376,7 @@ export const virtualKeysRouter = createTRPCRouter({
           scopes: input.scopes,
           principalUserId: input.principalUserId ?? null,
         },
-        budgetSpendRepoOrUndefined(),
+        chRepoOrUndefined(),
       );
     }),
 

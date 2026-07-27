@@ -37,7 +37,7 @@ type ApplicableBudget = {
   timezone: string | null;
   providerKey: string | null;
   providerLabel: string | null;
-  perMember: boolean;
+  isPerMember: boolean;
 };
 
 const {
@@ -305,7 +305,7 @@ describe("given the new-virtual-key drawer", () => {
           timezone: null,
           providerKey: null,
           providerLabel: null,
-          perMember: false,
+          isPerMember: false,
         },
         {
           id: "budget-project",
@@ -320,7 +320,7 @@ describe("given the new-virtual-key drawer", () => {
           timezone: null,
           providerKey: "mp-openai",
           providerLabel: "OpenAI",
-          perMember: false,
+          isPerMember: false,
         },
         {
           id: "budget-dept",
@@ -335,7 +335,7 @@ describe("given the new-virtual-key drawer", () => {
           timezone: null,
           providerKey: null,
           providerLabel: null,
-          perMember: true,
+          isPerMember: true,
         },
       ];
       renderDrawer();

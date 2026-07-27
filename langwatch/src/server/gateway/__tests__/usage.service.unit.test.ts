@@ -67,11 +67,11 @@ function service(
   virtualKeys: Array<{ id: string; name: string; displayPrefix: string }>,
   traces: TraceStub[],
 ): GatewayUsageService {
-  return GatewayUsageService.create(
-    mockPrisma(virtualKeys),
-    undefined,
-    mockSpendRepo(traces),
-  );
+  return GatewayUsageService.create({
+    prisma: mockPrisma(virtualKeys),
+    chRepo: undefined,
+    spendRepo: mockSpendRepo(traces),
+  });
 }
 
 const window = {
