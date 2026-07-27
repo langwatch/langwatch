@@ -469,6 +469,56 @@ describe("SlackConfigForm channel picker", () => {
       });
     });
 
+    describe("when the author replaces a picked channel with a free-typed one", () => {
+      // The picked channel stays the combobox's selection until something
+      // moves it, so the list would keep a tick beside a channel that is no
+      // longer the field's value.
+      it("moves the tick off the channel it replaced", async () => {
+        const user = typist();
+        renderForm({ initial: botSlice({ channelId: "" }) });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.click(await screen.findByText("#release-signoff"));
+        await user.clear(input);
+        await user.type(input, "#adhoc");
+        await user.tab();
+        await user.click(input);
+
+        const checked = Array.from(
+          document.querySelectorAll(
+            '[data-scope="combobox"][data-part="item"][data-state="checked"]',
+          ),
+        ).map((el) => el.textContent);
+
+        // The typed channel is the value, so it may carry the tick; the
+        // channel it replaced must not.
+        expect(checked).toEqual(["#adhoc"]);
+      });
+
+      // ...and moving that selection must not take the typed text with it:
+      // the combobox rewrites its input from the selection, so CLEARING the
+      // selection outright is exactly the move that blanks the box. This is
+      // the guard on that — it fails if the fix regresses to setSelectedId("").
+      it("keeps the typed channel in the box and in the slice", async () => {
+        const user = typist();
+        const onChangeSpy = vi.fn();
+        renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.click(await screen.findByText("#release-signoff"));
+        await user.clear(input);
+        await user.type(input, "#adhoc");
+        await user.tab();
+
+        expect(input).toHaveValue("#adhoc");
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "#adhoc" }),
+        );
+      });
+    });
+
     describe("given a saved automation whose channel id is already stored", () => {
       it("shows the channel name rather than the raw id", async () => {
         renderForm({ initial: botSlice({ channelId: "C003" }) });

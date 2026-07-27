@@ -325,10 +325,24 @@ function SlackChannelField({
     label: string;
     value: string;
   }>({ initialItems: [], filter: contains });
+  // A channel the bot can't list is still a real destination, so it gets its
+  // own entry once committed. That entry is what lets it be the combobox's
+  // SELECTION: the machine rewrites its input from the selected item's label,
+  // and an entry whose label is the typed text survives that rewrite unchanged.
+  const [customChannel, setCustomChannel] = useState("");
+  const listedIds = useMemo(
+    () => new Set((channelData ?? []).map((c) => c.id)),
+    [channelData],
+  );
   useEffect(() => {
-    set((channelData ?? []).map(channelOption));
+    const listed = (channelData ?? []).map(channelOption);
+    set(
+      customChannel && !listedIds.has(customChannel)
+        ? [...listed, { value: customChannel, label: customChannel }]
+        : listed,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelData]);
+  }, [channelData, customChannel]);
 
   // The channel actually PICKED from the list — deliberately NOT
   // `slice.channelId`, which also holds free-typed text. The combobox rewrites
@@ -352,6 +366,14 @@ function SlackChannelField({
     const typed = pendingText.current;
     pendingText.current = null;
     if (typed !== null && typed !== slice.channelId) {
+      // Typing over a picked channel replaces it, so the old pick must stop
+      // being the selection — otherwise the list keeps a tick beside a channel
+      // that is no longer this field's value. Clearing the selection outright
+      // would blank the box (the combobox rewrites its input from the selected
+      // item, and "nothing selected" stringifies to ""), so the typed channel
+      // becomes the selection instead, backed by its own collection entry.
+      if (!listedIds.has(typed)) setCustomChannel(typed);
+      setSelectedId(typed);
       onChange({ ...slice, channelId: typed });
     }
   };
