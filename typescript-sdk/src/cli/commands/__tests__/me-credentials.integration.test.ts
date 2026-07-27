@@ -44,6 +44,7 @@ let workDir: string;
 let personalProjectCalls = 0;
 let refreshCalls = 0;
 let lastSearchAuth: string | null = null;
+let lastMonitorsAuth: string | null = null;
 let rejectAccessToken: string | null = null;
 /** When true the device session is revoked server-side: the session-
  * authenticated endpoints AND refresh all 401, exactly as they would after a
@@ -206,6 +207,14 @@ beforeAll(async () => {
         return;
       }
 
+      if (url.startsWith("/api/monitors")) {
+        // A command that reads process.env.LANGWATCH_API_KEY directly (not via
+        // the client-factory default) — the sweep must feed it the scoped key.
+        lastMonitorsAuth = auth;
+        json(200, []);
+        return;
+      }
+
       json(404, { error: "not_found" });
     });
   });
@@ -225,6 +234,7 @@ beforeEach(() => {
   personalProjectCalls = 0;
   refreshCalls = 0;
   lastSearchAuth = null;
+  lastMonitorsAuth = null;
   rejectAccessToken = null;
   sessionRevoked = false;
 });
@@ -248,6 +258,26 @@ describe("device session powers data commands with zero env vars", () => {
     const second = await run(["trace", "search", "-o", "json"]);
     expect(second.exitCode).toBe(0);
     expect(personalProjectCalls).toBe(1);
+  });
+
+  it("feeds the scoped session key to commands that read the key directly, not just the trace client", async () => {
+    // `monitors list` reads process.env.LANGWATCH_API_KEY itself rather than
+    // going through the client-factory default, so it guards the sweep that
+    // made those call sites prefer the request-scoped key in device mode.
+    writeSession({
+      personal_project: {
+        id: "proj_personal",
+        slug: "personal-dev",
+        name: "Personal Workspace",
+        api_key: PERSONAL_KEY,
+        validated_at: Math.floor(Date.now() / 1000),
+      },
+    });
+
+    const result = await run(["monitor", "list", "-o", "json"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(lastMonitorsAuth).toBe(`Bearer ${PERSONAL_KEY}`);
   });
 
   /** @scenario device-session revocation severs CLI access and wipes the cached key */

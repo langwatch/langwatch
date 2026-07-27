@@ -1,3 +1,4 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
@@ -31,7 +32,7 @@ export const updateGraphCommand = async (
     process.exit(1);
   }
 
-  const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint =
     resolveControlPlaneUrl();
 

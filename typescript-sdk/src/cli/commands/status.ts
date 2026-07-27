@@ -1,3 +1,4 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../utils/spinner";
 import { resolveCredentials } from "../utils/apiKey";
@@ -143,7 +144,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   await resolveCredentials();
 
   const apiClient = createLangWatchApiClient();
-  const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
   const spinner = createSpinner("Fetching project status...").start();
 

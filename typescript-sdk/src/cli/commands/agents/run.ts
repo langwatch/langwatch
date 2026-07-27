@@ -1,3 +1,4 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
@@ -83,7 +84,7 @@ export const runAgentCommand = async (
     }
   } else {
     // For signature/code/workflow agents, try to run via the workflow API
-    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+    const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
     // Check if agent has a linked workflow

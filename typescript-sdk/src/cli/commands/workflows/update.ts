@@ -1,3 +1,4 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { resolveCredentials } from "../../utils/apiKey";
@@ -14,7 +15,7 @@ export const updateWorkflowCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Updating workflow "${id}"...`).start();
