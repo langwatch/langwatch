@@ -162,7 +162,10 @@ const appConfig = defineConfig({
           muted: { value: { _light: "#F7DDE1", _dark: "#511320" } },
           emphasized: { value: { _light: "#C0304A", _dark: "#7F1626" } },
           fg: { value: { _light: "#7F1626", _dark: "#F0A9B4" } },
-          focusRing: { value: "#9B1C2E" },
+          // Paired like the rest: a single dark value is nearly invisible as a
+          // focus ring against a dark surface, which matters more here than
+          // elsewhere because keyboard users navigate this form field by field.
+          focusRing: { value: { _light: "#9B1C2E", _dark: "#E06A7E" } },
         },
         orange: {
           solid: { value: "#ED8926" },
