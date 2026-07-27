@@ -11,6 +11,7 @@
  * exactly the code that ran before daemon mode existed.
  */
 
+import { runWithCredentialHolder } from "@/internal/credentialContext";
 import { execViaDaemon, requestStop } from "./client";
 import {
   collectForwardedEnv,
@@ -138,5 +139,11 @@ async function runInProcess(argv: string[]): Promise<void> {
   // expression surfacing from printResult outside a command's try/catch)
   // must become this call's rejection — a clean exit — not an unhandled
   // rejection with a raw stack.
-  await buildProgram().parseAsync(argv);
+  //
+  // Wrapped in a credential holder so the resolved key lands in a
+  // request-scoped store rather than the global env, matching the daemon path
+  // (internal/credentialContext.ts). For a cold CLI this is the one command
+  // in the process, but keeping the wrapper here means both paths behave
+  // identically and the resolver never has to touch process.env for the key.
+  await runWithCredentialHolder(() => buildProgram().parseAsync(argv));
 }

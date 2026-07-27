@@ -4,6 +4,8 @@ import {
   resolveCliAuthProjects,
 } from "../cliAuthProjects";
 
+const JANE = "u-jane";
+
 describe("resolveCliAuthProjects", () => {
   const teams = [
     {
@@ -30,6 +32,7 @@ describe("resolveCliAuthProjects", () => {
       id: "t-personal",
       name: "Jane's Workspace",
       isPersonal: true,
+      ownerUserId: JANE,
       projects: [
         {
           id: "p-personal",
@@ -50,7 +53,7 @@ describe("resolveCliAuthProjects", () => {
           projects,
           teams: offeredTeams,
           personalProject,
-        } = resolveCliAuthProjects({ teams });
+        } = resolveCliAuthProjects({ teams, currentUserId: JANE });
 
         expect(projects.map((p) => p.id)).toEqual(["p-shared"]);
         expect(projects[0]!.teamId).toBe("t-acme");
@@ -135,7 +138,10 @@ describe("resolveCliAuthProjects", () => {
   describe("given a single offered shared project", () => {
     describe("when the default project is computed", () => {
       it("auto-selects it, not the personal project", () => {
-        const { defaultProjectId } = resolveCliAuthProjects({ teams });
+        const { defaultProjectId } = resolveCliAuthProjects({
+          teams,
+          currentUserId: JANE,
+        });
         expect(defaultProjectId).toBe("p-shared");
       });
     });
@@ -147,6 +153,7 @@ describe("resolveCliAuthProjects", () => {
         id: "t-personal",
         name: "Jane's Workspace",
         isPersonal: true,
+        ownerUserId: JANE,
         projects: [
           {
             id: "p-personal",
@@ -165,7 +172,7 @@ describe("resolveCliAuthProjects", () => {
       /** @scenario a user with no shared projects gets their personal project preselected */
       it("preselects the personal project so the user is never dead-ended", () => {
         const { projects, personalProject, defaultProjectId } =
-          resolveCliAuthProjects({ teams: personalOnly });
+          resolveCliAuthProjects({ teams: personalOnly, currentUserId: JANE });
 
         expect(projects).toEqual([]);
         expect(personalProject?.id).toBe("p-personal");
@@ -177,6 +184,70 @@ describe("resolveCliAuthProjects", () => {
       it("returns no default and no personal entry", () => {
         const { personalProject, defaultProjectId } = resolveCliAuthProjects({
           teams: [{ id: "t-empty", name: "Team", projects: [] }],
+          currentUserId: JANE,
+        });
+
+        expect(personalProject).toBeNull();
+        expect(defaultProjectId).toBeNull();
+      });
+    });
+  });
+
+  describe("given an org admin who can see other members' personal teams", () => {
+    // `organization.getAll` retains EVERY team for an admin, including other
+    // members' personal workspaces. The picker must offer only the admin's own.
+    const adminView = [
+      {
+        id: "t-bob-personal",
+        name: "Bob's Workspace",
+        isPersonal: true,
+        ownerUserId: "u-bob",
+        projects: [
+          {
+            id: "p-bob",
+            name: "Bob Personal",
+            slug: "bob-personal",
+            isPersonal: true,
+            kind: "application",
+          },
+        ],
+      },
+      {
+        id: "t-jane-personal",
+        name: "Jane's Workspace",
+        isPersonal: true,
+        ownerUserId: JANE,
+        projects: [
+          {
+            id: "p-jane",
+            name: "Jane Personal",
+            slug: "jane-personal",
+            isPersonal: true,
+            kind: "application",
+          },
+        ],
+      },
+    ];
+
+    describe("with no shared projects in the org", () => {
+      /** @scenario an org admin is offered only their OWN personal workspace, never a colleague's */
+      it("offers and preselects only the caller's own personal workspace", () => {
+        const { personalProject, defaultProjectId } = resolveCliAuthProjects({
+          teams: adminView,
+          currentUserId: JANE,
+        });
+
+        expect(personalProject?.id).toBe("p-jane");
+        expect(personalProject?.slug).toBe("jane-personal");
+        expect(defaultProjectId).toBe("p-jane");
+      });
+    });
+
+    describe("when the caller id is unknown", () => {
+      /** @scenario no caller id yields no personal entry */
+      it("offers no personal entry rather than guessing a workspace", () => {
+        const { personalProject, defaultProjectId } = resolveCliAuthProjects({
+          teams: adminView,
         });
 
         expect(personalProject).toBeNull();
@@ -211,6 +282,7 @@ describe("resolveCliAuthProjects", () => {
         id: "t-personal",
         name: "Jane's Workspace",
         isPersonal: true,
+        ownerUserId: JANE,
         projects: [
           {
             id: "p-personal",
@@ -225,7 +297,10 @@ describe("resolveCliAuthProjects", () => {
 
     describe("when the default project is computed with no last project", () => {
       it("does not silently default to personal while shared projects exist", () => {
-        const { defaultProjectId } = resolveCliAuthProjects({ teams: mixed });
+        const { defaultProjectId } = resolveCliAuthProjects({
+          teams: mixed,
+          currentUserId: JANE,
+        });
         expect(defaultProjectId).toBeNull();
       });
     });

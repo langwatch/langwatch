@@ -11,6 +11,7 @@ import { StringDecoder } from "node:string_decoder";
 
 import chalk from "chalk";
 
+import { runWithCredentialHolder } from "@/internal/credentialContext";
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
 import { currentOutputScope, withOutputScope } from "../utils/errorOutput";
 
@@ -163,7 +164,13 @@ export function withExecutionContext<T>(
   context: ExecutionContext,
   fn: () => T,
 ): T {
-  return storage.run(context, () => withOutputScope(fn));
+  // A fresh credential holder per request: the resolver fills it later and the
+  // request's own services read it, so a resolved device-session key never
+  // reaches the shared env where a concurrent request could pick it up
+  // (internal/credentialContext.ts).
+  return storage.run(context, () =>
+    withOutputScope(() => runWithCredentialHolder(fn)),
+  );
 }
 
 let installed = false;

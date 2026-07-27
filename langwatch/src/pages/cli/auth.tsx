@@ -204,6 +204,7 @@ export default function CliAuthPage() {
   // project is never offered. The default is the last project the user
   // worked in when offered, else the sole shared project, else personal.
   const lastProjectSlug = currentProject?.slug ?? null;
+  const currentUserId = session?.user?.id ?? null;
   const {
     projects: projectsForOrg,
     teams: teamsForOrg,
@@ -211,8 +212,12 @@ export default function CliAuthPage() {
     defaultProjectId,
   } = useMemo(() => {
     const org = organizations?.find((o) => o.id === selectedOrgId);
-    return resolveCliAuthProjects({ teams: org?.teams, lastProjectSlug });
-  }, [organizations, selectedOrgId, lastProjectSlug]);
+    return resolveCliAuthProjects({
+      teams: org?.teams,
+      lastProjectSlug,
+      currentUserId,
+    });
+  }, [organizations, selectedOrgId, lastProjectSlug, currentUserId]);
 
   const offeredProjects = useMemo(
     () => [...projectsForOrg, ...(personalProject ? [personalProject] : [])],

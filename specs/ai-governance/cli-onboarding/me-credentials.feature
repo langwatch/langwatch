@@ -29,10 +29,53 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   @bdd @cli-onboarding @credentials @unit
   Scenario: a device session resolves the personal project API key when no env var is set
     Given ~/.langwatch/config.json holds a device session with a cached personal project key
+    And the cached key was validated within the revalidation window
     And LANGWATCH_API_KEY is not set anywhere
     When any API-calling command resolves credentials
     Then the resolved API key is the personal project's key
     And the resolved mode is device session
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Revocation cannot be bypassed by the cached key
+  #
+  # The cached key is a long-lived Project.apiKey, not a session-bound token,
+  # so trusting it forever would let a stolen ~/.langwatch/config.json keep
+  # working after the device was revoked from /me/devices. The resolver trusts
+  # the cache only within a short window; past it, it re-confirms the session
+  # is live before using the key, and drops the key when the session is gone.
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @cli-onboarding @credentials @revocation @unit
+  Scenario: a device session uses the cached key without a network call while validation is fresh
+    Given a cached personal project key validated less than the revalidation window ago
+    When any API-calling command resolves credentials
+    Then the cached key is used
+    And no session-authenticated revalidation request is made
+
+  @bdd @cli-onboarding @credentials @revocation @unit
+  Scenario: a stale cached key is revalidated before use
+    Given a cached personal project key whose validation is older than the revalidation window
+    When any API-calling command resolves credentials
+    And the session is still live
+    Then the CLI re-confirms the session through GET /api/auth/cli/personal-project
+    And it refreshes the cached key and the validation clock before using it
+
+  @bdd @cli-onboarding @credentials @revocation @integration
+  Scenario: device-session revocation severs CLI access and wipes the cached key
+    Given a device login whose cached key's validation is past the window
+    When the device is revoked from /me/devices (its Redis tokens are dropped)
+    And the next data command resolves credentials
+    Then the session-authenticated revalidation fails with 401
+    And the command reports the not-logged-in error
+    And the cached personal project key is deleted from ~/.langwatch/config.json
+    # so a copied config is now inert
+
+  @bdd @cli-onboarding @credentials @revocation @unit
+  Scenario: a transient/offline revalidation keeps the last-known key without extending trust
+    Given a stale cached key and an unreachable control plane
+    When the resolver tries to revalidate and the request errors (not a 401)
+    Then the last-known key is used for this command
+    And the validation clock is NOT advanced, so the next reachable command revalidates again
 
   @bdd @cli-onboarding @credentials @unit
   Scenario: LANGWATCH_API_KEY beats the stored device session
@@ -86,9 +129,38 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   @bdd @cli-onboarding @credentials @integration
   Scenario: GET /api/auth/cli/personal-project ensures the personal workspace
     Given a valid device-session bearer token for a user with no personal workspace yet
+    And the user is an active member of the token's organization
     When the CLI calls GET /api/auth/cli/personal-project
     Then the personal workspace is created
     And the response carries the personal project's id, slug, name and api_key
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Tenancy boundary: current membership is proven before minting a key
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: an offboarded user's pre-removal token cannot mint or return a personal key
+    Given a device-session token issued while the user was a member of an organization
+    And the user is then removed from that organization
+    When the CLI calls GET /api/auth/cli/personal-project with that token
+    Then the response is 403
+    And no personal team, project, or role binding is created in the former tenant
+    And the presented access token is revoked from Redis
+    And a follow-up call with the same token is 401
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a deactivated user's token cannot mint or return a personal key
+    Given a device-session token for a user whose account is deactivated
+    When the CLI calls GET /api/auth/cli/personal-project with that token
+    Then the response is 403
+    And the presented access token is revoked
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: POST /api/auth/cli/project-key applies the same membership boundary
+    Given a device-session token whose user is not an active member of the token's org
+    When the CLI calls POST /api/auth/cli/project-key
+    Then the response is 403 and no project key is returned
+    And the presented access token is revoked
 
   @bdd @cli-onboarding @credentials @integration
   Scenario: the delivered personal key authenticates /api/me/usage
@@ -158,14 +230,27 @@ Feature: /me credentials just work - CLI credential resolution after device logi
   # ─────────────────────────────────────────────────────────────────────
 
   @bdd @cli-onboarding @credentials @daemon @unit
-  Scenario: a credential materialised into the environment is never trusted as caller input
-    Given a previous request resolved a device session and materialised the key into process.env
-    When a later request resolves credentials in the same process
-    Then the resolver re-reads ~/.langwatch/config.json from disk
-    And a logout between the two requests makes the later request fail with the not-logged-in error
-    # The daemon serves many requests from one process. Auth is resolved per
-    # request from disk (see cli/daemon/identity.ts); the resolver tracks the
-    # value it materialised and refuses to read it back as if the caller set it.
+  Scenario: the resolved session key never touches the shared process env
+    Given a device session resolves the personal project key
+    When the resolver publishes it for the command's services to use
+    Then process.env.LANGWATCH_API_KEY is NOT written
+    And the key is published into a request-scoped credential holder instead
+    # Writing the per-user key into the one shared process.env is the
+    # cross-identity leak the daemon design forbids: concurrent device-mode
+    # requests share a (cwd, env, colour) execution window, so a global write
+    # by one is visible to another. The holder is established by AsyncLocalStorage
+    # at each request boundary (cli/daemon/execution.ts + the in-process
+    # dispatch), so a key set mid-command is visible to that request's own
+    # services but never to a sibling request's.
+
+  @bdd @cli-onboarding @credentials @daemon @unit
+  Scenario: two interleaved requests each observe only their own credential
+    Given two concurrent requests, each in its own credential holder
+    And each resolves a different device-session key after an await boundary
+    When each constructs its API client
+    Then the first request's client authenticates only with the first key
+    And the second request's client authenticates only with the second key
+    And neither key is ever read from the shared environment
 
   # ─────────────────────────────────────────────────────────────────────
   # The missing-credentials error

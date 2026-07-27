@@ -312,6 +312,9 @@ function persistDeviceSession(
 			slug: result.personal_project.slug,
 			name: result.personal_project.name,
 			api_key: result.personal_project.api_key,
+			// The exchange that just delivered this key proved the session is
+			// live, so seed the revalidation clock now.
+			validated_at: Math.floor(Date.now() / 1000),
 		};
 	}
 	if (result.endpoint) {

@@ -1,8 +1,8 @@
 /**
  * Credential resolution is the first thing every API-calling command does, so
- * its priority order, its daemon discipline, and both renderings of its
- * failure (a `{ ok: false, error: { kind: … } }` document on stdout under
- * `--format json`, human guidance on stderr otherwise) are pinned here.
+ * its priority order, its session-liveness gate, its daemon discipline (never
+ * write the resolved key to the shared env), and both renderings of its
+ * failure are pinned here.
  *
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
@@ -28,15 +28,24 @@ vi.mock("../governance/config", () => ({
   ),
 }));
 
-vi.mock("../governance/session-api", () => ({
-  fetchPersonalProject: vi.fn(async () => null),
-}));
+// Keep SessionApiError real (the resolver branches on `err.status`), mock only
+// the network call.
+vi.mock("../governance/session-api", async () => {
+  const actual =
+    await vi.importActual<typeof import("../governance/session-api")>(
+      "../governance/session-api",
+    );
+  return { SessionApiError: actual.SessionApiError, fetchPersonalProject: vi.fn() };
+});
 
 import { config } from "dotenv";
 import { loadConfig, saveConfig } from "../governance/config";
-import { fetchPersonalProject } from "../governance/session-api";
+import {
+  fetchPersonalProject,
+  SessionApiError,
+} from "../governance/session-api";
 import { maybePrintIdentityNotice } from "../identityNotice";
-import { resolveCredentials } from "../apiKey";
+import { resolveCredentials, SESSION_REVALIDATE_WINDOW_MS } from "../apiKey";
 import { setOutputFormat } from "../errorOutput";
 
 const mockedDotenvConfig = vi.mocked(config);
@@ -55,6 +64,30 @@ const loggedInConfig = (extra: Record<string, unknown> = {}) => ({
   access_token: "lw_at_test",
   refresh_token: "lw_rt_test",
   ...extra,
+});
+
+/** A fresh cached personal project (validated within the window). */
+const freshPersonal = (apiKey = "pkey_personal") => ({
+  personal_project: {
+    id: "proj_1",
+    slug: "personal-x",
+    name: "Personal Workspace",
+    api_key: apiKey,
+    validated_at: Math.floor(Date.now() / 1000),
+  },
+});
+
+/** A cached personal project whose validation clock is past the window. */
+const stalePersonal = (apiKey = "pkey_personal") => ({
+  personal_project: {
+    id: "proj_1",
+    slug: "personal-x",
+    name: "Personal Workspace",
+    api_key: apiKey,
+    validated_at: Math.floor(
+      (Date.now() - SESSION_REVALIDATE_WINDOW_MS - 60_000) / 1000,
+    ),
+  },
 });
 
 describe("resolveCredentials()", () => {
@@ -103,17 +136,12 @@ describe("resolveCredentials()", () => {
 
       expect(resolved.source).toBe("flag");
       expect(resolved.apiKey).toBe("sk-explicit");
-      expect(process.env.LANGWATCH_API_KEY).toBe("sk-explicit");
     });
 
     /** @scenario LANGWATCH_API_KEY beats the stored device session */
     it("prefers the environment over a stored device session", async () => {
       process.env.LANGWATCH_API_KEY = "sk-from-env";
-      mockedLoadConfig.mockReturnValue(
-        loggedInConfig({
-          personal_project: { api_key: "pkey_personal" },
-        }) as never,
-      );
+      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
 
       const resolved = await resolveCredentials();
 
@@ -124,17 +152,12 @@ describe("resolveCredentials()", () => {
 
     /** @scenario a device session resolves the personal project API key when no env var is set */
     it("falls back to the device session's personal project key", async () => {
-      mockedLoadConfig.mockReturnValue(
-        loggedInConfig({
-          personal_project: { api_key: "pkey_personal" },
-        }) as never,
-      );
+      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
 
       const resolved = await resolveCredentials();
 
       expect(resolved.source).toBe("session");
       expect(resolved.apiKey).toBe("pkey_personal");
-      expect(process.env.LANGWATCH_API_KEY).toBe("pkey_personal");
       expect(mockedNotice).toHaveBeenCalledWith(
         expect.objectContaining({ mode: "device" }),
       );
@@ -154,53 +177,111 @@ describe("resolveCredentials()", () => {
       expect(resolved.apiKey).toBe("pkey_lazy");
       expect(mockedSaveConfig).toHaveBeenCalledWith(
         expect.objectContaining({
-          personal_project: expect.objectContaining({ api_key: "pkey_lazy" }),
+          personal_project: expect.objectContaining({
+            api_key: "pkey_lazy",
+            validated_at: expect.any(Number),
+          }),
         }),
       );
     });
   });
 
-  describe("daemon discipline", () => {
-    /** @scenario a credential materialised into the environment is never trusted as caller input */
-    it("re-resolves from disk when the env value is one it materialised itself", async () => {
-      mockedLoadConfig.mockReturnValue(
-        loggedInConfig({
-          personal_project: { api_key: "pkey_personal" },
-        }) as never,
-      );
-      // Request 1 materialises the session key into the process env.
-      await resolveCredentials();
-      expect(process.env.LANGWATCH_API_KEY).toBe("pkey_personal");
+  describe("session-liveness gate (revocation cannot be bypassed by the cached key)", () => {
+    /** @scenario a device session uses the cached key without a network call while validation is fresh */
+    it("uses the cached key without revalidating inside the window", async () => {
+      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
 
-      // Logout happens between requests: config no longer has a session, but
-      // the process-global env still carries the materialised key.
-      mockedLoadConfig.mockReturnValue(loggedOutConfig() as never);
+      const resolved = await resolveCredentials();
+
+      expect(resolved.apiKey).toBe("pkey_personal");
+      expect(mockedFetchPersonalProject).not.toHaveBeenCalled();
+    });
+
+    /** @scenario a stale cached key is revalidated before use */
+    it("revalidates a stale cached key through the session endpoint", async () => {
+      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
+      mockedFetchPersonalProject.mockResolvedValue({
+        id: "proj_1",
+        slug: "personal-x",
+        name: "Personal Workspace",
+        api_key: "pkey_rotated",
+      } as never);
+
+      const resolved = await resolveCredentials();
+
+      expect(mockedFetchPersonalProject).toHaveBeenCalledTimes(1);
+      expect(resolved.apiKey).toBe("pkey_rotated");
+    });
+
+    /** @scenario device-session revocation severs CLI access and wipes the cached key */
+    it("wipes the cached key and reports not-logged-in when the session is revoked", async () => {
+      const cfg = loggedInConfig(stalePersonal());
+      mockedLoadConfig.mockReturnValue(cfg as never);
+      mockedFetchPersonalProject.mockRejectedValue(
+        new SessionApiError(401, "unauthorized", "Session expired or revoked"),
+      );
 
       await expect(resolveCredentials()).rejects.toThrow("process.exit called");
+
+      // The cached key was deleted and the wipe persisted.
+      expect(
+        (cfg as { personal_project?: unknown }).personal_project,
+      ).toBeUndefined();
+      expect(mockedSaveConfig).toHaveBeenCalled();
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
 
-    it("still honours a genuinely caller-provided env value that differs", async () => {
-      mockedLoadConfig.mockReturnValue(
-        loggedInConfig({
-          personal_project: { api_key: "pkey_personal" },
-        }) as never,
-      );
-      await resolveCredentials();
+    /** @scenario a transient/offline revalidation keeps the last-known key without extending trust */
+    it("keeps the last-known key on a transient/offline error without extending the clock", async () => {
+      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
+      mockedFetchPersonalProject.mockRejectedValue(new Error("network down"));
 
-      // A different window's caller provides their own key.
-      process.env.LANGWATCH_API_KEY = "sk-caller";
       const resolved = await resolveCredentials();
 
-      expect(resolved.source).toBe("env");
-      expect(resolved.apiKey).toBe("sk-caller");
+      expect(resolved.apiKey).toBe("pkey_personal");
+      // Clock NOT reset (no save on the offline path), so the next reachable
+      // command revalidates again.
+      expect(mockedSaveConfig).not.toHaveBeenCalled();
+    });
+
+    it("keeps a legacy-server key (404) and quiets the clock", async () => {
+      mockedLoadConfig.mockReturnValue(loggedInConfig(stalePersonal()) as never);
+      mockedFetchPersonalProject.mockResolvedValue(null as never); // 404: endpoint missing
+
+      const resolved = await resolveCredentials();
+
+      expect(resolved.apiKey).toBe("pkey_personal");
+      expect(mockedSaveConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          personal_project: expect.objectContaining({
+            validated_at: expect.any(Number),
+          }),
+        }),
+      );
     });
   });
 
-  describe("endpoint materialisation", () => {
+  describe("daemon discipline (no resolved key in the shared env)", () => {
+    /** @scenario the resolved session key never touches the shared process env */
+    it("does not materialize the session key into process.env", async () => {
+      mockedLoadConfig.mockReturnValue(loggedInConfig(freshPersonal()) as never);
+
+      await resolveCredentials();
+
+      // The resolved key lives in the request-scoped credential store, never
+      // in the shared env a concurrent daemon request could read.
+      expect(process.env.LANGWATCH_API_KEY).toBeUndefined();
+    });
+
+    it("does not materialize an explicit --api-key into process.env either", async () => {
+      await resolveCredentials({ apiKey: "sk-explicit" });
+
+      expect(process.env.LANGWATCH_API_KEY).toBeUndefined();
+    });
+
     it("materialises the config-resolved endpoint for services, without overriding env", async () => {
       mockedLoadConfig.mockReturnValue({
-        ...loggedInConfig({ personal_project: { api_key: "pkey_personal" } }),
+        ...loggedInConfig(freshPersonal()),
         control_plane_url: "http://localhost:5560",
       } as never);
 
@@ -315,7 +396,6 @@ describe("resolveCredentials()", () => {
         const resolved = await resolveCredentials();
 
         expect(resolved.apiKey).toBe("sk-from-dotenv");
-        expect(process.env.LANGWATCH_API_KEY).toBe("sk-from-dotenv");
       });
 
       it("never overwrites a variable the environment already has", async () => {
@@ -324,9 +404,9 @@ describe("resolveCredentials()", () => {
           parsed: { LANGWATCH_API_KEY: "sk-from-dotenv" },
         });
 
-        await resolveCredentials();
+        const resolved = await resolveCredentials();
 
-        expect(process.env.LANGWATCH_API_KEY).toBe("sk-real");
+        expect(resolved.apiKey).toBe("sk-real");
       });
     });
 

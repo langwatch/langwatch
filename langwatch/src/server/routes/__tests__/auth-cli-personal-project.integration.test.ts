@@ -59,6 +59,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { connection as redisConnection } from "~/server/redis";
 import { app } from "../auth-cli";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 
@@ -313,6 +314,126 @@ describe("/me credentials delivery over the CLI auth surface", () => {
         headers: { authorization: "Bearer lw_at_garbage" },
       });
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe("given a token whose user is no longer an active org member", () => {
+    // Seed a live access token directly in Redis for a throwaway user, then
+    // vary that user's membership. Keeps the shared admin session untouched.
+    const seedAccessToken = async (
+      token: string,
+      userId: string,
+    ): Promise<void> => {
+      const redis = redisConnection!;
+      await redis.set(
+        `lwcli:access:${token}`,
+        JSON.stringify({
+          user_id: userId,
+          organization_id: ORG_ID,
+          issued_at: Date.now(),
+          expires_at: Date.now() + 60 * 60 * 1000,
+        }),
+        "EX",
+        3600,
+      );
+      await redis.sadd(`lwcli:user:${userId}:tokens`, `lwcli:access:${token}`);
+    };
+
+    const personalTeamCount = (userId: string) =>
+      prisma.team.count({
+        where: { organizationId: ORG_ID, ownerUserId: userId, isPersonal: true },
+      });
+
+    /** @scenario an offboarded user's pre-removal token cannot mint or return a personal key */
+    it("refuses an offboarded user, revokes the token, and creates no workspace", async () => {
+      const offboardId = `usr-offboard-${suffix}`;
+      const token = `lw_at_offboard${suffix.replace(/[^a-z0-9]/gi, "")}`;
+      await prisma.user.create({
+        data: {
+          id: offboardId,
+          email: `offboard-${suffix}@example.com`,
+          name: `Offboard ${suffix}`,
+        },
+      });
+      // Was a member when the token was issued, then removed from the org.
+      await prisma.organizationUser.create({
+        data: { userId: offboardId, organizationId: ORG_ID, role: "MEMBER" },
+      });
+      await seedAccessToken(token, offboardId);
+      await prisma.organizationUser.deleteMany({
+        where: { userId: offboardId, organizationId: ORG_ID },
+      });
+
+      const before = await personalTeamCount(offboardId);
+      const res = await app.request("/api/auth/cli/personal-project", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      expect(res.status).toBe(403);
+      // No personal workspace was resurrected in the former tenant.
+      expect(await personalTeamCount(offboardId)).toBe(before);
+      // The stale session was revoked: its access token is gone from Redis.
+      expect(await redisConnection!.get(`lwcli:access:${token}`)).toBeNull();
+
+      // A follow-up call with the same token is now plainly unauthorized.
+      const after = await app.request("/api/auth/cli/personal-project", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(after.status).toBe(401);
+
+      await prisma.user.deleteMany({ where: { id: offboardId } }).catch(() => {});
+    });
+
+    /** @scenario a deactivated user's token cannot mint or return a personal key */
+    it("refuses a deactivated user even while org membership lingers", async () => {
+      const deactId = `usr-deact-${suffix}`;
+      const token = `lw_at_deact${suffix.replace(/[^a-z0-9]/gi, "")}`;
+      await prisma.user.create({
+        data: {
+          id: deactId,
+          email: `deact-${suffix}@example.com`,
+          name: `Deactivated ${suffix}`,
+          deactivatedAt: new Date(),
+        },
+      });
+      await prisma.organizationUser.create({
+        data: { userId: deactId, organizationId: ORG_ID, role: "MEMBER" },
+      });
+      await seedAccessToken(token, deactId);
+
+      const res = await app.request("/api/auth/cli/personal-project", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+      expect(res.status).toBe(403);
+      expect(await redisConnection!.get(`lwcli:access:${token}`)).toBeNull();
+
+      await prisma.organizationUser
+        .deleteMany({ where: { userId: deactId } })
+        .catch(() => {});
+      await prisma.user.deleteMany({ where: { id: deactId } }).catch(() => {});
+    });
+
+    /** @scenario POST /api/auth/cli/project-key applies the same membership boundary */
+    it("also refuses /project-key for a non-member, revoking the token", async () => {
+      const outsiderId = `usr-outsider-${suffix}`;
+      const token = `lw_at_outsider${suffix.replace(/[^a-z0-9]/gi, "")}`;
+      await prisma.user.create({
+        data: {
+          id: outsiderId,
+          email: `outsider-${suffix}@example.com`,
+          name: `Outsider ${suffix}`,
+        },
+      });
+      // Never a member of ORG_ID.
+      await seedAccessToken(token, outsiderId);
+
+      const { status } = await projectKey(token, SHARED_PROJECT_SLUG);
+
+      expect(status).toBe(403);
+      expect(await redisConnection!.get(`lwcli:access:${token}`)).toBeNull();
+
+      await prisma.user.deleteMany({ where: { id: outsiderId } }).catch(() => {});
     });
   });
 

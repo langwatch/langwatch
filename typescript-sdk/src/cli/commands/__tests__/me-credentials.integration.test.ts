@@ -45,6 +45,10 @@ let personalProjectCalls = 0;
 let refreshCalls = 0;
 let lastSearchAuth: string | null = null;
 let rejectAccessToken: string | null = null;
+/** When true the device session is revoked server-side: the session-
+ * authenticated endpoints AND refresh all 401, exactly as they would after a
+ * /me/devices revocation dropped the Redis tokens. */
+let sessionRevoked = false;
 
 const configPath = () => path.join(stateDir, "config.json");
 
@@ -126,7 +130,11 @@ beforeAll(async () => {
 
       if (url.startsWith("/api/auth/cli/personal-project")) {
         personalProjectCalls++;
-        if (auth !== "Bearer lw_at_valid" || rejectAccessToken === "lw_at_valid") {
+        if (
+          sessionRevoked ||
+          auth !== "Bearer lw_at_valid" ||
+          rejectAccessToken === "lw_at_valid"
+        ) {
           json(401, { error: "unauthorized" });
           return;
         }
@@ -144,7 +152,7 @@ beforeAll(async () => {
       if (url.startsWith("/api/auth/cli/refresh")) {
         refreshCalls++;
         const parsed = JSON.parse(body || "{}") as { refresh_token?: string };
-        if (parsed.refresh_token !== "lw_rt_valid") {
+        if (sessionRevoked || parsed.refresh_token !== "lw_rt_valid") {
           json(401, { error: "invalid_grant" });
           return;
         }
@@ -218,6 +226,7 @@ beforeEach(() => {
   refreshCalls = 0;
   lastSearchAuth = null;
   rejectAccessToken = null;
+  sessionRevoked = false;
 });
 
 afterEach(() => {
@@ -239,6 +248,37 @@ describe("device session powers data commands with zero env vars", () => {
     const second = await run(["trace", "search", "-o", "json"]);
     expect(second.exitCode).toBe(0);
     expect(personalProjectCalls).toBe(1);
+  });
+
+  /** @scenario device-session revocation severs CLI access and wipes the cached key */
+  it("stops authenticating after the session is revoked, wiping the cached key", async () => {
+    // A live session with a personal key whose validation clock is stale, so
+    // the next command must re-confirm liveness before trusting the key.
+    writeSession({
+      personal_project: {
+        id: "proj_personal",
+        slug: "personal-dev",
+        name: "Personal Workspace",
+        api_key: PERSONAL_KEY,
+        validated_at: Math.floor(Date.now() / 1000) - 3600, // past the window
+      },
+    });
+
+    // The device is revoked from /me/devices: Redis tokens are gone, so the
+    // session endpoints and refresh all 401.
+    sessionRevoked = true;
+
+    const result = await run(["trace", "search"]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "Error: not logged in and LANGWATCH_API_KEY is not set.",
+    );
+    // The command never reached the API with the stolen key...
+    expect(lastSearchAuth).toBeNull();
+    // ...and the cached key is gone from the retained config, so a copied
+    // ~/.langwatch/config.json is now inert.
+    expect(readSession().personal_project).toBeUndefined();
   });
 
   /** @scenario the lazy exchange refreshes an expired access token before giving up */

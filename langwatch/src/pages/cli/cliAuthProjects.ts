@@ -13,6 +13,14 @@
  *     implied by any other selection; picking it is a deliberate act, and
  *     the server (`/api/auth/cli/approve`) only honours the caller's own.
  *
+ * The personal entry is matched by `ownerUserId === currentUserId`, never by
+ * "first personal team in the payload". `organization.getAll` retains EVERY
+ * team for an org admin, including OTHER members' personal workspaces; without
+ * the owner filter an admin in a shared-project-less org would see a colleague's
+ * workspace preselected and labelled "Personal", and approval would then fail
+ * server-side with `personal_project_not_allowed`. The caller's id must be
+ * passed for the personal entry to resolve at all.
+ *
  * The default selection prefers the last project the user worked in (when
  * offered), then the sole shared project, then, when the org has no shared
  * projects at all, the personal project, so a fresh solo user is never
@@ -44,6 +52,7 @@ interface TeamLike {
   id: string;
   name: string;
   isPersonal?: boolean | null;
+  ownerUserId?: string | null;
   projects?: ProjectLike[] | null;
 }
 
@@ -53,6 +62,11 @@ export const PERSONAL_GROUP_NAME = "Personal";
 export function resolveCliAuthProjects(args: {
   teams: TeamLike[] | null | undefined;
   lastProjectSlug?: string | null;
+  /** The signed-in user's id. Required to resolve the personal entry: only a
+   *  personal team OWNED by this user is offered as "Personal". Absent (or no
+   *  match) means no personal entry is shown, which is correct: a picker with
+   *  no known caller must not guess someone's workspace. */
+  currentUserId?: string | null;
 }): {
   projects: CliAuthProjectOption[];
   teams: CliAuthTeamOption[];
@@ -74,24 +88,27 @@ export function resolveCliAuthProjects(args: {
       })),
   );
 
-  const personalProject = (args.teams ?? []).reduce<CliAuthProjectOption | null>(
-    (found, team) => {
-      if (found) return found;
-      const personal = (team.projects ?? []).find(
-        (p) => p.isPersonal && p.kind !== "internal_governance",
-      );
-      return personal
-        ? {
-            id: personal.id,
-            name: personal.name,
-            slug: personal.slug,
-            teamId: team.id,
-            teamName: PERSONAL_GROUP_NAME,
-          }
-        : null;
-    },
-    null,
-  );
+  // Only the CALLER's own personal workspace is offered, matched by the
+  // owning team's ownerUserId. Without a caller id, no personal entry is
+  // shown (never guess a stranger's workspace).
+  const personalProject = args.currentUserId
+    ? (args.teams ?? []).reduce<CliAuthProjectOption | null>((found, team) => {
+        if (found) return found;
+        if (team.ownerUserId !== args.currentUserId) return found;
+        const personal = (team.projects ?? []).find(
+          (p) => p.isPersonal && p.kind !== "internal_governance",
+        );
+        return personal
+          ? {
+              id: personal.id,
+              name: personal.name,
+              slug: personal.slug,
+              teamId: team.id,
+              teamName: PERSONAL_GROUP_NAME,
+            }
+          : null;
+      }, null)
+    : null;
 
   // Only teams that actually have an offered project, so the grouped picker
   // never renders an empty team header. The personal entry brings its own

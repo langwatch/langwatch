@@ -290,6 +290,107 @@ function getRedis() {
 }
 
 /**
+ * Extract the Bearer access token from an Authorization header, or null.
+ * Same shape validateAccessToken matches; kept separate so callers that need
+ * the raw token string (to revoke it) don't re-run full validation.
+ */
+function bearerAccessToken(
+  authHeader: string | null | undefined,
+): string | null {
+  if (!authHeader) return null;
+  const match = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/.exec(authHeader.trim());
+  return match ? match[1]! : null;
+}
+
+/**
+ * The tenancy boundary for key-minting CLI endpoints.
+ *
+ * `validateAccessToken` only proves a Redis token has not expired; it says
+ * nothing about whether the user is STILL an active member of the token's
+ * organization. A user offboarded after their token was issued must not be
+ * able to recreate a personal workspace in the former tenant or pull any
+ * project's key. Every endpoint that mints or returns a project API key
+ * therefore re-derives current membership from Postgres (the same authority
+ * the web RBAC helpers use) before handing anything back.
+ *
+ * On refusal it also severs the stale session: the presented access token is
+ * dropped from Redis (and from the user's token index), so a token minted
+ * before removal cannot keep hitting these endpoints. Org-scoped: only the
+ * caller's own presented token is revoked, never their sessions in other
+ * organizations. Org-wide offboarding still runs
+ * CliTokenRevocationService.revokeForUser via user deactivation.
+ *
+ * Returns a 403 Response to send when the caller is not an active member,
+ * or null to proceed.
+ *
+ * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+ */
+async function ensureActiveOrgMemberOr403(
+  c: Context,
+  tokenRecord: { user_id: string; organization_id: string },
+): Promise<Response | null> {
+  const [user, membership] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: tokenRecord.user_id },
+      select: { deactivatedAt: true },
+    }),
+    prisma.organizationUser.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: tokenRecord.user_id,
+          organizationId: tokenRecord.organization_id,
+        },
+      },
+      select: { userId: true },
+    }),
+  ]);
+
+  const active = !!user && user.deactivatedAt === null && !!membership;
+  if (active) return null;
+
+  // Sever the stale session before refusing: drop the presented access token
+  // so the offboarded caller's token stops authenticating immediately.
+  const token = bearerAccessToken(c.req.header("Authorization"));
+  if (token) {
+    try {
+      const redis = getRedis();
+      await redis.del(accessTokenKey(token));
+      await redis.srem(
+        userTokensIndexKey(tokenRecord.user_id),
+        accessTokenKey(token),
+      );
+    } catch (err) {
+      logger.warn(
+        { err, userId: tokenRecord.user_id },
+        "[auth-cli] failed to revoke stale access token on membership refusal",
+      );
+    }
+  }
+
+  logger.info(
+    {
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      reason: !user
+        ? "user_missing"
+        : user.deactivatedAt !== null
+          ? "user_deactivated"
+          : "not_org_member",
+    },
+    "[auth-cli] refusing key-minting request from non-active org member; session revoked",
+  );
+
+  return c.json(
+    {
+      error: "forbidden",
+      error_description:
+        "Your access to this organization has ended. Run `langwatch login` to sign in again.",
+    },
+    403,
+  );
+}
+
+/**
  * Control-plane base URL the CLI persists post-login (no trailing slash).
  * Falls back to `https://app.langwatch.ai` when neither `NEXTAUTH_URL` nor
  * `BASE_HOST` is set — same fallback the CLI uses on the client side, so
@@ -1049,6 +1150,12 @@ secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
       401,
     );
   }
+  // Tenancy boundary: prove current, active org membership BEFORE ensure(),
+  // which would otherwise recreate a personal workspace in a former tenant
+  // and hand out its key to an offboarded user.
+  const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
+  if (denied) return denied;
+
   const user = await prisma.user.findUnique({
     where: { id: tokenRecord.user_id },
     select: { name: true, email: true },
@@ -1115,6 +1222,11 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
       401,
     );
   }
+  // Same tenancy boundary as /personal-project: an offboarded user's
+  // pre-removal token must not be able to pull a shared project's key.
+  const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
+  if (denied) return denied;
+
   const body = await c.req.json().catch(() => ({}));
   const parsed = projectKeyRequestSchema.safeParse(body);
   if (!parsed.success) {

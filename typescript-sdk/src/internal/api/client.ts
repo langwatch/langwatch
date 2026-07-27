@@ -8,6 +8,7 @@ import {
   LANGWATCH_SDK_VERSION,
 } from "../constants";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { buildAuthHeaders } from "./auth";
 import { handledErrorFrom } from "./errors";
 
@@ -72,7 +73,12 @@ const handledErrorMiddleware: Middleware = {
  * @returns A new LangWatch API client.
  */
 export const createLangWatchApiClient = (
-  apiKey: string = process.env.LANGWATCH_API_KEY ?? "",
+  // The request-scoped key (the CLI resolver's output) wins over the global
+  // env: in the daemon the resolved device-session key lives ONLY in the
+  // async-scoped store, never in the shared process.env, so concurrent
+  // requests can't read each other's credential. A plain SDK embed sets no
+  // scope and falls back to the environment unchanged.
+  apiKey: string = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "",
   endpoint: string = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT,
   projectId: string | undefined = process.env.LANGWATCH_PROJECT_ID,
 ) => {

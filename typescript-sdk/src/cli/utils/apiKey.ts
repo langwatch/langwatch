@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { config } from "dotenv";
+import { setResolvedApiKey } from "@/internal/credentialContext";
 import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
 import { maybePrintIdentityNotice } from "./identityNotice";
@@ -9,7 +10,10 @@ import {
   loadConfig,
   saveConfig,
 } from "./governance/config";
-import { fetchPersonalProject } from "./governance/session-api";
+import {
+  fetchPersonalProject,
+  SessionApiError,
+} from "./governance/session-api";
 
 /**
  * Re-read the caller's .env, applying only the LANGWATCH_* keys.
@@ -50,19 +54,18 @@ export interface ResolvedCredentials {
 }
 
 /**
- * The last API key THIS PROCESS materialised into `process.env` from stored
- * state (a resolved device session, or an explicit key argument), as opposed
- * to a value the caller set. The distinction is the daemon's logged-in
- * single-identity boundary (cli/daemon/identity.ts): auth must be resolved
- * PER REQUEST from config.json on disk, so a value this resolver wrote into
- * the process-global env on a previous request must never be read back as if
- * the caller provided it: a logout between two requests would otherwise
- * keep serving the dead session's key. When the env value equals this
- * marker, the resolver goes back to disk; a genuinely caller-provided value
- * (which, per the daemon's identity hashing and window reset, is the only
- * way the env can legitimately differ) wins exactly as before.
+ * How long a device session's cached personal-project key is trusted before
+ * the resolver re-confirms the session is still live. The key is a long-lived
+ * `Project.apiKey`, not a session-bound token, so trusting it forever would
+ * let a stolen `~/.langwatch/config.json` keep working after the device was
+ * revoked from /me/devices. Bounding the trust to this window means a
+ * server-side revocation severs CLI access within at most this long: past the
+ * window every command re-validates through the session-authenticated
+ * endpoint and drops the key when the session is gone. Minutes, not days.
+ *
+ * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
-let materializedKey: string | undefined;
+export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
  * Resolve the credentials an API-calling command runs with, in priority
@@ -72,38 +75,43 @@ let materializedKey: string | undefined;
  *   2. `LANGWATCH_API_KEY` from the environment or the caller's .env
  *      (scoped load above, so CI and scripts are never surprised),
  *   3. the device session in ~/.langwatch/config.json, which resolves the
- *      PERSONAL PROJECT's API key: shipped by the login exchange, or
- *      lazily exchanged once (and persisted) for sessions that predate it.
+ *      PERSONAL PROJECT's API key: shipped by the login exchange, then
+ *      periodically re-validated against session liveness (see below).
  *
- * The winning key (and, when unset, the resolved endpoint) is materialised
- * into `process.env` so every downstream service (they all default to
- * `process.env.LANGWATCH_API_KEY` at construction) picks it up without
- * plumbing changes.
+ * The winning key is published into the request-scoped credential store
+ * (internal/credentialContext.ts), NOT the shared `process.env`. Every
+ * API-client factory reads that store first, so a service constructed
+ * downstream of this call sees only this request's credential; the daemon
+ * runs concurrent requests in separate async contexts, so one request can
+ * never read another's key. Writing the resolved key to the process-global
+ * env instead (the previous shape) was the cross-identity leak the daemon
+ * design forbids. The endpoint stays on `process.env` (via `??=`, so a caller
+ * value wins): it is resolved deterministically per execution window and
+ * window switches are serialized, so it is not identity-sensitive the way the
+ * key is.
  *
  * On success, prints the one-line identity notice (stderr only, 30-minute
- * suppression, see identityNotice.ts). With no credential anywhere it
- * reports the not-logged-in error and exits 1, structured on stdout for
- * machine callers, prose on stderr for humans.
+ * suppression, see identityNotice.ts). With no credential anywhere it reports
+ * the not-logged-in error and exits 1, structured on stdout for machine
+ * callers, prose on stderr for humans.
  *
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 export const resolveCredentials = async (
   opts: { apiKey?: string } = {},
 ): Promise<ResolvedCredentials> => {
-  // Load environment variables from .env file (scoped — see above)
+  // Load environment variables from .env file (scoped, see above)
   loadEnvFileScoped();
   const endpoint = getEndpoint();
-  // Services read `process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT` and
-  // never consult the persisted config, so a config-resolved endpoint must
-  // be materialised for them or a self-hosted login's key would be sent to
-  // the cloud default. `??=` keeps an explicit env value authoritative,
-  // matching the 4-source resolver's order (env above config).
+  // Services read `process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT`; a
+  // config-resolved endpoint must reach them or a self-hosted login's key
+  // would be sent to the cloud default. `??=` keeps an explicit env value
+  // authoritative, matching the 4-source resolver's order (env above config).
   process.env.LANGWATCH_ENDPOINT ??= endpoint;
 
   const flagKey = opts.apiKey?.trim();
   if (flagKey) {
-    process.env.LANGWATCH_API_KEY = flagKey;
-    materializedKey = flagKey;
+    setResolvedApiKey(flagKey);
     await maybePrintIdentityNotice({
       mode: "api-key",
       apiKey: flagKey,
@@ -113,7 +121,8 @@ export const resolveCredentials = async (
   }
 
   const envKey = process.env.LANGWATCH_API_KEY;
-  if (envKey && envKey.trim() !== "" && envKey !== materializedKey) {
+  if (envKey && envKey.trim() !== "") {
+    setResolvedApiKey(envKey);
     await maybePrintIdentityNotice({
       mode: "api-key",
       apiKey: envKey,
@@ -133,8 +142,7 @@ export const resolveCredentials = async (
   if (cfg && isLoggedIn(cfg)) {
     const sessionKey = await resolveSessionProjectKey(cfg);
     if (sessionKey) {
-      process.env.LANGWATCH_API_KEY = sessionKey;
-      materializedKey = sessionKey;
+      setResolvedApiKey(sessionKey);
       await maybePrintIdentityNotice({
         mode: "device",
         apiKey: sessionKey,
@@ -148,32 +156,84 @@ export const resolveCredentials = async (
 };
 
 /**
- * The personal project key for a live device session: from the config cache
- * when the login exchange delivered it, otherwise one lazy session-
- * authenticated exchange, persisted so it never repeats. Returns undefined
- * when the session cannot resolve a key (revoked session, pre-endpoint
- * server, offline); the caller then falls through to the not-logged-in
- * error, which names `langwatch login` as the fix either way.
+ * The personal-project key for a device session, gated on session liveness.
+ *
+ * The cached key (delivered by the login exchange, or a prior lazy exchange)
+ * is a long-lived `Project.apiKey`. Using it unconditionally is the
+ * revocation bypass: a config carrying `personal_project.api_key` would
+ * authenticate forever even after the device was revoked. So the cache is
+ * trusted only within `SESSION_REVALIDATE_WINDOW_MS`; past it, every call
+ * re-confirms the session through the session-authenticated
+ * `GET /api/auth/cli/personal-project` (which fails once Redis has dropped
+ * the revoked/expired tokens), and:
+ *
+ *   - success       : refresh the key + validation clock, use it.
+ *   - 401 (revoked) : DELETE the cached key from config and return undefined,
+ *                     so the command reports not-logged-in and the stolen
+ *                     config is now inert.
+ *   - 404 (a server predating the endpoint) : can't revalidate; keep the
+ *                     legacy key and reset the clock so old servers still
+ *                     "just work" (they have no device-revocation semantics
+ *                     to enforce anyway).
+ *   - network/other : offline; keep the last-known key WITHOUT resetting the
+ *                     clock, so the very next online command revalidates.
  */
 async function resolveSessionProjectKey(
   cfg: GovernanceConfig,
 ): Promise<string | undefined> {
-  const cached = cfg.personal_project?.api_key;
-  if (cached && cached.trim() !== "") return cached;
+  const trimmedKey = cfg.personal_project?.api_key?.trim() ?? "";
+  const cached: string | undefined =
+    trimmedKey.length > 0 ? trimmedKey : undefined;
+  const validatedAtMs = (cfg.personal_project?.validated_at ?? 0) * 1000;
+  const fresh =
+    !!cached && Date.now() - validatedAtMs < SESSION_REVALIDATE_WINDOW_MS;
+  if (fresh) return cached;
+
   try {
     const project = await fetchPersonalProject(cfg);
-    if (!project) return undefined;
+    if (!project) {
+      // Endpoint missing (legacy server). Nothing to revalidate against;
+      // trust the cached key and quiet the clock so we don't re-probe every
+      // command.
+      if (cached) {
+        markPersonalProjectValidated(cfg);
+        return cached;
+      }
+      return undefined;
+    }
     cfg.personal_project = {
       id: project.id,
       slug: project.slug,
       name: project.name,
       api_key: project.api_key,
+      validated_at: Math.floor(Date.now() / 1000),
     };
     saveConfig(cfg);
     return project.api_key;
-  } catch {
-    return undefined;
+  } catch (err) {
+    if (err instanceof SessionApiError && err.status === 401) {
+      // Session revoked or expired: sever access. Drop the cached key so the
+      // retained config can no longer authenticate. (fetchPersonalProject's
+      // refresh path may already have cleared it; this is idempotent.)
+      delete cfg.personal_project;
+      saveConfig(cfg);
+      return undefined;
+    }
+    // Offline / transient: fall back to the last-known key, but do NOT touch
+    // the validation clock, so the next reachable command revalidates.
+    return cached;
   }
+}
+
+/** Reset the revalidation clock on the cached personal project (legacy-server
+ * path), persisting it. No-op when there is no cached project. */
+function markPersonalProjectValidated(cfg: GovernanceConfig): void {
+  if (!cfg.personal_project) return;
+  cfg.personal_project = {
+    ...cfg.personal_project,
+    validated_at: Math.floor(Date.now() / 1000),
+  };
+  saveConfig(cfg);
 }
 
 /** The human error block, line by line. Exported for tests. */

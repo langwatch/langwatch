@@ -47,6 +47,24 @@ Feature: Authorize page project picker - honest selection and a path for empty o
     And the personal project is listed under a separate "Personal" group
     And selecting a team's project never implies personal access
 
+  @bdd @cli-onboarding @authorize-picker @unit
+  Scenario: an org admin is offered only their OWN personal workspace, never a colleague's
+    Given an org admin whose organization payload retains other members' personal teams
+    And the organization has no shared projects
+    When the picker resolves the personal entry for the signed-in admin
+    Then only the workspace whose owning team's ownerUserId is the admin is offered
+    And a different member's personal workspace is never preselected or labelled "Personal"
+    # organization.getAll keeps every team for an admin; matching the personal
+    # entry by "first personal team in the payload" would preselect a colleague's
+    # workspace and then fail approval server-side with personal_project_not_allowed.
+
+  @bdd @cli-onboarding @authorize-picker @unit
+  Scenario: no caller id yields no personal entry
+    Given the signed-in user's id is not available to the picker
+    When the picker resolves the personal entry
+    Then no personal project is offered
+    # Never guess a stranger's workspace.
+
   @bdd @cli-onboarding @authorize-picker @integration
   Scenario: approving with the personal project selected returns the personal project key
     Given the user explicitly selected their personal project

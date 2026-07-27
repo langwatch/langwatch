@@ -107,6 +107,8 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
       slug: "personal-dev",
       name: "Personal Workspace",
       api_key: "pkey_delivered",
+      // The exchange proved liveness, so the revalidation clock is seeded now.
+      validated_at: expect.any(Number),
     });
     expect(saveConfig).toHaveBeenCalledWith(
       expect.objectContaining({

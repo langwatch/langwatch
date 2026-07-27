@@ -184,6 +184,11 @@ describe("the CLI boot module graph", () => {
         "cli/utils/governance/config.ts",
         "cli/utils/governance/resolveEndpoint.ts",
         "internal/constants.ts",
+        // dispatch wraps the in-process command in a credential holder scope
+        // so the resolved key never touches the shared env. The module is a
+        // few lines over node:async_hooks (no third-party deps), so its boot
+        // cost is negligible; it belongs here deliberately.
+        "internal/credentialContext.ts",
         "internal/runtime.ts",
       ]);
     });
