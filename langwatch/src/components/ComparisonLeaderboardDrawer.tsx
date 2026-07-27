@@ -29,7 +29,7 @@ import {
 } from "./batch-evaluation-results/computeLeaderboardVerdict";
 import { computeSampleAdequacy } from "./batch-evaluation-results/computeSampleAdequacy";
 import { computeVariantMetrics } from "./batch-evaluation-results/computeVariantMetrics";
-import { LeaderboardExplainPanel } from "./batch-evaluation-results/LeaderboardExplainPanel";
+import { LeaderboardAskLangyButton } from "./batch-evaluation-results/LeaderboardAskLangyButton";
 import { LeaderboardStep } from "./batch-evaluation-results/LeaderboardStep";
 import { LeaderboardTrustPanel } from "./batch-evaluation-results/LeaderboardTrustPanel";
 import { LeaderboardVerdictPanel } from "./batch-evaluation-results/LeaderboardVerdictPanel";
@@ -162,11 +162,12 @@ export function ComparisonLeaderboardDrawer({
                 variantNames={variantNames}
                 targetColors={targetColors}
               >
-                {/* Strictly additive, and deliberately below the computed
-                    sentence rather than in place of it. If the generated
-                    prose and the verdict ever disagree, the verdict is the
-                    one still on screen. */}
-                <LeaderboardExplainPanel
+                {/* Hands the finished result to the assistant the platform
+                    already has, rather than rendering generated prose inside
+                    the panel at the same visual authority as the computed
+                    verdict. */}
+                <LeaderboardAskLangyButton
+                  comparisonName={column.name}
                   leaderboard={leaderboard}
                   verdict={verdict}
                   cheaperAlternative={cheaperAlternative}

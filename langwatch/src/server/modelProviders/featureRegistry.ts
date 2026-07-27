@@ -137,17 +137,6 @@ const REGISTRY: FeatureDescriptor[] = [
     description:
       "Names each Langy conversation from its messages. Point this at a cheap model.",
   },
-  {
-    key: "experiments.leaderboard_summary",
-    role: "FAST",
-    // FAST rather than DEFAULT on purpose: it is handed the already-computed
-    // ranking and asked to put it into words, never to decide which variant
-    // wins. Nothing it writes can change the result on screen, so a cheap
-    // model is the right trade.
-    displayName: "Comparison result explanation",
-    description:
-      "Explains a comparison leaderboard in plain language, on request.",
-  },
 
   // EMBEDDINGS — single line, no per-feature expand surfaced in the UI.
   {

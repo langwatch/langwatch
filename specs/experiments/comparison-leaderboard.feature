@@ -201,19 +201,45 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     Then no model has been called to describe the result
     And I see a control offering to explain the result in prose
 
-  Scenario: Asking for an explanation uses the workspace's own fast model
+  Scenario: The explanation is a conversation with Langy, not a paragraph in the panel
     When I ask for the result to be explained
-    Then the request uses the model configured for the leaderboard summary feature
-    And the response names the model that produced it
+    Then the question opens in Langy with the computed result already in it
+    And nothing generated is rendered inside the result panel itself
+    # Two reasons. Generated prose sitting inside the panel carries the same
+    # visual authority as the computed verdict beside it, which is how a
+    # fluent wrong answer gets acted on. And a reader who disagrees, or wants
+    # to know what to change, can push back on a conversation but not on a
+    # frozen paragraph.
 
-  Scenario: The explanation cannot overturn the computed verdict
-    Given the run does not separate the top two variants
+  Scenario: The question carries the computed conclusion
     When I ask for the result to be explained
-    Then the computed verdict remains displayed above the explanation, unchanged
-    # The generated text is additive. If it and the computed verdict ever
-    # disagree, the computed one is the one on screen and the one to trust.
+    Then Langy is given the scores, intervals, costs and checks that were already computed
+    And it is asked to explain that conclusion rather than to rank the variants again
+    # Langy could go and re-derive a ranking from the run. A second ranking
+    # that disagrees with the one on screen is worse than no explanation.
 
-  Scenario: The explanation is given the computed numbers rather than the raw run
-    When I ask for the result to be explained
-    Then the model receives the scores, intervals, costs and checks that were already computed
-    And it is asked to explain them rather than to decide anything
+  Scenario: A reader who cannot start a Langy conversation is not offered one
+    Given I do not have permission to start a Langy conversation
+    When I open the expanded leaderboard
+    Then I am not offered the explain control
+    And I still see the full computed result
+
+  # ── Axis labels ────────────────────────────────────────────────────────
+
+  Scenario: Every chart in the row labels the bars identically
+    Given the run's variants are named "support-assistant-warm", "support-assistant-formal" and "support-assistant-blunt"
+    When I view the results charts
+    Then the cost, latency, win-rate and leaderboard charts show the same label for each variant
+
+  Scenario: Labels name the part that tells the variants apart
+    Given every variant's name begins with the same long prefix
+    When I view the results charts
+    Then the shared prefix is elided and the distinguishing part of each name is shown
+    # Truncating from the left throws away exactly the part that differs, so
+    # every bar reads the same. Dropping the shared prefix removes the
+    # collision at source instead of papering over it with "(1)" "(2)" "(3)".
+
+  Scenario: Names that already fit are shown in full
+    Given the variants are named "gpt-5-mini" and "gpt-5-nano"
+    When I view the results charts
+    Then each bar shows its full name with no prefix elided

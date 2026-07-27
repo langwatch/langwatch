@@ -22,6 +22,7 @@ import {
 import { ChartTooltip } from "../analytics/ChartTooltip";
 import {
   axisLabelProps,
+  buildAxisLabels,
   chartHeightFor,
   truncateLabel,
 } from "./chartAxisLabels";
@@ -766,6 +767,21 @@ export const ComparisonCharts = ({
   // all share one x-axis of `chartData`.
   const axis = axisLabelProps(chartData.length);
 
+  // Bar labels, precomputed for the whole row rather than trimmed per tick.
+  // A tickFormatter only ever sees one value, so it cannot know that the
+  // other three bars share a prefix with this one — which is how these charts
+  // ended up rendering four bars all labelled "support-assista…" while their
+  // siblings rendered "(1) (2) (3) (4)". Same names, same trim, everywhere.
+  const axisLabelByName = useMemo(() => {
+    const names = chartData.map((d) => String(d.name));
+    const labels = buildAxisLabels(names, axis.maxLabelLength);
+    return new Map(names.map((name, i) => [name, labels[i] ?? name]));
+  }, [chartData, axis.maxLabelLength]);
+  const formatAxisTick = (value: unknown): string => {
+    const name = String(value);
+    return axisLabelByName.get(name) ?? truncateLabel(name, axis.maxLabelLength);
+  };
+
   // Height is shared by every chart in the row, including the WinRateCharts
   // rendered alongside — and a win-rate chart's bar count (its variants, plus
   // Tie) is independent of `chartData`, which excludes comparison columns
@@ -1243,9 +1259,7 @@ export const ComparisonCharts = ({
                       angle={axis.angle}
                       textAnchor={axis.textAnchor}
                       height={axis.height}
-                      tickFormatter={(value) =>
-                        truncateLabel(String(value), axis.maxLabelLength)
-                      }
+                      tickFormatter={formatAxisTick}
                     />
                     <YAxis
                       style={{ fontSize: "11px" }}
@@ -1314,9 +1328,7 @@ export const ComparisonCharts = ({
                       angle={axis.angle}
                       textAnchor={axis.textAnchor}
                       height={axis.height}
-                      tickFormatter={(value) =>
-                        truncateLabel(String(value), axis.maxLabelLength)
-                      }
+                      tickFormatter={formatAxisTick}
                     />
                     <YAxis
                       style={{ fontSize: "11px" }}
@@ -1391,9 +1403,7 @@ export const ComparisonCharts = ({
                           angle={axis.angle}
                           textAnchor={axis.textAnchor}
                           height={axis.height}
-                          tickFormatter={(value) =>
-                        truncateLabel(String(value), axis.maxLabelLength)
-                      }
+                          tickFormatter={formatAxisTick}
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}
@@ -1514,9 +1524,7 @@ export const ComparisonCharts = ({
                           angle={axis.angle}
                           textAnchor={axis.textAnchor}
                           height={axis.height}
-                          tickFormatter={(value) =>
-                        truncateLabel(String(value), axis.maxLabelLength)
-                      }
+                          tickFormatter={formatAxisTick}
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}

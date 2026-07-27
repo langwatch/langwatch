@@ -30,7 +30,7 @@ import {
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { useDrawer } from "~/hooks/useDrawer";
 import { buildPairwiseComparisons } from "./buildPairwiseComparisons";
-import { axisLabelProps, truncateLabel } from "./chartAxisLabels";
+import { axisLabelProps, buildAxisLabels, truncateLabel } from "./chartAxisLabels";
 import { computeBTLeaderboard } from "./computeBTLeaderboard";
 import {
   computeLeaderboardVerdict,
@@ -79,8 +79,9 @@ export function ComparisonLeaderboardChart({
   const nameById = new Map(column.variants.map((v) => [v.id, v.name]));
   const axis = axisLabelProps(Math.min(leaderboard.entries.length, MAX_COMPACT_BARS));
   const trimAxisLabel = (s: string) => truncateLabel(s, axis.maxLabelLength);
-  const displayNames = disambiguateNames(
-    leaderboard.entries.map((e) => trimAxisLabel(nameById.get(e.variantId) ?? e.variantId)),
+  const displayNames = buildAxisLabels(
+    leaderboard.entries.map((e) => nameById.get(e.variantId) ?? e.variantId),
+    axis.maxLabelLength,
   );
   const fullNames = disambiguateNames(
     leaderboard.entries.map((e) => nameById.get(e.variantId) ?? e.variantId),
