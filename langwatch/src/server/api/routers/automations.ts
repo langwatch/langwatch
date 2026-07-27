@@ -606,7 +606,9 @@ export const automationRouter = createTRPCRouter({
    * picker (ADR-041). Uses the freshly-typed token, or the saved automation's
    * stored token (decrypted server-side, never returned). A missing
    * `channels:read` scope comes back as `{ error: "missing_scope" }` so the UI
-   * degrades to manual entry instead of failing.
+   * degrades to manual entry instead of failing. A listing that succeeded but
+   * does not cover the whole workspace carries `gaps` saying why, so the picker
+   * can tell the author rather than presenting a short list as complete.
    */
   listSlackChannels: protectedProcedure
     .input(
@@ -630,7 +632,8 @@ export const automationRouter = createTRPCRouter({
           (saved?.actionParams ?? {}) as SlackActionParams,
         );
       }
-      if (!token) return { channels: [], error: "no_token" as string };
+      if (!token)
+        return { channels: [], error: "no_token" as string, gaps: [] };
       return listSlackChannels(token);
     }),
   updateTriggerFilters: protectedProcedure
