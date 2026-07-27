@@ -205,6 +205,60 @@ function buildWinMatrix(
   return W;
 }
 
+/**
+ * A comparison with its candidate ids already resolved to matrix indices.
+ * `winner === TIE` marks the two-way tie case.
+ */
+type ResolvedComparison = {
+  candIdxs: number[];
+  winner: number;
+};
+
+const TIE = -1;
+
+/** Null when the row carries no usable evidence (unknown ids, ambiguous tie). */
+function resolveComparison(
+  c: PairwiseComparison,
+  idx: Map<string, number>,
+): ResolvedComparison | null {
+  const candIdxs: number[] = [];
+  for (const id of c.candidates) {
+    const k = idx.get(id);
+    if (k !== undefined) candIdxs.push(k);
+  }
+  if (candIdxs.length < 2) return null;
+
+  if (c.winner === "tie") {
+    // Only well-defined for 2-way. N>2 "tie" rows are dropped — semantics
+    // are ambiguous (did all N tie pairwise? did some subset tie?).
+    return candIdxs.length === 2 ? { candIdxs, winner: TIE } : null;
+  }
+
+  const wIdx = idx.get(c.winner as string);
+  if (wIdx === undefined) return null;
+  return { candIdxs, winner: wIdx };
+}
+
+function buildWinMatrixFromResolved(
+  resolved: (ResolvedComparison | null)[],
+  n: number,
+): number[][] {
+  const W: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+  for (const r of resolved) {
+    if (!r) continue;
+    if (r.winner === TIE) {
+      const [i, j] = r.candIdxs as [number, number];
+      W[i]![j]! += 0.5;
+      W[j]![i]! += 0.5;
+      continue;
+    }
+    for (const cIdx of r.candIdxs) {
+      if (cIdx !== r.winner) W[r.winner]![cIdx]! += 1;
+    }
+  }
+  return W;
+}
+
 function perVariantTotals(W: number[][]): {
   wins: number[];
   losses: number[];
@@ -321,13 +375,23 @@ function bootstrapScoreCI(
   const m = comparisons.length;
   const scoreSamples: number[][] = Array.from({ length: n }, () => []);
 
+  // Resolve candidate ids to indices ONCE rather than inside every replicate.
+  // buildWinMatrix does a Map<string, number> lookup per candidate per row, so
+  // re-running it 200x over the same rows was ~3M string-key lookups on a
+  // mid-sized run and dominated the whole computation.
+  //
+  // The array keeps its original length, nulls included, so the resampling
+  // draws the same indices in the same order as before and the output stays
+  // bit-identical — this is a speedup, not a change in behaviour.
+  const resolved = comparisons.map((c) => resolveComparison(c, idx));
+
   for (let b = 0; b < samples; b++) {
-    const resampled: PairwiseComparison[] = new Array(m);
+    const resampled: (ResolvedComparison | null)[] = new Array(m);
     for (let k = 0; k < m; k++) {
       const r = Math.floor(rand() * m);
-      resampled[k] = comparisons[r]!;
+      resampled[k] = resolved[r]!;
     }
-    const Wb = buildWinMatrix(resampled, idx, n);
+    const Wb = buildWinMatrixFromResolved(resampled, n);
     // Smoothing must be decided per replicate, not inherited from the full
     // dataset. A resample routinely contains a variant that happened to win
     // nothing, even when no variant is degenerate overall — and with smooth=0
