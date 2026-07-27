@@ -478,6 +478,14 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       expect(res.status).toBe(401);
     });
 
+    /** @scenario Provider binding routes are gone since the ModelProvider fold */
+    it("returns 410 for the folded provider-binding routes", async () => {
+      const res = await app.request("/api/gateway/v1/providers", {
+        headers: legacyAuth(),
+      });
+      expect(res.status).toBe(410);
+    });
+
     /** @scenario A viewer-scoped API key can list but not create virtual keys */
     it("viewer API key: GET 200, POST 403 at the ceiling", async () => {
       const list = await app.request("/api/gateway/v1/virtual-keys", {
