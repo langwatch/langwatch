@@ -57,6 +57,12 @@ import {
 } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
 import {
+  type CliAccessTokenRecord,
+  type CliClientInfo,
+  cliAccessTokenKey,
+  validateCliAccessToken,
+} from "~/server/auth/cliAccessToken";
+import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
@@ -93,7 +99,6 @@ const POLL_RATE_LIMIT_SECONDS = 4;
 
 const DEVICE_CODE_PREFIX = "lwcli:device:"; // Redis key prefix for device-code records
 const REFRESH_TOKEN_PREFIX = "lwcli:refresh:"; // Redis key prefix for refresh-token records
-const ACCESS_TOKEN_PREFIX = "lwcli:access:"; // Redis key prefix for access-token records
 const POLL_RATE_PREFIX = "lwcli:poll:"; // Redis key prefix for poll-rate-limit window
 
 type DeviceCodeStatus =
@@ -148,45 +153,13 @@ interface DeviceCodeRecord {
   };
 }
 
-/**
- * Phase 8 — device metadata captured at /exchange time so users can
- * see "Bob's MacBook Pro" entries in the /me/devices inventory and
- * revoke them per-device. All fields optional to stay
- * backwards-compatible with older CLI versions that don't send
- * client_info; rendered as "Unknown device" in the UI when missing.
- *
- * Spec: specs/ai-governance/sessions/sessions-inventory.feature
- */
-interface ClientInfo {
-  /** Human label, defaults to platform + hostname. e.g. "Macbook Pro". */
-  device_label?: string;
-  /** os.hostname() output. */
-  hostname?: string;
-  /** os.userInfo().username so we can disambiguate two devs on same Mac. */
-  uname?: string;
-  /** "darwin" / "linux" / "win32" — process.platform. */
-  platform?: string;
-  /** First-issued timestamp; preserved across rotations of this session. */
-  session_started_at?: number;
-}
-
 interface RefreshTokenRecord {
   user_id: string;
   organization_id: string;
   issued_at: number;
   expires_at: number;
   /** Phase 8 — present when the CLI sent client_info on /exchange. */
-  client_info?: ClientInfo;
-}
-
-interface AccessTokenRecord {
-  user_id: string;
-  organization_id: string;
-  issued_at: number;
-  expires_at: number;
-  /** Phase 8 — mirror of refresh-token client_info; useful for the
-   * /me/devices UI which reads access tokens directly. */
-  client_info?: ClientInfo;
+  client_info?: CliClientInfo;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,10 +206,6 @@ function refreshTokenKey(refreshToken: string): string {
   return `${REFRESH_TOKEN_PREFIX}${refreshToken}`;
 }
 
-function accessTokenKey(accessToken: string): string {
-  return `${ACCESS_TOKEN_PREFIX}${accessToken}`;
-}
-
 /**
  * Per-user index of CLI token Redis keys, used by
  * `cliTokenRevocation.service.ts` to revoke every token a deactivated
@@ -252,32 +221,13 @@ function userTokensIndexKey(userId: string): string {
 /**
  * Resolve a Bearer access_token to its (user_id, organization_id) record.
  * Returns null on missing / expired / malformed. Used by every authenticated
- * CLI endpoint (currently /budget/status; future ones use the same helper).
- *
- * Auth contract: Authorization: Bearer lw_at_<base64url>. Anything else,
- * including session cookies, is rejected — these endpoints are CLI-only.
+ * CLI endpoint here, and — through the same shared implementation — by the
+ * mobile ops API, so a revoked token dies on both surfaces at once.
  */
 async function validateAccessToken(
   authHeader: string | null | undefined,
-): Promise<AccessTokenRecord | null> {
-  if (!authHeader) return null;
-  const match = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/.exec(authHeader.trim());
-  if (!match) return null;
-  const token = match[1]!;
-  const redis = getRedis();
-  const raw = await redis.get(accessTokenKey(token));
-  if (!raw) return null;
-  let record: AccessTokenRecord;
-  try {
-    record = JSON.parse(raw) as AccessTokenRecord;
-  } catch {
-    return null;
-  }
-  if (Date.now() > record.expires_at) {
-    await redis.del(accessTokenKey(token));
-    return null;
-  }
-  return record;
+): Promise<CliAccessTokenRecord | null> {
+  return validateCliAccessToken({ authHeader, redis: getRedis() });
 }
 
 function pollRateKey(deviceCode: string): string {
@@ -589,10 +539,10 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // "Bob's MacBook Pro" entries. session_started_at is preserved
     // through future /refresh rotations so the dashboard can show
     // "logged in 5 days ago" rather than the rotation timestamp.
-    const clientInfoStamped: ClientInfo | undefined = parsed.data.client_info
+    const clientInfoStamped: CliClientInfo | undefined = parsed.data.client_info
       ? { ...parsed.data.client_info, session_started_at: now }
       : undefined;
-    const accessRecord: AccessTokenRecord = {
+    const accessRecord: CliAccessTokenRecord = {
       user_id: user.id,
       organization_id: organization.id,
       issued_at: now,
@@ -612,7 +562,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // browser path only reads access; refresh exchange goes back through
     // this same handler if access expires.
     await redis.set(
-      accessTokenKey(accessToken),
+      cliAccessTokenKey(accessToken),
       JSON.stringify(accessRecord),
       "EX",
       ACCESS_TOKEN_TTL_SECONDS,
@@ -629,7 +579,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     const indexKey = userTokensIndexKey(user.id);
     await redis
       .pipeline()
-      .sadd(indexKey, accessTokenKey(accessToken), refreshTokenKey(refreshToken))
+      .sadd(indexKey, cliAccessTokenKey(accessToken), refreshTokenKey(refreshToken))
       .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
       .exec();
 
@@ -771,7 +721,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   // Preserve session_started_at across rotations so /me/devices can
   // accurately show "logged in N days ago" even after many refreshes.
   const carriedClientInfo = record.client_info;
-  const newAccessRecord: AccessTokenRecord = {
+  const newAccessRecord: CliAccessTokenRecord = {
     user_id: record.user_id,
     organization_id: record.organization_id,
     issued_at: now,
@@ -789,7 +739,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   await redis
     .multi()
     .set(
-      accessTokenKey(newAccessToken),
+      cliAccessTokenKey(newAccessToken),
       JSON.stringify(newAccessRecord),
       "EX",
       ACCESS_TOKEN_TTL_SECONDS,
@@ -811,7 +761,7 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
   const indexKey = userTokensIndexKey(record.user_id);
   await redis
     .pipeline()
-    .sadd(indexKey, accessTokenKey(newAccessToken), refreshTokenKey(newRefreshToken))
+    .sadd(indexKey, cliAccessTokenKey(newAccessToken), refreshTokenKey(newRefreshToken))
     .pexpire(indexKey, REFRESH_TOKEN_TTL_SECONDS * 1000)
     .exec();
 
@@ -1864,7 +1814,7 @@ secured.access(CLI_POLICY).post("/logout", async (c: Context) => {
     ops.del(refreshTokenKey(parsed.data.refresh_token));
   }
   if (parsed.data.access_token) {
-    ops.del(accessTokenKey(parsed.data.access_token));
+    ops.del(cliAccessTokenKey(parsed.data.access_token));
   }
   await ops.exec();
   return c.json({ ok: true });
