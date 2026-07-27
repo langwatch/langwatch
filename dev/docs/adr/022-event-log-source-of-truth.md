@@ -194,10 +194,19 @@ For one release the worker still accepts a v1 raw key, so commands queued across
 the deploy resolve; a v1 key whose tenant segment does not match the command's
 authenticated tenant is refused rather than dereferenced.
 
-**Superseded above:** "'No S3 equivalent' means no object storage at all" and
+**The orphan-cleanup window is 3 days, not 24h.** This ADR says 24h in two
+places (the flow sketch and the rules list); the implementation has said 3 days
+since it was written, with the rationale that a weekend incident needs catch-up
+time before orphans are reaped. Three days is the intended value and the only
+one now stated in code. Since `release_trace_blob_offload` has never been
+enabled in a shipped deployment, no lifecycle rule exists yet for this prefix
+anywhere — an operator turning the flag on creates it fresh, so there is no
+deployed rule for the correction to contradict.
+
+**Superseded above:** "'No S3 equivalent' means no object storage at all";
 "deployments with no object storage should leave `release_trace_blob_offload`
-off". Azure Blob and the local filesystem are now first-class spool
-destinations. The fail-open-on-write and read-must-not-degrade rules are
-unchanged.
+off"; and both "24h lifecycle policy" statements. Azure Blob and the local
+filesystem are now first-class spool destinations. The fail-open-on-write and
+read-must-not-degrade rules are unchanged.
 
 <!-- ci-trigger: force workflows to fire on this head -->

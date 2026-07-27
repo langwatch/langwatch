@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
@@ -31,7 +32,7 @@ const defaultSpoolStorage: SpoolStorage = {
  * inside `initializeWebApp` (worker-only import). So the customer detail
  * procedures can't reach the app-layer deps. This factory is the single
  * source of truth for constructing those deps; `presets.ts` consumes it too
- * (passing its own composition-root values) so the `new BlobStore(...)` +
+ * (passing its own composition-root values) so the `new BlobStore({ … })` +
  * `new TraceIOExtractionService()` shape is defined in exactly one place.
  *
  * Construction does NO network I/O: `BlobStore` only stores the resolver
@@ -70,11 +71,14 @@ export function buildTraceBlobResolutionDeps(overrides?: {
     overrides?.clickhouseEnabled ?? defaultClickHouseEnabled();
 
   return {
-    blobStore: new BlobStore(
-      createS3Client,
-      clickhouseEnabled ? resolveClickHouseClient : undefined,
-      defaultSpoolStorage,
-    ),
+    blobStore: new BlobStore({
+      resolveS3Client: createS3Client,
+      resolveClickHouseClient: clickhouseEnabled
+        ? resolveClickHouseClient
+        : undefined,
+      spoolStorage: defaultSpoolStorage,
+      logger: createLogger("langwatch:traces:blob-store"),
+    }),
     ioExtractionService: new TraceIOExtractionService(),
   };
 }

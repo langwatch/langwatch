@@ -5,6 +5,7 @@ import {
   type S3Client,
 } from "@aws-sdk/client-s3";
 import { Ksuid } from "@langwatch/ksuid";
+import type { Logger } from "@langwatch/observability";
 import type { Readable } from "node:stream";
 import { z } from "zod";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
@@ -293,12 +294,30 @@ export class BlobStore {
    *   tests exercise it without infrastructure. When absent, spool writes
    *   throw — `maybeSpool` is fail-open, so ingestion degrades to inline
    *   payloads rather than breaking.
+   * @param logger - Optional; used only to surface a refused cross-tenant
+   *   delete, which `deleteSpool`'s best-effort swallow would otherwise hide.
    */
-  constructor(
-    private readonly resolveS3Client: S3ClientResolver,
-    private readonly resolveClickHouseClient?: ClickHouseClientResolver,
-    private readonly spoolStorage?: SpoolStorage,
-  ) {}
+  private readonly resolveS3Client: S3ClientResolver;
+  private readonly resolveClickHouseClient?: ClickHouseClientResolver;
+  private readonly spoolStorage?: SpoolStorage;
+  private readonly logger?: Logger;
+
+  constructor({
+    resolveS3Client,
+    resolveClickHouseClient,
+    spoolStorage,
+    logger,
+  }: {
+    resolveS3Client: S3ClientResolver;
+    resolveClickHouseClient?: ClickHouseClientResolver;
+    spoolStorage?: SpoolStorage;
+    logger?: Logger;
+  }) {
+    this.resolveS3Client = resolveS3Client;
+    this.resolveClickHouseClient = resolveClickHouseClient;
+    this.spoolStorage = spoolStorage;
+    this.logger = logger;
+  }
 
   /**
    * Re-derives the spool object's URI from server-trusted inputs. Never reads a
@@ -595,7 +614,18 @@ export class BlobStore {
   }): Promise<void> {
     try {
       if (isLegacySpoolRef(spoolRef)) {
-        assertLegacySpoolKeyBelongsTo(spoolRef, projectId);
+        // A refusal here is a tamper indicator, not a storage blip. The
+        // best-effort swallow below is meant for the latter, so log this one
+        // explicitly rather than letting it disappear into the same catch.
+        try {
+          assertLegacySpoolKeyBelongsTo(spoolRef, projectId);
+        } catch {
+          this.logger?.warn(
+            { projectId, traceId, spanId },
+            "Refused a cross-tenant v1 spool delete",
+          );
+          return;
+        }
         const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
         await s3Client.send(
           new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),

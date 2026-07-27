@@ -16,8 +16,10 @@ import {
 } from "@aws-sdk/client-s3";
 import { describe, expect, it, vi } from "vitest";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { StreamTooLargeError } from "~/utils/streamToBuffer";
 import {
   BlobStore,
+  MAX_SPOOL_BYTES,
   SPOOL_REF_V2,
   type S3ClientResolver,
   type SpoolStorage,
@@ -155,11 +157,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
           "writes to the $name destination the deployment resolved",
           async ({ destination, expectedUri }) => {
             const objectStore = fakeObjectStore();
-            const store = new BlobStore(
-              forbiddenS3Resolver,
-              undefined,
-              spoolStorageFor(objectStore, destination),
-            );
+            const store = new BlobStore({
+              resolveS3Client: forbiddenS3Resolver,
+              spoolStorage: spoolStorageFor(objectStore, destination),
+            });
 
             await store.putSpool({
               ...spoolCoords,
@@ -176,11 +177,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
       describe("when putSpool is called", () => {
         it("returns a reference carrying no storage location", async () => {
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            forbiddenS3Resolver,
-            undefined,
-            spoolStorageFor(objectStore, AZURE_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+          });
 
           const spoolRef = await store.putSpool({
             ...spoolCoords,
@@ -194,11 +194,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
 
         it("issues exactly ONE write", async () => {
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            forbiddenS3Resolver,
-            undefined,
-            spoolStorageFor(objectStore, S3_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+          });
 
           await store.putSpool({
             ...spoolCoords,
@@ -214,11 +213,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
       describe("when putSpool is called", () => {
         it("keeps the object under the spool prefix", async () => {
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            forbiddenS3Resolver,
-            undefined,
-            spoolStorageFor(objectStore, S3_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+          });
 
           // Base64-encoded OTLP ids can contain "/", which unescaped would
           // inject extra path segments — or, leading, escape the prefix that
@@ -240,7 +238,7 @@ describe("BlobStore — spool operations (ADR-022)", () => {
     describe("given no spool storage is configured", () => {
       describe("when putSpool is called", () => {
         it("throws rather than falling back to a hardcoded backend", async () => {
-          const store = new BlobStore(forbiddenS3Resolver);
+          const store = new BlobStore({ resolveS3Client: forbiddenS3Resolver });
 
           await expect(
             store.putSpool({
@@ -258,11 +256,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
       describe("when getSpool is called with the command's own coordinates", () => {
         it("returns the exact bytes that were put", async () => {
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            forbiddenS3Resolver,
-            undefined,
-            spoolStorageFor(objectStore, AZURE_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+          });
           const originalBody = Buffer.from("exact span body bytes", "utf-8");
 
           const spoolRef = await store.putSpool({
@@ -280,11 +277,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
       describe("when getSpool is called", () => {
         it("reads the location derived from the command, ignoring the reference", async () => {
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            forbiddenS3Resolver,
-            undefined,
-            spoolStorageFor(objectStore, S3_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+          });
           const victimBytes = Buffer.from("another tenant's payload", "utf-8");
           await store.putSpool({
             projectId: "victim-org",
@@ -320,11 +316,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
             `test-bucket/${victimKey}`,
             Buffer.from("another tenant's payload", "utf-8"),
           );
-          const store = new BlobStore(
-            resolverFor(fake),
-            undefined,
-            spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: resolverFor(fake),
+            spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
+          });
 
           await expect(
             store.getSpool({ spoolRef: victimKey, ...spoolCoords }),
@@ -342,11 +337,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
           fake.objects.set(`test-bucket/${legacyKey}`, legacyBytes);
 
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            resolverFor(fake),
-            undefined,
-            spoolStorageFor(objectStore, AZURE_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: resolverFor(fake),
+            spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+          });
 
           const retrieved = await store.getSpool({
             spoolRef: legacyKey,
@@ -359,15 +353,45 @@ describe("BlobStore — spool operations (ADR-022)", () => {
       });
     });
 
+    describe("given an object larger than the read cap", () => {
+      describe("when getSpool is called", () => {
+        it("rejects instead of buffering it whole", async () => {
+          const objectStore = fakeObjectStore();
+          // Emitted lazily in 1 MB chunks — the cap should trip long before
+          // anything close to MAX_SPOOL_BYTES is actually resident.
+          objectStore.get.mockImplementationOnce(async () =>
+            Readable.from(
+              (function* () {
+                for (
+                  let sent = 0;
+                  sent <= MAX_SPOOL_BYTES;
+                  sent += 1024 * 1024
+                ) {
+                  yield Buffer.alloc(1024 * 1024);
+                }
+              })(),
+            ),
+          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+          });
+
+          await expect(
+            store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords }),
+          ).rejects.toThrow(StreamTooLargeError);
+        });
+      });
+    });
+
     describe("given the object is missing", () => {
       describe("when getSpool is called", () => {
         it("throws rather than returning an empty span", async () => {
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            forbiddenS3Resolver,
-            undefined,
-            spoolStorageFor(objectStore, S3_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+          });
 
           await expect(
             store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords }),
@@ -382,11 +406,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
       describe("when deleteSpool is called", () => {
         it("deletes the object it wrote", async () => {
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            forbiddenS3Resolver,
-            undefined,
-            spoolStorageFor(objectStore, AZURE_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+          });
           const spoolRef = await store.putSpool({
             ...spoolCoords,
             body: Buffer.from("to be deleted", "utf-8"),
@@ -409,11 +432,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
           const legacyKey = "trace-blobs/spool/orgA/trace-1/span-1";
           fake.objects.set(`test-bucket/${legacyKey}`, Buffer.from("old"));
           const objectStore = fakeObjectStore();
-          const store = new BlobStore(
-            resolverFor(fake),
-            undefined,
-            spoolStorageFor(objectStore, AZURE_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: resolverFor(fake),
+            spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
+          });
 
           await store.deleteSpool({ spoolRef: legacyKey, ...spoolCoords });
 
@@ -428,11 +450,10 @@ describe("BlobStore — spool operations (ADR-022)", () => {
         it("does not throw (best-effort — the lifecycle rule is the safety net)", async () => {
           const objectStore = fakeObjectStore();
           objectStore.delete.mockRejectedValueOnce(new Error("AccessDenied"));
-          const store = new BlobStore(
-            forbiddenS3Resolver,
-            undefined,
-            spoolStorageFor(objectStore, S3_DESTINATION),
-          );
+          const store = new BlobStore({
+            resolveS3Client: forbiddenS3Resolver,
+            spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
+          });
 
           await expect(
             store.deleteSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords }),
