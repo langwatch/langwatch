@@ -138,7 +138,7 @@ describe("useShowLangy", () => {
     });
   });
 
-  describe("given the active project has not resolved yet", () => {
+  describe("when the active project has not resolved yet", () => {
     beforeEach(() => {
       context.project = undefined;
       context.demoProjectSlug = undefined;
