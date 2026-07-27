@@ -1,0 +1,386 @@
+/**
+ * @vitest-environment node
+ *
+ * Integration coverage for the /me credentials delivery (real Redis + real
+ * Prisma + real ClickHouse wiring):
+ *
+ *   1. `POST /api/auth/cli/exchange` (device_session) ships the personal
+ *      project (id/slug/name/api_key), ensuring the workspace if the approve
+ *      path skipped it.
+ *   2. `GET /api/auth/cli/personal-project` is the lazy exchange for sessions
+ *      minted before 1., and also ensures the workspace.
+ *   3. The delivered key REALLY authenticates `GET /api/me/usage`, the
+ *      personal-surface read the CLI story hinges on.
+ *   4. `POST /api/auth/cli/project-key` resolves a shared project's existing
+ *      key by slug for headless `langwatch login --project <slug>`, enforcing
+ *      write access and the personal-project ownership rule.
+ *
+ * The browser normally drives /approve behind a NextAuth session; we stub
+ * only that identity (the auth boundary) and let everything else run real.
+ *
+ * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+ * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ */
+import {
+  afterAll,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+
+const ids = vi.hoisted(() => {
+  const s = Math.random().toString(36).slice(2, 10);
+  return {
+    suffix: s,
+    USER_ID: `usr-mecred-${s}`,
+    EMAIL: `mecred-${s}@example.com`,
+    NAME: `MeCred ${s}`,
+  };
+});
+
+// Only the auth identity is stubbed; the DB/governance calls are real.
+vi.mock("~/server/auth", () => ({
+  getServerAuthSession: vi.fn().mockResolvedValue({
+    user: { id: ids.USER_ID, email: ids.EMAIL, name: ids.NAME },
+  }),
+}));
+// Write-permission RBAC has its own coverage (auth-cli-personal-guard); here
+// it is granted by default and denied per-test to exercise the endpoint gate.
+vi.mock("~/server/api/rbac", async (importActual) => {
+  const actual = await importActual<typeof import("~/server/api/rbac")>();
+  return { ...actual, hasProjectPermission: vi.fn().mockResolvedValue(true) };
+});
+
+import { hasProjectPermission } from "~/server/api/rbac";
+import { prisma } from "~/server/db";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { app } from "../auth-cli";
+import { app as meApp } from "../../../app/api/me/[[...route]]/app";
+
+const suffix = ids.suffix;
+const USER_ID = ids.USER_ID;
+const ORG_ID = `org-mecred-${suffix}`;
+const TEAM_ID = `team-mecred-${suffix}`;
+const OTHER_USER_ID = `usr-mecred-other-${suffix}`;
+const OTHER_PTEAM_ID = `pteam-mecred-other-${suffix}`;
+const SHARED_PROJECT_ID = `proj-mecred-shared-${suffix}`;
+const SHARED_PROJECT_SLUG = `mecred-shared-${suffix}`;
+const SHARED_API_KEY = `sk-lw-mecred-shared-${suffix}-${"a".repeat(28)}`;
+const OTHER_PERSONAL_PROJECT_SLUG = `mecred-personal-other-${suffix}`;
+const OTHER_PERSONAL_API_KEY = `sk-lw-mecred-perso-${suffix}-${"b".repeat(28)}`;
+
+interface ExchangeSuccess {
+  kind: string;
+  access_token: string;
+  refresh_token: string;
+  personal_project?: {
+    id: string;
+    slug: string;
+    name: string;
+    api_key: string;
+  };
+}
+
+/** Run the full device flow: mint, approve (stubbed browser session), exchange. */
+async function runDeviceFlow(): Promise<ExchangeSuccess> {
+  const dcRes = await app.request("/api/auth/cli/device-code", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ credential_type: "device_session" }),
+  });
+  const dc = (await dcRes.json()) as {
+    device_code: string;
+    user_code: string;
+  };
+  const approveRes = await app.request("/api/auth/cli/approve", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      user_code: dc.user_code,
+      organization_id: ORG_ID,
+    }),
+  });
+  expect(approveRes.status).toBe(200);
+  const exchangeRes = await app.request("/api/auth/cli/exchange", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ device_code: dc.device_code }),
+  });
+  expect(exchangeRes.status).toBe(200);
+  return (await exchangeRes.json()) as ExchangeSuccess;
+}
+
+async function projectKey(
+  accessToken: string,
+  slug: string,
+): Promise<{ status: number; json: Record<string, unknown> }> {
+  const res = await app.request("/api/auth/cli/project-key", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ slug }),
+  });
+  return { status: res.status, json: (await res.json()) as Record<string, unknown> };
+}
+
+describe("/me credentials delivery over the CLI auth surface", () => {
+  let exchange: ExchangeSuccess;
+
+  beforeAll(async () => {
+    await startTestContainers();
+    await prisma.organization.create({
+      data: { id: ORG_ID, name: `MeCred Org ${suffix}`, slug: `mecred-${suffix}` },
+    });
+    await prisma.user.create({
+      data: { id: USER_ID, email: ids.EMAIL, name: ids.NAME },
+    });
+    await prisma.organizationUser.create({
+      data: { userId: USER_ID, organizationId: ORG_ID, role: "ADMIN" },
+    });
+    await prisma.team.create({
+      data: {
+        id: TEAM_ID,
+        name: `MeCred Team ${suffix}`,
+        slug: `mecred-team-${suffix}`,
+        organizationId: ORG_ID,
+      },
+    });
+    await prisma.teamUser.create({
+      data: { userId: USER_ID, teamId: TEAM_ID, role: "ADMIN" },
+    });
+    await prisma.project.create({
+      data: {
+        id: SHARED_PROJECT_ID,
+        name: `MeCred Shared ${suffix}`,
+        slug: SHARED_PROJECT_SLUG,
+        apiKey: SHARED_API_KEY,
+        teamId: TEAM_ID,
+        language: "typescript",
+        framework: "openai",
+        isPersonal: false,
+      },
+    });
+    // Another member's personal workspace: never resolvable by this caller.
+    await prisma.user.create({
+      data: {
+        id: OTHER_USER_ID,
+        email: `mecred-other-${suffix}@example.com`,
+        name: `MeCred Other ${suffix}`,
+      },
+    });
+    await prisma.organizationUser.create({
+      data: { userId: OTHER_USER_ID, organizationId: ORG_ID, role: "MEMBER" },
+    });
+    await prisma.team.create({
+      data: {
+        id: OTHER_PTEAM_ID,
+        name: `MeCred Personal Other ${suffix}`,
+        slug: `mecred-pteam-other-${suffix}`,
+        organizationId: ORG_ID,
+        isPersonal: true,
+        ownerUserId: OTHER_USER_ID,
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: `proj-mecred-perso-${suffix}`,
+        name: `Their Workspace ${suffix}`,
+        slug: OTHER_PERSONAL_PROJECT_SLUG,
+        apiKey: OTHER_PERSONAL_API_KEY,
+        teamId: OTHER_PTEAM_ID,
+        language: "typescript",
+        framework: "openai",
+        isPersonal: true,
+        ownerUserId: OTHER_USER_ID,
+      },
+    });
+
+    // The whole suite hangs off one real device flow, like one real login.
+    exchange = await runDeviceFlow();
+  }, 120_000);
+
+  afterAll(async () => {
+    await prisma.virtualKey
+      .deleteMany({ where: { principalUserId: { in: [USER_ID, OTHER_USER_ID] } } })
+      .catch(() => {});
+    const personalTeams = await prisma.team.findMany({
+      where: { organizationId: ORG_ID },
+      select: { id: true },
+    });
+    const teamIds = personalTeams.map((t) => t.id);
+    await prisma.roleBinding
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => {});
+    await prisma.project
+      .deleteMany({ where: { teamId: { in: teamIds } } })
+      .catch(() => {});
+    await prisma.teamUser
+      .deleteMany({ where: { teamId: { in: teamIds } } })
+      .catch(() => {});
+    await prisma.team
+      .deleteMany({ where: { id: { in: teamIds } } })
+      .catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => {});
+    await prisma.user
+      .deleteMany({ where: { id: { in: [USER_ID, OTHER_USER_ID] } } })
+      .catch(() => {});
+    await prisma.organization
+      .deleteMany({ where: { id: ORG_ID } })
+      .catch(() => {});
+    await stopTestContainers().catch(() => {});
+  });
+
+  describe("given a completed device-session exchange", () => {
+    /** @scenario device-login exchange delivers the personal project key and the CLI stores it */
+    it("ships the personal project with a real api_key", async () => {
+      expect(exchange.kind).toBe("device_session");
+      expect(exchange.personal_project).toBeDefined();
+      expect(exchange.personal_project!.api_key).toMatch(/^pkey_/);
+      expect(exchange.personal_project!.slug).toContain("personal-");
+
+      const project = await prisma.project.findUnique({
+        where: { id: exchange.personal_project!.id },
+        select: { isPersonal: true, ownerUserId: true, apiKey: true },
+      });
+      expect(project?.isPersonal).toBe(true);
+      expect(project?.ownerUserId).toBe(USER_ID);
+      expect(project?.apiKey).toBe(exchange.personal_project!.api_key);
+    });
+
+    /** @scenario the delivered personal key authenticates /api/me/usage */
+    it("authenticates GET /api/me/usage with the delivered key", async () => {
+      const res = await meApp.request("/api/me/usage", {
+        headers: {
+          Authorization: `Bearer ${exchange.personal_project!.api_key}`,
+          "X-Project-Id": exchange.personal_project!.id,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { summary?: unknown };
+      expect(body.summary).toBeDefined();
+    });
+
+    it("identifies the key's project on GET /api/me/project (the notice's name source)", async () => {
+      const res = await meApp.request("/api/me/project", {
+        headers: {
+          Authorization: `Bearer ${exchange.personal_project!.api_key}`,
+          "X-Project-Id": exchange.personal_project!.id,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        id: string;
+        name: string;
+        isPersonal: boolean;
+      };
+      expect(body.id).toBe(exchange.personal_project!.id);
+      expect(body.isPersonal).toBe(true);
+      expect(body.name).toBe(exchange.personal_project!.name);
+    });
+  });
+
+  describe("given the lazy personal-project exchange", () => {
+    /** @scenario a session created before this change lazily exchanges once and rewrites the session file */
+    /** @scenario GET /api/auth/cli/personal-project ensures the personal workspace */
+    it("returns the same personal project for a valid bearer, idempotently", async () => {
+      const res = await app.request("/api/auth/cli/personal-project", {
+        headers: { authorization: `Bearer ${exchange.access_token}` },
+      });
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        project: { id: string; api_key: string };
+      };
+      // ensure() is idempotent: the lazy exchange resolves the SAME workspace
+      // the login exchange created, never a duplicate.
+      expect(body.project.id).toBe(exchange.personal_project!.id);
+      expect(body.project.api_key).toBe(exchange.personal_project!.api_key);
+    });
+
+    it("rejects a missing or garbage bearer", async () => {
+      const res = await app.request("/api/auth/cli/personal-project", {
+        headers: { authorization: "Bearer lw_at_garbage" },
+      });
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe("given POST /api/auth/cli/project-key (headless --project <slug>)", () => {
+    /** @scenario `langwatch login --project <slug>` resolves the key through the device session, no browser */
+    it("returns the shared project's existing key by slug", async () => {
+      const { status, json } = await projectKey(
+        exchange.access_token,
+        SHARED_PROJECT_SLUG,
+      );
+
+      expect(status).toBe(200);
+      expect(json.api_key).toBe(SHARED_API_KEY);
+      expect((json.project as { id: string }).id).toBe(SHARED_PROJECT_ID);
+    });
+
+    /** @scenario the project-key endpoint enforces write access and refuses personal projects of others */
+    /** @scenario the server still refuses a personal project that is not the caller's own */
+    it("refuses another user's personal project outright", async () => {
+      const { status, json } = await projectKey(
+        exchange.access_token,
+        OTHER_PERSONAL_PROJECT_SLUG,
+      );
+
+      expect(status).toBe(400);
+      expect(json.error).toBe("personal_project_not_allowed");
+      expect(JSON.stringify(json)).not.toContain(OTHER_PERSONAL_API_KEY);
+    });
+
+    it("returns the caller's own personal project by slug", async () => {
+      const { status, json } = await projectKey(
+        exchange.access_token,
+        exchange.personal_project!.slug,
+      );
+
+      expect(status).toBe(200);
+      expect(json.api_key).toBe(exchange.personal_project!.api_key);
+    });
+
+    it("denies a project the caller cannot write, without leaking the key", async () => {
+      vi.mocked(hasProjectPermission).mockResolvedValueOnce(false);
+
+      const { status, json } = await projectKey(
+        exchange.access_token,
+        SHARED_PROJECT_SLUG,
+      );
+
+      expect(status).toBe(403);
+      expect(JSON.stringify(json)).not.toContain(SHARED_API_KEY);
+    });
+
+    it("404s an unknown slug with an error envelope the CLI can distinguish", async () => {
+      const { status, json } = await projectKey(
+        exchange.access_token,
+        `mecred-nope-${suffix}`,
+      );
+
+      expect(status).toBe(404);
+      expect(json.error).toBe("not_found");
+    });
+
+    it("rejects a missing bearer", async () => {
+      const res = await app.request("/api/auth/cli/project-key", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug: SHARED_PROJECT_SLUG }),
+      });
+      expect(res.status).toBe(401);
+    });
+  });
+});
