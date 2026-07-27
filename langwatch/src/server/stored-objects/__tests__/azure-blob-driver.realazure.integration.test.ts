@@ -123,6 +123,13 @@ describeRealAzure("AzureBlobDriver against real Azure Blob Storage (host-style a
 
       expect(await driver.exists(uri)).toBe(true);
       expect(await driver.head(uri)).toBe(0);
+
+      // The name promises a read, so actually perform one: a signed GET of a
+      // zero-length blob is its own case, not implied by exists() or head().
+      const stream = await driver.get(uri);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) chunks.push(chunk as Buffer);
+      expect(Buffer.concat(chunks)).toHaveLength(0);
     });
   });
 

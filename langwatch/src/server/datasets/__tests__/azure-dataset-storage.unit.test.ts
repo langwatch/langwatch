@@ -56,6 +56,7 @@ beforeEach(() => {
   driverGet.mockReset();
   driverPut.mockReset();
   driverDelete.mockReset();
+  driverHead.mockReset();
   driverExists.mockReset();
   driverConstructorCalls.length = 0;
 });

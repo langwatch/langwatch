@@ -108,6 +108,10 @@ describe("TieredBlobStore", () => {
   });
 
   describe("given a payload over the S3 threshold and an azure destination", () => {
+    /**
+     * Covers the groupQueue-blob-store HALF of this scenario; the
+     * defaultMintStorageUri half lives in stored-objects.service.unit.test.ts.
+     */
     /** @scenario "defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination" */
     it("mints an azure-blob uri under the durable tier and round-trips the bytes", async () => {
       const redisBlobs = new InMemoryJobBlobStore();

@@ -595,6 +595,11 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
   });
 
   describe("when STORED_OBJECTS_BACKEND=azure is configured with a complete Azure config", () => {
+    /**
+     * Covers the defaultMintStorageUri HALF of this scenario. The groupQueue
+     * blob store half is bound separately in tieredBlobStore.unit.test.ts —
+     * together they satisfy it; neither test covers both on its own.
+     */
     /** @scenario "defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination" */
     it("mints an azure-blob:// URI via defaultMintStorageUri", async () => {
       vi.mocked(dataplaneS3.getS3ConfigForProject).mockResolvedValueOnce(null);

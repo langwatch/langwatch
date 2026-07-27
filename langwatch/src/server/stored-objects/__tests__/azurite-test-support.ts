@@ -37,7 +37,10 @@ export type StartedAzurite = {
  */
 export async function startAzurite(): Promise<StartedAzurite> {
   const container = await new GenericContainer(
-    "mcr.microsoft.com/azure-storage/azurite:latest",
+    // Pinned deliberately: these suites assert on SharedKey signing behaviour,
+    // so a floating tag would let an emulator update turn a green suite red (or
+    // worse, hide a regression) with no commit to blame.
+    "mcr.microsoft.com/azure-storage/azurite:3.36.0",
   )
     .withExposedPorts(AZURITE_BLOB_PORT)
     .withCommand([

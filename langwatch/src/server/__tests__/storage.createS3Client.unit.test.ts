@@ -18,7 +18,7 @@
  * deeply, because the shape is the contract — the SDK does the actual
  * resolution from there.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { createS3Client } from "../storage";
 
 const s3ClientConstructorCalls: any[] = [];
@@ -263,10 +263,12 @@ describe("given the resolved destination is azure", () => {
     return createS3ClientFresh;
   }
 
-  function unmockAzureDestination() {
+  // afterEach, not a call at the tail of each test: an assertion that throws
+  // would skip the inline version and leak the module mock into the next test.
+  afterEach(() => {
     vi.doUnmock("../stored-objects/project-storage-destination");
     vi.doUnmock("../dataplane-s3");
-  }
+  });
 
   describe("when no S3_BUCKET_NAME is configured (azure-only install)", () => {
     /** @scenario "The legacy S3 client factory refuses an azure destination instead of inventing a bucket" */
@@ -278,7 +280,6 @@ describe("given the resolved destination is azure", () => {
       );
       expect(s3ClientConstructorCalls).toHaveLength(0);
 
-      unmockAzureDestination();
     });
   });
 
@@ -299,7 +300,6 @@ describe("given the resolved destination is azure", () => {
       // The hardcoded "langwatch" fallback is still never invented for azure.
       expect(s3Bucket).not.toBe("langwatch");
 
-      unmockAzureDestination();
     });
   });
 });

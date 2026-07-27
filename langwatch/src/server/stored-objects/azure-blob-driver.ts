@@ -395,8 +395,18 @@ export class AzureBlobDriver implements StorageDriver {
         `Azure Blob HEAD failed for ${redactStorageUri(uri)}: ${response.status} ${response.statusText}`,
       );
     }
-    const contentLength = Number(response.headers.get("content-length"));
-    if (!Number.isFinite(contentLength) || contentLength < 0) {
+    // An ABSENT header must not read as size 0: Number(null) is 0, which is
+    // finite and non-negative, so the guard below would pass it through. The
+    // staged-upload size cap depends on this value, so a silent 0 would wave
+    // an unbounded upload past the check.
+    const rawContentLength = response.headers.get("content-length");
+    const contentLength = Number(rawContentLength);
+    if (
+      rawContentLength === null ||
+      rawContentLength.trim() === "" ||
+      !Number.isFinite(contentLength) ||
+      contentLength < 0
+    ) {
       throw new Error(
         `Azure Blob HEAD returned no usable Content-Length for ${redactStorageUri(uri)}`,
       );

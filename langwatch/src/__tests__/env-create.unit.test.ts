@@ -226,10 +226,12 @@ describe("storedObjectsBackendSchema", () => {
       // Both keys must be first-class env vars: declared in the zod server
       // schema AND wired through runtimeEnv — otherwise application code
       // would have to reach into process.env directly, which the repo bans.
-      const schemaHits = source.match(/STORED_OBJECTS_BACKEND/g) ?? [];
-      const containerHits = source.match(/AZURE_BLOB_CONTAINER/g) ?? [];
-      expect(schemaHits.length).toBeGreaterThanOrEqual(2);
-      expect(containerHits.length).toBeGreaterThanOrEqual(2);
+      // Assert the two DECLARATIONS, not how many times the name appears —
+      // a comment mentioning the variable twice would satisfy a count.
+      expect(source).toMatch(
+        /STORED_OBJECTS_BACKEND:\s*storedObjectsBackendSchema/,
+      );
+      expect(source).toMatch(/AZURE_BLOB_CONTAINER:\s*z\s*\n?\s*\.string\(\)|AZURE_BLOB_CONTAINER:\s*z\.string\(\)/);
       expect(source).toMatch(
         /STORED_OBJECTS_BACKEND:\s*process\.env\.STORED_OBJECTS_BACKEND/,
       );

@@ -235,6 +235,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* Validate dataset storage secrets */}}
 {{- if .Values.app.dataplane.enabled }}
+  {{/* A provider name outside this set silently configures NOTHING: no
+       credentials are emitted, no validation runs, and the app falls through
+       to whatever STORED_OBJECTS_BACKEND says — so a typo would look like a
+       working install until the first write. Reject it here instead. */}}
+  {{- if not (has .Values.app.dataplane.provider (list "awsS3" "azureBlob")) }}
+    {{- $errors = append $errors (printf "app.dataplane.provider is %q — must be one of awsS3, azureBlob" .Values.app.dataplane.provider) }}
+  {{- end }}
   {{- if eq .Values.app.dataplane.provider "awsS3" }}
     {{- if .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.name }}
       {{- if empty .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.key }}
