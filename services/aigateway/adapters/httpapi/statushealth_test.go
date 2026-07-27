@@ -59,25 +59,37 @@ func (p *statusPinger) Health(context.Context) error {
 }
 
 // healthyMonitor returns a monitor that is healthy because a probe really
-// succeeded, not because it was just constructed. Fresh construction also
-// reads healthy (the boot grace window), but using that as the healthy
-// fixture would mean these tests never exercise a successful probe and
-// would keep passing if probing broke entirely.
+// succeeded, not because it was just constructed.
+//
+// Construction seeds lastSuccess with "now" for the boot grace window, so
+// a freshly built monitor reads healthy whether or not anything answered.
+// Waiting for a probe to be attempted is not enough either: the verdict
+// would still be sitting on that seed. This starts from a deliberately
+// stale seed, asserts the monitor is unhealthy first, and then waits for
+// it to flip. Only a probe that returned nil can do that, so if Health
+// started failing this helper fails rather than handing out a monitor
+// that is healthy for the wrong reason.
 func healthyMonitor(t *testing.T) *statusprobe.Monitor {
 	t.Helper()
-	pinger := &statusPinger{}
-	mon := statusprobe.New(statusprobe.Options{Pinger: pinger, Interval: time.Millisecond})
+	clock := &statusClock{t: time.Unix(1_700_000_000, 0)}
+	mon := statusprobe.New(statusprobe.Options{
+		Pinger:   &statusPinger{},
+		Now:      clock.Now,
+		Interval: time.Millisecond,
+	})
 	t.Cleanup(mon.Stop)
+
+	clock.Advance(statusprobe.DefaultUnhealthyAfter + time.Minute)
+	ok, _ := mon.ControlPlane()
+	require.False(t, ok, "the construction-time seed must be stale before probing starts")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	mon.Start(ctx)
 	require.Eventually(t, func() bool {
-		return pinger.calls.Load() >= 1
-	}, 2*time.Second, time.Millisecond, "the monitor should have completed a probe")
-
-	ok, _ := mon.ControlPlane()
-	require.True(t, ok, "a successful probe must read healthy")
+		ok, _ := mon.ControlPlane()
+		return ok
+	}, 2*time.Second, time.Millisecond, "a successful probe must move the verdict to healthy")
 	return mon
 }
 
