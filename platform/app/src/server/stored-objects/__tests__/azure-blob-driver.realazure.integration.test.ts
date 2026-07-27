@@ -128,7 +128,6 @@ describeRealAzure(
         expect(await driver.head(uri)).toBe(bytes.length);
       });
     });
-<<<<<<< HEAD
 
     describe("given a zero-byte body", () => {
       /**
