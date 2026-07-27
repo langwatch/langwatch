@@ -99,7 +99,15 @@ function assertHttpsEndpoint(endpointBaseUrl: string | undefined): void {
     return;
   }
   if (url.protocol === "https:") return;
-  if (process.env[ALLOW_INSECURE_TOKEN_ENDPOINT_ENV] === "1") return;
+  // Enforced in code, not by the comment on the constant: the escape hatch is
+  // refused outright in production, so setting it on a real deployment cannot
+  // put a bearer token on the wire in plaintext no matter who sets it.
+  if (
+    process.env[ALLOW_INSECURE_TOKEN_ENDPOINT_ENV] === "1" &&
+    process.env.NODE_ENV !== "production"
+  ) {
+    return;
+  }
 
   throw new AzureBackendMisconfiguredError(
     `AZURE_BLOB_ENDPOINT ("${endpointBaseUrl}") must use https in a token-based ` +

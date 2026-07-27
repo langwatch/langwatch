@@ -9,7 +9,10 @@
  * Call once per request — construction is lightweight; drivers are stateless.
  */
 import { AzureBlobDriver } from "./azure-blob-driver";
-import { resolveAzureCredentials } from "./azure-credentials";
+import {
+  AzureBackendMisconfiguredError,
+  resolveAzureCredentials,
+} from "./azure-credentials";
 import { LocalFilesystemDriver } from "./local-filesystem-driver";
 import { S3Driver } from "./s3-driver";
 import { StorageRegistry } from "./storage-registry";
@@ -42,12 +45,14 @@ export function maybeAzureDriver(): AzureBlobDriver | undefined {
     // azure-blob:// URI behind "unregistered scheme". A driver being
     // available to READ is not symmetric with Azure being chosen for WRITES.
     return new AzureBlobDriver(resolveAzureCredentials({ purpose: "read" }));
-  } catch {
-    // Misconfigured Azure (missing var, contradictory mode, etc.) — the
-    // destination resolver raises the SAME error at write time with the
-    // same actionable message; registration here silently declines rather
-    // than crashing every request that never touches storage.
-    return undefined;
+  } catch (error: unknown) {
+    // Only a KNOWN misconfiguration declines quietly: the destination
+    // resolver raises the same error at write time with the same actionable
+    // message, so failing here too would crash every request that never
+    // touches storage. Anything else is a bug in our own code, and a bare
+    // catch would bury it as "Azure just isn't configured" forever.
+    if (error instanceof AzureBackendMisconfiguredError) return undefined;
+    throw error;
   }
 }
 

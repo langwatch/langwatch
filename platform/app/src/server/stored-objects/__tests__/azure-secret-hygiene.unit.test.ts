@@ -119,6 +119,22 @@ describe("redactAuthorizationMaterial() against the wire formats the identity en
     });
   });
 
+  describe("given a JSON token response that a log pipeline will re-parse", () => {
+    /** @scenario "Authorization material never reaches logs, errors, or traces" */
+    it("leaves the JSON valid after redacting, not just token-free", () => {
+      const redacted = redactAuthorizationMaterial(
+        `{"token_type":"Bearer","expires_in":3599,"access_token":"${LEAKED_TOKEN}"}`,
+      );
+
+      expect(redacted).not.toContain(LEAKED_TOKEN);
+      // Redacting by eating the key's closing quote hides the token and
+      // corrupts the record — anything downstream that parses the log then
+      // fails on a line that looks fine to a human.
+      expect(() => JSON.parse(redacted)).not.toThrow();
+      expect(JSON.parse(redacted).access_token).toBe("***");
+    });
+  });
+
   describe("given a form-encoded exchange request echoed back", () => {
     /** @scenario "Authorization material never reaches logs, errors, or traces" */
     it("removes the client assertion", () => {
@@ -189,6 +205,9 @@ describe("AzureBlobDriver error paths", () => {
       const message = String(error?.message);
       expect(message).not.toContain("c2lnbmF0dXJlLWhlcmU");
       expect(message).not.toContain(KEY);
+      // The name promises the account name is gone too — assert it rather
+      // than leaving that third of the claim untested.
+      expect(message).not.toContain(ACCOUNT);
       expect(message).not.toContain("signature over PUT");
       // Still useful to an operator: the failure and its status survive.
       expect(message).toContain("403");

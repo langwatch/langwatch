@@ -12,7 +12,7 @@
  * driver was registered to serve it, a write outage. Both now call the same
  * `resolveAzureCredentials()`, so this must never happen again.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockEnv } = vi.hoisted(() => ({
   mockEnv: {} as Record<string, string | undefined>,
@@ -62,31 +62,41 @@ vi.mock("~/server/dataplane-s3", () => ({
 import { maybeAzureDriver } from "../stored-objects-factory";
 import { resolveProjectStorageDestination } from "../project-storage-destination";
 
+function clearInjectedWorkloadIdentityEnv() {
+  delete process.env.AZURE_CLIENT_ID;
+  delete process.env.AZURE_TENANT_ID;
+  delete process.env.AZURE_FEDERATED_TOKEN_FILE;
+}
+
 function resetEnv() {
   for (const key of Object.keys(mockEnv)) delete mockEnv[key];
 }
 
-async function azureIsUsable(): Promise<{
-  destinationIsAzure: boolean;
-  driverRegistered: boolean;
+async function evaluateAzureUsability(): Promise<{
+  isDestinationAzure: boolean;
+  isDriverRegistered: boolean;
 }> {
-  let destinationIsAzure = false;
+  let isDestinationAzure = false;
   try {
     const destination = await resolveProjectStorageDestination("proj-1");
-    destinationIsAzure = destination.kind === "azure";
+    isDestinationAzure = destination.kind === "azure";
   } catch {
-    destinationIsAzure = false;
+    isDestinationAzure = false;
   }
-  const driverRegistered = maybeAzureDriver() !== undefined;
-  return { destinationIsAzure, driverRegistered };
+  const isDriverRegistered = maybeAzureDriver() !== undefined;
+  return { isDestinationAzure, isDriverRegistered };
 }
 
 describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
   beforeEach(() => {
     resetEnv();
-    delete process.env.AZURE_CLIENT_ID;
-    delete process.env.AZURE_TENANT_ID;
-    delete process.env.AZURE_FEDERATED_TOKEN_FILE;
+    clearInjectedWorkloadIdentityEnv();
+  });
+
+  // These are real process.env values, not the mocked module env, so leaving
+  // them set after the last test bleeds into any suite sharing this worker.
+  afterEach(() => {
+    clearInjectedWorkloadIdentityEnv();
   });
 
   describe.each([
@@ -150,12 +160,13 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       it(`reports azure as usable=${String(expectedUsable)} identically for both the destination resolver and the driver registration`, async () => {
         Object.assign(mockEnv, env);
 
-        const { destinationIsAzure, driverRegistered } = await azureIsUsable();
+        const { isDestinationAzure, isDriverRegistered } =
+        await evaluateAzureUsability();
 
-        expect(destinationIsAzure).toBe(expectedUsable);
-        expect(driverRegistered).toBe(expectedUsable);
+        expect(isDestinationAzure).toBe(expectedUsable);
+        expect(isDriverRegistered).toBe(expectedUsable);
         // The invariant itself: never one true and the other false.
-        expect(destinationIsAzure).toBe(driverRegistered);
+        expect(isDestinationAzure).toBe(isDriverRegistered);
       });
     },
   );
@@ -171,10 +182,11 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       process.env.AZURE_TENANT_ID = "tenant-id";
       process.env.AZURE_FEDERATED_TOKEN_FILE = "/var/run/secrets/azure/tokens/azure-identity-token";
 
-      const { destinationIsAzure, driverRegistered } = await azureIsUsable();
+      const { isDestinationAzure, isDriverRegistered } =
+        await evaluateAzureUsability();
 
-      expect(destinationIsAzure).toBe(true);
-      expect(driverRegistered).toBe(true);
+      expect(isDestinationAzure).toBe(true);
+      expect(isDriverRegistered).toBe(true);
     });
   });
 
@@ -188,10 +200,11 @@ describe("maybeAzureDriver / resolveProjectStorageDestination parity", () => {
       // AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_FEDERATED_TOKEN_FILE
       // deliberately left unset.
 
-      const { destinationIsAzure, driverRegistered } = await azureIsUsable();
+      const { isDestinationAzure, isDriverRegistered } =
+        await evaluateAzureUsability();
 
-      expect(destinationIsAzure).toBe(false);
-      expect(driverRegistered).toBe(false);
+      expect(isDestinationAzure).toBe(false);
+      expect(isDriverRegistered).toBe(false);
     });
   });
 });
