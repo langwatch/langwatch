@@ -485,6 +485,54 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(bundle.providers_allowed).toBeNull();
     });
 
+    /** @scenario "A department budget gives each member their own allowance" */
+    it("ships the member's own bucket spend, not the department total", async () => {
+      const ch = getTestClickHouseClient();
+      expect(ch).not.toBeNull();
+      const chRepo = new GatewayBudgetClickHouseRepository(
+        async () => ch as ClickHouseClient,
+      );
+
+      // Two members spend against the same GROUP budget row, each in their
+      // own bucket.
+      const debit = (member: string, amountUsd: string) => ({
+        tenantId: PROJECT_ID,
+        budgetId: BUDGET_GROUP_ID,
+        scope: "GROUP" as const,
+        scopeId: `${GROUP_ID}:${member}`,
+        window: "MONTH" as const,
+        virtualKeyId: VK_PERSONAL_ID,
+        providerKey: null,
+        gatewayRequestId: `req-${suffix}-grp-${member}`,
+        amountUsd,
+        tokensInput: 10,
+        tokensOutput: 5,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        model: "gpt-5-mini",
+        status: "SUCCESS" as const,
+        occurredAt: new Date(),
+      });
+      // One insert per request: the repository enforces one
+      // gateway_request_id per debit burst.
+      await chRepo.insertDebit([debit(USER_ID, "10.0000")]);
+      await chRepo.insertDebit([debit(OTHER_USER_ID, "30.0000")]);
+
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
+      const bundle = await new GatewayConfigMaterialiser(
+        prisma,
+        chRepo,
+      ).materialise(vk!);
+
+      const groupBudget = bundle.budgets.find((b) => b.id === BUDGET_GROUP_ID);
+      // The gateway enforces spent >= limit on exactly this bucket. Reading
+      // the raw budget row here would prefix-sum every member and cap this
+      // member at what the whole department spent together — the shared pot
+      // the per-member design exists to rule out.
+      expect(groupBudget?.spent_micro_usd).toBe(10_000_000);
+    });
+
     /** @scenario "A key with no fallback is dispatched at most once" */
     /** @scenario "A key with no fallback attempts one provider and stops" */
     it("pins max_attempts to 1 when routing mode is NONE", async () => {

@@ -210,10 +210,7 @@ export class GatewayConfigMaterialiser {
     );
     const traceProject = await resolveTraceProject(this.prisma, vk);
     const budgets = await this.applicableBudgets(vk, traceProject);
-    const spendByBudgetId = await this.loadCurrentSpend(
-      vk,
-      budgets.map((b) => b.budget),
-    );
+    const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
     // An explicit allowlist narrows what the key can reach; absence means
@@ -359,7 +356,7 @@ export class GatewayConfigMaterialiser {
    */
   private async loadCurrentSpend(
     vk: VirtualKey,
-    budgets: GatewayBudget[],
+    budgets: ResolvedBudget[],
   ): Promise<Map<string, string>> {
     if (this.chRepo === null || budgets.length === 0) {
       return new Map();
@@ -371,9 +368,20 @@ export class GatewayConfigMaterialiser {
       });
       const tenantIds = orgProjects.map((p) => p.id);
       if (tenantIds.length === 0) return new Map();
+      // Read each budget's spend from its RESOLVED bucket, exactly. The
+      // bundle enforces this key's buckets, so the figure must be the
+      // bucket's own: a GROUP budget read from the raw row would prefix-sum
+      // every member's bucket, and the gateway would then cap each member
+      // at what the whole department spent together.
       const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
         tenantIds,
-        budgets,
+        budgets.map((r) => ({
+          budgetId: r.budget.id,
+          scope: r.budget.scopeType,
+          scopeId: r.bucketScopeId,
+          window: r.budget.window,
+          match: "exact" as const,
+        })),
       );
       const out = new Map<string, string>();
       for (const s of spends) {
