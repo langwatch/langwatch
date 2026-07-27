@@ -115,6 +115,35 @@ func TestMonitor_RecoversAfterSuccessfulProbe(t *testing.T) {
 	}, 2*time.Second, 5*time.Millisecond, "verdict should recover after a successful probe")
 }
 
+// @scenario "health response carries no tenant data or internal endpoints"
+// Monitor-level half of the scenario, against a probe that really failed:
+// the transport error a dead control plane produces embeds its host and
+// port, and that string must not reach the public detail. Asserted here
+// rather than only on a monitor that never probed, since a detail built
+// from the error would otherwise look clean in every test.
+func TestMonitor_PublicDetailNeverCarriesTheProbeError(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(1_700_000_000, 0)}
+	pinger := &countingPinger{}
+	pinger.fail.Store(true)
+
+	m := New(Options{Pinger: pinger, Now: clock.Now, Interval: time.Millisecond})
+	t.Cleanup(m.Stop)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	m.Start(ctx)
+
+	require.Eventually(t, func() bool {
+		return pinger.calls.Load() >= 2
+	}, 2*time.Second, time.Millisecond, "the loop should have observed real failures")
+	clock.Advance(DefaultUnhealthyAfter + time.Minute)
+
+	ok, detail := m.ControlPlane()
+	require.False(t, ok)
+	for _, leak := range []string{"dial", "tcp", "10.0.0.1", "5560", "connection refused"} {
+		assert.NotContains(t, detail, leak, "probe error internals must stay out of the public body")
+	}
+}
+
 // The loop probes on its own clock and Stop halts it. The endpoint's
 // no-fan-out property depends on the ticker being the only probe driver.
 func TestMonitor_ProbesOnItsOwnClockAndStops(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -41,13 +42,18 @@ func (c *statusClock) Advance(d time.Duration) {
 }
 
 // statusPinger counts control-plane probes so tests can prove none were
-// triggered by public polls.
+// triggered by public polls, and can fail with the shape of error a dead
+// control plane really produces, host and port included.
 type statusPinger struct {
 	calls atomic.Int64
+	fail  atomic.Bool
 }
 
 func (p *statusPinger) Health(context.Context) error {
 	p.calls.Add(1)
+	if p.fail.Load() {
+		return errors.New("dial tcp 10.0.0.1:5560: connection refused")
+	}
 	return nil
 }
 
@@ -180,7 +186,21 @@ func TestHealthEndpoint_ControlPlaneOutageFlips503(t *testing.T) {
 // the control plane's URL to leak.
 func TestHealthEndpoint_BodyIsPublicSafe(t *testing.T) {
 	clock := &statusClock{t: time.Unix(1_700_000_000, 0)}
-	mon := statusprobe.New(statusprobe.Options{Now: clock.Now})
+	// A monitor whose probes really fail, so the degraded body is produced
+	// downstream of an actual transport error rather than of a monitor that
+	// never dialed anything: an implementation that formatted the error
+	// into the detail would look clean against a monitor with no pinger.
+	pinger := &statusPinger{}
+	pinger.fail.Store(true)
+	mon := statusprobe.New(statusprobe.Options{Pinger: pinger, Now: clock.Now, Interval: time.Millisecond})
+	t.Cleanup(mon.Stop)
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	mon.Start(ctx)
+	require.Eventually(t, func() bool {
+		return pinger.calls.Load() >= 2
+	}, 2*time.Second, time.Millisecond, "the monitor should have observed real failures")
+
 	router := buildRouterWithStatus(mon)
 
 	assertPublicSafe := func(t *testing.T) {
