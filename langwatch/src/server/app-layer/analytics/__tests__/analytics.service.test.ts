@@ -153,18 +153,20 @@ describe("AnalyticsService", () => {
         expect(result.currentPeriod[0]?.series_0).toBe(50);
       });
 
-      // Pins the ADR-034 group-by-model decision end-to-end: the rollup's
-      // per-span Model attribution never serves a model-grouped read.
-      it("dispatches a model-grouped sum to the slim repository, not the rollup", async () => {
+      // Pins the group-by-model routing end-to-end: model group-bys need the
+      // legacy builder's span-model partition join (per-span attribution so
+      // buckets sum to the ungrouped totals); neither fast-path table can
+      // serve them.
+      it("dispatches a model-grouped sum to the legacy shim, not slim or the rollup", async () => {
         const { deps, spies } = makeDeps();
-        const result = await new AnalyticsService(deps).getTimeseries({
+        await new AnalyticsService(deps).getTimeseries({
           ...sumCost,
           groupBy: "metadata.model",
         });
 
-        expect(spies.runSlimTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runLegacy).toHaveBeenCalledTimes(1);
+        expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
         expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
-        expect(result.currentPeriod[0]?.series_0).toBe(60);
       });
 
       it("dispatches a span_type-grouped sum to the legacy shim", async () => {

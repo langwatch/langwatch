@@ -107,6 +107,22 @@ export function mapAttributesToMetadata(
     }
   }
 
+  // The fold stamps `metadata.models` as a JSON array string (the set of
+  // models the trace's spans used, most-recent-first); surface it as a real
+  // array like labels/prompt_ids. `metadata.model` (the primary) flows
+  // through the generic passthrough below as a plain string.
+  const modelsStr = attributes["metadata.models"];
+  if (modelsStr) {
+    try {
+      const models = JSON.parse(modelsStr);
+      if (Array.isArray(models)) {
+        metadata.models = models;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
   // Add remaining attributes as custom metadata
   const knownKeys = new Set([
     ...Object.keys(RESERVED_ATTRIBUTE_MAPPINGS),
@@ -115,6 +131,9 @@ export function mapAttributesToMetadata(
     "labels",
     "langwatch.prompt_ids",
     "langwatch.prompt_version_ids",
+    "metadata.models",
+    // Fold-internal bookkeeping for the metadata.model stamp; not user metadata.
+    "langwatch.reserved.model_metadata_stamped",
   ]);
 
   for (const [key, value] of Object.entries(attributes)) {

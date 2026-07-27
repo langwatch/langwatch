@@ -128,6 +128,29 @@ export const STANDARD_RESOURCE_PREFIXES = [
 ] as const;
 
 /**
+ * Trace-level model metadata stamped by the fold from the models its spans
+ * (or log turns) actually used. Semantic:
+ *
+ *   - `metadata.model`  — the trace's PRIMARY model: `models[0]`, i.e. the
+ *     model of the most recently folded LLM span / log turn (the same
+ *     "primary model" every `models[0]` consumer in the UI shows). Single
+ *     value for single-value consumers (filters, dataset mappings,
+ *     `trace.metadata.model` on the API).
+ *   - `metadata.models` — JSON array of ALL models seen on the trace,
+ *     most-recently-used first (same order as the `Models` column).
+ *
+ * Stamped keys live in the `metadata.*` namespace so they surface through the
+ * regular metadata read path and stay filterable. USER-PROVIDED values win:
+ * the fold only stamps when the keys are absent, or when the reserved marker
+ * says a previous fold stamped them (so the stamp can track new models as
+ * later spans arrive without ever clobbering explicit user metadata).
+ */
+export const STAMPED_MODEL_ATTRIBUTE = "metadata.model";
+export const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
+export const MODEL_METADATA_STAMPED_MARKER =
+  "langwatch.reserved.model_metadata_stamped";
+
+/**
  * Extracts per-span attributes and merges them into trace-level attributes,
  * handling labels union, prompt ID collection, metadata deep-merge,
  * origin hoisting, and PII redaction tracking.
@@ -366,5 +389,39 @@ export class TraceAttributeAccumulationService {
     }
 
     return merged;
+  }
+
+  /**
+   * Stamp the trace-level model metadata (`metadata.model` primary +
+   * `metadata.models` set) from the models accumulated so far. See
+   * {@link STAMPED_MODEL_ATTRIBUTE} for the exact semantic. Mutates the map.
+   *
+   * The fold calls this AFTER attribute accumulation with the merged models
+   * list, so the stamp tracks each newly seen model. User-provided
+   * `metadata.model` / `metadata.models` (span or resource metadata) win: the
+   * reserved marker records that WE stamped the current values, and without
+   * it a present value is treated as the user's and left untouched. A user
+   * value arriving only after a fold has already stamped is superseded by the
+   * stamp (the accumulator's existing-wins merge has already dropped it by
+   * the time this runs); resource-level metadata rides every span, so real
+   * user metadata is present from the first fold and always wins.
+   */
+  stampModelMetadata({
+    attributes,
+    models,
+  }: {
+    attributes: Record<string, string>;
+    models: string[];
+  }): void {
+    if (models.length === 0) return;
+    const stampedByUs = attributes[MODEL_METADATA_STAMPED_MARKER] === "true";
+    const userProvided =
+      !stampedByUs &&
+      (attributes[STAMPED_MODEL_ATTRIBUTE] !== undefined ||
+        attributes[STAMPED_MODELS_ATTRIBUTE] !== undefined);
+    if (userProvided) return;
+    attributes[STAMPED_MODEL_ATTRIBUTE] = models[0]!;
+    attributes[STAMPED_MODELS_ATTRIBUTE] = JSON.stringify(models);
+    attributes[MODEL_METADATA_STAMPED_MARKER] = "true";
   }
 }
