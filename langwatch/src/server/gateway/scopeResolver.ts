@@ -158,6 +158,11 @@ function parseModelProviderIds(raw: unknown): string[] {
  *     pre-governance) -> null. The materialiser then null-stamps
  *     `project_id` / `project_otlp_token` in the bundle and the gateway
  *     skips span export rather than 500-ing.
+ *
+ * Null is a read-path tolerance for keys that already exist, not a shape
+ * new writes may take: VirtualKeyService refuses create/update when this
+ * resolves null (`trace_project_required`), because dropped traces mean
+ * spend no budget can ever see.
  */
 export async function resolveTraceProject(
   prisma: PrismaClient,

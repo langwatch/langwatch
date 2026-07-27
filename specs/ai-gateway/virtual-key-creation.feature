@@ -8,7 +8,7 @@ Feature: AI Gateway — Creating a virtual key
   #
   # The drawer used to ask for a "scope", which conflated three different
   # things: which providers the key could reach, who could see the key, and
-  # where its traces landed. The last of those was never stated at all — an
+  # where its traces landed. The last of those was never stated at all: an
   # organization- or team-owned key silently resolved to the organization's
   # governance project, or to nothing, in which case the gateway had nowhere
   # to send the key's traces and dropped them. A key whose traces are dropped
@@ -18,7 +18,9 @@ Feature: AI Gateway — Creating a virtual key
   # So the key states its consequences: where it lives and where its traces
   # land, what it may spend, which providers it may reach, and whether it
   # fails over. Ordered that way, because that is the order the decisions
-  # actually get made in.
+  # actually get made in. And "nowhere" is no longer a place traces can
+  # land: every key must resolve a project for its traces and costs,
+  # because that is the feed every budget accrues from.
 
   Background:
     Given organization "acme" with team "platform" and project "web-app"
@@ -33,21 +35,44 @@ Feature: AI Gateway — Creating a virtual key
     When I choose to create a key owned by project "web-app"
     Then the drawer tells me its traces and costs land in "web-app"
 
-  @integration @unimplemented
-  Scenario: A key owned above a project must be told where its traces go
-    When I choose to create a key owned by organization "acme"
-    Then I must either pick the project its traces land in
-    Or state that this key is not traced
-    And I cannot finish while the destination is unstated
-    # Leaving it unstated is how keys ended up dropping their traces on the
-    # floor: no cost, no usage, and a budget on that key that could never
-    # accrue a cent no matter how much the key spent.
+  @integration
+  Scenario: A key owned above a project is refused until its traces have a home
+    When I try to create a key owned by organization "acme" with nowhere for its traces to land
+    Then the key is refused
+    And the refusal says its spend could not be capped
+    # "Untraced" used to be offered here as a choice, with a sentence
+    # disclosing what it cost. But spend accrual is fed by traces: an
+    # untraced key accrues nothing against any budget, including the
+    # organization's own cap, no matter how much it spends. That is not a
+    # trade-off to disclose, it is an enforcement hole, and a sentence on a
+    # form does not close it. The same refusal applies to a key owned by a
+    # team.
 
-  @integration @unimplemented
-  Scenario: A key declared untraced says what that costs
-    When I declare a key untraced
-    Then the drawer tells me this key will report no spend and no usage
-    And that budgets on it cannot enforce
+  @integration
+  Scenario: The governance inbox is a home for a shared key's traces
+    Given organization "acme" has a governance inbox
+    When I create a key owned by organization "acme"
+    Then its traces and costs land in the governance inbox
+    # A shared key does not need a hand-picked project when the organization
+    # has its governance inbox: that is a real destination, spend accrues
+    # from it, and the drawer states it like any other.
+
+  @integration
+  Scenario: A key cannot be updated into dropping its traces
+    Given a key owned by project "web-app"
+    When I move it above the project without giving its traces a home
+    Then the update is refused
+    And the key keeps landing its traces in "web-app"
+
+  @integration
+  Scenario: A key that predates this rule must be given a home before it changes
+    Given a key created before this rule whose traces land nowhere
+    When I try to change anything about it
+    Then the update is refused until its traces are given a home
+    But revoking it still works
+    # The next touch closes the hole. Renaming a key that cannot be capped
+    # would keep the hole alive indefinitely; revocation stays open because
+    # killing the key closes it the other way.
 
   # ============================================================================
   # What the key may spend

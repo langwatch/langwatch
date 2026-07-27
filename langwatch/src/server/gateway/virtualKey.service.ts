@@ -25,7 +25,10 @@ import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
-import { eligibleModelProvidersForVk } from "./scopeResolver";
+import {
+  eligibleModelProvidersForVk,
+  resolveTraceProject,
+} from "./scopeResolver";
 import {
   defaultVirtualKeyConfig,
   type GuardrailAttachment,
@@ -249,6 +252,7 @@ export class VirtualKeyService {
         },
         tx,
       );
+      await this.assertTraceProjectResolvable(vk, tx);
       await this.assertProvidersAllowedReachable(vk, config.providersAllowed, tx);
       if (input.budget) {
         await this.upsertKeyBudget(
@@ -351,6 +355,7 @@ export class VirtualKeyService {
         include: { scopes: true },
       });
 
+      await this.assertTraceProjectResolvable(vk, tx);
       await this.assertProvidersAllowedReachable(
         vk,
         config.providersAllowed,
@@ -673,6 +678,39 @@ export class VirtualKeyService {
         },
         tx,
       );
+    }
+  }
+
+  /**
+   * Every key must resolve a project for its traces and costs to land in.
+   * Budget spend is accrued from the trace fold, so a key whose traces
+   * land nowhere accrues nothing against ANY budget, the org-wide cap
+   * included; it spends invisibly by construction. Project-owned and
+   * personal keys resolve a project structurally, and org/team-owned keys
+   * resolve the organization's governance project when one exists. What is
+   * refused is the remaining shape: ownership above a project in an org
+   * with no governance project, which is exactly the shape that used to
+   * drop traces on the floor.
+   *
+   * Runs on create and on every update (not only scope changes), so a key
+   * that predates the rule cannot keep being edited around the hole: the
+   * next touch either gives its traces a home or does not go through.
+   * Revocation is intentionally not guarded, killing the key must always
+   * be possible.
+   *
+   * Spec: specs/ai-gateway/virtual-key-creation.feature
+   */
+  private async assertTraceProjectResolvable(
+    vk: VirtualKeyWithScopes,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const traceProject = await resolveTraceProject(this.prisma, vk, tx);
+    if (!traceProject) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "trace_project_required: an organization- or team-owned key needs a project for its traces and costs to land in; without one its spend could not be capped by any budget. Scope the key to a project, or set up the organization's governance project first.",
+      });
     }
   }
 
