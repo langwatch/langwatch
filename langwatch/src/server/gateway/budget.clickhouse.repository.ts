@@ -27,6 +27,7 @@ import type {
   GatewayBudgetWindow,
 } from "@prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { bucketScopeIdFor } from "./budgetResolution.service";
 
 const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
@@ -43,6 +44,8 @@ export type BudgetDebitRow = {
   window: GatewayBudgetWindow;
   virtualKeyId: string;
   providerCredentialId?: string | null;
+  /** ModelProvider the request was dispatched to, when the gateway said. */
+  providerKey?: string | null;
   gatewayRequestId: string;
   amountUsd: string;
   tokensInput: number;
@@ -62,6 +65,41 @@ export type ScopeSpend = {
   scopeId: string;
   spentUsd: string;
 };
+
+/**
+ * One budget's read target. `scopeId` is the ledger bucket, not the
+ * budget's target: a provider-filtered budget and a per-member GROUP
+ * allowance each accrue under their own key (see `bucketScopeIdFor` /
+ * `groupBucketScopeId`). `match: "prefix"` sums every bucket under the
+ * key, which is how a GROUP budget reports what a whole department has
+ * spent when no single member is in context.
+ */
+export type BudgetSpendTarget = {
+  budgetId: string;
+  scope: GatewayBudgetScopeType;
+  scopeId: string;
+  window: GatewayBudgetWindow;
+  match?: "exact" | "prefix";
+};
+
+/**
+ * Read targets for a plain list of budgets, with no request context. A
+ * GROUP budget has no single member here, so it sums every member bucket.
+ */
+export function spendTargetsForBudgets(
+  budgets: GatewayBudget[],
+): BudgetSpendTarget[] {
+  return budgets.map((b) => ({
+    budgetId: b.id,
+    scope: b.scopeType,
+    scopeId: bucketScopeIdFor(
+      b,
+      b.scopeType === "GROUP" ? `${b.scopeId}:` : b.scopeId,
+    ),
+    window: b.window,
+    match: b.scopeType === "GROUP" ? ("prefix" as const) : ("exact" as const),
+  }));
+}
 
 /**
  * Read-shape for ledger events. Mirrors the columns previously read off
@@ -144,6 +182,7 @@ export class GatewayBudgetClickHouseRepository {
       Window: windowToClickHouse(r.window),
       VirtualKeyId: r.virtualKeyId,
       ProviderCredentialId: r.providerCredentialId ?? "",
+      ProviderKey: r.providerKey ?? "",
       GatewayRequestId: r.gatewayRequestId,
       AmountUSD: r.amountUsd,
       TokensInput: r.tokensInput,
@@ -181,98 +220,16 @@ export class GatewayBudgetClickHouseRepository {
    */
   async getSpendForBudgets(
     tenantId: string,
-    budgets: GatewayBudget[],
+    budgets: GatewayBudget[] | BudgetSpendTarget[],
     // The instant the read is anchored to. Injectable so a test that wrote
     // a debit at a known time can read the same period deterministically
     // instead of racing the wall clock across a MINUTE or HOUR boundary.
     now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
-    if (budgets.length === 0) return [];
-
-    const byWindow = new Map<GatewayBudgetWindow, GatewayBudget[]>();
-    for (const b of budgets) {
-      const list = byWindow.get(b.window) ?? [];
-      list.push(b);
-      byWindow.set(b.window, list);
-    }
-
-    const out: Map<string, ScopeSpend> = new Map();
-
-    for (const [window, budgetsForWindow] of byWindow) {
-      const periodStart = currentPeriodStart(window, now);
-      const scopeTuples = budgetsForWindow.map((b) => ({
-        scope: scopeToClickHouse(b.scopeType),
-        scopeId: b.scopeId,
-        budgetId: b.id,
-      }));
-
-      // Build a parameter-safe IN clause. We query every (Scope, ScopeId)
-      // tuple for this window in one round-trip and stitch results back by
-      // budget id after.
-      const scopeFilter = scopeTuples
-        .map((_, i) => `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`)
-        .join(" OR ");
-      const params: Record<string, string | number> = {
-        tenantId,
-        window: windowToClickHouse(window),
-        periodStart: periodStart.getTime(),
-      };
-      for (let i = 0; i < scopeTuples.length; i++) {
-        params[`scope${i}`] = scopeTuples[i]!.scope;
-        params[`scopeId${i}`] = scopeTuples[i]!.scopeId;
-      }
-
-      try {
-        const client = await this.resolveClient(tenantId);
-        const result = await client.query({
-          query: `
-            SELECT
-              Scope,
-              ScopeId,
-              toString(sumMerge(SpendUSD)) AS SpentUSD
-            FROM ${TOTALS_TABLE}
-            WHERE TenantId = {tenantId:String}
-              AND Window = {window:String}
-              AND PeriodStart = fromUnixTimestamp64Milli({periodStart:Int64})
-              AND (${scopeFilter})
-            GROUP BY Scope, ScopeId
-          `,
-          query_params: params,
-          format: "JSONEachRow",
-        });
-        type Row = { Scope: string; ScopeId: string; SpentUSD: string };
-        const rows = (await result.json()) as Row[];
-        const byKey = new Map<string, string>();
-        for (const r of rows) {
-          byKey.set(`${r.Scope}:${r.ScopeId}`, r.SpentUSD);
-        }
-        for (const t of scopeTuples) {
-          const key = `${t.scope}:${t.scopeId}`;
-          out.set(t.budgetId, {
-            budgetId: t.budgetId,
-            scope: budgetsForWindow.find((b) => b.id === t.budgetId)!
-              .scopeType,
-            scopeId: t.scopeId,
-            spentUsd: byKey.get(key) ?? "0",
-          });
-        }
-      } catch (error) {
-        logger.error(
-          { tenantId, window, error },
-          "failed to read gateway budget scope totals",
-        );
-        throw error;
-      }
-    }
-
-    return budgets.map(
-      (b) =>
-        out.get(b.id) ?? {
-          budgetId: b.id,
-          scope: b.scopeType,
-          scopeId: b.scopeId,
-          spentUsd: "0",
-        },
+    return this.getSpendForTargetsAcrossTenants(
+      [tenantId],
+      toSpendTargets(budgets),
+      now,
     );
   }
 
@@ -292,30 +249,54 @@ export class GatewayBudgetClickHouseRepository {
    */
   async getSpendForBudgetsAcrossTenants(
     tenantIds: string[],
-    budgets: GatewayBudget[],
+    budgets: GatewayBudget[] | BudgetSpendTarget[],
+    now: Date = new Date(),
   ): Promise<ScopeSpend[]> {
-    if (budgets.length === 0 || tenantIds.length === 0) return [];
+    return this.getSpendForTargetsAcrossTenants(
+      tenantIds,
+      toSpendTargets(budgets),
+      now,
+    );
+  }
 
-    const now = new Date();
-    const byWindow = new Map<GatewayBudgetWindow, GatewayBudget[]>();
-    for (const b of budgets) {
-      const list = byWindow.get(b.window) ?? [];
-      list.push(b);
-      byWindow.set(b.window, list);
+  /**
+   * The one spend read. Sums the rollup for each target's bucket in its
+   * own current period, across every tenant given.
+   *
+   * A target's `scopeId` is the ledger bucket, so a provider-filtered
+   * budget reads only its provider's spend and a per-member department
+   * allowance reads only that member's — the same keys the fold writes.
+   * `match: "prefix"` is how a department budget totals all its members
+   * when no single member is in context.
+   */
+  async getSpendForTargetsAcrossTenants(
+    tenantIds: string[],
+    targets: BudgetSpendTarget[],
+    now: Date = new Date(),
+  ): Promise<ScopeSpend[]> {
+    if (targets.length === 0 || tenantIds.length === 0) return [];
+
+    const byWindow = new Map<GatewayBudgetWindow, BudgetSpendTarget[]>();
+    for (const t of targets) {
+      const list = byWindow.get(t.window) ?? [];
+      list.push(t);
+      byWindow.set(t.window, list);
     }
 
     const out: Map<string, ScopeSpend> = new Map();
 
-    for (const [window, budgetsForWindow] of byWindow) {
+    for (const [window, targetsForWindow] of byWindow) {
       const periodStart = currentPeriodStart(window, now);
-      const scopeTuples = budgetsForWindow.map((b) => ({
-        scope: scopeToClickHouse(b.scopeType),
-        scopeId: b.scopeId,
-        budgetId: b.id,
-      }));
 
-      const scopeFilter = scopeTuples
-        .map((_, i) => `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`)
+      // One round-trip per window: every bucket is asked for at once and
+      // stitched back onto its budget after. Prefix targets are grouped
+      // and summed per target rather than per bucket.
+      const scopeFilter = targetsForWindow
+        .map((t, i) =>
+          t.match === "prefix"
+            ? `(Scope = {scope${i}:String} AND startsWith(ScopeId, {scopeId${i}:String}))`
+            : `(Scope = {scope${i}:String} AND ScopeId = {scopeId${i}:String})`,
+        )
         .join(" OR ");
       const tenantPlaceholders = tenantIds
         .map((_, i) => `{tenant${i}:String}`)
@@ -327,9 +308,9 @@ export class GatewayBudgetClickHouseRepository {
       for (let i = 0; i < tenantIds.length; i++) {
         params[`tenant${i}`] = tenantIds[i]!;
       }
-      for (let i = 0; i < scopeTuples.length; i++) {
-        params[`scope${i}`] = scopeTuples[i]!.scope;
-        params[`scopeId${i}`] = scopeTuples[i]!.scopeId;
+      for (let i = 0; i < targetsForWindow.length; i++) {
+        params[`scope${i}`] = scopeToClickHouse(targetsForWindow[i]!.scope);
+        params[`scopeId${i}`] = targetsForWindow[i]!.scopeId;
       }
 
       try {
@@ -355,18 +336,22 @@ export class GatewayBudgetClickHouseRepository {
         });
         type Row = { Scope: string; ScopeId: string; SpentUSD: string };
         const rows = (await result.json()) as Row[];
-        const byKey = new Map<string, string>();
-        for (const r of rows) {
-          byKey.set(`${r.Scope}:${r.ScopeId}`, r.SpentUSD);
-        }
-        for (const t of scopeTuples) {
-          const key = `${t.scope}:${t.scopeId}`;
+        for (const t of targetsForWindow) {
+          const scope = scopeToClickHouse(t.scope);
+          const total = rows
+            .filter(
+              (r) =>
+                r.Scope === scope &&
+                (t.match === "prefix"
+                  ? r.ScopeId.startsWith(t.scopeId)
+                  : r.ScopeId === t.scopeId),
+            )
+            .reduce((sum, r) => sum + (Number.parseFloat(r.SpentUSD) || 0), 0);
           out.set(t.budgetId, {
             budgetId: t.budgetId,
-            scope: budgetsForWindow.find((b) => b.id === t.budgetId)!
-              .scopeType,
+            scope: t.scope,
             scopeId: t.scopeId,
-            spentUsd: byKey.get(key) ?? "0",
+            spentUsd: total.toFixed(6),
           });
         }
       } catch (error) {
@@ -378,12 +363,12 @@ export class GatewayBudgetClickHouseRepository {
       }
     }
 
-    return budgets.map(
-      (b) =>
-        out.get(b.id) ?? {
-          budgetId: b.id,
-          scope: b.scopeType,
-          scopeId: b.scopeId,
+    return targets.map(
+      (t) =>
+        out.get(t.budgetId) ?? {
+          budgetId: t.budgetId,
+          scope: t.scope,
+          scopeId: t.scopeId,
           spentUsd: "0",
         },
     );
@@ -540,6 +525,20 @@ function ledgerStatusFromCH(raw: string): GatewayBudgetLedgerStatus {
   }
 }
 
+/**
+ * Accept either raw budget rows (list views, which have no request
+ * context) or explicit bucket targets (request paths, which do).
+ */
+function toSpendTargets(
+  input: GatewayBudget[] | BudgetSpendTarget[],
+): BudgetSpendTarget[] {
+  if (input.length === 0) return [];
+  const first = input[0]!;
+  return "budgetId" in first
+    ? (input as BudgetSpendTarget[])
+    : spendTargetsForBudgets(input as GatewayBudget[]);
+}
+
 function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
   switch (scope) {
     case "ORGANIZATION":
@@ -567,7 +566,7 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
  * This is one half of a contract: the rollup only ever returns a row when
  * this lands on exactly the PeriodStart the materialised view bucketed the
  * debit into. The other half is the multiIf() in
- * 00058_gateway_budget_scope_totals_utc.sql, and the two are pinned
+ * 00055_gateway_budget_scope_totals_period_start.sql, and the two are pinned
  * together by budget.clickhouse.repository.periodStart.integration.test.ts.
  * Change one without the other and the affected window stops accruing
  * entirely: spend is written, every read returns 0, and budgets on that

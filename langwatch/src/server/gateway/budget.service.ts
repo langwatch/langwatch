@@ -21,6 +21,10 @@ import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import {
+  budgetAppliesToProvider,
+  resolveApplicableBudgets,
+} from "./budgetResolution.service";
+import {
   type BudgetScopeReach,
   resolveBudgetScopeReach,
 } from "./budgetScopeReach";
@@ -142,6 +146,13 @@ export type BudgetCheckInput = {
   virtualKeyId: string;
   principalUserId?: string | null;
   projectedCostUsd: number | string;
+  /**
+   * The provider this request would dispatch to, when the caller knows it.
+   * Given it, provider-filtered budgets are consulted; without it only
+   * unfiltered budgets are, so a provider filter can never block a request
+   * that was never going to that provider.
+   */
+  providerKey?: string | null;
 };
 
 export type BudgetCheckResult = {
@@ -768,26 +779,18 @@ export class GatewayBudgetService {
   async check(input: BudgetCheckInput): Promise<BudgetCheckResult> {
     const projected = new Prisma.Decimal(input.projectedCostUsd.toString());
 
-    const ors: Prisma.GatewayBudgetWhereInput[] = [
-      { scopeType: "ORGANIZATION", scopeId: input.organizationId },
-      { scopeType: "VIRTUAL_KEY", scopeId: input.virtualKeyId },
-    ];
-    if (input.teamId) {
-      ors.push({ scopeType: "TEAM", scopeId: input.teamId });
-    }
-    if (input.projectId) {
-      ors.push({ scopeType: "PROJECT", scopeId: input.projectId });
-    }
-    if (input.principalUserId) {
-      ors.push({ scopeType: "PRINCIPAL", scopeId: input.principalUserId });
-    }
-    const applicable = await this.prisma.gatewayBudget.findMany({
-      where: {
+    // Same resolver the bundle and the trace fold use, so what enforces
+    // here is exactly what the key was told applies to it.
+    const resolved = (
+      await resolveApplicableBudgets(this.prisma, {
         organizationId: input.organizationId,
-        archivedAt: null,
-        OR: ors,
-      },
-    });
+        teamId: input.teamId,
+        projectId: input.projectId,
+        virtualKeyId: input.virtualKeyId,
+        principalUserId: input.principalUserId,
+      })
+    ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));
+    const applicable = resolved.map((r) => r.budget);
 
     // Prefer ClickHouse spend (trace-fold ledger) when the repo is wired,
     // fall back to the PG `spentUsd` column for deploys without CH. The
@@ -810,7 +813,13 @@ export class GatewayBudgetService {
           if (tenantIds.length === 0) return new Map<string, string>();
           const spends = await this.chRepo!.getSpendForBudgetsAcrossTenants(
             tenantIds,
-            applicable,
+            resolved.map((r) => ({
+              budgetId: r.budget.id,
+              scope: r.budget.scopeType,
+              scopeId: r.bucketScopeId,
+              window: r.budget.window,
+              match: "exact" as const,
+            })),
           );
           return new Map(spends.map((s) => [s.budgetId, s.spentUsd] as const));
         })()

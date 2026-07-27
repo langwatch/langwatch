@@ -106,16 +106,16 @@ export async function resolveApplicableBudgets(
     budget.scopeType === "GROUP"
       ? {
           budget,
-          bucketScopeId: groupBucketScopeId(
-            budget.scopeId,
-            target.principalUserId!,
+          bucketScopeId: bucketScopeIdFor(
+            budget,
+            groupBucketScopeId(budget.scopeId, target.principalUserId!),
           ),
           principalUserId: target.principalUserId!,
           groupId: budget.scopeId,
         }
       : {
           budget,
-          bucketScopeId: budget.scopeId,
+          bucketScopeId: bucketScopeIdFor(budget, budget.scopeId),
           principalUserId: null,
           groupId: null,
         },
@@ -123,6 +123,24 @@ export async function resolveApplicableBudgets(
 
   return resolved.sort(byScopeThenId);
 }
+
+/**
+ * The ledger buckets spend by (Scope, ScopeId), so anything that must
+ * accrue separately has to be separate in that key. Two budgets on the
+ * same target — one counting everything, one counting only OpenAI — would
+ * otherwise share a bucket and each report the other's spend. The provider
+ * filter therefore rides the bucket id.
+ */
+export function bucketScopeIdFor(
+  budget: Pick<GatewayBudget, "providerKey">,
+  baseScopeId: string,
+): string {
+  return budget.providerKey
+    ? `${baseScopeId}${PROVIDER_BUCKET_SEPARATOR}${budget.providerKey}`
+    : baseScopeId;
+}
+
+const PROVIDER_BUCKET_SEPARATOR = "|provider:";
 
 /**
  * Group ids the user belongs to within this organization. Scoped to the
