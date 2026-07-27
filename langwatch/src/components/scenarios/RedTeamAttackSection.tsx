@@ -269,7 +269,10 @@ export function RedTeamAttackSection({
           </Accordion.ItemTrigger>
           <Accordion.ItemContent>
             <Accordion.ItemBody>
-              <VStack align="stretch" gap={4} paddingTop={2}>
+              {/* Bottom padding as well as top: without it the accordion's
+                  closing rule sits directly on the last input, and SITUATION
+                  below reads as part of Advanced rather than a new section. */}
+              <VStack align="stretch" gap={4} paddingTop={2} paddingBottom={4}>
                 <Field.Root>
                   <LabelWithHelp
                     label="Stop early at score"
