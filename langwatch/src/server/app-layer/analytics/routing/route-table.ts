@@ -323,7 +323,7 @@ const SLIM_ELIGIBLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
  * tokens) to the SPAN's own model so per-model buckets sum exactly to the
  * ungrouped totals. (It used to route to slim, whose whole-trace
  * `arrayJoin(Models)` attribution counted a multi-model trace's FULL totals
- * once per model — the double-count this partition join fixed.)
+ * once per model, the double-count this partition join fixed.)
  * `metadata.span_type` has no slim column at all (span type is per-span; slim
  * is per-trace) and so falls back to `trace_summaries` as well.
  *
@@ -356,7 +356,7 @@ const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
  * metrics (cost, tokens) per SPAN via the legacy builder's span-model
  * partition join, so per-model buckets sum exactly to the ungrouped totals.
  * Slim is one row per trace with no span-level data, so it can only reproduce
- * the old whole-trace `arrayJoin(Models)` attribution — the very shape that
+ * the old whole-trace `arrayJoin(Models)` attribution, the very shape that
  * counted a multi-model trace's FULL totals once per model (~2.9x observed on
  * a real multi-agent session). Model group-bys therefore fall back to
  * `trace_summaries`.

@@ -50,7 +50,7 @@ const ta = "ta";
  * `metadata.model` is deliberately NOT here: model group-bys need per-SPAN
  * attribution (the legacy builder's span-model partition join) so buckets
  * partition the ungrouped totals; slim has no span data. The router sends
- * them to `trace_summaries` — see SLIM_TRACE_GROUP_BY_KEYS in route-table.ts.
+ * them to `trace_summaries`; see SLIM_TRACE_GROUP_BY_KEYS in route-table.ts.
  */
 export type SlimGroupByKey =
   | "topics.topics"

@@ -131,12 +131,12 @@ export const STANDARD_RESOURCE_PREFIXES = [
  * Trace-level model metadata stamped by the fold from the models its spans
  * (or log turns) actually used. Semantic:
  *
- *   - `metadata.model`  — the trace's PRIMARY model: `models[0]`, i.e. the
+ *   - `metadata.model`  is the trace's PRIMARY model: `models[0]`, i.e. the
  *     model of the most recently folded LLM span / log turn (the same
  *     "primary model" every `models[0]` consumer in the UI shows). Single
  *     value for single-value consumers (filters, dataset mappings,
  *     `trace.metadata.model` on the API).
- *   - `metadata.models` — JSON array of ALL models seen on the trace,
+ *   - `metadata.models` is a JSON array of ALL models seen on the trace,
  *     most-recently-used first (same order as the `Models` column).
  *
  * Stamped keys live in the `metadata.*` namespace so they surface through the

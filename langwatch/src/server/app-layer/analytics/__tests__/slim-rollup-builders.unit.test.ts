@@ -161,9 +161,9 @@ describe("buildSlimTimeseriesQuery", () => {
   describe("when grouped by metadata.model", () => {
     // Model group-bys need per-SPAN attribution (the legacy builder's
     // span-model partition join) so buckets sum exactly to the ungrouped
-    // totals. Slim has no span data — the router must never send model
+    // totals. Slim has no span data: the router must never send model
     // group-bys here, and the builder throws as the backstop.
-    it("throws — the router should have routed model group-bys to trace_summaries", () => {
+    it("throws: the router should have routed model group-bys to trace_summaries", () => {
       expect(() =>
         buildSlimTimeseriesQuery({
           projectId: "tenant-slim",

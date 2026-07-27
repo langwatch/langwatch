@@ -205,7 +205,7 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
 
     describe("when grouped by model", () => {
-      it("routes to trace_summaries — model group-bys always take the legacy span-model partition join", () => {
+      it("routes to trace_summaries: model group-bys always take the legacy span-model partition join", () => {
         const table = pickAnalyticsTable({
           series: [series("performance.completion_time", "median")],
           groupBy: "metadata.model",
@@ -486,7 +486,7 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
       expect(__testOnly__.ROLLUP_TRACE_GROUP_BY_KEYS.size).toBe(0);
     });
 
-    it("keeps metadata.model OFF slim — model group-bys need the legacy span-model partition join", () => {
+    it("keeps metadata.model OFF slim: model group-bys need the legacy span-model partition join", () => {
       expect(__testOnly__.SLIM_TRACE_GROUP_BY_KEYS.has("metadata.model")).toBe(
         false,
       );

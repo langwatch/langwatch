@@ -283,7 +283,7 @@ const SPAN_MODEL_KEY_EXPR = `multiIf(SpanAttributes['gen_ai.response.model'] != 
  * Redundant-usage gate: mirrors SpanCostService.isTokenAccumulationSkipped.
  * A span marked as a duplicate usage copy (e.g. codex's lower-level response
  * span echoing the turn rollup) contributed nothing to the trace totals, so
- * it must contribute nothing to the per-model buckets either — otherwise the
+ * it must contribute nothing to the per-model buckets either, otherwise the
  * bucket sum overshoots the ungrouped total.
  */
 const SPAN_NOT_SKIPPED = `SpanAttributes['langwatch.reserved.skip_token_accumulation'] != 'true'`;
@@ -312,14 +312,14 @@ function spanFirstPositiveExpr(attrKeys: string[]): string {
 
 /**
  * Build the LEFT JOIN that partitions a trace's additive metrics across the
- * models its spans actually used — one joined row per (trace, span model).
+ * models its spans actually used: one joined row per (trace, span model).
  *
  * Two aggregation levels:
  *   1. Per (trace, span, model): `max()` per contribution collapses the rare
  *      duplicate stored_spans rows a redelivered SpanReceivedEvent leaves
  *      before the ReplacingMergeTree merge, without the banned `LIMIT 1 BY`
  *      pattern (see aggregation-builder-dedup-safety.unit.test.ts).
- *   2. Per (trace, model): `sum()` of the span contributions — the bucket's
+ *   2. Per (trace, model): `sum()` of the span contributions: the bucket's
  *      share of the trace totals.
  *
  * `Cost`/`NonBilledCost` are the fold-parity per-span columns (migration
@@ -433,8 +433,8 @@ const groupByExpressions: Partial<
   // session). Buckets come from each span's own model (response > request,
   // mirroring SpanCostService.extractModelsFromSpan); traces with no
   // span-model rows (log-only traces, or spans outside the scan window) fall
-  // back to their primary model `Models[1]` — or `'unknown'` when the trace
-  // genuinely has no model — so they keep a single, exactly-partitioned
+  // back to their primary model `Models[1]`, or `'unknown'` when the trace
+  // genuinely has no model, so they keep a single, exactly-partitioned
   // bucket instead of vanishing.
   "metadata.model": () => ({
     column: `if(${SPAN_MODEL_ALIAS}.SpanModelKey IS NULL OR ${SPAN_MODEL_ALIAS}.SpanModelKey = '', if(empty(${tableAliases.trace_summaries}.Models), 'unknown', ${tableAliases.trace_summaries}.Models[1]), ${SPAN_MODEL_ALIAS}.SpanModelKey)`,
@@ -2547,7 +2547,7 @@ function stripSelectExpressionAlias(
  * Transform a metric expression to work with deduplicated trace data.
  * count() becomes uniqExact(trace_id) to count distinct traces.
  * Trace-level column references are rewritten to their CTE columns, keeping
- * the metric's aggregation AND its arithmetic intact — a composite metric
+ * the metric's aggregation AND its arithmetic intact: a composite metric
  * like total_tokens (prompt + completion) keeps both terms.
  */
 function transformMetricForDedup(
