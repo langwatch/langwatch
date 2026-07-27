@@ -8,7 +8,11 @@
  * Not a `*.test.ts` file, so vitest's integration glob does not pick it up
  * as a suite on its own.
  */
-import { GenericContainer, type StartedTestContainer } from "testcontainers";
+import {
+  GenericContainer,
+  type StartedTestContainer,
+  Wait,
+} from "testcontainers";
 import { AzureBlobDriver } from "../azure-blob-driver";
 
 /**
@@ -43,6 +47,10 @@ export async function startAzurite(): Promise<StartedAzurite> {
     "mcr.microsoft.com/azure-storage/azurite:3.36.0",
   )
     .withExposedPorts(AZURITE_BLOB_PORT)
+    // Without a wait strategy, .start() resolves when the container is
+    // created, not when azurite-blob is accepting connections — the first
+    // request then races the emulator's boot and fails intermittently in CI.
+    .withWaitStrategy(Wait.forListeningPorts())
     .withCommand([
       "azurite-blob",
       "--blobHost",
@@ -73,10 +81,13 @@ export async function stopAzurite(
 }
 
 /** Idempotently creates a container in the running Azurite instance. */
-export async function ensureAzuriteContainer(
-  azurite: StartedAzurite,
-  container: string,
-): Promise<void> {
+export async function ensureAzuriteContainer({
+  azurite,
+  container,
+}: {
+  azurite: StartedAzurite;
+  container: string;
+}): Promise<void> {
   const driver = new AzureBlobDriver({
     accountName: azurite.accountName,
     accountKey: azurite.accountKey,

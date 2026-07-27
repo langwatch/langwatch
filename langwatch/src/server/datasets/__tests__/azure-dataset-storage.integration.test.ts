@@ -46,7 +46,7 @@ let storage: AzureDatasetStorage;
 
 beforeAll(async () => {
   azurite = await startAzurite();
-  await ensureAzuriteContainer(azurite, CONTAINER);
+  await ensureAzuriteContainer({ azurite, container: CONTAINER });
 
   mockEnv.AZURE_BLOB_ACCOUNT_KEY = azurite.accountKey;
   mockEnv.AZURE_BLOB_ENDPOINT = azurite.endpointBaseUrl;

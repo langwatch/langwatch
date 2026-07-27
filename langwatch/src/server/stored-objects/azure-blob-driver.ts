@@ -143,9 +143,14 @@ function withCanonicalisedQuery(
   resource: string,
   queryParams: Record<string, string>,
 ): string {
+  // Spec: lowercase the parameter name FIRST, then sort those names with an
+  // ordinal (byte) comparison. Sorting the original key and lowercasing after
+  // reorders a mixed-case param, and localeCompare is locale-sensitive — both
+  // produce a signature Azure computes differently and rejects with a 403.
   const lines = Object.entries(queryParams)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k.toLowerCase()}:${v}`);
+    .map(([k, v]) => [k.toLowerCase(), v] as const)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}:${v}`);
   return lines.length > 0 ? [resource, ...lines].join("\n") : resource;
 }
 
@@ -157,7 +162,9 @@ function canonicalisedHeaders(headers: Record<string, string>): string {
   const xMsHeaders = Object.entries(headers)
     .filter(([k]) => k.toLowerCase().startsWith("x-ms-"))
     .map(([k, v]) => [k.toLowerCase(), v.trim()] as const)
-    .sort(([a], [b]) => a.localeCompare(b));
+    // Ordinal, not localeCompare: the spec compares bytes, and a
+    // locale-aware collation can order the same two names differently.
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 
   return xMsHeaders.map(([k, v]) => `${k}:${v}`).join("\n");
 }

@@ -95,7 +95,9 @@ export class AzureDatasetStorage implements DatasetStorage {
     // Re-validating here would be a second source of truth that drifts.
     const driver = new AzureBlobDriver({
       accountName: destination.accountName,
-      accountKey: env.AZURE_BLOB_ACCOUNT_KEY!,
+      // Trimmed to match resolveAzureDestination: a padded Kubernetes secret
+      // would otherwise base64-decode to the wrong key and fail every request.
+      accountKey: env.AZURE_BLOB_ACCOUNT_KEY!.trim(),
       endpointBaseUrl: env.AZURE_BLOB_ENDPOINT,
     });
     return {

@@ -126,7 +126,7 @@ async function waitForRow(
 
 beforeAll(async () => {
   azurite = await startAzurite();
-  await ensureAzuriteContainer(azurite, CONTAINER);
+  await ensureAzuriteContainer({ azurite, container: CONTAINER });
   driver = new AzureBlobDriver({
     accountName: azurite.accountName,
     accountKey: azurite.accountKey,
@@ -200,6 +200,13 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
       await driver.put(uri, bytes, "application/octet-stream");
       expect(await driver.exists(uri)).toBe(true);
       expect(await driver.head(uri)).toBe(0);
+
+      // Actually read it: a signed GET of a zero-length blob is its own case,
+      // not implied by exists() or head(). This is the suite that runs in CI.
+      const stream = await driver.get(uri);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) chunks.push(chunk as Buffer);
+      expect(Buffer.concat(chunks)).toHaveLength(0);
 
       await driver.delete(uri);
     });

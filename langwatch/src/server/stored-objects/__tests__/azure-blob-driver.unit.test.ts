@@ -44,6 +44,13 @@ function newDriver() {
 }
 
 describe("AzureBlobDriver", () => {
+  // Restored in a hook, never inline: a rejected assertion between
+  // useFakeTimers() and an inline restore would leave every subsequent test
+  // in this file on a frozen clock, failing somewhere unrelated.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("when registered alongside the existing drivers", () => {
     /** @scenario "Both drivers remain available for reads regardless of which scheme new URIs use" */
     it("uses an azure-blob scheme distinct from s3/file AND the registry round-trips existing azure-blob URIs through the driver", async () => {
@@ -348,7 +355,6 @@ describe("AzureBlobDriver", () => {
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
       await driver.put(KAT_URI, KAT_BODY, "application/octet-stream");
 
-      vi.useRealTimers();
 
       const [, init] = fetchSpy.mock.calls[0]!;
       const headers = init.headers as Record<string, string>;
@@ -439,7 +445,6 @@ describe("AzureBlobDriver", () => {
       const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
       await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
 
-      vi.useRealTimers();
 
       const stringToSign = [
         "PUT",
@@ -490,7 +495,6 @@ describe("AzureBlobDriver", () => {
       const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
       await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
 
-      vi.useRealTimers();
 
       const wrongStringToSign = [
         "PUT",

@@ -601,7 +601,7 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
      * together they satisfy it; neither test covers both on its own.
      */
     /** @scenario "defaultMintStorageUri and the groupQueue blob store mint azure-blob URIs for an azure destination" */
-    it("mints an azure-blob:// URI via defaultMintStorageUri", async () => {
+    it("writes the object to an azure-blob address and persists that same address", async () => {
       vi.mocked(dataplaneS3.getS3ConfigForProject).mockResolvedValueOnce(null);
       const env = mockedEnv as Record<string, string | undefined>;
       env.STORED_OBJECTS_BACKEND = "azure";
@@ -620,8 +620,14 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
 
       const putUri = vi.mocked(registry.put).mock.calls[0]![0];
       const insertedRow = vi.mocked(repo.insert).mock.calls[0]![0].row;
+
+      // Digest computed independently from the input bytes, not read off the
+      // row under test — otherwise a wrong sha256 would move both sides of
+      // the comparison together and the assertion would still pass.
+      const expectedSha256 = createHash("sha256").update(TEST_BYTES).digest("hex");
+      expect(insertedRow.sha256).toBe(expectedSha256);
       expect(putUri).toBe(
-        `azure-blob://lwacct/lw-container/${PROJECT_ID}/${insertedRow.sha256}`,
+        `azure-blob://lwacct/lw-container/${PROJECT_ID}/${expectedSha256}`,
       );
       expect(insertedRow.storage_uri).toBe(putUri);
     });

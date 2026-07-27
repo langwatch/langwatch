@@ -51,7 +51,7 @@ let project: Project;
 
 beforeAll(async () => {
   azurite = await startAzurite();
-  await ensureAzuriteContainer(azurite, CONTAINER);
+  await ensureAzuriteContainer({ azurite, container: CONTAINER });
 
   mockEnv.STORED_OBJECTS_BACKEND = "azure";
   mockEnv.AZURE_BLOB_ACCOUNT_NAME = azurite.accountName;

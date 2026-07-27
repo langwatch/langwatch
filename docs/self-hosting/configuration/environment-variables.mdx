@@ -222,6 +222,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.dataplane.providers.azureBlob.accountKey.value` | `AZURE_BLOB_ACCOUNT_KEY` |
 | `app.dataplane.providers.azureBlob.container.value` | `AZURE_BLOB_CONTAINER` |
 | `app.dataplane.providers.azureBlob.endpoint.value` | `AZURE_BLOB_ENDPOINT` (sovereign clouds, private endpoints, emulator) |
+| `app.dataplane.legacyS3ReadBucket` | `S3_BUCKET_NAME` — set during an S3→Azure migration so pre-migration objects stay readable; leave empty on a greenfield Azure install |
 | `postgresql.external.connectionString.value` | `DATABASE_URL` |
 | `redis.external.connectionString.value` | `REDIS_URL` |
 | `workers.enabled` | Inverse of `START_WORKERS` |
