@@ -60,6 +60,12 @@ export type CreateBudgetInput = {
   limitUsd: number | string | Prisma.Decimal;
   onBreach?: "BLOCK" | "WARN";
   timezone?: string | null;
+  /**
+   * ModelProvider row id the budget counts and constrains. Null (the
+   * default) counts every provider. Orthogonal to the scope target, which
+   * is what makes the full target x provider matrix expressible.
+   */
+  providerKey?: string | null;
   actorUserId: string;
 };
 
@@ -680,6 +686,27 @@ export class GatewayBudgetService {
       }
     }
 
+    // Provider-filtered budgets reference a ModelProvider row. The id is
+    // request-supplied, so pin it to the budget's own organization — a
+    // cross-org id would create a filter that can never match this org's
+    // dispatches and silently count nothing.
+    if (input.providerKey) {
+      const provider = await this.prisma.modelProvider.findFirst({
+        where: {
+          id: input.providerKey,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!provider) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "provider_not_in_organization: the provider filter must name a model provider configured in this organization.",
+        });
+      }
+    }
+
     const resetsAt = nextResetAt(input.window);
     const projectId = resolveProjectFromScope(input.scope);
 
@@ -695,6 +722,7 @@ export class GatewayBudgetService {
           limitUsd: new Prisma.Decimal(input.limitUsd.toString()),
           onBreach: input.onBreach ?? "BLOCK",
           timezone: input.timezone ?? null,
+          providerKey: input.providerKey ?? null,
           resetsAt,
           currentPeriodStartedAt: new Date(),
           createdById: input.actorUserId,

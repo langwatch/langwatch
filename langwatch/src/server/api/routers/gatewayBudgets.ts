@@ -75,6 +75,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         budgets,
         input.organizationId,
       );
+      const providerLabels = await resolveProviderLabels(ctx.prisma, budgets);
       return {
         spendAvailable,
         budgets: budgets.map((b) => ({
@@ -82,6 +83,9 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           spendAvailable,
           unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
           scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
+          providerLabel: b.providerKey
+            ? (providerLabels.get(b.providerKey) ?? b.providerKey)
+            : null,
         })),
       };
     }),
@@ -102,6 +106,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         budgets,
         project?.team.organizationId ?? null,
       );
+      const providerLabels = await resolveProviderLabels(ctx.prisma, budgets);
       return {
         spendAvailable,
         budgets: budgets.map((b) => ({
@@ -109,6 +114,9 @@ export const gatewayBudgetsRouter = createTRPCRouter({
           spendAvailable,
           unreachableByAnyKey: scopeReach.get(b.id)?.reachable === false,
           scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
+          providerLabel: b.providerKey
+            ? (providerLabels.get(b.providerKey) ?? b.providerKey)
+            : null,
         })),
       };
     }),
@@ -123,11 +131,18 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       if (!detail) {
         throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
       }
+      const providerLabels = await resolveProviderLabels(ctx.prisma, [
+        detail.budget,
+      ]);
       return {
         ...toDto(detail.budget),
         spendAvailable: detail.spendAvailable,
         unreachableByAnyKey: detail.unreachableByAnyKey,
         scopeTarget: detail.scopeTarget,
+        providerLabel: detail.budget.providerKey
+          ? (providerLabels.get(detail.budget.providerKey) ??
+            detail.budget.providerKey)
+          : null,
         recentLedger: detail.recentLedger.map((l) => ({
           id: l.id,
           virtualKeyId: l.virtualKeyId,
@@ -152,6 +167,9 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         limitUsd: z.number().positive().or(z.string()),
         onBreach: z.enum(["BLOCK", "WARN"]).optional(),
         timezone: z.string().nullable().optional(),
+        // ModelProvider row id. Null / absent = the budget counts every
+        // provider; set = it counts and constrains only that provider.
+        providerKey: z.string().nullable().optional(),
       }),
     )
     .use(checkOrganizationPermission("gatewayBudgets:create"))
@@ -166,6 +184,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
         limitUsd: input.limitUsd,
         onBreach: input.onBreach,
         timezone: input.timezone ?? null,
+        providerKey: input.providerKey ?? null,
         actorUserId: ctx.session.user.id,
       });
       return toDto(row);
@@ -212,6 +231,8 @@ export type BudgetListScopeTarget = {
   name: string;
   secondary: string | null;
   projectSlug?: string | null;
+  /** GROUP targets only: how many members the per-member allowance covers. */
+  memberCount?: number;
 };
 
 // Batch-resolves scope target (name + secondary) for a list of budgets,
@@ -229,11 +250,12 @@ async function resolveScopeTargetsBatch(
     PROJECT: new Set(),
     VIRTUAL_KEY: new Set(),
     PRINCIPAL: new Set(),
+    GROUP: new Set(),
   };
   for (const b of budgets) {
     ids[b.scopeType]?.add(b.scopeId);
   }
-  const [orgs, teams, projects, vks, users] = await Promise.all([
+  const [orgs, teams, projects, vks, users, groups] = await Promise.all([
     ids.ORGANIZATION?.size
       ? prisma.organization.findMany({
           where: { id: { in: [...ids.ORGANIZATION!] } },
@@ -274,6 +296,17 @@ async function resolveScopeTargetsBatch(
       ? prisma.user.findMany({
           where: { id: { in: [...ids.PRINCIPAL!] } },
           select: { id: true, name: true, email: true },
+        })
+      : Promise.resolve([]),
+    ids.GROUP?.size
+      ? prisma.group.findMany({
+          where: { id: { in: [...ids.GROUP!] } },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            _count: { select: { members: true } },
+          },
         })
       : Promise.resolve([]),
   ]);
@@ -336,6 +369,15 @@ async function resolveScopeTargetsBatch(
       secondary: u.email ?? null,
     });
   }
+  for (const g of groups) {
+    out.set(`GROUP:${g.id}`, {
+      kind: "GROUP",
+      id: g.id,
+      name: g.name,
+      secondary: g.slug,
+      memberCount: g._count.members,
+    });
+  }
   return out;
 }
 
@@ -352,10 +394,34 @@ function toDto(b: import("@prisma/client").GatewayBudget) {
     limitUsd: b.limitUsd.toString(),
     spentUsd: b.spentUsd.toString(),
     timezone: b.timezone,
+    providerKey: b.providerKey,
     currentPeriodStartedAt: b.currentPeriodStartedAt.toISOString(),
     resetsAt: b.resetsAt.toISOString(),
     lastResetAt: b.lastResetAt?.toISOString() ?? null,
     archivedAt: b.archivedAt?.toISOString() ?? null,
     createdAt: b.createdAt.toISOString(),
   };
+}
+
+/**
+ * Display names for the ModelProvider rows referenced by provider-filtered
+ * budgets, so a filter renders as "OpenAI only" instead of a row id.
+ */
+async function resolveProviderLabels(
+  prisma: import("@prisma/client").PrismaClient,
+  budgets: Array<{ providerKey: string | null }>,
+): Promise<Map<string, string>> {
+  const ids = [
+    ...new Set(
+      budgets
+        .map((b) => b.providerKey)
+        .filter((k): k is string => Boolean(k)),
+    ),
+  ];
+  if (ids.length === 0) return new Map();
+  const rows = await prisma.modelProvider.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true, provider: true },
+  });
+  return new Map(rows.map((r) => [r.id, r.name || r.provider]));
 }

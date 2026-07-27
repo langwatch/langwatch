@@ -40,6 +40,8 @@ export type ApplicableBudget = {
   limitUsd: string;
   spentUsd: string;
   onBreach: string;
+  /** Null means resets are computed in the default timezone (UTC). */
+  timezone: string | null;
   /** Null when the budget counts every provider. */
   providerKey: string | null;
   /** Display name for `providerKey`, so the list can say "OpenAI only". */
@@ -91,6 +93,7 @@ export async function resolveApplicableBudgetsForDraftKey(
     limitUsd: budget.limitUsd.toFixed(6),
     spentUsd: spentByBudgetId.get(budget.id) ?? "0",
     onBreach: budget.onBreach,
+    timezone: budget.timezone,
     providerKey: budget.providerKey,
     providerLabel: budget.providerKey
       ? (providerLabels.get(budget.providerKey) ?? budget.providerKey)

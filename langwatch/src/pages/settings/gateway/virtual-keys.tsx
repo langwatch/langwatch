@@ -33,6 +33,7 @@ import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
+import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -81,6 +82,20 @@ function VirtualKeysPage() {
     { organizationId: orgId },
     { enabled: !!orgId },
   );
+  // Current-calendar-month spend per visible key, read from the same
+  // cost path the Usage tab reads so the click-through lands on numbers
+  // that agree with the one clicked.
+  const spendQuery = api.virtualKeys.spendThisMonth.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId },
+  );
+  const spendByKeyId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of spendQuery.data ?? []) {
+      map.set(row.virtualKeyId, row.spentUsd);
+    }
+    return map;
+  }, [spendQuery.data]);
   const policyNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const p of policiesQuery.data ?? []) {
@@ -290,8 +305,11 @@ function VirtualKeysPage() {
                           <Table.ColumnHeader>Prefix</Table.ColumnHeader>
                           <Table.ColumnHeader>Status</Table.ColumnHeader>
                           <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+                          <Table.ColumnHeader>Routing</Table.ColumnHeader>
                           <Table.ColumnHeader>
-                            Routing policy
+                            <Tooltip content="Spend this calendar month, from the same cost data the Usage tab shows. Click a value to open Usage filtered to that key.">
+                              <Text as="span">Spent this month</Text>
+                            </Tooltip>
                           </Table.ColumnHeader>
                           <Table.ColumnHeader>Last used</Table.ColumnHeader>
                           <Table.ColumnHeader></Table.ColumnHeader>
@@ -383,11 +401,45 @@ function VirtualKeysPage() {
                                   {policyNameById.get(vk.routingPolicyId) ??
                                     vk.routingPolicyId}
                                 </Badge>
+                              ) : vk.routingMode === "FALLBACK_ALL" ? (
+                                <Text fontSize="xs" color="fg.muted">
+                                  fallback: all providers
+                                </Text>
                               ) : (
                                 <Text fontSize="xs" color="fg.muted">
-                                  default cascade
+                                  no fallback
                                 </Text>
                               )}
+                            </Table.Cell>
+                            <Table.Cell
+                              onClick={(e) => e.stopPropagation()}
+                              cursor="default"
+                            >
+                              <Link
+                                href={`/settings/gateway/usage?vk=${vk.id}&days=30`}
+                                data-testid={`vk-spend-${vk.id}`}
+                                aria-label={`Usage for ${vk.name}, past 30 days`}
+                              >
+                                <Text
+                                  fontSize="sm"
+                                  fontVariantNumeric="tabular-nums"
+                                  color={
+                                    spendByKeyId.get(vk.id) &&
+                                    Number.parseFloat(
+                                      spendByKeyId.get(vk.id)!,
+                                    ) > 0
+                                      ? "fg"
+                                      : "fg.muted"
+                                  }
+                                  _hover={{ textDecoration: "underline" }}
+                                >
+                                  {spendQuery.isLoading
+                                    ? "…"
+                                    : formatBudgetUsd(
+                                        spendByKeyId.get(vk.id) ?? "0",
+                                      )}
+                                </Text>
+                              </Link>
                             </Table.Cell>
                             <Table.Cell>
                               {vk.lastUsedAt ? (

@@ -5,10 +5,20 @@ import {
   Input,
   NativeSelect,
   Spacer,
+  Text,
   Textarea,
   VStack,
+  Wrap,
 } from "@chakra-ui/react";
-import { useState } from "react";
+import {
+  Boxes,
+  Building2,
+  Folder,
+  KeyRound,
+  User,
+  Users,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
@@ -17,14 +27,43 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { api } from "~/utils/api";
 
+import { humanizeGatewayError } from "./gatewayErrorCopy";
+
 type BudgetCreateDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
 };
 
-type ScopeKind = "ORGANIZATION" | "TEAM" | "PROJECT" | "PRINCIPAL";
+type ScopeKind =
+  | "ORGANIZATION"
+  | "GROUP"
+  | "TEAM"
+  | "PROJECT"
+  | "PRINCIPAL"
+  | "VIRTUAL_KEY";
 type Window = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
+
+const KIND_OPTIONS: Array<{
+  kind: ScopeKind;
+  label: string;
+  icon: React.ReactElement;
+}> = [
+  {
+    kind: "ORGANIZATION",
+    label: "Organization",
+    icon: <Building2 size={14} aria-hidden />,
+  },
+  { kind: "GROUP", label: "Department", icon: <Boxes size={14} aria-hidden /> },
+  { kind: "TEAM", label: "Team", icon: <Users size={14} aria-hidden /> },
+  { kind: "PROJECT", label: "Project", icon: <Folder size={14} aria-hidden /> },
+  { kind: "PRINCIPAL", label: "Member", icon: <User size={14} aria-hidden /> },
+  {
+    kind: "VIRTUAL_KEY",
+    label: "Virtual key",
+    icon: <KeyRound size={14} aria-hidden />,
+  },
+];
 
 export function BudgetCreateDrawer({
   open,
@@ -35,18 +74,64 @@ export function BudgetCreateDrawer({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [scopeKind, setScopeKind] = useState<ScopeKind>("PROJECT");
-  const [principalUserId, setPrincipalUserId] = useState("");
+  const [targetId, setTargetId] = useState<string>("");
+  const [providerKey, setProviderKey] = useState<string>("");
   const [window, setWindow] = useState<Window>("MONTH");
   const [limitUsd, setLimitUsd] = useState("");
   const [onBreach, setOnBreach] = useState<"BLOCK" | "WARN">("BLOCK");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const orgId = organization?.id ?? "";
+
   const membersQuery = api.organization.getAllOrganizationMembers.useQuery(
-    { organizationId: organization?.id ?? "" },
+    { organizationId: orgId },
     {
-      enabled: !!organization?.id && scopeKind === "PRINCIPAL",
+      enabled: !!orgId && open && scopeKind === "PRINCIPAL",
       refetchOnWindowFocus: false,
     },
+  );
+  const departmentsQuery = api.departments.list.useQuery(
+    { organizationId: orgId },
+    {
+      enabled: !!orgId && open && scopeKind === "GROUP",
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
+  );
+  const keysQuery = api.virtualKeys.list.useQuery(
+    { organizationId: orgId },
+    {
+      enabled: !!orgId && open && scopeKind === "VIRTUAL_KEY",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const providersQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId: orgId },
+      { enabled: !!orgId && open, refetchOnWindowFocus: false },
+    );
+
+  const teams = useMemo(
+    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    [organization?.teams],
+  );
+  const projects = useMemo(
+    () =>
+      organization?.teams?.flatMap((t) =>
+        t.projects.map((p) => ({ id: p.id, name: `${p.name} · ${t.name}` })),
+      ) ?? [],
+    [organization?.teams],
+  );
+  const activeKeys = useMemo(
+    () => (keysQuery.data ?? []).filter((k) => k.status === "active"),
+    [keysQuery.data],
+  );
+  const providerOptions = useMemo(
+    () =>
+      (providersQuery.data?.providers ?? [])
+        .filter((p) => p.id)
+        .map((p) => ({ id: p.id!, name: p.name ?? p.provider })),
+    [providersQuery.data],
   );
 
   const utils = api.useContext();
@@ -71,7 +156,8 @@ export function BudgetCreateDrawer({
     setName("");
     setDescription("");
     setScopeKind("PROJECT");
-    setPrincipalUserId("");
+    setTargetId("");
+    setProviderKey("");
     setWindow("MONTH");
     setLimitUsd("");
     setOnBreach("BLOCK");
@@ -84,6 +170,39 @@ export function BudgetCreateDrawer({
     onOpenChange(false);
   };
 
+  const pickKind = (kind: ScopeKind) => {
+    setScopeKind(kind);
+    setSubmitError(null);
+    // Seed the target with the current context where one exists.
+    if (kind === "TEAM") setTargetId(team?.id ?? "");
+    else if (kind === "PROJECT") setTargetId(project?.id ?? "");
+    else setTargetId("");
+  };
+
+  const targetOptions: Array<{ id: string; name: string }> | null =
+    scopeKind === "ORGANIZATION"
+      ? null
+      : scopeKind === "GROUP"
+        ? (departmentsQuery.data ?? []).map((d) => ({
+            id: d.id,
+            name: d.name,
+          }))
+        : scopeKind === "TEAM"
+          ? teams
+          : scopeKind === "PROJECT"
+            ? projects
+            : scopeKind === "PRINCIPAL"
+              ? (membersQuery.data ?? []).map((m) => ({
+                  id: m.id,
+                  name: m.name ?? m.email ?? m.id,
+                }))
+              : activeKeys.map((k) => ({ id: k.id, name: k.name }));
+
+  const targetsLoading =
+    (scopeKind === "GROUP" && departmentsQuery.isLoading) ||
+    (scopeKind === "PRINCIPAL" && membersQuery.isLoading) ||
+    (scopeKind === "VIRTUAL_KEY" && keysQuery.isLoading);
+
   const submit = async () => {
     if (!organization) return;
     if (!name || !limitUsd) {
@@ -92,31 +211,30 @@ export function BudgetCreateDrawer({
     }
     const parsed = Number.parseFloat(limitUsd);
     if (!Number.isFinite(parsed) || parsed <= 0) {
-      toaster.create({ title: "Limit must be a positive number", type: "error" });
+      toaster.create({
+        title: "Limit must be a positive number",
+        type: "error",
+      });
+      return;
+    }
+    if (scopeKind !== "ORGANIZATION" && !targetId) {
+      setSubmitError("Pick what this budget applies to.");
       return;
     }
     setSubmitError(null);
     try {
-      if (scopeKind === "TEAM" && !team?.id) {
-        toaster.create({ title: "Team scope requires a team", type: "error" });
-        return;
-      }
-      if (scopeKind === "PROJECT" && !project?.id) {
-        toaster.create({ title: "Project scope requires a project", type: "error" });
-        return;
-      }
-      if (scopeKind === "PRINCIPAL" && !principalUserId) {
-        setSubmitError("Pick a member to bind this principal-scope budget to.");
-        return;
-      }
       const scope =
         scopeKind === "ORGANIZATION"
           ? { kind: "ORGANIZATION" as const, organizationId: organization.id }
-          : scopeKind === "TEAM"
-          ? { kind: "TEAM" as const, teamId: team?.id ?? "" }
-          : scopeKind === "PROJECT"
-          ? { kind: "PROJECT" as const, projectId: project?.id ?? "" }
-          : { kind: "PRINCIPAL" as const, principalUserId };
+          : scopeKind === "GROUP"
+            ? { kind: "GROUP" as const, groupId: targetId }
+            : scopeKind === "TEAM"
+              ? { kind: "TEAM" as const, teamId: targetId }
+              : scopeKind === "PROJECT"
+                ? { kind: "PROJECT" as const, projectId: targetId }
+                : scopeKind === "PRINCIPAL"
+                  ? { kind: "PRINCIPAL" as const, principalUserId: targetId }
+                  : { kind: "VIRTUAL_KEY" as const, virtualKeyId: targetId };
       await createMutation.mutateAsync({
         organizationId: organization.id,
         name,
@@ -125,20 +243,13 @@ export function BudgetCreateDrawer({
         window,
         limitUsd,
         onBreach,
+        providerKey: providerKey || null,
       });
       onCreated();
       reset();
       onOpenChange(false);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to create budget";
-      // Cross-org guard + missing-member errors are inline-actionable; other
-      // failures get a toast so the user knows something happened.
-      if (scopeKind === "PRINCIPAL") {
-        setSubmitError(message);
-      } else {
-        toaster.create({ title: message, type: "error" });
-      }
+      setSubmitError(humanizeGatewayError(error, "Failed to create budget"));
     }
   };
 
@@ -179,71 +290,115 @@ export function BudgetCreateDrawer({
                 placeholder="Optional. Who owns this? What's the policy?"
               />
             </Field.Root>
+
             <Field.Root required>
               <Field.Label>
-                Scope
+                Applies to
                 <FieldInfoTooltip
-                  description="Which resource the budget covers. Budgets are hierarchical — a request is checked against every budget that applies (org + team + project + virtual-key + principal). Any scope in breach blocks or warns per the on_breach action."
+                  description="What the budget covers. Budgets stack: a request is checked against every budget that applies to it (organization + department + team + project + member + virtual key), and any one in breach blocks or warns per its on-breach action. A department budget gives each member their own allowance rather than one shared pot."
                   docHref="/ai-gateway/budgets#scopes"
+                  testId="budget-applies-to-info"
                 />
               </Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={scopeKind}
-                  onChange={(e) =>
-                    setScopeKind((e.target.value as ScopeKind) ?? "PROJECT")
-                  }
-                >
-                  <option value="ORGANIZATION">
-                    Organization — all AI spend
-                  </option>
-                  <option value="TEAM">Team — {team?.name ?? "current"}</option>
-                  <option value="PROJECT">
-                    Project — {project?.name ?? "current"}
-                  </option>
-                  <option value="PRINCIPAL">
-                    Principal — single org member
-                  </option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>
-                Virtual-key scope is configured from each VK's detail page.
-              </Field.HelperText>
-            </Field.Root>
-            {scopeKind === "PRINCIPAL" && (
-              <Field.Root required>
-                <Field.Label>
-                  Member
-                  <FieldInfoTooltip
-                    description="Bind the budget to one organization member. Their AI spend across every project + virtual key in this org counts toward this cap. Cross-org users are rejected by the backend guard."
-                    docHref="/ai-gateway/budgets#principal-scope"
-                  />
-                </Field.Label>
+              <Wrap gap={2} role="group" aria-label="Budget target kind">
+                {KIND_OPTIONS.map((o) => {
+                  const active = scopeKind === o.kind;
+                  return (
+                    <Button
+                      key={o.kind}
+                      type="button"
+                      size="xs"
+                      variant={active ? "solid" : "outline"}
+                      aria-pressed={active}
+                      onClick={() => pickKind(o.kind)}
+                      data-testid={`budget-kind-${o.kind.toLowerCase()}`}
+                    >
+                      <HStack gap={1}>
+                        {o.icon}
+                        <Text>{o.label}</Text>
+                      </HStack>
+                    </Button>
+                  );
+                })}
+              </Wrap>
+              {scopeKind === "ORGANIZATION" ? (
+                <Text fontSize="xs" color="fg.muted" marginTop={1}>
+                  All AI spend in {organization?.name ?? "the organization"}.
+                </Text>
+              ) : (
                 <NativeSelect.Root
                   size="sm"
-                  disabled={membersQuery.isLoading}
+                  marginTop={1}
+                  disabled={targetsLoading}
                 >
                   <NativeSelect.Field
-                    value={principalUserId}
-                    onChange={(e) => setPrincipalUserId(e.target.value)}
+                    value={targetId}
+                    aria-label="Budget target"
+                    data-testid="budget-target"
+                    onChange={(e) => setTargetId(e.target.value)}
                   >
                     <option value="">
-                      {membersQuery.isLoading
-                        ? "Loading members…"
-                        : "Pick a member"}
+                      {targetsLoading
+                        ? "Loading…"
+                        : `Pick a ${
+                            KIND_OPTIONS.find((o) => o.kind === scopeKind)
+                              ?.label.toLowerCase() ?? "target"
+                          }`}
                     </option>
-                    {(membersQuery.data ?? []).map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name ?? m.email ?? m.id}
+                    {(targetOptions ?? []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
                       </option>
                     ))}
                   </NativeSelect.Field>
                 </NativeSelect.Root>
-              </Field.Root>
-            )}
+              )}
+              {scopeKind === "GROUP" && (
+                <Text fontSize="xs" color="fg.muted" marginTop={1}>
+                  Each member of the department gets this limit individually.
+                </Text>
+              )}
+              {scopeKind === "GROUP" && departmentsQuery.isError && (
+                <Text fontSize="xs" color="red.600" marginTop={1}>
+                  Departments could not be loaded
+                  {departmentsQuery.error?.data?.code === "FORBIDDEN"
+                    ? " — governance access is required to target one."
+                    : "."}
+                </Text>
+              )}
+            </Field.Root>
+
+            <Field.Root>
+              <Field.Label>
+                Provider
+                <FieldInfoTooltip
+                  description="Count and constrain spend on one provider only, e.g. 'OpenAI $200/month for this team'. With a provider set, only requests dispatched to that provider debit this budget, and on breach only that provider is withheld — others keep serving."
+                  docHref="/ai-gateway/budgets#provider-filter"
+                  testId="budget-provider-info"
+                />
+              </Field.Label>
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value={providerKey}
+                  aria-label="Provider filter"
+                  data-testid="budget-provider"
+                  onChange={(e) => setProviderKey(e.target.value)}
+                >
+                  <option value="">All providers</option>
+                  {providerOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} only
+                    </option>
+                  ))}
+                </NativeSelect.Field>
+              </NativeSelect.Root>
+            </Field.Root>
+
             {submitError && (
               <Field.Root invalid>
-                <Field.ErrorText>{submitError}</Field.ErrorText>
+                <Field.ErrorText data-testid="budget-submit-error">
+                  {submitError}
+                </Field.ErrorText>
               </Field.Root>
             )}
             <HStack gap={4} align="flex-start">

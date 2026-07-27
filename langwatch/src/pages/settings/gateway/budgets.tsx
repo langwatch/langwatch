@@ -133,9 +133,10 @@ function BudgetsPage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No budgets yet</EmptyState.Title>
                 <EmptyState.Description>
-                  Hierarchical budgets enforce a spend ceiling across
-                  organization, team, project, virtual-key, or principal.
-                  Create one to start governing cost.
+                  Budgets enforce a spend ceiling on any dimension:
+                  organization, department, team, project, member, or virtual
+                  key — each optionally limited to a single provider. Create
+                  one to start governing cost.
                 </EmptyState.Description>
                 {canCreate && (
                   <Button
@@ -225,6 +226,7 @@ function BudgetsPage() {
                             scopeType={b.scopeType}
                             scopeTarget={b.scopeTarget ?? null}
                             projectSlug={project?.slug ?? null}
+                            providerLabel={b.providerLabel ?? null}
                           />
                           {b.unreachableByAnyKey && (
                             <Tooltip
@@ -256,6 +258,34 @@ function BudgetsPage() {
                               / {formatBudgetUsd(limit)}
                             </Text>
                           </HStack>
+                        ) : b.scopeType === "GROUP" ? (
+                          // A department budget is one allowance per member;
+                          // the only number the list can total is everyone's
+                          // spend together, so it is labelled as exactly
+                          // that. Per-member standing lives on the detail
+                          // page and in the key drawer's applies list.
+                          <VStack
+                            align="stretch"
+                            gap={0.5}
+                            data-testid="budget-group-spend"
+                          >
+                            <HStack fontSize="xs" gap={1}>
+                              <Text fontWeight="medium">
+                                {formatBudgetUsd(spent)}
+                              </Text>
+                              <Text color="fg.muted">department total</Text>
+                            </HStack>
+                            <Text fontSize="2xs" color="fg.muted">
+                              {formatBudgetUsd(limit)} per member
+                              {typeof b.scopeTarget?.memberCount === "number"
+                                ? ` · ${b.scopeTarget.memberCount} ${
+                                    b.scopeTarget.memberCount === 1
+                                      ? "member"
+                                      : "members"
+                                  }`
+                                : ""}
+                            </Text>
+                          </VStack>
                         ) : (
                         <VStack align="stretch" gap={1}>
                           <HStack fontSize="xs">
@@ -366,7 +396,7 @@ function BudgetsPage() {
         </Box>
       </>
 
-      {project?.id && (
+      {organization?.id && (
         <BudgetCreateDrawer
           open={createOpen}
           onOpenChange={setCreateOpen}
@@ -407,25 +437,55 @@ type ScopeTarget = {
   name: string;
   secondary?: string | null;
   projectSlug?: string | null;
+  memberCount?: number;
 };
 
 function ScopeCell({
   scopeType,
   scopeTarget,
   projectSlug,
+  providerLabel,
 }: {
   scopeType: string;
   scopeTarget: ScopeTarget | null;
   projectSlug: string | null;
+  providerLabel?: string | null;
 }) {
-  const kindLabel = scopeType.toLowerCase().replace("_", " ");
+  const kindLabel =
+    scopeType === "GROUP"
+      ? "department"
+      : scopeType.toLowerCase().replace("_", " ");
   const vkHref =
     scopeTarget?.kind === "VIRTUAL_KEY"
       ? `/settings/gateway/virtual-keys/${scopeTarget.id}`
       : null;
   return (
     <VStack align="start" gap={0.5}>
-      <Badge colorPalette="gray">{kindLabel}</Badge>
+      <HStack gap={1}>
+        <Badge colorPalette="gray">{kindLabel}</Badge>
+        {scopeType === "GROUP" && (
+          <Tooltip content="Each member of the department gets this limit individually.">
+            <Badge
+              colorPalette="cyan"
+              variant="subtle"
+              data-testid="budget-per-member-badge"
+            >
+              per member
+            </Badge>
+          </Tooltip>
+        )}
+        {providerLabel && (
+          <Tooltip content="Only spend dispatched to this provider counts toward this budget.">
+            <Badge
+              colorPalette="blue"
+              variant="subtle"
+              data-testid="budget-provider-badge"
+            >
+              {providerLabel} only
+            </Badge>
+          </Tooltip>
+        )}
+      </HStack>
       {scopeTarget && (
         <HStack gap={1}>
           {vkHref ? (

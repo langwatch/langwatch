@@ -31,6 +31,7 @@ export type VirtualKeyCamelDto = {
   principalUser: { name: string | null; email: string | null } | null;
   scopes: VirtualKeyScopeEntry[];
   routingPolicyId: string | null;
+  routingMode: "NONE" | "FALLBACK_ALL" | "POLICY";
   config: unknown;
   revision: string;
   createdAt: string;
@@ -50,6 +51,7 @@ export type VirtualKeySnakeDto = {
   principal_user_id: string | null;
   scopes: Array<{ scope_type: string; scope_id: string }>;
   routing_policy_id: string | null;
+  routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
   config: unknown;
   revision: string;
   created_at: string;
@@ -78,6 +80,7 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
       scopeId: s.scopeId,
     })),
     routingPolicyId: vk.routingPolicyId,
+    routingMode: vk.routingMode,
     config: vk.config,
     revision: vk.revision.toString(),
     createdAt: vk.createdAt.toISOString(),
@@ -111,6 +114,7 @@ export function toVirtualKeySnakeDto(
       scope_id: s.scopeId,
     })),
     routing_policy_id: base.routingPolicyId,
+    routing_mode: base.routingMode,
     config: base.config,
     revision: base.revision,
     created_at: base.createdAt,

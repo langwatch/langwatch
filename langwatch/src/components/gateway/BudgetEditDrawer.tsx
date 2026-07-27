@@ -23,6 +23,8 @@ type BudgetRow = {
   name: string;
   description: string | null;
   scopeType: string;
+  scopeTarget?: { name: string } | null;
+  providerLabel?: string | null;
   window: string;
   limitUsd: string;
   onBreach: "BLOCK" | "WARN";
@@ -136,10 +138,20 @@ export function BudgetEditDrawer({
               />
             </Field.Root>
             <Field.Root>
-              <Field.Label>Scope</Field.Label>
+              <Field.Label>Applies to</Field.Label>
               <Text fontSize="sm" color="fg.muted">
-                {budget?.scopeType.toLowerCase()} (immutable after create)
+                {budget?.scopeType === "GROUP"
+                  ? "department"
+                  : budget?.scopeType.toLowerCase().replace("_", " ")}
+                {budget?.scopeTarget?.name ? ` — ${budget.scopeTarget.name}` : ""}
+                {budget?.providerLabel ? `, ${budget.providerLabel} only` : ""}{" "}
+                (immutable after create)
               </Text>
+              {budget?.scopeType === "GROUP" && (
+                <Field.HelperText>
+                  Each member of the department gets this limit individually.
+                </Field.HelperText>
+              )}
             </Field.Root>
             <Field.Root>
               <Field.Label>Window</Field.Label>
