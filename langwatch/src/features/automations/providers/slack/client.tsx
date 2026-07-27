@@ -265,8 +265,8 @@ function channelOption(channel: {
  * AUTOMATICALLY and drops in as filterable suggestions. Picking a suggestion
  * stores the channel ID (what `chat.postMessage` wants), while free typing is
  * kept verbatim so a custom / not-yet-listed channel still works — committed
- * when the author leaves the field, not on every keystroke. A missing scope
- * degrades to a hint, never a hard error.
+ * on blur or Enter, not on every keystroke. A missing scope degrades to a
+ * hint, never a hard error.
  */
 function SlackChannelField({
   projectId,
@@ -339,7 +339,7 @@ function SlackChannelField({
   const [selectedId, setSelectedId] = useState("");
   // Once the author starts typing, the field is theirs — nothing below may
   // reach in and rewrite what they are searching for.
-  const authorTyped = useRef(false);
+  const hasAuthorTyped = useRef(false);
 
   // Text typed but not yet committed to the slice. A ref, not state, and
   // deliberately NOT written through on every keystroke: writing the slice
@@ -360,7 +360,7 @@ function SlackChannelField({
   // Promoting it to a real selection once the list can resolve it lets the
   // combobox fill in the channel NAME, which is what the author recognises.
   useEffect(() => {
-    if (authorTyped.current) return;
+    if (hasAuthorTyped.current) return;
     const stored = (channelData ?? []).find((c) => c.id === slice.channelId);
     if (stored) setSelectedId(stored.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -421,7 +421,7 @@ function SlackChannelField({
           // Free entry (paste an ID / type a name that isn't listed) is held
           // until the author leaves the field — see `commitTypedChannel`.
           if (details.reason === "input-change") {
-            authorTyped.current = true;
+            hasAuthorTyped.current = true;
             pendingText.current = details.inputValue;
           }
         }}

@@ -410,9 +410,9 @@ describe("SlackConfigForm channel picker", () => {
         );
         await user.tab();
 
-        expect(onChangeSpy.mock.calls.at(-1)![0]).toMatchObject({
-          channelId: "#adhoc",
-        });
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "#adhoc" }),
+        );
       });
 
       it("carries the typed text into the slice on Enter", async () => {
@@ -425,9 +425,9 @@ describe("SlackConfigForm channel picker", () => {
           "#adhoc{Enter}",
         );
 
-        expect(onChangeSpy.mock.calls.at(-1)![0]).toMatchObject({
-          channelId: "#adhoc",
-        });
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "#adhoc" }),
+        );
       });
     });
 
@@ -441,9 +441,30 @@ describe("SlackConfigForm channel picker", () => {
         await user.click(input);
         await user.click(await screen.findByText("#release-signoff"));
 
-        expect(onChangeSpy.mock.calls.at(-1)![0]).toMatchObject({
-          channelId: "C003",
-        });
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "C003" }),
+        );
+        expect(input).toHaveValue("#release-signoff");
+      });
+
+      // Enter means two things in this field: commit what was typed, and
+      // accept the highlighted suggestion. Both handlers fire on the same
+      // keypress, so the one that lands LAST decides what gets saved — a
+      // suggestion the author deliberately highlighted must beat the search
+      // text they typed to find it.
+      it("keeps the highlighted channel, not the search text, when Enter accepts a suggestion", async () => {
+        const user = typist();
+        const onChangeSpy = vi.fn();
+        renderForm({ initial: botSlice({ channelId: "" }), onChangeSpy });
+        const input = screen.getByPlaceholderText(/#alerts or c0123/i);
+
+        await user.click(input);
+        await user.type(input, "signoff");
+        await user.keyboard("{ArrowDown}{Enter}");
+
+        expect(onChangeSpy).toHaveBeenLastCalledWith(
+          expect.objectContaining({ channelId: "C003" }),
+        );
         expect(input).toHaveValue("#release-signoff");
       });
     });
