@@ -115,7 +115,8 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
   });
 
   describe("rewriteChunk()", () => {
-    it("overwrites a chunk object in place", async () => {
+    describe("when a chunk is rewritten in place", () => {
+      it("returns the replacement rows on the next read", async () => {
       const projectId = `p-${nanoid(6)}`;
       const datasetId = `d-${nanoid(6)}`;
       await storage.writeChunks({ projectId, datasetId, records: [{ a: 1 }] });
@@ -127,13 +128,15 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
         records: [{ a: 99 }],
       });
 
-      const rows = await storage.readChunk({ projectId, datasetId, index: 0 });
-      expect(rows).toEqual([{ a: 99 }]);
+        const rows = await storage.readChunk({ projectId, datasetId, index: 0 });
+        expect(rows).toEqual([{ a: 99 }]);
+      });
     });
   });
 
   describe("deleteChunksFrom()", () => {
-    it("deletes contiguous chunks from the given index", async () => {
+    describe("when deleting from a non-zero index", () => {
+      it("removes the tail and leaves earlier chunks readable", async () => {
       const projectId = `p-${nanoid(6)}`;
       const datasetId = `d-${nanoid(6)}`;
       await storage.writeChunks({
@@ -154,13 +157,15 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
         storage.readChunk({ projectId, datasetId, index: 1 }),
       ).rejects.toThrow();
       // Chunk 0 still readable — only the tail was deleted.
-      const rows = await storage.readChunk({ projectId, datasetId, index: 0 });
-      expect(rows).toEqual([{ a: 1 }]);
+        const rows = await storage.readChunk({ projectId, datasetId, index: 0 });
+        expect(rows).toEqual([{ a: 1 }]);
+      });
     });
   });
 
   describe("putStaged() / streamStaged() / headStagedObjectSize()", () => {
-    it("round-trips a staged upload through Azure Blob", async () => {
+    describe("when a staged upload is deposited server-side", () => {
+      it("round-trips the bytes and reports the size before deletion", async () => {
       const { Readable } = await import("node:stream");
       const projectId = `p-${nanoid(6)}`;
       const key = `staging/${projectId}/${nanoid(6)}`;
@@ -179,8 +184,9 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
       for await (const chunk of stream) chunks.push(chunk as Buffer);
       expect(Buffer.concat(chunks).toString("utf-8")).toBe("staged bytes");
 
-      await storage.deleteStaged({ projectId, key });
-      await expect(storage.streamStaged({ projectId, key })).rejects.toThrow();
+        await storage.deleteStaged({ projectId, key });
+        await expect(storage.streamStaged({ projectId, key })).rejects.toThrow();
+      });
     });
   });
 });
