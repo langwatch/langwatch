@@ -578,6 +578,37 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // navigation. The CLI wrapper mints a VK lazily on first gateway call
     // once a provider chain becomes available.
 
+    // Personal project delivery: the personal project is a normal project
+    // with a normal apiKey, and it is what data commands (`langwatch trace
+    // search`, `/api/me/usage`, ...) authenticate with after a device
+    // login. Ensure the workspace here (idempotent; approve may have
+    // skipped VK minting for provider-less orgs) and ship its key so the
+    // CLI never has to ask the user for one. Best-effort: a workspace
+    // failure must not fail the login itself, and older CLIs ignore the
+    // extra field.
+    let personalProject:
+      | { id: string; slug: string; name: string; api_key: string }
+      | undefined;
+    try {
+      const workspace = await new PersonalWorkspaceService(prisma).ensure({
+        userId: user.id,
+        organizationId: organization.id,
+        displayName: user.name,
+        displayEmail: user.email,
+      });
+      personalProject = {
+        id: workspace.project.id,
+        slug: workspace.project.slug,
+        name: workspace.project.name,
+        api_key: workspace.project.apiKey,
+      };
+    } catch (err) {
+      logger.error(
+        { err, userId: user.id, organizationId: organization.id },
+        "[auth-cli] could not ensure personal workspace on exchange; device session ships without personal_project",
+      );
+    }
+
     // Mint access + refresh tokens, persist both in Redis with TTL so
     // protected CLI endpoints (/budget/status etc.) can validate Bearer
     // tokens against an authoritative store.
@@ -661,6 +692,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           slug: organization.slug,
         },
         default_personal_vk: record.personal_vk,
+        personal_project: personalProject,
         endpoint: responseEndpoint,
       },
       200,
@@ -992,6 +1024,164 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
     organizationId: tokenRecord.organization_id,
   });
   return c.json(result, 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/personal-project
+// ---------------------------------------------------------------------------
+// Lazy personal-key exchange for device sessions minted before /exchange
+// started shipping `personal_project`. The CLI calls this once with its
+// bearer token, persists the key into ~/.langwatch/config.json, and never
+// asks again. Ensures the workspace (idempotent) so sessions approved via
+// the provider-less branch, which skips VK minting, still resolve a key.
+//
+// Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+// ---------------------------------------------------------------------------
+secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const user = await prisma.user.findUnique({
+    where: { id: tokenRecord.user_id },
+    select: { name: true, email: true },
+  });
+  try {
+    const workspace = await new PersonalWorkspaceService(prisma).ensure({
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      displayName: user?.name,
+      displayEmail: user?.email,
+    });
+    return c.json(
+      {
+        project: {
+          id: workspace.project.id,
+          slug: workspace.project.slug,
+          name: workspace.project.name,
+          api_key: workspace.project.apiKey,
+        },
+      },
+      200,
+    );
+  } catch (err) {
+    logger.error(
+      { err, userId: tokenRecord.user_id },
+      "[auth-cli] personal-project resolution failed",
+    );
+    return c.json(
+      {
+        error: "server_error",
+        error_description: "Could not resolve your personal project",
+      },
+      500,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/cli/project-key
+// ---------------------------------------------------------------------------
+// Non-interactive project login: `langwatch login --project <slug>` in a
+// headless context (agent VM, CI without a key). The device session proves
+// the user; the same RBAC gate as the browser approve flow applies
+// (`project:update`, because Project.apiKey is the shared write credential),
+// and nothing new is minted, the project's existing key is returned. The
+// caller's OWN personal project is allowed, exactly like the authorize page's
+// explicit personal pick; anyone else's personal project is refused.
+//
+// Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+// ---------------------------------------------------------------------------
+const projectKeyRequestSchema = z.object({
+  slug: z.string().min(1),
+});
+
+secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = projectKeyRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_request", error_description: "slug is required" },
+      400,
+    );
+  }
+  const project = await prisma.project.findFirst({
+    where: {
+      slug: parsed.data.slug,
+      archivedAt: null,
+      team: { organizationId: tokenRecord.organization_id },
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      apiKey: true,
+      isPersonal: true,
+      ownerUserId: true,
+    },
+  });
+  if (!project) {
+    return c.json(
+      {
+        error: "not_found",
+        error_description: `No project with slug "${parsed.data.slug}" in your organization`,
+      },
+      404,
+    );
+  }
+  if (project.isPersonal && project.ownerUserId !== tokenRecord.user_id) {
+    return c.json(
+      {
+        error: "personal_project_not_allowed",
+        error_description:
+          "Another user's personal project can't back your API key. Pick a shared team project.",
+      },
+      400,
+    );
+  }
+  const canWriteProject = await hasProjectPermission(
+    {
+      prisma,
+      session: { user: { id: tokenRecord.user_id } },
+    } as Parameters<typeof hasProjectPermission>[0],
+    project.id,
+    "project:update",
+  );
+  if (!canWriteProject) {
+    return c.json(
+      {
+        error: "forbidden",
+        error_description:
+          "You need write access to this project to retrieve its API key.",
+      },
+      403,
+    );
+  }
+  return c.json(
+    {
+      api_key: project.apiKey,
+      project: { id: project.id, slug: project.slug, name: project.name },
+    },
+    200,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1620,6 +1810,7 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
         name: true,
         apiKey: true,
         isPersonal: true,
+        ownerUserId: true,
       },
     });
     if (!project) {
@@ -1633,17 +1824,19 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
       );
     }
 
-    // Project login must target a real, shared project, never a personal
-    // workspace project. A coding agent that picked (or had auto-selected)
-    // the personal project silently sent the user's evaluations there
-    // (customer report). The browser picker hides personal projects; this
-    // is the server-side guarantee.
-    if (project.isPersonal) {
+    // Personal projects are allowed only as the caller's OWN, explicit pick.
+    // The original hazard (customer report) was a coding agent silently
+    // AUTO-selecting a personal project and routing evaluations there; the
+    // browser picker now lists personal as a clearly-labelled entry the user
+    // must deliberately choose, so an explicit self-pick is honoured. Another
+    // user's personal project is still refused outright, whatever the picker
+    // sent.
+    if (project.isPersonal && project.ownerUserId !== session.user.id) {
       return c.json(
         {
           error: "personal_project_not_allowed",
           error_description:
-            "Personal projects can't back a project API key. Pick a shared team project so your evaluations, prompts and traces land on a real project.",
+            "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
         },
         400,
       );
