@@ -208,6 +208,43 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     });
   });
 
+  describe("given a sovereign-cloud endpoint under a token-based mode", () => {
+    const SOVEREIGN = [
+      "--set", "app.dataplane.enabled=true",
+      "--set", "app.dataplane.provider=azureBlob",
+      "--set", "app.dataplane.providers.azureBlob.authMode=managedIdentity",
+      "--set", "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set", "app.dataplane.providers.azureBlob.container.value=cont",
+      "--set", "app.dataplane.providers.azureBlob.endpoint.value=https://acct.blob.core.usgovcloudapi.net",
+      "--set", "app.storedObjects.localFilesystem.enabled=false",
+    ];
+
+    /**
+     * Regression (langwatch-agent review on PR #6181): the chart emitted the
+     * sovereign endpoint but had no value for the identity authority, so it
+     * rendered green and the app then refused the combination at the first
+     * storage call. Failing at render moves that to deploy time.
+     */
+    it("refuses to render without a matching identity authority", () => {
+      expect(renderExpectingFailure(SOVEREIGN)).toMatch(
+        /not the Azure public cloud/,
+      );
+    });
+
+    it("emits the authority and audience when they are configured", () => {
+      const out = render([
+        ...SOVEREIGN,
+        "--set", "app.dataplane.providers.azureBlob.authorityHost.value=https://login.microsoftonline.us",
+        "--set", "app.dataplane.providers.azureBlob.tokenAudience.value=https://storage.azure.us",
+      ]);
+
+      expect(out).toContain("name: AZURE_BLOB_AUTHORITY_HOST");
+      expect(out).toContain('value: "https://login.microsoftonline.us"');
+      expect(out).toContain("name: AZURE_BLOB_TOKEN_AUDIENCE");
+      expect(out).toContain('value: "https://storage.azure.us"');
+    });
+  });
+
   describe("given the azureBlob provider under shared-key auth", () => {
     /** @scenario "The chart still demands an account key under shared-key auth" */
     it("fails with an error naming the missing accountKey", () => {

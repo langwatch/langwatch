@@ -294,6 +294,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       {{- if or .Values.app.dataplane.providers.azureBlob.accountKey.value .Values.app.dataplane.providers.azureBlob.accountKey.secretKeyRef.name }}
         {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.authMode is %q but providers.azureBlob.accountKey is also configured — remove the key, it would be ignored" $azureAuthMode) }}
       {{- end }}
+      {{/* The app refuses a non-public endpoint in a token mode without a
+           matching identity authority (it would otherwise ask the
+           public-cloud issuer for a sovereign token). Mirror that here so a
+           sovereign install fails at deploy time rather than on the first
+           write, when the chart would otherwise have rendered green. */}}
+      {{- $azureEndpoint := .Values.app.dataplane.providers.azureBlob.endpoint.value }}
+      {{- if and $azureEndpoint (not (contains ".blob.core.windows.net" $azureEndpoint)) }}
+        {{- if not (or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name) }}
+          {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.endpoint is %q, which is not the Azure public cloud — a token-based authMode also requires providers.azureBlob.authorityHost so tokens are requested from the matching identity authority" $azureEndpoint) }}
+        {{- end }}
+      {{- end }}
       {{- if eq $azureAuthMode "workloadIdentity" }}
         {{- if not (include "langwatch.serviceAccountName" .) }}
           {{- $errors = append $errors "azureBlob authMode workloadIdentity requires global.serviceAccount (create=true or name) so the Entra identity has a ServiceAccount to bind to" }}
@@ -836,6 +847,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_CONTAINER" "fieldValues" .Values.app.dataplane.providers.azureBlob.container) }}
 {{- if or .Values.app.dataplane.providers.azureBlob.endpoint.value .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.azureBlob.endpoint) }}
+{{- end }}
+{{- if or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_AUTHORITY_HOST" "fieldValues" .Values.app.dataplane.providers.azureBlob.authorityHost) }}
+{{- end }}
+{{- if or .Values.app.dataplane.providers.azureBlob.tokenAudience.value .Values.app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef.name }}
+{{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_TOKEN_AUDIENCE" "fieldValues" .Values.app.dataplane.providers.azureBlob.tokenAudience) }}
 {{- end }}
 {{- if .Values.app.dataplane.legacyS3ReadBucket }}
 # S3->Azure migration: new writes go to Azure, but objects written before the
