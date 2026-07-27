@@ -35,8 +35,8 @@ describe("saveOrCommitWorkflowVersion", () => {
   });
 
   afterAll(async () => {
-    const wid = requireAssigned(workflowId, "workflowId");
-    const pid = requireAssigned(projectId, "projectId");
+    const wid = requireAssigned({ value: workflowId, name: "workflowId" });
+    const pid = requireAssigned({ value: projectId, name: "projectId" });
     // Version rows form a parent chain under onDelete: Restrict, which
     // Postgres checks per row, so the chain must be broken before a
     // one-shot delete; and the workflow's version pointers must be

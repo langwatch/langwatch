@@ -236,7 +236,10 @@ describe("given an organization with both personal and real workspaces", () => {
       await prisma.project.findMany({
         where: {
           team: {
-            organizationId: requireAssigned(organizationId, "organizationId"),
+            organizationId: requireAssigned({
+              value: organizationId,
+              name: "organizationId",
+            }),
           },
         },
         select: { id: true },

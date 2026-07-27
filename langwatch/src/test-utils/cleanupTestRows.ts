@@ -202,10 +202,16 @@ function sanitizeWhere(where: unknown, label: string): SanitizeResult {
  * prelude has the same collapse as the deletes: `findMany({ where: {
  * teamId: undefined } })` is `findMany({})`, every row in the table, which
  * would then feed everyone's ids into the cleanup. Anchoring the prelude
- * on `requireAssigned(teamId, "teamId")` turns a broken setup into a loud
- * skip before any query runs.
+ * on `requireAssigned({ value: teamId, name: "teamId" })` turns a broken
+ * setup into a loud skip before any query runs.
  */
-export function requireAssigned<T>(value: T | undefined | null, name: string): T {
+export function requireAssigned<T>({
+  value,
+  name,
+}: {
+  value: T | undefined | null;
+  name: string;
+}): T {
   if (value === undefined || value === null || value === "") {
     throw new Error(
       `${name} was never assigned, which usually means beforeAll threw ` +
@@ -234,7 +240,7 @@ export async function cleanupTestRows(
     const label = `${String(model)}[${index}]`;
     const { where: cleaned, fatal, dropped } = sanitizeWhere(where, label);
     problems.push(...fatal, ...dropped);
-    if (cleaned && fatal.length === 0) {
+    if (cleaned) {
       runnable.push({ model: String(model), where: cleaned });
     }
   });

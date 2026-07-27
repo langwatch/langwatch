@@ -171,4 +171,14 @@ describe("cleanupTestRows refusal rules", () => {
       ]);
     });
   });
+
+  describe("given a model that resolves to something without deleteMany", () => {
+    it("reports it as not a Prisma delegate, instead of crashing", async () => {
+      const prisma = { organization: {} } as unknown as PrismaClient;
+
+      await expect(
+        cleanupTestRows(prisma, [["organization", { id: "org_a" }]]),
+      ).rejects.toThrow(/organization is not a Prisma delegate with deleteMany/);
+    });
+  });
 });

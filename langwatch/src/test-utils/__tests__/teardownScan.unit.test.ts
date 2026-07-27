@@ -2,10 +2,10 @@
  * The teardown-safety rule and its enforcement.
  *
  * The snippet cases pin the rule itself, so it cannot regress to finding
- * nothing; the last case runs it over every test file in the repository,
- * which is what actually keeps the dangerous form out. Both ride the
- * ordinary unit shards, so there is no gate that can quietly stop
- * checking (#6169).
+ * nothing; the last case runs it over every test file under `src`, `ee`,
+ * and `packages`, which is what actually keeps the dangerous form out.
+ * Both ride the ordinary unit shards, so there is no gate that can
+ * quietly stop checking (#6169).
  *
  * Spec: specs/setup/test-teardown-safety.feature
  */
@@ -174,7 +174,38 @@ describe("scanTestSourceForUnsafeDeleteMany", () => {
     });
   });
 
-  describe("given every test file in the repository", () => {
+  describe("given a deleteMany argument that is not an inline object literal", () => {
+    it("flags it: a variable or call result cannot be proven safe", () => {
+      const violations = scan(
+        [
+          `let orgId: string;`,
+          `const args = { where: { id: orgId } };`,
+          `await prisma.team.deleteMany(args);`,
+        ].join("\n"),
+      );
+
+      expect(violations).toEqual([
+        expect.objectContaining({ variable: "<none>", model: "team" }),
+      ]);
+    });
+  });
+
+  describe("given a filter list built from a spread", () => {
+    it("flags a reassignable array spread the same as a bare identifier", () => {
+      const violations = scan(
+        [
+          `let teamIds: string[];`,
+          `await prisma.team.deleteMany({ where: { id: { in: [...teamIds] } } });`,
+        ].join("\n"),
+      );
+
+      expect(violations).toEqual([
+        expect.objectContaining({ variable: "teamIds", model: "team" }),
+      ]);
+    });
+  });
+
+  describe("when scanning the configured test roots", () => {
     it("finds none of them deleting by a reassignable id", () => {
       const offenders: string[] = [];
 

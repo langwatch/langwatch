@@ -333,7 +333,7 @@ describe("project.create with RoleBinding-only membership (no TeamUser)", () => 
     // findMany into every project in the database.
     const projectIds = (
       await prisma.project.findMany({
-        where: { teamId: requireAssigned(teamId, "teamId") },
+        where: { teamId: requireAssigned({ value: teamId, name: "teamId" }) },
         select: { id: true },
       })
     ).map((project) => project.id);

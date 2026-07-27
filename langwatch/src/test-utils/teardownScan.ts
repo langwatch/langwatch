@@ -12,9 +12,9 @@ import ts from "typescript";
  * import time) cannot be undefined and pass.
  *
  * Enforced from `__tests__/teardownScan.unit.test.ts`, which pins the rule
- * on snippets and then runs it over every test file in the repository, so
- * the check rides the ordinary unit shards instead of a gate nobody
- * notices has stopped checking (#6169).
+ * on snippets and then runs it over every test file under `src`, `ee`, and
+ * `packages`, so the check rides the ordinary unit shards instead of a
+ * gate nobody notices has stopped checking (#6169).
  *
  * Spec: specs/setup/test-teardown-safety.feature
  */
@@ -83,14 +83,12 @@ function checkWhereExpression({
   reassignable,
   source,
   model,
-  line,
   violations,
 }: {
   expression: ts.Expression;
   reassignable: Set<string>;
   source: ts.SourceFile;
   model: string;
-  line: number;
   violations: TeardownViolation[];
 }): void {
   const value = unwrapExpression(expression);
@@ -118,7 +116,6 @@ function checkWhereExpression({
           reassignable,
           source,
           model,
-          line,
           violations,
         });
       } else if (ts.isShorthandPropertyAssignment(property)) {
@@ -127,7 +124,6 @@ function checkWhereExpression({
           reassignable,
           source,
           model,
-          line,
           violations,
         });
       }
@@ -137,12 +133,15 @@ function checkWhereExpression({
 
   if (ts.isArrayLiteralExpression(value)) {
     for (const element of value.elements) {
+      // `{ in: [...teamIds] }` spreads a reassignable array into the
+      // list: check the spread expression itself, not the (nonexistent)
+      // element it would otherwise be treated as.
+      const target = ts.isSpreadElement(element) ? element.expression : element;
       checkWhereExpression({
-        expression: element,
+        expression: target,
         reassignable,
         source,
         model,
-        line,
         violations,
       });
     }
@@ -206,10 +205,21 @@ export function scanTestSourceForUnsafeDeleteMany(
               reassignable,
               source,
               model,
-              line,
               violations,
             });
           }
+        } else {
+          // A variable, call result, or spread standing in for the whole
+          // args object: this scanner only proves safety for an inline
+          // literal, so anything else cannot be told apart from an
+          // unfiltered delete.
+          violations.push({
+            line,
+            variable: "<none>",
+            model,
+            reason:
+              "deleteMany argument is not an inline object literal, so this scanner cannot verify its filter is safe",
+          });
         }
       }
     }
