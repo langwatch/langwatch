@@ -215,9 +215,6 @@ export function VirtualKeyProviderAccessSection({
                 All providers
               </Text>
             </Checkbox>
-            <Text fontSize="xs" color="fg.muted">
-              current and future
-            </Text>
           </HStack>
           {eligible.map((mp) => (
             <ProviderRow
