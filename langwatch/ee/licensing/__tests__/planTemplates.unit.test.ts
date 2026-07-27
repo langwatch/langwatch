@@ -69,8 +69,8 @@ describe("ENTERPRISE_TEMPLATE", () => {
     expect(ENTERPRISE_TEMPLATE.maxProjects).toBe(500);
   });
 
-  it("has maxMessagesPerMonth of 10000000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxMessagesPerMonth).toBe(10000000);
+  it("has unlimited maxMessagesPerMonth so licensed orgs are never ingestion-capped", () => {
+    expect(ENTERPRISE_TEMPLATE.maxMessagesPerMonth).toBe(DEFAULT_LIMIT);
   });
 
   it("has maxWorkflows of 1000", () => {

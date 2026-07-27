@@ -1,7 +1,11 @@
 import { PricingModel } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
+import {
+  PLAN_LIMITS,
+  UNLIMITED_MESSAGES,
+} from "../../../../../ee/billing/planLimits";
+import { PlanTypes } from "../../../../../ee/billing/planTypes";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import type { OrganizationService } from "../../organizations/organization.service";
@@ -310,6 +314,47 @@ describe("UsageService", () => {
           "Monthly limit of 1000 events reached",
         );
         expect(mockPlanResolver).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when org is on the ENTERPRISE plan with no message-cap override", () => {
+      it("does not block ingestion and skips the usage count entirely", async () => {
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
+          "org-123",
+        );
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue(
+          PLAN_LIMITS[PlanTypes.ENTERPRISE],
+        );
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(false);
+        expect(mockTraceUsageService.getCountByProjects).not.toHaveBeenCalled();
+        expect(mockEventUsageService.getCountByProjects).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when an ENTERPRISE org has a message-cap override at the cap", () => {
+      it("enforces the overridden limit", async () => {
+        vi.mocked(mockOrgService.getOrganizationIdByTeamId).mockResolvedValue(
+          "org-123",
+        );
+        vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
+        // The plan provider merges Subscription.maxMessagesPerMonth over the
+        // plan defaults; checkLimit only sees the resolved plan.
+        (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
+          ...PLAN_LIMITS[PlanTypes.ENTERPRISE],
+          maxMessagesPerMonth: 500_000,
+        });
+        mockTraceUsageService.getCountByProjects.mockResolvedValue([
+          { projectId: "proj-1", count: 500_000 },
+        ]);
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(true);
+        expect(result.maxMessagesPerMonth).toBe(500_000);
+        expect(result.planName).toBe("Enterprise");
       });
     });
 
