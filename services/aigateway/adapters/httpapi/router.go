@@ -67,6 +67,10 @@ type RouterDeps struct {
 	// config.DefaultNonStreamingHeartbeatInterval (45s); negative disables
 	// heartbeating entirely.
 	HeartbeatInterval time.Duration
+	// Status backs the public GET /health status-page endpoint
+	// (specs/ai-gateway/gateway-health.feature). Optional; when nil the
+	// endpoint reports the process-level component only.
+	Status StatusReporter
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -93,6 +97,15 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Get("/readyz", deps.Health.Readiness)
 		r.Get("/startupz", deps.Health.Startup)
 	}
+
+	// Public status-page surface, distinct from the k8s probes above: the
+	// probes gate pod lifecycle in-cluster, while /health is exposed
+	// through the ingress for status.langwatch.ai. HEAD is registered
+	// explicitly because chi does not fall HEAD back to GET, and uptime
+	// monitors commonly probe with HEAD.
+	statusRoute := statusHandler(deps.Status)
+	r.Get("/health", statusRoute)
+	r.Head("/health", statusRoute)
 
 	// Unauthenticated like the probes: the cluster's scraper has no
 	// virtual key, and the endpoint is kept off the public ingress by the
