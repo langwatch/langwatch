@@ -5,12 +5,33 @@ import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import {
+  RedTeamOptionError,
+  toRedTeamBody,
+  type RedTeamCliOptions,
+} from "./red-team-options";
 
 export const updateScenarioCommand = async (
   id: string,
-  options: { name?: string; situation?: string; criteria?: string; labels?: string },
+  options: {
+    name?: string;
+    situation?: string;
+    criteria?: string;
+    labels?: string;
+  } & RedTeamCliOptions,
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
+
+  let redTeam;
+  try {
+    redTeam = toRedTeamBody(options);
+  } catch (error) {
+    if (error instanceof RedTeamOptionError) {
+      console.error(chalk.red(error.message));
+      process.exit(1);
+    }
+    throw error;
+  }
 
   const service = new ScenariosApiService();
   const spinner = createSpinner(`Updating scenario "${id}"...`).start();
@@ -23,6 +44,8 @@ export const updateScenarioCommand = async (
       body.criteria = options.criteria.split(",").map((c) => c.trim());
     if (options.labels !== undefined)
       body.labels = options.labels.split(",").map((l) => l.trim());
+
+    Object.assign(body, redTeam);
 
     const scenario = await service.update(id, body);
 
