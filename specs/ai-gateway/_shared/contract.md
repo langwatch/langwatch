@@ -418,6 +418,25 @@ provider — would otherwise share a bucket and each report the other's spend.
 The control plane computes these keys in `budgetResolution.service.ts`; the
 gateway does not need to construct them, it receives them as `scope_id`.
 
+**Department (GROUP) budgets require the ClickHouse spend path.** On deploys
+without ClickHouse, `budget.check` falls back to the single Postgres
+`GatewayBudget.spentUsd` column, one running figure per budget row. Per-member
+buckets cannot be represented there: the fallback would enforce each member
+against the whole department's combined spend. `GatewayBudgetService.create`
+therefore refuses GROUP budgets with `group_budget_requires_clickhouse` when
+no ClickHouse spend repository is wired (the same detection `check()` uses to
+pick ClickHouse over the Postgres fallback). The other scope types keep
+working on the fallback because their bucket is the budget row itself.
+
+**Every key must resolve a trace project.** Spend accrual is fed by the trace
+fold above, so a key whose traces land nowhere accrues nothing against ANY
+budget, org-wide caps included. VK create/update refuse org/team-owned keys
+with no resolvable trace project (`trace_project_required`); project-owned and
+personal keys resolve one structurally, and org/team keys resolve the org's
+governance project when it exists. A null `project_id` can still appear in
+bundles for keys that predate the rule; the gateway skips span export for
+those, which is exactly the hole the refusal stops new keys from entering.
+
 **What key spend is read from.** Per-key spend shown to users (the keys
 table's "Spent this month" column and the Usage tab) is NOT read from this
 ledger. The ledger is per budget: it holds nothing for a key nobody capped,
