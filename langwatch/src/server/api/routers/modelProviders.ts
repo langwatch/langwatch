@@ -251,14 +251,7 @@ export const modelProviderRouter = createTRPCRouter({
 
   /**
    * Validates an API key for a given model provider.
-   *
-   * A mutation despite changing nothing, because tRPC sends queries as GET
-   * with their input encoded into the URL — and the input here is the
-   * customer's API key. A secret in a URL is written to access logs, proxy
-   * logs and browser history, and proxies that strip credential-shaped query
-   * parameters leave the server parsing an absent input, which surfaces to
-   * the customer as a validation error against a key that is perfectly good.
-   * POSTing the key in a body avoids all of it.
+   * This is a read-only query that tests if the provided API key works
    */
   validateApiKey: protectedProcedure
     .input(
@@ -275,7 +268,7 @@ export const modelProviderRouter = createTRPCRouter({
         .superRefine(requireTenantAnchor),
     )
     .use(checkProviderValidationPermission())
-    .mutation(async ({ input }) => {
+    .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
     }),

@@ -66,11 +66,8 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     fieldMetadata: {
       GEMINI_API_KEY: {
         label: "Gemini API Key",
-        // Naming the API restriction is the whole point: a Google Cloud key
-        // is commonly scoped to one API, and a customer told only "Gemini
-        // API key" has no way to know this is the Generative Language API.
         description:
-          "Your Google AI Studio key, or a Google Cloud key allowed to call the Generative Language API. On Google Cloud, Vertex AI is usually the better fit.",
+          "Your Google AI Studio API key from aistudio.google.com/apikey",
       },
     },
   },
