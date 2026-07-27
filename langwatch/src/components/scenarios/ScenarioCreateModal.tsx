@@ -105,10 +105,10 @@ export function ScenarioCreateModal({
       }
 
       try {
-        const generatedData = await generateScenarioWithAI(
-          description,
-          project.id,
-        );
+        const generatedData = await generateScenarioWithAI({
+          prompt: description,
+          projectId: project.id,
+        });
         storePromptForScenario(description);
         openEditorWithData(generatedData);
       } catch (error) {

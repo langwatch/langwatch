@@ -8,13 +8,16 @@
  * - A standard run is unaffected
  * - The run allows as many turns as the attack is configured for
  *
- * The last one is the point of this file. `RedTeamAgentConfig.totalTurns`
- * (the attacker's own budget) and `ScenarioConfig.maxTurns` (the run's
- * ceiling, default 10) are independent settings in the SDK. Setting only the
- * first lets a 30-turn attack get cut off at turn 10 while still reporting a
- * verdict, which reads as "the agent held up" when the attack simply ran out
- * of room. These tests pin both.
+ * The last one is the point of this file. What bounds a red-team run is the
+ * script `marathonScript()` builds from `totalTurns` — the runner walks it
+ * step by step and never consults `ScenarioConfig.maxTurns` on this path. So
+ * these tests pin the script, not a config field: if the script ever stopped
+ * scaling with the budget, a 50-turn attack would quietly become a short one
+ * that still reports a verdict, reading as "the agent held up" when the
+ * attack simply ran out of room.
  */
+import { redTeamCrescendo } from "@langwatch/scenario";
+import type { LanguageModel } from "ai";
 import { describe, expect, it } from "vitest";
 import {
   RED_TEAM_DEFAULT_TURNS,
@@ -22,6 +25,9 @@ import {
   RedTeamStrategySchema,
   ScenarioConfigSchema,
 } from "../types";
+
+/** The script is built without calling the model, so a stand-in suffices. */
+const stubModel = {} as LanguageModel;
 
 function scenarioConfig(overrides: Record<string, unknown> = {}) {
   return ScenarioConfigSchema.parse({
@@ -97,32 +103,53 @@ describe("red-team scenario configuration", () => {
     });
   });
 
-  describe("given the run's turn ceiling", () => {
-    // The regression this file exists for. The SDK's own ScenarioConfig
-    // default is 10; a red-team run must raise it to the attack's budget.
-    it("is the attack's turn count, not the pipeline default of 10", () => {
+  describe("given the attack's turn budget", () => {
+    it("produces a script long enough to spend every turn", () => {
       const config = scenarioConfig({
         redTeamStrategy: "crescendo",
         redTeamTarget: "extract credentials",
-        redTeamTotalTurns: 30,
+        redTeamTotalTurns: 12,
       });
 
-      const maxTurns = config.redTeamTotalTurns ?? RED_TEAM_DEFAULT_TURNS;
+      const attacker = redTeamCrescendo({
+        target: config.redTeamTarget!,
+        totalTurns: config.redTeamTotalTurns!,
+        model: stubModel,
+      });
 
-      expect(maxTurns).toBe(30);
-      expect(maxTurns).toBeGreaterThan(10);
+      // The script is the turn control: one user step, one agent step and a
+      // check per turn, then the judge. A run that stops early stops because
+      // the objective was met, never because the pipeline ran out of room.
+      expect(attacker.marathonScript().length).toBeGreaterThanOrEqual(12);
     });
 
-    it("falls back to the default budget when no count was set", () => {
+    it("grows the script with the budget", () => {
+      const shortAttack = redTeamCrescendo({
+        target: "extract credentials",
+        totalTurns: 3,
+        model: stubModel,
+      });
+      const longAttack = redTeamCrescendo({
+        target: "extract credentials",
+        totalTurns: 12,
+        model: stubModel,
+      });
+
+      expect(longAttack.marathonScript().length).toBeGreaterThan(
+        shortAttack.marathonScript().length,
+      );
+    });
+
+    it("falls back to the recommended budget when no count was set", () => {
       const config = scenarioConfig({
         redTeamStrategy: "goat",
         redTeamTarget: "extract credentials",
       });
 
-      const maxTurns = config.redTeamTotalTurns ?? RED_TEAM_DEFAULT_TURNS;
-
-      expect(maxTurns).toBe(RED_TEAM_DEFAULT_TURNS);
-      expect(maxTurns).toBeGreaterThan(10);
+      // 50, per the SDK docs: agents that hold at turn 1 often break by 20,
+      // and the guidance for cheaper runs is to disable per-turn scoring
+      // rather than shorten the attack.
+      expect(config.redTeamTotalTurns ?? RED_TEAM_DEFAULT_TURNS).toBe(50);
     });
   });
 

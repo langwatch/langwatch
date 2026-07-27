@@ -4,12 +4,17 @@ import {
   Field,
   HStack,
   Input,
+  Switch,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { HelpCircle } from "lucide-react";
+import { ChevronRight, HelpCircle } from "lucide-react";
 import { Controller, type UseFormReturn } from "react-hook-form";
+import {
+  RED_TEAM_DEFAULT_TURNS,
+  RED_TEAM_MAX_TURNS,
+} from "~/server/scenarios/execution/types";
 import { Tooltip } from "../ui/tooltip";
 import type { ScenarioFormData } from "./ScenarioForm";
 import { SectionHeader } from "./ui/SectionHeader";
@@ -25,12 +30,9 @@ export const RED_TEAM_STRATEGIES = [
     value: "goat" as const,
     label: "GOAT",
     description: "Picks a fresh angle every turn.",
-    help: "Chooses a different technique each turn based on how the agent replied — roleplay, hypotheticals, authority, splitting the request. Better against agents that hold firm against a single escalating line, and costs more because it reasons about each turn.",
+    help: "Chooses from seven techniques each turn — roleplay, hypotheticals, authority pressure, hiding the ask among innocent ones — based on how the agent replied. Reach for it when Crescendo has already failed against an agent. It needs room to work: under about ten turns it spends them exploring instead of committing.",
   },
 ];
-
-export const RED_TEAM_DEFAULT_TURNS = 30;
-export const RED_TEAM_MAX_TURNS = 50;
 
 const ATTACK_HELP =
   "A simulated attacker drives the conversation instead of a cooperative user, trying to make your agent do something it should refuse. The criteria below are what it must fail to achieve — they are how the run is judged. Only run this against agents you own or have permission to test.";
@@ -158,7 +160,7 @@ export function RedTeamAttackSection({
       <Field.Root>
         <LabelWithHelp
           label="Turns"
-          help={`How many attempts the attacker gets. More turns find more, and cost more — every turn is a model call on both sides. Up to ${RED_TEAM_MAX_TURNS}.`}
+          help={`How many attempts the attacker gets. Agents that hold at turn 1 often break by turn 20, so ${RED_TEAM_DEFAULT_TURNS} is the recommended starting point and the maximum. To make a run cheaper, turn off adaptive scoring under Advanced rather than cutting turns.`}
         />
         <Input
           type="number"
@@ -174,10 +176,28 @@ export function RedTeamAttackSection({
       <Accordion.Root collapsible>
         <Accordion.Item value="advanced">
           <Accordion.ItemTrigger>
+            {/* Points right when closed, down when open — the chevron shows
+                which way the section is about to move, not a bare marker.
+                Set via the standalone `rotate` property, not `transform`:
+                Chakra's accordion recipe already puts `rotate: 180deg` here for
+                its default down-chevron, and CSS applies `rotate` before
+                `transform`, so a transform-based rule composes with it (90°
+                became 270° and the chevron pointed up) instead of replacing it. */}
+            <Accordion.ItemIndicator
+              color="fg.muted"
+              display="flex"
+              alignItems="center"
+              lineHeight={0}
+              transition="rotate 120ms ease"
+              transformOrigin="center"
+              rotate="0deg"
+              _open={{ rotate: "90deg" }}
+            >
+              <ChevronRight size={14} />
+            </Accordion.ItemIndicator>
             <Text textStyle="sm" fontWeight="medium">
               Advanced
             </Text>
-            <Accordion.ItemIndicator />
           </Accordion.ItemTrigger>
           <Accordion.ItemContent>
             <Accordion.ItemBody>
@@ -208,8 +228,36 @@ export function RedTeamAttackSection({
 
                 <Field.Root>
                   <LabelWithHelp
+                    label="Adaptive scoring"
+                    help="Every reply is scored 0-10 and the attacker adjusts its next move, backing out of a line that got a hard refusal. Turning it off is the recommended way to make a run cheaper — it keeps the full turn budget, but the attacker stops reacting to what the agent said."
+                  />
+                  <Switch.Root
+                    checked={
+                      getValues("redTeamConfig")?.scoreResponses !== false
+                    }
+                    onCheckedChange={({ checked }) =>
+                      setValue("redTeamConfig", {
+                        ...(getValues("redTeamConfig") ?? {}),
+                        // Both knobs move together: the docs' fast recipe
+                        // disables scoring and refusal detection as a pair,
+                        // and refusal detection only feeds the scorer.
+                        scoreResponses: checked,
+                        detectRefusals: checked,
+                      })
+                    }
+                    colorPalette="redteam"
+                  >
+                    <Switch.HiddenInput />
+                    <Switch.Control cursor="pointer">
+                      <Switch.Thumb />
+                    </Switch.Control>
+                  </Switch.Root>
+                </Field.Root>
+
+                <Field.Root>
+                  <LabelWithHelp
                     label="Obfuscation"
-                    help="Chance per turn that the attacker disguises its message (base64, leetspeak, splitting words) to slip past filters that match on plain text. 0 sends everything in the clear; 1 disguises every turn. Leave empty for 0."
+                    help="Chance per turn that the attacker's message is re-encoded after it is written (Base64, ROT13) to slip past filters that match on plain text. 0 sends everything in the clear; 1 encodes every turn. Leave empty for 0."
                   />
                   <Input
                     type="number"

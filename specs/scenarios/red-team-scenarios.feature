@@ -78,15 +78,15 @@ Feature: Red Team Scenarios
     When the run executes
     Then the standard user simulator drives the conversation
 
-  # The attacker's turn budget and the run's own turn ceiling are separate
-  # settings. If only the attacker's budget is applied, a long attack is cut
-  # short by the run's default ceiling and silently under-tests the agent.
+  # An attack that ends early because the pipeline ran out of room still
+  # reports a verdict, and that verdict reads as "the agent held up". The turn
+  # budget the person configured has to be the budget the attack actually gets.
   @unit @unimplemented
-  Scenario: The run allows as many turns as the attack is configured for
+  Scenario: The attack gets every turn it was configured for
     Given a red-team scenario configured for 30 turns
     When the run executes
-    Then the run allows at least 30 turns
-    And the attack is not cut short by the default turn ceiling
+    Then the attacker is given 30 turns to work with
+    And a run that ends sooner ends because the objective was met
 
   @unit @unimplemented
   Scenario: Success criteria are still judged

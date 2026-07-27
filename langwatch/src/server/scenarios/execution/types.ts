@@ -214,12 +214,27 @@ export const RED_TEAM_STRATEGIES = ["goat", "crescendo"] as const;
 export const RedTeamStrategySchema = z.enum(RED_TEAM_STRATEGIES);
 export type RedTeamStrategyName = z.infer<typeof RedTeamStrategySchema>;
 
-/** Upper bound on attacker turns. Each turn is a model call on both sides. */
+/**
+ * Upper bound on attacker turns. Each turn is a model call on both sides.
+ *
+ * 50 is also the default, on the SDK docs' own recommendation: "agents that
+ * hold at turn 1 often break by turn 20", and the guidance for cheaper runs is
+ * to turn per-turn scoring off rather than cut the budget. The SDK's bare
+ * default is 30; starting there would quietly under-test.
+ */
 export const RED_TEAM_MAX_TURNS = 50;
-export const RED_TEAM_DEFAULT_TURNS = 30;
+export const RED_TEAM_DEFAULT_TURNS = 50;
 
 /** Optional tuning knobs, all with SDK-supplied defaults. */
 export const RedTeamConfigSchema = z.object({
+  /**
+   * Score each response 0-10 and let the attacker adapt. The documented way to
+   * make a run cheaper is to turn this off and keep the turn budget, rather
+   * than shorten the attack.
+   */
+  scoreResponses: z.boolean().optional(),
+  /** Pattern-match hard refusals to skip the scorer and trigger a backtrack. */
+  detectRefusals: z.boolean().optional(),
   successScore: z.number().min(0).max(10).optional(),
   successConfirmTurns: z.number().int().min(1).optional(),
   injectionProbability: z.number().min(0).max(1).optional(),

@@ -19,10 +19,8 @@ import {
   useWatch,
 } from "react-hook-form";
 import { z } from "zod";
-import {
-  RED_TEAM_DEFAULT_TURNS,
-  RedTeamAttackSection,
-} from "./RedTeamAttackSection";
+import { RED_TEAM_DEFAULT_TURNS } from "~/server/scenarios/execution/types";
+import { RedTeamAttackSection } from "./RedTeamAttackSection";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -42,6 +40,8 @@ export const scenarioFormSchema = z.object({
   redTeamTotalTurns: z.number().int().min(1).max(50).nullish(),
   redTeamConfig: z
     .object({
+      scoreResponses: z.boolean().optional(),
+      detectRefusals: z.boolean().optional(),
       successScore: z.number().min(0).max(10).optional(),
       successConfirmTurns: z.number().int().min(1).optional(),
       injectionProbability: z.number().min(0).max(1).optional(),

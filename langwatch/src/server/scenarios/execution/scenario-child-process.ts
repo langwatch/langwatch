@@ -176,21 +176,17 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
           ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
         judgeAgent,
       ],
-      // The attacker's turn budget and the run's own turn ceiling are separate
-      // settings, and the ceiling defaults to 10. Without raising it here, a
-      // 30-turn attack is silently cut off at turn 10 and under-tests the
-      // agent while still reporting a verdict.
+      // marathonScript is what makes a red-team run a real one. Without it the
+      // judge runs every turn and can end the scenario the moment nothing has
+      // gone wrong — "must never reveal X" is satisfied by one clean exchange,
+      // so a 50-turn attack finishes at turn one reporting that the agent held.
       //
-      // The script matters for the same reason. Left unset, the judge runs
-      // after every turn and can end the scenario the moment nothing has gone
-      // wrong yet — a "must never reveal X" criterion is trivially satisfied
-      // by one clean turn, so a six-turn attack finishes at turn one and
-      // reports that the agent held. marathonScript drives the full budget and
-      // judges at the end, so the verdict reflects an attack that actually
-      // happened.
-      ...(redTeam
-        ? { maxTurns: redTeam.totalTurns, script: redTeam.script }
-        : {}),
+      // The script is also the turn control. It expands to totalTurns rounds
+      // and the runner walks it step by step, so maxTurns is not consulted on
+      // this path at all (verified in the SDK: the scripted branch loops over
+      // script.length; the maxTurns check lives in the auto-advance branch).
+      // Setting it here would be dead config that reads like a safeguard.
+      ...(redTeam ? { script: redTeam.script } : {}),
       verbose,
       metadata: {
         langwatch: {
@@ -237,9 +233,10 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
  * Builds the adversarial attacker for a red-team scenario, or null for a
  * standard one.
  *
- * Returns the turn budget alongside the agent because the caller must apply
- * it to the run's own `maxTurns` as well: the two are independent settings and
- * the run-level ceiling would otherwise truncate the attack.
+ * Returns the marathon script alongside the agent. The script is what the
+ * runner walks, so it — not `maxTurns` — is what gives the attack its full
+ * turn budget, and it is what stops the judge from ending the run at turn one
+ * on a scenario where nothing has gone wrong yet.
  */
 function buildRedTeamAgent({
   scenario,
@@ -249,7 +246,6 @@ function buildRedTeamAgent({
   model: ReturnType<typeof createModelFromParams>;
 }): {
   agent: ScenarioRunner.UserSimulatorAgentAdapter;
-  totalTurns: number;
   script: ScenarioRunner.ScriptStep[];
 } | null {
   if (!scenario.redTeamStrategy || !scenario.redTeamTarget) return null;
@@ -267,7 +263,7 @@ function buildRedTeamAgent({
       ? ScenarioRunner.redTeamGoat(config)
       : ScenarioRunner.redTeamCrescendo(config);
 
-  return { agent, totalTurns, script: agent.marathonScript() };
+  return { agent, script: agent.marathonScript() };
 }
 
 /**

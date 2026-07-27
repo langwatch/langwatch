@@ -9,6 +9,8 @@ export const generatedScenarioSchema = z.object({
   name: z.string(),
   situation: z.string(),
   criteria: z.array(z.string()),
+  /** Present only on a red-team draft — the attacker's objective. */
+  redTeamTarget: z.string().optional(),
 });
 
 /**
@@ -51,14 +53,23 @@ export class ScenarioGenerationError extends Error {
  * @param prompt - The user's description of the scenario to generate
  * @param projectId - The project ID to generate the scenario for
  * @param currentScenario - Optional existing scenario data for refinement
+ * @param redTeam - Whether the editor is in red-team mode. Changes what the
+ *   model is asked for: an attack objective, defender-side context, and
+ *   criteria phrased as prohibitions rather than cooperative goals.
  * @returns The generated scenario data
  * @throws Error if the API call fails or returns invalid data
  */
-export async function generateScenarioWithAI(
-  prompt: string,
-  projectId: string,
-  currentScenario?: GeneratedScenario | null,
-): Promise<GeneratedScenario> {
+export async function generateScenarioWithAI({
+  prompt,
+  projectId,
+  currentScenario,
+  redTeam,
+}: {
+  prompt: string;
+  projectId: string;
+  currentScenario?: GeneratedScenario | null;
+  redTeam?: boolean;
+}): Promise<GeneratedScenario> {
   const response = await fetch("/api/scenario/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -66,6 +77,7 @@ export async function generateScenarioWithAI(
       prompt,
       currentScenario: currentScenario ?? null,
       projectId,
+      redTeam: redTeam ?? false,
     }),
   });
 
