@@ -20,6 +20,7 @@ import {
 } from "react-hook-form";
 import { z } from "zod";
 import { RED_TEAM_DEFAULT_TURNS } from "~/server/scenarios/execution/types";
+import { Tooltip } from "../ui/tooltip";
 import { RedTeamAttackSection } from "./RedTeamAttackSection";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
@@ -72,6 +73,24 @@ type ScenarioFormProps = {
 };
 
 /**
+ * The two modes, each with the explanation you get before committing to it —
+ * picking a type changes what the rest of the form is asking for, so the
+ * difference belongs on hover rather than after the click.
+ */
+const TYPES = [
+  {
+    redTeam: false,
+    label: "Standard scenario",
+    help: "A simulated user who is trying to get something done talks to your agent, and a judge checks the conversation against your criteria. This is the normal way to test behaviour.",
+  },
+  {
+    redTeam: true,
+    label: "Red team",
+    help: "A simulated attacker drives the conversation instead of a cooperative user, working across many turns to make your agent do something it should refuse. Your criteria become the lines it must not cross. Only run this against agents you own or have permission to test.",
+  },
+];
+
+/**
  * Standard vs red team. Switching to red team reveals the attack section
  * below rather than opening a second panel over this one.
  */
@@ -86,24 +105,31 @@ function ScenarioTypeSelector({
     <VStack align="stretch" gap={2}>
       <SectionHeader>Type</SectionHeader>
       <HStack gap={2}>
-        <Button
-          size="sm"
-          variant={isRedTeam ? "outline" : "solid"}
-          colorPalette="gray"
-          onClick={() => onSelect(false)}
-          flex={1}
-        >
-          Standard
-        </Button>
-        <Button
-          size="sm"
-          variant={isRedTeam ? "solid" : "outline"}
-          colorPalette={isRedTeam ? "redteam" : undefined}
-          onClick={() => onSelect(true)}
-          flex={1}
-        >
-          <ShieldAlert size={14} /> Red team
-        </Button>
+        {TYPES.map((type) => {
+          const selected = type.redTeam === isRedTeam;
+          return (
+            <Tooltip key={type.label} content={type.help} openDelay={200}>
+              <Button
+                size="sm"
+                variant="outline"
+                flex={1}
+                // Selected is a tint and a border, not a solid fill. A block of
+                // deep red for the whole button made choosing a mode look like
+                // a warning; the colour should say which one is on, and the
+                // drawer edge already says the scenario is an attack.
+                colorPalette={type.redTeam ? "redteam" : "gray"}
+                borderColor={selected ? "colorPalette.solid" : "border.muted"}
+                bg={selected ? "colorPalette.subtle" : undefined}
+                color={selected ? "colorPalette.fg" : "fg.muted"}
+                fontWeight={selected ? "medium" : "normal"}
+                onClick={() => onSelect(type.redTeam)}
+              >
+                {type.redTeam ? <ShieldAlert size={14} /> : null}
+                {type.label}
+              </Button>
+            </Tooltip>
+          );
+        })}
       </HStack>
     </VStack>
   );

@@ -536,7 +536,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // without repainting the whole surface.
         colorPalette="redteam"
         borderWidth={isRedTeamScenario ? "1px" : undefined}
-        borderColor={isRedTeamScenario ? "colorPalette.solid" : undefined}
+        // emphasized, not solid: the edge should mark the drawer as an attack
+        // without competing with the content inside it.
+        borderColor={isRedTeamScenario ? "colorPalette.emphasized" : undefined}
       >
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
