@@ -63,13 +63,14 @@ const SoftWarnPercent = 80
 // only when the exclusions leave the chain empty. The exhausted filtered
 // budget still contributes its warning, because a request served by another
 // provider is exactly when the caller should hear that one vendor's allowance
-// ran out. GROUP buckets need no special handling: the bundle materialises
+// ran out. GROUP buckets need no special handling: the bundle materializes
 // one bucket per (budget, member) with the key's principal already resolved,
 // so each "group" scope row here IS the per-member allowance.
 func (c *Checker) Precheck(_ context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error) {
 	decision := domain.BudgetDecision{Verdict: domain.BudgetAllow}
 
-	for _, scope := range bundle.Config.Budget.Scopes {
+	for i := range bundle.Config.Budget.Scopes {
+		scope := &bundle.Config.Budget.Scopes[i]
 		if scope.LimitMicroUSD <= 0 {
 			continue
 		}
@@ -79,7 +80,7 @@ func (c *Checker) Precheck(_ context.Context, bundle *domain.Bundle) (domain.Bud
 				if c.metrics != nil {
 					c.metrics.RecordBudgetBlock(scope.Scope)
 				}
-				blocked := scope
+				blocked := *scope
 				return domain.BudgetDecision{
 					Verdict:   domain.BudgetBlock,
 					BlockedBy: &blocked,
@@ -87,7 +88,7 @@ func (c *Checker) Precheck(_ context.Context, bundle *domain.Bundle) (domain.Bud
 			}
 			decision.ExcludedProviders = append(decision.ExcludedProviders, domain.ExcludedProvider{
 				ProviderKey: scope.ProviderKey,
-				Budget:      scope,
+				Budget:      *scope,
 			})
 		}
 		pctUsed := int((scope.SpentMicroUSD * 100) / scope.LimitMicroUSD)

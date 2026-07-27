@@ -199,7 +199,8 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	}
 
 	cfg.Budget.Scopes = make([]domain.BudgetScope, len(w.Budgets))
-	for i, b := range w.Budgets {
+	for i := range w.Budgets {
+		b := &w.Budgets[i]
 		cfg.Budget.Scopes[i] = domain.BudgetScope{
 			ID:            b.ID,
 			Scope:         b.Scope,

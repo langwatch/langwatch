@@ -13,7 +13,7 @@ import (
 )
 
 // The provider-filtered and per-member budget contract crosses the wire in
-// two places: the bundle the control plane materialises (budgets carry
+// two places: the bundle the control plane materializes (budgets carry
 // provider_key / principal_id / bucket scope_id, config carries
 // providers_allowed / routing_mode) and the span attribute the gateway
 // emits for the trace fold to attribute spend. These tests pin both halves
@@ -110,7 +110,7 @@ func TestConfigWireProvidersAllowedAndRoutingMode(t *testing.T) {
 		assert.Equal(t, 1, cfg.Fallback.MaxAttempts)
 	})
 
-	t.Run("fallback_all keeps the materialised attempt budget", func(t *testing.T) {
+	t.Run("fallback_all keeps the materialized attempt budget", func(t *testing.T) {
 		var wire configWire
 		require.NoError(t, json.Unmarshal([]byte(`{
 			"routing_mode": "fallback_all",

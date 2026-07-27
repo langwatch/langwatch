@@ -123,7 +123,7 @@ func translateWalkError(ctx context.Context, err error) error {
 //     skipped (eligibleCredentials, with its keep-something safety net).
 //  2. Provider allowlist: a key narrowed to specific providers cannot
 //     dispatch outside them even if the bundle's credential chain is stale
-//     or hand-crafted. The control plane already materialises the chain
+//     or hand-crafted. The control plane already materializes the chain
 //     filtered; this is the enforcement that makes the narrowing real at
 //     the seam rather than a property of one producer.
 //  3. Budget exclusions: providers whose provider-filtered blocking budgets
@@ -150,8 +150,8 @@ func (a *App) candidateChain(ctx context.Context, call *pipeline.Call) ([]domain
 		return allowed, nil
 	}
 	excluded := make(map[string]domain.ExcludedProvider, len(call.BudgetExcludedProviders))
-	for _, e := range call.BudgetExcludedProviders {
-		excluded[e.ProviderKey] = e
+	for i := range call.BudgetExcludedProviders {
+		excluded[call.BudgetExcludedProviders[i].ProviderKey] = call.BudgetExcludedProviders[i]
 	}
 	kept := allowed[:0:0]
 	var lastExcluded domain.ExcludedProvider
@@ -239,8 +239,9 @@ func dispatchedSlotID(el *retry.EventLog) string {
 		switch e.Reason {
 		case retry.ReasonCircuitOpen, retry.ReasonChainExhausted, retry.ReasonContextDone:
 			continue
+		default:
+			return e.SlotID
 		}
-		return e.SlotID
 	}
 	return ""
 }

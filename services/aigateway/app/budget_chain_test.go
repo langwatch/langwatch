@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -99,7 +98,7 @@ func TestDispatch_FilteredBreachWithNoAlternativeBlocksNamingTheBudget(t *testin
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrBudgetExceeded))
 	var e herr.E
-	require.True(t, errors.As(err, &e))
+	require.ErrorAs(t, err, &e)
 	assert.Equal(t, "gb_only", e.Meta["budget_id"], "the refusal must name the budget that ran out")
 	assert.Equal(t, "mp_only", e.Meta["budget_provider"])
 	assert.Contains(t, e.Meta["message"], "mp_only",
@@ -173,7 +172,7 @@ func TestDispatch_UnfilteredBreachStillBlocksOutright(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrBudgetExceeded))
 	var e herr.E
-	require.True(t, errors.As(err, &e))
+	require.ErrorAs(t, err, &e)
 	assert.Equal(t, "gb_project", e.Meta["budget_id"])
 	assert.Contains(t, e.Meta["message"], "project")
 }
