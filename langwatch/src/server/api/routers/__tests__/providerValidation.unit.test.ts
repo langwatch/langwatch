@@ -415,6 +415,69 @@ describe("validateProviderApiKey", () => {
       });
     });
 
+    /**
+     * Captured verbatim from Google (translate.googleapis.com, 2026-07-27)
+     * by calling a restricted API with a live key. Kept whole rather than
+     * hand-written, because the shape is the thing under test: the reason we
+     * act on sits in `error.details[]`, while `error.errors[0].reason` holds
+     * an unrelated "forbidden". Reading the wrong one silently loses the
+     * diagnosis, and only a real payload proves which is which.
+     */
+    const CAPTURED_GOOGLE_403 = {
+      error: {
+        code: 403,
+        message:
+          "Requests to this API translate method google.cloud.translate.v2.TranslateService.TranslateText are blocked.",
+        errors: [
+          {
+            message:
+              "Requests to this API translate method google.cloud.translate.v2.TranslateService.TranslateText are blocked.",
+            domain: "global",
+            reason: "forbidden",
+          },
+        ],
+        status: "PERMISSION_DENIED",
+        details: [
+          {
+            "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+            reason: "API_KEY_SERVICE_BLOCKED",
+            domain: "googleapis.com",
+            metadata: {
+              consumer: "projects/000000000000",
+              methodName:
+                "google.cloud.translate.v2.TranslateService.TranslateText",
+              apiName: "translate",
+              service: "translate.googleapis.com",
+            },
+          },
+          {
+            "@type": "type.googleapis.com/google.rpc.LocalizedMessage",
+            locale: "en-US",
+            message:
+              "Requests to this API translate method google.cloud.translate.v2.TranslateService.TranslateText are blocked.",
+          },
+        ],
+      },
+    };
+
+    describe("given a refusal Google actually sent", () => {
+      /** @scenario Gemini reports a key restricted away from the API, not a bad key */
+      it("reads the reason out of a real payload, not the decoy in errors[]", async () => {
+        respondWith(403, CAPTURED_GOOGLE_403);
+
+        const result = await validateProviderApiKey("gemini", {
+          GEMINI_API_KEY: "AIzaSyRestrictedKey",
+        });
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain("restriction");
+        expect(result.error).toContain("Vertex AI");
+        expect(result.error).not.toContain("Invalid API key");
+        // "forbidden" is what a details[]-blind parser would surface.
+        expect(result.error).not.toContain("forbidden");
+      });
+    });
+
     describe("given the key really is wrong", () => {
       /** @scenario "Gemini reports a genuinely invalid key as invalid" */
       it("still reports an invalid key", async () => {
