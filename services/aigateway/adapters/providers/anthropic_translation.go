@@ -102,7 +102,9 @@ func buildMessagesResponsesRequest(
 // caps thinking at 24576, and the provider's converter rejects the whole
 // request rather than clamping, so every Claude Code turn fails. Effort buckets
 // are the portable currency here, because each provider maps a bucket onto its
-// own valid range.
+// own valid range. The bucket itself always comes from the vendored converter,
+// which sets one in every thinking branch; this function only strips the
+// non-portable unit.
 //
 // The turn keeps its reasoning either way. Only the units change, and only on
 // the translated lane: the Anthropic lane never reaches this code and its
@@ -115,28 +117,14 @@ func normalizeReasoningBudget(bfReq *bfschemas.BifrostResponsesRequest) {
 	if reasoning.MaxTokens == nil {
 		return
 	}
-	budget := *reasoning.MaxTokens
 	reasoning.MaxTokens = nil
-	if reasoning.Effort != nil {
-		// The caller already expressed intent in the portable unit.
-		return
-	}
-	reasoning.Effort = bfschemas.Ptr(effortForThinkingBudget(budget))
-}
-
-// effortForThinkingBudget buckets an Anthropic thinking budget. The thresholds
-// follow Anthropic's own guidance: 1024 is the documented minimum budget, and
-// their examples treat low tens of thousands as deep thinking.
-func effortForThinkingBudget(budget int) string {
-	switch {
-	case budget <= 0:
-		return "none"
-	case budget < 4096:
-		return "low"
-	case budget < 16384:
-		return "medium"
-	default:
-		return "high"
+	if reasoning.Effort == nil {
+		// Unreachable from a real /v1/messages body: the vendored converter
+		// sets an effort in every thinking branch (the caller's own value,
+		// the budget-derived ratio, or its "high" default). Kept as a
+		// defensive floor so clearing the budget can never silently strip
+		// the reasoning intent.
+		reasoning.Effort = bfschemas.Ptr("high")
 	}
 }
 

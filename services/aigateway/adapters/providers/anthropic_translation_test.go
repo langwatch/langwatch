@@ -720,22 +720,6 @@ func TestMessagesTranslated_ThinkingBudget_BecomesPortableEffort(t *testing.T) {
 		"a 31999-token budget is medium effort against this model's output ceiling")
 }
 
-// The bucketing itself, at the boundaries.
-//
-// @scenario "A non-Anthropic destination is translated instead of raw-forwarded"
-func TestEffortForThinkingBudget_Buckets(t *testing.T) {
-	cases := map[int]string{
-		0: "none", -1: "none",
-		1024: "low", 4095: "low",
-		4096: "medium", 16383: "medium",
-		16384: "high", 31999: "high",
-	}
-	for budget, want := range cases {
-		assert.Equal(t, want, effortForThinkingBudget(budget),
-			"a %d token thinking budget is %s effort", budget, want)
-	}
-}
-
 // The non-streaming sibling of the streaming stop-reason promotion. A reply
 // carrying a tool call must say tool_use, or the client ends the turn and never
 // runs the tool.
