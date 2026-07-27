@@ -143,12 +143,18 @@ export function ComparisonLeaderboardChart({
         >
           {column.name} — leaderboard
         </Text>
+        {/* Always visible, just quiet. Revealing this only on hover made the
+            one route into the full leaderboard invisible until you happened to
+            mouse over the card — and unreachable altogether by keyboard or on
+            a touch screen, where there is no hover at all. Subdued by default,
+            full strength on hover or keyboard focus. */}
         <IconButton
           aria-label="Expand leaderboard"
           size="2xs"
           variant="ghost"
-          opacity={0}
+          opacity={0.55}
           _groupHover={{ opacity: 1 }}
+          _focusVisible={{ opacity: 1 }}
           transition="opacity 0.15s"
           onClick={onExpand}
         >
