@@ -180,7 +180,17 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
       // settings, and the ceiling defaults to 10. Without raising it here, a
       // 30-turn attack is silently cut off at turn 10 and under-tests the
       // agent while still reporting a verdict.
-      ...(redTeam ? { maxTurns: redTeam.totalTurns } : {}),
+      //
+      // The script matters for the same reason. Left unset, the judge runs
+      // after every turn and can end the scenario the moment nothing has gone
+      // wrong yet — a "must never reveal X" criterion is trivially satisfied
+      // by one clean turn, so a six-turn attack finishes at turn one and
+      // reports that the agent held. marathonScript drives the full budget and
+      // judges at the end, so the verdict reflects an attack that actually
+      // happened.
+      ...(redTeam
+        ? { maxTurns: redTeam.totalTurns, script: redTeam.script }
+        : {}),
       verbose,
       metadata: {
         langwatch: {
@@ -237,7 +247,11 @@ function buildRedTeamAgent({
 }: {
   scenario: ChildProcessJobData["scenario"];
   model: ReturnType<typeof createModelFromParams>;
-}): { agent: ScenarioRunner.UserSimulatorAgentAdapter; totalTurns: number } | null {
+}): {
+  agent: ScenarioRunner.UserSimulatorAgentAdapter;
+  totalTurns: number;
+  script: ScenarioRunner.ScriptStep[];
+} | null {
   if (!scenario.redTeamStrategy || !scenario.redTeamTarget) return null;
 
   const totalTurns = scenario.redTeamTotalTurns ?? RED_TEAM_DEFAULT_TURNS;
@@ -253,7 +267,7 @@ function buildRedTeamAgent({
       ? ScenarioRunner.redTeamGoat(config)
       : ScenarioRunner.redTeamCrescendo(config);
 
-  return { agent, totalTurns };
+  return { agent, totalTurns, script: agent.marathonScript() };
 }
 
 /**

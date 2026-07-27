@@ -28,6 +28,15 @@ export const RED_TEAM_STRATEGIES = [
   },
 ];
 
+/**
+ * Width of the attack drawer, and the gap the scenario editor leaves beside
+ * it. Exported so the editor can yield by exactly this much and the two sit
+ * side by side instead of one covering the other — the same move the Langy
+ * panel makes when it docks next to a drawer.
+ */
+export const RED_TEAM_DRAWER_WIDTH = 520;
+export const RED_TEAM_DRAWER_GAP = 8;
+
 export const RED_TEAM_DEFAULT_TURNS = 30;
 export const RED_TEAM_MAX_TURNS = 50;
 
@@ -107,10 +116,12 @@ export function RedTeamConfigDrawer({
     <Drawer.Root
       open={open}
       placement="end"
-      size="lg"
       onOpenChange={({ open }) => !open && onClose()}
     >
-      <Drawer.Content>
+      <Drawer.Content
+        maxWidth={`${RED_TEAM_DRAWER_WIDTH}px`}
+        width={`${RED_TEAM_DRAWER_WIDTH}px`}
+      >
         <Drawer.Header borderBottomWidth="1px">
           <VStack align="start" gap={1}>
             <Heading size="md">Configure attack</Heading>

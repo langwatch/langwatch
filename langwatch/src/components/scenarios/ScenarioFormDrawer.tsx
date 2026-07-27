@@ -39,7 +39,11 @@ import { Drawer } from "../ui/drawer";
 import { TagList } from "../ui/TagList";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
-import { RedTeamConfigDrawer } from "./RedTeamConfigDrawer";
+import {
+  RED_TEAM_DRAWER_GAP,
+  RED_TEAM_DRAWER_WIDTH,
+  RedTeamConfigDrawer,
+} from "./RedTeamConfigDrawer";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import {
   ScenarioForm,
@@ -531,7 +535,19 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      <Drawer.Content bg="bg">
+      {/* While the attack drawer is open the editor slides left by exactly its
+          width, so both are readable at once. Covering the editor would hide
+          the criteria the attack objective is written against, which is the
+          one thing you want in view while writing it. */}
+      <Drawer.Content
+        bg="bg"
+        marginEnd={
+          redTeamDrawerOpen
+            ? `${RED_TEAM_DRAWER_WIDTH + RED_TEAM_DRAWER_GAP}px`
+            : undefined
+        }
+        transition="margin-inline-end 200ms ease"
+      >
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
           <Heading size="md">
