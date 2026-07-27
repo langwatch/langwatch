@@ -36,8 +36,15 @@ import { resetParamCounter } from "../filter-translator";
 
 const TENANT_ID = "model-group-attribution-test";
 
-/** Fixed fixture instant, kept well inside the query window. */
-const T0 = new Date("2025-06-15T12:00:00.000Z").getTime();
+/**
+ * Fixture instant: one hour ago, like every other ClickHouse integration
+ * fixture in this repo. Keep it now-relative: a fixed months-old date made
+ * the rows invisible to the very same queries on CI's ClickHouse stack
+ * (25.10.x + the local_primary storage policy) while passing against a local
+ * 25.8 server, and the attribution semantics under test do not depend on
+ * when the traces happened.
+ */
+const T0 = Date.now() - 60 * 60 * 1000;
 
 const MODEL_OPUS = "claude-opus-5";
 const MODEL_SONNET = "claude-sonnet-4-5";
@@ -332,9 +339,9 @@ function storedSpanRow(s: SpanFixture) {
 
 const baseInput = {
   projectId: TENANT_ID,
-  startDate: new Date("2025-06-01T00:00:00Z"),
-  endDate: new Date("2025-07-01T00:00:00Z"),
-  previousPeriodStartDate: new Date("2025-05-01T00:00:00Z"),
+  startDate: new Date(T0 - 23 * 60 * 60 * 1000),
+  endDate: new Date(T0 + 60 * 60 * 1000),
+  previousPeriodStartDate: new Date(T0 - 47 * 60 * 60 * 1000),
   timeScale: "full" as const,
 };
 
@@ -402,6 +409,26 @@ describe("model group attribution (integration)", () => {
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
     });
+
+    // Read-back guard: fail HERE with a clear message if the fixture rows are
+    // not visible, so an environment problem can never masquerade as an
+    // aggregation bug in the assertions below.
+    for (const [table, expected] of [
+      ["trace_summaries", ALL_TRACES.length],
+      ["stored_spans", ALL_SPANS.length],
+    ] as const) {
+      const res = await ch.query({
+        query: `SELECT count() AS c FROM ${table} WHERE TenantId = {tenantId:String}`,
+        query_params: { tenantId: TENANT_ID },
+        format: "JSONEachRow",
+      });
+      const [row] = (await res.json()) as Array<{ c: string }>;
+      if (Number(row?.c ?? 0) < expected) {
+        throw new Error(
+          `Fixture read-back failed: ${table} has ${row?.c ?? 0} rows for ${TENANT_ID}, expected at least ${expected}`,
+        );
+      }
+    }
   }, 60_000);
 
   afterAll(async () => {
