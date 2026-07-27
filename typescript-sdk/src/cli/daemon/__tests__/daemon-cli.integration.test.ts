@@ -45,6 +45,12 @@ const run = (
   cwd: string = workDir,
 ): Promise<RunResult> =>
   new Promise((resolve) => {
+    // The identity notice is shown once per credential per 30 minutes
+    // (utils/identityNotice.ts), so a pair of runs would legitimately differ:
+    // the first prints it, the second is suppressed. These tests compare runs
+    // byte-for-byte, so every run starts from a fresh notice state and the
+    // notice itself becomes part of the fidelity check.
+    fs.rmSync(path.join(socketDir, "notice-state.json"), { force: true });
     const child = spawn(process.execPath, [CLI_PATH, ...args], {
       cwd,
       // stdio: "pipe" is what makes this a non-TTY invocation — i.e. exactly the
