@@ -146,18 +146,34 @@ func TestMonitor_PublicDetailNeverCarriesTheProbeError(t *testing.T) {
 
 // A half-wired monitor fails closed. With no Pinger nothing can ever
 // refresh the verdict, so it must go unhealthy at the tolerance rather
-// than pin the public status page green forever.
+// than pin the public status page green forever. The loop runs on a fast
+// ticker throughout, so a probe that treated "no pinger" as success would
+// keep stamping lastSuccess and pull the verdict back to healthy.
 func TestMonitor_WithoutAPingerFailsClosed(t *testing.T) {
 	clock := &fakeClock{t: time.Unix(1_700_000_000, 0)}
-	m := New(Options{Now: clock.Now})
+	m := New(Options{Now: clock.Now, Interval: time.Millisecond})
+	t.Cleanup(m.Stop)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	m.Start(ctx)
 
 	ok, _ := m.ControlPlane()
 	require.True(t, ok, "the boot grace window still applies")
 
 	clock.Advance(DefaultUnhealthyAfter + time.Second)
 
+	// Never, not Eventually: the verdict is already unhealthy the instant
+	// the clock moves, so Eventually would pass on the first read, before
+	// the loop had run at all. Holding it unhealthy across ~200 ticks is
+	// what proves the loop cannot talk itself back to healthy.
+	require.Never(t, func() bool {
+		ok, _ := m.ControlPlane()
+		return ok
+	}, 200*time.Millisecond, time.Millisecond, "a monitor with no pinger must not refresh its own verdict")
+
 	ok, detail := m.ControlPlane()
-	assert.False(t, ok)
+	require.False(t, ok)
 	assert.Contains(t, detail, "unreachable")
 }
 
