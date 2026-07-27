@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
@@ -12,7 +12,7 @@ export const updateWorkflowCommand = async (
   id: string,
   options: { name?: string; icon?: string; description?: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const apiKey = process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();

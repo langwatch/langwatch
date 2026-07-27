@@ -212,7 +212,7 @@ describe("the CLI served by a daemon", () => {
 
     describe("when a command exits non-zero", () => {
       it("reproduces the exit code and stderr of the in-process run", async () => {
-        // No API key: checkApiKey() prints and calls process.exit(1) — the exact
+        // No API key: resolveCredentials() prints and calls process.exit(1) — the exact
         // mid-flight-exit path that a warm process has to reproduce.
         const noKey = { LANGWATCH_API_KEY: "" };
 

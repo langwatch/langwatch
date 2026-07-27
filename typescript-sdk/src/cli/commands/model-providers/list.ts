@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -17,7 +17,7 @@ import type { CommandResult } from "../../utils/output";
  * that stays true of the machine payload.
  */
 export const listModelProvidersCommand = async (): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new ModelProvidersApiService();
   const spinner = createSpinner("Fetching model providers...").start();

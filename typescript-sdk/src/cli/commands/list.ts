@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../utils/spinner";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
-import { checkApiKey } from "../utils/apiKey";
+import { resolveCredentials } from "../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../utils/formatting";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { failSpinner } from "../utils/spinnerError";
@@ -10,7 +10,7 @@ import type { CommandResult } from "../utils/output";
 export const listCommand = async (): Promise<CommandResult | void> => {
   try {
     // Check API key before doing anything else
-    checkApiKey();
+    await resolveCredentials();
 
     // Get prompts API service
     const promptsApiService = new PromptsApiService();

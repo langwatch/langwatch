@@ -2,7 +2,7 @@ import { readFileSync } from "fs";
 import { basename } from "path";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
@@ -20,7 +20,7 @@ export const uploadCommand = async (
   filePath: string,
   options?: { ifExists?: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!filePath) {
     console.error(chalk.red("Error: File path is required"));

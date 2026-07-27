@@ -29,6 +29,22 @@ export interface GovernanceConfig {
   default_personal_vk?: { id?: string; secret?: string; prefix?: string };
 
   /**
+   * The user's personal workspace project on this control plane, delivered
+   * by `POST /api/auth/cli/exchange` at device-login time (or lazily via
+   * `GET /api/auth/cli/personal-project` for sessions minted before the
+   * field existed). Its `api_key` is what API-calling commands authenticate
+   * with when no `LANGWATCH_API_KEY` is set anywhere, so `langwatch trace
+   * search` etc. just work after `langwatch login`.
+   * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+   */
+  personal_project?: {
+    id?: string;
+    slug?: string;
+    name?: string;
+    api_key?: string;
+  };
+
+  /**
    * Personal ingest keys (the project-scoped ingest-only ApiKey
    * `sk-lw-<...>` shape minted by `/api/auth/cli/governance/ingestion-key`),
    * keyed by the tool's source_type slug (`claude_code` / `codex` /

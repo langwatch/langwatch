@@ -4,7 +4,7 @@ import {
   ExperimentsApiService,
   type ExperimentRunSummaryEntry,
 } from "@/client-sdk/services/experiments/experiments-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
@@ -55,7 +55,7 @@ const runStatus = (run: ExperimentRunSummaryEntry): string => {
 export const experimentListRunsCommand = async (
   options: ListRunsOptions = {},
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const experimentSlug = options.experiment?.trim();
   if (!experimentSlug) {

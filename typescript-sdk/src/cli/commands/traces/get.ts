@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import {
   printResult,
@@ -13,7 +13,7 @@ export const getTraceCommand = async (
   traceId: string,
   options: RawOutputFlags,
 ): Promise<void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new TracesApiService();
   const spinner = createSpinner(`Fetching trace "${traceId}"...`).start();

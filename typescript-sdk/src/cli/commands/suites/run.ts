@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { resolveOutputFormat } from "../../utils/errorOutput";
 import { buildAuthHeaders } from "@/internal/api/auth";
@@ -11,7 +11,7 @@ export const runSuiteCommand = async (
   id: string,
   options: { wait?: boolean; format?: string },
 ): Promise<void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new SuitesApiService();
   const spinner = createSpinner(`Scheduling suite run "${id}"...`).start();

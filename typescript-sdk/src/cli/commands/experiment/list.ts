@@ -4,7 +4,7 @@ import {
   ExperimentsApiService,
   type ExperimentSummary,
 } from "@/client-sdk/services/experiments/experiments-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
@@ -19,7 +19,7 @@ const MAX_PAGE_SIZE = 200;
 export const experimentListCommand = async (
   options: ExperimentListOptions = {},
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const limit = (() => {
     const parsed = options.limit ? parseInt(options.limit, 10) : DEFAULT_LIMIT;

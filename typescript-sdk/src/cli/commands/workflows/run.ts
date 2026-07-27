@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
@@ -12,7 +12,7 @@ export const runWorkflowCommand = async (
   id: string,
   options: { input?: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   // Parsed before the request, and outside its try: `await response.json()`
   // throws SyntaxError too, so sharing one catch reported a malformed SERVER

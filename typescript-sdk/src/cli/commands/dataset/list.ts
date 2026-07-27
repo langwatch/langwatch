@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { createCommandEvents } from "../../telemetry/events";
@@ -12,7 +12,7 @@ import { handleDatasetCommandError } from "./error-handler";
  * Displays a table with name, slug, record count, and last updated.
  */
 export const listCommand = async (): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = createDatasetService();
   const spinner = createSpinner("Fetching datasets...").start();

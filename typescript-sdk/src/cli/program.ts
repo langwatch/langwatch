@@ -148,8 +148,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
     )
     .option(
-      "--project",
-      "Force project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). The implicit default in non-TTY contexts.",
+      "--project [slug]",
+      "Force project login: write a project SDK key to .env (for the SDK, `langwatch eval`, prompts). With a slug, resolves the key through your device login with no browser (headless/agents); without one, picks the project in the browser. The implicit default in non-TTY contexts.",
     )
     .option(
       "--token <token>",
@@ -160,7 +160,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
     );
 
-  loginCmd.action(async (options: { apiKey?: string; device?: boolean; project?: boolean; browser?: string; endpoint?: string; token?: string }) => {
+  loginCmd.action(async (options: { apiKey?: string; device?: boolean; project?: boolean | string; browser?: string; endpoint?: string; token?: string }) => {
     try {
       await loginCommand(options);
     } catch (error) {

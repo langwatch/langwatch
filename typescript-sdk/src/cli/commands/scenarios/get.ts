@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -39,7 +39,7 @@ const formatScenarioDetails = (scenario: ScenarioResponse): void => {
 };
 
 export const getScenarioCommand = async (id: string): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new ScenariosApiService();
   const spinner = createSpinner(`Fetching scenario "${id}"...`).start();

@@ -4,7 +4,7 @@ import {
   SuitesApiService,
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -39,7 +39,7 @@ export const createSuiteCommand = async (
     description?: string;
   },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!options.scenarios) {
     console.error(chalk.red("Error: --scenarios is required (comma-separated scenario IDs)"));

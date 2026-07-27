@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
@@ -23,7 +23,7 @@ export const createMonitorCommand = async (
     parameters?: string;
   }
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const validModes = ["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"];
   if (options.executionMode && !validModes.includes(options.executionMode)) {

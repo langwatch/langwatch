@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
@@ -20,7 +20,7 @@ export const updateGraphCommand = async (
     filters?: string;
   }
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!options.name && !options.graph && !options.filters) {
     reportCommandError({

@@ -35,7 +35,7 @@ const PARTIAL_SGR_AT_END = /\u001B(?:\[[0-9;]*)?$/;
  * command actions are full of `try { … } catch (e) { console.error(e); process.exit(1) }`,
  * and a `catch` catches everything. That is fine, and is exactly why
  * `ExecutionContext` finalises on the FIRST exit and drops every write after
- * it: in a real process, `process.exit(1)` inside `checkApiKey()` terminates
+ * it: in a real process, `process.exit(1)` inside `resolveCredentials()` terminates
  * immediately and the enclosing catch block never gets to print anything. We
  * reproduce that by discarding whatever the unwinding stack emits.
  */

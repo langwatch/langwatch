@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { toTimeseriesShape } from "./timeseriesShape";
@@ -45,7 +45,7 @@ export const queryAnalyticsCommand = async (options: {
   groupBy?: string;
   timeScale?: string;
 }): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new AnalyticsApiService();
 

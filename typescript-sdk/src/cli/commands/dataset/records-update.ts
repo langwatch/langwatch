@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
@@ -17,7 +17,7 @@ export const recordsUpdateCommand = async (
   recordId: string,
   options: { json: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   let entry: Record<string, unknown>;
   try {
