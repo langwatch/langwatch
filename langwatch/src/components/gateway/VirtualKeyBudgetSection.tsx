@@ -9,7 +9,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { SmallLabel } from "../SmallLabel";
@@ -174,59 +173,54 @@ export function VirtualKeyBudgetSection({
           </NativeSelect.Field>
         </NativeSelect.Root>
       </HStack>
-      <Text
-        fontSize="xs"
-        color={value.limitUsd.trim() ? "fg" : "fg.muted"}
-        data-testid="vk-budget-annotation"
-      >
-        {budgetAnnotation(value)}
-      </Text>
-
-      {value.limitUsd.trim() && (
-        <Box width="full">
+      <HStack gap={1.5} alignItems="baseline">
+        <Text
+          fontSize="xs"
+          color={value.limitUsd.trim() ? "fg" : "fg.muted"}
+          data-testid="vk-budget-annotation"
+        >
+          {budgetAnnotation(value)}
+        </Text>
+        {value.limitUsd.trim() && (
           <Button
             type="button"
-            variant="plain"
+            variant="ghost"
             size="2xs"
             color="fg.muted"
-            paddingX={0}
+            fontSize="xs"
+            height="auto"
+            paddingX={1}
+            paddingY={0}
             onClick={() => setCustomizeOpen((open) => !open)}
             data-testid="vk-budget-customize-reset"
           >
-            <HStack gap={0.5}>
-              {customizeOpen ? (
-                <ChevronDown size={12} aria-hidden />
-              ) : (
-                <ChevronRight size={12} aria-hidden />
-              )}
-              <Text fontSize="xs">Customize reset</Text>
-            </HStack>
+            Customize
           </Button>
-          {customizeOpen && (
-            <NativeSelect.Root size="sm" maxWidth="340px" marginTop={1}>
-              <NativeSelect.Field
-                value={value.timezone ?? ""}
-                aria-label="Reset timezone"
-                data-testid="vk-budget-timezone"
-                onChange={(e) =>
-                  onChange({
-                    ...value,
-                    timezone: e.target.value || null,
-                  })
-                }
-              >
-                <option value="">UTC (default)</option>
-                {zones
-                  .filter((z) => z !== "UTC")
-                  .map((z) => (
-                    <option key={z} value={z}>
-                      {z}
-                    </option>
-                  ))}
-              </NativeSelect.Field>
-            </NativeSelect.Root>
-          )}
-        </Box>
+        )}
+      </HStack>
+      {value.limitUsd.trim() && customizeOpen && (
+        <NativeSelect.Root size="sm" maxWidth="340px">
+          <NativeSelect.Field
+            value={value.timezone ?? ""}
+            aria-label="Reset timezone"
+            data-testid="vk-budget-timezone"
+            onChange={(e) =>
+              onChange({
+                ...value,
+                timezone: e.target.value || null,
+              })
+            }
+          >
+            <option value="">UTC (default)</option>
+            {zones
+              .filter((z) => z !== "UTC")
+              .map((z) => (
+                <option key={z} value={z}>
+                  {z}
+                </option>
+              ))}
+          </NativeSelect.Field>
+        </NativeSelect.Root>
       )}
 
       <ApplicableBudgetsList
@@ -290,7 +284,7 @@ function ApplicableBudgetsList({
         paddingX={2.5}
         paddingTop={2}
       >
-        Already applies
+        Inherited budgets
       </Text>
       {rows.map((b) => (
         <HStack

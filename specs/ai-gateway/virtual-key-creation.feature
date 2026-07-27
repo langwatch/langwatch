@@ -30,7 +30,7 @@ Feature: AI Gateway — Creating a virtual key
   # Where the key lives, and where its traces land
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: The drawer states where this key's traces and costs will land
     When I choose to create a key owned by project "web-app"
     Then the drawer tells me its traces and costs land in "web-app"
@@ -86,13 +86,13 @@ Feature: AI Gateway — Creating a virtual key
     # One transaction. A key that exists for even a moment without the cap
     # its creator asked for is a key that can spend without one.
 
-  @integration @unimplemented
+  @integration
   Scenario: An empty budget field means no cap, and says so
     When I leave the budget field empty
     Then the drawer tells me there is no maximum spend for this key
     And no budget is created
 
-  @integration @unimplemented
+  @integration
   Scenario: A filled budget states its limit, its period and when it resets
     When I set a limit of $30 per day
     Then the drawer states the maximum and the time the period resets
@@ -117,7 +117,7 @@ Feature: AI Gateway — Creating a virtual key
     Then its budget no longer applies
     And the budget row is kept with its spend history
 
-  @integration @unimplemented
+  @integration
   Scenario: The drawer lists the budgets that already constrain this key
     Given the organization has a monthly budget
     And project "web-app" has a monthly budget
@@ -185,7 +185,7 @@ Feature: AI Gateway — Creating a virtual key
     Then the key is refused
     And asking for no fallback while naming a policy is refused too
 
-  @integration @unimplemented
+  @integration
   Scenario: Keys that existed before the routing choice keep failing over
     Given a key created before routing behaviour was an explicit choice
     When its configuration is read

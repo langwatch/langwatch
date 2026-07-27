@@ -90,7 +90,10 @@ export function BudgetCreateDrawer({
       refetchOnWindowFocus: false,
     },
   );
-  const departmentsQuery = api.departments.list.useQuery(
+  // GROUP budgets target Group rows (the entity SCIM provisions and
+  // GroupMembership fans budgets out over) — not the org-chart
+  // Department table, which has no gateway budget scope.
+  const groupsQuery = api.gatewayBudgets.groupTargets.useQuery(
     { organizationId: orgId },
     {
       enabled: !!orgId && open && scopeKind === "GROUP",
@@ -183,9 +186,12 @@ export function BudgetCreateDrawer({
     scopeKind === "ORGANIZATION"
       ? null
       : scopeKind === "GROUP"
-        ? (departmentsQuery.data ?? []).map((d) => ({
-            id: d.id,
-            name: d.name,
+        ? (groupsQuery.data ?? []).map((g) => ({
+            id: g.id,
+            name:
+              g.memberCount === 1
+                ? `${g.name} (1 member)`
+                : `${g.name} (${g.memberCount} members)`,
           }))
         : scopeKind === "TEAM"
           ? teams
@@ -199,7 +205,7 @@ export function BudgetCreateDrawer({
               : activeKeys.map((k) => ({ id: k.id, name: k.name }));
 
   const targetsLoading =
-    (scopeKind === "GROUP" && departmentsQuery.isLoading) ||
+    (scopeKind === "GROUP" && groupsQuery.isLoading) ||
     (scopeKind === "PRINCIPAL" && membersQuery.isLoading) ||
     (scopeKind === "VIRTUAL_KEY" && keysQuery.isLoading);
 
@@ -358,12 +364,9 @@ export function BudgetCreateDrawer({
                   Each member of the department gets this limit individually.
                 </Text>
               )}
-              {scopeKind === "GROUP" && departmentsQuery.isError && (
+              {scopeKind === "GROUP" && groupsQuery.isError && (
                 <Text fontSize="xs" color="red.600" marginTop={1}>
-                  Departments could not be loaded
-                  {departmentsQuery.error?.data?.code === "FORBIDDEN"
-                    ? " — governance access is required to target one."
-                    : "."}
+                  Departments could not be loaded.
                 </Text>
               )}
             </Field.Root>

@@ -164,7 +164,7 @@ Feature: Provider fallback chain
       When a request arrives
       Then the next eligible provider serves it
 
-    @integration @unimplemented
+    @integration
     Scenario: Keys that predate the choice keep falling back
       Given a key created before routing behaviour was explicit
       When its configuration is read

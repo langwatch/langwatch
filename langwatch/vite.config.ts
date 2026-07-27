@@ -220,8 +220,16 @@ export default defineConfig(async (): Promise<UserConfig> => {
         "**/server*.log",
         // Working files agents keep under .claude/tmp, per the repo
         // convention. A dev-server log teed there reloads the page on every
-        // request, same trap as above under a different name.
-        "**/.claude/**",
+        // request, same trap as above under a different name. Agent
+        // worktrees also live under .claude/worktrees, so a dev server
+        // started FROM one has .claude in every path — a blanket
+        // "**/.claude/**" ignore there blinds the watcher to the whole
+        // worktree and HMR never fires. From a worktree root only the
+        // noise sources are ignored; from the main root the entire tree
+        // (including nested worktree copies) stays ignored as before.
+        ...(process.cwd().includes("/.claude/")
+          ? ["**/.claude/tmp/**", "**/.claude/worktrees/**"]
+          : ["**/.claude/**"]),
       ],
       // Docker-on-macOS bind mounts don't surface inotify events reliably,
       // so Vite's default fs.watch sits silent on edits made from the host.

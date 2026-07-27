@@ -156,6 +156,32 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       };
     }),
 
+  /**
+   * The departments a budget can target, for whoever may create budgets.
+   * `group.listAll` exposes role-binding maps and demands
+   * organization:manage; a budget creator only needs names and sizes, so
+   * this stays gated by the same permission as the create it serves.
+   */
+  groupTargets: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("gatewayBudgets:create"))
+    .query(async ({ ctx, input }) => {
+      const groups = await ctx.prisma.group.findMany({
+        where: { organizationId: input.organizationId },
+        select: {
+          id: true,
+          name: true,
+          _count: { select: { members: true } },
+        },
+        orderBy: { name: "asc" },
+      });
+      return groups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        memberCount: g._count.members,
+      }));
+    }),
+
   create: protectedProcedure
     .input(
       z.object({

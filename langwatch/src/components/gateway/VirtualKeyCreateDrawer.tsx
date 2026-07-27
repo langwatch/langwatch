@@ -113,20 +113,17 @@ export function VirtualKeyCreateDrawer({
   );
 
   // Seed ownership with the project the user is currently in — the
-  // default shape of a key — the first time the drawer opens.
+  // default shape of a key — the first time the drawer opens. The trace
+  // project of an org- or team-owned key is deliberately NOT seeded:
+  // where a shared key's traces and costs land is an explicit choice.
   useEffect(() => {
     if (!open) return;
     setOwnership((prev) => {
-      if (prev.projectId ?? prev.teamId ?? prev.traceProjectId) return prev;
+      if (prev.projectId ?? prev.teamId) return prev;
       const seedProject = project?.id ?? availableProjects[0]?.id ?? null;
       const seedTeam =
         availableTeams.length === 1 ? (availableTeams[0]?.id ?? null) : null;
-      return {
-        ...prev,
-        projectId: seedProject,
-        teamId: seedTeam,
-        traceProjectId: seedProject,
-      };
+      return { ...prev, projectId: seedProject, teamId: seedTeam };
     });
   }, [open, project?.id, availableProjects, availableTeams]);
 
