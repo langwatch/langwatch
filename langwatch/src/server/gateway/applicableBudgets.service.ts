@@ -212,7 +212,7 @@ async function loadProviderLabels(
   if (providerKeys.length === 0) return new Map();
   const rows = await prisma.modelProvider.findMany({
     where: { id: { in: providerKeys } },
-    select: { id: true, provider: true, customName: true },
+    select: { id: true, provider: true, name: true },
   });
-  return new Map(rows.map((r) => [r.id, r.customName ?? r.provider]));
+  return new Map(rows.map((r) => [r.id, r.name || r.provider]));
 }
