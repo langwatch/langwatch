@@ -189,8 +189,16 @@ export class ProjectService {
       // member's private space. It also leaves the personal team without the
       // single project `PersonalWorkspaceService.ensure()` looks for, which
       // breaks that user's workspace permanently.
-      const current = await this.repo.getById(id);
-      if (current && current.teamId !== data.teamId) {
+      // Read the project with its team so the guard only fires for projects
+      // this organization actually owns. Deciding on an unscoped read would
+      // let a caller tell a personal project from a shared one in someone
+      // else's organization by the status code alone.
+      const current = await this.repo.getWithTeam(id);
+      if (
+        current &&
+        current.team.organizationId === organizationId &&
+        current.teamId !== data.teamId
+      ) {
         if (current.isPersonal) {
           throw new PersonalWorkspaceBoundaryError(
             PERSONAL_PROJECT_MOVE_OUT_REFUSAL,
@@ -221,11 +229,12 @@ export class ProjectService {
     // project. Archiving it hides the workspace from that lookup while the
     // team keeps the (organization, owner) uniqueness slot, so the next
     // ensure() can neither find the workspace nor create a replacement.
-    const existing = await this.repo.getById(id);
-    if (existing?.isPersonal) {
-      throw new PersonalProjectProtectedError(
-        PERSONAL_PROJECT_ARCHIVE_REFUSAL,
-      );
+    const existing = await this.repo.getWithTeam(id);
+    if (
+      existing?.isPersonal &&
+      existing.team.organizationId === organizationId
+    ) {
+      throw new PersonalProjectProtectedError(PERSONAL_PROJECT_ARCHIVE_REFUSAL);
     }
 
     // Cascade-delete stored-object bytes BEFORE the archive so BYOC S3 credentials

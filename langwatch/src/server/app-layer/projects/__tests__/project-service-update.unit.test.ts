@@ -13,6 +13,7 @@ function createMockRepo() {
   vi.spyOn(repo, "update");
   vi.spyOn(repo, "findActiveTeamInOrganization");
   vi.spyOn(repo, "getById");
+  vi.spyOn(repo, "getWithTeam");
   vi.spyOn(repo, "archive");
   return repo;
 }
@@ -130,10 +131,11 @@ describe("ProjectService.update", () => {
         id: "shared",
         isPersonal: false,
       });
-      vi.mocked(repo.getById).mockResolvedValue({
+      vi.mocked(repo.getWithTeam).mockResolvedValue({
         id: "p1",
         teamId: "personal",
         isPersonal: true,
+        team: { organizationId: "org1" },
       } as any);
 
       await expect(
@@ -153,10 +155,11 @@ describe("ProjectService.update", () => {
         id: "personal",
         isPersonal: true,
       });
-      vi.mocked(repo.getById).mockResolvedValue({
+      vi.mocked(repo.getWithTeam).mockResolvedValue({
         id: "p1",
         teamId: "shared",
         isPersonal: false,
+        team: { organizationId: "org1" },
       } as any);
 
       await expect(
@@ -175,10 +178,11 @@ describe("ProjectService.update", () => {
         id: "personal",
         isPersonal: true,
       });
-      vi.mocked(repo.getById).mockResolvedValue({
+      vi.mocked(repo.getWithTeam).mockResolvedValue({
         id: "p1",
         teamId: "personal",
         isPersonal: true,
+        team: { organizationId: "org1" },
       } as any);
       vi.mocked(repo.update).mockResolvedValue({
         id: "p1",
@@ -199,10 +203,11 @@ describe("ProjectService.update", () => {
   describe("when archiving a personal project", () => {
     /** @scenario ProjectService.archive refuses to archive a personal project */
     it("refuses, because the workspace is the project", async () => {
-      vi.mocked(repo.getById).mockResolvedValue({
+      vi.mocked(repo.getWithTeam).mockResolvedValue({
         id: "p1",
         teamId: "personal",
         isPersonal: true,
+        team: { organizationId: "org1" },
       } as any);
 
       await expect(
