@@ -267,9 +267,12 @@ describe("virtual key spend (real PG + real CH)", () => {
   /** @scenario "The window start is inclusive and the window end is exclusive" */
   it("keeps the boundaries half-open so a request is counted exactly once", async () => {
     const ch = getTestClickHouseClient()!;
-    // Outside every rolling window this suite queries, derived from the
-    // clock rather than the calendar so it cannot rot into one.
-    const anchor = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
+    // Outside every rolling window this suite queries (the widest is 30
+    // days), derived from the clock rather than the calendar so it cannot
+    // rot into one, and deliberately NEAR past: the CI ClickHouse proved
+    // unwilling to serve rows anchored hundreds of days back, and this
+    // test is about window boundaries, not retention.
+    const anchor = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
     await insertGatewayTrace({
       ch,
       traceId: `trace-boundary-${suffix}`,
@@ -296,7 +299,7 @@ describe("virtual key spend (real PG + real CH)", () => {
   it("counts a trace once when its projection is written twice", async () => {
     const ch = getTestClickHouseClient()!;
     const traceId = `trace-reprojected-${suffix}`;
-    const anchor = new Date(Date.now() - 390 * 24 * 60 * 60 * 1000);
+    const anchor = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
     // The same trace, projected twice before the engine merges the parts:
     // an early row with a partial cost and a later, correct one. Summing
     // both would over-report; taking the earlier one would under-report.
