@@ -24,7 +24,7 @@ import {
  * function so payload-shaped keys never reach the wire.
  *
  * Read-back (ADR-066): `get`/`getWithApplied` decode the last committed row
- * (typed read-back columns, migration 00055) so the delivery path never refolds
+ * (typed read-back columns, migration 00056) so the delivery path never refolds
  * from `event_log`; the applied-event-id watermark rides next to the row so a
  * cold-cache retry still dedups a redelivered batch.
  */
@@ -100,7 +100,7 @@ export class TraceAnalyticsStore
   /**
    * Read the trace's last committed slim state back together with the
    * applied-event-id watermark (ADR-066) — the CH-fallthrough behind the Redis
-   * cache miss. The typed read-back columns (migration 00055) let the trimmed
+   * cache miss. The typed read-back columns (migration 00056) let the trimmed
    * row round-trip the fold's working state — span count, the annotation id
    * set, name-resolution bookkeeping, the checkpoint — without replaying
    * `event_log`.

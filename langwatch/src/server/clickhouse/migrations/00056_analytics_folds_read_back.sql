@@ -67,14 +67,14 @@
 -- decoder maps those to documented state defaults — it never refolds. Old builds
 -- ignore the new columns entirely (additive schema).
 --
--- Caveat — latched booleans (pre-00055 rows only): HasAnnotation and a
+-- Caveat — latched booleans (pre-00056 rows only): HasAnnotation and a
 -- user-overridden TraceName were persisted before their backing columns
 -- (AnnotationIds / TraceNameUserOverridden) existed. On read-back the new columns
 -- supply their empty/false default, so the boolean is re-derived from that
--- default, not from the still-present old value. A pre-00055 annotated (or
+-- default, not from the still-present old value. A pre-00056 annotated (or
 -- user-renamed) trace that takes a non-annotation (resp. non-rename) event after
 -- a cache miss therefore downgrades the flag and does NOT self-heal — read-back
--- never replays event_log. Narrow blast radius (pre-00055 row x late event x
+-- never replays event_log. Narrow blast radius (pre-00056 row x late event x
 -- cache miss); an annotation add/remove re-derives the flag correctly. Accepted,
 -- not worked around with a synthetic id.
 -- ============================================================================

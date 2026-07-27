@@ -111,7 +111,7 @@ import {
  *
  * State continuity (ADR-066): the store reads its own last committed row back
  * (`get` → `findByTraceIdWithApplied` → `traceAnalyticsStateFromRow`). The
- * typed read-back columns (migration 00055) close the round-trip gap the
+ * typed read-back columns (migration 00056) close the round-trip gap the
  * trimmed row otherwise left, so the delivery path never re-folds from the
  * event log. Redis fronts the read; a miss is one windowed ClickHouse row.
  */
@@ -201,7 +201,7 @@ export interface TraceAnalyticsRow {
   // Trimmed Attributes map (post-trimAttributesForAnalytics).
   attributes: Record<string, string>;
 
-  // ── Read-back state (ADR-066, migration 00055) ─────────────────────────
+  // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
   // Not analytics columns — these round-trip the fold's working state so
   // store.get() can decode the row without replaying event_log. The hoisted
   // dimension columns above (UserId / ConversationId / CustomerId / Origin /
@@ -394,18 +394,18 @@ export function projectAnalyticsStateToRow({
  * a long value was trimmed out of the map. Payload / over-cap keys the trim
  * drops are never read by the fold, so their absence changes no derived value.
  *
- * A pre-migration row (00055 columns absent) decodes with documented defaults —
+ * A pre-migration row (00056 columns absent) decodes with documented defaults —
  * spanCount 0, empty annotation set, no root claimed, checkpoint 0 — and never
  * refolds.
  *
- * Caveat (pre-00055 rows only): `hasAnnotation` and a user-overridden trace name
+ * Caveat (pre-00056 rows only): `hasAnnotation` and a user-overridden trace name
  * are re-derived at write time from `annotationIds` / `traceNameUserOverridden`,
- * whose columns did not exist before 00055. A pre-00055 row supplies their
+ * whose columns did not exist before 00056. A pre-00056 row supplies their
  * empty/false default here, so a later NON-annotation (resp. non-rename) event
  * arriving after a cache miss recomputes the flag from that default and
  * downgrades it — it does not self-heal, since read-back never replays
  * `event_log`. The edge is narrow (an annotation add/remove re-derives the flag
- * correctly, and topic/late events on an already-annotated pre-00055 trace are
+ * correctly, and topic/late events on an already-annotated pre-00056 trace are
  * rare); accepted rather than papered over with a synthetic annotation id.
  */
 export function traceAnalyticsStateFromRow(
@@ -445,9 +445,9 @@ export function traceAnalyticsStateFromRow(
     tokensPerSecond: row.tokensPerSecond,
     containsErrorStatus: row.hasError,
 
-    // Pre-00055 rows carried HasAnnotation without this id set, so it reads back
+    // Pre-00056 rows carried HasAnnotation without this id set, so it reads back
     // empty and the derived flag can downgrade on a post-miss rewrite — see the
-    // pre-00055 caveat in this function's doc comment.
+    // pre-00056 caveat in this function's doc comment.
     annotationIds: row.annotationIds,
     attributes,
 
@@ -820,7 +820,7 @@ export class TraceAnalyticsFoldProjection
    * The store reads its own last committed state back (ADR-066): the row now
    * round-trips the full working state — counters, the annotation id set, the
    * name-resolution bookkeeping, the out-of-order checkpoint — via typed
-   * read-back columns (migration 00055), plus the trimmed attribute map with
+   * read-back columns (migration 00056), plus the trimmed attribute map with
    * its hoisted dimensions re-injected. So `store.get()` returns the state and
    * nothing on the delivery path reads `event_log`.
    *

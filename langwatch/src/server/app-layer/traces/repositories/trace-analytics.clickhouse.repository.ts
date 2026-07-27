@@ -63,7 +63,7 @@ interface ClickHouseTraceAnalyticsWriteRecord {
 
   Attributes: Record<string, string>;
 
-  // ── Read-back state (ADR-066, migration 00055) ─────────────────────────
+  // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
   SpanCount: number;
   AnnotationIds: string[];
   // UInt64 epoch-ms columns ride as strings, like TotalDurationMs — exact
@@ -74,7 +74,7 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   TraceNameUserOverridden: boolean;
   LastEventOccurredAt: string;
 
-  // ── Durable dedup watermark (ADR-066, migration 00055) ─────────────────
+  // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
   AppliedEventIds: string[];
 
   _retention_days: number;
@@ -226,7 +226,7 @@ export class TraceAnalyticsClickHouseRepository
 
   /**
    * The trace's last committed slim row plus its applied-event-id watermark
-   * (ADR-066, migration 00055) — the CH-fallthrough behind a Redis cache miss.
+   * (ADR-066, migration 00056) — the CH-fallthrough behind a Redis cache miss.
    *
    * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
    * ReplacingMergeTree only physically collapses rows sharing the full sort key
@@ -303,7 +303,7 @@ export class TraceAnalyticsClickHouseRepository
  * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}. The inverse
  * of {@link toClickHouseRecord}: DateTime64 columns come back as strings, the
  * UInt64 epoch-ms columns as strings, arrays/maps as themselves. A
- * pre-migration record simply omits the 00055 fields, so the parsers fall back
+ * pre-migration record simply omits the 00056 fields, so the parsers fall back
  * to the documented defaults (0 / empty / false).
  */
 function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {

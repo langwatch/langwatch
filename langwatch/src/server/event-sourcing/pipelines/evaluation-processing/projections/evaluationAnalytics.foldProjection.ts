@@ -137,7 +137,7 @@ export interface EvaluationAnalyticsRow {
   // Trimmed Attributes map (post-trimAttributesForAnalytics).
   attributes: Record<string, string>;
 
-  // ── Read-back state (ADR-066, migration 00055) ─────────────────────────
+  // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
   // Not analytics columns — the lifecycle operands DurationMs was derived
   // from. The row persisted the derived DurationMs but not startedAt/completedAt
   // themselves, so a `completed` event arriving after a cache miss could not
@@ -274,7 +274,7 @@ export function projectEvaluationAnalyticsStateToRow({
  * reconstructs from OccurredAt — for this fold the partition column IS the
  * latest event time (`occurredAtMs: state.LastEventOccurredAt` on write).
  *
- * A pre-migration row (00055 columns absent) decodes with StartedAt/CompletedAt
+ * A pre-migration row (00056 columns absent) decodes with StartedAt/CompletedAt
  * null and an empty applied set — never a refold.
  */
 export function evaluationAnalyticsStateFromRow(
@@ -383,7 +383,7 @@ export class EvaluationAnalyticsFoldProjection
   /**
    * The store reads its own last committed state back (ADR-066): the row now
    * round-trips the lifecycle timestamps DurationMs is derived from (StartedAt /
-   * CompletedAt, migration 00055), so `store.get()` returns the state and
+   * CompletedAt, migration 00056), so `store.get()` returns the state and
    * nothing on the delivery path reads `event_log`.
    *
    * `refoldOnStoreMiss` is gone — there is no null-returning miss to refold; a

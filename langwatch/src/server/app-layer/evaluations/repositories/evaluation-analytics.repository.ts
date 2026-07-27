@@ -18,7 +18,7 @@ export interface EvaluationAnalyticsRepository {
    * many days after its `OccurredAt`.
    *
    * `appliedEventIds` is the executor's redelivery-dedup watermark (ADR-066,
-   * migration 00055): the ids folded into this write, persisted next to the row
+   * migration 00056): the ids folded into this write, persisted next to the row
    * so a retry with a cold cache still recognises a batch it already committed.
    * Not part of the row — it is fold bookkeeping, not evaluation analytics.
    */
@@ -43,7 +43,7 @@ export interface EvaluationAnalyticsRepository {
 
   /**
    * The evaluation's last committed slim row plus the applied-event-id
-   * watermark persisted next to it (ADR-066, migration 00055). The read-back
+   * watermark persisted next to it (ADR-066, migration 00056). The read-back
    * store uses this on a cache miss so `store.get()` reconstructs working state
    * — and a retry can dedup a redelivered batch — without ever reading
    * `event_log`. Null when no row exists.

@@ -21,7 +21,7 @@ const logger = createLogger(
 
 /**
  * ClickHouse write shape for the slim `evaluation_analytics` table
- * (ADR-034 Phase 6, migration 00041; read-back columns migration 00055).
+ * (ADR-034 Phase 6, migration 00041; read-back columns migration 00056).
  *
  * The 64-bit-integer columns (`DurationMs`, and the epoch-ms read-back
  * timestamps) are serialised as STRINGS in the JSONEachRow body — JSON numbers
@@ -58,12 +58,12 @@ interface ClickHouseEvaluationAnalyticsWriteRecord {
 
   Attributes: Record<string, string>;
 
-  // ── Read-back state (ADR-066, migration 00055) ─────────────────────────
+  // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
   // Epoch ms as strings; "0" = null (not started / not completed).
   StartedAt: string;
   CompletedAt: string;
 
-  // ── Durable dedup watermark (ADR-066, migration 00055) ─────────────────
+  // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
   AppliedEventIds: string[];
 
   _retention_days: number;
@@ -205,7 +205,7 @@ export class EvaluationAnalyticsClickHouseRepository
 
   /**
    * The evaluation's last committed slim row plus its applied-event-id
-   * watermark (ADR-066, migration 00055) — the CH-fallthrough behind a Redis
+   * watermark (ADR-066, migration 00056) — the CH-fallthrough behind a Redis
    * cache miss.
    *
    * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
@@ -291,7 +291,7 @@ const asNullableBool = (value: unknown): boolean | null =>
 
 /**
  * Decode a raw ClickHouse record into an {@link EvaluationAnalyticsRow}. The
- * inverse of {@link toClickHouseRecord}. A pre-migration record omits the 00055
+ * inverse of {@link toClickHouseRecord}. A pre-migration record omits the 00056
  * fields, so the parsers fall back to the documented defaults (null timestamps,
  * empty applied set).
  */

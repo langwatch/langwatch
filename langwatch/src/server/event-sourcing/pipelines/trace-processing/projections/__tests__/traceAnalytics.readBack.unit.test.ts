@@ -119,7 +119,7 @@ describe("traceAnalytics read-back (fromRow)", () => {
   describe("given a pre-migration row whose read-back columns are absent", () => {
     it("decodes with documented defaults instead of refolding", () => {
       const row = project(committedState());
-      // A row written before migration 00055 supplies the column defaults.
+      // A row written before migration 00056 supplies the column defaults.
       const legacyRow: TraceAnalyticsRow = {
         ...row,
         spanCount: 0,

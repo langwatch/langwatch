@@ -2,15 +2,15 @@
  * @vitest-environment node
  * @integration
  *
- * Round-trips the slim trace_analytics table (migrations 00039 + 00055) through
+ * Round-trips the slim trace_analytics table (migrations 00039 + 00056) through
  * its real INSERT/SELECT SQL against ClickHouse. The unit tests cover the fold
  * derivation and the pure fromRow decoder with no I/O; this proves the
  * DDL↔repository column contract — a mismatched column name or type fails a
  * real insert loudly, which no mock can catch — plus the ADR-066 read-back path:
- * the 00055 columns (span count, annotation id set, name-resolution bookkeeping,
+ * the 00056 columns (span count, annotation id set, name-resolution bookkeeping,
  * the out-of-order checkpoint) survive the trip so store.get() reconstructs
  * working state without touching event_log, the AppliedEventIds watermark
- * survives cache loss, and a pre-00055 row whose body omits the columns decodes
+ * survives cache loss, and a pre-00056 row whose body omits the columns decodes
  * with documented defaults rather than refolding.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -65,7 +65,7 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
       "langwatch.reserved.cache_read_tokens": "900000000",
       "metadata.team": "platform",
     },
-    // Read-back state (migration 00055).
+    // Read-back state (migration 00056).
     spanCount: 7,
     annotationIds: [`${tag}-ann-a`, `${tag}-ann-b`],
     rootSpanStartTimeMs: baseMs - 5,
@@ -93,7 +93,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("trace_analytics round-trip (migrations 00039 + 00055)", () => {
+describe("trace_analytics round-trip (migrations 00039 + 00056)", () => {
   describe("given a fully populated slim row", () => {
     it("reads back every read-back column so the fold recovers its state", async () => {
       const row = traceRow({ traceId: `${tag}-rt` });
@@ -115,7 +115,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00055)", () => {
       expect(read!.row.topicId).toBe("topic-1");
       expect(read!.row.cacheReadTokens).toBe(900_000_000);
       expect(read!.row.attributes["metadata.team"]).toBe("platform");
-      // Read-back columns (00055) — exact integer / array / bool round-trip.
+      // Read-back columns (00056) — exact integer / array / bool round-trip.
       expect(read!.row.spanCount).toBe(7);
       expect(read!.row.annotationIds).toEqual([
         `${tag}-ann-a`,
@@ -173,10 +173,10 @@ describe("trace_analytics round-trip (migrations 00039 + 00055)", () => {
     });
   });
 
-  describe("given a pre-migration row that omits the 00055 columns", () => {
+  describe("given a pre-migration row that omits the 00056 columns", () => {
     it("decodes with documented defaults instead of refolding", async () => {
       const traceId = `${tag}-legacy`;
-      // A row written before migration 00055 emits a JSONEachRow body with none
+      // A row written before migration 00056 emits a JSONEachRow body with none
       // of the read-back columns, so ClickHouse supplies each column default.
       await ch.insert({
         table: "trace_analytics",
@@ -200,7 +200,7 @@ describe("trace_analytics round-trip (migrations 00039 + 00055)", () => {
 
       expect(read).not.toBeNull();
       expect(read!.row.traceName).toBe("Legacy Trace");
-      // The absent 00055 columns come back as their defaults — never a refold.
+      // The absent 00056 columns come back as their defaults — never a refold.
       expect(read!.row.spanCount).toBe(0);
       expect(read!.row.annotationIds).toEqual([]);
       expect(read!.row.rootSpanStartTimeMs).toBe(0);

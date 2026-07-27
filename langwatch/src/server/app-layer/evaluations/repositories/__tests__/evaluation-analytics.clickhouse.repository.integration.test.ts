@@ -2,14 +2,14 @@
  * @vitest-environment node
  * @integration
  *
- * Round-trips the slim evaluation_analytics table (migrations 00041 + 00055)
+ * Round-trips the slim evaluation_analytics table (migrations 00041 + 00056)
  * through its real INSERT/SELECT SQL against ClickHouse. The unit tests cover
  * the fold derivation and the pure fromRow decoder with no I/O; this proves the
- * DDL↔repository column contract plus the ADR-066 read-back path: the 00055
+ * DDL↔repository column contract plus the ADR-066 read-back path: the 00056
  * lifecycle columns (StartedAt / CompletedAt — the operands DurationMs is
  * derived from) survive the trip so store.get() reconstructs working state
  * without touching event_log, the AppliedEventIds watermark survives cache loss,
- * and a pre-00055 row whose body omits the columns decodes with null timestamps
+ * and a pre-00056 row whose body omits the columns decodes with null timestamps
  * rather than refolding.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -55,7 +55,7 @@ function evalRow(over: Partial<EvaluationAnalyticsRow> = {}): EvaluationAnalytic
     totalCost: null,
     nonBilledCost: null,
     attributes: { "metadata.team": "platform" },
-    // Read-back state (migration 00055).
+    // Read-back state (migration 00056).
     startedAtMs: baseMs - 1000,
     completedAtMs: baseMs,
     ...over,
@@ -78,7 +78,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("evaluation_analytics round-trip (migrations 00041 + 00055)", () => {
+describe("evaluation_analytics round-trip (migrations 00041 + 00056)", () => {
   describe("given a fully populated slim row", () => {
     it("reads back the lifecycle operands so the fold recovers its state", async () => {
       const row = evalRow({ evaluationId: `${tag}-rt` });
@@ -101,7 +101,7 @@ describe("evaluation_analytics round-trip (migrations 00041 + 00055)", () => {
       expect(read!.row.evaluatorName).toBe("Judge");
       expect(read!.row.isGuardrail).toBe(true);
       expect(read!.row.durationMs).toBe(1000);
-      // Read-back columns (00055) — exact ms round-trip.
+      // Read-back columns (00056) — exact ms round-trip.
       expect(read!.row.startedAtMs).toBe(baseMs - 1000);
       expect(read!.row.completedAtMs).toBe(baseMs);
     });
@@ -144,10 +144,10 @@ describe("evaluation_analytics round-trip (migrations 00041 + 00055)", () => {
     });
   });
 
-  describe("given a pre-migration row that omits the 00055 columns", () => {
+  describe("given a pre-migration row that omits the 00056 columns", () => {
     it("decodes with null lifecycle timestamps instead of refolding", async () => {
       const evaluationId = `${tag}-legacy`;
-      // A row written before migration 00055 emits a JSONEachRow body with none
+      // A row written before migration 00056 emits a JSONEachRow body with none
       // of the read-back columns, so ClickHouse supplies each column default.
       await ch.insert({
         table: "evaluation_analytics",
@@ -172,7 +172,7 @@ describe("evaluation_analytics round-trip (migrations 00041 + 00055)", () => {
 
       expect(read).not.toBeNull();
       expect(read!.row.status).toBe("processed");
-      // The absent 00055 columns come back as their defaults — never a refold.
+      // The absent 00056 columns come back as their defaults — never a refold.
       expect(read!.row.startedAtMs).toBeNull();
       expect(read!.row.completedAtMs).toBeNull();
       expect(read!.appliedEventIds).toEqual([]);
