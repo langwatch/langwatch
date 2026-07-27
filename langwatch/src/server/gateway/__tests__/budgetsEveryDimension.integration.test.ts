@@ -223,9 +223,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
   }, 120_000);
 
   describe("department budgets are per member", () => {
-    /**
-     * @scenario "A department budget gives each member their own allowance"
-     */
+    /** @scenario "A department budget gives each member their own allowance" */
     it("resolves a GROUP budget into that member's own bucket", async () => {
       const resolved = await resolveApplicableBudgets(prisma, {
         organizationId: ORG_ID,
@@ -241,9 +239,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(group!.groupId).toBe(GROUP_ID);
     });
 
-    /**
-     * @scenario "A department budget does not apply to a key with no person behind it"
-     */
+    /** @scenario "A department budget does not apply to a key with no person behind it" */
     it("skips GROUP budgets for a key with no principal", async () => {
       const resolved = await resolveApplicableBudgets(prisma, {
         organizationId: ORG_ID,
@@ -255,9 +251,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(resolved.map((r) => r.budget.id)).not.toContain(BUDGET_GROUP_ID);
     });
 
-    /**
-     * @scenario "Leaving a department drops that member's allowance on the next resolve"
-     */
+    /** @scenario "Leaving a department drops that member's allowance on the next resolve" */
     it("stops resolving the budget once the member leaves the group", async () => {
       await prisma.groupMembership.create({
         data: { userId: OTHER_USER_ID, groupId: GROUP_ID },
@@ -282,9 +276,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
   });
 
   describe("provider-filtered budgets", () => {
-    /**
-     * @scenario "A provider-filtered budget only counts spend sent to that provider"
-     */
+    /** @scenario "A provider-filtered budget only counts spend sent to that provider" */
     it("matches only the provider it names", async () => {
       const openAiOnly = await prisma.gatewayBudget.findUniqueOrThrow({
         where: { id: BUDGET_PROJECT_OPENAI_ID },
@@ -302,9 +294,8 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(budgetAppliesToProvider(everything, MP_ANTHROPIC_ID)).toBe(true);
     });
 
-    /**
-     * @scenario "Two budgets on the same target with different provider filters do not share spend"
-     */
+    /** @scenario "Two budgets on the same target with different provider filters do not share spend" */
+    /** @scenario "Spend is attributed to the provider that actually served the request" */
     it("keeps a filtered and an unfiltered budget on the same target apart", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
@@ -367,9 +358,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
   });
 
   describe("the gateway bundle", () => {
-    /**
-     * @scenario "The gateway is told each budget's provider filter and per-member bucket"
-     */
+    /** @scenario "The gateway is told each budget's provider filter and per-member bucket" */
     it("ships provider_key, the group bucket and routing_mode", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
@@ -397,9 +386,8 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(bundle.providers_allowed).toBeNull();
     });
 
-    /**
-     * @scenario "A key with no fallback is dispatched at most once"
-     */
+    /** @scenario "A key with no fallback is dispatched at most once" */
+    /** @scenario "A key with no fallback attempts one provider and stops" */
     it("pins max_attempts to 1 when routing mode is NONE", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const vk = await repo.findById(VK_PERSONAL_ID, ORG_ID);
@@ -426,9 +414,8 @@ describe("budgets on every dimension — real PG + real CH", () => {
       });
     });
 
-    /**
-     * @scenario "An explicit provider list narrows what the key can reach"
-     */
+    /** @scenario "An explicit provider list narrows what the key can reach" */
+    /** @scenario "A key narrowed to one provider reaches only that provider" */
     it("filters providers[] by providers_allowed and keeps All open-ended", async () => {
       const repo = new VirtualKeyRepository(prisma);
       const openVk = await repo.findById(VK_SHARED_ID, ORG_ID);
@@ -458,12 +445,54 @@ describe("budgets on every dimension — real PG + real CH", () => {
         data: { config: {} },
       });
     });
+
+    /** @scenario "Allowing all providers keeps future providers included" */
+    /** @scenario "A key left open reaches providers added after it was created" */
+    it("reaches a provider added after the key was created, unless narrowed", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const lateProviderId = `mp-nxn-late-${suffix}`;
+      await prisma.modelProvider.create({
+        data: {
+          id: lateProviderId,
+          name: "late-arrival",
+          provider: "groq",
+          enabled: true,
+          organizationId: ORG_ID,
+          scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }] },
+        },
+      });
+
+      // The key was created before this provider existed and was never
+      // edited: leaving the list open has to mean future providers too,
+      // otherwise "all" is only ever a snapshot of creation day.
+      const openBundle = await new GatewayConfigMaterialiser(
+        prisma,
+        null,
+      ).materialise((await repo.findById(VK_SHARED_ID, ORG_ID))!);
+      expect(openBundle.providers.map((p) => p.id)).toContain(lateProviderId);
+
+      await prisma.virtualKey.update({
+        where: { id: VK_SHARED_ID },
+        data: { config: { providersAllowed: [MP_OPENAI_ID] } },
+      });
+      const narrowedBundle = await new GatewayConfigMaterialiser(
+        prisma,
+        null,
+      ).materialise((await repo.findById(VK_SHARED_ID, ORG_ID))!);
+      expect(narrowedBundle.providers.map((p) => p.id)).not.toContain(
+        lateProviderId,
+      );
+
+      await prisma.virtualKey.update({
+        where: { id: VK_SHARED_ID },
+        data: { config: {} },
+      });
+      await prisma.modelProvider.deleteMany({ where: { id: lateProviderId } });
+    });
   });
 
   describe("a key's own budget", () => {
-    /**
-     * @scenario "Creating a key with a budget creates both or neither"
-     */
+    /** @scenario "Creating a key with a budget creates both or neither" */
     it("creates the key and its budget in one transaction", async () => {
       const service = VirtualKeyService.create(prisma);
       const { virtualKey } = await service.create({
@@ -493,9 +522,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(bundle.budgets.map((b) => b.id)).toContain(budget!.id);
     });
 
-    /**
-     * @scenario "Revoking a key retires its budget instead of deleting it"
-     */
+    /** @scenario "Revoking a key retires its budget instead of deleting it" */
     it("archives the key's budget on revoke and keeps the row", async () => {
       const service = VirtualKeyService.create(prisma);
       const { virtualKey } = await service.create({
@@ -524,9 +551,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(budget!.archivedAt).not.toBeNull();
     });
 
-    /**
-     * @scenario "Removing a key's budget from the drawer archives it"
-     */
+    /** @scenario "Removing a key's budget from the drawer archives it" */
     it("archives rather than deletes when the budget field is cleared", async () => {
       const service = VirtualKeyService.create(prisma);
       const { virtualKey } = await service.create({
@@ -564,9 +589,8 @@ describe("budgets on every dimension — real PG + real CH", () => {
   });
 
   describe("key configuration rules", () => {
-    /**
-     * @scenario "A key cannot be pointed at a provider it cannot reach"
-     */
+    /** @scenario "A key cannot be pointed at a provider it cannot reach" */
+    /** @scenario "A key cannot name a provider outside its reach" */
     it("rejects a provider allowlist outside the key's scope graph", async () => {
       const otherOrgProvider = `mp-nxn-foreign-${suffix}`;
       // Exists in the org, scoped to a team the key has no reach into.
@@ -605,9 +629,8 @@ describe("budgets on every dimension — real PG + real CH", () => {
       await prisma.team.deleteMany({ where: { id: strangerTeamId } });
     });
 
-    /**
-     * @scenario "Unticking every provider is refused rather than saved"
-     */
+    /** @scenario "Unticking every provider is refused rather than saved" */
+    /** @scenario "A key cannot be saved with no providers at all" */
     it("rejects an empty provider allowlist", async () => {
       const service = VirtualKeyService.create(prisma);
       await expect(
@@ -621,9 +644,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       ).rejects.toThrow(/providers_allowed_empty/);
     });
 
-    /**
-     * @scenario "A new key defaults to no fallback"
-     */
+    /** @scenario "A new key defaults to no fallback" */
     it("defaults a newly created key to routing mode NONE", async () => {
       const service = VirtualKeyService.create(prisma);
       const { virtualKey } = await service.create({
@@ -636,9 +657,7 @@ describe("budgets on every dimension — real PG + real CH", () => {
       expect(virtualKey.routingMode).toBe("NONE");
     });
 
-    /**
-     * @scenario "Routing mode and routing policy cannot contradict each other"
-     */
+    /** @scenario "Routing mode and routing policy cannot contradict each other" */
     it("refuses POLICY without a policy and NONE with one", async () => {
       const service = VirtualKeyService.create(prisma);
       await expect(

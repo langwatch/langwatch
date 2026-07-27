@@ -215,9 +215,7 @@ describe("virtual key spend — real PG + real CH", () => {
     await stopTestContainers();
   }, 120_000);
 
-  /**
-   * @scenario "A key with no budget still reports what it spent"
-   */
+  /** @scenario "A key with no budget still reports what it spent" */
   it("reports spend for a key nobody has capped", async () => {
     const now = new Date();
     const spend = await usageService().spendByVirtualKey({
@@ -229,9 +227,7 @@ describe("virtual key spend — real PG + real CH", () => {
     expect(spend.get(VK_UNBUDGETED_ID)?.requests).toBe(1);
   });
 
-  /**
-   * @scenario "A key covered by several budgets is not counted once per budget"
-   */
+  /** @scenario "A key covered by several budgets is not counted once per budget" */
   it("counts a request once even when two budgets apply", async () => {
     const now = new Date();
     const spend = await usageService().spendByVirtualKey({
@@ -243,9 +239,7 @@ describe("virtual key spend — real PG + real CH", () => {
     expect(spend.get(VK_BUDGETED_ID)?.requests).toBe(1);
   });
 
-  /**
-   * @scenario "Spend from minutes ago is inside the window the page asks for"
-   */
+  /** @scenario "Spend from minutes ago is inside the window the page asks for" */
   it("includes a request made moments ago in a rolling window", async () => {
     const now = new Date();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;
@@ -260,9 +254,7 @@ describe("virtual key spend — real PG + real CH", () => {
     );
   });
 
-  /**
-   * @scenario "The window start is inclusive and the window end is exclusive"
-   */
+  /** @scenario "The window start is inclusive and the window end is exclusive" */
   it("keeps the boundaries half-open so a request is counted exactly once", async () => {
     const ch = getTestClickHouseClient()!;
     const anchor = new Date("2026-03-15T12:00:00.000Z");
@@ -288,9 +280,7 @@ describe("virtual key spend — real PG + real CH", () => {
     expect(onEnd.totalRequests).toBe(0);
   });
 
-  /**
-   * @scenario "Spend is reported per key with its own daily and model split"
-   */
+  /** @scenario "Spend is reported per key with its own daily and model split" */
   it("breaks one key's spend down by day and model", async () => {
     const now = new Date();
     const thirtyDays = 30 * 24 * 60 * 60 * 1000;

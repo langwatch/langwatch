@@ -142,3 +142,33 @@ Feature: Model → provider routing via VK config
       When I GET /v1/models
       Then the gateway does not connect
       And the endpoint contributes no models
+
+  Rule: A key can be narrowed to specific providers, or left open to all
+
+    Which providers a key may reach is a list on the key, not an abstract
+    scope. Leaving it open is stored as the absence of a list, which is what
+    makes "all" mean all current and future providers rather than a snapshot
+    of the ones that happened to exist on the day the key was made.
+
+    @integration
+    Scenario: A key left open reaches providers added after it was created
+      Given a key created with every provider allowed
+      When a provider is added to the organization afterwards
+      Then the key can reach it without being edited
+
+    @integration
+    Scenario: A key narrowed to one provider reaches only that provider
+      Given a key allowed to use exactly one provider
+      When its configuration is read
+      Then only that provider is offered to the gateway
+      And a provider added afterwards is not
+
+    @integration
+    Scenario: A key cannot name a provider outside its reach
+      When a key is saved naming a provider its ownership does not reach
+      Then the save is refused
+
+    @integration
+    Scenario: A key cannot be saved with no providers at all
+      When a key is saved allowing no providers
+      Then the save is refused

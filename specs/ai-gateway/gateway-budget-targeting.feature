@@ -71,6 +71,75 @@ Feature: Gateway budget targeting
     Then the "globex" budget is not applied to it
 
   # ────────────────────────────────────────────────────────────────────────────
+  # Every dimension, and combinations of them
+  # ────────────────────────────────────────────────────────────────────────────
+  #
+  # A budget answers two questions that are deliberately kept apart: WHO it
+  # constrains (organization, team, project, department, person, virtual key)
+  # and WHICH provider's spend it counts. Keeping the provider orthogonal is
+  # what makes "$50 a month on OpenAI for the platform team" one budget
+  # instead of a new kind of scope for every vendor.
+
+  @integration
+  Scenario: A provider-filtered budget only counts spend sent to that provider
+    Given a budget on project "web-app" that counts only one provider's spend
+    When a request is dispatched to a different provider
+    Then that budget does not count it
+    And a budget on the same project with no provider filter counts it
+    # A dispatch whose provider is unknown counts only towards unfiltered
+    # budgets: attributing it to a named provider would be a guess, and a
+    # guess here mis-bills a spending control.
+
+  @integration
+  Scenario: Two budgets on the same target with different provider filters do not share spend
+    Given project "web-app" has a budget counting every provider
+    And project "web-app" also has a budget counting one provider only
+    When spend is recorded against the unfiltered budget
+    Then the filtered budget still reports nothing spent
+    # The two accrue in separate buckets. Sharing one would make each report
+    # the other's spend, and the tighter of the two would block on traffic it
+    # was never meant to see.
+
+  @integration
+  Scenario: A department budget gives each member their own allowance
+    Given a department "engineering" with members alice and bob
+    And a budget on that department
+    When alice's key is resolved
+    Then the budget applies to alice with her own allowance
+    And bob's spend does not count against it
+    # "People in this department each get this much" — one budget row, one
+    # bucket per member. A shared departmental pot is a team or project
+    # budget, which is a different question and already has an answer.
+
+  @integration
+  Scenario: A department budget does not apply to a key with no person behind it
+    Given a budget on department "engineering"
+    When a shared key that belongs to no one is resolved
+    Then the department budget does not apply to it
+    # There is nobody to charge the per-member allowance to. Silently
+    # charging it to the whole department would turn a per-person cap into a
+    # shared one the first time somebody made a service key.
+
+  @integration
+  Scenario: Leaving a department drops that member's allowance on the next resolve
+    Given bob is in department "engineering" which has a budget
+    When bob leaves the department
+    Then the budget no longer applies to bob
+    And it still applies to the members who remain
+    # Membership is read when the key's configuration is resolved, so a
+    # change takes effect on the next resolve rather than needing every
+    # affected key to be edited.
+
+  @integration
+  Scenario: The gateway is told each budget's provider filter and per-member bucket
+    Given a key covered by a provider-filtered budget and a department budget
+    When its configuration is materialised for the gateway
+    Then each budget carries the provider it counts, or nothing if it counts all
+    And the department budget arrives as this member's own bucket
+    # The gateway enforces from what it is told. A filter the bundle omits is
+    # a filter that does not exist at request time.
+
+  # ────────────────────────────────────────────────────────────────────────────
   # Cleanup when a scoping entity goes away
   # ────────────────────────────────────────────────────────────────────────────
 
