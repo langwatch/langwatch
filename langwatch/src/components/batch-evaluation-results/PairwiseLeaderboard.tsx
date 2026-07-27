@@ -12,7 +12,7 @@ import type { BTLeaderboard } from "./computeBTLeaderboard";
  * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103).
  * Purely presentational — caller computes `leaderboard` via
  * `computeBTLeaderboard` and passes it in. Gated by the
- * `release_ui_comparison_leaderboard_enabled` flag at the mount site.
+ * Mounted only for comparisons with 3+ variants (see ComparisonCharts).
  */
 
 export type PairwiseLeaderboardProps = {

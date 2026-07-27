@@ -26,12 +26,13 @@ Feature: Comparison leaderboard (Bradley-Terry ranking on the results page)
     Given an EvaluationsV3 experiment with target variants "variant_1", "variant_2", "variant_3"
     And a dataset with rows having "input" and "expected_output" fields
     And a Comparison evaluator has run across all rows, producing a verdict per row
-    And the "release_ui_comparison_leaderboard_enabled" feature flag is on
 
-  Scenario: The leaderboard chart is feature-flagged off by default
-    Given the "release_ui_comparison_leaderboard_enabled" feature flag is off
+  Scenario: The leaderboard is offered without any opt-in
     When I view the run on the results page
-    Then I do not see a leaderboard chart
+    Then I see the leaderboard chart already enabled in the Metrics selector
+    # No feature flag: a ranking is the point of running a Comparison across
+    # 3+ variants, so it ships on. Variant count is the only gate, and it is a
+    # product rule rather than a rollout one — see the scenario below.
 
   Scenario: The leaderboard chart appears once there are enough variants to rank
     Given the comparison has 3 variants

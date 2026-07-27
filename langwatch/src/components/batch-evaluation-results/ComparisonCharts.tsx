@@ -130,8 +130,6 @@ type ComparisonChartsProps = {
    * through per-run in `comparisonData`.
    */
   comparisonRows?: BatchResultRow[];
-  /** Feature-flag gate for the Bradley-Terry leaderboard chart (#5103). */
-  showComparisonLeaderboard?: boolean;
 };
 
 type EvaluatorMetrics = {
@@ -322,7 +320,6 @@ export const ComparisonCharts = ({
   onTargetColorsChange,
   comparisonColumns,
   comparisonRows,
-  showComparisonLeaderboard,
 }: ComparisonChartsProps) => {
   /**
    * The comparison evaluators on this page, which are excluded from the
@@ -825,30 +822,48 @@ export const ComparisonCharts = ({
     }
 
     // Bradley-Terry leaderboard (#5103) — only meaningful at 3+ variants; a
-    // 2-variant comparison is already a plain win-rate story. Flag-gated
-    // separately from `comparisonColumns` itself since it's an additive
-    // power-user surface, not a replacement for the win-rate chart above.
-    if (showComparisonLeaderboard) {
-      for (const column of comparisonColumns ?? []) {
-        if (column.variants.length < 3) continue;
-        metrics.push({
-          id: `leaderboard_${column.evaluatorId}` as MetricType,
-          name: `${column.name} (Leaderboard)`,
-          type: "leaderboard",
-          evaluatorId: column.evaluatorId,
-        });
-      }
+    // 2-variant comparison is already a plain win-rate story, which the
+    // win-rate chart above already tells. Additive to that chart, never a
+    // replacement, so both are offered for a 3+ comparison.
+    for (const column of comparisonColumns ?? []) {
+      if (column.variants.length < 3) continue;
+      metrics.push({
+        id: `leaderboard_${column.evaluatorId}` as MetricType,
+        name: `${column.name} (Leaderboard)`,
+        type: "leaderboard",
+        evaluatorId: column.evaluatorId,
+      });
     }
 
     return metrics;
-  }, [scoreEvaluators, passRateEvaluators, comparisonColumns, showComparisonLeaderboard]);
+  }, [scoreEvaluators, passRateEvaluators, comparisonColumns]);
 
-  // Initialize visible metrics to include all available metrics on first load
+  // Show every metric the run offers, including ones that appear later.
+  //
+  // The previous guard keyed off `internalVisibleMetrics.size <= 2`, which
+  // fails in both directions. A metric that becomes available after the first
+  // load — a comparison column arriving with run data, an evaluator finishing
+  // — was never switched on, because by then the set had grown past two; a
+  // chart nobody knows to look for is a chart nobody finds. And since the
+  // initial set is exactly {cost, latency}, a run offering only those two kept
+  // the guard true forever, setting a fresh Set on every pass.
+  //
+  // Track which ids have already been offered instead. Newly-offered metrics
+  // switch on once; anything the user has since unchecked stays unchecked,
+  // because it is already in `seen`.
+  const seenMetricIdsRef = useRef<Set<MetricType>>(new Set());
   useEffect(() => {
-    if (availableMetrics.length > 0 && internalVisibleMetrics.size <= 2) {
-      const allMetricIds = new Set(availableMetrics.map((m) => m.id));
-      setInternalVisibleMetrics(allMetricIds);
-    }
+    const unseen = availableMetrics
+      .map((m) => m.id)
+      .filter((id) => !seenMetricIdsRef.current.has(id));
+    if (unseen.length === 0) return;
+
+    for (const id of unseen) seenMetricIdsRef.current.add(id);
+    setInternalVisibleMetrics((current) => {
+      const next = new Set(current);
+      for (const id of unseen) next.add(id);
+      return next;
+    });
   }, [availableMetrics]);
 
   // Get available X-axis options from target properties and metadata
@@ -1399,10 +1414,9 @@ export const ComparisonCharts = ({
             {/* Bradley-Terry leaderboard chart (#5103) — a sibling of
                 WinRateChart, gated the same way through the Metrics
                 dropdown. Only ever added to availableMetrics for 3+ variant
-                comparisons when the flag is on (see availableMetrics above),
-                so no extra gating is needed here beyond visibleMetrics. */}
-            {showComparisonLeaderboard &&
-              comparisonColumns?.map(
+                comparisons (see availableMetrics above), so no extra gating
+                is needed here beyond visibleMetrics. */}
+            {comparisonColumns?.map(
                 (column) =>
                   visibleMetrics.has(
                     `leaderboard_${column.evaluatorId}` as MetricType,
