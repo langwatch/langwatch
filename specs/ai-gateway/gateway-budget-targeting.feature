@@ -131,6 +131,18 @@ Feature: Gateway budget targeting
     # affected key to be edited.
 
   @integration
+  Scenario: A department budget cannot be created where members' spend cannot be told apart
+    Given a deployment that reads budget spend from the database fallback
+    When an admin creates a budget on department "engineering"
+    Then the budget is refused
+    And the refusal says department budgets need the spend ledger
+    # The fallback keeps one running spend figure per budget row. A
+    # department budget is one bucket per member; squeezed into one figure
+    # it would cap each member at what the whole department spent together,
+    # which is a different promise than the one on the label. A control
+    # that cannot mean what it says is refused rather than created.
+
+  @integration
   Scenario: The gateway is told each budget's provider filter and per-member bucket
     Given a key covered by a provider-filtered budget and a department budget
     When its configuration is materialised for the gateway

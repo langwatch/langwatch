@@ -48,7 +48,8 @@ export type BudgetScope =
   | { kind: "TEAM"; teamId: string }
   | { kind: "PROJECT"; projectId: string }
   | { kind: "VIRTUAL_KEY"; virtualKeyId: string }
-  | { kind: "PRINCIPAL"; principalUserId: string };
+  | { kind: "PRINCIPAL"; principalUserId: string }
+  | { kind: "GROUP"; groupId: string };
 
 export type CreateBudgetInput = {
   organizationId: string;
@@ -643,6 +644,42 @@ export class GatewayBudgetService {
       }
     }
 
+    if (input.scope.kind === "GROUP") {
+      // A GROUP budget is one enforcement bucket per member, and per-member
+      // buckets only exist on the ClickHouse spend path. Without it,
+      // `check()` falls back to the single PG `spentUsd` figure per budget
+      // row, which would enforce each member against the whole
+      // department's combined spend: a different control than the one the
+      // admin asked for. Refuse rather than create a cap that cannot mean
+      // what it says. Detection matches `check()`'s own CH-vs-PG pick:
+      // the presence of the ClickHouse repo this service was built with.
+      // Spec: specs/ai-gateway/gateway-budget-targeting.feature.
+      if (!this.chRepo) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "group_budget_requires_clickhouse: department budgets track spend per member, which needs the ClickHouse spend ledger; this deployment reads budget spend from Postgres only, which cannot keep members apart.",
+        });
+      }
+      // Cross-org guard, mirroring the TEAM / PROJECT / PRINCIPAL guards:
+      // the scope id is request-supplied, so without this a caller could
+      // put a per-member budget on another tenant's department.
+      const group = await this.prisma.group.findFirst({
+        where: {
+          id: input.scope.groupId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!group) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "groupId does not belong to this organization; GROUP budgets must scope a department inside the budget's org.",
+        });
+      }
+    }
+
     const resetsAt = nextResetAt(input.window);
     const projectId = resolveProjectFromScope(input.scope);
 
@@ -898,6 +935,8 @@ function scopeIdForScope(scope: BudgetScope): string {
       return scope.virtualKeyId;
     case "PRINCIPAL":
       return scope.principalUserId;
+    case "GROUP":
+      return scope.groupId;
   }
 }
 
@@ -908,7 +947,8 @@ function scopeKindToEnum(
   | "TEAM"
   | "PROJECT"
   | "VIRTUAL_KEY"
-  | "PRINCIPAL" {
+  | "PRINCIPAL"
+  | "GROUP" {
   return kind;
 }
 

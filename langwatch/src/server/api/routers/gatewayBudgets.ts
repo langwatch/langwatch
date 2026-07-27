@@ -2,9 +2,9 @@
  * tRPC router for gateway budgets.
  *
  * Budgets are always organization-scoped but the resource target is one of
- * ORGANIZATION / TEAM / PROJECT / VIRTUAL_KEY / PRINCIPAL. The UI flows pass
- * a scope kind + target id; the server normalises onto `scopeType` and the
- * matching typed FK column.
+ * ORGANIZATION / TEAM / PROJECT / VIRTUAL_KEY / PRINCIPAL / GROUP. The UI
+ * flows pass a scope kind + target id; the server normalises onto
+ * `scopeType` and the matching typed FK column.
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -41,6 +41,9 @@ const scopeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("PROJECT"), projectId: z.string() }),
   z.object({ kind: z.literal("VIRTUAL_KEY"), virtualKeyId: z.string() }),
   z.object({ kind: z.literal("PRINCIPAL"), principalUserId: z.string() }),
+  // Per-member department budgets. Creation is service-guarded: it needs
+  // the ClickHouse spend path (group_budget_requires_clickhouse otherwise).
+  z.object({ kind: z.literal("GROUP"), groupId: z.string() }),
 ]);
 
 async function requireOrgAccess(

@@ -24,6 +24,7 @@ import {
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
+import { GatewayBudgetService } from "../budget.service";
 import {
   budgetAppliesToProvider,
   resolveApplicableBudgets,
@@ -46,6 +47,9 @@ const VK_SHARED_ID = `vk_nxn_shared_${suffix}`;
 const BUDGET_GROUP_ID = `bdg-nxn-group-${suffix}`;
 const BUDGET_PROJECT_ALL_ID = `bdg-nxn-proj-all-${suffix}`;
 const BUDGET_PROJECT_OPENAI_ID = `bdg-nxn-proj-openai-${suffix}`;
+// A second tenant whose department must not be budgetable from ORG_ID.
+const FOREIGN_ORG_ID = `org-nxn-foreign-${suffix}`;
+const FOREIGN_GROUP_ID = `grp-nxn-foreign-${suffix}`;
 
 // Ids created by the tests themselves; the teardown only touches what was
 // actually assigned so a failure before creation cannot widen a delete.
@@ -205,6 +209,12 @@ describe("budgets on every dimension — real PG + real CH", () => {
       where: { organizationId: ORG_ID },
     });
     await prisma.auditLog.deleteMany({ where: { organizationId: ORG_ID } });
+    // The cross-org test's tenant: refusals leave no budget rows behind,
+    // and deleting the organization cascades its group.
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: FOREIGN_ORG_ID },
+    });
+    await prisma.organization.deleteMany({ where: { id: FOREIGN_ORG_ID } });
     await prisma.virtualKey.deleteMany({
       where: { id: { in: [VK_PERSONAL_ID, VK_SHARED_ID] } },
     });
@@ -272,6 +282,95 @@ describe("budgets on every dimension — real PG + real CH", () => {
         principalUserId: OTHER_USER_ID,
       });
       expect(left.map((r) => r.budget.id)).not.toContain(BUDGET_GROUP_ID);
+    });
+  });
+
+  describe("creating a department budget", () => {
+    /** @scenario "A department budget cannot be created where members' spend cannot be told apart" */
+    it("refuses GROUP creation when no ClickHouse spend path is wired", async () => {
+      // The same detection check() uses to pick ClickHouse over the PG
+      // fallback: the repo the service was constructed with. Without it,
+      // per-member buckets collapse into the single spentUsd figure and
+      // every member would be capped at the department's combined spend.
+      const service = GatewayBudgetService.create(prisma);
+      await expect(
+        service.create({
+          organizationId: ORG_ID,
+          scope: { kind: "GROUP", groupId: GROUP_ID },
+          name: `No ledger ${suffix}`,
+          window: "MONTH",
+          limitUsd: "25.00",
+          actorUserId: USER_ID,
+        }),
+      ).rejects.toThrow(/group_budget_requires_clickhouse/);
+
+      const rows = await prisma.gatewayBudget.findMany({
+        where: { organizationId: ORG_ID, name: `No ledger ${suffix}` },
+      });
+      expect(rows).toHaveLength(0);
+    });
+
+    it("creates a GROUP budget when the ClickHouse spend path is wired, per member", async () => {
+      const ch = getTestClickHouseClient();
+      expect(ch).not.toBeNull();
+      const chRepo = new GatewayBudgetClickHouseRepository(
+        async () => ch as ClickHouseClient,
+      );
+      const service = GatewayBudgetService.create(prisma, chRepo);
+      const row = await service.create({
+        organizationId: ORG_ID,
+        scope: { kind: "GROUP", groupId: GROUP_ID },
+        name: `Ledgered ${suffix}`,
+        window: "MONTH",
+        limitUsd: "25.00",
+        actorUserId: USER_ID,
+      });
+      expect(row.scopeType).toBe("GROUP");
+      expect(row.scopeId).toBe(GROUP_ID);
+
+      // The created budget rides the per-member cascade like any other
+      // department budget.
+      const resolved = await resolveApplicableBudgets(prisma, {
+        organizationId: ORG_ID,
+        virtualKeyId: VK_PERSONAL_ID,
+        principalUserId: USER_ID,
+      });
+      const bucket = resolved.find((r) => r.budget.id === row.id);
+      expect(bucket).toBeDefined();
+      expect(bucket!.bucketScopeId).toBe(`${GROUP_ID}:${USER_ID}`);
+    });
+
+    it("refuses a department from another organization", async () => {
+      await prisma.organization.create({
+        data: {
+          id: FOREIGN_ORG_ID,
+          name: `NxN Foreign ${suffix}`,
+          slug: `nxn-foreign-${suffix}`,
+        },
+      });
+      await prisma.group.create({
+        data: {
+          id: FOREIGN_GROUP_ID,
+          organizationId: FOREIGN_ORG_ID,
+          name: `Foreign Eng ${suffix}`,
+          slug: `foreign-eng-${suffix}`,
+        },
+      });
+      const ch = getTestClickHouseClient();
+      const chRepo = new GatewayBudgetClickHouseRepository(
+        async () => ch as ClickHouseClient,
+      );
+      const service = GatewayBudgetService.create(prisma, chRepo);
+      await expect(
+        service.create({
+          organizationId: ORG_ID,
+          scope: { kind: "GROUP", groupId: FOREIGN_GROUP_ID },
+          name: `Cross tenant ${suffix}`,
+          window: "MONTH",
+          limitUsd: "25.00",
+          actorUserId: USER_ID,
+        }),
+      ).rejects.toThrow(/does not belong to this organization/);
     });
   });
 
