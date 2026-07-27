@@ -144,12 +144,11 @@ describe("useShowLangy", () => {
       context.demoProjectSlug = undefined;
     });
 
-    /**
-     * @scenario `DEMO_PROJECT_SLUG === project?.slug` with both sides
-     * undefined must not read as "this is the demo project". An install
-     * with no demo project configured hits exactly this on any route whose
-     * project hasn't resolved yet, and did not deserve to lose Langy for it.
-     */
+    // `DEMO_PROJECT_SLUG === project?.slug` with both sides undefined must
+    // not read as "this is the demo project". An install with no demo
+    // project configured hits exactly this on any route whose project
+    // hasn't resolved yet, and did not deserve to lose Langy for it.
+    /** @scenario An unresolved project is not mistaken for the demo project */
     it("does not treat the unresolved project as the demo project", () => {
       gate.rule = { organizationId: "org-1" };
 

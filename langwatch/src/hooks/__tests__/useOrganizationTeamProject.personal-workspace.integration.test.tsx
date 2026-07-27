@@ -256,22 +256,21 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       mockRouter.asPath = "/me";
     });
 
-    /**
-     * @scenario /me is the one "no slug" page that means the OPPOSITE of the
-     * organization-scoped case above: the personal workspace must win, not
-     * the shared team it otherwise correctly loses to. Unfixed, this landed
-     * on the shared team's own first project (or, per "given the shared team
-     * has no project yet" below, no project at all): any organization
-     * feature gated on "does this reader have a project" (Langy chief among
-     * them) then read a personal-workspace visit as project-less.
-     */
+    // /me is the one "no slug" page that means the OPPOSITE of the
+    // organization-scoped case above: the personal workspace must win, not
+    // the shared team it otherwise correctly loses to. Unfixed, this landed
+    // on the shared team's own first project (or, per "given the shared team
+    // has no project yet" below, no project at all): any organization
+    // feature gated on "does this reader have a project" (Langy chief among
+    // them) then read a personal-workspace visit as project-less.
+    /** @scenario Visiting the personal-workspace page resolves the personal team */
     it("resolves the personal team instead of the shared one", () => {
       const { result } = renderResolution();
 
       expect(result.current.team?.id).toBe("team-personal");
     });
 
-    /** @scenario /me resolves the user's own project, not the org's */
+    /** @scenario Visiting the personal-workspace page resolves the personal team */
     it("resolves the personal project instead of the organization's", () => {
       const { result } = renderResolution();
 
@@ -292,12 +291,11 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       );
     });
 
-    /**
-     * @scenario The organization-scoped equivalent of this fixture correctly
-     * leaves the page without a project (see "given the shared team has no
-     * project yet" above), /me must not inherit that outcome just because
-     * the same shared, project-less team exists in the organization.
-     */
+    // The organization-scoped equivalent of this fixture correctly leaves the
+    // page without a project (see "given the shared team has no project yet"
+    // above), /me must not inherit that outcome just because the same
+    // shared, project-less team exists in the organization.
+    /** @scenario A shared team without a project does not leak into the personal-workspace page */
     it("still resolves the personal team and project, not an empty shared one", () => {
       const { result } = renderResolution();
 
@@ -313,7 +311,7 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       mockRouter.asPath = "/me/devices";
     });
 
-    /** @scenario Every /me/* sub-route gets the same treatment as /me itself */
+    /** @scenario Every personal-workspace sub-route gets the same treatment */
     it("resolves the personal team and project there too", () => {
       const { result } = renderResolution();
 
@@ -336,12 +334,11 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       mockLocalStorage.selectedTeamId = "team-shared";
     });
 
-    /**
-     * @scenario Unlike a stale PERSONAL slug fading off an organization page
-     * (which the code already handles), a stale SHARED team id must not
-     * follow the user onto /me: this route is unambiguously about the
-     * personal workspace regardless of whatever was last remembered.
-     */
+    // Unlike a stale PERSONAL slug fading off an organization page (which the
+    // code already handles), a stale SHARED team id must not follow the user
+    // onto /me: this route is unambiguously about the personal workspace
+    // regardless of whatever was last remembered.
+    /** @scenario A team remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page */
     it("still resolves the personal team, not the remembered shared one", () => {
       const { result } = renderResolution();
 
@@ -360,11 +357,10 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       );
     });
 
-    /**
-     * @scenario An EXTERNAL member with no personal workspace of their own
-     * falls through to the ordinary ambient resolution exactly as before:
-     * the /me fix only ever adds a preference, never a requirement.
-     */
+    // An EXTERNAL member with no personal workspace of their own falls
+    // through to the ordinary ambient resolution exactly as before: the /me
+    // fix only ever adds a preference, never a requirement.
+    /** @scenario A member with no personal workspace of their own falls back to the ambient team */
     it("falls back to the ambient team rather than resolving nothing", () => {
       const { result } = renderResolution();
 
