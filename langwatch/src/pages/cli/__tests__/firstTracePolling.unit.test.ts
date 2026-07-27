@@ -12,20 +12,18 @@ const base = {
   isTimedOut: false,
   hasPriorTraces: false,
   hasSeenNeverSynced: true,
-  isVisible: true,
 } as const;
 
 describe("resolveFirstTracePolling", () => {
   describe("when the never-synced state is confirmed", () => {
     /** @scenario "First-trace polling only runs while the page is visible and stops at the timeout" */
-    it("polls on the interval only while the tab is visible", () => {
+    it("polls on the interval while the watch is live", () => {
+      // Visible-tab-only is react-query's own default: with
+      // refetchIntervalInBackground unset, interval refetches pause on a
+      // hidden tab. The RTL suite pins that the option is never overridden.
       expect(resolveFirstTracePolling(base)).toEqual({
         enabled: true,
         refetchInterval: FIRST_TRACE_POLL_INTERVAL_MS,
-      });
-      expect(resolveFirstTracePolling({ ...base, isVisible: false })).toEqual({
-        enabled: true,
-        refetchInterval: false,
       });
     });
 

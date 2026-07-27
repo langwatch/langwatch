@@ -1049,8 +1049,12 @@ export class AiToolEntryService {
       },
       // Waiting on the advisory lock counts toward the interactive-txn
       // timeout; give a losing concurrent provisioner room to wait out
-      // the winner instead of aborting at Prisma's 5s default.
-      { timeout: 15_000 },
+      // the winner instead of aborting at Prisma's 5s default. maxWait is
+      // raised the same way dataset-lock.ts does it: the burst this lock
+      // exists for is several first-loads of one fresh org hitting the
+      // pool at once, and Prisma's 2s default can fail a provisioner on
+      // connection acquisition before it ever reaches the lock.
+      { timeout: 15_000, maxWait: 10_000 },
     );
   }
 

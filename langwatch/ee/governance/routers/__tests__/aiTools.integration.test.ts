@@ -761,6 +761,85 @@ describe("aiToolsRouter integration", () => {
       }
     });
 
+    /** @scenario "re-importing the starter pack adds only tiles the catalog never had" */
+    /** @scenario "an archived starter tile is not restored or duplicated by a re-import" */
+    it("adds only never-had tiles on re-import and leaves archived tiles archived", async () => {
+      const freshOrgId = `starter-org-${nanoid(8)}`;
+      await prisma.organization.create({
+        data: {
+          id: freshOrgId,
+          name: `Starter ${nanoid(4)}`,
+          slug: `starter-${nanoid(6)}`,
+        },
+      });
+      await prisma.organizationUser.create({
+        data: {
+          userId: adminUserId,
+          organizationId: freshOrgId,
+          role: OrganizationUserRole.ADMIN,
+        },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: freshOrgId,
+          userId: adminUserId,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: freshOrgId,
+        },
+      });
+
+      try {
+        await callerFor(adminUserId).aiTools.importStarterPack({
+          organizationId: freshOrgId,
+        });
+
+        // Curate: archive codex, and remove gemini entirely so it counts
+        // as a tile the catalog never had.
+        const codex = await prisma.aiToolEntry.findFirstOrThrow({
+          where: { organizationId: freshOrgId, slug: "codex" },
+        });
+        await prisma.aiToolEntry.update({
+          where: { id: codex.id },
+          data: { archivedAt: new Date() },
+        });
+        await prisma.aiToolEntry.deleteMany({
+          where: { organizationId: freshOrgId, slug: { in: ["gemini"] } },
+        });
+
+        const result = await callerFor(adminUserId).aiTools.importStarterPack({
+          organizationId: freshOrgId,
+        });
+        // Only the genuinely missing tile comes back; the archived one and
+        // the six untouched ones are treated as present.
+        expect(result.created).toBe(1);
+        expect(result.skipped).toBe(7);
+
+        const rows = await prisma.aiToolEntry.findMany({
+          where: { organizationId: freshOrgId },
+        });
+        expect(rows.filter((r) => r.slug === "gemini")).toHaveLength(1);
+        const codexRows = rows.filter(
+          (r) => r.id === codex.id || r.displayName === codex.displayName,
+        );
+        expect(codexRows).toHaveLength(1);
+        expect(codexRows[0]!.archivedAt).not.toBeNull();
+      } finally {
+        await prisma.aiToolEntry
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.roleBinding
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.organizationUser
+          .deleteMany({ where: { organizationId: freshOrgId } })
+          .catch(() => undefined);
+        await prisma.organization
+          .deleteMany({ where: { id: freshOrgId } })
+          .catch(() => undefined);
+      }
+    });
+
     it("rejects MEMBER callers - manage-permission required", async () => {
       await expect(
         callerFor(memberPlatformUserId).aiTools.importStarterPack({

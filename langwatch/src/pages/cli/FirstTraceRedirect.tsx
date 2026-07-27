@@ -31,10 +31,11 @@ const REDIRECT_DELAY_MS = 1_200;
  * Pure polling policy: the query runs only while there is a project to watch
  * and nothing has concluded the watch (redirect underway, timeout reached, or
  * the project already had traces). The refetch interval additionally requires
- * a visible tab, plus either a confirmed never-synced state or no result yet,
- * so a failed initial read keeps retrying until the timeout instead of
- * stalling, while a hidden tab or an already-synced project never ticks the
- * network.
+ * either a confirmed never-synced state or no result yet, so a failed
+ * initial read keeps retrying until the timeout instead of stalling.
+ * Hidden tabs are covered by react-query itself: with the default
+ * refetchIntervalInBackground (false), an interval query only ticks while
+ * the tab is focused per the focus manager's visibilitychange handling.
  */
 export function resolveFirstTracePolling({
   hasProject,
@@ -43,7 +44,6 @@ export function resolveFirstTracePolling({
   isTimedOut,
   hasPriorTraces,
   hasSeenNeverSynced,
-  isVisible,
 }: {
   hasProject: boolean;
   hasResult: boolean;
@@ -51,12 +51,11 @@ export function resolveFirstTracePolling({
   isTimedOut: boolean;
   hasPriorTraces: boolean;
   hasSeenNeverSynced: boolean;
-  isVisible: boolean;
 }): { enabled: boolean; refetchInterval: number | false } {
   const enabled =
     hasProject && !isRedirecting && !isTimedOut && !hasPriorTraces;
   const refetchInterval =
-    enabled && isVisible && (hasSeenNeverSynced || !hasResult)
+    enabled && (hasSeenNeverSynced || !hasResult)
       ? FIRST_TRACE_POLL_INTERVAL_MS
       : false;
   return { enabled, refetchInterval };
@@ -86,21 +85,6 @@ export function resolveFirstTraceTransition({
   return "redirect";
 }
 
-function useDocumentVisible(): boolean {
-  const [isVisible, setIsVisible] = useState<boolean>(
-    typeof document === "undefined"
-      ? true
-      : document.visibilityState === "visible",
-  );
-  useEffect(() => {
-    const onVisibility = () =>
-      setIsVisible(document.visibilityState === "visible");
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, []);
-  return isVisible;
-}
-
 type FirstTraceWatchState = "hidden" | "waiting" | "redirecting";
 
 /**
@@ -121,7 +105,6 @@ function useFirstTraceWatch(): FirstTraceWatchState {
     [organizations, session?.user?.id],
   );
 
-  const isVisible = useDocumentVisible();
   const [hasResult, setHasResult] = useState(false);
   const [isTimedOut, setIsTimedOut] = useState(false);
   const [hasSeenNeverSynced, setHasSeenNeverSynced] = useState(false);
@@ -143,7 +126,6 @@ function useFirstTraceWatch(): FirstTraceWatchState {
     isTimedOut,
     hasPriorTraces,
     hasSeenNeverSynced,
-    isVisible,
   });
 
   const hasFirstMessage = api.project.getHasFirstMessage.useQuery(

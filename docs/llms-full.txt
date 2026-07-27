@@ -16455,8 +16455,10 @@ The provisioned set is org-scoped and editable like any other entry.
 You can reorder, scope, disable, or archive entries afterward.
 Auto-provisioning only ever runs on a catalog that has never had any
 entry, so a catalog you curated down to nothing stays empty. The
-**Import starter pack** CTA in the editor re-imports missing starter
-tiles whenever you want them back.
+**Import starter pack** button in the editor adds starter tiles the
+catalog never had, such as tiles added to the pack after your org was
+provisioned. Tiles you archived are respected as removed: import skips
+them, and **+ Add tile** recreates one if you want it back.
 
 ## Adding a tile
 

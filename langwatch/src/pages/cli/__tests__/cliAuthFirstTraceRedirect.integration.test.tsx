@@ -15,13 +15,23 @@ import userEvent from "@testing-library/user-event";
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fetchMock, sessionRef, firstMessageState, credentialTypeRef } =
-  vi.hoisted(() => {
+const {
+  fetchMock,
+  sessionRef,
+  firstMessageState,
+  credentialTypeRef,
+  lastFirstMessageQueryOptions,
+} = vi.hoisted(() => {
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const listeners = new Set<() => void>();
     return {
       fetchMock,
+      lastFirstMessageQueryOptions: {
+        current: undefined as
+          | { enabled?: boolean; refetchIntervalInBackground?: boolean }
+          | undefined,
+      },
       sessionRef: {
         current: {
           data: { user: { id: "user-1", email: "dev@example.com" } },
@@ -121,8 +131,12 @@ vi.mock("~/utils/api", async () => {
         getHasFirstMessage: {
           useQuery: (
             _input: { projectId: string },
-            options?: { enabled?: boolean },
+            options?: {
+              enabled?: boolean;
+              refetchIntervalInBackground?: boolean;
+            },
           ) => {
+            lastFirstMessageQueryOptions.current = options;
             const value = useSyncExternalStore(
               (listener) => firstMessageState.subscribe(listener),
               () => firstMessageState.value,
@@ -213,6 +227,12 @@ describe("/cli/auth first-trace watch", () => {
       expect(screen.getByText(/Waiting for your first trace/i)).toBeDefined(),
     );
     expect(mockRouter.push).not.toHaveBeenCalled();
+
+    // Visible-tab-only polling rides react-query's default: the component
+    // must never override refetchIntervalInBackground.
+    expect(
+      lastFirstMessageQueryOptions.current?.refetchIntervalInBackground,
+    ).toBeUndefined();
 
     act(() => firstMessageState.set(true));
 
