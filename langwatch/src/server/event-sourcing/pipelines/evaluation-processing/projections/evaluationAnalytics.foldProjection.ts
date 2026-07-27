@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { trimAttributesForAnalytics } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
 import {
   AbstractFoldProjection,
@@ -67,6 +68,10 @@ import {
  * same Version → ReplacingMergeTree collapses duplicates. No explicit
  * truncate, no settle, no signs.
  */
+
+const logger = createLogger(
+  "langwatch:event-sourcing:evaluation-processing:evaluation-analytics-fold",
+);
 
 const evaluationAnalyticsEvents = [
   evaluationScheduledEventSchema,
@@ -280,9 +285,26 @@ export function projectEvaluationAnalyticsStateToRow({
 export function evaluationAnalyticsStateFromRow(
   row: EvaluationAnalyticsRow,
 ): EvaluationAnalyticsData {
-  const status: EvaluationAnalyticsData["status"] = EVALUATION_STATUS_VALUES.has(
+  // Unreachable for a same-version writer, but read-back is explicitly
+  // mixed-deploy safe: a newer node can persist a status this build does not
+  // know yet. Coercing keeps the delivery path total (never throw on a decode),
+  // but the coercion is NOT self-healing — read-back never replays event_log, so
+  // the next fold writes the downgrade over the real terminal state. Log it so
+  // the mixed-deploy window is detectable rather than silent.
+  const isKnownStatus = EVALUATION_STATUS_VALUES.has(
     row.status as EvaluationAnalyticsData["status"],
-  )
+  );
+  if (!isKnownStatus) {
+    logger.warn(
+      {
+        tenantId: row.tenantId,
+        evaluationId: row.evaluationId,
+        status: row.status,
+      },
+      "evaluation_analytics read-back saw an unknown status; coercing to scheduled",
+    );
+  }
+  const status: EvaluationAnalyticsData["status"] = isKnownStatus
     ? (row.status as EvaluationAnalyticsData["status"])
     : "scheduled";
 
