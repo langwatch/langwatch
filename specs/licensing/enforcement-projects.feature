@@ -140,6 +140,17 @@ Feature: Project Limit Enforcement with License
     Then the request fails with FORBIDDEN
     And the reported project count is unchanged
 
+  # A personal workspace is its project. Archiving it hides the workspace from
+  # the lookup that provisions it while the team keeps the one slot allowed per
+  # (organization, owner), so the owner is left with no personal workspace and
+  # no way to get one back.
+
+  Scenario: Archiving a personal project is refused
+    Given the organization has 1 personal project
+    When I archive the personal project
+    Then the request fails with FORBIDDEN
+    And the owner still has a personal workspace
+
   Scenario: A project counts unless its own flag and its team both call it personal
     Given the organization has 2 projects
     And the organization has 1 project marked personal inside a shared team

@@ -133,6 +133,13 @@ Feature: Edit project name and team
     Then the service refuses the move
     And the project's teamId is unchanged
 
+  @unit
+  Scenario: ProjectService.archive refuses to archive a personal project
+    Given a personal project in a personal team
+    When I call ProjectService.archive on it
+    Then the service refuses the archival
+    And the project is not archived
+
   # ── RBAC inheritance ─────────────────────────────────────────────────────────
 
   @unit @unimplemented

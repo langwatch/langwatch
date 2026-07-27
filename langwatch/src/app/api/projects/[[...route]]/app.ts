@@ -10,6 +10,7 @@ import {
 import type { ApiKeyService } from "~/server/api-key/api-key.service";
 import {
   DestinationTeamNotFoundError,
+  PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
   type ProjectService,
@@ -259,6 +260,9 @@ secured.access(requires("project:delete")).delete(
     } catch (error) {
       if (error instanceof ProjectNotFoundError) {
         throw new NotFoundError("Project not found");
+      }
+      if (error instanceof PersonalProjectProtectedError) {
+        throw new ForbiddenError(error.message);
       }
       throw error;
     }

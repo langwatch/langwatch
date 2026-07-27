@@ -55,6 +55,22 @@ export class PersonalWorkspaceBoundaryError extends Error {
   name = "PersonalWorkspaceBoundaryError" as const;
 }
 
+export class PersonalProjectProtectedError extends Error {
+  name = "PersonalProjectProtectedError" as const;
+}
+
+/** The refusal a personal project gives to anything that would move it out. */
+export const PERSONAL_PROJECT_MOVE_OUT_REFUSAL =
+  "Personal workspace projects cannot be moved to another team. Create a project in the destination team instead.";
+
+/** The refusal a personal team gives to anything that would move a project in. */
+export const PERSONAL_PROJECT_MOVE_IN_REFUSAL =
+  "Projects cannot be moved into a personal workspace. Personal workspaces hold only their owner's personal project.";
+
+/** The refusal a personal project gives to anything that would archive it. */
+export const PERSONAL_PROJECT_ARCHIVE_REFUSAL =
+  "Personal workspace projects cannot be archived. A personal workspace is its project, and archiving it leaves the owner without one in this organization.";
+
 export interface CreateProjectParams {
   organizationId: string;
   userId?: string | null;
@@ -177,12 +193,12 @@ export class ProjectService {
       if (current && current.teamId !== data.teamId) {
         if (current.isPersonal) {
           throw new PersonalWorkspaceBoundaryError(
-            "Personal workspace projects cannot be moved to another team. Create a project in the destination team instead.",
+            PERSONAL_PROJECT_MOVE_OUT_REFUSAL,
           );
         }
         if (team.isPersonal) {
           throw new PersonalWorkspaceBoundaryError(
-            "Projects cannot be moved into a personal workspace. Personal workspaces hold only their owner's personal project.",
+            PERSONAL_PROJECT_MOVE_IN_REFUSAL,
           );
         }
       }
@@ -200,6 +216,18 @@ export class ProjectService {
     id: string;
     organizationId: string;
   }): Promise<Project> {
+    // A personal workspace is its project: PersonalWorkspaceService looks the
+    // workspace up by the personal team still holding an unarchived personal
+    // project. Archiving it hides the workspace from that lookup while the
+    // team keeps the (organization, owner) uniqueness slot, so the next
+    // ensure() can neither find the workspace nor create a replacement.
+    const existing = await this.repo.getById(id);
+    if (existing?.isPersonal) {
+      throw new PersonalProjectProtectedError(
+        PERSONAL_PROJECT_ARCHIVE_REFUSAL,
+      );
+    }
+
     // Cascade-delete stored-object bytes BEFORE the archive so BYOC S3 credentials
     // are still resolvable from the live project row. Wrapped in try/catch so a
     // cascade failure never blocks the user-facing project deletion — orphan bytes

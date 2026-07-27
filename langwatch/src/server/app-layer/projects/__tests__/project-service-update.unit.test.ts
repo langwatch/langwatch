@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   DestinationTeamNotFoundError,
+  PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
   ProjectService,
@@ -12,6 +13,7 @@ function createMockRepo() {
   vi.spyOn(repo, "update");
   vi.spyOn(repo, "findActiveTeamInOrganization");
   vi.spyOn(repo, "getById");
+  vi.spyOn(repo, "archive");
   return repo;
 }
 
@@ -191,6 +193,23 @@ describe("ProjectService.update", () => {
           data: { name: "My Workspace", teamId: "personal" },
         }),
       ).resolves.toMatchObject({ name: "My Workspace" });
+    });
+  });
+
+  describe("when archiving a personal project", () => {
+    /** @scenario ProjectService.archive refuses to archive a personal project */
+    it("refuses, because the workspace is the project", async () => {
+      vi.mocked(repo.getById).mockResolvedValue({
+        id: "p1",
+        teamId: "personal",
+        isPersonal: true,
+      } as any);
+
+      await expect(
+        service.archive({ id: "p1", organizationId: "org1" }),
+      ).rejects.toThrow(PersonalProjectProtectedError);
+
+      expect(repo.archive).not.toHaveBeenCalled();
     });
   });
 

@@ -406,6 +406,42 @@ describe("given a personal workspace beside a shared team in one organization", 
     });
   });
 
+  describe("when the owner archives the personal project", () => {
+    /** @scenario Archiving a personal project is refused */
+    it("refuses the archival", async () => {
+      await expect(
+        callerAsOwner().project.archiveById({
+          projectId: sharedProjectId,
+          projectToArchiveId: personalProjectId,
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: expect.stringContaining("cannot be archived"),
+      });
+    });
+
+    /** @scenario Archiving a personal project is refused */
+    it("leaves the workspace where the next login finds it", async () => {
+      await expect(
+        callerAsOwner().project.archiveById({
+          projectId: sharedProjectId,
+          projectToArchiveId: personalProjectId,
+        }),
+      ).rejects.toThrow();
+
+      const project = await prisma.project.findUnique({
+        where: { id: personalProjectId },
+        select: { archivedAt: true },
+      });
+      expect(project?.archivedAt).toBeNull();
+
+      await expect(ensureWorkspace()).resolves.toMatchObject({
+        created: false,
+        project: { id: personalProjectId },
+      });
+    });
+  });
+
   describe("when the owner archives the personal team", () => {
     /** @scenario Archiving a personal team is refused */
     it("refuses the archival", async () => {

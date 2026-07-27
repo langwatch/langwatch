@@ -12,6 +12,11 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import {
+  PERSONAL_PROJECT_ARCHIVE_REFUSAL,
+  PERSONAL_PROJECT_MOVE_IN_REFUSAL,
+  PERSONAL_PROJECT_MOVE_OUT_REFUSAL,
+} from "~/server/app-layer/projects/project.service";
 import type { Session } from "~/server/auth";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -349,15 +354,13 @@ export const projectRouter = createTRPCRouter({
           if (project.isPersonal) {
             throw new TRPCError({
               code: "FORBIDDEN",
-              message:
-                "Personal workspace projects cannot be moved to another team. Create a project in the destination team instead.",
+              message: PERSONAL_PROJECT_MOVE_OUT_REFUSAL,
             });
           }
           if (destinationTeam.isPersonal) {
             throw new TRPCError({
               code: "FORBIDDEN",
-              message:
-                "Projects cannot be moved into a personal workspace. Personal workspaces hold only their owner's personal project.",
+              message: PERSONAL_PROJECT_MOVE_IN_REFUSAL,
             });
           }
         }
@@ -445,6 +448,22 @@ export const projectRouter = createTRPCRouter({
       );
       if (!canDeleteTarget) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
+      // A personal workspace is its project. PersonalWorkspaceService finds
+      // the workspace by the personal team still holding an unarchived
+      // personal project, so archiving it hides the workspace while the team
+      // keeps the (organization, owner) uniqueness slot, and the next
+      // ensure() can neither find it nor create a replacement.
+      const target = await prisma.project.findUnique({
+        where: { id: input.projectToArchiveId },
+        select: { isPersonal: true },
+      });
+      if (target?.isPersonal) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: PERSONAL_PROJECT_ARCHIVE_REFUSAL,
+        });
       }
 
       const result = await prisma.project.updateMany({
