@@ -210,8 +210,8 @@ export class RecordSpanCommand
           const spoolBody = await this.blobStore.getSpool({
             spoolRef: commandData.spoolRef,
             projectId: tenantIdStr,
-            traceId: commandData.span.traceId as string,
-            spanId: commandData.span.spanId as string,
+            traceId: commandData.span.traceId,
+            spanId: commandData.span.spanId,
           });
           // ADR-022: spool body is the full serialized RecordSpanCommandData.
           // Merge the spooled span/resource/instrumentationScope fields back into
@@ -395,8 +395,8 @@ export class RecordSpanCommand
    * ADR-022: Best-effort spool deletion, invoked by processCommand() AFTER
    * storeEventsFn (event_log INSERT) commits. This ordering ensures the spool
    * is only deleted once the event is durable — if the INSERT fails the spool
-   * survives so the command can be retried. The 24h S3 lifecycle policy is the
-   * safety net for orphans if this call itself fails.
+   * survives so the command can be retried. The 3-day lifecycle rule on the
+   * spool prefix is the safety net for orphans if this call itself fails.
    *
    * The spoolRef is read from the original command argument rather than instance
    * state, eliminating the race bug that arose when a single handler instance was
@@ -411,8 +411,8 @@ export class RecordSpanCommand
         .deleteSpool({
           spoolRef,
           projectId: command.tenantId,
-          traceId: command.data.span.traceId as string,
-          spanId: command.data.span.spanId as string,
+          traceId: command.data.span.traceId,
+          spanId: command.data.span.spanId,
         })
         .catch((err: unknown) => {
         this.logger.warn(

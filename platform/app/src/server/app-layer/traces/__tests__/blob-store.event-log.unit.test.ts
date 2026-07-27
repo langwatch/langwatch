@@ -132,10 +132,10 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -169,10 +169,10 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -205,10 +205,10 @@ describe("given a KSUID EventId (the time is embedded in the id)", () => {
       const { client, sqlCaptures, paramCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       const result = await blobStore.getFromEventLog({
         eventId: ksuidEventId,
@@ -243,10 +243,10 @@ describe("given a non-KSUID EventId (legacy / unparseable id)", () => {
       const { client, sqlCaptures, paramCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       await blobStore.getFromEventLog({
         eventId: "not-a-ksuid",
@@ -273,10 +273,10 @@ describe("given an event_log row under tenantA when tenantB attempts to read it"
       // No rows returned — cross-tenant query returns empty set
       const { client } = makeMockChClient({ rows: [] });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       await expect(
         blobStore.getFromEventLog({
@@ -302,10 +302,10 @@ describe("given an event_log row with a corrupt (non-JSON) EventPayload", () => 
         rows: [{ EventPayload: "not-valid-json{{{{" }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       await expect(
         blobStore.getFromEventLog({
@@ -334,10 +334,10 @@ describe("given a valid event_log row whose EventPayload does not contain the re
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       await expect(
         blobStore.getFromEventLog({
@@ -361,7 +361,9 @@ describe("given a transient spool ref", () => {
     it("issues an S3 DELETE and returns void (no error thrown even if S3 DELETE fails)", async () => {
       const sendMock = vi.fn().mockRejectedValue(new Error("S3 DELETE failed"));
 
-      const blobStore = new BlobStore(makeS3Resolver({ send: sendMock }));
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: sendMock }),
+      });
 
       const spoolRef = `trace-blobs/spool/proj/trace-001/span-001`;
 
@@ -391,10 +393,10 @@ describe("given an event_log row whose EventPayload is a log record (full body a
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -413,10 +415,10 @@ describe("given an event_log row whose EventPayload is a log record (full body a
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       await expect(
         blobStore.getFromEventLog({
@@ -439,7 +441,9 @@ describe("given an S3 GetObject that returns a response with no Body", () => {
   describe("when getSpool is called", () => {
     it("throws an explicit 'no body' error rather than returning an empty buffer", async () => {
       const sendMock = vi.fn().mockResolvedValue({ Body: undefined });
-      const blobStore = new BlobStore(makeS3Resolver({ send: sendMock }));
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: sendMock }),
+      });
 
       await expect(
         blobStore.getSpool({
@@ -523,10 +527,10 @@ describe("given a SpanReceivedEvent written through eventToRecord (real write pa
         rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       // read path must find the attribute at span.attributes, NOT data.span.attributes
       const result = await blobStore.getFromEventLog({
@@ -571,10 +575,10 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
         throw new Error("no object storage configured");
       };
 
-      const blobStore = new BlobStore(
-        noStorageResolver,
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: noStorageResolver,
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       const result = await blobStore.getFromEventLog({
         eventId: EVENT_ID,
@@ -670,10 +674,10 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
         rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       const result = await blobStore.getFromEventLog({
         eventId: spanReceivedEvent.id,
@@ -699,10 +703,10 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
         rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       const result = await blobStore.getFromEventLog({
         eventId: spanReceivedEvent.id,
@@ -790,10 +794,10 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
         rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
       });
 
-      const blobStore = new BlobStore(
-        makeS3Resolver({ send: vi.fn() }),
-        makeChResolver(client) as never,
-      );
+      const blobStore = new BlobStore({
+        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        resolveClickHouseClient: makeChResolver(client) as never,
+      });
 
       // The LEANED span as projected: preview value + the eventref pointer that
       // leanForProjection embeds with the event's id (the read path JOINs on it).

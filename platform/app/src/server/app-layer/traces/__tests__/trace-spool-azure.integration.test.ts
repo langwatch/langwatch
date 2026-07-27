@@ -81,11 +81,10 @@ afterAll(async () => {
 describe("given a deployment whose storage destination is Azure Blob", () => {
   describe("when an over-threshold span is spooled at the ingestion edge", () => {
     it("round-trips the payload through Azure and cleans the object up", async () => {
-      const store = new BlobStore(
-        s3MustNotBeUsed,
-        undefined,
-        azureSpoolStorage(),
-      );
+      const store = new BlobStore({
+        resolveS3Client: s3MustNotBeUsed,
+        spoolStorage: azureSpoolStorage(),
+      });
       // Larger than COMMAND_INLINE_THRESHOLD, which is what puts a span on this
       // path in the first place.
       const body = Buffer.from("x".repeat(300 * 1024), "utf-8");
@@ -122,14 +121,13 @@ describe("given a deployment whose storage destination is Azure Blob", () => {
       // S3_BUCKET_NAME still set so legacy objects stay readable. The spool used
       // to resolve that bucket and quietly keep writing trace payloads to AWS.
       const legacyS3 = vi.fn();
-      const store = new BlobStore(
-        async () => ({
+      const store = new BlobStore({
+        resolveS3Client: async () => ({
           s3Client: { send: legacyS3 } as never,
           s3Bucket: "legacy-bucket",
         }),
-        undefined,
-        azureSpoolStorage(),
-      );
+        spoolStorage: azureSpoolStorage(),
+      });
 
       const spoolRef = await store.putSpool({
         projectId: PROJECT_ID,
