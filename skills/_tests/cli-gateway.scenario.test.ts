@@ -47,14 +47,12 @@ export $(grep LANGWATCH_API_KEY .env)
 
 Workflow to exercise (in order):
 1. \`langwatch virtual-keys list\` — confirm CLI is authenticated.
-2. \`langwatch gateway-providers list\` — find an existing provider binding id (or report one is needed).
-3. If a provider id is available (env \`LANGWATCH_GATEWAY_GPC_ID\` OR first row of gateway-providers list): run \`langwatch virtual-keys create --name "scenario-dogfood-<timestamp>" --description "from scenario test" --environment test --provider <gpc_id> --format json\` — capture the vk_id + secret from the JSON output.
-4. \`langwatch virtual-keys get <vk_id>\` — verify the VK exists and is ACTIVE.
+2. \`langwatch virtual-keys create --name "scenario-dogfood-<timestamp>" --description "from scenario test" --budget-limit 5 --budget-window month -f json\` — capture the vk id + secret from the JSON output. No provider argument exists: the key's eligible providers derive from its scopes, and scope defaults to the calling project.
+3. \`langwatch virtual-keys get <vk_id>\` — verify the VK exists with status "active".
+4. \`langwatch virtual-keys spend <vk_id> -f json\` — read the key's month-to-date spend (a fresh key reports "0").
 5. \`langwatch virtual-keys rotate <vk_id>\` — capture the new secret.
 6. \`langwatch virtual-keys revoke <vk_id>\` — revoke the VK.
-7. \`langwatch virtual-keys get <vk_id>\` — verify status is REVOKED.
-
-If step 3's prerequisite (a provider binding) is missing, stop gracefully with \`gateway-providers list\` output and explain that a \`gpc_*\` id is required in \`LANGWATCH_GATEWAY_GPC_ID\` or must be created via \`gateway-providers create\`.
+7. \`langwatch virtual-keys get <vk_id>\` — verify status is "revoked".
 `,
       );
 
@@ -70,9 +68,9 @@ If step 3's prerequisite (a provider binding) is missing, stop gracefully with \
             model: judgeModel,
             criteria: [
               "Agent ran `langwatch virtual-keys list` to confirm CLI auth",
-              "Agent ran `langwatch gateway-providers list` to discover a provider binding id",
-              "Agent either created a VK successfully OR explained cleanly that a provider binding was needed with instructions to set LANGWATCH_GATEWAY_GPC_ID",
-              "If a VK was created, the agent then called rotate and revoke on it",
+              "Agent created a VK with an inline budget and captured the id + secret",
+              "Agent read the key's spend with `langwatch virtual-keys spend`",
+              "Agent then called rotate and revoke on the created key",
             ],
           }),
         ],
@@ -93,7 +91,7 @@ If step 3's prerequisite (a provider binding) is missing, stop gracefully with \
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+virtual-keys\s+list/);
-            expect(allText).toMatch(/langwatch\s+gateway-providers\s+list/);
+            expect(allText).toMatch(/langwatch\s+virtual-keys\s+create/);
           },
           scenario.judge(),
         ],
