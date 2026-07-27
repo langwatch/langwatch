@@ -345,7 +345,7 @@ describe("Feature: Teams REST API", () => {
     });
   });
 
-  describe("Personal workspaces", () => {
+  describe("when the team is a personal workspace", () => {
     let personalTeamId: string | undefined;
     let colleagueUserId: string | undefined;
 

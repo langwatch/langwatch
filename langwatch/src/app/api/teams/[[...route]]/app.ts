@@ -272,7 +272,8 @@ secured
       const team = await service.getById({ id, organizationId: organization.id });
       if (!team) throw new NotFoundError("Team not found");
       // A personal team holds exactly its owner, which is why plan limits
-      // exempt it. A second member turns it into a shared team nothing counts.
+      // exempt it. A second member would contradict that, so the request is
+      // refused rather than the team quietly becoming something else.
       if (team.isPersonal) {
         throw new ForbiddenError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
       }
@@ -324,8 +325,9 @@ secured
 
       const team = await service.getById({ id, organizationId: organization.id });
       if (!team) throw new NotFoundError("Team not found");
-      // Removing the one member of a personal team strips its owner of access
-      // to their own workspace, which nothing puts back.
+      // The one member of a personal team is its owner, and nothing puts that
+      // binding back, so removal is refused rather than leaving the owner
+      // locked out of their own workspace.
       if (team.isPersonal) {
         throw new ForbiddenError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
       }

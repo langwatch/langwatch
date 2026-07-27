@@ -13,9 +13,8 @@ import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
-  PERSONAL_PROJECT_ARCHIVE_REFUSAL,
-  PERSONAL_PROJECT_MOVE_IN_REFUSAL,
-  PERSONAL_PROJECT_MOVE_OUT_REFUSAL,
+  personalWorkspaceArchiveViolation,
+  personalWorkspaceMoveViolation,
 } from "~/server/app-layer/projects/project.service";
 import type { Session } from "~/server/auth";
 import { provisionLangyVirtualKey } from "~/server/app-layer/langy/langyVirtualKey";
@@ -341,27 +340,15 @@ export const projectRouter = createTRPCRouter({
           });
         }
 
-        // Personal workspaces sit outside team moves in both directions.
-        // Project.isPersonal is a denormalized mirror of Team.isPersonal
-        // (see prisma/schema.prisma) that trace ingest and plan-limit
-        // counting read without a join, so a move across the personal
-        // boundary would either hand the organization a shared project
-        // that plan limits never count, or strand a shared project inside
-        // one member's private space. It would also leave the personal
-        // team without its single project, which permanently breaks
-        // PersonalWorkspaceService.ensure() for that user.
+        // The boundary itself is defined once in the projects app layer, which
+        // this router does not go through. See the helper for why it holds.
         if (input.teamId !== project.teamId) {
-          if (project.isPersonal) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: PERSONAL_PROJECT_MOVE_OUT_REFUSAL,
-            });
-          }
-          if (destinationTeam.isPersonal) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: PERSONAL_PROJECT_MOVE_IN_REFUSAL,
-            });
+          const violation = personalWorkspaceMoveViolation({
+            isProjectPersonal: project.isPersonal,
+            isDestinationTeamPersonal: destinationTeam.isPersonal,
+          });
+          if (violation) {
+            throw new TRPCError({ code: "FORBIDDEN", message: violation });
           }
         }
       }
@@ -450,20 +437,15 @@ export const projectRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
 
-      // A personal workspace is its project. PersonalWorkspaceService finds
-      // the workspace by the personal team still holding an unarchived
-      // personal project, so archiving it hides the workspace while the team
-      // keeps the (organization, owner) uniqueness slot, and the next
-      // ensure() can neither find it nor create a replacement.
       const target = await prisma.project.findUnique({
         where: { id: input.projectToArchiveId },
         select: { isPersonal: true },
       });
-      if (target?.isPersonal) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: PERSONAL_PROJECT_ARCHIVE_REFUSAL,
-        });
+      const archiveViolation = personalWorkspaceArchiveViolation(
+        target?.isPersonal ?? false,
+      );
+      if (archiveViolation) {
+        throw new TRPCError({ code: "FORBIDDEN", message: archiveViolation });
       }
 
       const result = await prisma.project.updateMany({

@@ -125,7 +125,7 @@ describe("ProjectService.update", () => {
   });
 
   describe("when the move crosses the personal workspace boundary", () => {
-    /** @scenario ProjectService.update refuses to move a personal project out of its workspace */
+    /** @scenario Editing a project cannot move it out of a personal workspace */
     it("refuses to move a personal project into a shared team", async () => {
       vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({
         id: "shared",
@@ -149,7 +149,7 @@ describe("ProjectService.update", () => {
       expect(repo.update).not.toHaveBeenCalled();
     });
 
-    /** @scenario ProjectService.update refuses to move a project into a personal workspace */
+    /** @scenario Editing a project cannot move it into a personal workspace */
     it("refuses to move a shared project into a personal team", async () => {
       vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({
         id: "personal",
@@ -201,7 +201,7 @@ describe("ProjectService.update", () => {
   });
 
   describe("when archiving a personal project", () => {
-    /** @scenario ProjectService.archive refuses to archive a personal project */
+    /** @scenario Deleting a project cannot empty a personal workspace */
     it("refuses, because the workspace is the project", async () => {
       vi.mocked(repo.getWithTeam).mockResolvedValue({
         id: "p1",

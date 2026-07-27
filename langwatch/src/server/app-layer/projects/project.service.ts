@@ -71,6 +71,50 @@ export const PERSONAL_PROJECT_MOVE_IN_REFUSAL =
 export const PERSONAL_PROJECT_ARCHIVE_REFUSAL =
   "Personal workspace projects cannot be archived. A personal workspace is its project, and archiving it leaves the owner without one in this organization.";
 
+/**
+ * Whether moving a project between these two teams crosses the personal
+ * workspace boundary, and the reason to give back if it does.
+ *
+ * A personal workspace is one team holding one project. `Project.isPersonal`
+ * is a denormalized mirror of `Team.isPersonal` that plan-limit counting and
+ * trace ingest read without a join, so a move across the boundary either hands
+ * the organization a project no limit counts, or strands a shared project
+ * inside one member's private space. Either way the personal team loses the
+ * single project `PersonalWorkspaceService.ensure()` looks for, which breaks
+ * that user's workspace permanently.
+ *
+ * Lives here rather than in either caller because the tRPC router writes
+ * Prisma directly and never passes through this service, and an invariant
+ * enforced twice is an invariant that eventually diverges.
+ */
+export function personalWorkspaceMoveViolation({
+  isProjectPersonal,
+  isDestinationTeamPersonal,
+}: {
+  isProjectPersonal: boolean;
+  isDestinationTeamPersonal: boolean;
+}): string | null {
+  if (isProjectPersonal) return PERSONAL_PROJECT_MOVE_OUT_REFUSAL;
+  if (isDestinationTeamPersonal) return PERSONAL_PROJECT_MOVE_IN_REFUSAL;
+  return null;
+}
+
+/**
+ * Whether archiving this project would take a personal workspace with it, and
+ * the reason to give back if it would.
+ *
+ * `PersonalWorkspaceService` finds a workspace by its personal team still
+ * holding an unarchived personal project. Archiving that project hides the
+ * workspace from the lookup while the team keeps the one slot allowed per
+ * (organization, owner), so the next `ensure()` can neither find the workspace
+ * nor create a replacement.
+ */
+export function personalWorkspaceArchiveViolation(
+  isProjectPersonal: boolean,
+): string | null {
+  return isProjectPersonal ? PERSONAL_PROJECT_ARCHIVE_REFUSAL : null;
+}
+
 export interface CreateProjectParams {
   organizationId: string;
   userId?: string | null;
@@ -181,15 +225,7 @@ export class ProjectService {
         );
       }
 
-      // Personal workspaces sit outside team moves in both directions.
-      // `Project.isPersonal` is a denormalized mirror of `Team.isPersonal`
-      // that plan-limit counting and trace ingest read without a join, so a
-      // move across the personal boundary either hands the organization a
-      // project no limit counts, or strands a shared project inside one
-      // member's private space. It also leaves the personal team without the
-      // single project `PersonalWorkspaceService.ensure()` looks for, which
-      // breaks that user's workspace permanently.
-      // Read the project with its team so the guard only fires for projects
+      // Read the project with its team so the guard only decides on projects
       // this organization actually owns. Deciding on an unscoped read would
       // let a caller tell a personal project from a shared one in someone
       // else's organization by the status code alone.
@@ -199,15 +235,12 @@ export class ProjectService {
         current.team.organizationId === organizationId &&
         current.teamId !== data.teamId
       ) {
-        if (current.isPersonal) {
-          throw new PersonalWorkspaceBoundaryError(
-            PERSONAL_PROJECT_MOVE_OUT_REFUSAL,
-          );
-        }
-        if (team.isPersonal) {
-          throw new PersonalWorkspaceBoundaryError(
-            PERSONAL_PROJECT_MOVE_IN_REFUSAL,
-          );
+        const violation = personalWorkspaceMoveViolation({
+          isProjectPersonal: current.isPersonal,
+          isDestinationTeamPersonal: team.isPersonal,
+        });
+        if (violation) {
+          throw new PersonalWorkspaceBoundaryError(violation);
         }
       }
     }
@@ -224,17 +257,14 @@ export class ProjectService {
     id: string;
     organizationId: string;
   }): Promise<Project> {
-    // A personal workspace is its project: PersonalWorkspaceService looks the
-    // workspace up by the personal team still holding an unarchived personal
-    // project. Archiving it hides the workspace from that lookup while the
-    // team keeps the (organization, owner) uniqueness slot, so the next
-    // ensure() can neither find the workspace nor create a replacement.
+    // Scoped to this organization for the same reason the move guard is.
     const existing = await this.repo.getWithTeam(id);
-    if (
-      existing?.isPersonal &&
-      existing.team.organizationId === organizationId
-    ) {
-      throw new PersonalProjectProtectedError(PERSONAL_PROJECT_ARCHIVE_REFUSAL);
+    const archiveViolation =
+      existing && existing.team.organizationId === organizationId
+        ? personalWorkspaceArchiveViolation(existing.isPersonal)
+        : null;
+    if (archiveViolation) {
+      throw new PersonalProjectProtectedError(archiveViolation);
     }
 
     // Cascade-delete stored-object bytes BEFORE the archive so BYOC S3 credentials

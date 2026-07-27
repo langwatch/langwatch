@@ -110,34 +110,35 @@ Feature: Edit project name and team
     When I call ProjectService.update without teamId
     Then the project's teamId remains "Engineering"
 
-  # A personal workspace is one member's private space, exempt from the plan
-  # allowance and made of exactly one team and one project. Moving a project
-  # across that boundary settles the exemption by flag alone and leaves the
-  # personal team without the project its provisioning looks for. The REST API
-  # reaches this service directly, so the boundary is held here rather than in
-  # the tRPC router alone.
+  # ── Personal workspaces ──────────────────────────────────────────────────────
+  #
+  # A personal workspace is one member's private space: one team, one project,
+  # one owner. Editing a project is the way it could leave that space, enter
+  # someone else's, or be taken away from its owner altogether, so every
+  # project edit refuses all three. The plan-allowance side of the same rule
+  # lives in specs/licensing/enforcement-projects.feature.
 
   @unit
-  Scenario: ProjectService.update refuses to move a personal project out of its workspace
-    Given a personal project in a personal team
+  Scenario: Editing a project cannot move it out of a personal workspace
+    Given a personal project in Jane's personal workspace
     And team "Analytics" in the same organization
-    When I call ProjectService.update with teamId of "Analytics"
-    Then the service refuses the move
-    And the project's teamId is unchanged
+    When I move the personal project to "Analytics"
+    Then the move is refused
+    And the project is still in Jane's personal workspace
 
   @unit
-  Scenario: ProjectService.update refuses to move a project into a personal workspace
+  Scenario: Editing a project cannot move it into a personal workspace
     Given a project in team "Engineering"
-    And a personal team in the same organization
-    When I call ProjectService.update with teamId of the personal team
-    Then the service refuses the move
-    And the project's teamId is unchanged
+    And Jane has a personal workspace in the same organization
+    When I move that project into Jane's personal workspace
+    Then the move is refused
+    And the project is still in team "Engineering"
 
   @unit
-  Scenario: ProjectService.archive refuses to archive a personal project
-    Given a personal project in a personal team
-    When I call ProjectService.archive on it
-    Then the service refuses the archival
+  Scenario: Deleting a project cannot empty a personal workspace
+    Given a personal project in Jane's personal workspace
+    When I archive that project
+    Then the archival is refused
     And the project is not archived
 
   # ── RBAC inheritance ─────────────────────────────────────────────────────────
