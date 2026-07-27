@@ -326,7 +326,7 @@ export const projectRouter = createTRPCRouter({
             organizationId: project.team.organizationId,
             archivedAt: null,
           },
-          select: { id: true },
+          select: { id: true, isPersonal: true },
         });
         if (!destinationTeam) {
           throw new TRPCError({
@@ -334,6 +334,32 @@ export const projectRouter = createTRPCRouter({
             message:
               "Destination team not found, is archived, or belongs to a different organization",
           });
+        }
+
+        // Personal workspaces sit outside team moves in both directions.
+        // Project.isPersonal is a denormalized mirror of Team.isPersonal
+        // (see prisma/schema.prisma) that trace ingest and plan-limit
+        // counting read without a join, so a move across the personal
+        // boundary would either hand the organization a shared project
+        // that plan limits never count, or strand a shared project inside
+        // one member's private space. It would also leave the personal
+        // team without its single project, which permanently breaks
+        // PersonalWorkspaceService.ensure() for that user.
+        if (input.teamId !== project.teamId) {
+          if (project.isPersonal) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message:
+                "Personal workspace projects cannot be moved to another team. Create a project in the destination team instead.",
+            });
+          }
+          if (destinationTeam.isPersonal) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message:
+                "Projects cannot be moved into a personal workspace. Personal workspaces hold only their owner's personal project.",
+            });
+          }
         }
       }
 

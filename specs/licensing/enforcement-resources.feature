@@ -217,6 +217,36 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     When I view the organization usage
     Then the reported team count is 1
 
+  # A personal team is exempt from the allowance because it holds one member,
+  # its owner. Letting it take a second member would turn the exemption into a
+  # way of running a team the allowance never sees.
+
+  @integration
+  Scenario: Adding a member to a personal team is refused
+    Given the organization has 1 personal team
+    When I add another member to the personal team
+    Then the request fails with FORBIDDEN
+    And the personal team still has exactly its owner
+    And the reported team count is unchanged
+
+  @integration
+  Scenario: Renaming a personal team is still allowed
+    Given the organization has 1 personal team
+    When I rename the personal team
+    Then the team is renamed successfully
+
+  # Archiving a personal team cannot be undone by the owner: the uniqueness of
+  # a personal team per (organization, owner) covers archived rows too, while
+  # the workspace lookup skips them. The archived team keeps the slot, so
+  # provisioning can neither find the workspace nor create a replacement.
+
+  @integration
+  Scenario: Archiving a personal team is refused
+    Given the organization has 1 personal team
+    When I archive the personal team
+    Then the request fails with FORBIDDEN
+    And the owner still has a personal workspace
+
   # ============================================================================
   # UI: Click-then-Modal Pattern (All Resources)
   # ============================================================================
