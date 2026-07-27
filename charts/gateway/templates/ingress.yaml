@@ -25,4 +25,17 @@ spec:
                 name: {{ include "gateway.fullname" . }}
                 port:
                   number: {{ .Values.service.port }}
+          {{- if .Values.ingress.healthPath.enabled }}
+          {{- /*
+            Status-page health endpoint. Exact so only GET/HEAD /health
+            is public; the k8s probes and /metrics stay in-cluster.
+          */}}
+          - path: {{ .Values.ingress.healthPath.path }}
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "gateway.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+          {{- end }}
 {{- end }}
