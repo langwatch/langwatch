@@ -1,20 +1,10 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-  Wrap,
-} from "@chakra-ui/react";
-import { useMemo, useState } from "react";
+import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { useMemo } from "react";
 
 import { SmallLabel } from "../SmallLabel";
 import { ProviderRow } from "./VirtualKeyProviderRow";
 import { Checkbox } from "~/components/ui/checkbox";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
-import { ProviderScopeChips } from "../settings/ProviderScopeChips";
-import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
 import {
   buildScopeHierarchy,
