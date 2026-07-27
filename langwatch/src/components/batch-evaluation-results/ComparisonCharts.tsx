@@ -353,8 +353,17 @@ export const ComparisonCharts = ({
     const judgeModelByEvaluatorId: Record<string, string | null> = {};
     for (const target of comparisonData[0]?.data?.targetColumns ?? []) {
       modelByTargetId[target.id] = target.model ?? null;
-      if (target.type === "evaluator" && target.evaluatorId) {
-        judgeModelByEvaluatorId[target.evaluatorId] = target.model ?? null;
+      if (target.type === "evaluator") {
+        // Keyed under BOTH ids on purpose. detectComparisonColumns keys a
+        // column-style comparison by its TARGET id, while an inline
+        // evaluator is keyed by its config id — so `column.evaluatorId` is
+        // one or the other depending on how the comparison was authored.
+        // Indexing only the config id silently missed every column-style
+        // comparison, which is the shape the workbench actually creates.
+        judgeModelByEvaluatorId[target.id] = target.model ?? null;
+        if (target.evaluatorId) {
+          judgeModelByEvaluatorId[target.evaluatorId] = target.model ?? null;
+        }
       }
     }
     return { modelByTargetId, judgeModelByEvaluatorId };
