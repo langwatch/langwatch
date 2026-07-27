@@ -79,15 +79,30 @@ export const formatLeaderboardHeadline = ({
   // A tie plus a price difference is not an inconclusive result — it is a
   // decision, just made on cost instead of on quality.
   if (cheaperAlternative) {
-    return {
-      tone: "positive",
-      heading: `Ship ${nameOf(cheaperAlternative.variantId, variantNames)} — same quality, ${Math.round(
-        cheaperAlternative.savingRatio * 100,
-      )}% cheaper`,
-      detail: `${tiedNames} score too closely for this run to separate them, so quality is not the deciding factor here. Cost is: ${formatCost(
-        cheaperAlternative.cost,
-      )} vs ${formatCost(cheaperAlternative.leaderCost)} per row.`,
-    };
+    const percent = Math.round(cheaperAlternative.savingRatio * 100);
+    const name = nameOf(cheaperAlternative.variantId, variantNames);
+    const others =
+      verdict.tiedIds.length > 2
+        ? "the others it ties with"
+        : "the one it ties with";
+    const price = `${formatCost(cheaperAlternative.cost)} vs ${formatCost(
+      cheaperAlternative.dearestCost,
+    )} per row.`;
+
+    // The leader being the cheapest is the strongest result this chart can
+    // produce, and it used to render as a bare "too close to call" — the
+    // vaguest phrasing for the least ambiguous outcome.
+    return cheaperAlternative.isLeader
+      ? {
+          tone: "positive",
+          heading: `Ship ${name} — top of the ranking and ${percent}% cheaper`,
+          detail: `${tiedNames} score too closely for this run to separate them on quality, and ${name} is the cheapest of them: ${price}`,
+        }
+      : {
+          tone: "positive",
+          heading: `Ship ${name} — same quality, ${percent}% cheaper`,
+          detail: `${tiedNames} score too closely for this run to separate them, so quality is not the deciding factor here. ${name} costs less than ${others}: ${price}`,
+        };
   }
 
   return {

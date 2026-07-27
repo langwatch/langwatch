@@ -217,10 +217,30 @@ describe("findCheaperTiedAlternative", () => {
   });
 
   describe("when the leader is already the cheapest", () => {
-    it("recommends nothing", () => {
+    // This used to return null, on the reasoning that there was no
+    // "alternative" to switch to. But the reader is not asking what to
+    // switch to, they are asking what to ship — and "tops the ranking AND
+    // costs 78% less than the variant it ties with" is the single clearest
+    // answer this chart can give. Returning null threw it away and left the
+    // headline reading "too close to call".
+    it("still recommends it, flagged as the leader", () => {
       const result = findCheaperTiedAlternative({
         verdict: { kind: "tie-at-top", leaderId: "a", tiedIds: ["a", "b"] },
         variantMetrics: makeMetrics({ a: 0.02, b: 0.09 }),
+      });
+
+      expect(result?.variantId).toBe("a");
+      expect(result?.isLeader).toBe(true);
+      expect(result?.dearestCost).toBe(0.09);
+      expect(result?.savingRatio).toBeCloseTo(0.7778, 3);
+    });
+  });
+
+  describe("when only one tied variant has a known cost", () => {
+    it("recommends nothing, since there is no spread to compare", () => {
+      const result = findCheaperTiedAlternative({
+        verdict: { kind: "tie-at-top", leaderId: "a", tiedIds: ["a", "b"] },
+        variantMetrics: makeMetrics({ a: 0.02, b: null }),
       });
 
       expect(result).toBeNull();

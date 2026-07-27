@@ -90,13 +90,16 @@ export const computeLeaderboardVerdict = (
 };
 
 export type CheaperAlternative = {
+  /** Cheapest variant among the tied set. May be the top-ranked one. */
   variantId: string;
   /** Mean cost of the recommended variant. */
   cost: number;
-  /** Mean cost of the current leader. */
-  leaderCost: number;
-  /** e.g. 0.6 means the alternative costs 60% less than the leader. */
+  /** Mean cost of the dearest variant it is tied with. */
+  dearestCost: number;
+  /** e.g. 0.6 means the recommendation costs 60% less than the dearest. */
   savingRatio: number;
+  /** True when the cheapest tied variant also tops the ranking. */
+  isLeader: boolean;
 };
 
 /**
@@ -104,9 +107,19 @@ export type CheaperAlternative = {
  *
  * This is the payoff of reporting ties honestly. If two variants are
  * statistically indistinguishable and one costs half as much, the ranking
- * is not the decision — the price is, and the top row is the wrong pick.
- * Returns null when the leader is already the cheapest, when costs are
- * unknown, or when there is nothing to break a tie between.
+ * is not the decision — the price is.
+ *
+ * The cheapest tied variant is the answer whether or not it happens to be
+ * the top row. An earlier version only looked BELOW the leader, so a run
+ * where the leader was already the cheapest — the clearest possible
+ * outcome, top of the ranking and cheapest to run — fell through to a bare
+ * "too close to call" and threw the decision away. Cost is therefore
+ * measured against the dearest variant in the tie rather than against the
+ * leader, which is the same number whenever the leader is the dearest and
+ * a true one in every other arrangement.
+ *
+ * Returns null when costs are unknown, when the spread is inside the noise
+ * floor, or when there is nothing to break a tie between.
  */
 export const findCheaperTiedAlternative = ({
   verdict,
@@ -126,21 +139,25 @@ export const findCheaperTiedAlternative = ({
   const costOf = (variantId: string): number | null =>
     variantMetrics[variantId]?.costStats?.avg ?? null;
 
-  const leaderCost = costOf(verdict.leaderId);
-  if (leaderCost === null || leaderCost <= 0) return null;
+  const priced = verdict.tiedIds
+    .map((variantId) => ({ variantId, cost: costOf(variantId) }))
+    .filter((entry): entry is { variantId: string; cost: number } =>
+      entry.cost !== null && Number.isFinite(entry.cost),
+    );
+  if (priced.length < 2) return null;
 
-  let best: CheaperAlternative | null = null;
-  for (const variantId of verdict.tiedIds) {
-    if (variantId === verdict.leaderId) continue;
-    const cost = costOf(variantId);
-    if (cost === null) continue;
+  const cheapest = priced.reduce((a, b) => (b.cost < a.cost ? b : a));
+  const dearest = priced.reduce((a, b) => (b.cost > a.cost ? b : a));
+  if (dearest.cost <= 0) return null;
 
-    const savingRatio = (leaderCost - cost) / leaderCost;
-    if (savingRatio < minSaving) continue;
-    if (best && savingRatio <= best.savingRatio) continue;
+  const savingRatio = (dearest.cost - cheapest.cost) / dearest.cost;
+  if (savingRatio < minSaving) return null;
 
-    best = { variantId, cost, leaderCost, savingRatio };
-  }
-
-  return best;
+  return {
+    variantId: cheapest.variantId,
+    cost: cheapest.cost,
+    dearestCost: dearest.cost,
+    savingRatio,
+    isLeader: cheapest.variantId === verdict.leaderId,
+  };
 };

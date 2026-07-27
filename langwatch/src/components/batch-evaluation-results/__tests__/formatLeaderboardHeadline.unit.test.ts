@@ -34,14 +34,42 @@ describe("formatLeaderboardHeadline", () => {
         cheaperAlternative: {
           variantId: "a",
           cost: 0.00175,
-          leaderCost: 0.00687,
+          dearestCost: 0.00687,
           savingRatio: 0.745,
+          isLeader: false,
         },
         variantNames: NAMES,
       });
 
       expect(headline.heading).toBe("Ship warm — same quality, 75% cheaper");
       expect(headline.detail).toContain("warm-premium and warm");
+      expect(headline.tone).toBe("positive");
+    });
+  });
+
+  describe("given the leader is itself the cheapest of the tied set", () => {
+    // The strongest outcome the chart can produce — top of the ranking AND
+    // cheapest to run — used to fall through to "too close to call".
+    it("names it and says it leads on both", () => {
+      const headline = formatLeaderboardHeadline({
+        verdict: {
+          kind: "tie-at-top",
+          leaderId: "a",
+          tiedIds: ["a", "b"],
+        } satisfies LeaderboardVerdict,
+        cheaperAlternative: {
+          variantId: "a",
+          cost: 0.00175,
+          dearestCost: 0.00687,
+          savingRatio: 0.745,
+          isLeader: true,
+        },
+        variantNames: NAMES,
+      });
+
+      expect(headline.heading).toBe(
+        "Ship warm — top of the ranking and 75% cheaper",
+      );
       expect(headline.tone).toBe("positive");
     });
   });
@@ -124,8 +152,9 @@ describe("formatLeaderboardHeadline", () => {
         cheaperAlternative: {
           variantId: "a",
           cost: 0.0002,
-          leaderCost: 0.0019,
+          dearestCost: 0.0019,
           savingRatio: 0.894,
+          isLeader: false,
         },
         variantNames: NAMES,
       });
