@@ -13,7 +13,9 @@ import type {
  * one place instead of three hand-maintained copies.
  */
 export interface TriggerActionParams {
+  slackDelivery?: "bot" | "webhook";
   slackWebhook?: string;
+  slackChannelId?: string;
   members?: string[];
   datasetId?: string;
   annotators?: { id: string; name: string }[];
