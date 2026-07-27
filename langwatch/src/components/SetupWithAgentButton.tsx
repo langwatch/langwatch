@@ -121,10 +121,15 @@ Use LangWatch's "${setup.skill}" skill for this: install it with \`npx skills ad
 export function SetupWithAgentButton({
   surface,
   size = "sm",
+  label = "Setup via Agent",
 }: {
   surface: SetupSurface;
   /** Match the sibling buttons of the empty state this sits in. */
   size?: "sm" | "md";
+  /** Per-surface trigger copy. Shared-project empty states really are
+   *  setting a feature up, so the default stands there; the personal (/me)
+   *  surface passes "Connect your agent", an action with an outcome. */
+  label?: string;
 }) {
   const setup = SETUP_SURFACES[surface];
   const canAsk = useCanAskLangy();
@@ -156,7 +161,7 @@ export function SetupWithAgentButton({
             page's own buttons rather than a themed import. */}
         <Button variant="outline" size={size} aria-haspopup="menu">
           <LuSparkles size={14} />
-          Setup via Agent
+          {label}
           <LuChevronDown size={14} />
         </Button>
       </Menu.Trigger>

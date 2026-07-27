@@ -16,6 +16,7 @@ export function CreateProjectDrawer({
   navigateOnCreate = false,
   defaultTeamId,
   organizationId: organizationIdProp,
+  onCreated,
 }: {
   open?: boolean;
   onClose?: () => void;
@@ -25,6 +26,10 @@ export function CreateProjectDrawer({
    * When the user clicks "New Project" under Org B while viewing Org A, this ensures
    * the project is created in Org B instead of the current context. */
   organizationId?: string;
+  /** Fires on successful creation (before the drawer closes) so embedding
+   * surfaces without an ambient project (the CLI authorize page) can adopt
+   * the new project, e.g. select it in a picker once lists refresh. */
+  onCreated?: (result: { projectSlug: string }) => void;
 }): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
@@ -87,6 +92,8 @@ export function CreateProjectDrawer({
               type: "success",
               meta: { closable: true },
             });
+
+            onCreated?.({ projectSlug: result.projectSlug });
 
             if (navigateOnCreate) {
               // Use hard redirect to ensure fresh data after project creation

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveCliAuthProjects } from "../cliAuthProjects";
+import {
+  PERSONAL_GROUP_NAME,
+  resolveCliAuthProjects,
+} from "../cliAuthProjects";
 
 describe("resolveCliAuthProjects", () => {
   const teams = [
@@ -15,13 +18,6 @@ describe("resolveCliAuthProjects", () => {
           kind: "application",
         },
         {
-          id: "p-personal",
-          name: "My Workspace",
-          slug: "jane-personal",
-          isPersonal: true,
-          kind: "application",
-        },
-        {
           id: "p-gov",
           name: "Governance",
           slug: "internal_governance",
@@ -31,13 +27,14 @@ describe("resolveCliAuthProjects", () => {
       ],
     },
     {
-      id: "t-personal-only",
-      name: "Solo",
+      id: "t-personal",
+      name: "Jane's Workspace",
+      isPersonal: true,
       projects: [
         {
-          id: "p-solo",
-          name: "My Workspace 2",
-          slug: "bob-personal",
+          id: "p-personal",
+          name: "Personal Workspace",
+          slug: "jane-personal",
           isPersonal: true,
           kind: "application",
         },
@@ -45,23 +42,37 @@ describe("resolveCliAuthProjects", () => {
     },
   ];
 
-  describe("given a team with a personal, an internal-governance, and a shared project", () => {
+  describe("given teams with a personal, an internal-governance, and a shared project", () => {
     describe("when the CLI-auth project list is resolved", () => {
-      /** @scenario the project picker omits personal and internal-governance projects */
-      it("offers only the shared project, carries its team, and drops teams without an offered project", () => {
-        const { projects, teams: offeredTeams } = resolveCliAuthProjects({
-          teams,
-        });
+      /** @scenario the project picker lists the caller's personal project explicitly and omits internal-governance projects */
+      it("offers the shared project under its team and the personal project as an explicit Personal entry", () => {
+        const {
+          projects,
+          teams: offeredTeams,
+          personalProject,
+        } = resolveCliAuthProjects({ teams });
 
         expect(projects.map((p) => p.id)).toEqual(["p-shared"]);
         expect(projects[0]!.teamId).toBe("t-acme");
-        expect(projects.map((p) => p.slug)).not.toContain("jane-personal");
         expect(projects.map((p) => p.slug)).not.toContain(
           "internal_governance",
         );
-        // Only teams that actually have an offered project are returned, so the
-        // grouped picker never renders an empty or personal-only team header.
-        expect(offeredTeams).toEqual([{ id: "t-acme", name: "ACME" }]);
+        // Personal rides its own explicit entry, never mixed into the shared
+        // list, so selecting a team's project can never imply it.
+        expect(projects.map((p) => p.slug)).not.toContain("jane-personal");
+        expect(personalProject).toEqual({
+          id: "p-personal",
+          name: "Personal Workspace",
+          slug: "jane-personal",
+          teamId: "t-personal",
+          teamName: PERSONAL_GROUP_NAME,
+        });
+        // Shared team headers come from offered projects; the personal group
+        // is appended with its own label.
+        expect(offeredTeams).toEqual([
+          { id: "t-acme", name: "ACME" },
+          { id: "t-personal", name: PERSONAL_GROUP_NAME },
+        ]);
       });
     });
   });
@@ -121,11 +132,101 @@ describe("resolveCliAuthProjects", () => {
     });
   });
 
-  describe("given a single offered project", () => {
+  describe("given a single offered shared project", () => {
     describe("when the default project is computed", () => {
-      it("auto-selects it", () => {
+      it("auto-selects it, not the personal project", () => {
         const { defaultProjectId } = resolveCliAuthProjects({ teams });
         expect(defaultProjectId).toBe("p-shared");
+      });
+    });
+  });
+
+  describe("given an organization with no shared projects at all", () => {
+    const personalOnly = [
+      {
+        id: "t-personal",
+        name: "Jane's Workspace",
+        isPersonal: true,
+        projects: [
+          {
+            id: "p-personal",
+            name: "Personal Workspace",
+            slug: "jane-personal",
+            isPersonal: true,
+            kind: "application",
+          },
+        ],
+      },
+      // An empty shared team (fresh coding-usage signup shape).
+      { id: "t-empty", name: "Team", projects: [] },
+    ];
+
+    describe("when the default project is computed", () => {
+      /** @scenario a user with no shared projects gets their personal project preselected */
+      it("preselects the personal project so the user is never dead-ended", () => {
+        const { projects, personalProject, defaultProjectId } =
+          resolveCliAuthProjects({ teams: personalOnly });
+
+        expect(projects).toEqual([]);
+        expect(personalProject?.id).toBe("p-personal");
+        expect(defaultProjectId).toBe("p-personal");
+      });
+    });
+
+    describe("when there is no personal project either", () => {
+      it("returns no default and no personal entry", () => {
+        const { personalProject, defaultProjectId } = resolveCliAuthProjects({
+          teams: [{ id: "t-empty", name: "Team", projects: [] }],
+        });
+
+        expect(personalProject).toBeNull();
+        expect(defaultProjectId).toBeNull();
+      });
+    });
+  });
+
+  describe("given multiple shared projects and a personal project", () => {
+    const mixed = [
+      {
+        id: "t-acme",
+        name: "ACME",
+        projects: [
+          {
+            id: "p-a",
+            name: "A",
+            slug: "acme-a",
+            isPersonal: false,
+            kind: "application",
+          },
+          {
+            id: "p-b",
+            name: "B",
+            slug: "acme-b",
+            isPersonal: false,
+            kind: "application",
+          },
+        ],
+      },
+      {
+        id: "t-personal",
+        name: "Jane's Workspace",
+        isPersonal: true,
+        projects: [
+          {
+            id: "p-personal",
+            name: "Personal Workspace",
+            slug: "jane-personal",
+            isPersonal: true,
+            kind: "application",
+          },
+        ],
+      },
+    ];
+
+    describe("when the default project is computed with no last project", () => {
+      it("does not silently default to personal while shared projects exist", () => {
+        const { defaultProjectId } = resolveCliAuthProjects({ teams: mixed });
+        expect(defaultProjectId).toBeNull();
       });
     });
   });

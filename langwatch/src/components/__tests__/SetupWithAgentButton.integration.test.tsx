@@ -50,10 +50,10 @@ const REPO_CONNECTED: SetupSurface[] = [
   "simulationRuns",
 ];
 
-function renderButton(surface: SetupSurface) {
+function renderButton(surface: SetupSurface, label?: string) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <SetupWithAgentButton surface={surface} />
+      <SetupWithAgentButton surface={surface} label={label} />
     </ChakraProvider>,
   );
 }
@@ -105,6 +105,25 @@ describe("setupAgentPrompt()", () => {
 });
 
 describe("SetupWithAgentButton", () => {
+  describe("the per-surface trigger label", () => {
+    /** @scenario shared-project surfaces keep "Setup via Agent" */
+    it("defaults to Setup via Agent", () => {
+      renderButton("simulations");
+      expect(
+        screen.getByRole("button", { name: /setup via agent/i }),
+      ).toBeDefined();
+    });
+
+    /** @scenario the personal traces empty state labels the button "Connect your agent" */
+    it("renders the caller's label where a surface passes one", () => {
+      renderButton("traces", "Connect your agent");
+      expect(
+        screen.getByRole("button", { name: /connect your agent/i }),
+      ).toBeDefined();
+      expect(screen.queryByText(/setup via agent/i)).toBeNull();
+    });
+  });
+
   describe("when the reader can ask Langy", () => {
     /** @scenario Langy is offered first where the reader can ask */
     it("offers all three routes and hands the surface prompt to Langy", async () => {

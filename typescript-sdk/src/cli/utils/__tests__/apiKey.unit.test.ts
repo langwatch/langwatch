@@ -337,7 +337,7 @@ describe("resolveCredentials()", () => {
         delete process.env[SECRET];
       });
 
-      /** @scenario the caller's .env still contributes only LANGWATCH_* keys (daemon constraint) */
+      /** @scenario "the caller's .env still contributes only LANGWATCH_* keys (daemon constraint)" */
       it("does NOT stuff them into process.env (the daemon is long-lived and shared)", async () => {
         mockedDotenvConfig.mockReturnValue({
           parsed: {
