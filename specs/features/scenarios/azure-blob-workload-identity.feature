@@ -30,10 +30,12 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
   - Browser-direct upload to Azure stays out of scope: dataset staging keeps
     minting a same-origin URL, so no user-delegation-key role is needed.
 
-  Every scenario below is tagged @unimplemented: the specification lands ahead
-  of its tests so the design can be reviewed before code exists. Issue #6087
-  tracks building them, and each tag must be removed together with the test
-  that binds its scenario.
+  Scenarios here are bound to tests except where explicitly tagged
+  @unimplemented. Those that remain are deliberate, and each says why at the
+  scenario: the emulator has no OAuth mode, so bearer-only round-trips are
+  covered against real Azure instead, and the dataset/token-mode path shares
+  the driver and registry the byte-path tests already exercise. Issue #6087
+  tracks the rest; a tag comes off together with the test that binds it.
 
   # ---------------------------------------------------------------
   # One credential decision, consumed everywhere

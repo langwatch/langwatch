@@ -330,8 +330,12 @@ describe("azureBlobAuthModeSchema", () => {
         path.join(__dirname, "..", "env-create.mjs"),
         "utf-8",
       );
-      const schemaHits = source.match(/AZURE_BLOB_AUTH_MODE/g) ?? [];
-      expect(schemaHits.length).toBeGreaterThanOrEqual(2);
+      // The declaration and the runtime wiring, not how many times the name
+      // appears — a comment mentioning it twice would satisfy a count, which
+      // is the assertion the sibling test above deliberately avoids.
+      expect(source).toMatch(
+        /AZURE_BLOB_AUTH_MODE:\s*azureBlobAuthModeSchema/,
+      );
       expect(source).toMatch(
         /AZURE_BLOB_AUTH_MODE:\s*process\.env\.AZURE_BLOB_AUTH_MODE/,
       );

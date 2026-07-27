@@ -187,7 +187,7 @@ const AUTHORIZATION_MATERIAL_IN_TEXT =
 // quoting a token response or a request body carries the credential as a
 // key/value pair, which the scheme pattern above never sees.
 const CREDENTIAL_FIELD_IN_TEXT =
-  /\b(access_token|id_token|refresh_token|client_assertion|assertion|client_secret)\b"?(\s*[=:]\s*)"?([A-Za-z0-9\-._~+/=]{20,})"?/gi;
+  /\b(access_token|id_token|refresh_token|client_assertion|assertion|client_secret)\b("?)(\s*[=:]\s*)("?)[A-Za-z0-9\-._~+/=]{20,}("?)/gi;
 
 // Azure echoes signed-request detail back in XML error bodies. The tag may
 // carry attributes (xml:space="preserve"), so the name match must not
@@ -198,9 +198,20 @@ const XML_ASSERTION_IN_TEXT =
 export function redactAuthorizationMaterial(text: string): string {
   return text
     .replace(AUTHORIZATION_MATERIAL_IN_TEXT, (_m, scheme: string) => `${scheme} ***`)
+    // Each quote is captured and re-emitted rather than assumed: consuming the
+    // key's closing quote without restoring it turned
+    // `"access_token":"…"` into `"access_token:"***"`, which redacts the
+    // token but leaves JSON a downstream log parser can no longer read.
     .replace(
       CREDENTIAL_FIELD_IN_TEXT,
-      (_m, field: string, separator: string) => `${field}${separator}"***"`,
+      (
+        _m,
+        field: string,
+        keyQuote: string,
+        separator: string,
+        openQuote: string,
+        closeQuote: string,
+      ) => `${field}${keyQuote}${separator}${openQuote}***${closeQuote}`,
     )
     .replace(XML_ASSERTION_IN_TEXT, (_m, tag: string) => `<${tag}>***</${tag}>`);
 }

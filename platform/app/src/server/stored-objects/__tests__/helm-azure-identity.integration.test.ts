@@ -43,10 +43,19 @@ function hasHelm(): boolean {
  * one — the same honesty as the helm-not-installed guard above.
  */
 function chartDepsReady(): boolean {
+  // Every dependency in Chart.yaml must be present, not merely one archive:
+  // a partial charts/ directory (a half-finished `helm dependency build`, or
+  // a new dependency added since the last one) would otherwise look ready and
+  // then fail the render on "missing in charts/ directory".
   const builtDir = path.join(CHART_DIR, "charts");
-  if (fs.existsSync(builtDir) && fs.readdirSync(builtDir).some((f) => f.endsWith(".tgz"))) {
-    return true;
-  }
+  const declared = (
+    fs.readFileSync(path.join(CHART_DIR, "Chart.yaml"), "utf-8").match(/^\s*-\s*name:\s*(\S+)/gm) ?? []
+  ).map((line) => line.replace(/^\s*-\s*name:\s*/, "").trim());
+  const built = fs.existsSync(builtDir) ? fs.readdirSync(builtDir) : [];
+  const allPresent =
+    declared.length > 0 &&
+    declared.every((dep) => built.some((f) => f.startsWith(`${dep}-`) && f.endsWith(".tgz")));
+  if (allPresent) return true;
   try {
     execFileSync("helm", ["dependency", "build", CHART_DIR], {
       stdio: "pipe",
@@ -121,6 +130,12 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       const named = out.match(/serviceAccountName: t$/gm) ?? [];
       // App + workers + cronjob — one each, all resolving to the same name.
       expect(named).toHaveLength(3);
+
+      // And the webhook label on each of those same three pod templates:
+      // a count short here means one workload silently never gets a token.
+      const labelled =
+        out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
+      expect(labelled).toHaveLength(0);
     });
 
     /** @scenario "The chart binds every storage-touching workload to one federated service account" */
@@ -179,6 +194,23 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       expect(out).toContain("name: AZURE_BLOB_AUTH_MODE");
       expect(out).toContain('value: "workloadIdentity"');
       expect(out).not.toContain("AZURE_BLOB_ACCOUNT_KEY");
+    });
+
+    /** @scenario "The chart binds every storage-touching workload to one federated service account" */
+    it("labels every storage-touching pod so the webhook mutates all of them", () => {
+      const out = render([
+        ...AZURE,
+        ...ALL_WORKLOADS,
+        "--set", "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        "--set", "global.serviceAccount.create=true",
+      ]);
+
+      // One per pod template: app, workers, cronjob. A count short means a
+      // workload boots without a token and fails on its first storage call,
+      // which is exactly the shape of the bug this label exists to prevent.
+      const labelled =
+        out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
+      expect(labelled).toHaveLength(3);
     });
 
     /** @scenario "The chart does not require an account key under a token-based mode" */
