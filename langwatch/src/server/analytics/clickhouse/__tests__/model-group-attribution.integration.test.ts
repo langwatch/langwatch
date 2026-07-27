@@ -551,6 +551,37 @@ describe("model group attribution (integration)", () => {
     });
   });
 
+  describe("model grouping combined with a span-joined filter", () => {
+    // The generic stored_spans filter JOIN (alias ss) and the span-model
+    // partition JOIN (alias smd) must coexist in one query without breaking
+    // the partition property.
+    it("keeps exact bucket partition when filtering by span type", async () => {
+      resetParamCounter();
+      const { sql, params } = buildTimeseriesQuery({
+        ...baseInput,
+        series: sumSeries("performance.total_cost"),
+        groupBy: "metadata.model",
+        filters: { "spans.type": ["llm"] },
+      });
+      const result = await ch.query({
+        query: sql,
+        query_params: params,
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as ResultRow[];
+      const buckets = bucketsOf(rows, "0__performance_total_cost__sum");
+
+      // Every fixture trace has at least one llm span except the model-less
+      // one, so the filtered result keeps the same partition.
+      expect(buckets[MODEL_OPUS]).toBeCloseTo(0.5, 9);
+      expect(buckets[MODEL_SONNET]).toBeCloseTo(0.25, 9);
+      expect(buckets[MODEL_OPUS_1M]).toBeCloseTo(0.125, 9);
+      expect(buckets[MODEL_HAIKU]).toBeCloseTo(0.0625 + 0.03125, 9);
+      const bucketSum = Object.values(buckets).reduce((a, b) => a + b, 0);
+      expect(bucketSum).toBeCloseTo(EXPECTED_TOTAL_COST, 9);
+    });
+  });
+
   describe("bug 3 (query side): unknown bucket honesty", () => {
     it("counts traces per model without a spurious unknown bucket", async () => {
       const rows = await runQuery(
