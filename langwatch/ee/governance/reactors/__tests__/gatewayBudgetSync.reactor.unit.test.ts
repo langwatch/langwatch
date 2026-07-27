@@ -114,7 +114,16 @@ function mockDeps(
         },
       } as any,
       budgetRepository: {
-        applicableForRequest: vi.fn().mockResolvedValue(budgets),
+        // The reactor resolves buckets, not bare rows: a department budget
+        // debits one member's bucket, not the whole group's.
+        resolveForRequest: vi.fn().mockResolvedValue(
+          budgets.map((budget) => ({
+            budget,
+            bucketScopeId: budget.scopeId,
+            principalUserId: null,
+            groupId: null,
+          })),
+        ),
       } as any,
       budgetCHRepository: {
         insertDebit,

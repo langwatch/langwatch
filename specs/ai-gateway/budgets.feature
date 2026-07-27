@@ -344,6 +344,12 @@ Feature: AI Gateway — Budgets
     And a window ending at exactly that instant excludes it
 
   @integration
+  Scenario: A re-projected trace is counted once, at its latest cost
+    Given a trace whose cost was written once and then corrected
+    When spend is read before the two writes have been merged
+    Then the trace counts once, at the corrected cost
+
+  @integration
   Scenario: Spend is reported per key with its own daily and model split
     Given a key with traffic across models
     When its usage is requested

@@ -228,6 +228,22 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
   },
   "model_aliases": { "gpt-4o": "azure/my-deployment", "claude": "anthropic/claude-haiku-4-5-20251001" },
   "models_allowed": ["gpt-5-mini", "claude-haiku-*", "gemini-2.5-flash"],
+  /* Provider allowlist. `null` means every provider the key reaches through
+     its scope graph, INCLUDING providers added after the key was created —
+     that is what the drawer's "All providers" persists, and `providers[]`
+     above is already filtered to match. A list narrows to those
+     ModelProvider ids; it is never empty. */
+  "providers_allowed": null,
+  /* How the key behaves when its provider fails.
+       none          — no failover. `fallback.max_attempts` is pinned to 1,
+                       so a gateway that does not yet read this field still
+                       behaves correctly. Default for keys created after the
+                       routing-mode split.
+       fallback_all  — walk every eligible provider in `fallback.chain`.
+                       Keys created before the split are migrated to this,
+                       so their behaviour is unchanged.
+       policy        — ordering and rules come from the linked RoutingPolicy. */
+  "routing_mode": "none",
   "cache": { "mode": "respect|force|disable", "ttl_s": 3600 },
   "guardrails": {
     /* Both fail-open flags default false (fail-closed). Flip to true per
@@ -261,19 +277,33 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
      error code = vk_rate_limit_exceeded. TPM deferred to v1.1 (requires
      Redis-coordinated cluster-wide counters; pre-request token count is
      an estimate too imprecise for a hard cap). */
+  /* `scope_id` is the bucket spend accumulates under, which is the budget's
+     target for every scope except "group". `provider_key` is orthogonal to
+     the scope: null counts every dispatch, set counts and constrains only
+     dispatches to that ModelProvider id. See §4.6 for how a filtered budget
+     is enforced. */
   "budgets": [
     {
-      "scope": "virtual_key", "scope_id": "vk_01HZ...",
+      "scope": "virtual_key", "scope_id": "vk_01HZ...", "provider_key": null,
       "window": "day", "limit_usd": 25.00,
       "spent_usd": 4.12, "remaining_usd": 20.88, "resets_at": "2026-04-19T00:00:00Z",
       "on_breach": "block"
     },
-    { "scope": "project", "scope_id": "proj_01HZ...", "window": "month", "limit_usd": 1000.00,
+    { "scope": "project", "scope_id": "proj_01HZ...", "provider_key": "mp_01HZ...",
+      "window": "month", "limit_usd": 1000.00,
       "spent_usd": 437.55, "remaining_usd": 562.45, "resets_at": "2026-05-01T00:00:00Z",
       "on_breach": "block" },
-    { "scope": "team", "scope_id": "team_01HZ...", "window": "month", "limit_usd": 5000.00,
+    { "scope": "team", "scope_id": "team_01HZ...", "provider_key": null,
+      "window": "month", "limit_usd": 5000.00,
       "spent_usd": 3210.00, "remaining_usd": 1790.00, "resets_at": "2026-05-01T00:00:00Z",
-      "on_breach": "warn" }
+      "on_breach": "warn" },
+    /* A department budget is per member: one budget row materialises one
+       bucket per member, so `scope_id` is `<groupId>:<userId>` and
+       `principal_id` names the member. Two members never share a pot. */
+    { "scope": "group", "scope_id": "grp_01HZ...:user_01HZ...", "principal_id": "user_01HZ...",
+      "provider_key": null, "window": "month", "limit_usd": 50.00,
+      "spent_usd": 12.40, "remaining_usd": 37.60, "resets_at": "2026-05-01T00:00:00Z",
+      "on_breach": "block" }
   ],
   "metadata": { "label": "dev/codex", "tags": ["coding-cli"], "created_by": "user_01HZ..." }
 }
@@ -351,9 +381,14 @@ the OTel trace the gateway already emits for every request. The flow:
    cost from the pricing catalog (matching on `gen_ai.request.model` +
    per-project custom costs) and stamps it onto the span.
 3. The `gatewayBudgetSync` reactor reads the enriched span, resolves the
-   applicable budgets (VK, project, team, org, principal scopes), and
-   writes one row per applicable budget to the ClickHouse table
+   applicable budgets (VK, project, team, org, principal and department
+   scopes), and writes one row per applicable budget to the ClickHouse table
    `gateway_budget_ledger_events`, keyed by `(TenantId, BudgetId, GatewayRequestId)`.
+   Each row stamps `ProviderKey` — the provider the request was dispatched
+   to, read from `langwatch.model_provider_id` on the span. A budget with a
+   provider filter is only debited when that provider matches; a dispatch
+   with no reported provider debits unfiltered budgets only, because
+   attributing it to a named provider would be a guess.
 4. A `gateway_budget_scope_totals_mv` AggregatingMergeTree materialised view
    aggregates `sumState(AmountUSD)` per `(scope, scope_id, window, period_start)`.
 5. `/budget/check` reads `finalizeAggregation(sumMerge(SpendUSD))` against the
@@ -367,6 +402,46 @@ or 24h window is required.
 The Postgres `GatewayBudgetLedger` table is deprecated — the schema remains
 for rollback safety but no code writes to it. `GatewayBudget` (the budget
 *definition*) stays authoritative for limits/windows/on_breach.
+
+**Buckets.** The ledger accumulates by `(Scope, ScopeId)`, so anything that
+must accrue separately is separate in `ScopeId`:
+
+| Budget | `ScopeId` written |
+|---|---|
+| Plain | the target id |
+| Provider-filtered | `<targetId>\|provider:<modelProviderId>` |
+| Department (per member) | `<groupId>:<userId>` |
+| Department, provider-filtered | `<groupId>:<userId>\|provider:<modelProviderId>` |
+
+Two budgets on the same target — one counting everything, one counting one
+provider — would otherwise share a bucket and each report the other's spend.
+The control plane computes these keys in `budgetResolution.service.ts`; the
+gateway does not need to construct them, it receives them as `scope_id`.
+
+**What key spend is read from.** Per-key spend shown to users (the keys
+table's "Spent this month" column and the Usage tab) is NOT read from this
+ledger. The ledger is per budget: it holds nothing for a key nobody capped,
+and one row per budget for a key covered several times. Those surfaces read
+`trace_summaries` — the enriched per-trace cost — keyed on
+`langwatch.virtual_key_id`, deduped per trace. The ledger remains the source
+for budget enforcement and for a budget's own debit list.
+
+### 4.6 Provider-filtered budget enforcement
+
+A budget with `provider_key` set constrains one vendor, not the request. At
+check time (the Budget interceptor runs after Resolve, so the candidate
+providers are known):
+
+- A breached provider-filtered budget removes that provider from the
+  candidate chain, exactly like provider unavailability.
+- If candidates remain, the request is served by one of them and no
+  budget error is returned.
+- If the chain empties, the request is blocked with `budget_exceeded`,
+  naming the budget that emptied it.
+- With `routing_mode: "none"` the chain is length one, so this degenerates
+  to a plain block.
+
+Unfiltered budgets are unchanged: a breach blocks the request outright.
 
 ### 4.6 `POST /api/internal/gateway/guardrail/check`
 

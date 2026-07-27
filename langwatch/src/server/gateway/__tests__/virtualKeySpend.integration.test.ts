@@ -49,6 +49,7 @@ async function insertGatewayTrace(args: {
   occurredAt: Date;
   totalCost: number;
   models?: string[];
+  updatedAt?: Date;
 }): Promise<void> {
   await args.ch.insert({
     table: "trace_summaries",
@@ -61,7 +62,7 @@ async function insertGatewayTrace(args: {
         Attributes: { "langwatch.virtual_key_id": args.virtualKeyId },
         OccurredAt: args.occurredAt,
         CreatedAt: args.occurredAt,
-        UpdatedAt: args.occurredAt,
+        UpdatedAt: args.updatedAt ?? args.occurredAt,
         ComputedIOSchemaVersion: "",
         ComputedInput: null,
         ComputedOutput: null,
@@ -278,6 +279,38 @@ describe("virtual key spend — real PG + real CH", () => {
       toDate: anchor,
     });
     expect(onEnd.totalRequests).toBe(0);
+  });
+
+  /** @scenario "A re-projected trace is counted once, at its latest cost" */
+  it("counts a trace once when its projection is written twice", async () => {
+    const ch = getTestClickHouseClient()!;
+    const traceId = `trace-reprojected-${suffix}`;
+    const anchor = new Date("2026-02-10T09:00:00.000Z");
+    // The same trace, projected twice before the engine merges the parts:
+    // an early row with a partial cost and a later, correct one. Summing
+    // both would over-report; taking the earlier one would under-report.
+    await insertGatewayTrace({
+      ch,
+      traceId,
+      virtualKeyId: VK_UNBUDGETED_ID,
+      occurredAt: anchor,
+      totalCost: 0.1,
+    });
+    await insertGatewayTrace({
+      ch,
+      traceId,
+      virtualKeyId: VK_UNBUDGETED_ID,
+      occurredAt: anchor,
+      totalCost: 0.9,
+      updatedAt: new Date(anchor.getTime() + 5_000),
+    });
+
+    const summary = await usageService().summary(PROJECT_ID, {
+      fromDate: anchor,
+      toDate: new Date(anchor.getTime() + 60_000),
+    });
+    expect(summary.totalRequests).toBe(1);
+    expect(Number(summary.totalUsd)).toBeCloseTo(0.9, 4);
   });
 
   /** @scenario "Spend is reported per key with its own daily and model split" */
