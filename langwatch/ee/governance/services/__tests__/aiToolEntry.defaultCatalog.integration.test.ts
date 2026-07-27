@@ -59,7 +59,7 @@ describe("AiToolEntryService.ensureDefaultCatalog", () => {
     const organizationId = await createOrg("fresh");
 
     const result = await service.ensureDefaultCatalog({ organizationId });
-    expect(result).toEqual({ seeded: true, created: 8 });
+    expect(result).toEqual({ hasSeeded: true, created: 8 });
 
     const rows = await prisma.aiToolEntry.findMany({
       where: { organizationId },
@@ -92,7 +92,7 @@ describe("AiToolEntryService.ensureDefaultCatalog", () => {
     await service.ensureDefaultCatalog({ organizationId });
 
     const second = await service.ensureDefaultCatalog({ organizationId });
-    expect(second).toEqual({ seeded: false, created: 0 });
+    expect(second).toEqual({ hasSeeded: false, created: 0 });
     expect(
       await prisma.aiToolEntry.count({ where: { organizationId } }),
     ).toBe(8);
@@ -134,7 +134,7 @@ describe("AiToolEntryService.ensureDefaultCatalog", () => {
     });
 
     const result = await service.ensureDefaultCatalog({ organizationId });
-    expect(result).toEqual({ seeded: false, created: 0 });
+    expect(result).toEqual({ hasSeeded: false, created: 0 });
 
     const rows = await prisma.aiToolEntry.findMany({
       where: { organizationId },
@@ -157,7 +157,7 @@ describe("AiToolEntryService.ensureDefaultCatalog", () => {
     // re-checks under the lock (or trips the cheap pre-check) and backs
     // off. There is no unique constraint on (organizationId, slug), so
     // this lock is the only thing standing between us and duplicates.
-    expect([a, b].filter((r) => r.seeded)).toHaveLength(1);
+    expect([a, b].filter((r) => r.hasSeeded)).toHaveLength(1);
 
     const rows = await prisma.aiToolEntry.findMany({
       where: { organizationId },

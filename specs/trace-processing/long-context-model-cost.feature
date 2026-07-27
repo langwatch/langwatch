@@ -26,7 +26,7 @@ Feature: Long-context [1m] model id cost matching
   # suffix; these scenarios pin both halves so neither regresses.
 
   @bdd @trace-processing @model-cost @unit
-  Scenario: A [1m] long-context model id resolves the base model's registry pricing
+  Scenario: A [1m] long-context model id is priced as its base model
     Given Claude Opus 5 is a priced model on the platform
     When a trace reports its model as "claude-opus-5[1m]"
     Then the trace is priced as Claude Opus 5
@@ -40,7 +40,7 @@ Feature: Long-context [1m] model id cost matching
     And the cached share is billed at Claude's cache read and cache write prices, not the fresh-input price
 
   @bdd @trace-processing @model-cost @unit
-  Scenario: The [1m] suffix resolves registry pricing across the Claude model family
+  Scenario: The [1m] suffix is priced as the base model across the Claude family
     Given the platform prices the current Claude models
     When traces report "claude-sonnet-4-5[1m]" or "anthropic/claude-opus-5[1m]"
     Then each is priced as its base model

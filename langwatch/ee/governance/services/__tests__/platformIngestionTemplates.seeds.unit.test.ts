@@ -30,7 +30,7 @@ const CODING_ASSISTANT_SLUGS = [
 
 describe("PLATFORM_INGESTION_TEMPLATES", () => {
   describe("when the platform seed input is inspected", () => {
-    /** @scenario The platform default template set ships no claude-cowork */
+    /** @scenario The platform-template seed produces no coding-assistant rows */
     it("ships no default template rows at all", () => {
       expect(PLATFORM_INGESTION_TEMPLATES).toEqual([]);
     });

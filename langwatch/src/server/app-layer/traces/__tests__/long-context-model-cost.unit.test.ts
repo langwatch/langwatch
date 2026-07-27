@@ -23,7 +23,7 @@ const OPUS_5_CACHE_WRITE = 0.00000625;
 const OPUS_5_CACHE_READ = 0.0000005;
 
 describe("long-context [1m] model cost matching", () => {
-  /** @scenario "A [1m] long-context model id resolves the base model's registry pricing" */
+  /** @scenario "A [1m] long-context model id is priced as its base model" */
   it("matches claude-opus-5[1m] to the anthropic/claude-opus-5 registry entry at standard rates", () => {
     const match = matchModelCostWithFallbacks(
       "claude-opus-5[1m]",
@@ -79,7 +79,7 @@ describe("long-context [1m] model cost matching", () => {
     );
   });
 
-  /** @scenario "The [1m] suffix resolves registry pricing across the Claude model family" */
+  /** @scenario "The [1m] suffix is priced as the base model across the Claude family" */
   it("resolves the [1m] suffix for other Claude spellings too", () => {
     const costs = getStaticModelCosts();
 

@@ -63,15 +63,15 @@ Feature: AI Tools Portal — Admin catalog editor at /settings/governance/tool-c
   Scenario: re-importing the starter pack adds only tiles the catalog never had
     Given the catalog has most starter tiles but lacks one entirely
     When the starter pack is imported again
-    Then only the missing starter tile is created
-    And the tiles already present are skipped untouched
+    Then the catalog gains only the tile it lacked
+    And the tiles already in the catalog stay exactly as they were
 
   @bdd @admin-catalog @starter-pack @integration
   Scenario: an archived starter tile is not restored or duplicated by a re-import
     Given the admin archived a starter tile
     When the starter pack is imported again
-    Then the archived tile stays archived
-    And no duplicate row for it is created
+    Then the archived tile does not reappear anywhere in the catalog
+    And the catalog does not gain a second copy of it
 
   Scenario: admin sees populated catalog with scope badges
     Given the catalog has these admin-visible entries:

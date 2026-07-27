@@ -426,6 +426,8 @@ describe("resolveWrapperPath", () => {
       expect(otlpChoiceTitle("codex")).toBe("Using a ChatGPT subscription");
       expect(otlpChoiceTitle("gemini")).toBe("Using a Gemini subscription");
       expect(otlpChoiceTitle("cursor")).toBe("Using a Cursor subscription");
+      // Inherited object keys must take the fallback, not the prototype.
+      expect(otlpChoiceTitle("toString")).toBe("Using your own toString plan");
       // opencode is a bring-your-own client with no single subscription.
       expect(otlpChoiceTitle("opencode")).toBe("Using your own opencode plan");
     });

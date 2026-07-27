@@ -511,7 +511,7 @@ describe("aiToolsRouter integration", () => {
     });
   });
 
-  describe("list auto-provisioning", () => {
+  describe("when list reads hit organizations in different provisioning states", () => {
     // Hermetic fresh org: the suite org accumulates tiles from sibling
     // tests (and gets auto-provisioned by their list calls), so pinning
     // the exact default set needs a clean slate.
@@ -825,18 +825,18 @@ describe("aiToolsRouter integration", () => {
         expect(codexRows).toHaveLength(1);
         expect(codexRows[0]!.archivedAt).not.toBeNull();
       } finally {
-        await prisma.aiToolEntry
-          .deleteMany({ where: { organizationId: freshOrgId } })
-          .catch(() => undefined);
-        await prisma.roleBinding
-          .deleteMany({ where: { organizationId: freshOrgId } })
-          .catch(() => undefined);
-        await prisma.organizationUser
-          .deleteMany({ where: { organizationId: freshOrgId } })
-          .catch(() => undefined);
-        await prisma.organization
-          .deleteMany({ where: { id: freshOrgId } })
-          .catch(() => undefined);
+        await prisma.aiToolEntry.deleteMany({
+          where: { organizationId: freshOrgId },
+        });
+        await prisma.roleBinding.deleteMany({
+          where: { organizationId: freshOrgId },
+        });
+        await prisma.organizationUser.deleteMany({
+          where: { organizationId: freshOrgId },
+        });
+        await prisma.organization.deleteMany({
+          where: { id: freshOrgId },
+        });
       }
     });
 

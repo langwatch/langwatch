@@ -219,6 +219,7 @@ describe("/cli/auth first-trace watch", () => {
   };
 
   /** @scenario "Approving a device session before any trace has synced waits and then redirects to the personal traces page" */
+  /** @scenario "First-trace polling only runs while the page is visible and stops at the timeout" */
   it("waits for the first trace, then redirects to the personal traces page", async () => {
     renderPage();
     await approveDeviceSession();

@@ -25,8 +25,9 @@ const MESH_COLORS_DARK = ["#78350f", "#7c2d12", "#4c1d95", "#1a1206"];
  * Admin empty-state hero for the AI tools portal. Shown when the catalog
  * has zero enabled tiles and the viewer can manage it. Fresh orgs are
  * auto-provisioned with the standard catalog, so this only renders for a
- * catalog whose admin archived or disabled everything (the curated-empty
- * fallback). Reuses the home-banner glass-card visual to make "set up
+ * catalog curated down to no enabled tools, whether by archiving,
+ * disabling, or deleting entries (the curated-empty fallback). Reuses
+ * the home-banner glass-card visual to make "set up
  * governance" feel like a first-class call to action rather than a bare
  * empty list, and points straight at the tool catalog where the starter
  * pack lives.

@@ -1017,11 +1017,11 @@ export class AiToolEntryService {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<{ seeded: boolean; created: number }> {
+  }): Promise<{ hasSeeded: boolean; created: number }> {
     const existingCount = await this.prisma.aiToolEntry.count({
       where: { organizationId },
     });
-    if (existingCount > 0) return { seeded: false, created: 0 };
+    if (existingCount > 0) return { hasSeeded: false, created: 0 };
 
     return await this.prisma.$transaction(
       async (tx) => {
@@ -1032,7 +1032,7 @@ export class AiToolEntryService {
         const countUnderLock = await tx.aiToolEntry.count({
           where: { organizationId },
         });
-        if (countUnderLock > 0) return { seeded: false, created: 0 };
+        if (countUnderLock > 0) return { hasSeeded: false, created: 0 };
 
         await tx.aiToolEntry.createMany({
           data: STARTER_PACK_TILES.map((tile, index) =>
@@ -1045,7 +1045,7 @@ export class AiToolEntryService {
             }),
           ),
         });
-        return { seeded: true, created: STARTER_PACK_TILES.length };
+        return { hasSeeded: true, created: STARTER_PACK_TILES.length };
       },
       // Waiting on the advisory lock counts toward the interactive-txn
       // timeout; give a losing concurrent provisioner room to wait out

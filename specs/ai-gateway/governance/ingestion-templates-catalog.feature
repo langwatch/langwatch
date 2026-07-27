@@ -148,10 +148,11 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   Scenario: The platform-template seed produces no coding-assistant rows
     When the platform IngestionTemplate seed runs
     Then no seeded row has a slug of claude_code, codex, cursor, gemini, or opencode
-    And no platform template rows are seeded at all (claude_cowork is retired
-        and archived on existing installs, see default-catalog.feature)
-    # No flag, no filter constant: the coding assistants are absent from the seed
-    # input itself, so the /me grid and the admin list never have a row to drop.
+    And no platform template rows are seeded at all
+    # claude_cowork's retirement and archival on existing installs is covered
+    # by default-catalog.feature. No flag, no filter constant: the coding
+    # assistants are absent from the seed input itself, so the /me grid and
+    # the admin list never have a row to drop.
 
   # No-leak invariant: persona-aware-chrome layout component branches on
   # route shape to hide IngestionTemplate catalog under /[project]. No

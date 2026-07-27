@@ -27,8 +27,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 // Zero enabled entries: list resolves to [], availability to no configured
 // providers. Server-side auto-provisioning means a fresh org never actually
-// serves an empty list; this state is only reachable when the admin archived
-// or disabled every entry (the curated-empty fallback these tests pin).
+// serves an empty list; this state is only reachable when the catalog was
+// curated down to no enabled tools (the curated-empty fallback these pin).
 vi.mock("~/utils/api", () => ({
   api: {
     aiTools: {
