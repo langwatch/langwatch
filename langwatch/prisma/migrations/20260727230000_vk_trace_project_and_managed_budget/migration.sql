@@ -17,3 +17,8 @@
 ALTER TABLE "VirtualKey" ADD COLUMN "traceProjectId" TEXT;
 ALTER TABLE "GatewayBudget" ADD COLUMN "managedByVirtualKeyId" TEXT;
 CREATE INDEX "GatewayBudget_managedByVirtualKeyId_idx" ON "GatewayBudget"("managedByVirtualKeyId");
+
+-- Down: (reversible, uncomment and run manually to roll back)
+-- DROP INDEX "GatewayBudget_managedByVirtualKeyId_idx";
+-- ALTER TABLE "GatewayBudget" DROP COLUMN "managedByVirtualKeyId";
+-- ALTER TABLE "VirtualKey" DROP COLUMN "traceProjectId";
