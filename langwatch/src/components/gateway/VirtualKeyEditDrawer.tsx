@@ -239,7 +239,7 @@ export function VirtualKeyEditDrawer({
     const budgetReason = budgetInvalidReason(budget);
     if (budgetReason) return budgetReason;
     // Until providers resolve we cannot tell a valid narrow list from an
-    // empty one — let the save through and the server validate.
+    // empty one; let the save through and the server validate.
     if (!orgProvidersQuery.isLoading) {
       const providerReason = providerAccessInvalidReason(
         providerAccess,
@@ -319,7 +319,7 @@ export function VirtualKeyEditDrawer({
               <Field.Label>
                 Name
                 <FieldInfoTooltip
-                  description="Human-readable identifier shown in the list and audit log. Must be unique within the organization. Rename is non-breaking — the VK id + secret remain the same."
+                  description="Human-readable identifier shown in the list and audit log. Must be unique within the organization. Rename is non-breaking: the VK id + secret remain the same."
                   docHref="/ai-gateway/virtual-keys#creating-a-vk"
                 />
               </Field.Label>
@@ -431,13 +431,13 @@ export function VirtualKeyEditDrawer({
                     }
                   >
                     <option value="respect">
-                      Respect — pass provider cache directives through unchanged
+                      Respect: pass provider cache directives through unchanged
                     </option>
                     <option value="disable">
-                      Disable — strip cache directives before dispatch
+                      Disable: strip cache directives before dispatch
                     </option>
                     <option value="force">
-                      Force — inject cache_control on Anthropic (OpenAI auto,
+                      Force: inject cache_control on Anthropic (OpenAI auto,
                       Gemini WARN)
                     </option>
                   </NativeSelect.Field>
@@ -482,7 +482,7 @@ export function VirtualKeyEditDrawer({
                 <Field.Label>
                   tpm
                   <FieldInfoTooltip
-                    description="Tokens / minute — requires pre-request token estimation; ships with Redis-coordinated cluster counters (v1.1)."
+                    description="Tokens / minute; requires pre-request token estimation and ships with Redis-coordinated cluster counters (v1.1)."
                     docHref="/ai-gateway/rate-limits"
                   />
                 </Field.Label>

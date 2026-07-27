@@ -52,7 +52,7 @@ function decode(raw: string): VirtualKeyRoutingValue {
 /**
  * Routing choice for the virtual-key drawers. "No fallback" leads and is
  * the default for new keys: failing over sends the request, and its data,
- * to a different vendor — a decision worth making on purpose rather than
+ * to a different vendor: a decision worth making on purpose rather than
  * inheriting from a blank field.
  */
 export function VirtualKeyRoutingSection({

@@ -91,7 +91,7 @@ export function BudgetCreateDrawer({
     },
   );
   // GROUP budgets target Group rows (the entity SCIM provisions and
-  // GroupMembership fans budgets out over) — not the org-chart
+  // GroupMembership fans budgets out over), not the org-chart
   // Department table, which has no gateway budget scope.
   const groupsQuery = api.gatewayBudgets.groupTargets.useQuery(
     { organizationId: orgId },
@@ -284,7 +284,7 @@ export function BudgetCreateDrawer({
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Engineering — monthly $1k cap"
+                placeholder="e.g. Engineering monthly $1k cap"
                 autoFocus
               />
             </Field.Root>
@@ -375,7 +375,7 @@ export function BudgetCreateDrawer({
               <Field.Label>
                 Provider
                 <FieldInfoTooltip
-                  description="Count and constrain spend on one provider only, e.g. 'OpenAI $200/month for this team'. With a provider set, only requests dispatched to that provider debit this budget, and on breach only that provider is withheld — others keep serving."
+                  description="Count and constrain spend on one provider only, e.g. 'OpenAI $200/month for this team'. With a provider set, only requests dispatched to that provider debit this budget, and on breach only that provider is withheld; others keep serving."
                   docHref="/ai-gateway/budgets#provider-filter"
                   testId="budget-provider-info"
                 />
@@ -409,7 +409,7 @@ export function BudgetCreateDrawer({
                 <Field.Label>
                   Window
                   <FieldInfoTooltip
-                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule in the budget's timezone. 'total' never resets — useful for burn-down budgets on a fixed-fund project."
+                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule in the budget's timezone. 'total' never resets, which suits burn-down budgets on a fixed-fund project."
                     docHref="/ai-gateway/budgets#windows"
                   />
                 </Field.Label>
@@ -449,7 +449,7 @@ export function BudgetCreateDrawer({
               <Field.Label>
                 On breach
                 <FieldInfoTooltip
-                  description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error — useful for soft budgets where ops monitors spend without enforcing a hard cap."
+                  description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error, which suits soft budgets where ops monitors spend without enforcing a hard cap."
                   docHref="/ai-gateway/budgets#on_breach"
                 />
               </Field.Label>
@@ -462,8 +462,8 @@ export function BudgetCreateDrawer({
                     )
                   }
                 >
-                  <option value="BLOCK">Block — reject requests at limit</option>
-                  <option value="WARN">Warn — tag responses, keep serving</option>
+                  <option value="BLOCK">Block: reject requests at limit</option>
+                  <option value="WARN">Warn: tag responses, keep serving</option>
                 </NativeSelect.Field>
               </NativeSelect.Root>
             </Field.Root>

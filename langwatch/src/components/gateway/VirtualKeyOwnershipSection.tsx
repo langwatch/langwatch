@@ -29,7 +29,7 @@ export type VirtualKeyOwnership = {
   teamId: string | null;
   /**
    * ORGANIZATION / TEAM ownership: the project this key's traces and
-   * costs land in. Required — a key whose traces land nowhere accrues
+   * costs land in. Required: a key whose traces land nowhere accrues
    * against no budget, so the server refuses it.
    */
   traceProjectId: string | null;
@@ -140,7 +140,7 @@ const KIND_OPTIONS: Array<{
  *
  * The consequence of the choice is stated inline: every ownership names
  * the project its traces and costs land in, because that is the feed
- * every budget accrues from — there is no untraced shape.
+ * every budget accrues from; there is no untraced shape.
  */
 export function VirtualKeyOwnershipSection({
   value,

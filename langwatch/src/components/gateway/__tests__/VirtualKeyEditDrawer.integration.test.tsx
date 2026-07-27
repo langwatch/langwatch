@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The edit drawer must read back exactly what a key is — its routing
- * mode, its budget, its provider allowlist — and persist only what the
+ * The edit drawer must read back exactly what a key is (its routing
+ * mode, its budget, its provider allowlist) and persist only what the
  * user changed. The sharp edges pinned here: an existing key's routing
  * choice survives an unrelated edit (nothing changes under a customer),
  * clearing the budget field archives the key's cap, and the key's own

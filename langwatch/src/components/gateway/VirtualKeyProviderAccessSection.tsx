@@ -28,7 +28,7 @@ import {
 /**
  * Which providers a key may dispatch to.
  *
- * `allProviders: true` persists as `providers_allowed: null` — every
+ * `allProviders: true` persists as `providers_allowed: null`: every
  * provider the key can reach through its ownership, including providers
  * added later. An explicit selection persists the listed ModelProvider
  * row ids and never grows on its own.
@@ -212,7 +212,7 @@ export function VirtualKeyProviderAccessSection({
             <Text as="span" fontFamily="mono">
               /settings/model-providers
             </Text>{" "}
-            first — the key cannot route requests without a provider.
+            first; the key cannot route requests without a provider.
           </Text>
         </VStack>
       ) : (

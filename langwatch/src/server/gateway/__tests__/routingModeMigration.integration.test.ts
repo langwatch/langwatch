@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Keys that predate the explicit routing choice keep falling back —
+ * Keys that predate the explicit routing choice keep falling back -
  * against real Postgres, replaying the shipped migration.
  *
  * The old implicit default was "a null routing policy means fall back
@@ -12,7 +12,7 @@
  *
  *   1. The backfill statements shipped in the migration file map a
  *      legacy null-policy row to FALLBACK_ALL and a policy-carrying row
- *      to POLICY — replayed verbatim inside a rolled-back transaction,
+ *      to POLICY. Replayed verbatim inside a rolled-back transaction,
  *      so re-running them cannot disturb other rows.
  *   2. A key in the migrated state materialises a bundle that walks
  *      every provider it can reach: full chain, more than one attempt,
@@ -95,7 +95,7 @@ async function createBareKeyRow(args: {
   });
 }
 
-describe("keys that predate the routing choice keep falling back — real PG", () => {
+describe("keys that predate the routing choice keep falling back against real PG", () => {
   beforeAll(async () => {
     await startTestContainers();
 

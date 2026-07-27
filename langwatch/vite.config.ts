@@ -222,7 +222,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
         // convention. A dev-server log teed there reloads the page on every
         // request, same trap as above under a different name. Agent
         // worktrees also live under .claude/worktrees, so a dev server
-        // started FROM one has .claude in every path — a blanket
+        // started FROM one has .claude in every path, so a blanket
         // "**/.claude/**" ignore there blinds the watcher to the whole
         // worktree and HMR never fires. From a worktree root only the
         // noise sources are ignored; from the main root the entire tree

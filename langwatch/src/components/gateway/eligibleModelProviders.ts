@@ -1,7 +1,7 @@
 import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
 
 /**
- * A scope a VirtualKey is reachable from — the org/team/project triad the
+ * A scope a VirtualKey is reachable from: the org/team/project triad the
  * key's ownership persists as. Owned here (rather than by a picker
  * component) because everything provider-eligibility touches keys on it.
  */

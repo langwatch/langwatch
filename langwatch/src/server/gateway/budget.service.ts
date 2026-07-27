@@ -687,7 +687,7 @@ export class GatewayBudgetService {
     }
 
     // Provider-filtered budgets reference a ModelProvider row. The id is
-    // request-supplied, so pin it to the budget's own organization — a
+    // request-supplied, so pin it to the budget's own organization: a
     // cross-org id would create a filter that can never match this org's
     // dispatches and silently count nothing.
     if (input.providerKey) {

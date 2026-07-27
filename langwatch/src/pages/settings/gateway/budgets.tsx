@@ -135,7 +135,7 @@ function BudgetsPage() {
                 <EmptyState.Description>
                   Budgets enforce a spend ceiling on any dimension:
                   organization, department, team, project, member, or virtual
-                  key — each optionally limited to a single provider. Create
+                  key; each optionally limited to a single provider. Create
                   one to start governing cost.
                 </EmptyState.Description>
                 {canCreate && (

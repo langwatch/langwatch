@@ -49,7 +49,7 @@ function formatLimit(limitUsd: string): string {
 /**
  * The one deliberately visible line on this form. "Resets at midnight" is
  * a different promise in each timezone, and the wrong assumption is only
- * discovered by being billed — so the reset instant and its timezone are
+ * discovered by being billed; so the reset instant and its timezone are
  * spelled out instead of tucked behind a tooltip.
  */
 export function budgetAnnotation(value: VirtualKeyBudgetValue): string {
@@ -112,7 +112,7 @@ export function VirtualKeyBudgetSection({
   value: VirtualKeyBudgetValue;
   onChange: (next: VirtualKeyBudgetValue) => void;
   organizationId: string;
-  /** The draft key's scopes — what decides which budgets already apply. */
+  /** The draft key's scopes; these decide which budgets already apply. */
   scopes: ScopeTriadEntry[];
   principalUserId?: string | null;
   /** Set in the edit drawer so its own key-targeted budget is not listed twice. */
@@ -126,7 +126,7 @@ export function VirtualKeyBudgetSection({
       <HStack gap={1} alignItems="center">
         <SmallLabel>Budget</SmallLabel>
         <FieldInfoTooltip
-          description="The most this key may spend per period. Enforced by the gateway: once the limit is reached, requests through this key are refused until the period resets. Leave empty for no cap on the key itself — budgets on the organization, team, project or your account still apply."
+          description="The most this key may spend per period. Enforced by the gateway: once the limit is reached, requests through this key are refused until the period resets. Leave empty for no cap on the key itself; budgets on the organization, team, project or your account still apply."
           docHref="/ai-gateway/budgets"
           testId="vk-budget-info"
         />
@@ -234,7 +234,7 @@ export function VirtualKeyBudgetSection({
 }
 
 /**
- * The budgets that would already constrain this key — resolved by the
+ * The budgets that would already constrain this key, resolved by the
  * same service the gateway enforces from, so the list cannot promise a
  * constraint that will not apply, or miss one that will.
  */
