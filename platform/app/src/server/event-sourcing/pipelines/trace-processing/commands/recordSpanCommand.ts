@@ -204,7 +204,15 @@ export class RecordSpanCommand
 
         let resolvedCommandData = commandData;
         if (commandData.spoolRef && this.blobStore) {
-          const spoolBody = await this.blobStore.getSpool(commandData.spoolRef);
+          // The spool location is re-derived from the command's own
+          // authenticated tenantId and span ids — never from spoolRef, which is
+          // just a format marker. See BlobStore.getSpool / SPOOL_REF_V2.
+          const spoolBody = await this.blobStore.getSpool({
+            spoolRef: commandData.spoolRef,
+            projectId: tenantIdStr,
+            traceId: commandData.span.traceId as string,
+            spanId: commandData.span.spanId as string,
+          });
           // ADR-022: spool body is the full serialized RecordSpanCommandData.
           // Merge the spooled span/resource/instrumentationScope fields back into
           // the in-flight command (the queue message carries only spoolRef + id fields).
@@ -399,7 +407,14 @@ export class RecordSpanCommand
   ): Promise<void> {
     const spoolRef = command.data.spoolRef;
     if (spoolRef && this.blobStore) {
-      await this.blobStore.deleteSpool(spoolRef).catch((err: unknown) => {
+      await this.blobStore
+        .deleteSpool({
+          spoolRef,
+          projectId: command.tenantId,
+          traceId: command.data.span.traceId as string,
+          spanId: command.data.span.spanId as string,
+        })
+        .catch((err: unknown) => {
         this.logger.warn(
           { spoolRef, error: err instanceof Error ? err.message : String(err) },
           "Best-effort spool deletion failed — lifecycle policy will clean up",

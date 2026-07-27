@@ -6,11 +6,7 @@ import type { Logger } from "@langwatch/observability";
 import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import {
-  mintAzureBlobUri,
-  mintFileUri,
-  mintS3Uri,
-} from "~/server/stored-objects/uri";
+import { mintUriForDestination } from "~/server/stored-objects/uri";
 
 import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";
@@ -216,29 +212,10 @@ export class TieredBlobStore {
     hash: string;
   }): Promise<string> {
     const destination = await this.resolveDestinationCached(projectId);
-    switch (destination.kind) {
-      case "s3":
-        return mintS3Uri({
-          bucket: destination.bucket,
-          projectId,
-          sha256: hash,
-        });
-      case "file":
-        return mintFileUri({ root: destination.root, projectId, sha256: hash });
-      case "azure":
-        return mintAzureBlobUri({
-          accountName: destination.accountName,
-          container: destination.container,
-          projectId,
-          sha256: hash,
-        });
-      default: {
-        const unhandled: never = destination;
-        throw new Error(
-          `Unhandled storage destination kind: ${JSON.stringify(unhandled)}`,
-        );
-      }
-    }
+    return mintUriForDestination({
+      destination,
+      objectPath: `${projectId}/${hash}`,
+    });
   }
 
   async put({

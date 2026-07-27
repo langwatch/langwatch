@@ -353,46 +353,6 @@ describe("given a valid event_log row whose EventPayload does not contain the re
 });
 
 // ---------------------------------------------------------------------------
-// putSpool — happy path
-// ---------------------------------------------------------------------------
-
-describe("given a span that exceeds COMMAND_INLINE_THRESHOLD", () => {
-  describe("when putSpool is called with projectId, traceId, spanId, body", () => {
-    it("issues an S3 PUT at trace-blobs/spool/{projectId}/{traceId}/{spanId} and returns the spool ref string", async () => {
-      const sendMock = vi.fn().mockImplementation(async (command: unknown) => {
-        if (command instanceof PutObjectCommand) return {};
-        throw new Error("unexpected command");
-      });
-
-      const blobStore = new BlobStore(makeS3Resolver({ send: sendMock }));
-
-      const projectId = "proj-aaa";
-      const traceId = "trace-001";
-      const spanId = "span-001";
-      const body = Buffer.from("full span JSON here", "utf-8");
-
-      const spoolRef = await blobStore.putSpool({
-        projectId,
-        traceId,
-        spanId,
-        body,
-      });
-
-      expect(typeof spoolRef).toBe("string");
-      // Key shape pinned: trace-blobs/spool/{projectId}/{traceId}/{spanId}
-      expect(spoolRef).toBe(
-        `trace-blobs/spool/${projectId}/${traceId}/${spanId}`,
-      );
-
-      // S3 PUT was issued
-      expect(sendMock).toHaveBeenCalledOnce();
-      const cmd = sendMock.mock.calls[0]?.[0] as PutObjectCommand;
-      expect(cmd.input.Key).toBe(spoolRef);
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
 // deleteSpool — best-effort (errors swallowed)
 // ---------------------------------------------------------------------------
 
@@ -406,7 +366,14 @@ describe("given a transient spool ref", () => {
       const spoolRef = `trace-blobs/spool/proj/trace-001/span-001`;
 
       // Must not throw — errors are swallowed
-      await expect(blobStore.deleteSpool(spoolRef)).resolves.toBeUndefined();
+      await expect(
+        blobStore.deleteSpool({
+          spoolRef,
+          projectId: "proj",
+          traceId: "trace-001",
+          spanId: "span-001",
+        }),
+      ).resolves.toBeUndefined();
     });
   });
 });
@@ -475,7 +442,12 @@ describe("given an S3 GetObject that returns a response with no Body", () => {
       const blobStore = new BlobStore(makeS3Resolver({ send: sendMock }));
 
       await expect(
-        blobStore.getSpool("trace-blobs/spool/proj/trace-001/span-001"),
+        blobStore.getSpool({
+          spoolRef: "trace-blobs/spool/proj/trace-001/span-001",
+          projectId: "proj",
+          traceId: "trace-001",
+          spanId: "span-001",
+        }),
       ).rejects.toThrow(/no body/i);
     });
   });

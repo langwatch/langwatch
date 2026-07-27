@@ -14,15 +14,15 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, expect, it, vi } from "vitest";
-import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { type Command, createTenantId } from "../../../../";
+import { describe, it, expect, vi } from "vitest";
+import { createTenantId, type Command } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
 } from "../recordSpanCommand";
+import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -170,10 +170,18 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
         (blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> })
           .getSpool,
       ).toHaveBeenCalledOnce();
+      // The location is derived from the command's own authenticated tenant and
+      // span ids — the ref is passed through only so the legacy format can be
+      // recognised (langwatch/langwatch-saas#800).
       expect(
         (blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> })
           .getSpool,
-      ).toHaveBeenCalledWith(SPOOL_REF);
+      ).toHaveBeenCalledWith({
+        spoolRef: SPOOL_REF,
+        projectId: TENANT_ID,
+        traceId: TRACE_ID,
+        spanId: SPAN_ID,
+      });
 
       // Reconstituted span flows through — event data carries the full attributes
       expect(events).toHaveLength(1);
@@ -233,7 +241,12 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
 
       // deleteSpool is called once with the spool ref
       expect(deleteSpoolMock).toHaveBeenCalledOnce();
-      expect(deleteSpoolMock).toHaveBeenCalledWith(SPOOL_REF);
+      expect(deleteSpoolMock).toHaveBeenCalledWith({
+        spoolRef: SPOOL_REF,
+        projectId: TENANT_ID,
+        traceId: TRACE_ID,
+        spanId: SPAN_ID,
+      });
     });
 
     it("does NOT call BlobStore.deleteSpool when storeEvents throws (handle() succeeded but INSERT failed)", async () => {
@@ -404,12 +417,14 @@ describe("given a shared RecordSpanCommand instance processing two concurrent tr
     it("deletes each job's own spoolRef — not the other job's ref — pinning the race fix", async () => {
       const deleteSpoolMock = vi.fn().mockResolvedValue(undefined);
       const blobStore = {
-        getSpool: vi.fn().mockImplementation(async (ref: string) => {
-          if (ref === SPOOL_REF_A) {
-            return Buffer.from(makeSpoolBody(TRACE_ID_A, SPAN_ID_A), "utf-8");
-          }
-          return Buffer.from(makeSpoolBody(TRACE_ID_B, SPAN_ID_B), "utf-8");
-        }),
+        getSpool: vi
+          .fn()
+          .mockImplementation(async ({ traceId }: { traceId: string }) => {
+            if (traceId === TRACE_ID_A) {
+              return Buffer.from(makeSpoolBody(TRACE_ID_A, SPAN_ID_A), "utf-8");
+            }
+            return Buffer.from(makeSpoolBody(TRACE_ID_B, SPAN_ID_B), "utf-8");
+          }),
         deleteSpool: deleteSpoolMock,
       } as unknown as BlobStore;
 
@@ -437,11 +452,22 @@ describe("given a shared RecordSpanCommand instance processing two concurrent tr
       // Exactly two deletions — one per job, in order of cleanupAfterStore calls
       expect(deleteSpoolMock).toHaveBeenCalledTimes(2);
 
-      // First cleanup must target cmdA's spool — NOT cmdB's
-      expect(deleteSpoolMock).toHaveBeenNthCalledWith(1, SPOOL_REF_A);
+      // Each cleanup must target its OWN job's span coordinates — those, not the
+      // reference, are what now locate the object (langwatch/langwatch-saas#800),
+      // so they are what pins the race fix.
+      expect(deleteSpoolMock).toHaveBeenNthCalledWith(1, {
+        spoolRef: SPOOL_REF_A,
+        projectId: TENANT_ID,
+        traceId: TRACE_ID_A,
+        spanId: SPAN_ID_A,
+      });
 
-      // Second cleanup must target cmdB's spool — NOT cmdA's
-      expect(deleteSpoolMock).toHaveBeenNthCalledWith(2, SPOOL_REF_B);
+      expect(deleteSpoolMock).toHaveBeenNthCalledWith(2, {
+        spoolRef: SPOOL_REF_B,
+        projectId: TENANT_ID,
+        traceId: TRACE_ID_B,
+        spanId: SPAN_ID_B,
+      });
     });
   });
 });
