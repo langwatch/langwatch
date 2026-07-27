@@ -262,6 +262,31 @@ Feature: Credential Validation
     When I call validateProviderApiKey for it
     Then the key is hidden from the error I see
 
+  # The probe runs from our servers. A key restricted to the customer's own
+  # network, a provider outage, or a key that has not finished propagating all
+  # look exactly like a bad key, so a refusal cannot be the end of the road.
+
+  @integration
+  Scenario: A refused key can still be saved
+    Given the provider refuses the API key I entered
+    When I click "Save"
+    Then the provider is not saved
+    And the button offers to save anyway
+
+  @integration
+  Scenario: Saving anyway does not probe the provider again
+    Given the provider refused the API key I entered
+    When I click "Save anyway"
+    Then the provider is saved
+    And the provider is not probed a second time
+
+  @integration
+  Scenario: Correcting a refused key probes it again
+    Given the provider refused the API key I entered
+    When I change the API key
+    Then the button offers to save
+    And saving probes the corrected key
+
   @unit
   Scenario: A provider server error is not reported as a bad key
     Given a provider returns a server error

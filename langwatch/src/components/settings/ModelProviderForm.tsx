@@ -320,6 +320,22 @@ export const EditModelProviderForm = ({
     state.scopes,
   );
 
+  // A failed probe is a strong signal, not proof. It runs from our servers, so
+  // a key restricted to the customer's own network, a provider outage, or a
+  // key that has not finished propagating all look exactly like a bad key.
+  // Refusing to save at all leaves those customers with nowhere to go, so the
+  // first refusal explains itself and the next Save goes through unprobed.
+  const credentialsFingerprint = useMemo(
+    () => JSON.stringify(state.customKeys),
+    [state.customKeys],
+  );
+  const [refusedCredentials, setRefusedCredentials] = useState<string | null>(
+    null,
+  );
+  // Editing any credential re-arms the probe, so a corrected key is checked
+  // again rather than saved on the strength of the previous refusal.
+  const canSaveWithoutProbe = refusedCredentials === credentialsFingerprint;
+
   const handleSave = useCallback(async () => {
     // Clear previous errors
     setFieldErrors({});
@@ -384,13 +400,24 @@ export const EditModelProviderForm = ({
     // console, hit a temporary 401, etc.). Safety providers like
     // azure_safety also skip this — their endpoints can't answer the
     // OpenAI-compatible probe at all.
-    if (isLlmProvider && !isOAuthDeviceProvider && userEnteredNewApiKey) {
+    if (
+      isLlmProvider &&
+      !isOAuthDeviceProvider &&
+      userEnteredNewApiKey &&
+      !canSaveWithoutProbe
+    ) {
       const isValid = await validateApiKey();
-      if (!isValid) return;
+      if (!isValid) {
+        setRefusedCredentials(credentialsFingerprint);
+        return;
+      }
+      setRefusedCredentials(null);
     }
 
     void actions.submit();
   }, [
+    canSaveWithoutProbe,
+    credentialsFingerprint,
     isLlmProvider,
     isOAuthDeviceProvider,
     isUsingEnvVars,
@@ -563,7 +590,7 @@ export const EditModelProviderForm = ({
             }
             onClick={handleSave}
           >
-            Save
+            {canSaveWithoutProbe ? "Save anyway" : "Save"}
           </Button>
         </HStack>
       </VStack>
