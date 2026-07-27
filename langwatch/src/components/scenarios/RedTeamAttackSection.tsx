@@ -177,6 +177,9 @@ export function RedTeamAttackSection({
                 size="xs"
                 colorPalette="redteam"
                 fontWeight="normal"
+                /* 11px rather than the size-xs default of 12: the longest
+                   labels reach the chip border in a 3-column track otherwise. */
+                fontSize="11px"
                 width="full"
                 justifyContent="flex-start"
                 gap={1.5}
