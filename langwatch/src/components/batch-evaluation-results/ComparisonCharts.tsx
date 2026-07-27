@@ -50,6 +50,19 @@ import { WinRateChart } from "./WinRateChart";
 const CONFUSION_MATRIX_MIN_ANNOTATED_ROWS = 5;
 
 /**
+ * Ceiling on trace ids fetched for annotation lookup.
+ *
+ * The hook chunks at 50 ids per request, so this caps the fan-out at ten
+ * concurrent queries. Agreement is a sampling question anyway — a few hundred
+ * annotated rows settle it, and the interval shown in the drawer already
+ * reports how settled.
+ */
+const CONFUSION_MATRIX_MAX_TRACES = 500;
+
+/** Stable identity for the "nothing to fetch" path, so the memo chain holds. */
+const EMPTY_TRACE_IDS: string[] = [];
+
+/**
  * Metric id for one confusion-matrix card.
  *
  * Must carry BOTH ids. A run has several targets and the same pass/fail
@@ -1018,13 +1031,20 @@ export const ComparisonCharts = ({
 
 
   const confusionMatrixTraceIds = useMemo(() => {
-    if (passFailTargets.length === 0) return [];
+    if (passFailTargets.length === 0) return EMPTY_TRACE_IDS;
     const targetIds = new Set(passFailTargets.map((t) => t.targetId));
     const ids: string[] = [];
+    // One trace per row PER TARGET, so this grows as rows x targets, not rows.
+    // The hook chunks at 50 ids per request, so an uncapped 2000-row run with
+    // four targets would fan out to 160 concurrent queries against a browser
+    // budget of six connections per origin — starving every other query on
+    // the page. Bound it and say so in the coverage line rather than melting
+    // the results page for a chart the reader may not even open.
     for (const row of confusionMatrixRows) {
       for (const targetId of targetIds) {
         const traceId = row.targets[targetId]?.traceId;
         if (traceId) ids.push(traceId);
+        if (ids.length >= CONFUSION_MATRIX_MAX_TRACES) return ids;
       }
     }
     return ids;
@@ -1033,8 +1053,12 @@ export const ComparisonCharts = ({
   const { data: confusionMatrixAnnotations } = useAnnotationsByTraceIds({
     projectId: confusionMatrixProjectId ?? "",
     traceIds: confusionMatrixTraceIds,
+    // Gated on isVisible: the charts panel collapses, and paying a
+    // multi-request fan-out for a chart nobody is looking at is the kind of
+    // cost that only shows up in someone else's slow page.
     enabled:
       !!showConfusionMatrix &&
+      !!isVisible &&
       !!confusionMatrixProjectId &&
       confusionMatrixTraceIds.length > 0,
   });
@@ -1052,22 +1076,44 @@ export const ComparisonCharts = ({
   // Each candidate's resolved judge/reviewer pairs, keyed by evaluatorId —
   // only ones meeting the annotation floor become an available metric.
   const confusionMatrixData = useMemo(() => {
+    // Annotation lookup is capped, so past the cap a row's annotations were
+    // never fetched and "not annotated" would be a lie. Score only the slice
+    // that was actually checked, and mark it so the drawer can say so.
+    const truncated =
+      confusionMatrixTraceIds.length >= CONFUSION_MATRIX_MAX_TRACES;
+    const scoredRows = truncated
+      ? confusionMatrixRows.slice(
+          0,
+          Math.ceil(
+            CONFUSION_MATRIX_MAX_TRACES / Math.max(1, passFailTargets.length),
+          ),
+        )
+      : confusionMatrixRows;
+
     return passFailTargets
       .map((candidate) => ({
         ...candidate,
-        coverage: buildJudgeAnnotationPairs(
-          confusionMatrixRows,
-          candidate.targetId,
-          candidate.evaluatorId,
-          annotationsByTraceId,
-        ),
+        coverage: {
+          ...buildJudgeAnnotationPairs(
+            scoredRows,
+            candidate.targetId,
+            candidate.evaluatorId,
+            annotationsByTraceId,
+          ),
+          truncated,
+        },
       }))
       .filter(
         (candidate) =>
           candidate.coverage.pairs.length >=
           CONFUSION_MATRIX_MIN_ANNOTATED_ROWS,
       );
-  }, [passFailTargets, confusionMatrixRows, annotationsByTraceId]);
+  }, [
+    passFailTargets,
+    confusionMatrixRows,
+    confusionMatrixTraceIds,
+    annotationsByTraceId,
+  ]);
 
   // Build available metrics list
   const availableMetrics: MetricDefinition[] = useMemo(

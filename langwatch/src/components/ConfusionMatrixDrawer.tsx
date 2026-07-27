@@ -151,7 +151,8 @@ export function ConfusionMatrixDrawer({
                 Confusion matrix
               </Text>
               <Text fontSize="xs" color="fg.muted">
-                {coverage.annotatedRows} of {coverage.totalRows} rows annotated
+                {coverage.annotatedRows} of {coverage.totalRows} rows
+                {coverage.truncated ? " checked" : " annotated"}
                 {coverage.conflictingRows > 0
                   ? `; ${coverage.conflictingRows} row${
                       coverage.conflictingRows === 1 ? "" : "s"

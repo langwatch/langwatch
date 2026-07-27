@@ -24,6 +24,13 @@ export type JudgeAnnotationCoverage = {
   annotatedRows: number;
   /** Subset of annotatedRows where reviewers disagreed — excluded from pairs. */
   conflictingRows: number;
+  /**
+   * True when annotation lookup was capped, so `totalRows` is the slice that
+   * was checked rather than the whole run. Surfaced in the drawer: a silent
+   * truncation reads as "we measured everything", which is the one thing this
+   * chart must never imply.
+   */
+  truncated?: boolean;
 };
 
 export const buildJudgeAnnotationPairs = (
