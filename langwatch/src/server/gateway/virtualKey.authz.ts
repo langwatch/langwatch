@@ -8,6 +8,8 @@ import {
   hasTeamPermission,
   type Permission,
 } from "../api/rbac";
+import { resolveApiKeyPermission } from "../rbac/role-binding-resolver";
+import type { GuardrailAttachment } from "./virtualKey.config";
 
 /**
  * Scope-aware authorization for VirtualKey write paths.
@@ -45,27 +47,98 @@ export type Scope = {
   scopeId: string;
 };
 
+/**
+ * The identity a VK write is authorized as. One vocabulary for both doors
+ * into the service layer, so REST and tRPC cannot enforce different rules:
+ *
+ *   - `session`          — a browser session (tRPC). Checked through the
+ *                          role-binding cascade exactly as before.
+ *   - `apiKey`           — a scoped API key (public REST). Checked through
+ *                          the API-key ceiling (`effective = key ∩ user`)
+ *                          at each scope the call touches.
+ *   - `legacyProjectKey` — a legacy project API key (public REST). These
+ *                          historically carry full access to their own
+ *                          project and nothing beyond it, so they are
+ *                          authorized at exactly the scope
+ *                          `PROJECT:<their project>` and denied elsewhere.
+ */
+export type VirtualKeyActor =
+  | { kind: "session"; session: Session | null }
+  | {
+      kind: "apiKey";
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+    }
+  | { kind: "legacyProjectKey"; projectId: string };
+
+export type ActorContext = { prisma: PrismaClient; actor: VirtualKeyActor };
+
 function scopeLabel(scope: Scope): string {
   return `${scope.scopeType}:${scope.scopeId}`;
 }
 
-async function hasPermissionAtScope(
-  ctx: RBACContext,
+async function actorHasPermissionAtScope(
+  ctx: ActorContext,
   scope: Scope,
   permission: Permission,
 ): Promise<boolean> {
-  if (!ctx.session) return false;
+  const { prisma, actor } = ctx;
+  switch (actor.kind) {
+    case "session": {
+      if (!actor.session) return false;
+      const sessionCtx = { prisma, session: actor.session };
+      if (scope.scopeType === "ORGANIZATION") {
+        return hasOrganizationPermission(sessionCtx, scope.scopeId, permission);
+      }
+      if (scope.scopeType === "TEAM") {
+        return hasTeamPermission(sessionCtx, scope.scopeId, permission);
+      }
+      return hasProjectPermission(sessionCtx, scope.scopeId, permission);
+    }
+    case "apiKey": {
+      const scopeRef = await scopeRefFor(prisma, scope);
+      if (!scopeRef) return false;
+      return resolveApiKeyPermission({
+        prisma,
+        apiKeyId: actor.apiKeyId,
+        userId: actor.userId,
+        organizationId: actor.organizationId,
+        scope: scopeRef,
+        permission,
+      });
+    }
+    case "legacyProjectKey":
+      // Full access at the key's own project (the historical contract for
+      // project keys), nothing at any other scope. Broader provisioning
+      // requires a scoped API key with the bindings to prove it.
+      return scope.scopeType === "PROJECT" && scope.scopeId === actor.projectId;
+  }
+}
+
+/** Map a VK scope row onto the role-binding resolver's scope reference. */
+async function scopeRefFor(
+  prisma: PrismaClient,
+  scope: Scope,
+): Promise<
+  | { type: "org"; id: string }
+  | { type: "team"; id: string }
+  | { type: "project"; id: string; teamId: string }
+  | null
+> {
   if (scope.scopeType === "ORGANIZATION") {
-    return hasOrganizationPermission(
-      { prisma: ctx.prisma, session: ctx.session },
-      scope.scopeId,
-      permission,
-    );
+    return { type: "org", id: scope.scopeId };
   }
   if (scope.scopeType === "TEAM") {
-    return hasTeamPermission(ctx, scope.scopeId, permission);
+    return { type: "team", id: scope.scopeId };
   }
-  return hasProjectPermission(ctx, scope.scopeId, permission);
+  const project = await prisma.project.findUnique({
+    where: { id: scope.scopeId },
+    select: { id: true, teamId: true },
+  });
+  // Fail closed on a dangling project reference.
+  if (!project) return null;
+  return { type: "project", id: project.id, teamId: project.teamId };
 }
 
 /**
@@ -73,15 +146,15 @@ async function hasPermissionAtScope(
  * Throws FORBIDDEN naming the first unauthorized scope so the caller sees
  * exactly which grant is missing.
  */
-export async function assertCanManageAllScopes(
-  ctx: RBACContext,
+export async function assertActorCanManageAllScopes(
+  ctx: ActorContext,
   scopes: Scope[],
 ): Promise<void> {
-  if (!ctx.session) {
+  if (ctx.actor.kind === "session" && !ctx.actor.session) {
     throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
   }
   for (const scope of scopes) {
-    if (!(await hasPermissionAtScope(ctx, scope, "virtualKeys:manage"))) {
+    if (!(await actorHasPermissionAtScope(ctx, scope, "virtualKeys:manage"))) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: `permission_denied: virtualKeys:manage at ${scopeLabel(scope)}`,
@@ -95,20 +168,48 @@ export async function assertCanManageAllScopes(
  * of the key's existing scopes. Throws FORBIDDEN when the caller holds it
  * on none of them.
  */
-export async function assertCanOperateOnAnyScope(
-  ctx: RBACContext,
+export async function assertActorCanOperateOnAnyScope(
+  ctx: ActorContext,
   scopes: Scope[],
   permission: Permission,
 ): Promise<void> {
-  if (ctx.session) {
-    for (const scope of scopes) {
-      if (await hasPermissionAtScope(ctx, scope, permission)) return;
-    }
+  for (const scope of scopes) {
+    if (await actorHasPermissionAtScope(ctx, scope, permission)) return;
   }
   throw new TRPCError({
     code: "FORBIDDEN",
     message: `permission_denied: ${permission} at one of the virtual key's scopes`,
   });
+}
+
+/** Session-shaped wrapper over {@link assertActorCanManageAllScopes}. */
+export async function assertCanManageAllScopes(
+  ctx: RBACContext,
+  scopes: Scope[],
+): Promise<void> {
+  return assertActorCanManageAllScopes(
+    { prisma: ctx.prisma, actor: { kind: "session", session: ctx.session } },
+    scopes,
+  );
+}
+
+/** Session-shaped wrapper over {@link assertActorCanOperateOnAnyScope}. */
+export async function assertCanOperateOnAnyScope(
+  ctx: RBACContext,
+  scopes: Scope[],
+  permission: Permission,
+): Promise<void> {
+  if (!ctx.session) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `permission_denied: ${permission} at one of the virtual key's scopes`,
+    });
+  }
+  return assertActorCanOperateOnAnyScope(
+    { prisma: ctx.prisma, actor: { kind: "session", session: ctx.session } },
+    scopes,
+    permission,
+  );
 }
 
 /**
@@ -166,6 +267,188 @@ export async function loadMembershipSet(
     teamIds,
     projectIds: new Set(projects.map((p) => p.id)),
   };
+}
+
+/**
+ * Every requested scope must belong to the VK's own organization.
+ * `assertActorCanManageAllScopes` only proves the caller controls each
+ * scope, not that the scope lives in `organizationId` — without this, a
+ * caller with manage rights in org A could submit `organizationId` for
+ * org B plus a scope from org A and write a cross-org VK row.
+ * ORGANIZATION scopes must equal the org; TEAM/PROJECT scopes must
+ * resolve to it.
+ */
+export async function assertScopesBelongToOrg(
+  prisma: PrismaClient,
+  organizationId: string,
+  scopes: { scopeType: string; scopeId: string }[],
+): Promise<void> {
+  const teamIds = scopes
+    .filter((s) => s.scopeType === "TEAM")
+    .map((s) => s.scopeId);
+  const projectIds = scopes
+    .filter((s) => s.scopeType === "PROJECT")
+    .map((s) => s.scopeId);
+
+  for (const s of scopes) {
+    if (s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `scope_org_mismatch: scope ${s.scopeId} is not in organization ${organizationId}`,
+      });
+    }
+  }
+
+  if (teamIds.length > 0) {
+    const found = await prisma.team.findMany({
+      where: { id: { in: teamIds }, organizationId },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((t) => t.id));
+    for (const id of teamIds) {
+      if (!foundIds.has(id)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `scope_org_mismatch: team ${id} is not in organization ${organizationId}`,
+        });
+      }
+    }
+  }
+
+  if (projectIds.length > 0) {
+    const found = await prisma.project.findMany({
+      where: { id: { in: projectIds }, team: { organizationId } },
+      select: { id: true },
+    });
+    const foundIds = new Set(found.map((p) => p.id));
+    for (const id of projectIds) {
+      if (!foundIds.has(id)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `scope_org_mismatch: project ${id} is not in organization ${organizationId}`,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Resolve the single PROJECT scope a VK is reachable from. Guardrails are
+ * project-scoped, so a VK can only attach guardrails from this one
+ * project (its trace project). Returns null when the VK has zero or more
+ * than one PROJECT scope — neither has a well-defined guardrail surface.
+ */
+export async function resolveVkProjectId(
+  prisma: PrismaClient,
+  organizationId: string,
+  vkId: string | null,
+  inputScopes: { scopeType: string; scopeId: string }[] | undefined,
+  traceProjectId?: string | null,
+): Promise<string | null> {
+  let scopes = inputScopes;
+  let storedTraceProjectId: string | null = null;
+  if (!scopes && vkId) {
+    const vk = await prisma.virtualKey.findFirst({
+      where: { id: vkId, organizationId },
+      select: {
+        traceProjectId: true,
+        scopes: { select: { scopeType: true, scopeId: true } },
+      },
+    });
+    scopes = vk?.scopes;
+    storedTraceProjectId = vk?.traceProjectId ?? null;
+  }
+  const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
+  if (projectScopes.length === 1) return projectScopes[0]!.scopeId;
+  // Guardrails are project-scoped and enforce where traces land, so an
+  // org- or team-owned key's guardrail surface is its explicit trace
+  // destination.
+  return traceProjectId ?? storedTraceProjectId;
+}
+
+/**
+ * The explicit trace destination must be a project of the key's own
+ * organization: it decides where traces (and therefore budget debits)
+ * land, and a stray id would route another tenant's costs.
+ */
+export async function assertTraceProjectBelongsToOrg(
+  prisma: PrismaClient,
+  organizationId: string,
+  traceProjectId: string | null | undefined,
+): Promise<void> {
+  if (!traceProjectId) return;
+  const project = await prisma.project.findFirst({
+    where: { id: traceProjectId, team: { organizationId } },
+    select: { id: true },
+  });
+  if (!project) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `scope_org_mismatch: trace project ${traceProjectId} is not in organization ${organizationId}`,
+    });
+  }
+}
+
+/**
+ * Validate guardrail attachments before handing off to the service:
+ *   - every referenced guardrail must belong to the VK's own project
+ *     (guardrails are project-scoped; the materialiser only ships the
+ *     VK trace-project's guardrails) — else BAD_REQUEST
+ *     `guardrail_project_mismatch`.
+ *   - the actor must hold `gatewayGuardrails:attach` on that project —
+ *     else FORBIDDEN `missing_perm:gatewayGuardrails:attach`.
+ *
+ * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
+ *       — @cross-project + @rbac scenarios.
+ */
+export async function assertGuardrailAttachmentsAllowed(
+  ctx: ActorContext,
+  vkProjectId: string | null,
+  attachments: GuardrailAttachment[] | undefined,
+): Promise<void> {
+  const referencedIds = Array.from(
+    new Set((attachments ?? []).flatMap((a) => a.guardrailIds)),
+  );
+  if (referencedIds.length === 0) return;
+
+  if (!vkProjectId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "guardrail_project_mismatch: virtual key is not scoped to a single project",
+    });
+  }
+
+  // Scope the lookup to the VK's own project. Any referenced guardrail
+  // that belongs to a different project (or doesn't exist) is simply
+  // absent from the result, so the membership check below rejects it.
+  // Scoping by projectId also satisfies the multitenancy middleware.
+  const rows = await ctx.prisma.gatewayGuardrail.findMany({
+    where: { id: { in: referencedIds }, projectId: vkProjectId },
+    select: { id: true },
+  });
+  const foundIds = new Set(rows.map((r) => r.id));
+
+  for (const id of referencedIds) {
+    if (!foundIds.has(id)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `guardrail_project_mismatch: guardrail ${id} is not in the virtual key's project`,
+      });
+    }
+  }
+
+  const allowed = await actorHasPermissionAtScope(
+    ctx,
+    { scopeType: "PROJECT", scopeId: vkProjectId },
+    "gatewayGuardrails:attach",
+  );
+  if (!allowed) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "missing_perm:gatewayGuardrails:attach",
+    });
+  }
 }
 
 export function isVisibleToMembership(

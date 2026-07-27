@@ -14,223 +14,47 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
-
-import type { PrismaClient } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { Session } from "~/server/auth";
+
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import {
-  GatewayGuardrailProjectMismatchError,
-  GatewayScopeOrgMismatchError,
-  GatewaySpendUnavailableError,
-  GuardrailAttachForbiddenError,
-  VirtualKeyNotFoundError,
-} from "~/server/gateway/errors";
+  chRepoOrUndefined,
+  spendRepoOrUndefined,
+} from "~/server/gateway/clickhouseRepos";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
 import {
-  assertCanManageAllScopes,
-  assertCanOperateOnAnyScope,
-  isVisibleToMembership,
-  loadMembershipSet,
-} from "~/server/gateway/virtualKey.authz";
+  VirtualKeyService,
+  virtualKeyBudgetInputSchema,
+} from "~/server/gateway/virtualKey.service";
+import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import {
-  type GuardrailAttachment,
   parseVirtualKeyConfig,
   virtualKeyConfigSchema,
 } from "~/server/gateway/virtualKey.config";
 import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-import { authorizeInResolver, hasProjectPermission } from "../rbac";
+
+import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { chRepoOrUndefined, spendRepoOrUndefined } from "./gatewayUsage";
+import {
+  assertCanManageAllScopes,
+  assertCanOperateOnAnyScope,
+  assertGuardrailAttachmentsAllowed,
+  assertScopesBelongToOrg,
+  assertTraceProjectBelongsToOrg,
+  isVisibleToMembership,
+  loadMembershipSet,
+  resolveVkProjectId,
+} from "~/server/gateway/virtualKey.authz";
 
 const scopeInputSchema = scopeAssignmentSchema;
 
 const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
 
-/**
- * The cap a key carries on itself. Only the calendar windows a person
- * reasons about in a drawer: a per-minute cap on one key is an ops knob,
- * not a spending decision, and belongs on the budgets page.
- */
-const budgetInputSchema = z.object({
-  // A whole decimal number of dollars, strictly positive. String rather
-  // than number to survive JSON round-trips without float drift; the
-  // regex rejects partial parses ("10abs"), signs, and bare dots.
-  limitUsd: z
-    .string()
-    .trim()
-    .regex(/^\d+(\.\d+)?$/, "limitUsd must be a decimal number")
-    .refine((v) => Number.parseFloat(v) > 0, {
-      message: "limitUsd must be greater than zero",
-    }),
-  window: z.enum(["DAY", "WEEK", "MONTH"]),
-  onBreach: z.enum(["BLOCK", "WARN"]).optional(),
-  name: z.string().min(1).max(128).optional(),
-});
+const budgetInputSchema = virtualKeyBudgetInputSchema;
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
-
-/**
- * Resolve the single PROJECT scope a VK is reachable from. Guardrails are
- * project-scoped, so a VK can only attach guardrails from this one
- * project (its trace project). Returns null when the VK has zero or more
- * than one PROJECT scope — neither has a well-defined guardrail surface.
- */
-async function resolveVkProjectId(
-  prisma: PrismaClient,
-  organizationId: string,
-  vkId: string | null,
-  inputScopes: { scopeType: string; scopeId: string }[] | undefined,
-  traceProjectId?: string | null,
-): Promise<string | null> {
-  let scopes = inputScopes;
-  let storedTraceProjectId: string | null = null;
-  if (!scopes && vkId) {
-    const vk = await prisma.virtualKey.findFirst({
-      where: { id: vkId, organizationId },
-      select: {
-        traceProjectId: true,
-        scopes: { select: { scopeType: true, scopeId: true } },
-      },
-    });
-    scopes = vk?.scopes;
-    storedTraceProjectId = vk?.traceProjectId ?? null;
-  }
-  const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
-  if (projectScopes.length === 1) return projectScopes[0]!.scopeId;
-  // Guardrails are project-scoped and enforce where traces land, so an
-  // org- or team-owned key's guardrail surface is its explicit trace
-  // destination.
-  return traceProjectId ?? storedTraceProjectId;
-}
-
-/**
- * The explicit trace destination must be a project of the key's own
- * organization: it decides where traces (and therefore budget debits)
- * land, and a stray id would route another tenant's costs.
- */
-async function assertTraceProjectBelongsToOrg(
-  prisma: PrismaClient,
-  organizationId: string,
-  traceProjectId: string | null | undefined,
-): Promise<void> {
-  if (!traceProjectId) return;
-  const project = await prisma.project.findFirst({
-    where: { id: traceProjectId, team: { organizationId } },
-    select: { id: true },
-  });
-  if (!project) {
-    throw new GatewayScopeOrgMismatchError("project");
-  }
-}
-
-/**
- * Every requested scope must belong to the VK's own organization.
- * `assertCanManageAllScopes` only proves the caller controls each scope,
- * not that the scope lives in `organizationId` — without this, a caller
- * with manage rights in org A could submit `organizationId` for org B
- * plus a scope from org A and write a cross-org VK row. ORGANIZATION
- * scopes must equal the org; TEAM/PROJECT scopes must resolve to it.
- */
-async function assertScopesBelongToOrg(
-  prisma: PrismaClient,
-  organizationId: string,
-  scopes: { scopeType: string; scopeId: string }[],
-): Promise<void> {
-  const teamIds = scopes
-    .filter((s) => s.scopeType === "TEAM")
-    .map((s) => s.scopeId);
-  const projectIds = scopes
-    .filter((s) => s.scopeType === "PROJECT")
-    .map((s) => s.scopeId);
-
-  for (const s of scopes) {
-    if (s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId) {
-      throw new GatewayScopeOrgMismatchError("organization");
-    }
-  }
-
-  if (teamIds.length > 0) {
-    const found = await prisma.team.findMany({
-      where: { id: { in: teamIds }, organizationId },
-      select: { id: true },
-    });
-    const foundIds = new Set(found.map((t) => t.id));
-    for (const id of teamIds) {
-      if (!foundIds.has(id)) {
-        throw new GatewayScopeOrgMismatchError("team");
-      }
-    }
-  }
-
-  if (projectIds.length > 0) {
-    const found = await prisma.project.findMany({
-      where: { id: { in: projectIds }, team: { organizationId } },
-      select: { id: true },
-    });
-    const foundIds = new Set(found.map((p) => p.id));
-    for (const id of projectIds) {
-      if (!foundIds.has(id)) {
-        throw new GatewayScopeOrgMismatchError("project");
-      }
-    }
-  }
-}
-
-/**
- * Validate guardrail attachments before handing off to the service:
- *   - every referenced guardrail must belong to the VK's own project
- *     (guardrails are project-scoped; the materialiser only ships the
- *     VK trace-project's guardrails) — else BAD_REQUEST
- *     `guardrail_project_mismatch`.
- *   - the actor must hold `gatewayGuardrails:attach` on that project —
- *     else FORBIDDEN `missing_perm:gatewayGuardrails:attach`.
- *
- * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
- *       — @cross-project + @rbac scenarios.
- */
-async function assertGuardrailAttachmentsAllowed(
-  ctx: { prisma: PrismaClient; session: Session | null },
-  vkProjectId: string | null,
-  attachments: GuardrailAttachment[] | undefined,
-): Promise<void> {
-  const referencedIds = Array.from(
-    new Set((attachments ?? []).flatMap((a) => a.guardrailIds)),
-  );
-  if (referencedIds.length === 0) return;
-
-  if (!vkProjectId) {
-    throw new GatewayGuardrailProjectMismatchError();
-  }
-
-  // Scope the lookup to the VK's own project. Any referenced guardrail
-  // that belongs to a different project (or doesn't exist) is simply
-  // absent from the result, so the membership check below rejects it.
-  // Scoping by projectId also satisfies the multitenancy middleware.
-  const rows = await ctx.prisma.gatewayGuardrail.findMany({
-    where: { id: { in: referencedIds }, projectId: vkProjectId },
-    select: { id: true },
-  });
-  const foundIds = new Set(rows.map((r) => r.id));
-
-  for (const id of referencedIds) {
-    if (!foundIds.has(id)) {
-      throw new GatewayGuardrailProjectMismatchError();
-    }
-  }
-
-  const allowed = await hasProjectPermission(
-    ctx,
-    vkProjectId,
-    "gatewayGuardrails:attach",
-  );
-  if (!allowed) {
-    throw new GuardrailAttachForbiddenError();
-  }
-}
 
 export const virtualKeysRouter = createTRPCRouter({
   // Visibility is membership-based, not permission-based: a caller sees a
@@ -264,7 +88,7 @@ export const virtualKeysRouter = createTRPCRouter({
       // A key the caller can't see is indistinguishable from one that
       // doesn't exist — same NOT_FOUND, no existence leak.
       if (!vk) {
-        throw new VirtualKeyNotFoundError();
+        throw new TRPCError({ code: "NOT_FOUND" });
       }
       const membership = await loadMembershipSet(
         ctx.prisma,
@@ -272,7 +96,7 @@ export const virtualKeysRouter = createTRPCRouter({
         ctx.session.user.id,
       );
       if (!isVisibleToMembership(membership, vk.scopes)) {
-        throw new VirtualKeyNotFoundError();
+        throw new TRPCError({ code: "NOT_FOUND" });
       }
       return toVirtualKeyCamelDto(vk);
     }),
@@ -292,7 +116,10 @@ export const virtualKeysRouter = createTRPCRouter({
       // confident $0.00 that cannot be told apart from a zero-spend key.
       const spendRepo = spendRepoOrUndefined();
       if (!spendRepo) {
-        throw new GatewaySpendUnavailableError();
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "spend_source_unavailable",
+        });
       }
       const membership = await loadMembershipSet(
         ctx.prisma,
@@ -367,7 +194,7 @@ export const virtualKeysRouter = createTRPCRouter({
           },
         });
         if (!vk) {
-          throw new VirtualKeyNotFoundError();
+          throw new TRPCError({ code: "NOT_FOUND" });
         }
         const membership = await loadMembershipSet(
           ctx.prisma,
@@ -377,23 +204,17 @@ export const virtualKeysRouter = createTRPCRouter({
         if (
           !isVisibleToMembership(
             membership,
-            vk.scopes as {
-              scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-              scopeId: string;
-            }[],
+            vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
           )
         ) {
-          throw new VirtualKeyNotFoundError();
+          throw new TRPCError({ code: "NOT_FOUND" });
         }
         return resolveApplicableBudgetsForDraftKey(
           ctx.prisma,
           {
             organizationId: input.organizationId,
             virtualKeyId: vk.id,
-            scopes: vk.scopes as {
-              scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-              scopeId: string;
-            }[],
+            scopes: vk.scopes as { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[],
             traceProjectId: vk.traceProjectId,
             principalUserId: vk.principalUserId,
           },
@@ -436,7 +257,11 @@ export const virtualKeysRouter = createTRPCRouter({
           select: { userId: true },
         });
         if (!membership) {
-          throw new GatewayScopeOrgMismatchError("user");
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "principalUserId is not a member of this organization.",
+          });
         }
       }
       return resolveApplicableBudgetsForDraftKey(
@@ -505,7 +330,7 @@ export const virtualKeysRouter = createTRPCRouter({
         input.traceProjectId ?? null,
       );
       await assertGuardrailAttachmentsAllowed(
-        ctx,
+        { prisma: ctx.prisma, actor: { kind: "session", session: ctx.session } },
         vkProjectId,
         input.config?.guardrailAttachments,
       );
@@ -546,7 +371,7 @@ export const virtualKeysRouter = createTRPCRouter({
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await service.getById(input.id, input.organizationId);
       if (!existing) {
-        throw new VirtualKeyNotFoundError();
+        throw new TRPCError({ code: "NOT_FOUND" });
       }
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in.
@@ -605,7 +430,7 @@ export const virtualKeysRouter = createTRPCRouter({
           ? parseVirtualKeyConfig(existing.config).guardrailAttachments
           : undefined);
       await assertGuardrailAttachmentsAllowed(
-        ctx,
+        { prisma: ctx.prisma, actor: { kind: "session", session: ctx.session } },
         vkProjectId,
         attachmentsToCheck,
       );
@@ -632,7 +457,7 @@ export const virtualKeysRouter = createTRPCRouter({
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await service.getById(input.id, input.organizationId);
       if (!existing) {
-        throw new VirtualKeyNotFoundError();
+        throw new TRPCError({ code: "NOT_FOUND" });
       }
       await assertCanOperateOnAnyScope(
         { prisma: ctx.prisma, session: ctx.session },
@@ -654,7 +479,7 @@ export const virtualKeysRouter = createTRPCRouter({
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await service.getById(input.id, input.organizationId);
       if (!existing) {
-        throw new VirtualKeyNotFoundError();
+        throw new TRPCError({ code: "NOT_FOUND" });
       }
       await assertCanOperateOnAnyScope(
         { prisma: ctx.prisma, session: ctx.session },

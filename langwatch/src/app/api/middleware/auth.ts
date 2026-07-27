@@ -1,11 +1,12 @@
 import type { Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
-import type { Permission } from "~/server/api/rbac";
-import {
-  requireApiKeyPermission as createRequireApiKeyPermission,
-  createUnifiedAuthMiddleware,
-} from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
+import {
+  createUnifiedAuthMiddleware,
+  requireApiKeyPermission as createRequireApiKeyPermission,
+} from "~/server/api-key/auth-middleware";
+import type { ResolvedToken } from "~/server/api-key/token-resolver";
+import type { Permission } from "~/server/api/rbac";
 
 /**
  * Variables set by the auth middleware.
@@ -16,6 +17,13 @@ export type AuthMiddlewareVariables = {
   apiKeyId?: string;
   apiKeyUserId?: string;
   apiKeyOrganizationId?: string;
+  /**
+   * The full resolved credential. Always set by the unified middleware;
+   * optional here because other middlewares sharing this Variables shape
+   * do not set it. Handlers that need to know WHICH kind of credential
+   * called (scoped API key vs legacy project key) read this.
+   */
+  resolvedToken?: ResolvedToken;
 };
 
 /**
@@ -25,9 +33,8 @@ export type AuthMiddlewareVariables = {
  *   - Bearer Legacy: sk-lw-...
  *   - X-Auth-Token: legacy header
  */
-export const authMiddleware: MiddlewareHandler = createUnifiedAuthMiddleware({
-  prisma,
-});
+export const authMiddleware: MiddlewareHandler =
+  createUnifiedAuthMiddleware({ prisma });
 
 /**
  * Per-endpoint RBAC middleware. Legacy project keys always pass through;
