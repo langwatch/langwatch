@@ -19,6 +19,10 @@ import {
   useWatch,
 } from "react-hook-form";
 import { z } from "zod";
+import {
+  RED_TEAM_DEFAULT_TURNS,
+  RedTeamAttackSection,
+} from "./RedTeamAttackSection";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -58,27 +62,23 @@ export interface ScenarioInitialData {
 type ScenarioFormProps = {
   defaultValues?: Partial<ScenarioFormData>;
   formRef?: (form: UseFormReturn<ScenarioFormData>) => void;
-  /** Opens the attack configuration. Omit to hide the type selector entirely. */
-  onConfigureRedTeam?: () => void;
-  /** Clears the attack configuration, returning to a standard scenario. */
-  onClearRedTeam?: () => void;
+  /** Show the Standard / Red team selector. */
+  showTypeSelector?: boolean;
+  /** Reports whether this is currently a red-team scenario, so the drawer
+   *  can mark itself. Fires on toggle, not only on load. */
+  onIsRedTeamChange?: (isRedTeam: boolean) => void;
 };
 
 /**
- * Standard vs red team. Picking "Red team" opens the attack configuration
- * straight away, because a red-team scenario without an objective has nothing
- * to run.
+ * Standard vs red team. Switching to red team reveals the attack section
+ * below rather than opening a second panel over this one.
  */
 function ScenarioTypeSelector({
   isRedTeam,
-  onSelectStandard,
-  onSelectRedTeam,
-  summary,
+  onSelect,
 }: {
   isRedTeam: boolean;
-  onSelectStandard?: () => void;
-  onSelectRedTeam: () => void;
-  summary: string | null;
+  onSelect: (redTeam: boolean) => void;
 }) {
   return (
     <VStack align="stretch" gap={2}>
@@ -87,7 +87,7 @@ function ScenarioTypeSelector({
         <Button
           size="sm"
           variant={isRedTeam ? "outline" : "solid"}
-          onClick={onSelectStandard}
+          onClick={() => onSelect(false)}
           flex={1}
         >
           Standard
@@ -96,22 +96,12 @@ function ScenarioTypeSelector({
           size="sm"
           variant={isRedTeam ? "solid" : "outline"}
           colorPalette={isRedTeam ? "redteam" : undefined}
-          onClick={onSelectRedTeam}
+          onClick={() => onSelect(true)}
           flex={1}
         >
           <ShieldAlert size={14} /> Red team
         </Button>
       </HStack>
-      {isRedTeam && (
-        <HStack justify="space-between" gap={2}>
-          <Text textStyle="xs" color="fg.muted" truncate>
-            {summary ?? "No attack configured yet"}
-          </Text>
-          <Button size="xs" variant="ghost" onClick={onSelectRedTeam}>
-            Edit attack
-          </Button>
-        </HStack>
-      )}
     </VStack>
   );
 }
@@ -124,8 +114,8 @@ function ScenarioTypeSelector({
 export function ScenarioForm({
   defaultValues,
   formRef,
-  onConfigureRedTeam,
-  onClearRedTeam,
+  showTypeSelector = true,
+  onIsRedTeamChange,
 }: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
     defaultValues: {
@@ -149,23 +139,32 @@ export function ScenarioForm({
   // useForm here, but the same rule applies for re-render correctness inside
   // the nested selector.
   const redTeamStrategy = useWatch({ control, name: "redTeamStrategy" });
-  const redTeamTarget = useWatch({ control, name: "redTeamTarget" });
-  const redTeamTotalTurns = useWatch({ control, name: "redTeamTotalTurns" });
+  const isRedTeam = !!redTeamStrategy;
 
-  const redTeamSummary = redTeamStrategy
-    ? [
-        redTeamStrategy === "goat" ? "GOAT" : "Crescendo",
-        redTeamTotalTurns ? `${redTeamTotalTurns} turns` : null,
-        redTeamTarget ? `"${redTeamTarget}"` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : null;
+  const handleTypeSelect = (redTeam: boolean) => {
+    if (redTeam) {
+      // Default to Crescendo — the SDK's own recommended starting strategy —
+      // so the section opens usable rather than empty.
+      if (!redTeamStrategy) form.setValue("redTeamStrategy", "crescendo");
+      if (!form.getValues("redTeamTotalTurns")) {
+        form.setValue("redTeamTotalTurns", RED_TEAM_DEFAULT_TURNS);
+      }
+      return;
+    }
+    form.setValue("redTeamStrategy", null);
+    form.setValue("redTeamTarget", null);
+    form.setValue("redTeamTotalTurns", null);
+    form.setValue("redTeamConfig", null);
+  };
 
   // Expose form to parent
   useEffect(() => {
     formRef?.(form);
   }, [form, formRef]);
+
+  useEffect(() => {
+    onIsRedTeamChange?.(isRedTeam);
+  }, [isRedTeam, onIsRedTeamChange]);
 
   // Reset form when defaultValues change (using ref to track previous serialized values)
   const prevDefaultsRef = useRef<string | null>(null);
@@ -197,13 +196,8 @@ export function ScenarioForm({
       {/* TYPE Section — a red-team scenario is still a scenario; only who
           drives the conversation changes, so this is a mode on the same form
           rather than a separate creation flow. */}
-      {onConfigureRedTeam && (
-        <ScenarioTypeSelector
-          isRedTeam={!!redTeamStrategy}
-          onSelectStandard={onClearRedTeam}
-          onSelectRedTeam={onConfigureRedTeam}
-          summary={redTeamSummary}
-        />
+      {showTypeSelector && (
+        <ScenarioTypeSelector isRedTeam={isRedTeam} onSelect={handleTypeSelect} />
       )}
 
       {/* SCENARIO Section */}
@@ -218,6 +212,8 @@ export function ScenarioForm({
           <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
         </Field.Root>
       </VStack>
+
+      {isRedTeam && <RedTeamAttackSection form={form} />}
 
       {/* SITUATION Section */}
       <VStack align="stretch" gap={3}>

@@ -39,11 +39,6 @@ import { Drawer } from "../ui/drawer";
 import { TagList } from "../ui/TagList";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
-import {
-  RED_TEAM_DRAWER_GAP,
-  RED_TEAM_DRAWER_WIDTH,
-  RedTeamConfigDrawer,
-} from "./RedTeamConfigDrawer";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import {
   ScenarioForm,
@@ -123,9 +118,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { target: persistedTarget, setTarget: persistTarget } =
     useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
+  const [isRedTeamScenario, setIsRedTeamScenario] = useState(false);
   const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
-  const [redTeamDrawerOpen, setRedTeamDrawerOpen] = useState(false);
 
   // Run-model dialog: after a target is picked in Save and Run, the user
   // confirms which user-simulator and judge models to run with. null = follow
@@ -535,18 +530,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
-      {/* While the attack drawer is open the editor slides left by exactly its
-          width, so both are readable at once. Covering the editor would hide
-          the criteria the attack objective is written against, which is the
-          one thing you want in view while writing it. */}
       <Drawer.Content
         bg="bg"
-        marginEnd={
-          redTeamDrawerOpen
-            ? `${RED_TEAM_DRAWER_WIDTH + RED_TEAM_DRAWER_GAP}px`
-            : undefined
-        }
-        transition="margin-inline-end 200ms ease"
+        // A thin rim so an adversarial scenario is identifiable at a glance
+        // without repainting the whole surface.
+        colorPalette="redteam"
+        borderWidth={isRedTeamScenario ? "1px" : undefined}
+        borderColor={isRedTeamScenario ? "colorPalette.solid" : undefined}
       >
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
@@ -568,13 +558,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
                 formRef={setFormRef}
-                onConfigureRedTeam={() => setRedTeamDrawerOpen(true)}
-                onClearRedTeam={() => {
-                  formInstance?.setValue("redTeamStrategy", null);
-                  formInstance?.setValue("redTeamTarget", null);
-                  formInstance?.setValue("redTeamTotalTurns", null);
-                  formInstance?.setValue("redTeamConfig", null);
-                }}
+                onIsRedTeamChange={setIsRedTeamScenario}
               />
             </GridItem>
             {/* Right: Help Sidebar */}
@@ -624,26 +608,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }}
       />
 
-      {/* Red Team attack configuration — nested, edits the form in memory */}
-      {formInstance && (
-        <RedTeamConfigDrawer
-          open={redTeamDrawerOpen}
-          onClose={() => setRedTeamDrawerOpen(false)}
-          value={{
-            redTeamStrategy: formInstance.getValues("redTeamStrategy") ?? null,
-            redTeamTarget: formInstance.getValues("redTeamTarget") ?? null,
-            redTeamTotalTurns:
-              formInstance.getValues("redTeamTotalTurns") ?? null,
-            redTeamConfig: formInstance.getValues("redTeamConfig") ?? null,
-          }}
-          onSave={(next) => {
-            formInstance.setValue("redTeamStrategy", next.redTeamStrategy);
-            formInstance.setValue("redTeamTarget", next.redTeamTarget);
-            formInstance.setValue("redTeamTotalTurns", next.redTeamTotalTurns);
-            formInstance.setValue("redTeamConfig", next.redTeamConfig);
-          }}
-        />
-      )}
 
       {/* Prompt Creation Drawer */}
       <PromptEditorDrawer
