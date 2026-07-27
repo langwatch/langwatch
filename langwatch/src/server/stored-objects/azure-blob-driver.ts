@@ -95,7 +95,9 @@ function isPathStyleEndpoint(
 ): boolean {
   if (!endpointBaseUrl) return false;
   try {
-    const url = new URL(endpointBaseUrl);
+    // Normalised first: a trailing slash leaves an empty final path segment,
+    // so the account-name comparison below would never match.
+    const url = new URL(normalizeEndpoint(endpointBaseUrl));
     const segments = url.pathname.split("/").filter(Boolean);
     return segments[segments.length - 1] === accountName;
   } catch {
@@ -235,6 +237,19 @@ function signRequest({
 
 function defaultEndpoint(accountName: string): string {
   return `https://${accountName}.blob.core.windows.net`;
+}
+
+/**
+ * Endpoints are concatenated as `${endpoint}/${container}/${blobPath}`, so a
+ * trailing slash on the configured value produces `//container/blob` on the
+ * wire while the signature canonicalises `/container/blob`. Azure answers 400.
+ * A trailing slash is a normal thing to paste out of the portal, so strip it
+ * once here rather than at each of the six call sites — path-style detection
+ * reads the same normalised value, otherwise the empty last path segment
+ * makes it miss the account name.
+ */
+function normalizeEndpoint(endpointBaseUrl: string): string {
+  return endpointBaseUrl.replace(/\/+$/, "");
 }
 
 /**
@@ -474,8 +489,9 @@ export class AzureBlobDriver implements StorageDriver {
     queryParams?: Record<string, string>;
   }): { endpoint: string; headers: Record<string, string> } {
     const date = new Date().toUTCString();
-    const endpoint =
-      this.credentials.endpointBaseUrl ?? defaultEndpoint(this.credentials.accountName);
+    const endpoint = this.credentials.endpointBaseUrl
+      ? normalizeEndpoint(this.credentials.endpointBaseUrl)
+      : defaultEndpoint(this.credentials.accountName);
     const pathStyle = isPathStyleEndpoint(
       this.credentials.endpointBaseUrl,
       this.credentials.accountName,

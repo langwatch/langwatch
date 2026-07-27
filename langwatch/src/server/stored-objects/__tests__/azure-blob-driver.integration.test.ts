@@ -177,6 +177,42 @@ describe("AzureBlobDriver against a real Azurite emulator (path-style addressing
     });
   });
 
+  describe("given a custom endpoint pasted with a trailing slash", () => {
+    /**
+     * Regression (langwatch-agent review on PR #6092). URLs are built as
+     * `${endpoint}/${container}/${blobPath}`, so a trailing slash sent
+     * `//container/blob` while the signature canonicalised `/container/blob`.
+     * Azurite answers 400 Bad Request — verified before the fix. A trailing
+     * slash is a normal thing to paste out of the portal.
+     */
+    it("round-trips anyway, because the endpoint is normalised once", async () => {
+      const driverWithSlash = new AzureBlobDriver({
+        accountName: azurite.accountName,
+        accountKey: azurite.accountKey,
+        endpointBaseUrl: `${azurite.endpointBaseUrl}/`,
+      });
+      const bytes = Buffer.from("trailing slash payload", "utf8");
+      const uri = mintAzureBlobUri({
+        accountName: azurite.accountName,
+        container: CONTAINER,
+        projectId: PROJECT,
+        sha256: sha256Of(bytes),
+      });
+
+      await driverWithSlash.put(uri, bytes, "text/plain");
+      expect(await driverWithSlash.exists(uri)).toBe(true);
+
+      const stream = await driverWithSlash.get(uri);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) chunks.push(chunk as Buffer);
+      expect(Buffer.concat(chunks).toString("utf8")).toBe(
+        "trailing slash payload",
+      );
+
+      await driverWithSlash.delete(uri);
+    });
+  });
+
   describe("given a zero-byte body", () => {
     /**
      * Regression (ruthless-review P1 on PR #6092): `put()` used to sign
