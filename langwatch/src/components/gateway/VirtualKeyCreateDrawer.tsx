@@ -123,6 +123,13 @@ export function VirtualKeyCreateDrawer({
       const seedProject = project?.id ?? availableProjects[0]?.id ?? null;
       const seedTeam =
         availableTeams.length === 1 ? (availableTeams[0]?.id ?? null) : null;
+      // A no-op seed must keep the previous state's identity: a fresh
+      // but value-identical object re-arms this effect through its own
+      // render and spins the drawer at 100% CPU in an org with no
+      // projects.
+      if (prev.projectId === seedProject && prev.teamId === seedTeam) {
+        return prev;
+      }
       return { ...prev, projectId: seedProject, teamId: seedTeam };
     });
   }, [open, project?.id, availableProjects, availableTeams]);
