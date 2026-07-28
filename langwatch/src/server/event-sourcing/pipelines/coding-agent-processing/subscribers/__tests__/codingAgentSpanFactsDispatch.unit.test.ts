@@ -149,13 +149,13 @@ describe("codingAgentSpanFactsDispatch", () => {
   });
 
   describe("when a span from an ordinary LLM trace passes by", () => {
-    /**
-     * The handler's inline gate is the rollover-safety guard: a build without
-     * the enqueue filter stages a job for every span, so after the upgrade the
-     * handler must still discard the non-matching ones it dequeues.
-     *
-     * @scenario a job staged before the filter existed is still gated by the handler
-     */
+    // The handler's inline gate is the rollover-safety guard: a build without
+    // the enqueue filter stages a job for every span, so after the upgrade the
+    // handler must still discard the non-matching ones it dequeues.
+    //
+    // NB: the parity checker only reads an annotation whose line ends in `*/`,
+    // so this stays a one-line JSDoc with the prose above it.
+    /** @scenario a job staged before the filter existed is still gated by the handler */
     it("is ignored without decoding it", async () => {
       const { subscriber, dispatched } = makeSubscriber();
 

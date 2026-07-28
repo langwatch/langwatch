@@ -17,6 +17,7 @@ Feature: Payload cost governs the scheduling plane
   Background:
     Given an event subscriber that needs only a small derived slice of each relevant event
 
+  @unit
   Scenario: a non-matching event never mints a job
     Given the subscriber declares which events are relevant to it
     And an event the subscriber considers not relevant
@@ -24,32 +25,66 @@ Feature: Payload cost governs the scheduling plane
     Then no job is staged for that subscriber
     And the subscriber's handler never runs for that event
 
+  @unit
   Scenario: a matching event mints a job for the subscriber
     Given an event the subscriber considers relevant
     When the event is routed to subscribers
     Then a job is staged for that subscriber
 
+  @unit
   Scenario: filtering leaves the dedup identity of the jobs that remain intact
     Given two relevant events for the same aggregate
     When both are routed to subscribers
     Then a redelivery of the same event inside the dedup window stages no second job
 
+  @unit
   Scenario: a job staged before the filter existed is still gated by the handler
     Given a job staged by the previous release, which minted one for every event
     And that job carries an event the filter would now decline
     When the handler dequeues it after the upgrade
     Then the handler discards it to the same outcome as before the upgrade
 
-  Scenario: a throwing enqueue filter surfaces into retry, never a silent drop
+  # The routing seam has no retry, so this is a reported loss, not a recovered
+  # one. That is precisely why an enqueue hook must be total — the scenario
+  # below pins the honest semantics so no future adopter builds on a promise
+  # the platform does not keep.
+  @unit
+  Scenario: a raising enqueue filter is reported as a failure, not as a decline
     Given a relevant event whose filter predicate raises
     When the event is routed to subscribers
-    Then the routing attempt fails and is retried
-    And the event is never silently discarded
+    Then the routing attempt reports the failure
+    And no job is staged for that subscriber
+    And the failure is distinguishable from the event having been filtered out
 
+  @unit
+  Scenario: a raising enqueue filter loses only its own subscriber's job
+    Given two subscribers observing the same event
+    And the first subscriber's filter predicate raises
+    When the event is routed to subscribers
+    Then the second subscriber still receives the event
+    And the other events in the same batch are still routed
+
+  @unit
+  Scenario: a raising enqueue filter's job is never re-dispatched
+    Given a committed event whose filter predicate raises
+    When the storing service completes the write
+    Then the write succeeds
+    And the dispatch failure is logged for operators
+    And nothing re-dispatches the subscriber fan-out for that event
+
+  @unit
   Scenario: enqueue outcomes are visible to operators
     Given a stream of relevant and irrelevant events
     When they are routed to subscribers
     Then an operator-visible count distinguishes events filtered out from events staged as a job
+
+  @unit
+  Scenario: a job that fails to reach the queue is not counted as staged
+    Given a relevant event the subscriber's filter admits
+    And the subscriber's queue is unavailable
+    When the event is routed to subscribers
+    Then the routing attempt reports the failure
+    And the event is not counted among those staged as a job
 
   # --- Phases 2-4: the remaining ADR-069 invariants ---
 

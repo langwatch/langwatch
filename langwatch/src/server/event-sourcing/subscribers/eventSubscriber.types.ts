@@ -12,18 +12,33 @@ export interface EventSubscriberContext {
  * committed event is already in memory — BEFORE any subscriber job is staged
  * (payload-cost doctrine invariant 4 — ADR-069).
  *
- * The hook runs on the routing/dispatch path, so it shares its failure
- * contract: a throw propagates into the routing retry (the committed event's
- * subscriber fan-out is retried), it is NEVER swallowed into a silent drop.
- * Keep it cheap and total — anything data-dependent or expensive belongs in
- * the handler's own consumer lane, where a failure retries only that
- * subscriber's job.
+ * **A hook here MUST be total.** The routing/dispatch path has no retry: the
+ * only production caller of `ProjectionRouter.dispatch` is
+ * `EventSourcingService.storeEvents`, which logs a dispatch failure and
+ * continues so that a projection fault cannot fail an already-committed write.
+ * Nothing re-dispatches subscriber fan-out afterwards. So a hook that throws
+ * loses this subscriber's job for this event permanently — the failure is
+ * reported (logged, and surfaced as an `AggregateError` from `dispatch`), but
+ * it is not recoverable.
+ *
+ * Blast radius is one `(subscriber, event)` pair: dispatch catches per event,
+ * so the other subscribers and the other events in the batch still fan out.
+ *
+ * That is the whole reason this seam takes only cheap, total predicates.
+ * Anything data-dependent or fallible — decoding, normalization, I/O —
+ * belongs in the handler's own consumer lane, where a failure retries just
+ * that subscriber's job instead of dropping it.
  */
 export interface EnqueueDispatchOptions<E extends Event = Event> {
   /**
    * Predicate deciding whether a job is staged at all. `false` → no job is ever
-   * minted for this event (the cheapest job is the one that never exists). A
-   * throw is NOT treated as `false`: it fails loudly into the routing retry.
+   * minted for this event (the cheapest job is the one that never exists).
+   *
+   * A throw is NOT read as `false`: it is reported as a dispatch failure so
+   * the fault is visible rather than silently indistinguishable from "not
+   * relevant". It is still a permanent loss of this job — see the interface
+   * docblock. Restrict this to predicates that cannot throw (a set lookup, a
+   * typeof check, a field comparison).
    */
   filter?: (event: E) => boolean;
 }

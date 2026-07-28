@@ -2,26 +2,31 @@
  * @vitest-environment node
  *
  * The enqueue-time subscriber contract (payload-cost doctrine invariant 4 —
- * ADR-069), proven at the fan-out seam. These drive the real ProjectionRouter
- * over its synchronous (no-queue) dispatch path, so what a subscriber's handler
- * receives is exactly what the seam would have staged.
+ * ADR-069), proven at the fan-out seam. These drive the real ProjectionRouter,
+ * so what a subscriber's handler receives is exactly what the seam would have
+ * staged.
  *
  * Guarantees under test:
  *   - a `filter` returning false never mints a job;
- *   - a `filter` that throws fails loudly into the routing retry, never a
- *     silent drop;
+ *   - a `filter` that raises is reported as a failure rather than read as a
+ *     decline, loses only its own subscriber's job, and — because the routing
+ *     path has no retry — is never re-dispatched (which is why the contract
+ *     requires enqueue hooks to be total);
  *   - without a filter, the full event is staged unchanged; and
- *   - each outcome is counted on `es_subscriber_enqueue_total`.
+ *   - each outcome is counted on `es_subscriber_enqueue_total`, `staged` only
+ *     once the handoff to the subscriber's lane actually succeeded.
  *
  * @see specs/event-sourcing/payload-cost.feature
  */
 import { register } from "prom-client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types";
 import { ProjectionRouter } from "../../projections/projectionRouter";
+import { EventSourcingService } from "../../services/eventSourcingService";
 import { QueueManager } from "../../services/queues/queueManager";
 import {
+  createMockEventStore,
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
@@ -34,20 +39,25 @@ const aggregateType = createTestAggregateType();
 const tenantId = createTestTenantId();
 const readContext = createTestEventStoreReadContext(tenantId);
 
-function makeRouter(subscriber: EventSubscriberDefinition<Event>) {
+function makeQueueManager() {
   // A QueueManager with no global queue leaves `hasSubscriberQueues()` false,
   // so the router runs the subscriber inline — the seam still applies the
   // enqueue filter, and the handler sees the staged payload.
-  const queueManager = new QueueManager<Event>({
+  return new QueueManager<Event>({
     aggregateType,
     pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
   });
+}
+
+function makeRouter(...subscribers: EventSubscriberDefinition<Event>[]) {
   const router = new ProjectionRouter<Event>(
     aggregateType,
     TEST_CONSTANTS.PIPELINE_NAME,
-    queueManager,
+    makeQueueManager(),
   );
-  router.registerEventSubscriber(subscriber);
+  for (const subscriber of subscribers) {
+    router.registerEventSubscriber(subscriber);
+  }
   return router;
 }
 
@@ -64,7 +74,10 @@ function makeEvent(id: string): Event {
   );
 }
 
-async function enqueueOutcomeCount(outcome: string): Promise<number> {
+async function enqueueOutcomeCount(
+  outcome: string,
+  subscriberName = "seamSubscriber",
+): Promise<number> {
   const metric = register.getSingleMetric("es_subscriber_enqueue_total");
   if (!metric) return 0;
   const snapshot = (await metric.get()) as {
@@ -73,10 +86,35 @@ async function enqueueOutcomeCount(outcome: string): Promise<number> {
   return snapshot.values
     .filter(
       (v) =>
-        v.labels.subscriber_name === "seamSubscriber" &&
+        v.labels.subscriber_name === subscriberName &&
         v.labels.outcome === outcome,
     )
     .reduce((sum, v) => sum + v.value, 0);
+}
+
+const raises = () => {
+  throw new Error("filter blew up");
+};
+
+/**
+ * `dispatch` reports failures as an AggregateError, so the specific cause sits
+ * in `.errors`. Asserting there proves *which* failure surfaced — a bare
+ * `rejects.toThrow()` would pass on any dispatch fault at all.
+ */
+async function expectDispatchFailure(
+  dispatching: Promise<void>,
+  expected: RegExp,
+): Promise<Error[]> {
+  const caught: unknown = await dispatching.then(
+    () => null,
+    (error: unknown) => error,
+  );
+  expect(caught).toBeInstanceOf(AggregateError);
+  const causes = (caught as AggregateError).errors as Error[];
+  for (const cause of causes) {
+    expect(cause.message).toMatch(expected);
+  }
+  return causes;
 }
 
 describe("subscriber enqueue-time contract", () => {
@@ -102,25 +140,111 @@ describe("subscriber enqueue-time contract", () => {
       });
     });
 
-    describe("when the filter throws", () => {
-      /** @scenario a throwing enqueue filter surfaces into retry, never a silent drop */
-      it("fails loudly into the routing retry rather than dropping silently", async () => {
+    describe("when the filter raises", () => {
+      /** @scenario a raising enqueue filter is reported as a failure, not as a decline */
+      it("reports the failure and counts neither outcome, so a raise is never mistaken for a decline", async () => {
+        const beforeFiltered = await enqueueOutcomeCount("filtered");
+        const beforeStaged = await enqueueOutcomeCount("staged");
+        const received: unknown[] = [];
         const router = makeRouter({
           name: "seamSubscriber",
           eventTypes: [],
-          handle: async () => undefined,
-          options: {
-            enqueue: {
-              filter: () => {
-                throw new Error("filter blew up");
-              },
+          handle: async (event) => {
+            received.push(event);
+          },
+          options: { enqueue: { filter: raises } },
+        });
+
+        const causes = await expectDispatchFailure(
+          router.dispatch([makeEvent("evt-throw")], readContext),
+          /filter blew up/,
+        );
+
+        expect(causes).toHaveLength(1);
+        expect(received).toHaveLength(0);
+        // Neither counter moves: the shortfall against events routed is what
+        // makes a raising hook distinguishable from a declining one.
+        expect(await enqueueOutcomeCount("filtered")).toBe(beforeFiltered);
+        expect(await enqueueOutcomeCount("staged")).toBe(beforeStaged);
+      });
+
+      /** @scenario a raising enqueue filter loses only its own subscriber's job */
+      it("still fans the event out to the other subscribers and the rest of the batch", async () => {
+        const healthy: string[] = [];
+        const router = makeRouter(
+          {
+            name: "seamSubscriber",
+            eventTypes: [],
+            handle: async () => undefined,
+            options: { enqueue: { filter: raises } },
+          },
+          {
+            name: "healthySubscriber",
+            eventTypes: [],
+            handle: async (event) => {
+              healthy.push(event.id);
             },
           },
+        );
+
+        const causes = await expectDispatchFailure(
+          router.dispatch([makeEvent("evt-a"), makeEvent("evt-b")], readContext),
+          /filter blew up/,
+        );
+
+        // Blast radius is one (subscriber, event) pair, not the batch: exactly
+        // the raising subscriber's two pairs fail, and the healthy subscriber
+        // still sees both events.
+        expect(causes).toHaveLength(2);
+        expect(healthy).toEqual(["evt-a", "evt-b"]);
+      });
+
+      // The honest semantics the contract states: the routing path has no
+      // retry, so the reported failure is where it ends. Pinned at the
+      // production caller, not just at the router boundary — a router-level
+      // `rejects.toThrow()` passes even when storeEvents swallows it.
+      /** @scenario a raising enqueue filter's job is never re-dispatched */
+      it("is swallowed by storeEvents, so the committed write succeeds and nothing re-dispatches", async () => {
+        const eventStore = createMockEventStore<Event>();
+        const logger = {
+          debug: vi.fn(),
+          info: vi.fn(),
+          warn: vi.fn(),
+          error: vi.fn(),
+          fatal: vi.fn(),
+          trace: vi.fn(),
+          child: vi.fn().mockReturnThis(),
+          level: "info",
+          silent: false,
+        };
+        const handle = vi.fn().mockResolvedValue(void 0);
+        const service = new EventSourcingService<Event>({
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          aggregateType,
+          eventStore,
+          subscribers: [
+            {
+              name: "seamSubscriber",
+              eventTypes: [],
+              handle,
+              options: { enqueue: { filter: raises } },
+            },
+          ],
+          logger: logger as never,
         });
 
         await expect(
-          router.dispatch([makeEvent("evt-throw")], readContext),
-        ).rejects.toThrow();
+          service.storeEvents([makeEvent("evt-committed")], readContext),
+        ).resolves.not.toThrow();
+
+        // The write stands, the failure is visible to operators, and the job
+        // is simply gone — there is no re-dispatch anywhere behind this.
+        expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
+        expect(logger.error).toHaveBeenCalledWith(
+          expect.objectContaining({ aggregateType }),
+          "Failed to dispatch events to projections",
+        );
+        expect(handle).not.toHaveBeenCalled();
       });
     });
   });
@@ -145,6 +269,38 @@ describe("subscriber enqueue-time contract", () => {
         expect(received).toHaveLength(1);
         expect(received[0]).toEqual(event);
         expect(await enqueueOutcomeCount("staged")).toBe(before + 1);
+      });
+    });
+
+    describe("when the subscriber's queue rejects the send", () => {
+      /** @scenario a job that fails to reach the queue is not counted as staged */
+      it("reports the failure and does not count the event as staged", async () => {
+        const before = await enqueueOutcomeCount("staged");
+        const queueManager = makeQueueManager();
+        // Only the queue boundary is faked: the router still runs its real
+        // queued branch, which is the path that can fail in production.
+        vi.spyOn(queueManager, "hasSubscriberQueues").mockReturnValue(true);
+        vi.spyOn(queueManager, "getSubscriberQueue").mockReturnValue({
+          send: vi.fn().mockRejectedValue(new Error("queue unavailable")),
+        } as never);
+
+        const router = new ProjectionRouter<Event>(
+          aggregateType,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        );
+        router.registerEventSubscriber({
+          name: "seamSubscriber",
+          eventTypes: [],
+          handle: async () => undefined,
+        });
+
+        await expectDispatchFailure(
+          router.dispatch([makeEvent("evt-send-fails")], readContext),
+          /queue unavailable/,
+        );
+
+        expect(await enqueueOutcomeCount("staged")).toBe(before);
       });
     });
   });

@@ -1199,7 +1199,10 @@ export class ProjectionRouter<
         try {
           // Enqueue-time filter (ADR-069 invariant 4): a declined event never
           // mints a job. A throw here is deliberately NOT caught as `false` —
-          // it falls through to the catch below and into the routing retry.
+          // it falls through to the catch below, so the failure is reported
+          // rather than silently read as "not relevant". The routing path has
+          // no retry (see EnqueueDispatchOptions), so the hook must be total:
+          // if it throws, this subscriber loses its job for this event.
           if (enqueue?.filter && !enqueue.filter(event)) {
             incrementEsSubscriberEnqueueTotal({
               pipelineName: this.pipelineName,
@@ -1209,20 +1212,23 @@ export class ProjectionRouter<
             continue;
           }
 
+          const queue = queued
+            ? this.queueManager.getSubscriberQueue(name)
+            : undefined;
+          if (queue) {
+            await queue.send(event);
+          } else {
+            await this.handleSubscriber(subscriber, event);
+          }
+
+          // Counted only once the handoff succeeded. A failed send throws to
+          // the catch below, so a queue outage never inflates `staged` — the
+          // filtered/staged split stays an honest picture of what the seam did.
           incrementEsSubscriberEnqueueTotal({
             pipelineName: this.pipelineName,
             subscriberName: name,
             outcome: "staged",
           });
-
-          if (queued) {
-            const queue = this.queueManager.getSubscriberQueue(name);
-            if (queue) {
-              await queue.send(event);
-              continue;
-            }
-          }
-          await this.handleSubscriber(subscriber, event);
         } catch (error) {
           this.logger.error(
             {
