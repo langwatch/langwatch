@@ -222,6 +222,15 @@ describe("computeBTLeaderboard — the difference intervals it produces", () => 
       expect(byDifference).toBeGreaterThan(byOverlap);
     });
 
+    it("reports how often the replicate fits failed to settle", () => {
+      // Built from a thousand other fits, whose failures used to be dropped.
+      const lb = fourWay({ rows: 60, seed: 1 });
+
+      expect(lb.bootstrapNonConvergence).not.toBeNull();
+      expect(lb.bootstrapNonConvergence).toBeGreaterThanOrEqual(0);
+      expect(lb.bootstrapNonConvergence).toBeLessThanOrEqual(1);
+    });
+
     it("stores each pair in both directions, negated", () => {
       const lb = fourWay({ rows: 60, seed: 1 });
       const ab = lb.scoreDifferenceCI!.a!.b!;

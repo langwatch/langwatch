@@ -31,6 +31,19 @@ export type SampleAdequacy = {
   totalPairs: number;
   /** separatedPairs / totalPairs, or null when there are no pairs. */
   resolution: number | null;
+  /**
+   * Chance that at least one of the pairs would look separated on luck alone,
+   * given each is tested at 95% and several are tested at once. Null when
+   * there is at most one pair, where there is no multiplicity to report.
+   *
+   * Reported rather than corrected for. Widening the intervals until they
+   * hold simultaneously was built and measured, and it separated fewer pairs
+   * than the plain interval-overlap test this feature started with — every
+   * claim would get weaker than before the work, to fix an overstatement a
+   * sentence fixes for free. So each pair stays correctly calibrated at 95%
+   * on its own, and the reader is told what the count does and does not mean.
+   */
+  familyWiseFalsePositiveRate: number | null;
 };
 
 export const computeSampleAdequacy = (
@@ -59,5 +72,11 @@ export const computeSampleAdequacy = (
     separatedPairs,
     totalPairs,
     resolution: totalPairs > 0 ? separatedPairs / totalPairs : null,
+    // 1 − 0.95^k, the standard independent-tests figure. The pairs are in
+    // fact positively correlated, being differences among the same scores,
+    // so the true rate is somewhat lower — this errs toward warning, which
+    // is the right direction for a caveat.
+    familyWiseFalsePositiveRate:
+      totalPairs > 1 ? 1 - Math.pow(0.95, totalPairs) : null,
   };
 };

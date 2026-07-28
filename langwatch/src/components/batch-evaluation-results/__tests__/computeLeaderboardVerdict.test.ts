@@ -45,6 +45,7 @@ const makeLeaderboard = (
   // No replicates, so separation falls back to comparing the marginal
   // intervals — which is what these expectations were written against.
   scoreDifferenceCI: null,
+  bootstrapNonConvergence: null,
   ...overrides,
 });
 
@@ -68,6 +69,8 @@ const makeMetrics = (
         // about the thing under test.
         costMeanCI: null,
         durationMeanCI: null,
+        costDifferenceCI: {},
+        durationDifferenceCI: {},
       },
     ]),
   );

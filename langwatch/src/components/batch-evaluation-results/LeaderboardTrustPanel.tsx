@@ -42,6 +42,14 @@ export type LeaderboardTrustPanelProps = {
  */
 export type TrustTone = "ok" | "warn" | "note";
 
+/**
+ * Share of non-converged bootstrap replicates above which the intervals stop
+ * being reported as exact. Not zero: a handful of awkward resamples is normal
+ * and does not meaningfully move a percentile built from a thousand of them,
+ * so warning on any at all would fire on healthy runs and be tuned out.
+ */
+const BOOTSTRAP_NONCONVERGENCE_LIMIT = 0.02;
+
 export type TrustCheck = {
   label: string;
   detail: string;
@@ -146,6 +154,23 @@ export const buildTrustChecks = ({
           ? "The ranking converged on a stable answer."
           : "The ranking did not fully settle, so treat the order as approximate.",
     },
+    // The margins of error are built from a thousand OTHER fits, and their
+    // failures used to be discarded — so the check above could report a clean
+    // convergence while the intervals beside it came from fits that never
+    // settled. A resample is often harder to fit than the full dataset,
+    // because it can drop a variant's only wins.
+    ...(leaderboard.bootstrapNonConvergence !== null &&
+    leaderboard.bootstrapNonConvergence > BOOTSTRAP_NONCONVERGENCE_LIMIT
+      ? [
+          {
+            label: "Margins of error are approximate",
+            tone: "warn" as const,
+            detail: `${Math.round(
+              leaderboard.bootstrapNonConvergence * 100,
+            )}% of the resamples used to size the margins of error did not settle, so treat the intervals as rough rather than exact.`,
+          },
+        ]
+      : []),
   ];
 
   // How much of the order this run actually established. Deliberately a
@@ -158,6 +183,20 @@ export const buildTrustChecks = ({
   checks.push(buildJudgeIndependenceCheck(judgeIndependence, variantNames));
 
   return checks;
+};
+
+/**
+ * The count above is several 95% tests reported as one number, so it is not
+ * a joint guarantee. Stated as a plain chance rather than corrected for: the
+ * simultaneous version was measured and separated fewer pairs than the test
+ * this feature replaced, so it would cost real findings to fix a sentence.
+ */
+const multiplicityNote = (adequacy: SampleAdequacy): string => {
+  const rate = adequacy.familyWiseFalsePositiveRate;
+  if (rate === null || adequacy.separatedPairs === 0) return "";
+  return ` Each pair is judged on its own at 95%, so across ${adequacy.totalPairs} pairs there is roughly a ${Math.round(
+    rate * 100,
+  )}% chance at least one of them separated by luck.`;
 };
 
 const buildResolutionCheck = (adequacy: SampleAdequacy): TrustCheck => {
@@ -183,9 +222,10 @@ const buildResolutionCheck = (adequacy: SampleAdequacy): TrustCheck => {
     label: "How much this run settled",
     tone: separatedPairs === totalPairs ? "ok" : "note",
     detail:
-      separatedPairs === totalPairs
+      (separatedPairs === totalPairs
         ? `All ${totalPairs} variant pairs were separated, so the run establishes a full order. Based on ${comparisonCount} comparisons.`
-        : `${separatedPairs} of ${totalPairs} variant pairs were separated; the rest are within each other's margin of error. Based on ${comparisonCount} comparisons.`,
+        : `${separatedPairs} of ${totalPairs} variant pairs were separated; the rest are within each other's margin of error. Based on ${comparisonCount} comparisons.`) +
+      multiplicityNote(adequacy),
   };
 };
 

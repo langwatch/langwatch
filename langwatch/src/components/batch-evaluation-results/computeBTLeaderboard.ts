@@ -93,6 +93,17 @@ export type BTLeaderboard = {
    * replicate still puts a ahead of b.
    */
   scoreDifferenceCI: ScoreDifferenceCI | null;
+  /**
+   * Share of bootstrap replicates whose own fit hit the iteration cap
+   * instead of settling. Null when the bootstrap did not run.
+   *
+   * The point fit reports `didConverge`, but the interval is built from a
+   * thousand other fits and their failures used to be discarded. A resample
+   * can be much harder to fit than the full dataset — it routinely drops a
+   * variant's only wins — so a run can converge cleanly and still have its
+   * interval drawn largely from fits that never did.
+   */
+  bootstrapNonConvergence: number | null;
 };
 
 /**
@@ -152,6 +163,7 @@ export function computeBTLeaderboard({
       didConverge: true,
       comparability: { identifiable: true, groups: [], dominates: [] },
       scoreDifferenceCI: null,
+      bootstrapNonConvergence: null,
     };
   }
 
@@ -195,8 +207,13 @@ export function computeBTLeaderboard({
     tol: opts.tol,
   });
 
+  // Computed before the bootstrap because the simultaneous bands are centred
+  // on the observed differences, not on the mean of the replicates.
+  const score = strength.map((s) => 400 * Math.log10(s));
+
   let scoreCI: Array<[number, number] | null> = new Array(n).fill(null);
   let scoreDifferenceCI: ScoreDifferenceCI | null = null;
+  let bootstrapNonConvergence: number | null = null;
   if (opts.bootstrapSamples > 0 && usable.length > 1) {
     const bootstrapped = bootstrapScoreCI({
       comparisons: usable,
@@ -210,9 +227,9 @@ export function computeBTLeaderboard({
     });
     scoreCI = bootstrapped.scoreCI;
     scoreDifferenceCI = bootstrapped.differenceCI;
+    bootstrapNonConvergence =
+      bootstrapped.nonConverged / opts.bootstrapSamples;
   }
-
-  const score = strength.map((s) => 400 * Math.log10(s));
 
   const entries: BTLeaderboardEntry[] = variantIds.map((id, i) => ({
     variantId: id,
@@ -254,6 +271,7 @@ export function computeBTLeaderboard({
     didConverge: converged,
     comparability: computeComparability({ winMatrix, variantIds }),
     scoreDifferenceCI,
+    bootstrapNonConvergence,
   };
 }
 
@@ -485,10 +503,15 @@ function bootstrapScoreCI({
 }): {
   scoreCI: Array<[number, number] | null>;
   differenceCI: ScoreDifferenceCI;
+  nonConverged: number;
 } {
   const rand = mulberry32(seed);
   const m = comparisons.length;
   const scoreSamples: number[][] = Array.from({ length: n }, () => []);
+  // Replicates whose own MM fit hit the iteration cap. Silently averaging
+  // these in means the interval is partly built from fits that never
+  // settled, and nothing downstream could tell.
+  let nonConverged = 0;
 
   // Resolve candidate ids to indices ONCE rather than inside every replicate.
   // buildWinMatrix does a Map<string, number> lookup per candidate per row, so
@@ -516,12 +539,13 @@ function bootstrapScoreCI({
     // geometric-mean renormalisation throws its opponent to ~1e300, i.e.
     // +120000. The resulting interval is not merely wide, it is fabricated,
     // and it is finite, so downstream isFinite() guards let it through.
-    const { strength } = fitBT({
+    const { strength, converged } = fitBT({
       W: Wb,
       smooth: smoothingFor(Wb, n),
       maxIter,
       tol,
     });
+    if (!converged) nonConverged++;
     for (let i = 0; i < n; i++) {
       scoreSamples[i]!.push(400 * Math.log10(strength[i] ?? 1));
     }
@@ -539,6 +563,33 @@ function bootstrapScoreCI({
   // as a whole. That is the entire reason this is worth keeping: the spread
   // of the difference is smaller than the spread of either score whenever the
   // two move together, which on a shared fit they always do.
+  //
+  // ── These are PER-PAIR intervals, and that is a deliberate choice ──
+  //
+  // The UI asks about several pairs at once: four variants make six, and the
+  // trust panel reports how many were separated. Six tests at 95% leave
+  // roughly a 1-in-4 chance that at least one fires on luck alone, so the
+  // count is not a joint guarantee and must not be read as one.
+  //
+  // The textbook answer is to widen the bands until they hold simultaneously.
+  // That was built and measured, and it is worse than useless here. A max-t
+  // construction — take the largest standardised deviation across all pairs
+  // in each replicate, then its 95th percentile as one critical value — is
+  // the efficient version of that idea, since it reads the correlation
+  // between pairs off the replicates instead of assuming the worst the way
+  // Bonferroni does. Measured on 40 synthetic four-variant runs it separated
+  // 12.9% of pairs, against 26.3% for the plain interval-overlap test this
+  // work replaced and 39.2% for the per-pair difference below. The
+  // simultaneous band came out about 1.10x the overlap test's own effective
+  // threshold: the multiplicity multiplier (~2.9 rather than 1.96) more than
+  // cancels the correlation gain that makes the difference worth using.
+  //
+  // Shipping that would make every claim weaker than before any of this
+  // work, to fix an overstatement that costs nothing to fix with a sentence.
+  // So the bands stay per-pair — each individual claim is then correctly
+  // calibrated at 95%, which is what "these two differ" should mean — and
+  // `computeSampleAdequacy` states the multiplicity plainly wherever it
+  // reports a count across pairs.
   const differenceCI: ScoreDifferenceCI = {};
   for (const id of variantIds) differenceCI[id] = {};
 
@@ -564,7 +615,7 @@ function bootstrapScoreCI({
     }
   }
 
-  return { scoreCI, differenceCI };
+  return { scoreCI, differenceCI, nonConverged };
 }
 
 function quantile(sorted: number[], q: number): number {

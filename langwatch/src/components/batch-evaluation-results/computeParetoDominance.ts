@@ -152,6 +152,23 @@ export const computeParetoDominance = ({
     if (dimension === "quality") {
       return compareQuality({ a, b, differenceCI: leaderboard.scoreDifferenceCI });
     }
+
+    // The paired per-row difference, when the run produced one. This is the
+    // real test, and it supersedes the relative floor below — that floor was
+    // a stand-in from when no interval existed, and it could call a 6% gap
+    // "cheaper" on two rows or miss a dead-certain 4% gap on two hundred.
+    const metrics = variantMetrics[a.variantId];
+    const paired =
+      dimension === "cost"
+        ? metrics?.costDifferenceCI?.[b.variantId]
+        : metrics?.durationDifferenceCI?.[b.variantId];
+    if (paired && paired.every((bound) => Number.isFinite(bound))) {
+      // Lower is better, so a is better when the whole interval is below zero.
+      if (paired[1] < 0) return 1;
+      if (paired[0] > 0) return -1;
+      return 0;
+    }
+
     const read = dimension === "cost" ? costOf : speedOf;
     const aValue = read(a.variantId);
     const bValue = read(b.variantId);

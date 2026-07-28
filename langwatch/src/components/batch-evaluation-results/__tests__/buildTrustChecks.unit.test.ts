@@ -24,6 +24,7 @@ const leaderboard = (
   // No replicates, so separation falls back to comparing the marginal
   // intervals — which is what these expectations were written against.
   scoreDifferenceCI: null,
+  bootstrapNonConvergence: null,
   ...overrides,
 });
 
@@ -33,6 +34,7 @@ const adequacy = (overrides: Partial<SampleAdequacy> = {}): SampleAdequacy => ({
   separatedPairs: 5,
   totalPairs: 6,
   resolution: 5 / 6,
+  familyWiseFalsePositiveRate: 1 - Math.pow(0.95, 6),
   ...overrides,
 });
 
