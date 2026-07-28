@@ -928,7 +928,7 @@ secured
     try {
       const validatedData = schema.parse(body);
 
-      await prisma.trigger.create({
+      await getApp().triggers.create({
         data: {
           projectId: project.id,
           action: TriggerAction.SEND_SLACK_MESSAGE,

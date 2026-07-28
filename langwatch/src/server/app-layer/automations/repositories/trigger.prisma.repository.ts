@@ -3,7 +3,12 @@ import {
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
-import type { TriggerFilters } from "~/server/filters/types";
+import { evaluationRunDataSchema } from "~/server/app-layer/evaluations/types";
+import {
+  findOffendingEvaluationStateEntries,
+  type TriggerFilters,
+} from "~/server/filters/types";
+import { InvalidEvaluationStateFilterError } from "../errors";
 import {
   graphAlertIncidentKey,
   type GraphTriggerSentRepository,
@@ -160,6 +165,7 @@ export class PrismaTriggerRepository implements TriggerRepository {
   }: {
     data: Prisma.TriggerUncheckedCreateInput;
   }): Promise<Trigger> {
+    assertCanonicalEvaluationStateFilters(data.filters);
     return this.prisma.trigger.create({ data });
   }
 
@@ -172,6 +178,7 @@ export class PrismaTriggerRepository implements TriggerRepository {
     projectId: string;
     data: Prisma.TriggerUncheckedUpdateInput;
   }): Promise<Trigger> {
+    assertCanonicalEvaluationStateFilters(data.filters);
     return this.prisma.trigger.update({
       where: { id: triggerId, projectId },
       data,
@@ -342,6 +349,38 @@ function parseFilters(raw: unknown): TriggerFilters {
     return raw as TriggerFilters;
   }
   return {};
+}
+
+/**
+ * Write-path guard for the one filter field with a closed value domain
+ * (#4805, #6296): `evaluations.state`. `filters` arrives here in either of
+ * the two encodings every write path uses — a JSON string (the tRPC
+ * `create`/`upsert`/`updateTriggerFilters` mutations, and the REST/MCP
+ * handlers) or a raw object (graph-alert/report rows, whose builders always
+ * persist `{}`) — `parseFilters` above normalises both before the check runs.
+ *
+ * The tRPC schemas (`triggerFiltersSchema` / `triggerFiltersPermissiveSchema`)
+ * and `sanitizeTriggerFilters` already reject or repair this before most
+ * callers ever reach here; this is the backstop for the REST and MCP
+ * surfaces, which validate `filters` with a bare `z.record(z.unknown())` and
+ * never see those schemas at all. Throws a `HandledError` (never a bare
+ * `ZodError`) so the failure renders as an actionable message instead of
+ * falling back to a generic "Could not save automation".
+ */
+function assertCanonicalEvaluationStateFilters(filters: unknown): void {
+  if (filters === undefined) return;
+
+  const parsedFilters = parseFilters(filters);
+  const offense = findOffendingEvaluationStateEntries(
+    parsedFilters["evaluations.state"],
+  )[0];
+  if (!offense) return;
+
+  throw new InvalidEvaluationStateFilterError({
+    evaluatorKey: offense.evaluatorKey,
+    offendingValue: offense.offendingValue,
+    canonicalValues: evaluationRunDataSchema.shape.status.options,
+  });
 }
 
 // Defensive narrow: column is a free-form TEXT so an upstream write of an
