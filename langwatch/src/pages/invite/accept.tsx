@@ -1,5 +1,6 @@
-import { Alert, Button, HStack, VStack } from "@chakra-ui/react";
+import { Button, HStack, VStack } from "@chakra-ui/react";
 
+import { HandledErrorAlert } from "~/features/errors";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -12,7 +13,7 @@ export default function Accept() {
   const router = useRouter();
   const { inviteCode } = router.query;
   const { data: session } = useRequiredSession();
-  const { status, errorMessage } = useAcceptInviteOnce({
+  const { status, error } = useAcceptInviteOnce({
     inviteCode: typeof inviteCode === "string" ? inviteCode : undefined,
     enabled: !!session,
   });
@@ -33,15 +34,13 @@ export default function Accept() {
   return (
     <SetupLayout>
       <VStack gap={4}>
-        <Alert.Root status="error">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>
-              An error occurred while accepting the invite.
-            </Alert.Title>
-            <Alert.Description>{errorMessage}</Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        {/* A signed-out visitor with a dead invite link has no other recourse,
+            so this has to say something they can act on. The registry supplies
+            the words; the raw message would be the code slug (#5984). */}
+        <HandledErrorAlert
+          error={error}
+          fallbackTitle="An error occurred while accepting the invite"
+        />
         <HStack gap={3}>
           {/* Hard navigation on purpose: busts caches primed with pre-invite
               "no org" state, same reason the hook redirects hard on success. */}

@@ -1,5 +1,6 @@
 import { Alert, Box, Center, Spinner, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
+import { HandledErrorAlert } from "~/features/errors";
 import { TraceDrawerContent } from "~/features/traces-v2/components/TraceDrawer/TraceDrawerContent";
 import {
   SharedTraceProvider,
@@ -38,7 +39,10 @@ function SharedTraceView() {
   if (!trace) {
     return (
       <Center flex={1} padding={8}>
-        <Text color="fg.muted">This trace could not be loaded.</Text>
+        <Text color="fg.muted">
+          This shared trace didn&apos;t load. Refresh the page, or ask whoever
+          shared it for a new link.
+        </Text>
       </Center>
     );
   }
@@ -105,13 +109,22 @@ export default function SharePage() {
   );
 
   if (shared.isError) {
+    // The one surface whose reader has no account, no navigation and no other
+    // support channel — so it gets the full alert, not a flattened sentence:
+    // the role, the registry's remediation, the docs link and the error id they
+    // can quote back. Every code reachable here (`share_link_not_found` /
+    // `_forbidden` / `_expired` / `_exhausted`, `share_read_rate_limited`) is
+    // written for a recipient who did nothing wrong, and none of them discloses
+    // whether a trace exists or who owns it — the server collapses those cases
+    // into one code on purpose (see app-layer/share/errors.ts).
     return (
       <Center height="100vh" padding={8}>
-        <Text color="fg.muted">
-          {shared.error instanceof Error
-            ? shared.error.message
-            : "This share link is not available."}
-        </Text>
+        <Box maxWidth="480px" width="full">
+          <HandledErrorAlert
+            error={shared.error}
+            fallbackTitle="This share link isn't available"
+          />
+        </Box>
       </Center>
     );
   }

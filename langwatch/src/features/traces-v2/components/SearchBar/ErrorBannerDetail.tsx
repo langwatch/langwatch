@@ -1,5 +1,6 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
+import { safeRelayedProse } from "~/features/errors";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 
 /**
@@ -49,7 +50,15 @@ export function hasAiErrorDetails(error: AiActionError): boolean {
   );
 }
 
-/** Renders all present structured detail fields for an AI error. */
+/**
+ * Renders all present structured detail fields for an AI error.
+ *
+ * This is diagnostic detail an operator opts into, not copy — the headline
+ * above it comes from the code-keyed registry. `reason` is the one field the
+ * provider wrote itself, so it goes through `safeRelayedProse`: it scrubs
+ * credential-shaped tokens and clamps the length before a third party's
+ * sentence reaches the screen.
+ */
 export const AiErrorDetails: React.FC<{ error: AiActionError }> = ({
   error,
 }) => (
@@ -64,7 +73,11 @@ export const AiErrorDetails: React.FC<{ error: AiActionError }> = ({
       <DetailRow label="Model" value={error.details.model} />
     )}
     {error.details?.reason && (
-      <DetailRow label="Reason" value={error.details.reason} multiline />
+      <DetailRow
+        label="Reason"
+        value={safeRelayedProse(error.details.reason)}
+        multiline
+      />
     )}
     {error.details?.lastQuery && (
       <DetailRow label="Last query" value={error.details.lastQuery} multiline />

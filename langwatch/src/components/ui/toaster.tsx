@@ -33,24 +33,13 @@ export const toaster = {
   },
 };
 
-/**
- * A restrained hairline in the status colour, mixed into the neutral border
- * rather than drawn on top of it — the same formula as the Langy card's
- * `accentBorder` (`features/asaplangy/tokens.ts`), which exists so a card can
- * carry a tone without wearing a coloured ring.
- */
-const statusHairline = (color: string) =>
-  `color-mix(in srgb, var(--chakra-colors-${color}) 26%, var(--chakra-colors-border-muted))`;
-
+/** The status colour, spent only on the small icon. */
 const STATUS = {
-  error: { hairline: statusHairline("red-solid"), fg: "red.fg" },
-  // Semantic tokens throughout: a literal hex is the one value that can't
-  // resolve differently per theme, and this icon sits on a near-black surface
-  // in dark mode where a fixed mid-amber loses most of its contrast.
-  warning: { hairline: statusHairline("yellow-solid"), fg: "yellow.fg" },
-  success: { hairline: statusHairline("green-solid"), fg: "green.fg" },
-  info: { hairline: "border.muted", fg: "fg.muted" },
-  loading: { hairline: "border.muted", fg: "fg.muted" },
+  error: { fg: "red.fg" },
+  warning: { fg: "yellow.fg" },
+  success: { fg: "green.fg" },
+  info: { fg: "fg.muted" },
+  loading: { fg: "fg.muted" },
 } as const;
 
 type ToastStatus = keyof typeof STATUS;
@@ -90,6 +79,9 @@ function StatusIcon({ status }: { status: ToastStatus }) {
  * hairline carrying the status tone, the status colour spent on a small icon,
  * and the accent reserved for the action. An error still reads in the
  * interface's voice — it says what happened and offers the way forward.
+ *
+ * The material itself — surface, radius, padding, type and the per-status
+ * hairline — is the `toast` slot recipe in `pages/_app.tsx`.
  */
 export const Toaster = () => {
   return (
@@ -108,11 +100,6 @@ export const Toaster = () => {
               // IS the payload here, so losing it loses the whole toast. The
               // prop spreads onto the element and wins over zag's default.
               role={status === "error" ? "alert" : undefined}
-              // Material, radius, padding and type come from the `toast`
-              // slot recipe in `pages/_app.tsx` — Chakra's defaults are
-              // attribute selectors that a style prop can't outrank. Only the
-              // per-status hairline is set here.
-              borderColor={STATUS[status].hairline}
             >
               <StatusIcon status={status} />
 

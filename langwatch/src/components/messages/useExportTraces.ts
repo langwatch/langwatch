@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
-import { showErrorToast } from "~/features/errors";
+import { readHandledError, showErrorToast } from "~/features/errors";
 import type { ExportProgressEvent } from "~/server/api/routers/export";
 import type {
   ExportFormat,
@@ -87,6 +87,45 @@ function extractFilename({
   }
 
   return fallbackName;
+}
+
+/**
+ * The failure behind a non-OK download response, as something the shared error
+ * reader understands.
+ *
+ * `/api/export/traces/download` answers a rejection with the flat handled body
+ * — `{ error: "<code>", message, ...meta, trace }`, see
+ * `src/app/api/middleware/error-handler.ts` — and that code is the entire
+ * point: a payload too large, a rate limit and a gateway timeout are three
+ * different things, and only the first two are worth retrying differently.
+ * Synthesising `new Error("Export failed: 413 Payload Too Large")` threw all of
+ * it away, and `showErrorToast` — handed an error with no handled payload on it
+ * — answered every one of them with "We've been notified. Try again in a
+ * moment."
+ *
+ * The body rides ON an `Error` rather than replacing it, so the throw stays an
+ * Error (the `AbortError` check downstream depends on that) while
+ * `readHandledError` still finds the flat REST payload hanging off it.
+ *
+ * A body carrying no recognisable code — an unhandled 500, or an ingress
+ * answering HTML before the route ever ran — degrades to `export_failed`, the
+ * registry's own code for an export that did not finish. That is already a far
+ * better answer than the generic unknown, and it improves on its own the moment
+ * the route names its rejections.
+ */
+async function exportRequestError(response: Response): Promise<Error> {
+  const body: unknown = await response.json().catch(() => null);
+  const payload = readHandledError(body)
+    ? (body as Record<string, unknown>)
+    : { error: "export_failed" };
+
+  return Object.assign(
+    new Error(`Trace export rejected with HTTP ${response.status}`),
+    payload,
+    // The flat body carries no status of its own — it IS the HTTP status,
+    // which lives on the response rather than in it.
+    { status: response.status },
+  );
 }
 
 /**
@@ -231,9 +270,7 @@ export function useExportTraces({
       })
         .then(async (response) => {
           if (!response.ok) {
-            throw new Error(
-              `Export failed: ${response.status} ${response.statusText}`,
-            );
+            throw await exportRequestError(response);
           }
 
           // Read total from header immediately

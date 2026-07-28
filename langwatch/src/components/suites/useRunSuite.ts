@@ -9,17 +9,13 @@
 import { generate } from "@langwatch/ksuid";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useRef, useState } from "react";
-import {
-  explainHandledError,
-  readHandledError,
-  showErrorToast,
-} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { toaster } from "../ui/toaster";
+import { showSuiteRunError } from "./showSuiteRunError";
 
 export interface UseRunSuiteOptions {
   onRunScheduled?: (suiteId: string, batchRunId: string) => void;
@@ -105,38 +101,13 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
       setPendingSuite(null);
       setPendingBatchRunId(null);
 
-      // A run plan with nothing runnable left is a curated rejection with its
-      // own way out — this toast adds the "Edit Run Plan" action, which is the
-      // fix. Keyed off the stable code; the words stay in the registry, which
-      // already owns copy for both of these.
-      const handled = readHandledError(err);
-      const allArchived =
-        handled &&
-        (handled.code === "suite_all_scenarios_archived" ||
-          handled.code === "suite_all_targets_archived")
-          ? handled
-          : null;
-
-      if (allArchived) {
-        const { title, description } = explainHandledError(allArchived);
-        toaster.create({
-          title,
-          description: description || undefined,
-          type: "error",
-          meta: { closable: true },
-          action: {
-            label: "Edit Run Plan",
-            onClick: () => {
-              openDrawer("suiteEditor", {
-                urlParams: { suiteId: variables.id },
-              });
-            },
-          },
-        });
-        return;
-      }
-
-      showErrorToast({ error: err, fallbackTitle: "Couldn't start run plan" });
+      showSuiteRunError({
+        error: err,
+        fallbackTitle: "Couldn't start run plan",
+        onEditRunPlan: () => {
+          openDrawer("suiteEditor", { urlParams: { suiteId: variables.id } });
+        },
+      });
     },
   });
 

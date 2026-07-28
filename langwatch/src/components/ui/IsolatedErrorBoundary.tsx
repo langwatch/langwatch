@@ -3,6 +3,8 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 import * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
+import { explainAnyError } from "~/features/errors";
+
 interface IsolatedErrorBoundaryProps {
   /**
    * Human-readable error label. Defaults to "Something went wrong" — pass a
@@ -59,7 +61,22 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
   resetErrorBoundary,
   scope,
 }) => {
-  const message = error instanceof Error ? error.message : String(error);
+  // This is the fallback for every drawer and dialog in the app, so whatever it
+  // prints, a customer reads — in production. `error.message` is a render-time
+  // crash's message: since #5984 a handled one is the code slug, and an
+  // unhandled one is a stack-adjacent internal. The registry decides the words;
+  // the raw message stays behind the dev gate, exactly as `PageErrorFallback`
+  // does it.
+  const explanation = explainAnyError(error);
+  // A render crash almost never carries a handled payload, so the registry's
+  // headline is usually the generic one — and the caller's `scope` ("Couldn't
+  // load this trace") names the surface that broke, which is more use.
+  const heading = explanation.isRegistered
+    ? explanation.title
+    : (scope ?? explanation.title);
+  const isDev = process.env.NODE_ENV === "development";
+  const rawMessage = error instanceof Error ? error.message : String(error);
+
   return (
     <Box
       role="alert"
@@ -78,20 +95,27 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
             <AlertTriangle />
           </Icon>
           <Text textStyle="xs" fontWeight="semibold" color="red.fg">
-            {scope ?? "Something went wrong"}
+            {heading}
           </Text>
         </HStack>
-        <Text
-          textStyle="2xs"
-          color="fg.muted"
-          fontFamily="mono"
-          maxHeight="120px"
-          overflowY="auto"
-          whiteSpace="pre-wrap"
-          wordBreak="break-word"
-        >
-          {message || "No error message"}
-        </Text>
+        {explanation.description && (
+          <Text textStyle="2xs" color="fg.muted">
+            {explanation.description}
+          </Text>
+        )}
+        {isDev && (
+          <Text
+            textStyle="2xs"
+            color="fg.muted"
+            fontFamily="mono"
+            maxHeight="120px"
+            overflowY="auto"
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+          >
+            {rawMessage || "No error message"}
+          </Text>
+        )}
         <HStack justify="flex-end">
           <Button
             size="xs"

@@ -37,8 +37,14 @@ interface SlackApiResponse {
  * `channel_not_found`) are the top setup snags and read as opaque in a toast —
  * a bot posting to a public channel it hasn't joined needs either an invite or
  * the `chat:write.public` scope, and a bad channel value needs the picker.
+ *
+ * `null` for a code with no remediation we can vouch for. The caller ships this
+ * to the customer verbatim, so anything returned here has to be a sentence
+ * written FOR one — and `ratelimited` or `fatal_error` is a provider slug, not
+ * copy. Those get the registry's own "Check the destination and try again."
+ * instead; the code still travels in the log line.
  */
-function explainSlackPostError(code: string): string {
+function explainSlackPostError(code: string): string | null {
   switch (code) {
     case "not_in_channel":
       return "the bot isn't in that channel. Invite it with `/invite @LangWatch` in the channel, or reinstall the Slack app with the `chat:write.public` scope so it can post to any public channel";
@@ -54,7 +60,7 @@ function explainSlackPostError(code: string): string {
     case "missing_scope":
       return "the Slack app is missing a required scope. Reinstall it with the `chat:write` (and `chat:write.public`) scopes";
     default:
-      return `Slack rejected the message: ${code}`;
+      return null;
   }
 }
 
@@ -121,14 +127,24 @@ export async function postSlackChatMessage({
     : "";
   const explanation = explainSlackPostError(code);
   throw new DispatchError({
-    message: `${label}: ${explanation}${detail}`,
+    message: `${label}: ${explanation ?? `Slack rejected the message: ${code}`}${detail}`,
     retryable: RETRYABLE_SLACK_ERRORS.has(code),
     // Slack told us what the admin has to do; that sentence is the whole value
     // of this failure, so it travels to them. Capitalised because
     // `explainSlackPostError` writes a clause to follow the label, and this is
     // read on its own. `label` and `detail` stay behind: one names an internal
     // dispatcher, the other is raw provider metadata.
-    customerMessage: `${explanation.charAt(0).toUpperCase()}${explanation.slice(1)}`,
+    //
+    // Only when there IS one. Omitting the property is what makes the registry
+    // fall back to its own copy for `notification_delivery_error` — see
+    // NotificationDeliveryError. Sending `Slack rejected the message:
+    // ratelimited` instead would put a provider slug in front of a customer,
+    // which is neither remediation nor English.
+    ...(explanation
+      ? {
+          customerMessage: `${explanation.charAt(0).toUpperCase()}${explanation.slice(1)}`,
+        }
+      : {}),
   });
 }
 

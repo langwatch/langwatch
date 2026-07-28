@@ -12,6 +12,7 @@ import {
   cleanup,
 } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ScenarioGenerationError } from "../../scenarios/services/scenarioGeneration";
 import { AICreateModal } from "../AICreateModal";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -375,7 +376,7 @@ describe("<AICreateModal/>", () => {
   });
 
   describe("when generation fails", () => {
-    it("displays error title and message", async () => {
+    it("displays the registry's copy, never the failure's own message", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API connection failed"));
 
       render(
@@ -400,7 +401,12 @@ describe("<AICreateModal/>", () => {
       await waitFor(() => {
         expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
       });
-      expect(within(dialog).getByText("API connection failed")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("We've been notified. Try again in a moment."),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).queryByText("API connection failed"),
+      ).not.toBeInTheDocument();
     });
 
     it("displays Try again button", async () => {
@@ -574,7 +580,9 @@ describe("<AICreateModal/>", () => {
       });
 
       expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
-      expect(within(dialog).getByText(/timed out/i)).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("We've been notified. Try again in a moment."),
+      ).toBeInTheDocument();
     });
   });
 
@@ -624,12 +632,14 @@ describe("<AICreateModal/>", () => {
   // Error classifier integration
   // ─────────────────────────────────────────────────────────────────────────
 
-  describe("given an auth-shape error", () => {
+  describe("given a handled auth failure", () => {
     describe("when ErrorState renders", () => {
       it("shows the Configure model provider button", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(new Error("Invalid API key provided by the provider"));
+          .mockRejectedValue(
+            new ScenarioGenerationError("invalid_api_key", "invalid_api_key"),
+          );
 
         render(
           <AICreateModal
@@ -657,10 +667,12 @@ describe("<AICreateModal/>", () => {
         });
       });
 
-      it("shows tailored copy about API key", async () => {
+      it("shows the registry's copy about the API key", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(new Error("Invalid API key provided"));
+          .mockRejectedValue(
+            new ScenarioGenerationError("invalid_api_key", "invalid_api_key"),
+          );
 
         render(
           <AICreateModal
@@ -682,7 +694,9 @@ describe("<AICreateModal/>", () => {
         );
 
         await waitFor(() => {
-          expect(within(dialog).getByText(/api key/i)).toBeInTheDocument();
+          expect(
+            within(dialog).getByText("That API key isn't valid"),
+          ).toBeInTheDocument();
         });
       });
     });
@@ -690,7 +704,10 @@ describe("<AICreateModal/>", () => {
 
   describe("given an unknown error", () => {
     describe("when ErrorState renders", () => {
-      it("shows the raw error message verbatim", async () => {
+      // The raw message used to be printed in a <Code> block. For a handled
+      // failure that is the code slug, and for an unhandled one it can carry
+      // internals — neither is a customer's to read (#5984, ADR-045).
+      it("never shows the raw error message", async () => {
         const onGenerate = vi
           .fn()
           .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
@@ -716,9 +733,12 @@ describe("<AICreateModal/>", () => {
 
         await waitFor(() => {
           expect(
-            within(dialog).getByText("Completely unexpected server meltdown 42")
+            within(dialog).getByText("Something went wrong")
           ).toBeInTheDocument();
         });
+        expect(
+          within(dialog).queryByText("Completely unexpected server meltdown 42")
+        ).not.toBeInTheDocument();
       });
 
       it("does not show Configure model provider button", async () => {
@@ -754,12 +774,17 @@ describe("<AICreateModal/>", () => {
     });
   });
 
-  describe("given a config-shape error", () => {
+  describe("given a handled configuration failure", () => {
     describe("when Configure is clicked", () => {
       it("links to settings/model-providers in a new tab", async () => {
         const onGenerate = vi
           .fn()
-          .mockRejectedValue(new Error("No default model configured for this project"));
+          .mockRejectedValue(
+            new ScenarioGenerationError(
+              "no_provider_configured",
+              "no_provider_configured",
+            ),
+          );
 
         render(
           <AICreateModal

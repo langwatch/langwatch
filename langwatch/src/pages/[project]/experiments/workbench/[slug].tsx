@@ -18,6 +18,7 @@ import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
 import type { ProposalHandlers } from "~/features/langy/components/MessageContent";
 import { useRegisterLangyHandlers } from "~/features/langy/LangyContext";
+import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -322,14 +323,10 @@ export default function ExperimentsWorkbenchPage() {
     return (
       <DashboardLayout backgroundColor="bg.panel">
         <Box padding={6}>
-          <Alert.Root status="error">
-            <Alert.Indicator />
-            <Alert.Title>Failed to load experiment</Alert.Title>
-            <Alert.Description>
-              {error?.message ??
-                "An unexpected error occurred while loading the experiment."}
-            </Alert.Description>
-          </Alert.Root>
+          <HandledErrorAlert
+            error={error}
+            fallbackTitle="Couldn't load this experiment"
+          />
         </Box>
       </DashboardLayout>
     );

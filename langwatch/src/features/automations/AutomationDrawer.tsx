@@ -99,6 +99,19 @@ import {
  * turn to find the syntax error the description is describing. The failing
  * field rides on the handled payload's `meta.field`; these are the words for
  * each one.
+ *
+ * A KNOWN EXCEPTION to the one-authoring-surface rule, and the only one in this
+ * feature. `ErrorPresentation.title` is a static string, so a code whose
+ * headline depends on its own `meta` cannot express itself in the registry
+ * today — which leaves one code with words in two files, the exact shape the
+ * deleted `errorExplainer.ts` was removed for. It is deliberate rather than
+ * accidental: the alternative is four near-identical codes for one failure, or
+ * a headline that makes the author hunt.
+ *
+ * The fix belongs in the registry, not here: widening `title` to
+ * `string | ((error) => string)` would let `template_validation_error` pick its
+ * own headline off `meta.field` and delete this map outright. Until then, this
+ * map and the registry entry must be changed together.
  */
 const TEMPLATE_FIELD_TITLES: Record<string, string> = {
   emailSubjectTemplate: "Your email subject template isn't valid",
@@ -823,7 +836,10 @@ export function AutomationDrawer({
               (explanation.isRegistered
                 ? explanation.title
                 : "Test fire failed"),
-            errorDetail: explanation.description,
+            // The title when the code has no description of its own. The
+            // attempt log is persistent history a person reads back later, and
+            // a title-only code otherwise wrote a blank row into it.
+            errorDetail: explanation.description || explanation.title,
           });
           showErrorToast({
             error: err,

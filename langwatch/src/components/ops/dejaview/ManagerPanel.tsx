@@ -1,5 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 
+import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
 
 import { ManagerCard } from "./ManagerCard";
@@ -63,8 +64,14 @@ export function ManagerPanel({
       </Box>
       {query.error ? (
         <Box paddingX={3} paddingY={4}>
+          {/* One `Text`, so the registry's sentence reads as one sentence. The
+              old inline `error.message` rendered "Could not load process
+              managers: clickhouse_unavailable" — a slug, since #5984. */}
           <Text textStyle="xs" color="red.500">
-            Could not load process managers: {query.error.message}
+            {describeError({
+              error: query.error,
+              fallbackTitle: "Could not load process managers",
+            })}
           </Text>
         </Box>
       ) : (

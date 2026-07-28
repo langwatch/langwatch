@@ -108,7 +108,10 @@ describe("explainLangyError", () => {
           }),
         );
         expect(presentation.kind).toBe("langy_codex_plan_limit");
-        expect(presentation.description).toContain("another model");
+        // The registry's words, not a second authoring at the call site.
+        expect(presentation.title).toBe(
+          "You've reached your OpenAI plan's limit",
+        );
         expect(presentation.action).toEqual({
           label: "Try again",
           kind: "retry",
@@ -308,12 +311,12 @@ describe("explainLangyError", () => {
   });
 
   describe("given the worker stopped mid-reply", () => {
-    it("names the worker stopping specifically and offers a manual retry", () => {
+    it("names the stop specifically and offers a manual retry", () => {
       const presentation = explainLangyError(
         domain({ code: "langy_worker_stopped", httpStatus: 503 }),
       );
 
-      expect(presentation.title).toBe("Langy's worker stopped");
+      expect(presentation.title).toBe("Langy stopped mid-reply");
       expect(presentation.description).toContain("safe");
       expect(presentation.render).toBe("card");
       expect(presentation.action).toEqual({
@@ -453,7 +456,9 @@ describe("resolveLiveTurnError", () => {
         });
 
         expect(domain.code).toBe("unknown");
-        expect(domain.meta).toEqual({ error: "SSE Error" });
+        // `meta` is the contract for what the card renders, not a scratchpad:
+        // the raw transport message is logged by the caller instead.
+        expect(domain.meta).toEqual({});
       });
     });
   });

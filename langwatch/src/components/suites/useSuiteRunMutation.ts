@@ -4,13 +4,9 @@
  * Used by both SuiteFormDrawer (Save & Run) and suites/index.tsx (sidebar Run).
  */
 
-import {
-  explainHandledError,
-  readHandledError,
-  showErrorToast,
-} from "~/features/errors";
 import { api } from "~/utils/api";
 import { toaster } from "../ui/toaster";
+import { showSuiteRunError } from "./showSuiteRunError";
 
 interface UseSuiteRunMutationOptions {
   onEditSuite: (suiteId: string) => void;
@@ -61,36 +57,10 @@ export function useSuiteRunMutation({
       }
     },
     onError: (err, variables) => {
-      // A run plan with nothing runnable left is a curated rejection with its
-      // own way out — this toast adds the "Edit Run Plan" action, which is the
-      // fix. Keyed off the stable code; the words stay in the registry, which
-      // already owns copy for both of these.
-      const handled = readHandledError(err);
-      const allArchived =
-        handled &&
-        (handled.code === "suite_all_scenarios_archived" ||
-          handled.code === "suite_all_targets_archived")
-          ? handled
-          : null;
-
-      if (allArchived) {
-        const { title, description } = explainHandledError(allArchived);
-        toaster.create({
-          title,
-          description: description || undefined,
-          type: "error",
-          meta: { closable: true },
-          action: {
-            label: "Edit Run Plan",
-            onClick: () => onEditSuite(variables.id),
-          },
-        });
-        return;
-      }
-
-      showErrorToast({
+      showSuiteRunError({
         error: err,
         fallbackTitle: "Couldn't execute run plan",
+        onEditRunPlan: () => onEditSuite(variables.id),
       });
     },
   });
