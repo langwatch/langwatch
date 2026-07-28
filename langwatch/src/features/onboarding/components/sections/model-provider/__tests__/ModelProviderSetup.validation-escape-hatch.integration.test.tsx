@@ -112,6 +112,7 @@ vi.mock("../../../../../../utils/api", () => ({
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { ModelProviderSetup } from "../ModelProviderSetup";
+import { MASKED_KEY_PLACEHOLDER } from "../../../../../../utils/constants";
 
 const renderSetup = () =>
   render(
@@ -200,6 +201,34 @@ describe("Feature: a refused API key is not a dead end during onboarding", () =>
           expect(mockSubmit).toHaveBeenCalledTimes(1);
         });
         expect(saveButton()).toHaveTextContent(/^save$/i);
+      });
+    });
+  });
+
+  describe("given a stored key the customer has not touched", () => {
+    describe("when they save an unrelated change", () => {
+      /**
+       * Re-probing on every save makes picking a model depend on third-party
+       * uptime, and blocks it entirely behind a key that has drifted
+       * out-of-band. The settings drawer already only probes a key the
+       * customer actually typed.
+       */
+      it("saves without asking the provider anything", async () => {
+        // The masked placeholder is what a stored key looks like in the form;
+        // nothing here has been typed over.
+        mockCustomKeys.current = {
+          OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+        };
+        renderSetup();
+        const user = userEvent.setup();
+
+        await user.click(saveButton());
+
+        await waitFor(() => {
+          expect(mockSubmit).toHaveBeenCalledTimes(1);
+        });
+        expect(mockValidateApiKey).not.toHaveBeenCalled();
+        expect(mockValidateWithCustomUrl).not.toHaveBeenCalled();
       });
     });
   });
