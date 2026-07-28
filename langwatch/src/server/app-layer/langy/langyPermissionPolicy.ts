@@ -58,9 +58,39 @@ const ACTION_EXCLUSIONS: Record<string, string> = {
 };
 
 /**
- * Families Langy has no business touching at ANY grain, with the reason each
- * is off-limits. Absence from this map is not permission — a family must also
- * survive the action rule above.
+ * The families Langy may be delegated at all. An ALLOWLIST, not a blocklist,
+ * and the distinction is the whole point: with a blocklist, a resource family
+ * invented next quarter is delegable the moment it exists, before anyone has
+ * assessed it — and the coverage test would then go RED until someone added it
+ * to the candidate list, which is CI pressure to grant a capability nobody
+ * decided on. Exactly backwards for a credential.
+ *
+ * With an allowlist, a new family is excluded until someone lists it here, and
+ * the coverage test stays green. The decision is still forced — the reviewer of
+ * the new family's routes has to add it — but the DEFAULT while nobody is
+ * looking is "Langy cannot", which is the only safe direction to fail.
+ */
+const DELEGABLE_FAMILIES = new Set([
+  "project",
+  "traces",
+  "evaluations",
+  "datasets",
+  "scenarios",
+  "annotations",
+  "analytics",
+  "prompts",
+  "triggers",
+  "workflows",
+  "experiments",
+]);
+
+/**
+ * Families that are explicitly off-limits, with the reason each one is. These
+ * are redundant against `DELEGABLE_FAMILIES` — anything absent there is already
+ * refused — and they are kept anyway, because a reader asking "why can't Langy
+ * read secrets?" deserves an answer at the point of the decision rather than
+ * silence. `classifyForLangy` consults this first so the caller gets the
+ * specific reason instead of the generic not-on-the-allowlist one.
  */
 const OFF_LIMITS_FAMILIES: Record<string, string> = {
   secrets: "reads the project's stored credentials",
@@ -120,10 +150,12 @@ export function splitPermission(permission: string): {
 /**
  * Should Langy be able to hold this permission on the caller's behalf?
  *
- * Fail-closed at every step: an unrecognised action and an unrecognised family
- * shape both come back `excluded`, so the rule can only ever be too strict —
- * and being too strict shows up as a CI failure naming the route, never as a
- * silently over-broad credential.
+ * Fail-closed at every step, and "every step" is meant literally: an
+ * unrecognised ACTION, an unrecognised FAMILY, and a string that is not
+ * `resource:action` at all each come back `excluded`. The rule can therefore
+ * only ever be too strict, and being too strict shows up as a reviewer having
+ * to add a family to `DELEGABLE_FAMILIES` — never as a silently over-broad
+ * credential.
  */
 export function classifyForLangy(
   permission: Permission | string,
@@ -148,6 +180,16 @@ export function classifyForLangy(
 
   const offLimits = OFF_LIMITS_FAMILIES[family];
   if (offLimits) return { disposition: "excluded", reason: offLimits };
+
+  if (!DELEGABLE_FAMILIES.has(family)) {
+    return {
+      disposition: "excluded",
+      reason:
+        `\`${family}\` is not on the list of families Langy may be delegated. ` +
+        `If Langy should be able to use it, add it to DELEGABLE_FAMILIES; if ` +
+        `not, record why in OFF_LIMITS_FAMILIES`,
+    };
+  }
 
   const readOnly = READ_ONLY_FAMILIES[family];
   if (readOnly && action !== "view") {
