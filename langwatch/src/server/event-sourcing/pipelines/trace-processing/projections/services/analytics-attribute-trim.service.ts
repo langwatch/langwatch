@@ -120,6 +120,26 @@ export const PAYLOAD_BLOCKLIST_PREFIXES: readonly string[] = [
 const METADATA_PREFIX = "metadata.";
 const RESERVED_PREFIX = "langwatch.reserved.";
 
+/**
+ * Keys the fold accumulates across spans by read-modify-write on its OWN
+ * previous value, rather than deriving fresh from each event.
+ *
+ * These must survive the trim. Under ADR-066 the trimmed map is read back as
+ * fold state, so dropping one does not merely shrink the stored row — it resets
+ * the accumulator, and the union silently restarts from the next span. Every
+ * other accumulator already sits under `langwatch.reserved.` and is kept for
+ * that reason; `langwatch.prompt_ids` is the one that does not, and at ~8
+ * prompt-bearing spans its JSON crosses the arbitrary-key cap and vanishes.
+ *
+ * A cap still bounds these — an unbounded accumulator would grow the row
+ * without limit — but at the metadata cap, not the much tighter arbitrary one.
+ * Past that ceiling truncation still breaks the JSON and resets the union; the
+ * durable fix is a typed column with an element cap, as `AnnotationIds` has.
+ */
+const FOLD_ACCUMULATOR_KEYS: ReadonlySet<string> = new Set([
+  "langwatch.prompt_ids",
+]);
+
 function isBlocklisted(key: string): boolean {
   if (PAYLOAD_BLOCKLIST_EXACT.has(key)) return true;
   for (const prefix of PAYLOAD_BLOCKLIST_PREFIXES) {
@@ -150,7 +170,7 @@ export function trimAttributesForAnalytics(
       out[key] = truncateWithEllipsis(value, ANALYTICS_METADATA_VALUE_CAP);
       continue;
     }
-    if (key.startsWith(RESERVED_PREFIX)) {
+    if (key.startsWith(RESERVED_PREFIX) || FOLD_ACCUMULATOR_KEYS.has(key)) {
       out[key] = truncateWithEllipsis(value, ANALYTICS_METADATA_VALUE_CAP);
       continue;
     }

@@ -83,6 +83,18 @@ Feature: Fold projections read back their own state
     When a late contribution that would otherwise supply a name arrives
     Then the name the person set is preserved
 
+  Scenario: a total recomputed from its recorded parts is not collapsed by the next part
+    Given an aggregate whose totals are recomputed whole from every part recorded against it
+    And whose committed state predates the fold recording those parts
+    When a further part for that aggregate arrives
+    Then the totals still account for every part recorded before it
+
+  Scenario: a sequence keeps the order things happened in rather than the order they arrived
+    Given an aggregate whose recorded sequence is kept in the order things actually happened
+    And whose committed state predates the fold recording when each entry happened
+    When a further entry arrives later than an entry that happened after it
+    Then the sequence still reflects the order things happened in
+
   Scenario: a signal with nothing else to store is not lost to a cold cache
     Given an aggregate whose only signal so far is a classification a person or job attached to it
     And the fold has no summary worth committing for it yet

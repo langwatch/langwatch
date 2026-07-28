@@ -219,3 +219,107 @@ describe("CodingAgentSessionStore durable dedup", () => {
     });
   });
 });
+
+/**
+ * The version gate (ADR-066). The read-back columns of migrations 00053/00054
+ * are only trustworthy on a row this build wrote; a row written before them
+ * decodes every one as a ClickHouse default indistinguishable from a real value.
+ * The store therefore decodes a row ONLY at the current projection version and
+ * reports any other stamp as a miss, which the fold's `refoldOnStoreMiss`
+ * rebuilds from `event_log` once.
+ */
+describe("CodingAgentSessionStore read-back version gate", () => {
+  /** A session with every read-back column carrying real, non-default values. */
+  function committedState(): CodingAgentSessionState {
+    return makeState({
+      modelCalls: 3,
+      subAgents: 2,
+      subAgentIds: ["sub-a", "sub-b"],
+      previousCallContextTokens: 12_000,
+      steps: [{ name: "Read", count: 2, failed: false, startedAtMs: 9_000 }],
+      metricSeries: {
+        "loc-added": {
+          metricName: "claude_code.lines_of_code.count",
+          type: "added",
+          decision: null,
+          language: null,
+          value: 42,
+        },
+      },
+      linesAdded: 42,
+    });
+  }
+
+  describe("given a row stamped with the current projection version", () => {
+    describe("when the fold reads it back", () => {
+      it("returns the decoded state and the durable watermark", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: makeRow(committedState()),
+          appliedEventIds: ["e1", "e2"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        const { state, appliedEventIds } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state?.subAgentIds).toEqual(["sub-a", "sub-b"]);
+        expect(state?.steps[0]?.startedAtMs).toBe(9_000);
+        expect(Object.keys(state?.metricSeries ?? {})).toEqual(["loc-added"]);
+        expect(appliedEventIds).toEqual(["e1", "e2"]);
+      });
+    });
+  });
+
+  describe("given a row stamped with an older projection version", () => {
+    /**
+     * Such a row predates the read-back columns, so each one carries its column
+     * default: an empty metric-series map makes the next contribution recompute
+     * every metric-fed total from that one series alone, an empty sub-agent id
+     * set resets the count to one, zeroed step start times leave later steps
+     * only their arrival order to be placed by, and a zeroed previous context
+     * size reads as "first call ever" so the next cache rebuild goes uncounted.
+     */
+    const staleRow = (): CodingAgentSessionRow => ({
+      ...makeRow(committedState()),
+      version: "2026-07-21",
+      subAgentIds: [],
+      stepStartedAt: [],
+      previousCallContextTokens: 0,
+      metricSeries: [],
+      lastEventOccurredAt: 0,
+    });
+
+    describe("when the fold reads it back", () => {
+      /** @scenario a stored state written under an older shape is rebuilt rather than trusted */
+      it("reports a store miss so the fold rebuilds instead of trusting it", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = {
+          row: staleRow(),
+          appliedEventIds: ["e1", "e2"],
+        };
+        const store = new CodingAgentSessionStore(repo);
+
+        const { state, appliedEventIds } = await store.getWithApplied(
+          "session-1",
+          context(),
+        );
+
+        expect(state).toBeNull();
+        // The watermark goes with the state: keeping it would suppress the very
+        // events the re-fold needs to see.
+        expect(appliedEventIds).toEqual([]);
+      });
+
+      it("misses through get() too, so both read paths agree", async () => {
+        const repo = new FakeRepo();
+        repo.withApplied = { row: staleRow(), appliedEventIds: ["e1"] };
+        const store = new CodingAgentSessionStore(repo);
+
+        expect(await store.get("session-1", context())).toBeNull();
+      });
+    });
+  });
+});

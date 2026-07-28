@@ -210,7 +210,11 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   });
 
   describe("given the option is not set", () => {
-    it("keeps the legacy init+apply behaviour on a store miss", async () => {
+    // The default is OFF, and this pins it: a fold that never opts in must not
+    // reach event_log, whatever the executor's gate is later rewritten to. An
+    // unbounded history scan is the expensive path (ADR-066), so it stays
+    // opt-in — a fold earns continuity by persisting read-back state instead.
+    it("starts from init+apply on a store miss without reading the event log", async () => {
       const e2 = makeEvent("e2", 2000);
       const store = createMockFoldProjectionStore<CountState>();
       (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);

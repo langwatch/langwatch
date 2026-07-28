@@ -415,14 +415,21 @@ export function projectAnalyticsStateToRow({
  * derives nothing.
  *
  * The slim row is deliberately lossy on ONE axis — the Attributes map is
- * trimmed at write time. That is not a read-back gap: the fold only ever reads
- * the hoisted dimension keys and the `langwatch.reserved.*` accumulators from
- * `state.attributes`. The reserved keys survive the trim by contract
- * (analytics-attribute-trim.service.ts keeps every `langwatch.reserved.*`), and
- * the dimension keys are re-injected here from their typed columns (UserId /
- * ConversationId / CustomerId / Origin / Labels) so they are faithful even when
- * a long value was trimmed out of the map. Payload / over-cap keys the trim
- * drops are never read by the fold, so their absence changes no derived value.
+ * trimmed at write time. That is not a read-back gap, but only because the trim
+ * is written to keep everything the fold reads back: the hoisted dimension keys
+ * and the accumulators it grows by read-modify-write. The dimension keys are
+ * re-injected here from their typed columns (UserId / ConversationId /
+ * CustomerId / Origin / Labels), so they are faithful even when a long value
+ * was trimmed out of the map. The accumulators survive by contract — every
+ * `langwatch.reserved.*` key plus the named exceptions in the trim service's
+ * FOLD_ACCUMULATOR_KEYS, which exists precisely because `langwatch.prompt_ids`
+ * accumulates without carrying the reserved prefix. Payload / over-cap keys the
+ * trim drops are never read by the fold, so their absence derives nothing.
+ *
+ * The coupling is real and worth stating plainly: a key that the fold reads its
+ * own previous value from, and that the trim can drop, resets the accumulator
+ * on the next read-back instead of merely shrinking the stored row. Adding such
+ * a key means adding it to that set — the fold-equivalence suite fails if not.
  *
  * This decoder is TOTAL: handed a row whose read-back columns are absent it
  * still answers, mapping the ClickHouse column defaults to state defaults

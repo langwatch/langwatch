@@ -18,6 +18,12 @@ import {
  * is a session worth a row — including a metric-only session, which has zero
  * model calls and zero tool runs and must still appear
  * (specs/coding-agent/session-aggregate.feature).
+ *
+ * Read-back (ADR-066): `get`/`getWithApplied` decode the last committed row
+ * (typed read-back columns, migrations 00053/00054) so the delivery path does
+ * not refold from `event_log`; the applied-event-id watermark rides next to the
+ * row so a cold-cache retry still dedups a redelivered batch. Decoding is gated
+ * on the row's projection version — see `getWithApplied`.
  */
 export class CodingAgentSessionStore
   implements FoldProjectionStore<CodingAgentSessionState>
@@ -94,6 +100,24 @@ export class CodingAgentSessionStore
    * a batch it already committed. It never replays `event_log`; that is the
    * offline rebuild path, not this one.
    *
+   * Those columns are only trustworthy on a row this build wrote, so the row's
+   * projection version is the discriminator: an older stamp means the row
+   * predates the read-back columns (migrations 00053/00054) and every one of
+   * them would decode as a ClickHouse default indistinguishable from a real
+   * value — an empty `MetricSeries` makes the next metric contribution recompute
+   * lines/commits/PRs/edit-decisions/active-time from that one series alone and
+   * collapse everything already converged, an empty `SubAgentIds` makes the next
+   * sub-agent span reset `subAgents` to 1, an empty `StepStartedAt` starts every
+   * decoded step at 0 so later steps can only be appended in arrival order, and
+   * a zeroed `PreviousCallContextTokens` reads as "first call ever" so the next
+   * model call's cache rebuild is never detected. So a stale-version row is
+   * reported as a MISS (null state, empty watermark — the same answer as "no
+   * row"), which the fold's `refoldOnStoreMiss` rebuilds from `event_log` once;
+   * the rewrite carries the current version and every later read hits.
+   * Transitional by construction: it stops firing as soon as the session is
+   * rewritten, and for the population as a whole once retention has aged the
+   * pre-00053 rows out.
+   *
    * `context.readWindow` — computed by the executor from the fold's declared
    * `options.readWindow` — prunes the read to a window of partitions around the
    * event being folded; it is passed through verbatim. On a windowed miss the
@@ -113,6 +137,13 @@ export class CodingAgentSessionStore
       window: context.readWindow,
     });
     if (!found) return { state: null, appliedEventIds: [] };
+    // Stale schema snapshot: the read-back columns did not exist when this row
+    // was written, so decoding it would fabricate state. Answer exactly as for
+    // "no row" — the watermark is dropped too, because a watermark without the
+    // state it belongs to would suppress the very events the re-fold needs.
+    if (found.row.version !== CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST) {
+      return { state: null, appliedEventIds: [] };
+    }
     return {
       state: codingAgentSessionStateFromRow(found.row),
       appliedEventIds: found.appliedEventIds,

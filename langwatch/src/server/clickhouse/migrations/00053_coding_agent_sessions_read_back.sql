@@ -12,8 +12,10 @@
 --
 -- ADR-066 makes the fold read back its own last committed state instead. The
 -- row already carries almost the whole state as typed columns; these five close
--- the round-trip gap so store.get() can reconstruct working state WITHOUT ever
--- reading event_log:
+-- the round-trip gap so store.get() reconstructs working state without reading
+-- event_log — for every row written at the current projection version, which
+-- after one event per session is all of them (see the version gate at the end
+-- of this header):
 --
 --   SubAgentIds               — the dedup set behind the SubAgents count; the
 --                               row carried the count + types, not the ids.
@@ -35,6 +37,49 @@
 --
 -- Each ALTER is its own statement block — ClickHouse does not support
 -- multi-statement queries.
+--
+-- Old rows are NOT read back — the projection version is the discriminator.
+--
+-- A row written before this migration omits every column above, so ClickHouse
+-- supplies the column default (empty array / 0). Those defaults are
+-- indistinguishable from real values, and decoding them into fold state would be
+-- actively wrong, not merely lossy:
+--
+--   * MetricSeries empty makes the next metric contribution recompute the
+--     metric-fed fields (lines of code, commits, PRs, edit decisions, active
+--     time) from that ONE series — every unit already converged is dropped from
+--     the totals, and the replace-not-increment contract (ADR-056 §5) turns from
+--     idempotent into destructive.
+--   * SubAgentIds empty makes the next sub-agent span reset SubAgents to 1: the
+--     count is the size of the dedup set, so a session with four sub-agents
+--     reports one.
+--   * StepStartedAt empty starts every decoded step at 0, so later steps can
+--     only be appended in ARRIVAL order — the exact "plausible-looking but
+--     wrong" sequence this column was added to prevent (spans are batched on the
+--     wire and arrive out of start order).
+--   * PreviousCallContextTokens 0 is the fold's "first call ever" sentinel, so
+--     the next model call can never be scored as a cache rebuild however large
+--     its cache-creation tokens are.
+--   * LastEventOccurredAt 0 resets the fold's out-of-order checkpoint.
+--   * AppliedEventIds (migration 00054) empty leaves a redelivered batch nothing
+--     to be recognised by.
+--
+-- So the fold's version stamp was bumped to 2026-07-27 alongside these columns —
+-- the stamp records the projected row SHAPE (ADR-021/022), which is exactly what
+-- changed — and the store decodes a row ONLY at that version. Any other stamp is
+-- reported as a store MISS (state AND watermark), which the fold's restored
+-- refoldOnStoreMiss rebuilds from event_log once. The rebuild is written back at
+-- the current version, so the row hits from then on: the population self-heals
+-- per session on its next event, with no backfill migration, and the
+-- transitional net expires on its own once retention has aged the last
+-- pre-00053 row out. Steady state is untouched — every row carries the current
+-- version, every get() hits, nothing refolds.
+--
+-- Old builds ignore the new columns entirely (additive schema). During a rolling
+-- deploy the gate is symmetric — an old node likewise declines a row a new node
+-- stamped — so a session touched by both may refold once per side until the
+-- rollout completes. Bounded by the deploy window, and the safe direction:
+-- neither build decodes a row shape it does not know.
 -- ============================================================================
 
 -- +goose StatementBegin

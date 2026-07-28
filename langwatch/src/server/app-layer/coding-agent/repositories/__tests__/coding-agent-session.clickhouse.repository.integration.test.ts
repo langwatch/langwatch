@@ -17,6 +17,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
   startTestContainers,
@@ -42,7 +43,7 @@ function sessionRow(
     tenantId,
     sessionId: `${tag}-s`,
     sessionKeySource: "provider",
-    version: "2026-07-21",
+    version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
     startedAtMs: baseMs,
     agent: "claude_code",
     agentVersion: "2.0.0",
@@ -335,7 +336,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
           TenantId: tenantId,
           SessionId: sessionId,
           StartedAt: new Date(baseMs),
-          Version: "2026-07-21",
+          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
         },
       ],
       format: "JSONEachRow",
