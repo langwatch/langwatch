@@ -96,12 +96,20 @@ export const formatTradeoffSummary = ({
       (edge?.strictlyBetterOn ?? []).map((d) => DIMENSION_WORDS[d]),
     );
 
+    // "and no worse on the rest" is only true when there IS a rest. Appending
+    // it unconditionally pointed the reader at dimensions that did not exist
+    // whenever the winner swept every one of them — a small version of
+    // exactly the fault this feature is built to avoid.
+    const tiedOnSome =
+      (edge?.strictlyBetterOn.length ?? 0) < dominance.dimensions.length;
+    const clause = tiedOnSome ? ", and no worse on the rest" : "";
+
     return {
       tone: "actionable",
       droppableIds,
       headline: `${nameOf(loserId)} is beaten outright by ${nameOf(
         winnerId,
-      )} — better on ${wonOn}, and no worse on the rest. There is nothing it is buying you.`,
+      )} — better on ${wonOn}${clause}. There is nothing it is buying you.`,
     };
   }
 

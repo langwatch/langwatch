@@ -165,3 +165,47 @@ describe("formatTradeoffSummary", () => {
     });
   });
 });
+
+describe("formatTradeoffSummary — 'the rest' has to exist", () => {
+  describe("given the winner won on every compared dimension", () => {
+    it("does not refer to dimensions it did not win", () => {
+      // "better on quality, cost and speed, and no worse on the rest" —
+      // there is no rest. A clause that points at nothing is the small
+      // version of the same fault this whole feature exists to avoid.
+      const summary = formatTradeoffSummary({
+        variantNames: names,
+        dominance: dominance({
+          dimensions: ["quality", "cost", "speed"],
+          dominatedBy: { a: [], b: ["a"] },
+          edges: [
+            {
+              winnerId: "a",
+              loserId: "b",
+              strictlyBetterOn: ["quality", "cost", "speed"],
+            },
+          ],
+        }),
+      })!;
+
+      expect(summary.headline).toContain("better on quality, cost and speed");
+      expect(summary.headline).not.toContain("no worse on the rest");
+    });
+  });
+
+  describe("given the winner tied on one dimension", () => {
+    it("still says it was no worse there", () => {
+      const summary = formatTradeoffSummary({
+        variantNames: names,
+        dominance: dominance({
+          dimensions: ["quality", "cost", "speed"],
+          dominatedBy: { a: [], b: ["a"] },
+          edges: [
+            { winnerId: "a", loserId: "b", strictlyBetterOn: ["quality", "cost"] },
+          ],
+        }),
+      })!;
+
+      expect(summary.headline).toContain("no worse on the rest");
+    });
+  });
+});
