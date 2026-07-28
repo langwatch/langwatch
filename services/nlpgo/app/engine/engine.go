@@ -297,8 +297,9 @@ func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner
 	wg.Wait()
 }
 
-// dispatch routes a node to its executor, then scrubs every resolved secret
-// value out of what that executor produced.
+// dispatch routes a node to its executor, then scrubs resolved secret values
+// out of that executor's DIAGNOSTIC output — stdout, stderr, and error text.
+// Not its outputs; see redactNodeSecrets for why that asymmetry is deliberate.
 //
 // The redaction lives HERE, at the one point both runLayer and runLayerStream
 // funnel through, rather than at each executor — because a per-executor guard
