@@ -129,14 +129,12 @@ const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
  *     prevents the list from rotting.
  */
 const LEGACY_UNBOUND: string[] = [
-  // typescript-sdk/specs was invisible to this checker until its tree was
-  // added to SPECS_ROOTS above, so none of it has ever been bound. Tolerated
-  // here so making it VISIBLE is not gated on binding 37 scenarios at once;
-  // the point of the change is that a new binding can now resolve at all.
-  // `cli/daemon.feature` is deliberately NOT here — it is fully bound.
-  "typescript-sdk/specs/evaluation/evaluation-api.feature",
-  "typescript-sdk/specs/prompts/fetch-policy.feature",
-  "typescript-sdk/specs/telemetry/langy-live-events.feature",
+  // typescript-sdk/specs is deliberately absent: adding its tree to
+  // SPECS_ROOTS above made it visible, and every scenario in it has since been
+  // resolved one way or the other — bound to a test that genuinely exercises
+  // it, or tagged @unimplemented with the gap spelled out in the feature file.
+  // Keep it that way; the tree is enforced like any other.
+  //
   // The consolidated Langy/home corpus landed while feature parity was already
   // enforce-all, but its tests predate @scenario bindings. Keep the debt
   // explicit and file-scoped while #3338 drives this list back to empty; new

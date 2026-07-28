@@ -20,21 +20,31 @@ Feature: Evaluation API
     Then the callback is called for each item with index and span
     And each iteration creates a trace span
 
-  @e2e
+  # The only test for this asserts `expect(true).toBe(true)` — it cannot fail.
+  # No test captures the `evaluations` array of a log_results request body, so
+  # nothing verifies that a logged metric reaches the API.
+  @e2e @unimplemented
   Scenario: Log custom metrics during evaluation
     Given I am inside an evaluation loop
     When I call evaluation.log with metric "accuracy" and score 0.95
     Then the metric is sent to LangWatch
     And it appears in the experiment results
 
-  @e2e
+  # `Experiment.evaluate()` — the in-loop evaluator that auto-logs its result —
+  # has no test at all. The `evaluations.*.test.ts` suites cover a DIFFERENT
+  # surface (`langwatch.evaluations.evaluate`), which never logs into an
+  # experiment, so they must not be bound here.
+  @e2e @unimplemented
   Scenario: Run built-in evaluator
     Given I am inside an evaluation loop
     When I call evaluation.run with "langevals/exact_match"
     Then the evaluator is called via the API
     And the result is logged automatically
 
-  @e2e
+  # The nearest test asserts `expect(true).toBe(true)`; nothing checks that both
+  # targets land in the experiment. The UI-comparison step is not observable
+  # from the SDK at all.
+  @e2e @unimplemented
   Scenario: Compare multiple targets with manual target specification
     Given I am inside an evaluation loop
     When I log metrics for target "gpt4" with metadata
@@ -42,7 +52,12 @@ Feature: Evaluation API
     Then both targets appear in the experiment
     And I can compare them in the UI
 
-  @e2e
+  # Only the latency step is genuinely covered. The sequential two-target test
+  # asserts both span ids are *defined*, never that they DIFFER, and no test
+  # asserts that a metric logged inside a withTarget() block is attributed to
+  # that target. See "Parallel target execution within single dataset item",
+  # which IS bound — it asserts distinct trace ids.
+  @e2e @unimplemented
   Scenario: Compare multiple targets with withTarget() wrapper
     Given I have initialized an evaluation
     And I have a dataset with 2 items
@@ -64,7 +79,11 @@ Feature: Evaluation API
     And latency is captured automatically from span duration
     And metrics logged inside withTarget() are associated with that target
 
-  @e2e
+  # The similarly-titled test ("auto-infers target in log() calls inside
+  # withTarget()") only asserts that its two callbacks ran — booleans it set
+  # itself. It never observes the inferred target, so it cannot fail if
+  # inference breaks.
+  @e2e @unimplemented
   Scenario: Automatic target context inference in nested calls
     Given I am inside a withTarget() block for "gpt-4"
     When I call evaluation.log("latency", { index, score: 100 }) without specifying target
@@ -94,7 +113,10 @@ Feature: Evaluation API
 
   # Integration: Edge cases and error handling
 
-  @integration
+  # The debounced batching exists in `Experiment.scheduleSend`, but no test
+  # counts the requests it produces — every capture-based test flattens across
+  # all captured bodies, so a per-log request would pass them unchanged.
+  @integration @unimplemented
   Scenario: Evaluation sends batched results
     Given I have initialized an evaluation
     When I log 5 metrics in quick succession
@@ -116,14 +138,20 @@ Feature: Evaluation API
     Then an error is thrown
     And the message explains the conflict
 
-  @integration
+  # Not implemented: the batch payload carries only `created_at` / `finished_at`
+  # timestamps. There is no `stopped_at` anywhere in the SDK and no failed-run
+  # marking, so there is nothing to bind.
+  @integration @unimplemented
   Scenario: Graceful shutdown on error
     Given I am in the middle of an evaluation loop
     When an error occurs in my code
     Then the SDK sends a stopped_at timestamp
     And the experiment is marked as failed
 
-  @integration
+  # Not implemented: `Experiment.sendBatch` is fire-and-forget — a failed send
+  # is logged and dropped, with no retry or backoff. (`fetchResultsWithRetry`
+  # retries the v3 RESULTS fetch, a different API, and must not be bound here.)
+  @integration @unimplemented
   Scenario: Retry on network failure
     Given the API returns a temporary error
     When the SDK tries to send results
@@ -132,7 +160,10 @@ Feature: Evaluation API
 
   # Unit: Pure logic / isolated class behavior
 
-  @unit
+  # `Experiment.serializeItem` has no test. The nearest candidate asserts that a
+  # Zod schema ACCEPTS a nested entry — schema validation, not serialization —
+  # so it does not verify this scenario's Then.
+  @unit @unimplemented
   Scenario: Dataset item serialization
     Given I have a dataset item with nested objects
     When it is serialized for the API
@@ -146,7 +177,11 @@ Feature: Evaluation API
     Then the trace_id is extracted from the span context
     And included in the logged result
 
-  @unit
+  # Same gap as "Automatic target context inference in nested calls": the
+  # isolation test's own comment concedes it is "tested implicitly by the fact
+  # that we can run them concurrently without errors". No test reads back the
+  # target a log() call was attributed to.
+  @unit @unimplemented
   Scenario: Target context isolation with AsyncLocalStorage
     Given I have two concurrent withTarget() executions
     When target "gpt-4" is executing simultaneously with target "claude-3"

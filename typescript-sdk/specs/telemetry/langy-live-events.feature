@@ -59,7 +59,11 @@ Feature: The CLI streams live progress events for the Langy UI
       Then an error event carries the failure message
       And the command still fails the way it always did
 
-    @unit
+    # No test asserts the resource/verb naming for a NON-trace command. The one
+    # test that builds a dataset/list event asserts only its error kind and
+    # status, never that the records name the dataset resource and list verb,
+    # and `dataset/list.ts` has no command-level test at all.
+    @unit @unimplemented
     Scenario: The same vocabulary describes other read commands
       Given the live event channel is switched on
       When I list datasets
