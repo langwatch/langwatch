@@ -1,6 +1,6 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { safeRelayedProse } from "~/features/errors";
+import { safeProse } from "~/features/errors/logic/readHandledError";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 
 /**
@@ -54,10 +54,17 @@ export function hasAiErrorDetails(error: AiActionError): boolean {
  * Renders all present structured detail fields for an AI error.
  *
  * This is diagnostic detail an operator opts into, not copy — the headline
- * above it comes from the code-keyed registry. `reason` is the one field the
- * provider wrote itself, so it goes through `safeRelayedProse`: it scrubs
- * credential-shaped tokens and clamps the length before a third party's
- * sentence reaches the screen.
+ * above it comes from the code-keyed registry.
+ *
+ * Every field here is something LangWatch knows rather than something an
+ * upstream said. `reason` is set only on the validation exit, where it is the
+ * query validator's own message; the provider exit sends status, provider and
+ * model and no prose at all, because the field a provider fills with its
+ * explanation is the same one it fills with the key it just rejected. See
+ * `summarizeProviderError`.
+ *
+ * `safeProse` still clamps: a server-authored sentence belongs in a row, not a
+ * paragraph.
  */
 export const AiErrorDetails: React.FC<{ error: AiActionError }> = ({
   error,
@@ -75,7 +82,7 @@ export const AiErrorDetails: React.FC<{ error: AiActionError }> = ({
     {error.details?.reason && (
       <DetailRow
         label="Reason"
-        value={safeRelayedProse(error.details.reason)}
+        value={safeProse(error.details.reason)}
         multiline
       />
     )}

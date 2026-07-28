@@ -105,10 +105,17 @@ func (s *llmStreamSniffer) inspectLine(line []byte) {
 	}
 	s.sawError = true
 
-	// Same capture shape as a rejected call: the turn's terminal error frame
-	// carries the provider's message, and a known provider discriminant
-	// (error.type) rides as a typed reason for the panel's classification.
-	e, _ := decodeLLMErrorBody(payload)
+	// Same capture shape as a rejected call: a known provider discriminant
+	// (error.type) rides as a typed reason for the panel's classification, and
+	// the provider's own prose stays out of the frame.
+	//
+	// Decoded as provider-native outright rather than through
+	// decodeLLMErrorBody's gateway-envelope test. This is an error event inside
+	// a 200 stream; the gateway reports its own failures as non-200 JSON, so
+	// there is no envelope to find here — and OpenAI's quota body would satisfy
+	// that test by coincidence and carry its prose through as though we had
+	// written it.
+	e := decodeProviderErrorBody(payload)
 	s.entry.setLLMError(e)
 
 	hard := hasHardLimitReason(e)

@@ -3,8 +3,8 @@ import { createLogger } from "@langwatch/observability";
 import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
 import { buildFieldsBlock } from "./query-language/fieldCatalogue";
+import { QUERY_SYNTAX_DOC } from "./query-language/grammar";
 import { isEmptyAST, parse } from "./query-language/parse";
 import { validateAst } from "./query-language/queries";
 
@@ -54,7 +54,17 @@ export interface AiActionErrorDetails {
   provider?: string;
   model?: string;
   httpStatus?: number;
-  /** Cleaned-up provider response text, free of stack traces. */
+  /**
+   * Why the last attempt failed, in OUR words — the query validator's own
+   * message ("unexpected token at position 12"), set only on the validation
+   * exit below.
+   *
+   * Never the provider's response text. `summarizeProviderError` used to fill
+   * this by regexing `"message"` out of the failure body, which is the field
+   * an OpenAI 401 fills with `Incorrect API key provided: sk-proj-…` — our own
+   * key, on a managed provider. The structured fields around it carry the
+   * operator-actionable part of a provider failure without any of that risk.
+   */
   reason?: string;
   /** The last query the model produced, when it produced one. */
   lastQuery?: string;
@@ -313,11 +323,16 @@ export async function generateTraceAction(
   }
 
   // Don't leak raw SDK exception messages — those carry stack-y prefixes
-  // like "litellm.BadRequestError: OpenAIException - …" plus traces.
+  // like "litellm.BadRequestError: OpenAIException - …" plus traces, and for a
+  // rejected key the provider's body is the credential itself.
   // `summarizeProviderError` extracts the operator-actionable fields
-  // (provider, model, http status, reason) for the "View details"
-  // disclosure; the headline the customer reads comes from the registry
-  // entry for `ai_query_provider_error`.
+  // (provider, model, http status) for the "View details" disclosure; the
+  // headline the customer reads comes from the registry entry for
+  // `ai_query_provider_error`.
+  //
+  // The validation exit passes a `reason` and the provider exit does not, which
+  // is the whole distinction: on that path the sentence is `validateQuery`'s,
+  // written here for a query WE parsed, with no provider body anywhere near it.
   //
   // Both exits raise the same code on purpose. From where the customer sits
   // there is one failure — the model didn't give us something we could search
@@ -333,11 +348,13 @@ export async function generateTraceAction(
 /**
  * Curate an SDK/provider exception into the operator-actionable fields
  * the UI renders in the AI-search composer's "View details" disclosure.
- * Prefers the structured fields the AI SDK's APICallError carries
- * (statusCode, responseBody) and falls back to text extraction: strips stack
- * traces and `litellm.XYZException` prefixes; pulls out HTTP status, provider
- * key, referenced model id, and the human-readable `'message'` substring
- * embedded in the JSON-shaped body LiteLLM forwards from providers.
+ * Prefers the structured `statusCode` the AI SDK's APICallError carries and
+ * falls back to text extraction: strips stack traces and `litellm.XYZException`
+ * prefixes; pulls out HTTP status, provider key and referenced model id.
+ *
+ * Everything it returns is a value from a known set — a status code, one of a
+ * fixed list of vendor names, a model id. It deliberately extracts no prose:
+ * see the note at the return.
  *
  * `context.model` is the model the backend actually resolved for the
  * call — provider errors like Azure's bare "Resource not found" carry
@@ -360,16 +377,14 @@ export function summarizeProviderError(
     .join("\n")
     .trim();
 
-  const structured = err as
-    | { statusCode?: unknown; responseBody?: unknown }
-    | null
-    | undefined;
+  // `statusCode` only. The AI SDK's APICallError also carries `responseBody`,
+  // which is the provider's raw failure body — it was read here to mine a
+  // message out of, and there is nothing else in it we want.
+  const structured = err as { statusCode?: unknown } | null | undefined;
   const structuredStatus =
     typeof structured?.statusCode === "number"
       ? structured.statusCode
       : undefined;
-  const structuredBody =
-    typeof structured?.responseBody === "string" ? structured.responseBody : "";
 
   const statusMatch =
     cleaned.match(/status[_\s]*code[:\s]+(\d{3})/i) ??
@@ -389,22 +404,26 @@ export function summarizeProviderError(
     ) ?? cleaned.match(/Unknown\s+model[:\s]+([\w./:-]+)/i);
   const model = modelMatch ? modelMatch[1] : context?.model;
 
-  const searchable = `${cleaned}\n${structuredBody}`;
-  const reasonMatch =
-    searchable.match(/['"]message['"][:\s]+['"]([^'"]{1,300})['"]/) ??
-    searchable.match(/['"]error['"][:\s]+['"]([^'"]{1,300})['"]/);
-  const reason = reasonMatch?.[1];
-
-  // When nothing structured could be pulled out, the first cleaned line is
-  // still the most informative thing there is — it belongs in the disclosure's
-  // "Reason" row, not in a headline.
-  const fallbackReason = cleaned.split("\n")[0]?.trim().slice(0, 200);
-
+  // No `reason` on this exit, deliberately.
+  //
+  // It used to be pulled straight out of the failure body with
+  // `/['"]message['"][:\s]+['"](…)['"]/`, falling back to the first line of the
+  // exception. Both land on the provider's own sentence, and `"message"` is
+  // exactly the field OpenAI answers a rejected key with: `Incorrect API key
+  // provided: sk-proj-…`. On a LangWatch-managed provider that key is OURS, so
+  // the disclosure was one 401 away from printing a platform credential — and
+  // masking it after the fact only works for credential shapes someone thought
+  // to enumerate.
+  //
+  // The fields kept below are the operator-actionable ones and none of them is
+  // free text: a status code, a provider key matched against a fixed list of
+  // vendors, a model id. They say which configured model to go fix, which is
+  // what the disclosure is for. The words stay the registry's, keyed by
+  // `ai_query_provider_error`.
   return {
     ...(provider ? { provider } : {}),
     ...(model ? { model } : {}),
     ...(httpStatus ? { httpStatus } : {}),
-    ...(reason ? { reason } : fallbackReason ? { reason: fallbackReason } : {}),
   };
 }
 
@@ -562,4 +581,3 @@ the query language, output an empty string. An empty string is a
 legitimate, polite "I couldn't translate that"; hallucinating a filter
 the operator didn't ask for is worse.`;
 }
-

@@ -11,7 +11,6 @@ import {
   readAuthoredMessage,
   readErrorTraceId,
   readHandledError,
-  redactSecrets,
   safeProse,
 } from "../readHandledError";
 
@@ -407,99 +406,6 @@ describe("safeProse", () => {
     expect(clamped).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
     expect(clamped).not.toMatch(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
     expect(clamped).not.toContain("�");
-  });
-});
-
-describe("redactSecrets", () => {
-  /**
-   * Providers put key material in their own error bodies, and those bodies are
-   * relayed verbatim onto `meta.message` for `llm_upstream_error`. When the
-   * call used a LangWatch-MANAGED provider, the key in the sentence is OURS —
-   * so an unredacted relay prints a platform credential in a toast, and again
-   * in whatever the customer pastes into a support thread.
-   */
-
-  /**
-   * Assembled at runtime, not written as a literal: a whole Slack bot token
-   * spelled out in the source trips GitHub's push protection, which blocks the
-   * push rather than the commit — so a fixture for the redactor becomes the one
-   * thing that stops the redactor shipping. Keep it in pieces. The value the
-   * assertion sees is identical; only the bytes on disk differ.
-   */
-  const slackBotToken = ["xoxb", "1234567890", "0987654321", "AbCdEfGhIjKlMnOp"].join("-");
-
-  it.each([
-    [
-      "an OpenAI 401",
-      "Incorrect API key provided: sk-proj-Ab3xQ9zLmNoPqRsTuVwXyZ01. You can find your API key at https://platform.openai.com/account/api-keys.",
-      "sk-proj-Ab3xQ9zLmNoPqRsTuVwXyZ01",
-    ],
-    [
-      "an older OpenAI key",
-      "Incorrect API key provided: sk-Ab3xQ9zLmNoPqRsTuVwXyZ01234567890.",
-      "sk-Ab3xQ9zLmNoPqRsTuVwXyZ01234567890",
-    ],
-    [
-      "an Anthropic key",
-      "authentication_error: invalid x-api-key sk-ant-api03-KJh2f8Ljs9dKJHs8fkjhSDF8",
-      "sk-ant-api03-KJh2f8Ljs9dKJHs8fkjhSDF8",
-    ],
-    [
-      "a Slack bot token",
-      `invalid_auth for token ${slackBotToken}`,
-      slackBotToken,
-    ],
-    [
-      "a GitHub token",
-      "Bad credentials for ghp_16C7e42F292c6912E7710c838347Ae178B4a",
-      "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
-    ],
-    [
-      "an AWS access key id",
-      "The security token included in the request is invalid: AKIAIOSFODNN7EXAMPLE",
-      "AKIAIOSFODNN7EXAMPLE",
-    ],
-    [
-      "an Authorization header echoed back",
-      "Rejected request with Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
-    ],
-    [
-      "a key spelled as a parameter",
-      "Unrecognised request argument api_key=9f8e7d6c5b4a39281706f5e4d3c2b1a0",
-      "9f8e7d6c5b4a39281706f5e4d3c2b1a0",
-    ],
-  ])("masks the credential in %s", (_label, body, secret) => {
-    const redacted = redactSecrets(body);
-
-    expect(redacted).not.toContain(secret);
-    expect(redacted).toContain("[redacted]");
-  });
-
-  it("leaves the sentence around it readable, which is why we relay it", () => {
-    expect(
-      redactSecrets(
-        "Your credit balance is too low to access the Claude API. Please go to Plans & Billing to upgrade or purchase credits.",
-      ),
-    ).toBe(
-      "Your credit balance is too low to access the Claude API. Please go to Plans & Billing to upgrade or purchase credits.",
-    );
-  });
-
-  it("does not mistake the words 'API key' for a key", () => {
-    expect(
-      redactSecrets("Your API key does not have access to this model."),
-    ).toBe("Your API key does not have access to this model.");
-  });
-
-  it("masks before the clamp, so a key past the cap is still masked", () => {
-    const clamped = safeProse(
-      redactSecrets(
-        `${"filler word ".repeat(30)}sk-proj-Ab3xQ9zLmNoPqRsTuVwXyZ01`,
-      ),
-    );
-
-    expect(clamped).not.toContain("sk-proj-");
   });
 });
 

@@ -26,10 +26,11 @@ export {
   UNKNOWN_ERROR_PRESENTATION,
 } from "./logic/presentation";
 export type { HandledErrorShape } from "./logic/readHandledError";
-// `safeRelayedProse` for the rare surface that renders a third party's own
-// sentence outside this feature's components — it scrubs credential-shaped
-// tokens and clamps the result. Nothing we authored needs it.
-export { readHandledError, safeRelayedProse } from "./logic/readHandledError";
+// No export for rendering a third party's own sentence, deliberately: there is
+// no surface that does. A failure we can name resolves to our copy through the
+// code-keyed registry; one we cannot resolves to the generic line and a trace
+// id. See the note above `isRecord` in `readHandledError`.
+export { readHandledError } from "./logic/readHandledError";
 export type { ResolvedErrorCopy } from "./logic/resolveErrorCopy";
 export { describeError, resolveErrorCopy } from "./logic/resolveErrorCopy";
 export type { ShowErrorToastOptions } from "./logic/showErrorToast";

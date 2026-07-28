@@ -155,12 +155,20 @@ describe("explainLangyError", () => {
 
   describe("given an agent failure whose reason chain carries the provider's message", () => {
     describe("when the failure is explained", () => {
-      /** @scenario A rejected model call shows the provider's own message on the card */
-      it("shows the provider's own message on the card, inside the friendly framing", () => {
-        // The langyagent LLM proxy captures the model provider's error body
-        // (an out-of-credits Anthropic account, the codex backend rejecting a
-        // model) with the prose in meta.message — the one channel the card is
-        // allowed to read (ADR-045). The same text the playground shows.
+      /** @scenario A rejected model call never recites the provider's own message */
+      it("keeps the provider's sentence off the card", () => {
+        // This test asserted the OPPOSITE until the leak was found, on the
+        // reasoning that a provider's error body is written for its caller and
+        // is therefore safe to show. It is written for whoever holds the KEY,
+        // and on a LangWatch-managed provider that is us: OpenAI answers a bad
+        // key with `Incorrect API key provided: sk-proj-…`, so the card was one
+        // 401 away from printing a platform credential. Masking it afterwards
+        // only covers the credential shapes someone enumerated.
+        //
+        // The message here is the benign out-of-credits one, deliberately: the
+        // rule is that NO upstream prose reaches the card, not that we filter
+        // the dangerous-looking ones. A test using a key-shaped fixture would
+        // still pass against a scrubber.
         const providerMessage =
           "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.";
         const presentation = explainLangyError(
@@ -177,8 +185,9 @@ describe("explainLangyError", () => {
 
         expect(presentation.kind).toBe("langy_agent_errored");
         expect(presentation.title).toBe("Langy's reply failed");
+        expect(presentation.description).not.toContain("credit balance");
         expect(presentation.description).toBe(
-          `The model provider rejected this reply: ${providerMessage} Your message is safe. Try again, or pick a different model from the composer.`,
+          "Langy hit an error while writing this reply. Your message is safe — try again.",
         );
         expect(presentation.action).toEqual({
           label: "Try again",
@@ -186,7 +195,7 @@ describe("explainLangyError", () => {
         });
       });
 
-      it("reads the message from a NESTED reason too", () => {
+      it("keeps a NESTED reason's message off the card too", () => {
         const presentation = explainLangyError(
           domain({
             code: "langy_agent_errored",
@@ -203,8 +212,45 @@ describe("explainLangyError", () => {
             ],
           }),
         );
-        expect(presentation.description).toContain("model overloaded");
+        expect(presentation.description).not.toContain("model overloaded");
       });
+    });
+  });
+
+  describe("given an agent failure whose reason chain names an out-of-allowance provider", () => {
+    describe("when the failure is explained", () => {
+      /** @scenario An out-of-allowance model call is promoted by reason code, not by message */
+      it.each(["insufficient_quota", "billing_hard_limit_reached"])(
+        "promotes %s to the plan-limit card",
+        (reasonCode) => {
+          // The meaning the old relay carried — "you have nothing left to
+          // spend" — survives as a discriminant rather than as the provider's
+          // sentence. `usage_limit_reached` and `codex_plan_limit` were already
+          // promoted; these two are the same situation reached through OpenAI's
+          // own API codes, and they were only ever explained by the prose.
+          //
+          // `meta.message` is populated and must still not appear: the copy is
+          // selected by the code and written in the registry.
+          const presentation = explainLangyError(
+            domain({
+              code: "langy_agent_errored",
+              reasons: [
+                {
+                  kind: "llm_upstream_error",
+                  reasons: [{ kind: reasonCode }],
+                  meta: { message: "You exceeded your current quota." },
+                },
+              ],
+            }),
+          );
+
+          expect(presentation.kind).toBe("langy_codex_plan_limit");
+          expect(presentation.title).toBe(
+            "You've reached your OpenAI plan's limit",
+          );
+          expect(presentation.description).not.toContain("current quota");
+        },
+      );
     });
   });
 

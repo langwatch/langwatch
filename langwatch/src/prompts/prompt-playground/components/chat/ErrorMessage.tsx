@@ -1,10 +1,6 @@
 import { Alert } from "@chakra-ui/react";
 import { Link } from "~/components/ui/link";
 import { describeError } from "~/features/errors";
-// Deep import: `safeRelayedProse` is the clamp the registry applies to a third
-// party's sentence, and it is not on the barrel because nothing outside the
-// errors module had needed it until this surface.
-import { safeRelayedProse } from "~/features/errors/logic/readHandledError";
 import type { ParsedLLMError } from "~/utils/formatLLMError";
 
 interface ErrorMessageProps {
@@ -14,41 +10,64 @@ interface ErrorMessageProps {
 /**
  * Displays error messages in the chat with type-specific styling and actions.
  *
- * `error.message` here is NOT the message of an error we threw. `parseLLMError`
- * pulls it out of the model provider's own response body, and showing that
- * sentence is the point of the playground: "Your credit balance is too low" is
- * the fix, where "something went wrong" is advice that cannot work.
+ * This used to render `error.message`, which is NOT the message of an error we
+ * threw: `parseLLMError` pulls it out of the model provider's own response
+ * body. The justification was that the provider's sentence is the point ("Your
+ * credit balance is too low" is a fix; "something went wrong" is not), with a
+ * credential mask over the top to make it safe.
  *
- * Two rules keep that from being a leak:
+ * The mask was the flaw. It matched credential SHAPES, so it could only ever
+ * cover the shapes someone had thought of — and the body it was covering is the
+ * one OpenAI fills with `Incorrect API key provided: sk-proj-…`, where on a
+ * managed provider the key is LangWatch's rather than the customer's.
  *
- *  - `type: "unknown"` means the parser recognised nothing, so the string is
- *    whatever message the copilotkit adapter happened to catch — one of ours,
- *    a driver diagnostic, a stack-adjacent internal. Those are explained by
- *    the registry rather than recited.
- *  - Everything else is a third party's prose, so it is credential-masked and
- *    clamped to a sentence, exactly as the registry does for
- *    `llm_upstream_error`.
+ * What survived the removal is the part that was always doing the work:
+ * `parseLLMError` already classifies the failure into a small closed set of
+ * types, and this component already branched on that set to choose an action
+ * link. So the type now chooses the sentence too. Each one is written below,
+ * says what the customer can actually do, and cannot contain anything an
+ * upstream wrote. `unknown` keeps going to the registry, as before.
  */
 export function ErrorMessage({ error }: ErrorMessageProps) {
   const description =
     error.type === "unknown"
       ? describeError({ error })
-      : safeRelayedProse(error.message);
+      : describeLLMError(error.type);
 
   return (
     <Alert.Root status="error" borderRadius="md">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Description>
-          {/* The guard sees a local derived from `.message` and can't see that
-              the derivation is `safeRelayedProse`, the registry's own clamp for
-              a third party's sentence. Exempted per line, not per file. */}
-          {description /* no-raw-error-toast-ok */}
+          {description}
           {renderAction(error.type)}
         </Alert.Description>
       </Alert.Content>
     </Alert.Root>
   );
+}
+
+/**
+ * The sentence for each failure class `parseLLMError` recognises.
+ *
+ * Sits next to `renderAction`, which has always chosen the follow-on link off
+ * the same discriminant — one switch for what happened, one for what to do
+ * about it. `unknown` is absent on purpose: it means the parser recognised
+ * nothing, which is the registry's generic case, not a case to write copy for.
+ */
+function describeLLMError(type: Exclude<ParsedLLMError["type"], "unknown">) {
+  switch (type) {
+    case "auth":
+      return "The model provider rejected our credentials for this model.";
+    case "not_found":
+      return "The model provider doesn't have the model this prompt asks for.";
+    case "rate_limit":
+      return "The model provider is rate-limiting this project, or the account behind it has no allowance left.";
+    case "bad_request":
+      return "The model provider rejected the request — usually a parameter this model doesn't support, or a conversation past its context limit.";
+    case "connection":
+      return "We couldn't reach the model provider.";
+  }
 }
 
 function renderAction(type: ParsedLLMError["type"]) {

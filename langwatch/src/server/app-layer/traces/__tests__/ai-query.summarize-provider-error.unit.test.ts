@@ -5,9 +5,18 @@
  * "Resource not found" used to produce `{}`, leaving the operator with nothing
  * to act on.
  *
- * It deliberately produces no headline. The words a customer reads come from
- * the `ai_query_provider_error` entry in the presentation registry — a
- * provider's own sentence is diagnostic detail, never our copy.
+ * It deliberately produces no headline AND no prose. The words a customer reads
+ * come from the `ai_query_provider_error` entry in the presentation registry;
+ * everything this function returns is a value from a known set — a status code,
+ * a vendor name matched against a fixed list, a model id.
+ *
+ * That last part is the point of half the tests below. This used to return a
+ * `reason` scraped out of the provider's failure body with
+ * `/['"]message['"][:\s]+['"](…)['"]/`, and `"message"` is the field OpenAI
+ * fills with `Incorrect API key provided: sk-proj-…`. On a LangWatch-managed
+ * provider that key is ours, so the disclosure was one 401 away from printing a
+ * platform credential — and an earlier version of this very file asserted the
+ * extraction worked, quoting that sentence, which is how it survived review.
  */
 import { describe, expect, it } from "vitest";
 
@@ -36,7 +45,7 @@ describe("summarizeProviderError", () => {
       });
     });
 
-    it("extracts the reason from a JSON responseBody", () => {
+    it("takes no reason from a JSON responseBody", () => {
       const err = new FakeApiCallError(
         "Resource not found",
         404,
@@ -44,32 +53,47 @@ describe("summarizeProviderError", () => {
       );
       const out = summarizeProviderError(err, { model: "azure/gpt-5.4-mini" });
 
-      expect(out.reason).toBe(
-        "The API deployment for this resource does not exist",
-      );
+      // A benign message, deliberately: the rule is that no provider prose is
+      // extracted, not that the credential-shaped ones are filtered out. A test
+      // using a key-bearing fixture would still pass against a scrubber.
+      expect(out.reason).toBeUndefined();
+      expect(out.httpStatus).toBe(404);
     });
   });
 
   describe("when the error is only a text blob", () => {
-    it("still surfaces the resolved model alongside the raw first line", () => {
+    it("still surfaces the resolved model, without the raw first line", () => {
       const out = summarizeProviderError(new Error("Resource not found"), {
         model: "azure/gpt-5.4-mini",
       });
 
       expect(out.model).toBe("azure/gpt-5.4-mini");
-      expect(out.reason).toBe("Resource not found");
+      expect(out.reason).toBeUndefined();
     });
 
-    it("keeps litellm-style extraction working without model context", () => {
+    it("keeps litellm-style extraction of the structured fields", () => {
       const out = summarizeProviderError(
         new Error(
           'litellm.AuthenticationError: OpenAIException - {"message": "Incorrect API key provided", "status_code: 401"}',
         ),
       );
 
+      // Provider and status still come through — they are what tells an
+      // operator which configured model to go fix, and neither can carry a key.
       expect(out.provider).toBe("openai");
       expect(out.httpStatus).toBe(401);
-      expect(out.reason).toContain("Incorrect API key provided");
+    });
+
+    it("never returns the provider's own sentence, even when it holds a key", () => {
+      const out = summarizeProviderError(
+        new Error(
+          'litellm.AuthenticationError: OpenAIException - {"message": "Incorrect API key provided: sk-proj-NOT-A-REAL-KEY. You can find your API key at https://platform.openai.com/account/api-keys.", "status_code: 401"}',
+        ),
+      );
+
+      expect(JSON.stringify(out)).not.toContain("sk-proj-");
+      expect(JSON.stringify(out)).not.toContain("Incorrect API key");
+      expect(out.reason).toBeUndefined();
     });
   });
 

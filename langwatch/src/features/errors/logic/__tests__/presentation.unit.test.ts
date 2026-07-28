@@ -133,16 +133,28 @@ describe("explainHandledError", () => {
       expect(titleFor(undefined)).toBe("Dataset import stalled");
     });
 
-    /** @scenario "Server-authored prose travels only in the explicit channel" */
-    it("renders server prose only from the explicit meta.message channel", () => {
-      const { description } = explainHandledError(
+    /** @scenario "An unrecognised code renders no prose at all" */
+    it("renders nothing from meta.message for a code it has no entry for", () => {
+      // The inverse of what this asserted before. An unrecognised code is the
+      // branch with the least standing to render a sentence: the client has no
+      // entry for it, so it cannot say which service minted it, whether the
+      // prose was written for a customer, or whether it is a provider body
+      // relayed through a hop nobody can see. Rendering it anyway is how an
+      // upstream's words — and whatever they quote — reach LangWatch's own
+      // error chrome unread.
+      //
+      // Empty is the correct answer: callers fall back to the server's first
+      // remediation tip, then to the generic line and a trace id. The fix for a
+      // code that lands here often is to give it an entry.
+      const { description, isRegistered } = explainHandledError(
         shape({
           code: "some_future_code",
           meta: { message: "The widget is out of stock." },
         }),
       );
 
-      expect(description).toBe("The widget is out of stock.");
+      expect(isRegistered).toBe(false);
+      expect(description).toBe("");
     });
   });
 
@@ -351,19 +363,20 @@ describe("explainHandledError", () => {
        * Narrower than {@link ALLOWED_ECHOES}: an exemption that applies to
        * every code is a hole, and `meta.message` is the field a relayed Go
        * service can write, so it is named per code and nowhere else.
+       *
+       * Every entry left here is prose LangWatch AUTHORED. `llm_upstream_error`
+       * used to sit alongside them as the one admitted relay — the model
+       * provider's own rejection, on the grounds that it is the same sentence
+       * the provider's SDK shows its caller. That is true only for the caller
+       * who owns the key; for a mediated call the caller is us, and OpenAI
+       * writes rejected keys into exactly this field. It echoes nothing now, so
+       * the list is once again only our own words.
        */
       const ALLOWED_PER_CODE: Record<string, Set<string>> = {
         // The provider's own reason for rejecting delivery is the entire
         // value of this error — "invite the bot with /invite @LangWatch".
         // Authored server-side by `explainSlackPostError`, never relayed.
         notification_delivery_error: new Set(["message"]),
-        // The model provider's own rejection, captured by the langyagent LLM
-        // proxy. Relayed rather than authored — the one exemption here that is
-        // — and deliberately so: it is the same sentence the provider's SDK
-        // shows its caller, and "your credit balance is too low" is the whole
-        // fix where "try again" is advice that cannot work. Clamped by
-        // `safeProse`, because the endpoint behind it may be the customer's.
-        llm_upstream_error: new Set(["message"]),
         // Here `reason` is not a machine sub-classifier: it is the sentence
         // the service wrote for this exact case ("This automation has no email
         // recipients to test-fire to."), and it names WHICH piece is missing.

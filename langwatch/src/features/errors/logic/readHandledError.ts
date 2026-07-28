@@ -250,65 +250,29 @@ export function safeProse(value: string): string {
 
 const MAX_PROSE_LENGTH = 200;
 
-/**
- * Relayed prose — a third party's sentence, shown because it is the whole
- * answer — with anything credential-shaped masked before it is clamped.
+/*
+ * There is deliberately no `redactSecrets` here, and no "relayed prose" variant
+ * of `safeProse`.
  *
- * Use this, never {@link safeProse}, for text that originated outside
- * LangWatch. Copy authored in the presentation registry needs neither.
+ * An earlier version of this file masked credential-shaped runs out of a third
+ * party's sentence before showing it. That is unsafe by construction: it
+ * matches on SHAPE, so it can only mask the shapes someone thought of, and the
+ * credential that leaks is by definition the one whose shape was not
+ * enumerated. A scrubber that is wrong once is worse than none, because the
+ * surfaces downstream of it were written believing the string was clean.
+ *
+ * The contract already had the right answer (ADR-045): when we know the cause
+ * and the caller can act on it, we mint a `HandledError` with a stable `code`
+ * and the customer reads OUR words, chosen from the code-keyed registry in
+ * `presentation.ts`. When we do not know it, they read the generic line and a
+ * trace id. Neither branch needs a third party's sentence, so no surface here
+ * renders one and nothing has to be scrubbed.
+ *
+ * Structured facts lifted off a payload — an HTTP status, a provider key, a
+ * model id, a provider's own error-type discriminant — are fine and are used
+ * freely. They are values from small, known sets, not free text, so they cannot
+ * smuggle a key.
  */
-export function safeRelayedProse(value: string): string {
-  return safeProse(redactSecrets(value));
-}
-
-/**
- * Masks credential-shaped tokens in text we are about to show a customer.
- *
- * Providers put key material in their own error bodies: an OpenAI 401 answers
- * `Incorrect API key provided: sk-proj-…`, and that body is relayed verbatim
- * onto `meta.message` for `llm_upstream_error`. When the call went through a
- * LangWatch-MANAGED provider, the key in that sentence is OURS, not the
- * customer's — so the relayed sentence would print a platform credential in a
- * toast, and again in whatever the customer pastes into a support thread.
- *
- * Deliberately shape-based rather than a list of known vendors: a prefix we
- * have not enumerated is exactly the one that leaks. The final two patterns
- * are the catch-all — a 20-character unbroken run of key-alphabet characters
- * is a token, not a word.
- *
- * Redaction happens BEFORE truncation, so a key that would have sat past the
- * 200-character clamp is still masked rather than merely cropped out of this
- * particular surface.
- */
-export function redactSecrets(text: string): string {
-  return text.replace(SECRET_SHAPES, REDACTED);
-}
-
-const REDACTED = "[redacted]";
-
-const SECRET_SHAPES = new RegExp(
-  [
-    // `Authorization: Bearer <token>`, echoed back by upstreams that quote the
-    // request they refused.
-    "\\bBearer\\s+[A-Za-z0-9._~+/=-]{8,}",
-    // `api_key=…`, `apiKey: "…"`, `api-key = …`. The separator class is
-    // required, so the English words "API key" (with a space) are left alone —
-    // they are usually the sentence that names the problem.
-    "\\bapi[-_]?key[\"'\\s:=]+\\S+",
-    // OpenAI / Anthropic / OpenRouter and anything else using the same shape.
-    "\\bsk-(?:proj-|ant-|or-v1-|live-|test-)?[A-Za-z0-9_-]{8,}",
-    // Slack bot, user, app and legacy tokens.
-    "\\bxox[abpsre]-[A-Za-z0-9-]{8,}",
-    // GitHub personal access tokens, old and new.
-    "\\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}",
-    // AWS access key ids (long-lived and STS).
-    "\\b(?:AKIA|ASIA)[A-Z0-9]{12,}",
-    // The catch-all: a base64url or hex run long enough that no one typed it.
-    "\\b[A-Za-z0-9+/_-]{20,}={0,2}",
-    "\\b[0-9a-f]{20,}\\b",
-  ].join("|"),
-  "gi",
-);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
