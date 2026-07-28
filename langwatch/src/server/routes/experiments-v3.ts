@@ -69,13 +69,13 @@ const apiKeyAuthRead = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:view"],
-  credential: "session",
+  credential: "apiKey",
 });
 const apiKeyAuthRun = handlerManagedAuth({
   reason:
     "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
-  credential: "session",
+  credential: "apiKey",
 });
 
 // Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...

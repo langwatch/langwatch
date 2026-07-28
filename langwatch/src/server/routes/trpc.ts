@@ -155,7 +155,7 @@ secured.access(
       reason: "tRPC enforces per-procedure RBAC internally",
       // Per-procedure, via checkProjectPermission — not visible at route level.
       permissions: [],
-  credential: "session",
+  credential: "both",
 }),
 ).get("/trpc/*", handler);
 secured.access(
@@ -163,7 +163,7 @@ secured.access(
       reason: "tRPC enforces per-procedure RBAC internally",
       // Per-procedure, via checkProjectPermission — not visible at route level.
       permissions: [],
-  credential: "session",
+  credential: "both",
 }),
 ).post("/trpc/*", handler);
 

@@ -28,7 +28,10 @@ import { describe, expect, it } from "vitest";
 
 import { LANGY_CANDIDATE_PERMISSIONS } from "../langyApiKey";
 import { classifyForLangy } from "../langyPermissionPolicy";
-import { permissionsDemandedByRoutes } from "./helpers/routePermissions";
+import {
+  experimentRoutePermissions,
+  permissionsDemandedByRoutes,
+} from "./helpers/routePermissions";
 
 describe("Langy permission coverage", () => {
   describe("given every permission the mounted API routes demand", () => {
@@ -77,6 +80,36 @@ describe("Langy permission coverage", () => {
     });
   });
 
+  // A route marked with the wrong `credential` is INVISIBLE rather than wrong:
+  // the sweeps skip it and stay green while checking less than they claim.
+  // That is not hypothetical — both API-key policies in experiments-v3 shipped
+  // as `session` for one commit, which silently dropped `evaluations:view` and
+  // `evaluations:create` from the session-key suite. Nothing caught it, because
+  // the one permission the guard named came from a different policy kind.
+  //
+  // So pin the credential classification itself: every grain the experiment
+  // surface enforces for a KEY-bearing caller has to be reachable as one.
+  describe("given the experiment routes an API key can reach", () => {
+    describe("when their credential classification is read back", () => {
+      it("includes the run and read grains, not just the list read", () => {
+        const reachable = experimentRoutePermissions();
+
+        // From `requires("experiments:view")` — a middleware policy, so it
+        // survives even a total handler-managed misclassification. On its own
+        // it proves nothing about `credential`.
+        expect(reachable).toContain("experiments:view");
+        // These come ONLY from handler-managed policies that must be marked
+        // `apiKey`. If either is missing, a route is classified as unreachable
+        // by a key when the CLI reaches it every day.
+        expect(reachable).toContain("evaluations:view");
+        expect(reachable).toContain("evaluations:create");
+        // The session-only execute route must NOT leak in: Langy holds a key,
+        // never a browser session, and that route demands the manage grain.
+        expect(reachable).not.toContain("evaluations:manage");
+      });
+    });
+  });
+
   // The regression that started this: the reported 403 was `experiments:view`
   // on `GET /api/experiments`, and the run route asked `evaluations:manage` —
   // a grain no least-privilege key can hold. Both are covered by the sweeps
@@ -86,18 +119,18 @@ describe("Langy permission coverage", () => {
       it("demands only permissions the Langy key carries", async () => {
         const demanded = permissionsDemandedByRoutes();
 
-        const experimentRoutePermissions = [...demanded.entries()]
+        const experimentGrains = [...demanded.entries()]
           .filter(([, routes]) =>
             routes.some((r) => r.includes("/api/experiments")),
           )
           .map(([permission]) => permission);
 
         // The list endpoint's dedicated read must be there...
-        expect(experimentRoutePermissions).toContain("experiments:view");
+        expect(experimentGrains).toContain("experiments:view");
         // ...and every experiment-route permission Langy is meant to hold must
         // actually be held. `evaluations:manage` on the session-only execute
         // route is correctly excluded, so it is filtered out by the policy.
-        const shouldHold = experimentRoutePermissions.filter(
+        const shouldHold = experimentGrains.filter(
           (p) => classifyForLangy(p).disposition === "granted",
         );
         expect(shouldHold.length).toBeGreaterThan(0);
