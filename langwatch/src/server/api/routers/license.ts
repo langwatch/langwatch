@@ -2,28 +2,53 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOrganizationPermission } from "../rbac";
-import { type LicenseStatus, getPlanTemplate } from "../../../../ee/licensing";
-import { licenseValidationError } from "../../../../ee/licensing/errors";
-import type { LicenseData } from "../../../../ee/licensing";
-import { signLicense, encodeLicenseKey, generateLicenseId } from "../../../../ee/licensing/signing";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
+import type { LicenseData } from "../../../../ee/licensing";
+import { getPlanTemplate, type LicenseStatus } from "../../../../ee/licensing";
+import { licenseValidationError } from "../../../../ee/licensing/errors";
+import {
+  encodeLicenseKey,
+  generateLicenseId,
+  signLicense,
+} from "../../../../ee/licensing/signing";
+import { checkOrganizationPermission } from "../rbac";
 
 const logger = createLogger("langwatch:api:licenseRouter");
 
 /** Schema for plan limits input */
 const planLimitsSchema = z.object({
   maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMembersLite: z.number().int().positive("Plan limits must be positive numbers"),
+  maxMembersLite: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
   maxTeams: z.number().int().positive("Plan limits must be positive numbers"),
-  maxProjects: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
-  maxWorkflows: z.number().int().positive("Plan limits must be positive numbers"),
+  maxProjects: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
+  maxMessagesPerMonth: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
+  maxWorkflows: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
   maxPrompts: z.number().int().positive("Plan limits must be positive numbers"),
-  maxEvaluators: z.number().int().positive("Plan limits must be positive numbers"),
-  maxScenarios: z.number().int().positive("Plan limits must be positive numbers"),
+  maxEvaluators: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
+  maxScenarios: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
   maxAgents: z.number().int().positive("Plan limits must be positive numbers"),
-  maxExperiments: z.number().int().positive("Plan limits must be positive numbers"),
+  maxExperiments: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
   canPublish: z.boolean(),
   usageUnit: z.enum(["traces", "events"]),
 });
@@ -46,7 +71,7 @@ export const licenseRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string().min(1),
-      })
+      }),
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input }): Promise<LicenseStatus> => {
@@ -64,13 +89,13 @@ export const licenseRouter = createTRPCRouter({
       z.object({
         organizationId: z.string().min(1),
         licenseKey: z.string().min(1, "License key is required"),
-      })
+      }),
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
       const result = await getLicenseHandler().validateAndStoreLicense(
         input.organizationId,
-        input.licenseKey
+        input.licenseKey,
       );
 
       if (!result.success) {
@@ -93,11 +118,13 @@ export const licenseRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string().min(1),
-      })
+      }),
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      const result = await getLicenseHandler().removeLicense(input.organizationId);
+      const result = await getLicenseHandler().removeLicense(
+        input.organizationId,
+      );
 
       return {
         success: true,
@@ -111,13 +138,16 @@ export const licenseRouter = createTRPCRouter({
    */
   generate: protectedProcedure
     .input(
-      z.object({
-        organizationId: z.string().min(1),
-      }).merge(generateLicenseSchema)
+      z
+        .object({
+          organizationId: z.string().min(1),
+        })
+        .merge(generateLicenseSchema),
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      const { privateKey, organizationName, email, expiresAt, planType, plan } = input;
+      const { privateKey, organizationName, email, expiresAt, planType, plan } =
+        input;
 
       // Validate expiration is in the future
       if (expiresAt <= new Date()) {

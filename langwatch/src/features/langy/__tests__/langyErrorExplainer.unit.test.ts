@@ -220,37 +220,37 @@ describe("explainLangyError", () => {
   describe("given an agent failure whose reason chain names an out-of-allowance provider", () => {
     describe("when the failure is explained", () => {
       /** @scenario An out-of-allowance model call is promoted by reason code, not by message */
-      it.each(["insufficient_quota", "billing_hard_limit_reached"])(
-        "promotes %s to the plan-limit card",
-        (reasonCode) => {
-          // The meaning the old relay carried — "you have nothing left to
-          // spend" — survives as a discriminant rather than as the provider's
-          // sentence. `usage_limit_reached` and `codex_plan_limit` were already
-          // promoted; these two are the same situation reached through OpenAI's
-          // own API codes, and they were only ever explained by the prose.
-          //
-          // `meta.message` is populated and must still not appear: the copy is
-          // selected by the code and written in the registry.
-          const presentation = explainLangyError(
-            domain({
-              code: "langy_agent_errored",
-              reasons: [
-                {
-                  kind: "llm_upstream_error",
-                  reasons: [{ kind: reasonCode }],
-                  meta: { message: "You exceeded your current quota." },
-                },
-              ],
-            }),
-          );
+      it.each([
+        "insufficient_quota",
+        "billing_hard_limit_reached",
+      ])("promotes %s to the plan-limit card", (reasonCode) => {
+        // The meaning the old relay carried — "you have nothing left to
+        // spend" — survives as a discriminant rather than as the provider's
+        // sentence. `usage_limit_reached` and `codex_plan_limit` were already
+        // promoted; these two are the same situation reached through OpenAI's
+        // own API codes, and they were only ever explained by the prose.
+        //
+        // `meta.message` is populated and must still not appear: the copy is
+        // selected by the code and written in the registry.
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                reasons: [{ kind: reasonCode }],
+                meta: { message: "You exceeded your current quota." },
+              },
+            ],
+          }),
+        );
 
-          expect(presentation.kind).toBe("langy_codex_plan_limit");
-          expect(presentation.title).toBe(
-            "You've reached your OpenAI plan's limit",
-          );
-          expect(presentation.description).not.toContain("current quota");
-        },
-      );
+        expect(presentation.kind).toBe("langy_codex_plan_limit");
+        expect(presentation.title).toBe(
+          "You've reached your OpenAI plan's limit",
+        );
+        expect(presentation.description).not.toContain("current quota");
+      });
     });
   });
 
