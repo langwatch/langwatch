@@ -30,6 +30,14 @@ export interface RedTeamBody {
   } | null;
 }
 
+/**
+ * Mirrors RED_TEAM_MAX_TURNS on the platform, which owns the real limit and
+ * rejects anything past it. Duplicated because the CLI cannot import from the
+ * app; the point of checking here is a message that names the flag rather than
+ * a validation error from a round trip.
+ */
+const MAX_TURNS = 50;
+
 export class RedTeamOptionError extends Error {}
 
 function isStrategy(value: string): value is RedTeamStrategyName {
@@ -82,9 +90,9 @@ export function toRedTeamBody(options: RedTeamCliOptions): RedTeamBody {
 
   if (options.redTeamTurns !== undefined) {
     const turns = Number(options.redTeamTurns);
-    if (!Number.isInteger(turns) || turns < 1 || turns > 50) {
+    if (!Number.isInteger(turns) || turns < 1 || turns > MAX_TURNS) {
       throw new RedTeamOptionError(
-        `--red-team-turns must be a whole number between 1 and 50, got "${options.redTeamTurns}".`,
+        `--red-team-turns must be a whole number between 1 and ${MAX_TURNS}, got "${options.redTeamTurns}".`,
       );
     }
     body.redTeamTotalTurns = turns;
