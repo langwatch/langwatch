@@ -8,7 +8,7 @@
  * with its own specs) and the tRPC surface is a proxy that answers every
  * query empty unless a test pins it. The two pinned reads are the personal
  * context (which project the /me home watches) and
- * project.getHasFirstMessage — the same Project.firstMessage signal the
+ * project.getHasFirstMessage, the same Project.firstMessage signal the
  * authorize page's first-trace watch polls, reused here as the button's
  * appearance gate.
  */

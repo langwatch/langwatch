@@ -9,7 +9,7 @@ Feature: Connect your agent from the /me usage home
   # is the /me home's EXPLORATION control: it appears only once usage exists
   # and points an agent at the reader's own traces and spend.
   #
-  # The appearance gate is Project.firstMessage on the personal project — the
+  # The appearance gate is Project.firstMessage on the personal project, the
   # same first-traces signal the authorize page's post-login watch polls
   # (specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature).
   #
