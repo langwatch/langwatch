@@ -231,9 +231,7 @@ describe("PromptPlaygroundChat ref methods", () => {
         </ChakraProvider>,
       );
 
-      const AssistantMessageProp = captured.chatProps?.[
-        "AssistantMessage"
-      ] as unknown as React.ComponentType<Record<string, unknown>>;
+      const AssistantMessageProp = captured.chatProps?.AssistantMessage as unknown as React.ComponentType<Record<string, unknown>>;
       expect(AssistantMessageProp).toBeDefined();
 
       render(

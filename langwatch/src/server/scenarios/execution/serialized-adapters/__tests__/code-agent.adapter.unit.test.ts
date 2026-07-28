@@ -352,8 +352,8 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const inputsRecord = callBody.payload.inputs[0];
-      expect(inputsRecord["query"]).toBe("Hello");
-      expect(inputsRecord["context"]).toBe("Search the knowledge base");
+      expect(inputsRecord.query).toBe("Hello");
+      expect(inputsRecord.context).toBe("Search the knowledge base");
     });
 
     it("uses resolved mappings for workflow node input values", async () => {
@@ -385,8 +385,8 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const inputsRecord = callBody.payload.inputs[0];
-      expect(inputsRecord["query"]).toBe("Hello");
-      expect(inputsRecord["deleted_field"]).toBeUndefined();
+      expect(inputsRecord.query).toBe("Hello");
+      expect(inputsRecord.deleted_field).toBeUndefined();
     });
   });
 
@@ -407,8 +407,8 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const inputsRecord = callBody.payload.inputs[0];
-      expect(inputsRecord["query"]).toBe("Hello");
-      expect(inputsRecord["context"]).toBe("");
+      expect(inputsRecord.query).toBe("Hello");
+      expect(inputsRecord.context).toBe("");
     });
   });
 

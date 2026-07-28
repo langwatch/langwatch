@@ -7,10 +7,6 @@ const service = new CanonicalizeSpanAttributesService();
 const stubSpan = makeStubSpan();
 
 /** Vercel AI SDK spans require instrumentationScope.name === "ai" */
-const vercelSpan = makeStubSpan({
-  name: "ai.generateText",
-  instrumentationScope: { name: "ai", version: "3.0" },
-});
 
 describe("CanonicalizeSpanAttributesService — chat message coercion", () => {
   describe("when messages are standard {role, content} format", () => {

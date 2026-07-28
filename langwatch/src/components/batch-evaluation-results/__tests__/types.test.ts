@@ -245,7 +245,7 @@ describe("transformBatchEvaluationData", () => {
       expect(result.targetColumns[0]?.name).toBe("Output");
       expect(result.rows).toHaveLength(1);
       expect(result.rows[0]?.datasetEntry).toEqual({ input: "test" });
-      expect(result.rows[0]?.targets["_default"]?.error).toBe("Connection timeout");
+      expect(result.rows[0]?.targets._default?.error).toBe("Connection timeout");
     });
   });
 
@@ -700,25 +700,25 @@ describe("transformBatchEvaluationData", () => {
 
       // Each target should have its own output from evaluator inputs
       expect(
-        result.rows[0]?.targets["_eval_sample_metric"]?.output,
+        result.rows[0]?.targets._eval_sample_metric?.output,
       ).toEqual({ output: "The answer is 4" });
       expect(
-        result.rows[0]?.targets["_eval_sample_metric2"]?.output,
+        result.rows[0]?.targets._eval_sample_metric2?.output,
       ).toEqual({ output: "Another response" });
 
       // Each target should have only its own evaluator result
       expect(
-        result.rows[0]?.targets["_eval_sample_metric"]?.evaluatorResults,
+        result.rows[0]?.targets._eval_sample_metric?.evaluatorResults,
       ).toHaveLength(1);
       expect(
-        result.rows[0]?.targets["_eval_sample_metric"]?.evaluatorResults[0]
+        result.rows[0]?.targets._eval_sample_metric?.evaluatorResults[0]
           ?.score,
       ).toBe(0.95);
       expect(
-        result.rows[0]?.targets["_eval_sample_metric2"]?.evaluatorResults,
+        result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults,
       ).toHaveLength(1);
       expect(
-        result.rows[0]?.targets["_eval_sample_metric2"]?.evaluatorResults[0]
+        result.rows[0]?.targets._eval_sample_metric2?.evaluatorResults[0]
           ?.passed,
       ).toBe(true);
     });
@@ -750,7 +750,7 @@ describe("transformBatchEvaluationData", () => {
       // Output should be the full inputs object (not wrapped in {output: ...})
       // This will be displayed as JSON in the UI
       expect(
-        result.rows[0]?.targets["_eval_sample_metric"]?.output,
+        result.rows[0]?.targets._eval_sample_metric?.output,
       ).toEqual({ foo: "bar", bar: "baz" });
     });
 
@@ -824,16 +824,16 @@ describe("transformBatchEvaluationData", () => {
 
       // Rows should have the error information attached to the virtual target
       expect(result.rows).toHaveLength(2);
-      expect(result.rows[0]?.targets["_default"]?.error).toBe("Not implemented");
-      expect(result.rows[0]?.targets["_default"]?.duration).toBe(4);
-      expect(result.rows[0]?.targets["_default"]?.traceId).toBe("trace-1");
+      expect(result.rows[0]?.targets._default?.error).toBe("Not implemented");
+      expect(result.rows[0]?.targets._default?.duration).toBe(4);
+      expect(result.rows[0]?.targets._default?.traceId).toBe("trace-1");
 
-      expect(result.rows[1]?.targets["_default"]?.error).toBe("Not implemented");
-      expect(result.rows[1]?.targets["_default"]?.duration).toBe(3);
-      expect(result.rows[1]?.targets["_default"]?.traceId).toBe("trace-2");
+      expect(result.rows[1]?.targets._default?.error).toBe("Not implemented");
+      expect(result.rows[1]?.targets._default?.duration).toBe(3);
+      expect(result.rows[1]?.targets._default?.traceId).toBe("trace-2");
 
       // Output should be null since there's no predicted value
-      expect(result.rows[0]?.targets["_default"]?.output).toBeNull();
+      expect(result.rows[0]?.targets._default?.output).toBeNull();
     });
 
     it("creates virtual target only when there are errors, not for empty dataset", () => {

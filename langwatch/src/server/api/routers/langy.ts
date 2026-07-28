@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";

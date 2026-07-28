@@ -2,6 +2,8 @@
 // langwatch module is evaluated (or any import-time side effect can wire an exporter).
 // A platform process holding LANGWATCH_API_KEY would self-reference its own trace
 // ingest; the boot module throws. See langwatchPlatformGuard for the full rationale.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import "./langwatchPlatformGuard.boot";
 
 import { metrics } from "@opentelemetry/api";

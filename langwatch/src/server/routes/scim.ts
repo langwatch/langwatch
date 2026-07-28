@@ -27,8 +27,6 @@ import {
   scimReplaceGroupRequestSchema,
 } from "~/server/scim/scim.types";
 
-const SCIM_HEADERS = { "Content-Type": "application/scim+json" };
-
 const secured = createServiceApp({ basePath: "/api/scim/v2" });
 
 const SCIM_POLICY = internalSecret("SCIM bearer token validated in-handler");

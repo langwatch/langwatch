@@ -206,10 +206,10 @@ describe("collectRemoteSpans()", () => {
       const tool = spans.find((s) => s.name === "tool_call.lookup_order");
       expect(tool).toBeDefined();
       expect(tool!.parentSpanContext?.spanId).toBe("parent_llm_span");
-      expect(tool!.attributes["input"]).toBe(
+      expect(tool!.attributes.input).toBe(
         JSON.stringify({ order_id: "1234" }),
       );
-      expect(tool!.attributes["output"]).toBe(
+      expect(tool!.attributes.output).toBe(
         JSON.stringify({ status: "shipped", tracking: "TRACK-5678" }),
       );
     });

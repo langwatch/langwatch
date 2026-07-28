@@ -36,8 +36,6 @@ import {
 } from "./_messages";
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
-const logger = createLogger("langwatch:trace-processing:langwatch-extractor");
-
 /** JSON.stringify that never throws — returns a fallback on circular refs / BigInt / etc. */
 function safeStringify(value: unknown): string {
   try {

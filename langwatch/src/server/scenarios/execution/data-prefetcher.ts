@@ -469,7 +469,7 @@ async function fetchHttpAgentData(
   fetcher: AgentFetcher,
 ): Promise<HttpAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
-  if (!agent || agent.type !== "http") return null;
+  if (agent?.type !== "http") return null;
 
   const parseResult = HttpAgentConfigSchema.safeParse(agent.config);
   if (!parseResult.success) {
@@ -519,7 +519,7 @@ async function fetchCodeAgentData(
   projectSecretsFetcher: ProjectSecretsFetcher,
 ): Promise<CodeAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
-  if (!agent || agent.type !== "code") return null;
+  if (agent?.type !== "code") return null;
 
   const parseResult = RawCodeAgentConfigSchema.safeParse(agent.config);
   if (!parseResult.success) {
@@ -581,7 +581,7 @@ async function fetchWorkflowAgentData({
   projectSecretsFetcher: ProjectSecretsFetcher;
 }): Promise<WorkflowAgentData | HydrationFailure | null> {
   const agent = await agentFetcher.findById({ projectId, id: agentId });
-  if (!agent || agent.type !== "workflow") return null;
+  if (agent?.type !== "workflow") return null;
 
   const parseResult = RawWorkflowAgentConfigSchema.safeParse(agent.config);
   if (!parseResult.success) return null;

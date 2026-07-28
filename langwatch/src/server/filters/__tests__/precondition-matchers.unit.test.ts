@@ -42,7 +42,7 @@ function makeTraceData(
 
 describe("PRECONDITION_FIELD_MATCHERS", () => {
   describe("input matcher", () => {
-    const matcher = PRECONDITION_FIELD_MATCHERS["input"]!;
+    const matcher = PRECONDITION_FIELD_MATCHERS.input!;
 
     it("returns the input value from trace data", () => {
       expect(matcher(makeTraceData({ input: "hello" }), "")).toBe("hello");
@@ -54,7 +54,7 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
   });
 
   describe("output matcher", () => {
-    const matcher = PRECONDITION_FIELD_MATCHERS["output"]!;
+    const matcher = PRECONDITION_FIELD_MATCHERS.output!;
 
     it("returns the output value from trace data", () => {
       expect(matcher(makeTraceData({ output: "world" }), "")).toBe("world");
@@ -376,8 +376,8 @@ describe("PRECONDITION_ALLOWED_RULES", () => {
   /** @scenario Allowed rules derive from field characteristics */
   it("allows all 4 text rules for input and output", () => {
     const textRules = ["is", "contains", "not_contains", "matches_regex"];
-    expect(PRECONDITION_ALLOWED_RULES["input"]).toEqual(textRules);
-    expect(PRECONDITION_ALLOWED_RULES["output"]).toEqual(textRules);
+    expect(PRECONDITION_ALLOWED_RULES.input).toEqual(textRules);
+    expect(PRECONDITION_ALLOWED_RULES.output).toEqual(textRules);
   });
 
   it("allows only 'is' for boolean fields", () => {
@@ -470,8 +470,8 @@ describe("getAvailablePreconditionFields()", () => {
     const fieldMap = Object.fromEntries(
       fields.map((f) => [f.field, f.label]),
     );
-    expect(fieldMap["input"]).toBe("Input");
-    expect(fieldMap["output"]).toBe("Output");
+    expect(fieldMap.input).toBe("Input");
+    expect(fieldMap.output).toBe("Output");
   });
 
   it("returns allowedRules matching PRECONDITION_ALLOWED_RULES", () => {

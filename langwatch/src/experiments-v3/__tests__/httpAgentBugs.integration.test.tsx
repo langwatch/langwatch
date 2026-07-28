@@ -418,13 +418,6 @@ describe("Bug 3: HTTP agent mappings in drawer", () => {
     },
   ];
 
-  const mockInputMappings = {
-    input: {
-      sourceId: "dataset-1",
-      sourceField: "question",
-    },
-  };
-
   it("HTTP agent editor drawer shows Variables tab when availableSources provided", async () => {
     render(
       <AgentHttpEditorDrawer

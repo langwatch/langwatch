@@ -5,15 +5,6 @@ import {
   type SpanStorageRepository,
 } from "./repositories/span-storage.clickhouse.repository";
 
-class NullSpanStorageRepository implements SpanStorageRepository {
-  async getSpansByTraceId(
-    _tenantId: string,
-    _traceId: string,
-  ): Promise<Span[]> {
-    return [];
-  }
-}
-
 export class SpanStorageService {
   private readonly useClickHouse: boolean;
 

@@ -105,18 +105,6 @@ function safeReturnTo(raw: string | null | undefined): string {
   return raw;
 }
 
-function appOrigin(reqUrl: string): string {
-  const fromEnv = env.NEXTAUTH_URL;
-  if (fromEnv) {
-    try {
-      return new URL(fromEnv).origin;
-    } catch {
-      // misconfigured NEXTAUTH_URL — fall through to request-derived
-    }
-  }
-  return new URL(reqUrl).origin;
-}
-
 // The App must have a private key (to mint tokens) + id (JWT issuer) + slug
 // (the install deep-link target) for the install flow to be usable.
 function installConfigured(): boolean {

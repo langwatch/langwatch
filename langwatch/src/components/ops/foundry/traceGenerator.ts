@@ -23,7 +23,6 @@ export interface GeneratorOptions {
   includeEvents?: boolean;
 }
 
-const GENAI_TYPES: SpanType[] = ["llm", "agent", "tool", "rag", "chain", "guardrail"];
 const INFRA_TYPES: SpanType[] = ["server", "client", "span", "task", "component", "module"];
 
 const MODEL_NAMES = [
@@ -533,7 +532,7 @@ function buildSubtree(args: SubtreeArgs): { spans: SpanConfig[]; used: number } 
 }
 
 /** Assign sequential offsets so the waterfall view looks realistic */
-function assignOffsets(spans: SpanConfig[], startOffset: number = 0): void {
+function assignOffsets(spans: SpanConfig[], startOffset = 0): void {
   let offset = startOffset;
   for (const span of spans) {
     span.offsetMs = offset;

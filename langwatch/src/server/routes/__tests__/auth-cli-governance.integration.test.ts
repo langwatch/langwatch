@@ -429,8 +429,6 @@ describe("GET /api/auth/cli/governance/*", () => {
     const INGEST_KEY_USER = `usr-cli-ik-${suffix}`;
     const INGEST_KEY_ORG = `org-cli-ik-${suffix}`;
     const INGEST_KEY_TOKEN = `lw_at_${"k".repeat(43)}-${suffix}`;
-    let ingestionKeyLookupId: string | undefined;
-    let revokedKeyLookupId: string | undefined;
 
     beforeAll(async () => {
       await prisma.organization.create({

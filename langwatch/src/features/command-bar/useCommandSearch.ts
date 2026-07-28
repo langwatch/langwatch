@@ -130,7 +130,7 @@ export function useCommandSearch(query: string, isOpen: boolean) {
 
     // Filter prompts
     prompts
-      ?.filter((p) => p.handle && p.handle.toLowerCase().includes(lowerQuery))
+      ?.filter((p) => p.handle?.toLowerCase().includes(lowerQuery))
       .forEach((p) => {
         results.push({
           id: `prompt-${p.id}`,

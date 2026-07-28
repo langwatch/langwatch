@@ -45,7 +45,7 @@ export function PublishedPromptActions({
     useState(false);
   const { open, setOpen } = useDisclosure();
   const { deletePrompt } = usePrompts();
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const {
     renameHandle,

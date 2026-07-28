@@ -37,7 +37,7 @@ import type {
   GatewayCacheRuleMode,
   PrismaClient,
 } from "@prisma/client";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";

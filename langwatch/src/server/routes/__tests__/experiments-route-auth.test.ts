@@ -19,7 +19,7 @@
  * future reordering or re-introduction of a namespace-wide API-key guard that
  * shadows the session routes fails here.
  */
-import { Hono } from "hono";
+import type { Hono } from "hono";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 // The execute endpoint authenticates by user session. Force "no session" so

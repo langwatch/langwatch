@@ -39,7 +39,6 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
     model: "openai/gpt-4o-mini",
   };
 
-  let shutdownCalled = false;
 
   return {
     scenarioRepository: {
@@ -62,7 +61,7 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
     },
     tracerFactory: {
       create: () => ({
-        shutdown: async () => { shutdownCalled = true; },
+        shutdown: async () => {},
       }),
     },
     scenarioExecutor: {

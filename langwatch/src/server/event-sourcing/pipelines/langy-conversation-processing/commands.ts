@@ -30,7 +30,7 @@ import {
   langyToolCallInitiatedEventDataSchema,
   langyToolCallSucceededEventDataSchema,
 } from "@langwatch/langy";
-import { type LangyConversationProcessingEvent } from "./schemas/events";
+import type { LangyConversationProcessingEvent } from "./schemas/events";
 
 /**
  * Langy conversation commands. Most are pure 1:1 command → event mappings via

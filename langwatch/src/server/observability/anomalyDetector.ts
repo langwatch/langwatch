@@ -2,10 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../featureFlag/types";
 import type { Anomaly } from "./anomalyState";
-import { AnomalyStateStore } from "./anomalyState";
+import type { AnomalyStateStore } from "./anomalyState";
 import {
   ANOMALY_DETECTION_KILL_SWITCH_FLAG,
-  TenantRateTracker,
+  type TenantRateTracker,
 } from "./tenantRateTracker";
 
 const logger = createLogger("langwatch:observability:anomalyDetector");

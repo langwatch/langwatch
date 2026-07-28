@@ -61,7 +61,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
         entry = PYTHON_BUILTIN_BY_NAME.get(callee);
         if (entry) label = entry.name;
       }
-      if (!entry || !entry.signature) return null;
+      if (!entry?.signature) return null;
 
       const sigLabel = entry.signature ?? label ?? callee;
       // Cheap parameter slice: anything between the first `(` and the matching `)`.

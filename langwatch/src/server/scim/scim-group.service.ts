@@ -1,4 +1,4 @@
-import { type Group, type PrismaClient } from "@prisma/client";
+import type { Group, PrismaClient } from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { slugify } from "~/utils/slugify";
 import { KSUID_RESOURCES } from "~/utils/constants";

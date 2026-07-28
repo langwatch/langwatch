@@ -12,8 +12,8 @@ const MINUTE_MS = 60 * 1000;
 
 let mockTriggerRow: Record<string, unknown> | null = null;
 let mockRecentFires: Array<Record<string, unknown>> = [];
-let mockGraphRow: Record<string, unknown> | null = null;
-let mockDatasets: Array<Record<string, unknown>> = [];
+const mockGraphRow: Record<string, unknown> | null = null;
+const mockDatasets: Array<Record<string, unknown>> = [];
 let mockWebhookDeliveries: Array<Record<string, unknown>> = [];
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({

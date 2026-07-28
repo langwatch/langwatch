@@ -256,7 +256,7 @@ describe("StorageMeterService memory guard", () => {
 
     describe("when the cold read fails", () => {
       it("degrades to 0 and self-heals on the next read", async () => {
-        let t = 0;
+        const t = 0;
         let resolverCall = 0;
         const query = vi.fn(async () => ({
           json: async () => [{ total: "77" }],

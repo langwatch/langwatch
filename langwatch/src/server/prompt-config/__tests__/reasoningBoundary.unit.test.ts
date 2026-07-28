@@ -62,15 +62,15 @@ vi.mock("../../../utils/modelProviderHelpers", () => ({
 describe("reasoningBoundary", () => {
   describe("LITELLM_PARAMETER_TRANSLATION", () => {
     it("maps effort to reasoning_effort", () => {
-      expect(LITELLM_PARAMETER_TRANSLATION["effort"]).toBe("reasoning_effort");
+      expect(LITELLM_PARAMETER_TRANSLATION.effort).toBe("reasoning_effort");
     });
 
     it("maps thinkingLevel to reasoning_effort", () => {
-      expect(LITELLM_PARAMETER_TRANSLATION["thinkingLevel"]).toBe("reasoning_effort");
+      expect(LITELLM_PARAMETER_TRANSLATION.thinkingLevel).toBe("reasoning_effort");
     });
 
     it("maps reasoning_effort to reasoning_effort (passthrough)", () => {
-      expect(LITELLM_PARAMETER_TRANSLATION["reasoning_effort"]).toBe("reasoning_effort");
+      expect(LITELLM_PARAMETER_TRANSLATION.reasoning_effort).toBe("reasoning_effort");
     });
   });
 

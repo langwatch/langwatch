@@ -14,6 +14,8 @@
  * - POST /oauth/token  — OAuth token endpoint
  */
 
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { getConfig, initConfig, runWithConfig } from "@langwatch/mcp-server/config";

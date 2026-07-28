@@ -21,7 +21,7 @@ import type { MappingState } from "../../../../tracer/tracesMapping";
 import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
 import type { Command, CommandHandler } from "../../../";
 import {
-  createTenantId,
+  type createTenantId,
   defineCommandSchema,
   EventUtils,
 } from "../../../";

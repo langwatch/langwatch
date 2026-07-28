@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 export interface ReplayStatus {
   state: "idle" | "running" | "completed" | "failed" | "cancelled";
   runId: string | null;

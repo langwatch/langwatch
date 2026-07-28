@@ -160,7 +160,6 @@ export function MessagesTable({
     highlightIds,
     acceptPending: acceptPendingBuffer,
     mouseLeftAtRef,
-    bypassBufferRef,
     displayDataRef,
     addPendingCount,
     reset: resetBuffer,

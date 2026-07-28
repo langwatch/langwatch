@@ -45,7 +45,7 @@ function ConsumerC() {
 function Navigator({ to }: { to: string }) {
   const navigate = useNavigate();
   useEffect(() => {
-    navigate(to);
+    void navigate(to);
   }, [navigate, to]);
   return null;
 }

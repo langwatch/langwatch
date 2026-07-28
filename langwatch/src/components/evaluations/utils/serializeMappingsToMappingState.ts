@@ -9,7 +9,7 @@ import {
   type MappingState,
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPINGS,
-  TRACE_MAPPINGS,
+  type TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
 
 export function serializeMappingsToMappingState(

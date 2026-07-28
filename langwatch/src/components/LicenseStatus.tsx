@@ -25,7 +25,6 @@ export function LicenseStatus({
     data: status,
     isLoading,
     isError,
-    error,
     refetch,
   } = api.license.getStatus.useQuery(
     { organizationId },

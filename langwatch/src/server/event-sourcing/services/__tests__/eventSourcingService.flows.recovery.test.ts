@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type vi } from "vitest";
 import { EventStoreMemory } from "../../stores/eventStoreMemory";
 import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
 import { EVENT_TYPES } from "../../domain/eventType";

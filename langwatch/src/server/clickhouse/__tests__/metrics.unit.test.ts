@@ -71,7 +71,7 @@ describe("ClickHouse metrics", () => {
 
   describe("observeClickHouseQueryDuration", () => {
     it("records query duration for SELECT queries", () => {
-      const observeSpy = vi.spyOn(
+      vi.spyOn(
         metrics.clickhouseQueryDurationHistogram.labels("SELECT", "test_table"),
         "observe"
       );

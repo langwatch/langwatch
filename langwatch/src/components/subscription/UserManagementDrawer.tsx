@@ -19,7 +19,7 @@ import {
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
-import { type MemberType } from "~/server/license-enforcement/member-classification";
+import type { MemberType } from "~/server/license-enforcement/member-classification";
 import { type Currency, type BillingInterval, formatPrice } from "./billing-plans";
 import {
   type PlannedUser,

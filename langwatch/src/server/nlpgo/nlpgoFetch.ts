@@ -146,7 +146,7 @@ export async function nlpgoFetch<T = unknown>(
   // (the 2026-05-14 orphan-trace bug rchaves caught in prod).
   // Format: 00-<32-hex traceId>-<16-hex parentSpanId>-<flags>
   if (opts.parentTrace) {
-    headers["traceparent"] = formatTraceparent(opts.parentTrace);
+    headers.traceparent = formatTraceparent(opts.parentTrace);
   }
 
   const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG

@@ -20,7 +20,6 @@ import { PlatformGrid } from "./observability/PlatformGrid";
 import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
 
 export function ObservabilityScreen(): React.ReactElement {
-  const { project } = useActiveProject();
   const [selectedPlatform, setSelectedPlatform] =
     useState<PlatformKey>("typescript");
   const [selectedFramework, setSelectedFramework] =

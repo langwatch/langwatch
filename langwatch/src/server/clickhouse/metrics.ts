@@ -452,7 +452,7 @@ let storageStatsInterval: ReturnType<typeof setInterval> | null = null;
  */
 export function startStorageStatsCollection(
   client: ClickHouseClient,
-  intervalMs: number = 15000,
+  intervalMs = 15000,
 ): void {
   if (storageStatsInterval) {
     return; // Already running

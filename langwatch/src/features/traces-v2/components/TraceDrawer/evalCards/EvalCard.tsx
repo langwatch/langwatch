@@ -28,7 +28,6 @@ export function EvalCard({
   const { name, score, scoreType, status } = eval_;
   const tone = STATUS[status] ?? STATUS.warning;
   const noVerdict = isNoVerdict(status);
-  const { project, organization } = useOrganizationTeamProject();
 
   let scoreLabel = "";
   let scoreSubLabel = "";

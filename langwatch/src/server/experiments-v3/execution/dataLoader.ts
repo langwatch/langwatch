@@ -507,7 +507,7 @@ export const loadExecutionData = async (
   for (const target of targets) {
     if (target.type !== "agent" || !target.dbAgentId) continue;
     const agent = loadedAgents.get(target.dbAgentId);
-    if (!agent || agent.type !== "workflow") continue;
+    if (agent?.type !== "workflow") continue;
 
     const linkedWorkflowId =
       agent.workflowId ??

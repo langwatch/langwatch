@@ -15,12 +15,12 @@ import {
 describe("field-mappings", () => {
   describe("fieldMappings", () => {
     it("has mappings for trace identity fields", () => {
-      expect(fieldMappings["trace_id"]).toBeDefined();
-      expect(fieldMappings["trace_id"]?.table).toBe("trace_summaries");
-      expect(fieldMappings["trace_id"]?.column).toBe("TraceId");
+      expect(fieldMappings.trace_id).toBeDefined();
+      expect(fieldMappings.trace_id?.table).toBe("trace_summaries");
+      expect(fieldMappings.trace_id?.column).toBe("TraceId");
 
-      expect(fieldMappings["project_id"]).toBeDefined();
-      expect(fieldMappings["project_id"]?.column).toBe("TenantId");
+      expect(fieldMappings.project_id).toBeDefined();
+      expect(fieldMappings.project_id?.column).toBe("TenantId");
     });
 
     it("has mappings for metadata fields", () => {

@@ -1,10 +1,10 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
-import {
-  type LangyGithubInstallationRow,
-  type LangyGithubInstallationsRepository,
-  type LangyGithubRepositoryRef,
-  type UpsertLangyGithubInstallationInput,
+import type {
+  LangyGithubInstallationRow,
+  LangyGithubInstallationsRepository,
+  LangyGithubRepositoryRef,
+  UpsertLangyGithubInstallationInput,
 } from "./langy-github-installations.repository";
 
 function parseRepositories(

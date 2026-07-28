@@ -91,11 +91,11 @@ describe("given EventSourcingService is configured with a map projection", () =>
       // storeEvents sees the original event (no _leaned marker)
       const storedArg = (eventStore.storeEvents as ReturnType<typeof vi.fn>).mock
         .calls[0]?.[0] as Event[];
-      expect((storedArg[0]?.data as Record<string, unknown>)?.["_leaned"]).toBeUndefined();
+      expect((storedArg[0]?.data as Record<string, unknown>)?._leaned).toBeUndefined();
 
       // dispatch sees the leaned event (has _leaned marker)
       const dispatchedArg = (mapDef.map as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as Event;
-      expect((dispatchedArg.data as Record<string, unknown>)?.["_leaned"]).toBe(true);
+      expect((dispatchedArg.data as Record<string, unknown>)?._leaned).toBe(true);
     });
   });
 

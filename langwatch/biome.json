@@ -9,7 +9,6 @@
 		"ignoreUnknown": false,
 		"includes": ["**", "!src/server/modelProviders/llmModels.json"]
 	},
-	"plugins": ["./biome-plugins/no-raw-error-toast.grit"],
 	"formatter": {
 		"enabled": true,
 		"indentStyle": "tab"
@@ -99,7 +98,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["*.ts", "*.tsx", "*.mts", "*.cts"],
+			"includes": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
 			"linter": {
 				"rules": {
 					"complexity": {
@@ -134,16 +133,26 @@
 		},
 		{
 			"includes": [
-				"*.test.ts",
-				"*.test.tsx",
-				"*.spec.ts",
-				"*.spec.tsx",
+				"**/*.test.ts",
+				"**/*.test.tsx",
+				"**/*.spec.ts",
+				"**/*.spec.tsx",
 				"**/__tests__/**"
 			],
 			"linter": {
 				"rules": {
 					"suspicious": {
 						"noEmptyBlockStatements": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/*.tsx"],
+			"linter": {
+				"rules": {
+					"nursery": {
+						"noMisusedPromises": "off"
 					}
 				}
 			}

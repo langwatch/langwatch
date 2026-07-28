@@ -10,7 +10,7 @@ import {
   BindingNotFoundError,
   DuplicateMemberError,
   GroupNotFoundError,
-  GroupRestService,
+  type GroupRestService,
   ScimManagedGroupError,
   ScopeNotInOrganizationError,
   UserNotInOrganizationError,

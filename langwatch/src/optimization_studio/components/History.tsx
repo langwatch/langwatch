@@ -83,7 +83,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
     currentVersion,
     hasChanges,
     canSaveNewVersion,
-    nextVersion,
   } = useVersionState({ project, form });
 
   const commitVersion = api.workflow.commitVersion.useMutation();

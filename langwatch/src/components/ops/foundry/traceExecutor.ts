@@ -88,11 +88,6 @@ export function getFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
  * clean slate between cases; production code rarely needs it (the
  * page-hide hook handles real teardown).
  */
-async function closeAllFoundryExecutors(): Promise<void> {
-  const all = [...executorCache.values()];
-  executorCache.clear();
-  await Promise.all(all.map((e) => e.close()));
-}
 
 /**
  * Build a fresh provider-backed executor. Prefer `getFoundryExecutor`

@@ -109,8 +109,8 @@ vi.mock("~/components/ui/select", () => {
   }) => (
     <div
       data-testid="select-root"
-      data-flex={rest["flex"] as string | undefined}
-      data-max-width={rest["maxWidth"] as string | undefined}
+      data-flex={rest.flex as string | undefined}
+      data-max-width={rest.maxWidth as string | undefined}
     >
       <select
         aria-label={rest["aria-label"] as string}

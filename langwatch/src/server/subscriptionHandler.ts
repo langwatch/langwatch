@@ -1,4 +1,4 @@
-import { LicenseHandler, PUBLIC_KEY } from "../../ee/licensing";
+import { type LicenseHandler, PUBLIC_KEY } from "../../ee/licensing";
 import { createLicenseHandler } from "../../ee/licensing/server";
 import { prisma } from "./db";
 

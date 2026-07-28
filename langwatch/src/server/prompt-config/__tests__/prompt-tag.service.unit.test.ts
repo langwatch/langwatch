@@ -9,7 +9,7 @@ import {
 } from "../prompt-tag.service";
 import {
   PROTECTED_TAGS,
-  PromptTagRepository,
+  type PromptTagRepository,
 } from "../repositories/prompt-tag.repository";
 import type { PromptTag } from "@prisma/client";
 

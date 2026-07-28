@@ -666,7 +666,7 @@ describe("traceRequest.utils", () => {
 
         // The result is a JSON string containing the raw OTLP kvlistValue structures,
         // NOT the flattened key-value pairs one might expect.
-        const parsed = JSON.parse(result["messages"] as string);
+        const parsed = JSON.parse(result.messages as string);
         expect(parsed).toHaveLength(2);
         // Each item is the raw OtlpAnyValue because scalar() returns undefined for kvlist
         expect(parsed[0]).toHaveProperty("kvlistValue");
@@ -807,7 +807,7 @@ describe("traceRequest.utils", () => {
         // "0" / "1" as index, and "tool_calls.0.name" / "tool_calls.0.args" as remainder.
         // unflattenObject then splits the remainder by "." and creates nested objects.
         expect(result).toHaveProperty("choices");
-        expect(result["choices"]).toEqual([
+        expect(result.choices).toEqual([
           { tool_calls: { "0": { name: "get_weather", args: '{"city":"NYC"}' } } },
           { tool_calls: { "0": { name: "get_time", args: '{"tz":"EST"}' } } },
         ]);

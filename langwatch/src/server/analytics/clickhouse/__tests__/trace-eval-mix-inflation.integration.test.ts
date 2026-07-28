@@ -120,7 +120,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
     rows: Array<Record<string, unknown>>,
     alias: string,
   ): number {
-    const currentRows = rows.filter((r) => r["period"] === "current");
+    const currentRows = rows.filter((r) => r.period === "current");
     expect(currentRows.length).toBeGreaterThan(0);
     // Sum across all current buckets (some paths return one row, others
     // return one row per date bucket).
@@ -136,7 +136,7 @@ describe("trace-eval-mix-inflation (#3088)", () => {
     rows: Array<Record<string, unknown>>,
     alias: string,
   ): number {
-    const currentRows = rows.filter((r) => r["period"] === "current");
+    const currentRows = rows.filter((r) => r.period === "current");
     const values = currentRows
       .map((r) => Number(r[alias]))
       .filter((n) => Number.isFinite(n));
@@ -219,12 +219,12 @@ describe("trace-eval-mix-inflation (#3088)", () => {
       });
 
       const rows = await runQuery(sql, params);
-      const currentRows = rows.filter((r) => r["period"] === "current");
+      const currentRows = rows.filter((r) => r.period === "current");
 
       // seedSpans populates Models: ["gpt-5-mini"] for every trace, so we
       // expect the cost for that single group to equal EXPECTED_TOTAL_COST.
       const gpt5Rows = currentRows.filter(
-        (r) => r["group_key"] === "gpt-5-mini",
+        (r) => r.group_key === "gpt-5-mini",
       );
       expect(gpt5Rows.length).toBeGreaterThan(0);
 

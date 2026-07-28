@@ -230,8 +230,10 @@ secured.access(
       // Send connected event
       writeData({ type: "connected" });
 
-      // Call the procedure and handle the result
-      (async () => {
+      // Call the procedure and handle the result. Deliberately fire-and-forget:
+      // the stream stays open while this runs, and the catch below is the only
+      // place a rejection can surface.
+      void (async () => {
         try {
           const result = await procedure(input);
 

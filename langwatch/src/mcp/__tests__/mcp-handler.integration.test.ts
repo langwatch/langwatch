@@ -239,9 +239,9 @@ async function sendRequest({
   if (
     path === "/mcp" &&
     (method === "POST" || method === "GET") &&
-    !fetchHeaders["accept"]
+    !fetchHeaders.accept
   ) {
-    fetchHeaders["accept"] = "text/event-stream, application/json";
+    fetchHeaders.accept = "text/event-stream, application/json";
   }
 
   const res = await fetch(url, {

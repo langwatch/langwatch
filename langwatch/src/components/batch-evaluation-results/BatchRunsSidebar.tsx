@@ -247,7 +247,7 @@ export function BatchRunsSidebar({
       {isLoading && (
         <VStack gap={0.5} align="stretch" paddingX={2}>
           {Array.from({ length: 6 }).map((_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: Its for skeleton data
+            // Its for skeleton data.
             <HStack key={index} paddingX={2} paddingY={2} gap={2}>
               <VStack align="start" gap={1} flex={1} minWidth={0}>
                 {/* Line 1: Color square + name + version */}

@@ -474,7 +474,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       // seed rows that already have output.
       const targetComparisonDeps = (id: string): string[] => {
         const t = targets.find((tg) => tg.id === id);
-        if (!t || t.type !== "evaluator") return [];
+        if (t?.type !== "evaluator") return [];
         return (toComparisonConfig(t)?.variants ?? []).filter(
           (v): v is string => !!v,
         );
@@ -566,7 +566,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           let newTargetOutputs = { ...state.results.targetOutputs };
           let newTargetMetadata = { ...state.results.targetMetadata };
           let newErrors = { ...state.results.errors };
-          let newEvaluatorResults = { ...state.results.evaluatorResults };
+          const newEvaluatorResults = { ...state.results.evaluatorResults };
 
           // For evaluator-only scopes, determine which single evaluator to clear
           const specificEvaluatorId =

@@ -184,7 +184,7 @@ export class EventSourcedQueueProcessorMemory<
       "queue.job_id": job.jobId ?? "unknown",
     };
 
-    let customAttributes: Record<string, string | number | boolean> = {};
+    const customAttributes: Record<string, string | number | boolean> = {};
     if (this.spanAttributes) {
       try {
         const attributes = this.spanAttributes(job.payload);

@@ -92,7 +92,7 @@ let _inflight: Promise<CompatSession | null> | null = null;
 const _subscribers = new Set<(session: CompatSession | null) => void>();
 
 async function _fetchSessionShared(): Promise<CompatSession | null> {
-  if (_inflight) return _inflight;
+  if (_inflight !== null) return _inflight;
   _inflight = (async () => {
     try {
       const res = await fetch("/api/auth/session", { credentials: "include" });

@@ -187,7 +187,10 @@ describe("the REST boundary's request validator", () => {
   describe("given the route supplies its own hook", () => {
     /** @scenario "A route's own validation hook still wins" */
     it("uses the hook's response unchanged", async () => {
-      const app = appWith(((_result: unknown, c: { json: Function }) =>
+      const app = appWith(((
+        _result: unknown,
+        c: { json: (body: unknown, status?: number) => unknown },
+      ) =>
         c.json({ mine: true }, 418)) as never);
 
       const res = await post({ name: "", metric: "latency" }, app);

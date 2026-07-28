@@ -40,8 +40,6 @@ describe("user.persona-home customization integration", () => {
   const USER_EMAIL = `${ns}@example.com`;
 
   let caller: ReturnType<typeof appRouter.createCaller>;
-  let appProjectAlphaId: string;
-  let appProjectBetaId: string;
 
   beforeAll(async () => {
     await startTestContainers();
@@ -95,7 +93,7 @@ describe("user.persona-home customization integration", () => {
     // Two app-kind projects (one updated more recently than the other) +
     // one hidden internal_governance project that MUST be excluded from
     // the userProjects response.
-    const alpha = await prisma.project.create({
+    await prisma.project.create({
       data: {
         id: `proj-alpha-${ns}`,
         name: "Alpha Service",
@@ -108,8 +106,7 @@ describe("user.persona-home customization integration", () => {
         updatedAt: new Date("2026-04-01T00:00:00Z"),
       },
     });
-    appProjectAlphaId = alpha.id;
-    const beta = await prisma.project.create({
+    await prisma.project.create({
       data: {
         id: `proj-beta-${ns}`,
         name: "Beta Pipeline",
@@ -122,7 +119,6 @@ describe("user.persona-home customization integration", () => {
         updatedAt: new Date("2026-05-01T00:00:00Z"),
       },
     });
-    appProjectBetaId = beta.id;
     await prisma.project.create({
       data: {
         id: `proj-hidden-${ns}`,

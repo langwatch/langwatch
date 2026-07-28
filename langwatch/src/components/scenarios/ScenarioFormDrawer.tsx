@@ -255,23 +255,28 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
       // Create mode: no scenarioId in URL yet
       return new Promise((resolve) => {
-        checkCompoundLimits([scenarioEnforcement], async () => {
-          try {
-            const result = await createMutation.mutateAsync({
-              projectId: project.id,
-              ...data,
-              ...(models ?? {}),
-            });
-            // Transition to edit mode to prevent double-create on subsequent saves.
-            // Skip when the drawer is about to close (save-without-running).
-            if (!skipTransition) {
-              transitionToEditMode(result.id);
+        // checkCompoundLimits takes a synchronous callback, so the create runs
+        // in a fire-and-forget scope that resolves the outer promise on both
+        // paths rather than returning one the caller would drop.
+        checkCompoundLimits([scenarioEnforcement], () => {
+          void (async () => {
+            try {
+              const result = await createMutation.mutateAsync({
+                projectId: project.id,
+                ...data,
+                ...(models ?? {}),
+              });
+              // Transition to edit mode to prevent double-create on subsequent saves.
+              // Skip when the drawer is about to close (save-without-running).
+              if (!skipTransition) {
+                transitionToEditMode(result.id);
+              }
+              resolve(result);
+            } catch {
+              // Error already handled by global mutation cache if license error
+              resolve(null);
             }
-            resolve(result);
-          } catch {
-            // Error already handled by global mutation cache if license error
-            resolve(null);
-          }
+          })();
         });
 
         // If limit exceeded, modal is shown and callback won't run - resolve null

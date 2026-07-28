@@ -327,7 +327,7 @@ const detectArrayPatterns = (
 
   for (const [key, value] of Object.entries(attrs)) {
     const match = INDEXED_KEY_REGEX.exec(key);
-    if (!match || match.length !== 4) continue;
+    if (match?.length !== 4) continue;
 
     const [, prefix, indexStr, remainder] = match;
     if (!prefix || !indexStr || !remainder) continue;

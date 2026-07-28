@@ -179,7 +179,7 @@ function usablePredecessor({
 }): CanonicalMetricDataPoint | undefined {
   if (point.aggregationTemporality !== "cumulative") return undefined;
   const previous = previousPoint(all, index);
-  if (!previous || previous.metricKind !== "exponential_histogram") {
+  if (previous?.metricKind !== "exponential_histogram") {
     return undefined;
   }
   return startsNewSequence(previous, point) ? undefined : previous;

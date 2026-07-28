@@ -546,8 +546,6 @@ function GoldenAnswerSection({
     control: formContext?.control,
     name: "settings.prompt",
   }) as string | undefined;
-  const hasGoldenAnswer =
-    (watchedHasGoldenAnswer ?? draft.hasGoldenAnswer) !== false;
 
   // Keep the judge prompt in sync with the golden setting reactively — on
   // every change of either field, not just a click — so the correct default

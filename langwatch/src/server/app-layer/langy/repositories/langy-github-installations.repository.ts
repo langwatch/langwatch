@@ -9,6 +9,8 @@
  * it lives in the control-plane env, not the database.
  */
 
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 export interface LangyGithubRepositoryRef {
   id: string;
   fullName: string;

@@ -23,7 +23,7 @@ import {
   computePermissionsFromSelections,
 } from "../../../server/api-key/permission-categories";
 import { getTeamRolePermissions } from "../../../server/api/rbac";
-import { TeamUserRole } from "@prisma/client";
+import type { TeamUserRole } from "@prisma/client";
 import {
   PermissionCategoryList,
   PermissionCounter,

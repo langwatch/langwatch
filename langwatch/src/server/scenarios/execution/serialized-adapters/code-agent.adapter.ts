@@ -90,7 +90,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             type: inp.type,
             value: resolvedValues[inp.identifier] ?? "",
           }))
-        : [{ identifier: "input", type: "str", value: resolvedValues["input"] ?? "" }];
+        : [{ identifier: "input", type: "str", value: resolvedValues.input ?? "" }];
 
     const outputs =
       this.config.outputs.length > 0

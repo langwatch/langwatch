@@ -135,7 +135,6 @@ function buildPrisma() {
 describe("ApiKeyService — safety invariants (mocked)", () => {
   let prisma: ReturnType<typeof buildPrisma>["prisma"];
   let mockTx: ReturnType<typeof buildPrisma>["mockTx"];
-  let txState: ReturnType<typeof buildPrisma>["txState"];
   let service: ApiKeyService;
 
   beforeEach(() => {

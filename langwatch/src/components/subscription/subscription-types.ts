@@ -2,8 +2,8 @@
  * Shared types and helpers for the subscription page components.
  */
 import { z } from "zod";
-import { type MemberType } from "~/server/license-enforcement/member-classification";
-import { type Currency } from "./billing-plans";
+import type { MemberType } from "~/server/license-enforcement/member-classification";
+import type { Currency } from "./billing-plans";
 import { Currency as PrismaCurrency } from "@prisma/client";
 
 export const isValidEmail = (value: string) => z.string().email().safeParse(value).success;

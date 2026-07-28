@@ -239,9 +239,6 @@ async function waitForSuiteRunState(
 }
 
 // Skip when running without testcontainers (Prisma-only integration tests)
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-);
 
 // Skipped: chronic async-event-handler timeout flake — see langwatch/langwatch#3240.
 describe.skip("Suite Run Processing Pipeline - Integration Tests", () => {

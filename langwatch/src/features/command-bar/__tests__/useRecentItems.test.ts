@@ -90,7 +90,6 @@ describe("useRecentItems", () => {
 
   it("groups items by time period", () => {
     const { result } = renderHook(() => useRecentItems());
-    const now = Date.now();
 
     act(() => {
       // Add item accessed "today"

@@ -32,7 +32,7 @@ export function QuarantineFillAlert({
     },
   );
 
-  if (!data || !data.exceeded) return null;
+  if (!data?.exceeded) return null;
 
   return (
     <Alert.Root status="warning" variant="surface">

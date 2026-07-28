@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { performance } from "node:perf_hooks";
 import { createLogger } from "@langwatch/observability";
 import {

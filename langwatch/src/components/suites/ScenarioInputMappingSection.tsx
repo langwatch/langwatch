@@ -12,6 +12,8 @@
  * Display format is inverted: scenario_field → agent_input.
  */
 
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import {
   Box,
   Link,
@@ -197,8 +199,8 @@ export function ScenarioInputMappingSection({
 
   // Validation: at least one of input or messages must be mapped
   const missingInputIds = useMemo(() => {
-    const hasInput = !!displayMappings["input"];
-    const hasMessages = !!displayMappings["messages"];
+    const hasInput = !!displayMappings.input;
+    const hasMessages = !!displayMappings.messages;
     if (hasInput || hasMessages) return new Set<string>();
     return new Set(["input", "messages"]);
   }, [displayMappings]);

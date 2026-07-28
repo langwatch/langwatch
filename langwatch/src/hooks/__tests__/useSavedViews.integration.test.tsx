@@ -15,7 +15,7 @@ import {
   waitFor,
   cleanup,
 } from "@testing-library/react";
-import React from "react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -664,7 +664,7 @@ describe("useSavedViews() full restore lifecycle", () => {
       isFetched: false,
     });
 
-    const { result, rerender } = renderHook(() => useSavedViews(), {
+    const { result } = renderHook(() => useSavedViews(), {
       wrapper,
     });
 

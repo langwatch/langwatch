@@ -15,7 +15,7 @@ export function ReplayStatusBanner() {
 
   const status = statusQuery.data;
   // Only show banner while actively running
-  if (!status || status.state !== "running") return null;
+  if (status?.state !== "running") return null;
 
   const activeProjectionNames = parseActiveProjections(
     status.currentProjection,

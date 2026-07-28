@@ -1,5 +1,6 @@
 import { Box, Field, Input, VStack } from "@chakra-ui/react";
-import React, { useEffect } from "react";
+import type React from "react";
+import { useEffect } from "react";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,

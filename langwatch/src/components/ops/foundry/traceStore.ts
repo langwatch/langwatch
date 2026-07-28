@@ -213,7 +213,7 @@ export const useTraceStore = create<TraceStore>((set) => ({
     set((state) => {
       const newSpans = structuredClone(state.trace.spans);
       const found = findSpanParent(newSpans, id);
-      if (!found || !found.parent) return state;
+      if (!found?.parent) return state;
       const span = found.siblings.splice(found.index, 1)[0]!;
       const parentFound = findSpanParent(newSpans, found.parent.id);
       if (!parentFound) return state;

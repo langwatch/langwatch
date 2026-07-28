@@ -4,7 +4,7 @@ import {
   getGrowthSeatPriceCents,
   formatPrice,
 } from "./billing-plans";
-import { type MemberType } from "~/server/license-enforcement/member-classification";
+import type { MemberType } from "~/server/license-enforcement/member-classification";
 import { countFullMembers } from "./subscription-types";
 
 interface HasMemberType {

@@ -89,12 +89,6 @@ describe("GET /api/auth/cli/budget/status", () => {
     if (redisConnection) {
       await redisConnection.del(ACCESS_TOKEN_KEY);
     }
-    // dbMultiTenancyProtection requires projectId in the WHERE for
-    // VirtualKey — resolve project ids explicitly.
-    const projects = await prisma.project.findMany({
-      where: { team: { organizationId: ORG_ID } },
-      select: { id: true },
-    });
     await prisma.virtualKey.deleteMany({
       where: { organizationId: ORG_ID },
     });

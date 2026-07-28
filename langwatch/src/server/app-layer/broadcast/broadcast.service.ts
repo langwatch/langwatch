@@ -53,7 +53,7 @@ export class BroadcastService {
   private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly EMITTER_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private emitterEmptyTimes = new Map<string, number>(); // tenantId -> timestamp when emitter became empty
-  private active: boolean = false;
+  private active = false;
   private readonly senderRateLimiter = new TenantRateLimiter();
   private readonly subscriberRateLimiter = new TenantRateLimiter();
 

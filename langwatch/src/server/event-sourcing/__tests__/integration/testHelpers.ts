@@ -40,7 +40,7 @@ export async function closePipelineGracefully(pipeline: {
  * Generates a unique aggregate ID to avoid collisions in parallel tests.
  */
 export function generateTestAggregateId(
-  prefix: string = "test-aggregate",
+  prefix = "test-aggregate",
 ): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }

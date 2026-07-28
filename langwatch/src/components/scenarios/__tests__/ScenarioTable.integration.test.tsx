@@ -180,10 +180,10 @@ describe("<ScenarioTable/>", () => {
       );
       // Other scenarios should NOT be in the selection
       const lastCall = onSelectionChange.mock.calls[onSelectionChange.mock.calls.length - 1]![0] as RowSelectionState;
-      expect(lastCall["scen_1"]).toBeUndefined();
-      expect(lastCall["scen_2"]).toBeUndefined();
-      expect(lastCall["scen_3"]).toBeUndefined();
-      expect(lastCall["scen_5"]).toBeUndefined();
+      expect(lastCall.scen_1).toBeUndefined();
+      expect(lastCall.scen_2).toBeUndefined();
+      expect(lastCall.scen_3).toBeUndefined();
+      expect(lastCall.scen_5).toBeUndefined();
     });
   });
 

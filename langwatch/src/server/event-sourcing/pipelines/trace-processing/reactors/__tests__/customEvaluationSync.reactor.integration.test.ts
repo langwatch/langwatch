@@ -39,9 +39,6 @@ import { EvaluationRunStore } from "../../../../pipelines/evaluation-processing/
 import type { EvaluationProcessingEvent } from "../../../../pipelines/evaluation-processing/schemas/events";
 
 // Skip when running without testcontainers
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-);
 
 /**
  * Subclass that injects no-op dependencies for PII/cost/token enrichment.

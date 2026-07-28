@@ -161,11 +161,11 @@ describe("autoComputeAgentMappings", () => {
 
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
-      const mappings = config!["scenarioMappings"] as Record<
+      const mappings = config!.scenarioMappings as Record<
         string,
         { type: string; sourceId: string; path: string[] }
       >;
-      expect(mappings["query"]).toEqual({
+      expect(mappings.query).toEqual({
         type: "source",
         sourceId: "scenario",
         path: ["input"],
@@ -187,11 +187,11 @@ describe("autoComputeAgentMappings", () => {
 
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
-      const mappings = config!["scenarioMappings"] as Record<
+      const mappings = config!.scenarioMappings as Record<
         string,
         { type: string; sourceId: string; path: string[] }
       >;
-      expect(mappings["history"]).toEqual({
+      expect(mappings.history).toEqual({
         type: "source",
         sourceId: "scenario",
         path: ["messages"],
@@ -213,7 +213,7 @@ describe("autoComputeAgentMappings", () => {
 
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
-      expect(config!["scenarioOutputField"]).toBe("response");
+      expect(config!.scenarioOutputField).toBe("response");
     });
 
     it("queries agents by workflowId and projectId excluding archived", async () => {
@@ -317,11 +317,11 @@ describe("autoComputeAgentMappings", () => {
       expect(prisma.agent.update).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
-      const mappings = config!["scenarioMappings"] as Record<string, unknown>;
+      const mappings = config!.scenarioMappings as Record<string, unknown>;
       // Stale key must be gone
-      expect(mappings["old_query"]).toBeUndefined();
+      expect(mappings.old_query).toBeUndefined();
       // New field "prompt" must be present
-      expect(mappings["prompt"]).toBeDefined();
+      expect(mappings.prompt).toBeDefined();
     });
 
     it("preserves non-stale mappings (does not re-compute when all keys are current)", async () => {
@@ -387,13 +387,13 @@ describe("autoComputeAgentMappings", () => {
       expect(prisma.agent.update).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
-      const mappings = config!["scenarioMappings"] as Record<
+      const mappings = config!.scenarioMappings as Record<
         string,
         { type: string; sourceId: string; path: string[] }
       >;
-      expect(mappings["old_query"]).toBeUndefined();
-      expect(mappings["prompt"]).toBeDefined();
-      expect(mappings["extra"]).toEqual({
+      expect(mappings.old_query).toBeUndefined();
+      expect(mappings.prompt).toBeDefined();
+      expect(mappings.extra).toEqual({
         type: "source",
         sourceId: "scenario",
         path: ["custom", "user_picked"],
@@ -451,7 +451,7 @@ describe("autoComputeAgentMappings", () => {
       expect(config).toBeDefined();
       // Stale scenarioOutputField must be removed, not left pointing at
       // a non-existent output field.
-      expect(config!["scenarioOutputField"]).toBeUndefined();
+      expect(config!.scenarioOutputField).toBeUndefined();
     });
   });
 
@@ -484,10 +484,10 @@ describe("autoComputeAgentMappings", () => {
 
       expect(prisma.agent.update).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
-      expect(config!["scenarioOutputField"]).toBe("new_out");
+      expect(config!.scenarioOutputField).toBe("new_out");
       // Input mappings are preserved verbatim.
-      const mappings = config!["scenarioMappings"] as Record<string, unknown>;
-      expect(mappings["prompt"]).toEqual({
+      const mappings = config!.scenarioMappings as Record<string, unknown>;
+      expect(mappings.prompt).toEqual({
         type: "source",
         sourceId: "scenario",
         path: ["input"],
@@ -555,10 +555,10 @@ describe("autoComputeAgentMappings", () => {
 
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
-      const mappings = config!["scenarioMappings"] as Record<string, unknown>;
+      const mappings = config!.scenarioMappings as Record<string, unknown>;
       // Bug #3362: unwired entry outputs are dropped from auto-computed mappings.
       // After the fix, "new_field" must appear with a best-match default.
-      expect(mappings["new_field"]).toBeDefined();
+      expect(mappings.new_field).toBeDefined();
     });
   });
 
@@ -584,9 +584,9 @@ describe("autoComputeAgentMappings", () => {
 
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
-      const mappings = config!["scenarioMappings"] as Record<string, unknown>;
+      const mappings = config!.scenarioMappings as Record<string, unknown>;
       // Regression: wired entry fields must always appear in scenarioMappings.
-      expect(mappings["query"]).toBeDefined();
+      expect(mappings.query).toBeDefined();
     });
   });
 });

@@ -700,7 +700,7 @@ function CustomGraphForm({
 
   const addNewGraph = api.graphs.create.useMutation();
   const updateGraphById = api.graphs.updateById.useMutation();
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const trpc = api.useContext();
   const { checkAndProceed } = useLicenseEnforcement("customGraphs");

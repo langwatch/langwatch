@@ -627,7 +627,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             where: { id: teamRoleUpdate.customRoleId },
             select: { organizationId: true, kind: true },
           });
-          if (!customRole || customRole.kind !== "custom" || customRole.organizationId !== organizationId) {
+          if (customRole?.kind !== "custom" || customRole.organizationId !== organizationId) {
             throw new NotFoundError("custom_role_not_found", "CustomRole", teamRoleUpdate.customRoleId ?? "unknown");
           }
         }
@@ -712,7 +712,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           where: { id: storedCustomRoleId },
           select: { organizationId: true, permissions: true, kind: true },
         });
-        if (!customRole || customRole.kind !== "custom" || customRole.organizationId !== team.organizationId) {
+        if (customRole?.kind !== "custom" || customRole.organizationId !== team.organizationId) {
           throw new TRPCError({
             code: "FORBIDDEN",
             message: "Role does not belong to team's organization",

@@ -79,8 +79,8 @@ async function runGroupKeys(
   });
   const rows = (await result.json()) as Row[];
   return rows
-    .filter((r) => r["period"] === "current")
-    .map((r) => r["group_key"]);
+    .filter((r) => r.period === "current")
+    .map((r) => r.group_key);
 }
 
 describe("evaluation_passed groupBy on score-only / non-processed rows", () => {

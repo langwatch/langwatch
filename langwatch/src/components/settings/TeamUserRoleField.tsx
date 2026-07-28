@@ -4,7 +4,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { type OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { useMemo } from "react";
 import { api } from "../../utils/api";
 import {

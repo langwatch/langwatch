@@ -499,7 +499,7 @@ describe("ExperimentFromPlaygroundButton", () => {
         expect(datasetMappings).toBeDefined();
 
         // "input" field should be mapped to "input" column
-        expect(datasetMappings?.["input"]).toEqual({
+        expect(datasetMappings?.input).toEqual({
           type: "source",
           source: "dataset",
           sourceId: "test-data",

@@ -309,7 +309,7 @@ describe("<EvaluatorEditorDrawer />", () => {
           >;
           const callsWithConfig = calls.filter(
             (call) =>
-              call[0] !== undefined && call[0]?.name?.includes("Modified"),
+              call[0]?.name?.includes("Modified"),
           );
           expect(callsWithConfig.length).toBeGreaterThan(0);
         },
@@ -323,7 +323,7 @@ describe("<EvaluatorEditorDrawer />", () => {
       const lastCallWithConfig = calls
         .filter(
           (call) =>
-            call[0] !== undefined && call[0]?.name?.includes("Modified"),
+            call[0]?.name?.includes("Modified"),
         )
         .pop();
       expect(lastCallWithConfig?.[0]?.name).toBe("Exact Match Modified");

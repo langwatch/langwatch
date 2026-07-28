@@ -110,7 +110,7 @@ describe("HTTP trace context propagation", () => {
         const requests = echoServer.getReceivedRequests();
         expect(requests).toHaveLength(1);
 
-        const traceparent = requests[0]!.headers["traceparent"];
+        const traceparent = requests[0]!.headers.traceparent;
         expect(traceparent).toBeDefined();
         expect(traceparent).toMatch(W3C_TRACEPARENT_REGEX);
       });
@@ -184,7 +184,7 @@ describe("HTTP trace context propagation", () => {
         expect(turnRequests).toHaveLength(3);
 
         const traceIds = turnRequests.map((req) => {
-          const traceparent = req.headers["traceparent"] as string;
+          const traceparent = req.headers.traceparent as string;
           const match = traceparent.match(W3C_TRACEPARENT_REGEX);
           return match?.[1];
         });
@@ -228,7 +228,7 @@ describe("HTTP trace context propagation", () => {
         expect(lastRequest.headers["x-request-source"]).toBe("test-suite");
 
         // Trace header is also present
-        expect(lastRequest.headers["traceparent"]).toMatch(W3C_TRACEPARENT_REGEX);
+        expect(lastRequest.headers.traceparent).toMatch(W3C_TRACEPARENT_REGEX);
       });
     });
   });

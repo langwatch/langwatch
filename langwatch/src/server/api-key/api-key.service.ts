@@ -53,10 +53,6 @@ type RoleBindingInput =
   | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
   | (RoleBindingBase & { role: "CUSTOM"; customRoleId?: string });
 
-type ResolvedRoleBinding =
-  | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
-  | (RoleBindingBase & { role: "CUSTOM"; customRoleId: string });
-
 type CreatorScope =
   | { type: "org"; id: string }
   | { type: "team"; id: string }

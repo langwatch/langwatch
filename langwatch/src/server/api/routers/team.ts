@@ -239,7 +239,7 @@ export const teamRouter = createTRPCRouter({
             where: { id: member.customRoleId },
             select: { organizationId: true, kind: true },
           });
-          if (!customRole || customRole.kind !== "custom") {
+          if (customRole?.kind !== "custom") {
             throw new TRPCError({ code: "NOT_FOUND", message: `Custom role ${member.customRoleId} not found` });
           }
           if (customRole.organizationId !== organizationId) {
@@ -451,8 +451,7 @@ export const teamRouter = createTRPCRouter({
             });
 
             if (
-              !customRole ||
-              customRole.kind !== "custom" ||
+              customRole?.kind !== "custom" ||
               customRole.organizationId !== team.organizationId
             ) {
               throw new TRPCError({

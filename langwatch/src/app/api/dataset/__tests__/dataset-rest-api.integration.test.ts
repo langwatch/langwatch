@@ -1018,15 +1018,12 @@ describe("Feature: Dataset REST API", () => {
 
   describe("Slug or ID resolution", () => {
     describe("when a dataset has both slug and id", () => {
-      let datasetId: string;
-
       beforeEach(async () => {
-        const dataset = await createDataset({
+        await createDataset({
           name: "My Data",
           slug: "my-data",
           id: "dataset_xyz",
         });
-        datasetId = dataset.id;
       });
 
       it("returns the same dataset for both slug and id", async () => {

@@ -249,7 +249,7 @@ export class SchedulerService {
       }
     }
 
-    if (this.loopPromise) {
+    if (this.loopPromise !== null) {
       const settled = await Promise.race([
         this.loopPromise.then(() => true),
         new Promise<false>((resolve) =>

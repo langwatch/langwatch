@@ -1509,7 +1509,7 @@ describe("Evaluation Execution", () => {
       });
 
       // Both evaluators should show spinners
-      let spinners = document.querySelectorAll(".chakra-spinner");
+      const spinners = document.querySelectorAll(".chakra-spinner");
       expect(spinners.length).toBe(2);
 
       // Cell A's evaluator completes (but cell B's is still running)

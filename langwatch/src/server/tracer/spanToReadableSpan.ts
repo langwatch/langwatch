@@ -84,11 +84,11 @@ function buildAttributes(span: Span): Attributes {
     if (span.input.type === "chat_messages") {
       attrs["gen_ai.input.messages"] = JSON.stringify(span.input.value);
     } else if (span.input.type === "text") {
-      attrs["input"] = span.input.value;
+      attrs.input = span.input.value;
     } else if (span.input.type === "json") {
-      attrs["input"] = JSON.stringify(span.input.value);
+      attrs.input = JSON.stringify(span.input.value);
     } else if (span.input.type === "raw") {
-      attrs["input"] = span.input.value;
+      attrs.input = span.input.value;
     }
   }
 
@@ -97,11 +97,11 @@ function buildAttributes(span: Span): Attributes {
     if (span.output.type === "chat_messages") {
       attrs["gen_ai.output.messages"] = JSON.stringify(span.output.value);
     } else if (span.output.type === "text") {
-      attrs["output"] = span.output.value;
+      attrs.output = span.output.value;
     } else if (span.output.type === "json") {
-      attrs["output"] = JSON.stringify(span.output.value);
+      attrs.output = JSON.stringify(span.output.value);
     } else if (span.output.type === "raw") {
-      attrs["output"] = span.output.value;
+      attrs.output = span.output.value;
     }
   }
 

@@ -2,7 +2,7 @@ import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
 import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
 import type { LimitCheckResult, LimitType } from "./types";
-import { limitTypes } from "./types";
+import type { limitTypes } from "./types";
 import { LimitExceededError } from "./errors";
 
 /**

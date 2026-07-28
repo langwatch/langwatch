@@ -295,7 +295,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
 
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
         // At least one bucket must exist with a non-null numeric score.
         // avg(0.75, 0.25) = 0.5 if both rows are visible via the JOIN.
@@ -342,7 +342,7 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
 
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
         const metricKey = Object.keys(currentRows[0] ?? {}).find(
           (k) => k !== "date" && k !== "period" && k !== "group_key",

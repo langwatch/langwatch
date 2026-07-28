@@ -354,8 +354,8 @@ describe.skipIf(!hasTestcontainers)(
             spanCostService: new SpanCostService(),
           });
 
-        expect(scenarioRoleCosts["Agent"]).toBeGreaterThan(0);
-        expect(scenarioRoleLatencies["Agent"]).toBe(4000);
+        expect(scenarioRoleCosts.Agent).toBeGreaterThan(0);
+        expect(scenarioRoleLatencies.Agent).toBe(4000);
       }, 60_000);
     });
   },

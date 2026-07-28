@@ -50,7 +50,7 @@ export function QueryStringFieldsFilters({
 	const { nonEmptyFilters, setFilters, filterParams } = useFilterParams();
 
 	const { openDrawer } = useDrawer();
-	const { project, hasPermission } = useOrganizationTeamProject();
+	const { hasPermission } = useOrganizationTeamProject();
 
 	const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 

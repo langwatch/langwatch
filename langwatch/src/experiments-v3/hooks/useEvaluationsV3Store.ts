@@ -263,7 +263,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   addColumn: (datasetId, column) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -294,7 +294,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   removeColumn: (datasetId, columnId) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -323,7 +323,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   renameColumn: (datasetId, columnId, newName) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -350,7 +350,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateColumnType: (datasetId, columnId, type) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      if (dataset?.type !== "inline" || !dataset.inline) {
         return state;
       }
 
@@ -424,7 +424,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   updateSavedRecordValue: (datasetId, rowIndex, columnId, value) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "saved" || !dataset.datasetId) {
+      if (dataset?.type !== "saved" || !dataset.datasetId) {
         return state;
       }
 
@@ -521,8 +521,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     const state = get();
     const dataset = state.datasets.find((d) => d.id === datasetId);
     if (
-      !dataset ||
-      dataset.type !== "saved" ||
+      dataset?.type !== "saved" ||
       !dataset.savedRecords ||
       !dataset.datasetId
     ) {
@@ -1011,8 +1010,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           (d) => d.id === datasetId,
         );
         if (
-          !currentDataset ||
-          currentDataset.type !== "inline" ||
+          currentDataset?.type !== "inline" ||
           !currentDataset.inline
         ) {
           return currentState;
@@ -1066,8 +1064,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           (d) => d.id === datasetId,
         );
         if (
-          !currentDataset ||
-          currentDataset.type !== "saved" ||
+          currentDataset?.type !== "saved" ||
           !currentDataset.savedRecords
         ) {
           return currentState;

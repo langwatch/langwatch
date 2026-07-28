@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import type { AggregateType } from "../../../";
-import { createTenantId, definePipeline } from "../../../";
+import { type createTenantId, definePipeline } from "../../../";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -281,9 +281,6 @@ async function waitForEvaluationRun(
 }
 
 // Skip when running without testcontainers (Prisma-only integration tests)
-const hasTestcontainers = !!(
-  process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
-);
 
 // Skipped: chronic async-event-handler timeout flake — see langwatch/langwatch#3240.
 describe.skip(

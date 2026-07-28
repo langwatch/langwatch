@@ -48,7 +48,6 @@ import {
 import { ScopeChipPicker, type ScopeTriadEntry } from "./ScopeChipPicker";
 
 type Payload = RouterOutputs["modelProvider"]["getDefaultModelsForProject"];
-type ConfigRow = Payload["configs"][number];
 type FeatureProjection = Payload["features"][number];
 type ScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 type ModelRoleKey = "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";

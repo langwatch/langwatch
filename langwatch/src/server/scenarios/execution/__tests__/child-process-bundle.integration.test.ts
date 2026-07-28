@@ -88,11 +88,8 @@ describe("Pre-compiled Scenario Child Process", () => {
             cwd: PACKAGE_ROOT,
           });
 
-          let stderr = "";
-
-          child.stderr?.on("data", (data: Buffer) => {
-            stderr += data.toString();
-          });
+          // Drain stderr so a full pipe buffer cannot stall the child.
+          child.stderr?.resume();
 
           // Send invalid JSON to trigger a fast parse error — proves stdin is being read
           child.stdin?.write("invalid-json");

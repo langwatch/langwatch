@@ -136,7 +136,7 @@ export async function autoComputeAgentMappings({
           ? (agent.config as Record<string, unknown>)
           : {};
 
-      const existingMappings = config["scenarioMappings"];
+      const existingMappings = config.scenarioMappings;
       const currentMappings =
         existingMappings !== null &&
         typeof existingMappings === "object" &&
@@ -178,7 +178,7 @@ export async function autoComputeAgentMappings({
       // that no longer exists. Initialize on first auto-compute (no existing
       // mappings + new output available). Don't clobber an intentionally-unset
       // field on agents that already have mappings configured.
-      const existingOutputField = config["scenarioOutputField"];
+      const existingOutputField = config.scenarioOutputField;
       const outputFieldIsStale =
         typeof existingOutputField === "string" &&
         !outputIdentifiers.has(existingOutputField);

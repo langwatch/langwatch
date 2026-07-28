@@ -40,7 +40,6 @@ export const clearGuardrailsDrawerState = () => {
 
 export function GuardrailsDrawer(props: GuardrailsDrawerProps) {
   const { closeDrawer, openDrawer, goBack } = useDrawer();
-  const { project } = useOrganizationTeamProject();
 
   const onClose = props.onClose ?? closeDrawer;
   const isOpen = props.open !== false && props.open !== undefined;

@@ -304,7 +304,7 @@ export class ReportUsageForMonthCommand
 
       const result = results[0];
 
-      if (!result || !result.reported) {
+      if (!result?.reported) {
         // Permanent Stripe rejection: do NOT update checkpoint.
         logger.error(
           {

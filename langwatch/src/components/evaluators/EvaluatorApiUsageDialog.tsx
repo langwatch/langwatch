@@ -46,7 +46,6 @@ export function EvaluatorApiUsageDialog({
   open,
   onClose,
 }: EvaluatorApiUsageDialogProps) {
-  const { project } = useOrganizationTeamProject();
   const [usageMode, setUsageMode] = useState<UsageMode>("online");
   const [language, setLanguage] = useState<Language>("python");
 

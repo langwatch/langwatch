@@ -9,7 +9,7 @@
  *   - 404s from Azure surface as ObjectNotFoundError on GET
  */
 import crypto from "node:crypto";
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AzureBlobDriver } from "../azure-blob-driver";
 import { ObjectNotFoundError } from "../errors";

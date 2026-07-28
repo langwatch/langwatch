@@ -398,7 +398,7 @@ export const getActiveDatasetData = (
   const activeDataset = state.datasets.find(
     (d) => d.id === state.activeDatasetId,
   );
-  if (!activeDataset || activeDataset.type !== "inline") {
+  if (activeDataset?.type !== "inline") {
     return undefined;
   }
   return activeDataset.inline;

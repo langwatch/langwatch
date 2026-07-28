@@ -98,7 +98,7 @@ export class ScenarioFailureHandler {
         },
       },
       async (span) => {
-        const { projectId, scenarioId, setId, batchRunId, error, name, description, cancelled } = params;
+        const { projectId, scenarioId, setId, batchRunId, error, cancelled } = params;
         const status = cancelled ? ScenarioRunStatus.CANCELLED : ScenarioRunStatus.ERROR;
         const scenarioRunId = params.scenarioRunId;
 

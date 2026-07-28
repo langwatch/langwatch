@@ -173,7 +173,7 @@ export async function dispatchScheduledReport({
     projectId: fire.projectId,
     triggerId: fire.targetId,
   });
-  if (!trigger || !trigger.active || trigger.deleted) {
+  if (!trigger?.active || trigger.deleted) {
     logger.info(
       { triggerId: fire.targetId, projectId: fire.projectId },
       "Report trigger missing/inactive — skipping scheduled fire",

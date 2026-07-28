@@ -35,7 +35,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Check, MoreVertical, User, X } from "lucide-react";
-import React, { useCallback, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useRef, useState } from "react";
 import type { SavedView } from "../../hooks/useSavedViews";
 import { useSavedViews } from "../../hooks/useSavedViews";
 import { getOriginColor } from "../../utils/originColors";

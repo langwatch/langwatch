@@ -18,7 +18,7 @@ vi.mock("next/dynamic", () => ({
   default: (loader: () => Promise<{ default: unknown }>) => {
     let Component: React.ComponentType<Record<string, unknown>> | null = null;
     const promise = loader();
-    promise.then((mod) => {
+    void promise.then((mod) => {
       Component = mod.default as React.ComponentType<Record<string, unknown>>;
     });
     return function DynamicComponent(props: Record<string, unknown>) {

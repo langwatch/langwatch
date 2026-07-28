@@ -186,10 +186,10 @@ describe("cross-evaluator-groupby", () => {
 
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
-        const goodRows = currentRows.filter((r) => r["group_key"] === "good");
-        const badRows = currentRows.filter((r) => r["group_key"] === "bad");
+        const goodRows = currentRows.filter((r) => r.group_key === "good");
+        const badRows = currentRows.filter((r) => r.group_key === "bad");
 
         expect(goodRows.length).toBeGreaterThan(0);
         expect(badRows.length).toBeGreaterThan(0);
@@ -239,13 +239,13 @@ describe("cross-evaluator-groupby", () => {
 
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
         const passedRows = currentRows.filter(
-          (r) => r["group_key"] === "passed",
+          (r) => r.group_key === "passed",
         );
         const failedRows = currentRows.filter(
-          (r) => r["group_key"] === "failed",
+          (r) => r.group_key === "failed",
         );
 
         expect(passedRows.length).toBeGreaterThan(0);
@@ -295,10 +295,10 @@ describe("cross-evaluator-groupby", () => {
 
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
         // Labels "good" and "bad" come from evaluatorA
-        const groupKeys = currentRows.map((r) => r["group_key"]);
+        const groupKeys = currentRows.map((r) => r.group_key);
         expect(groupKeys).toContain("good");
         expect(groupKeys).toContain("bad");
 
@@ -308,8 +308,8 @@ describe("cross-evaluator-groupby", () => {
         );
         expect(metricKey).toBeDefined();
 
-        const goodRow = currentRows.find((r) => r["group_key"] === "good");
-        const badRow = currentRows.find((r) => r["group_key"] === "bad");
+        const goodRow = currentRows.find((r) => r.group_key === "good");
+        const badRow = currentRows.find((r) => r.group_key === "bad");
 
         expect(goodRow).toBeDefined();
         expect(badRow).toBeDefined();
@@ -361,10 +361,10 @@ describe("cross-evaluator-groupby", () => {
         // Query must not crash
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
         // Label groups must appear — the fix preserves the groupBy behaviour
-        const groupKeys = currentRows.map((r) => r["group_key"]);
+        const groupKeys = currentRows.map((r) => r.group_key);
         expect(groupKeys).toContain("good");
         expect(groupKeys).toContain("bad");
 

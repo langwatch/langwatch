@@ -16,7 +16,8 @@
 
 import { differenceInCalendarDays, subDays } from "date-fns";
 import { useRouter } from "~/utils/compat/next-router";
-import React, {
+import type React from "react";
+import {
   createContext,
   useCallback,
   useContext,
@@ -154,9 +155,9 @@ function buildViewQuery({
     }
   }
 
-  if (query) out["query"] = query;
-  if (startDate) out["startDate"] = startDate;
-  if (endDate) out["endDate"] = endDate;
+  if (query) out.query = query;
+  if (startDate) out.startDate = startDate;
+  if (endDate) out.endDate = endDate;
 
   return out;
 }

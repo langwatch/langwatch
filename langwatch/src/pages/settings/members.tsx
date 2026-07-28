@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import {
   Badge,
   Box,
@@ -42,7 +44,7 @@ import type {
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
 import type { RouterOutputs } from "../../utils/api";
-import { OrganizationUserRole, RoleBindingScopeType } from "@prisma/client";
+import { type OrganizationUserRole, RoleBindingScopeType } from "@prisma/client";
 
 type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 

@@ -5,11 +5,11 @@ import {
   TABLE_TIME_COLUMNS,
 } from "../facet-registry";
 import { EVALUATOR_DEF, LABEL_DEF, MODEL_DEF } from "./custom-handlers";
-import {
-  type CategoricalRead,
-  type FieldDef,
-  type FieldNeeds,
-  type RangeRead,
+import type {
+  CategoricalRead,
+  FieldDef,
+  FieldNeeds,
+  RangeRead,
 } from "./field-def";
 import { UNSUPPORTED } from "./field-def";
 import {

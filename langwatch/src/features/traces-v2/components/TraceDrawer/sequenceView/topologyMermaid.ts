@@ -118,8 +118,7 @@ export function generateTopologySyntax(
 ): TopologyMermaidResult {
   const tree = buildSpanTree(spans);
   const byId = new Map<string, SpanWithChildren>();
-  for (const id in tree) {
-    const node = tree[id];
+  for (const [id, node] of Object.entries(tree)) {
     if (node) byId.set(id, node);
   }
   const typesToInclude = new Set<string>(includedTypes);
