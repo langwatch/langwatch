@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"io"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -147,31 +148,44 @@ func TestPeekClientHelloSNI_NonTLSStreamIsNotAHandshake(t *testing.T) {
 	}
 }
 
+// repeatReader serves b over and over, without end. The stream must be
+// genuinely infinite: dribbling a FINITE buffer proves nothing about the
+// reassembly bound, because io.ReadFull hits EOF and the loop returns on its
+// own. The earlier version of this test used a bytes.Reader and so passed with
+// maxClientHelloBytes deleted outright.
+type repeatReader struct {
+	b []byte
+	i int
+}
+
+func (r *repeatReader) Read(p []byte) (int, error) {
+	n := copy(p, r.b[r.i:])
+	r.i = (r.i + n) % len(r.b)
+	return n, nil
+}
+
 // A handshake that never completes must not buffer without bound.
 func TestPeekClientHelloSNI_BoundsEndlessFragments(t *testing.T) {
-	// A handshake message claiming a huge length, dribbled as small records
-	// that never complete it.
-	var stream []byte
-	body := make([]byte, 256)
-	first := append([]byte{1, 0xFF, 0xFF, 0xFF}, body...)
-	appendRecord := func(chunk []byte) {
-		stream = append(stream, 22, 3, 1, byte(len(chunk)>>8), byte(len(chunk)))
-		stream = append(stream, chunk...)
-	}
-	appendRecord(first)
-	for len(stream) < maxClientHelloBytes*2 {
-		appendRecord(body)
-	}
+	// One record, repeated forever. Every copy re-opens a handshake message
+	// claiming ~16 MiB, and handshakeMessageComplete only ever reads that length
+	// from the first four bytes, so the message can never complete however much
+	// we feed it — no need for the later records to differ from the first.
+	body := append([]byte{1, 0xFF, 0xFF, 0xFF}, make([]byte, 256)...)
+	record := append([]byte{22, 3, 1, byte(len(body) >> 8), byte(len(body))}, body...)
 
-	done := make(chan struct{})
+	done := make(chan error, 1)
 	go func() {
-		defer close(done)
-		_, _, _, _ = peekClientHelloSNI(fakeConn{r: bytes.NewReader(stream), w: io.Discard}, 0)
+		_, _, _, err := peekClientHelloSNI(fakeConn{r: &repeatReader{b: record}, w: io.Discard}, 0)
+		done <- err
 	}()
+
 	select {
-	case <-done:
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "reassembly bound") {
+			t.Fatalf("err = %v, want the reassembly-bound error", err)
+		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("peek did not terminate on an endless fragment stream")
+		t.Fatal("peek did not terminate — the reassembly bound is gone")
 	}
 }
 
@@ -212,7 +226,7 @@ func TestSNIUnreadable_LetsACleanlyNonTLSStreamThrough(t *testing.T) {
 	}
 }
 
-// @scenario "An unreadable ClientHello is left alone under monitor-only"
+// @scenario "A bare IP authority is exempt from the SNI requirement"
 func TestIsIPLiteral_ExemptsBareAddressesFromTheSNIRequirement(t *testing.T) {
 	// RFC 6066 forbids server_name for an IP literal, so a conforming client
 	// legitimately sends none and must not be failed closed for it.
@@ -228,26 +242,61 @@ func TestIsIPLiteral_ExemptsBareAddressesFromTheSNIRequirement(t *testing.T) {
 	}
 }
 
-// A stream whose first byte happens to be 0x16 but which is not TLS must leave
-// by the not-a-handshake branch, not be held for the peek timeout and then
-// denied as unreadable under an enforcing policy.
-func TestReadClientHelloRecords_RejectsAnImplausibleRecordVersion(t *testing.T) {
-	// 0x16 then a version no TLS record carries.
-	stream := []byte{22, 0xFF, 0xFF, 0x00, 0x05, 1, 2, 3, 4, 5}
+// A record that CLAIMS content type 22 but carries a version no TLS record uses
+// must come back UNREADABLE, never as "cleanly not TLS".
+//
+// This test asserted the opposite until the review caught it, and in doing so it
+// pinned a fail-open. Returning (sawHandshake=false, err=nil) here satisfies
+// neither term of the caller's guard — `sni == "" && sniUnreadable(saw, err)` —
+// so the tunnel spliced uninspected. One byte of legacy_record_version
+// (0x0301 -> 0x0305) was the whole bypass, because RFC 8446 §5.1 deprecates that
+// field and says it MUST be ignored, so the destination happily parsed the
+// ClientHello we had just declined to read. Domain fronting, restored.
+//
+// The latency worry that motivated the version check is still served: it is the
+// CONTENT TYPE, not the version, that lets an opaque tunnel leave promptly.
+func TestReadClientHelloRecords_TreatsAnImplausibleRecordVersionAsUnreadable(t *testing.T) {
+	for _, name := range []struct {
+		label  string
+		header []byte
+	}{
+		{"minor above the plausible range", []byte{22, 3, 5, 0x00, 0x05}},
+		{"major that is not 3", []byte{22, 4, 3, 0x00, 0x05}},
+		{"nonsense in both bytes", []byte{22, 0xFF, 0xFF, 0x00, 0x05}},
+	} {
+		t.Run(name.label, func(t *testing.T) {
+			stream := append(append([]byte{}, name.header...), 1, 2, 3, 4, 5)
 
-	_, _, sawHandshake, err := readClientHelloRecords(bytes.NewReader(stream))
+			_, _, sawHandshake, err := readClientHelloRecords(bytes.NewReader(stream))
 
-	if sawHandshake {
-		t.Fatal("0x16 alone must not be taken as proof the stream is TLS")
+			if !sniUnreadable(sawHandshake, err) {
+				t.Fatalf("a content-type-22 record we cannot follow must be UNREADABLE "+
+					"so the caller fails closed; got sawHandshake=%v err=%v", sawHandshake, err)
+			}
+		})
 	}
-	if err != nil {
-		t.Fatalf("a cleanly non-TLS stream is not an error: %v", err)
+}
+
+// The genuine not-TLS exit is keyed on the content type alone, so an opaque
+// tunnel still leaves promptly instead of being held for the peek timeout.
+func TestReadClientHelloRecords_LetsANonHandshakeContentTypeThrough(t *testing.T) {
+	for _, contentType := range []byte{20, 21, 23, 'G'} {
+		stream := append([]byte{contentType, 3, 1, 0x00, 0x05}, 1, 2, 3, 4, 5)
+
+		_, _, sawHandshake, err := readClientHelloRecords(bytes.NewReader(stream))
+		if sawHandshake || err != nil {
+			t.Errorf("content type %d is not a handshake (saw=%v err=%v)", contentType, sawHandshake, err)
+		}
+		if sniUnreadable(sawHandshake, err) {
+			t.Errorf("content type %d is cleanly not TLS and must not read as unreadable", contentType)
+		}
 	}
 }
 
 func TestReadClientHelloRecords_AcceptsRealRecordVersions(t *testing.T) {
-	// TLS 1.3 still writes a 0x0301/0x0303 legacy_record_version.
-	for _, minor := range []byte{1, 3} {
+	// TLS 1.3 still writes a 0x0301/0x0303 legacy_record_version; 0x0300 (SSL
+	// 3.0) and the nominal 0x0304 are inside the range we accept.
+	for _, minor := range []byte{0, 1, 2, 3, 4} {
 		hello := clientHelloFor(t, "example.test")
 		hello[2] = minor
 

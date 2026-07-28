@@ -66,20 +66,30 @@ func readClientHelloRecords(r io.Reader) (raw []byte, handshake []byte, sawHands
 		if herr != nil {
 			return raw, handshake, sawHandshake, herr
 		}
-		// header[0] == 22 (handshake) AND a plausible legacy record version.
-		//
-		// The version check is not pedantry: byte 0 alone is one byte of
-		// coincidence, and treating any 0x16-prefixed stream as TLS means an
-		// opaque tunnel that merely starts with 0x16 gets held for the whole
-		// peek timeout waiting for records that never come — and then, under an
-		// enforcing policy, denied as unreadable. Requiring 0x03 0x0X (SSL 3.0
-		// through TLS 1.2 legacy_record_version; TLS 1.3 still writes 0x0301 or
-		// 0x0303 here for compatibility) makes the "this is TLS" claim cheap to
-		// falsify, so non-TLS traffic leaves promptly by the branch below.
-		if header[0] != 22 || header[1] != 3 || header[2] > 4 {
+		// A content type that is not 22 is the clean "not TLS" exit: an opaque
+		// tunnel that never claimed to be a handshake. No error, no
+		// sawHandshake — require-TLS is the rung that governs it, and holding
+		// it for the whole peek timeout would be a latency cost for nothing.
+		if header[0] != 22 {
 			return raw, handshake, sawHandshake, nil
 		}
+		// Past here the stream HAS claimed to be a handshake, so every exit
+		// below must leave the caller able to tell it could not read an SNI.
+		//
+		// The version is checked, but an implausible one is an ERROR rather
+		// than a pass. Returning nil here — as this did — was a fail-OPEN: the
+		// caller's guard is `sni == "" && sniUnreadable(sawHandshake, err)`,
+		// and (false, nil) satisfies neither term, so the tunnel spliced
+		// uninspected. Flipping one byte of legacy_record_version (0x0301 ->
+		// 0x0305) was enough, because RFC 8446 §5.1 deprecates that field and
+		// says it MUST be ignored — so the destination still parsed the very
+		// ClientHello we had just declined to look at, and domain fronting was
+		// back. Anything claiming content type 22 that we cannot follow is
+		// unreadable, not absent.
 		sawHandshake = true
+		if header[1] != 3 || header[2] > 4 {
+			return raw, handshake, sawHandshake, errors.New("implausible tls record version")
+		}
 		length := int(header[3])<<8 | int(header[4])
 		if length <= 0 || length > maxClientHelloRecord {
 			return raw, handshake, sawHandshake, errors.New("tls record length out of range")

@@ -198,12 +198,28 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "proxy misconfigured", http.StatusInternalServerError)
 		return
 	}
-	clientConn, _, err := hijacker.Hijack()
+	clientConn, bufrw, err := hijacker.Hijack()
 	if err != nil {
 		a.record(fqdn, port, decision, "hijack failed: "+err.Error(), 0)
 		return
 	}
 	defer clientConn.Close()
+
+	// Take back whatever net/http already buffered. A client that pipelines its
+	// CONNECT and its ClientHello into one segment leaves the hello sitting in
+	// the server's 4 KiB read buffer, and discarding that reader loses it: the
+	// peek below reads the RAW socket, finds nothing, and blocks for the whole
+	// sniPeekTimeout. Under an enforcing policy that is merely a slow deny, but
+	// with the cross-check off the tunnel is spliced with the ClientHello
+	// silently missing and the upstream handshake dies with no diagnostic.
+	if n := bufrw.Reader.Buffered(); n > 0 {
+		buffered := make([]byte, n)
+		if _, err := io.ReadFull(bufrw, buffered); err != nil {
+			a.record(fqdn, port, decision, "buffered read failed: "+err.Error(), 0)
+			return
+		}
+		clientConn = &prefixConn{Conn: clientConn, prefix: buffered}
+	}
 
 	if throttled && tarpit > 0 {
 		a.record(fqdn, port, egressThrottled, "connection burst tar-pit", 0)
@@ -216,10 +232,15 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 
 	// rung 3 cross-check: peek the TLS ClientHello SNI (without terminating
 	// TLS) and re-run the decision against the host the client is REALLY
-	// negotiating with. Catches domain-fronting — `CONNECT allowed:443` then a
-	// TLS SNI of `attacker.com` on a shared CDN IP. The authority passed; if the
-	// differing SNI would NOT pass the same allow set, it never reaches the
-	// destination. A benign quirk (SNI differs but is itself allowed) proceeds.
+	// negotiating with. Catches the SNI variant of domain-fronting —
+	// `CONNECT allowed:443` then a TLS SNI of `attacker.com` on a shared CDN IP.
+	// The authority passed; if the differing SNI would NOT pass the same allow
+	// set, it never reaches the destination.
+	//
+	// It does NOT catch the classic variant, where the SNI is the allowed host
+	// and the deception is a `Host:` header INSIDE the encrypted stream. Seeing
+	// that would mean terminating TLS, which we decline to do — the tunnel stays
+	// opaque. ADR-076 records this as an accepted limit.
 	if a.cfg.sniCrossCheck {
 		sni, sawHandshake, replay, perr := peekClientHelloSNI(clientConn, a.cfg.sniPeekTimeout)
 		clientConn = replay
@@ -230,6 +251,14 @@ func (a *egressAdapter) handleConnect(w http.ResponseWriter, r *http.Request) {
 					fmt.Sprintf("sni %q not allowed (authority was %q)", sni, fqdn), 0)
 				return
 			}
+			// Allowed, but still worth a line. An SNI that differs from the
+			// authority is anomalous whether or not the target happens to be
+			// listed — it is the fingerprint of a fronting attempt, and rung 0
+			// says every decision flags. Without this, an operator reviewing
+			// egress telemetry after an incident sees a normal flow to the
+			// authority and no trace of the host actually spoken to.
+			a.record(sni, port, a.cfg.policy.decide(sni),
+				fmt.Sprintf("sni %q differs from authority %q but is allowed", sni, fqdn), 0)
 		case sni == "" && sniUnreadable(sawHandshake, perr) &&
 			!isIPLiteral(host) && a.cfg.policy.enforcing():
 			// We could not positively read an SNI out of something we were

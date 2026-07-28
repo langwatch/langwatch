@@ -42,6 +42,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # Rung 0 / Rung 2 default — no allow-list means monitor, not block
   # ===========================================================================
 
+  @unit
   Scenario: With no allow-list, outbound traffic is monitored but allowed
     Given a project has not configured a Langy egress allow-list
     And a worker is running for a conversation in that project
@@ -50,6 +51,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     And the destination is recorded and attributed to the worker's conversation
     And nothing is blocked on allow-list grounds
 
+  @unimplemented
   Scenario: With no allow-list, a suspicious destination is flagged without being blocked
     Given a project has not configured a Langy egress allow-list
     And a worker is running for a conversation in that project
@@ -61,6 +63,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # Rung 2 — allow-list set means restrict to it
   # ===========================================================================
 
+  @unit
   Scenario: With an allow-list set, a listed host is allowed
     Given a project's Langy egress allow-list contains "registry.npmjs.org"
     And a worker is running for a conversation in that project
@@ -68,6 +71,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     Then the connection is allowed
     And the destination is recorded and attributed to the worker's conversation
 
+  @unit
   Scenario: With an allow-list set, a non-listed host is blocked and flagged
     Given a project's Langy egress allow-list contains "registry.npmjs.org"
     And a worker is running for a conversation in that project
@@ -76,6 +80,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     And the destination never receives any bytes
     And the denied attempt is flagged and attributed to the worker's conversation
 
+  @unimplemented
   Scenario: Changing the allow-list does not leave a live worker on the old policy
     Given a worker is running under a project with allow-list "a.example.com"
     When the project's allow-list is changed to "b.example.com"
@@ -88,12 +93,14 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # Rung 1 — require TLS
   # ===========================================================================
 
+  @unit
   Scenario: Cleartext egress to an external host is refused
     Given a worker is running for a conversation
     When the worker attempts a plaintext HTTP request to an external host
     Then the request is refused at the egress adapter
     And the worker cannot send the bytes over cleartext to a public destination
 
+  @unit
   Scenario: TLS egress to an allowed host still succeeds
     Given a worker is running for a conversation
     And the destination host is permitted for that worker
@@ -104,6 +111,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # Rung 1 — per-destination throttle
   # ===========================================================================
 
+  @unit
   Scenario: A high-volume flow to a single destination is throttled and flagged
     Given a worker is running for a conversation
     When the worker streams an unusually large volume to a single destination
@@ -111,6 +119,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     And the flow is flagged for an operator to review
     And other destinations for that worker are not slowed
 
+  @unit
   Scenario: A burst of new connections to a rare host is throttled
     Given a worker is running for a conversation
     When the worker opens many new connections to a rarely-seen host in a short window
@@ -121,6 +130,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # Rung 3 — always-on FQDN floor
   # ===========================================================================
 
+  @unit
   Scenario: Structural destinations stay reachable regardless of allow-list
     Given the operator FQDN floor includes GitHub, the AI gateway, and the control plane
     And a project has not configured a Langy egress allow-list
@@ -128,6 +138,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     Then those connections are allowed by the floor
     And the worker's legitimate PR / model / API work is unaffected
 
+  @unit
   Scenario: The floor composes with, and is not widened by, an empty customer list
     Given a project has not configured a Langy egress allow-list
     When a worker connects to a host outside the operator FQDN floor
@@ -138,6 +149,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # Rung 3 limitation — cooperative L7, honestly bounded
   # ===========================================================================
 
+  @unimplemented
   Scenario: A direct-IP bypass of the adapter is still observed
     Given a worker is running under an enforced allow-list
     When the worker ignores its proxy and connects directly to an external IP on 443
@@ -149,6 +161,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # Rung 4 — the legacy path is gone
   # ===========================================================================
 
+  @unimplemented
   Scenario: The worker has no unproxied egress path once enforcement lands
     Given the egress adapter is the sole egress path for workers
     When a worker's tools make outbound requests
@@ -159,6 +172,7 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
   # Safe-by-default posture
   # ===========================================================================
 
+  @unit
   Scenario: An install that configures nothing upgrades into watching, not blocking
     Given an existing install with no per-project allow-lists and the FQDN floor off
     When workers make their normal outbound requests after this change ships
@@ -204,3 +218,24 @@ Feature: Langy worker egress enforcement — monitor first, enforce last
     And a worker opens a tunnel carrying a protocol that is not TLS
     Then the SNI cross-check does not refuse it
     And the require-TLS rung remains the control that governs cleartext
+
+  # A conforming client sends no server_name for a bare address (RFC 6066), so
+  # requiring one there would deny an allow-listed destination for obeying the
+  # spec. The address itself is still decided against the allow set first.
+  @unit
+  Scenario: A bare IP authority is exempt from the SNI requirement
+    Given a project allow-list is in force
+    And the requested authority is a bare IP address rather than a name
+    When the handshake carries no SNI
+    Then the connection is not refused on SNI grounds
+
+  # The record's legacy_record_version is deprecated and ignored downstream, so
+  # a handshake we decline to parse is still parsed by the destination. Treating
+  # an implausible version as "not TLS" made the cross-check opt-out: one byte.
+  @unit
+  Scenario: A ClientHello with an implausible record version is refused
+    Given a project allow-list is in force
+    And a worker sends a handshake record carrying a version no TLS record uses
+    When the cross-check cannot read an SNI from it
+    Then the connection is refused before the destination is dialed
+    And the refusal is flagged as an unreadable SNI
