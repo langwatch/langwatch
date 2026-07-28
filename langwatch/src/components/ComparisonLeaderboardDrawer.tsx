@@ -170,9 +170,13 @@ export function ComparisonLeaderboardDrawer({
                   one. The score is chess-rating style: 0 is average for this
                   group, and it is the GAP that means something, not the number.
                   A 400-point gap is roughly 10:1 odds; 0 is a coin flip. The
-                  shaded band behind each bar is where the score could plausibly
-                  sit — when two bands overlap, this run cannot tell those two
-                  apart, whatever their bars look like.
+                  shaded band behind each bar is where that score could
+                  plausibly sit. Whether two variants actually differ is judged
+                  on the gap between them rather than on those two bands: every
+                  resample re-scores the whole field at once, so the scores
+                  move together and the gap is pinned down better than either
+                  score is on its own. Two bands can overlap and the run still
+                  tell those variants apart.
                 </>
               }
             >

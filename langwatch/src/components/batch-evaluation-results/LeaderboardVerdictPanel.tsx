@@ -304,11 +304,23 @@ function ScoreBars({
           </Box>
         );
       })}
+      {/*
+        This used to read "where two bands overlap, this run did not separate
+        those variants". That was the rule when separation compared these two
+        bands; it is now decided on the interval of the DIFFERENCE between two
+        scores, which is tighter than either band because both move together
+        across resamples. Overlapping bands are therefore routinely separated
+        — on a four-variant run this caption sat a few lines above a count
+        that contradicted it. The bands still show how well each score is
+        pinned down, which is what they are for; they just are not the test.
+      */}
       <Text fontSize="2xs" color="fg.muted">
         Bar marks the score, the shaded band the range it could plausibly be.
-        Where two bands overlap, this run did not separate those variants
+        Two bands overlapping does not by itself mean the run failed to
+        separate them — that is judged on the gap between the two scores,
+        which is pinned down better than either score alone
         {showTieShading
-          ? " — “tied for first” marks the ones it could not separate from the top scorer"
+          ? ", and “tied for first” marks the variants it could not separate from the top scorer"
           : ""}
         . A faded edge means the band continues past the chart.
       </Text>
