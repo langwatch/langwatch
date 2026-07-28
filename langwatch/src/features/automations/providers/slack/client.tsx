@@ -394,13 +394,32 @@ function SlackChannelField({
     list.data?.error && list.data.error !== "no_token"
       ? list.data.error
       : null;
+  // A listing can succeed and still be short of the workspace. Saying nothing
+  // is the worst option: the author scrolls a list that looks complete, doesn't
+  // find their channel, and concludes the integration is broken.
+  // Both gaps can apply at once — an app without `groups:read` whose public
+  // channels then outrun the page budget — so they are listed, not ranked.
+  // Showing only the first would have the author fix one cause and still not
+  // find their channel.
+  const gaps = list.data?.gaps ?? [];
+  const gapHints = [
+    gaps.includes("private_channels_hidden")
+      ? "Private channels aren't listed — your Slack app needs the groups:read permission. Reinstall it with the manifest above."
+      : null,
+    gaps.includes("page_cap")
+      ? "This workspace has more channels than we can list here, so some are missing."
+      : null,
+  ].filter((line): line is string => line !== null);
+  const gapHint = gapHints.length
+    ? `${gapHints.join(" ")} Type the channel name or paste its ID above to use one that isn't shown.`
+    : null;
   const hint = list.isError
     ? `Couldn't load channels: ${list.error?.message ?? "request failed"}. You can still type the channel above.`
     : returnedError === "missing_scope"
-      ? "Add the channels:read scope to your app and reinstall it to pick from a list — you can still type the channel above."
+      ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
       : returnedError
         ? "Couldn't load channels from Slack. Check the token, or type the channel above."
-        : null;
+        : gapHint;
 
   return (
     <Field.Root>
@@ -930,7 +949,8 @@ function SlackBotFields({
               </List.Item>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Invite the bot to the channel you post to.
+                  Public channels work straight away. To post to a private
+                  channel, add the app to that channel first.
                 </Text>
               </List.Item>
             </List.Root>
