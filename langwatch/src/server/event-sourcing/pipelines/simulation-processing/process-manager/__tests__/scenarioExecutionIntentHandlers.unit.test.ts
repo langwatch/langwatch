@@ -7,6 +7,7 @@ import { ScenarioExecutorUnavailableError } from "~/server/scenarios/execution/e
 import {
   createScenarioExecutionExecuteRunHandler,
   createScenarioExecutionFailRunHandler,
+  ScenarioExecutorUnavailableError,
   type ScenarioExecutionDispatchDeps,
 } from "../scenarioExecutionIntentHandlers";
 import type {
