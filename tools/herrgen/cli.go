@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 // defaultOut is where the control plane reads the codes from.
@@ -46,14 +47,19 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	// Both halves land in one file and the client presentation registry is
-	// keyed by the code string alone, so a string declared on both sides
-	// renders twice with two doc blocks and shares one presentation entry.
-	// Not fatal — the artifact is still valid TypeScript — but nobody meant it.
-	for _, code := range sharedCodes(entries, nodeCodes) {
+	// keyed by the code string alone, so a string declared on both sides is one
+	// error identity with one entry. It used to render twice, with two doc
+	// blocks and a warning per code on every run; MergeNodeCodes folds it into
+	// the Go half instead, which is what the registry's union type was already
+	// doing. The shared codes are still reported, as information rather than a
+	// complaint — a code appearing on both transports is worth knowing about
+	// when you go to write its copy.
+	if shared := sharedCodes(entries, nodeCodes); len(shared) > 0 {
 		fmt.Fprintf(stderr,
-			"warning: %q is declared both as a herr code and as a NodeError type; it renders in both halves of %s and shares one presentation entry.\n",
-			code, *out)
+			"note: %s declared as both a herr code and a NodeError type; each renders once, in goErrorCodes, with its node sites listed.\n",
+			strings.Join(shared, ", "))
 	}
+	entries, nodeCodes = MergeNodeCodes(entries, nodeCodes)
 	generated := append(Render(entries), RenderNodeCodes(nodeCodes)...)
 	target := filepath.Join(*root, *out)
 
@@ -116,6 +122,51 @@ func sharedCodes(entries []Entry, nodeCodes []NodeCode) []string {
 	}
 	slices.Sort(shared)
 	return slices.Compact(shared)
+}
+
+// MergeNodeCodes folds the codes declared on BOTH sides into the Go half and
+// drops them from the node half, returning both lists.
+//
+// A handful of engine failures are declared twice: `invalid_dataset` is a
+// `herr.Code` in nlpgo's domain package AND a `NodeError.Type` in its engine,
+// because the same failure travels as an HTTP error response on one path and as
+// a node error event on the other. That is one error identity, not two, which
+// is why the presentation registry has always had a single entry for it — the
+// registry is keyed by the code string and its type is a UNION of the two
+// halves, so a duplicate key collapses.
+//
+// It just did not collapse in the generated file, where the string appeared in
+// both objects with two unrelated doc blocks and a warning on every run telling
+// the reader that this was nobody's intention. Folding is the honest version of
+// what the type system was already doing. Nothing is lost: the surviving entry
+// is the richer one (a real Go doc comment, and an HTTP status), and the node
+// sites it also occupies are carried across as NodeSources so the generated
+// file still names every file the code is written in.
+func MergeNodeCodes(entries []Entry, nodeCodes []NodeCode) ([]Entry, []NodeCode) {
+	byCode := make(map[string][]string, len(nodeCodes))
+	for _, node := range nodeCodes {
+		byCode[node.Code] = node.Sources
+	}
+
+	merged := make([]Entry, 0, len(entries))
+	for _, entry := range entries {
+		if sources, ok := byCode[entry.Code]; ok {
+			entry.NodeSources = sources
+		}
+		merged = append(merged, entry)
+	}
+
+	goCodes := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		goCodes[entry.Code] = true
+	}
+	remaining := make([]NodeCode, 0, len(nodeCodes))
+	for _, node := range nodeCodes {
+		if !goCodes[node.Code] {
+			remaining = append(remaining, node)
+		}
+	}
+	return merged, remaining
 }
 
 // writeAtomic replaces target in one step.

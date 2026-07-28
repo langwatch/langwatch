@@ -222,10 +222,12 @@ const ErrNotFound = herr.Code("not_found")
 		}
 	})
 
-	t.Run("warns when one string is declared as both a Go code and a node type", func(t *testing.T) {
-		// Both halves land in one file and the presentation registry is keyed
-		// by the string alone, so the code renders twice with two doc blocks
-		// and shares one entry. Valid TypeScript, but nobody meant it.
+	t.Run("renders a string declared as both a Go code and a node type once", func(t *testing.T) {
+		// One error identity reached over two transports — an HTTP failure and
+		// a node error event — so it gets one entry, which is what the registry
+		// (keyed by the string, typed as a union of both halves) always did with
+		// it. This used to render in both objects with two unrelated doc blocks
+		// and a warning per code on every run.
 		root := tree(t, map[string]string{
 			"packages/handled-error/src/.keep":  "",
 			"pkg/herr/herr.go":                  herrPackage,
@@ -242,8 +244,21 @@ const ErrHTTP = herr.Code("http_error")
 		if code := herrgen.Run([]string{"-root", root}, &stdout, &stderr); code != 0 {
 			t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
 		}
-		if !strings.Contains(stderr.String(), `"http_error"`) {
+		if !strings.Contains(stderr.String(), "http_error") {
 			t.Errorf("stderr = %q, want it to name the shared code", stderr.String())
+		}
+
+		written, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(out)))
+		if err != nil {
+			t.Fatalf("reading generated file: %v", err)
+		}
+		if got := strings.Count(string(written), "  http_error: {"); got != 1 {
+			t.Errorf("http_error rendered %d times, want exactly 1:\n%s", got, written)
+		}
+		// The node site survives the fold — it is the only place the file can
+		// still name it, since the node half no longer carries the code.
+		if !strings.Contains(string(written), "services/nlpgo/app/engine/http.go") {
+			t.Errorf("generated file lost the node source for a folded code:\n%s", written)
 		}
 	})
 

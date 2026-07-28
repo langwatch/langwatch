@@ -74,6 +74,10 @@ type Entry struct {
 	// HasStatus is false when nothing in the tree registers this code. No
 	// status is invented for it — the entry simply carries none.
 	HasStatus bool
+	// NodeSources are the files where the same string is also used as a
+	// workflow NodeError.Type, set by MergeNodeCodes. Empty for the codes that
+	// live on only one side, which is nearly all of them.
+	NodeSources []string
 }
 
 // Primary is the declaration the doc comment and service name come from.

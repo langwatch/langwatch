@@ -30,7 +30,7 @@ export const goErrorCodes = {
    *
    * @source services/aigateway/domain/errors.go
    */
-  auth_upstream_unavailable: { service: "aigateway" },
+  auth_upstream_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrBadRequest — is the catch-all for shape errors that don't have a more
    * specific code.
@@ -71,9 +71,23 @@ export const goErrorCodes = {
    * ErrCodeBlockTimeout — signals the user code subprocess exceeded
    * NLP_CODE_BLOCK_TIMEOUT_SECONDS and was killed.
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
    * @source services/nlpgo/domain/errors.go
    */
   code_block_timeout: { service: "nlpgo", httpStatus: 504 },
+  /**
+   * ErrCodexSessionExpired — means the codex provider's OAuth session is dead
+   * (refresh rejected) — the user must sign in with OpenAI again. Clients
+   * receive it as a 401 with this code so Langy can render the re-authenticate
+   * card instead of a generic provider error.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  codex_session_expired: { service: "aigateway" },
   /**
    * ConfigInvalid — is the herr code for configuration validation failures.
    *
@@ -120,6 +134,14 @@ export const goErrorCodes = {
    */
   guardrail_blocked: { service: "aigateway", httpStatus: 403 },
   /**
+   * ErrGuardrailUpstreamUnavailable — means the guardrail could not be
+   * evaluated at all. Fail-closed keys stop here rather than proceeding as
+   * though the guardrail had passed. Contract 5.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  guardrail_upstream_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
    * ErrIdleTimeout — signals the SSE stream went silent past
    * NLP_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the connection.
    *
@@ -155,6 +177,12 @@ export const goErrorCodes = {
    * length mismatch, entry_selection out of range, split sizes exceeding row
    * count).
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
+   * @source services/nlpgo/app/engine/evaluation.go
    * @source services/nlpgo/domain/errors.go
    */
   invalid_dataset: { service: "nlpgo", httpStatus: 400 },
@@ -172,6 +200,17 @@ export const goErrorCodes = {
    * @source services/nlpgo/domain/errors.go
    */
   jsonpath_no_match: { service: "nlpgo", httpStatus: 422 },
+  /**
+   * llmUpstreamErrorCode — marks a failed mediated LLM call whose response
+   * body was NOT the gateway's typed herr envelope — a provider-native error
+   * the gateway forwarded verbatim (an Anthropic "credit balance too low", the
+   * codex backend's `{"detail": ...}`). The provider's own error type rides as
+   * a typed reason so the control plane can name the failure; the provider's
+   * prose does not travel with it (see decodeLLMErrorBody).
+   *
+   * @source services/langyagent/adapters/otelrelay/llmproxy.go
+   */
+  llm_upstream_error: { service: "langyagent" },
   /**
    * ErrMaxWorkers — signals LANGY_MAX_WORKERS is reached. The chat
    * orchestrator converts it into a 200 ndjson
@@ -295,12 +334,22 @@ export const goErrorCodes = {
    * supported by the Go engine (agent, evaluator, retriever, custom). Triggers
    * a 501 so the TS app can fall back to Python.
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
    * @source services/nlpgo/domain/errors.go
    */
   unsupported_node_kind: { service: "nlpgo", httpStatus: 501 },
   /**
    * ErrUpstreamHTTP — signals a non-2xx from an HTTP block's upstream.
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
    * @source services/nlpgo/domain/errors.go
    */
   upstream_http_error: { service: "nlpgo", httpStatus: 502 },
@@ -367,10 +416,6 @@ export const nodeErrorCodes = {
    * @source services/nlpgo/app/engine/attachment.go
    */
   attachment_fetch_error: { service: "nlpgo" },
-  /**
-   * @source services/nlpgo/app/engine/engine.go
-   */
-  code_block_timeout: { service: "nlpgo" },
   /**
    * @source services/nlpgo/app/engine/engine.go
    */
@@ -443,11 +488,6 @@ export const nodeErrorCodes = {
   invalid_condition: { service: "nlpgo" },
   /**
    * @source services/nlpgo/app/engine/engine.go
-   * @source services/nlpgo/app/engine/evaluation.go
-   */
-  invalid_dataset: { service: "nlpgo" },
-  /**
-   * @source services/nlpgo/app/engine/engine.go
    */
   llm_error: { service: "nlpgo" },
   /**
@@ -458,14 +498,6 @@ export const nodeErrorCodes = {
    * @source services/nlpgo/app/engine/engine.go
    */
   llm_model_not_set: { service: "nlpgo" },
-  /**
-   * @source services/nlpgo/app/engine/engine.go
-   */
-  unsupported_node_kind: { service: "nlpgo" },
-  /**
-   * @source services/nlpgo/app/engine/engine.go
-   */
-  upstream_http_error: { service: "nlpgo" },
 } as const;
 
 export type NodeErrorCode = keyof typeof nodeErrorCodes;

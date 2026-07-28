@@ -131,6 +131,12 @@ func docLines(entry Entry) []string {
 	if others := alsoDeclaredBy(entry); others != "" {
 		paragraphs = append(paragraphs, others)
 	}
+	if len(entry.NodeSources) > 0 {
+		paragraphs = append(paragraphs,
+			"Also produced as a workflow NodeError type, so this one entry is the "+
+				"copy for both the HTTP failure and the node error event. Its node "+
+				"sites are among the @source files below.")
+	}
 
 	var lines []string
 	for _, paragraph := range paragraphs {
@@ -171,11 +177,16 @@ func alsoDeclaredBy(entry Entry) string {
 }
 
 // sources lists every file declaring the code, in path order.
+//
+// NodeSources are included: when a code is declared on both sides
+// (MergeNodeCodes), this entry is the only place it renders, so leaving the
+// node sites out would drop them from the generated file entirely.
 func sources(entry Entry) []string {
-	paths := make([]string, 0, len(entry.Declarations))
+	paths := make([]string, 0, len(entry.Declarations)+len(entry.NodeSources))
 	for _, declaration := range entry.Declarations {
 		paths = append(paths, declaration.Source)
 	}
+	paths = append(paths, entry.NodeSources...)
 	slices.Sort(paths)
 	return slices.Compact(paths)
 }
