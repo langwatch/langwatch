@@ -202,6 +202,24 @@ export const findCheaperTiedAlternative = ({
   const savingRatio = (baseline.cost - cheapest.cost) / baseline.cost;
   if (savingRatio < minSaving) return null;
 
+  // The gap also has to be one this run can actually see. Rows vary far more
+  // than variants do, so two averages can differ sharply while the per-row
+  // difference straddles zero — and this sentence is the most-read claim in
+  // the feature, recommending a switch on the strength of it. When the paired
+  // interval exists and includes zero, there is no established saving to
+  // quote. An absent interval means the run produced none to consult, where
+  // the mean gap remains the best answer available.
+  const pairedSaving =
+    variantMetrics[cheapest.variantId]?.costDifferenceCI?.[baseline.variantId];
+  if (
+    pairedSaving &&
+    pairedSaving.every((bound) => Number.isFinite(bound)) &&
+    // cheapest minus baseline: a real saving sits entirely below zero.
+    pairedSaving[1] >= 0
+  ) {
+    return null;
+  }
+
   return {
     variantId: cheapest.variantId,
     cost: cheapest.cost,

@@ -256,3 +256,84 @@ describe("findCheaperTiedAlternative — the saving it quotes", () => {
     });
   });
 });
+
+describe("findCheaperTiedAlternative — the saving must be one the run can see", () => {
+  const tie2 = (ids: string[]) => ({
+    kind: "tie-at-top" as const,
+    leaderId: ids[0]!,
+    tiedIds: ids,
+  });
+
+  const metricsWith = ({
+    costs,
+    differences,
+  }: {
+    costs: Record<string, [number, number]>;
+    differences?: Record<string, Record<string, [number, number]>>;
+  }) =>
+    Object.fromEntries(
+      Object.entries(costs).map(([id, v]) => [
+        id,
+        {
+          variantId: id,
+          costStats: { avg: v[0], count: v[1] },
+          durationStats: null,
+          costMeanCI: null,
+          durationMeanCI: null,
+          costDifferenceCI: differences?.[id] ?? {},
+          durationDifferenceCI: {},
+        },
+      ]),
+    ) as any;
+
+  describe("given a large mean gap the paired test cannot separate", () => {
+    it("declines to recommend the switch", () => {
+      // Rows vary far more than the variants do, so the averages differ
+      // sharply while the per-row difference straddles zero. Recommending a
+      // switch here reads as a cost saving the run never established — the
+      // same fault the dominance check was fixed for, in the headline.
+      const result = findCheaperTiedAlternative({
+        verdict: tie2(["L", "C"]),
+        variantMetrics: metricsWith({
+          costs: { L: [0.01, 40], C: [0.002, 40] },
+          differences: {
+            L: { C: [-0.004, 0.02] },
+            C: { L: [-0.02, 0.004] },
+          },
+        }),
+      });
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("given the paired test does separate them", () => {
+    it("still recommends the cheaper one", () => {
+      const result = findCheaperTiedAlternative({
+        verdict: tie2(["L", "C"]),
+        variantMetrics: metricsWith({
+          costs: { L: [0.01, 40], C: [0.002, 40] },
+          differences: {
+            L: { C: [0.006, 0.01] },
+            C: { L: [-0.01, -0.006] },
+          },
+        }),
+      });
+
+      expect(result?.variantId).toBe("C");
+    });
+  });
+
+  describe("given no paired intervals at all", () => {
+    it("falls back to the mean gap rather than going silent", () => {
+      const result = findCheaperTiedAlternative({
+        verdict: tie2(["L", "C"]),
+        variantMetrics: metricsWith({
+          costs: { L: [0.01, 40], C: [0.002, 40] },
+        }),
+      });
+
+      expect(result?.variantId).toBe("C");
+    });
+  });
+});
